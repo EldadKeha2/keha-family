@@ -3,14 +3,13 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFile} from 'node:fs/promises';
 import worker,{FamilyState,LIMITS,sniff} from '../src/worker.mjs';
-import {makeSession,session} from '../src/auth.mjs';
 import {signedRequest} from '../src/hf.mjs';
 
 function fixture(){
   const database=new DatabaseSync(':memory:');
   const sql={exec(query,...args){const statement=database.prepare(query);const rows=statement.columns().length?statement.all(...args):(statement.run(...args),[]);return {toArray:()=>rows};}};
   const storage={sql,transactionSync(callback){database.exec('BEGIN');try{const result=callback();database.exec('COMMIT');return result;}catch(error){database.exec('ROLLBACK');throw error;}}};
-  const env={FAMILY_PASSWORD:'example-family-password-123',HF_NAMESPACE:'example-owner',HF_BUCKET:'keha-family',HF_ACCESS_KEY_ID:'HFAK_TEST_ONLY',HF_SECRET_ACCESS_KEY:'example-test-secret'};
+  const env={HF_NAMESPACE:'example-owner',HF_BUCKET:'keha-family',HF_ACCESS_KEY_ID:'HFAK_TEST_ONLY',HF_SECRET_ACCESS_KEY:'example-test-secret'};
   let state=new FamilyState({storage},env);
   env.FAMILY_STATE={idFromName:name=>name,get:()=>state};
   env.ASSETS={fetch:async()=>new Response('static assets',{headers:{'Content-Type':'text/html'}})};
@@ -33,50 +32,41 @@ function fixture(){
     const bytes=file.bytes.slice(start,end+1);headers['Content-Length']=String(bytes.byteLength);
     return new Response(request.method==='HEAD'?null:bytes,{status,headers});
   };
-  let cookie='',csrf='';
-  async function call(path,{method='GET',body,headers={},authenticated=true}={}){
+  let csrf='';
+  async function call(path,{method='GET',body,headers={},clientHeaders=true}={}){
     const h=new Headers(headers);
-    if(authenticated&&cookie)h.set('Cookie',cookie);
-    if(method==='POST'){h.set('Origin',h.get('Origin')||'https://family.example');if(authenticated&&csrf&&!h.has('X-Family-Token'))h.set('X-Family-Token',csrf);}
+    if(method==='POST'){h.set('Origin',h.get('Origin')||'https://family.example');if(clientHeaders&&csrf&&!h.has('X-Family-Token'))h.set('X-Family-Token',csrf);}
     if(body&&typeof body==='object'&&!(body instanceof FormData)&&!(body instanceof ArrayBuffer)&&!ArrayBuffer.isView(body)&&!(body instanceof ReadableStream)){h.set('Content-Type','application/json');body=JSON.stringify(body);}
     return worker.fetch(new Request('https://family.example'+path,{method,body,headers:h,...(body instanceof ReadableStream?{duplex:'half'}:{})}),env,ctx);
   }
   async function connect(){
-    const response=await call('/auth/login',{method:'POST',body:new URLSearchParams({password:env.FAMILY_PASSWORD}).toString(),authenticated:false,headers:{'Content-Type':'application/x-www-form-urlencoded'}});
-    assert.equal(response.status,303);cookie=response.headers.get('Set-Cookie').split(';')[0];
-    const bootstrap=await call('/family-data.js');const script=await bootstrap.text();csrf=JSON.parse(/window.FAMILY_API_TOKEN=("[^"]+")/.exec(script)[1]);return script;
+    const bootstrap=await call('/family-data.js');assert.equal(bootstrap.status,200);
+    const script=await bootstrap.text();csrf=JSON.parse(/window.FAMILY_API_TOKEN=("[^"]+")/.exec(script)[1]);return script;
   }
   return {env,call,connect,objects,network,database,storage,restart(){state=new FamilyState({storage},env);},flush:()=>Promise.allSettled(tasks),async close(){await Promise.allSettled(tasks);globalThis.fetch=originalFetch;database.close();}};
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
 
-test('anonymous visitors cannot read the bootstrap, API, assets or stored files',async()=>{
+test('visitors can open the site and data without a password or cookie',async()=>{
   const f=fixture();try{
-    const home=await f.call('/');assert.equal(home.status,200);assert.match(await home.text(),/הסיסמה המשפחתית/);
-    for(const path of ['/api/media','/api/stories','/family-data.js','/media/'+('a'.repeat(32))])assert.equal((await f.call(path)).status,401);
-    const asset=await f.call('/assets/style.css');assert.match(await asset.text(),/הסיסמה המשפחתית/);
-    f.env.FAMILY_PASSWORD='';assert.equal((await f.call('/')).status,503);
+    const home=await f.call('/');assert.equal(home.status,200);assert.equal(await home.text(),'static assets');
+    assert.equal((await f.call('/assets/style.css')).status,200);
+    const script=await f.connect();assert.match(script,/window.LOCAL_FAMILY_SERVER=true/);assert.equal(script.includes(f.env.HF_SECRET_ACCESS_KEY),false);
+    assert.equal(Object.keys((await (await f.call('/api/media')).json()).people).length,81);
+    assert.equal((await f.call('/api/stories')).status,200);
+    assert.equal((await f.call('/api/export')).status,200);
+    f.env.FAMILY_PASSWORD='a-leftover-setting-is-ignored';assert.equal((await f.call('/')).status,200);
   }finally{await f.close();}
 });
-test('login, signed sessions, CSRF, origin checks and logout',async()=>{
+test('public visitors can save while cross-origin and malformed writes are rejected',async()=>{
   const f=fixture();try{
-    const script=await f.connect();assert.match(script,/window.LOCAL_FAMILY_SERVER=true/);assert.equal(script.includes(f.env.HF_SECRET_ACCESS_KEY),false);
-    const response=await f.call('/api/media');assert.equal(Object.keys((await response.json()).people).length,81);
-    const body={birthday:'1.1.2000',expectedBirthday:'1.1.1111'};
+    await f.connect();const body={birthday:'1.1.2000',expectedBirthday:'1.1.1111'};
+    assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,clientHeaders:false})).status,403);
     assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,headers:{'X-Family-Token':'wrong'}})).status,403);
     assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,headers:{Origin:'https://other.example'}})).status,403);
-    assert.equal((await f.call('/auth/logout',{method:'POST'})).status,200);
-    const token=await makeSession(f.env,1000);
-    const request=new Request('https://family.example',{headers:{Cookie:'family_session='+token}});
-    assert.ok(await session(request,f.env,1001));assert.equal(await session(request,f.env,1000+8*86400),null);
-    assert.equal(await session(request,{...f.env,FAMILY_PASSWORD:'rotated-password'},1001),null);
-  }finally{await f.close();}
-});
-test('repeated failed login attempts are limited',async()=>{
-  const f=fixture();try{
-    for(let n=0;n<10;n++)assert.equal((await f.call('/auth/login',{method:'POST',body:'password=wrong',authenticated:false})).status,401);
-    assert.equal((await f.call('/auth/login',{method:'POST',body:'password=wrong',authenticated:false})).status,429);
+    const result=await f.call('/api/people/yona/birthday',{method:'POST',body});assert.equal(result.status,200);
+    assert.equal((await result.json()).person.birthday,'1.1.2000');
   }finally{await f.close();}
 });
 test('birthday validation, stale-write conflicts and durable reload',async()=>{

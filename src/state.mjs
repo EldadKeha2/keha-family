@@ -11,7 +11,6 @@ export class FamilyState {
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS meta(id TEXT PRIMARY KEY,value TEXT NOT NULL)');
-    this.sql.exec('CREATE TABLE IF NOT EXISTS logins(ip TEXT PRIMARY KEY,window INTEGER NOT NULL,attempts INTEGER NOT NULL)');
     for(const p of Object.values(family.people))this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
@@ -33,14 +32,6 @@ export class FamilyState {
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   run(action,p){
     switch(action){
-      case 'login.attempt':{
-        const window=Math.floor(Date.now()/300000),row=this.rows('SELECT window,attempts FROM logins WHERE ip=?',p.ip)[0];
-        const attempts=row?.window===window?row.attempts+1:1;
-        if(attempts>10)throw new HttpError(429,'בוצעו כמה ניסיונות כניסה. אפשר לנסות שוב בעוד חמש דקות.');
-        this.sql.exec('INSERT INTO logins(ip,window,attempts) VALUES(?,?,?) ON CONFLICT(ip) DO UPDATE SET window=excluded.window,attempts=excluded.attempts',p.ip,window,attempts);
-        this.sql.exec('DELETE FROM logins WHERE window<?',window-2);return {ok:true};
-      }
-      case 'login.clear':this.sql.exec('DELETE FROM logins WHERE ip=?',p.ip);return {ok:true};
       case 'people':{
         const byPerson=new Map();
         for(const row of this.rows("SELECT person_id,data FROM media WHERE category='personal' ORDER BY rowid")){if(!byPerson.has(row.person_id))byPerson.set(row.person_id,[]);byPerson.get(row.person_id).push(JSON.parse(row.data));}

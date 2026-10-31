@@ -204,7 +204,7 @@
     galleryRevision = null;
     gallerySignature = '';
     const p = data.people[personId];
-    $('personBody').innerHTML = `<header class="gallery-header"><div><h2 id="galleryTitle">הגלריה של ${safe(nameOf(p))}</h2><div class="profile-birthday" id="profileBirthday">${birthdayHTML(p)}</div><span id="galleryCount" class="gallery-count"></span></div></header><section class="photo-dropzone${apiEnabled ? '' : ' offline'}" id="photoDropzone" aria-label="אזור להעלאת תמונות"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 27v7h26v-7M20 28V6m-8 8 8-8 8 8"/></svg><button class="primary-button upload-photos" id="uploadPhotos" ${apiEnabled ? '' : 'disabled'}>הוספת תמונות</button><button class="secondary-button mobile-camera" id="capturePersonPhoto" ${apiEnabled ? '' : 'disabled'}>צילום תמונה</button><span>בחרו תמונות מהגלריה או מהמצלמה<span class="desktop-paste"> · אפשר לגרור לכאן או להדביק צילום עם <bdi>Ctrl+V</bdi></span></span></section><div id="uploadState" class="upload-state" role="status"></div><div class="photo-gallery-grid" id="galleryGrid"></div><div class="gallery-empty-state" id="galleryEmpty" ${apiEnabled ? 'hidden' : ''}>${apiEnabled ? 'אין עדיין תמונות בגלריה' : 'יש להיכנס לאתר כדי לשמור תמונות'}</div>`;
+    $('personBody').innerHTML = `<header class="gallery-header"><div><h2 id="galleryTitle">הגלריה של ${safe(nameOf(p))}</h2><div class="profile-birthday" id="profileBirthday">${birthdayHTML(p)}</div><span id="galleryCount" class="gallery-count"></span></div></header><section class="photo-dropzone${apiEnabled ? '' : ' offline'}" id="photoDropzone" aria-label="אזור להעלאת תמונות"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 27v7h26v-7M20 28V6m-8 8 8-8 8 8"/></svg><button class="primary-button upload-photos" id="uploadPhotos" ${apiEnabled ? '' : 'disabled'}>הוספת תמונות</button><button class="secondary-button mobile-camera" id="capturePersonPhoto" ${apiEnabled ? '' : 'disabled'}>צילום תמונה</button><span>בחרו תמונות מהגלריה או מהמצלמה<span class="desktop-paste"> · אפשר לגרור לכאן או להדביק צילום עם <bdi>Ctrl+V</bdi></span></span></section><div id="uploadState" class="upload-state" role="status"></div><div class="photo-gallery-grid" id="galleryGrid"></div><div class="gallery-empty-state" id="galleryEmpty" ${apiEnabled ? 'hidden' : ''}>${apiEnabled ? 'אין עדיין תמונות בגלריה' : 'השמירה אינה זמינה כרגע'}</div>`;
     if (!$('personDialog').open) $('personDialog').showModal();
     $('personDialog').scrollTop = 0;
     const cached = getMedia(p);
@@ -366,13 +366,13 @@
       Object.entries(result.people).forEach(([personId,item])=>updatePersonUI(personId,item));
       $('runtimeNotice').hidden = true;
     } catch(error) {
-      $('runtimeNotice').textContent = 'החיבור לשמירה אינו זמין כרגע. נסו לרענן או להיכנס לאתר מחדש.';
+      $('runtimeNotice').textContent = 'החיבור לשמירה אינו זמין כרגע. נסו לרענן את הדף.';
       $('runtimeNotice').hidden = false;
     } finally {mediaLoading = false;}
   }
 
   function addUploads(files, fromClipboard=false) {
-    if (!apiEnabled) {toast('יש להיכנס לאתר כדי להעלות תמונות.');return;}
+    if (!apiEnabled) {toast('ההעלאה אינה זמינה כרגע. נסו לרענן את הדף.');return;}
     if (!state.currentPerson || !$('personDialog').open) return;
     const selected = Array.from(files).filter(file => /^image\/(jpeg|png|webp|gif|avif)$/i.test(file.type) || imageTypes.test(file.name));
     if (!selected.length) {toast('בחרו תמונת JPG, PNG, WEBP, GIF או AVIF.');return;}
@@ -504,7 +504,7 @@
     setInterval(()=>{if(document.visibilityState!=='hidden')loadFamilyMedia();},30000);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){loadFamilyMedia();refreshOpenGallery(true);}});
   }else{
-    $('runtimeNotice').textContent='כדי להוסיף תמונות ולערוך פרטים, יש להיכנס לבית המשפחה.';
+    $('runtimeNotice').textContent='החיבור לשמירה אינו זמין כרגע. נסו לרענן את הדף.';
     $('runtimeNotice').hidden=false;
   }
 })();

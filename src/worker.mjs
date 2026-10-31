@@ -1,9 +1,10 @@
 import family from './family.mjs';
-import {HttpError,json,fail,text,uid,readJSON,boundedBody} from './http.mjs';
-import {session,requireWrite,login,loginPage,cookie} from './auth.mjs';
+import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 export {FamilyState} from './state.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
+// Public visitors receive this request marker with the page. It is not a password.
+export const PUBLIC_WRITE_TOKEN='family-public-v1';
 
 function client(db){return async(action,p={})=>{
   const response=await db.fetch(new Request('https://state.internal/',{method:'POST',body:JSON.stringify({action,...p}),headers:{'Content-Type':'application/json'}}));
@@ -113,20 +114,16 @@ export default {
   async fetch(request,env,ctx){
     try{
       const url=new URL(request.url),path=url.pathname;
-      if(!env.FAMILY_PASSWORD||env.FAMILY_PASSWORD.length<10)return loginPage('',503,true);
       if(!env.FAMILY_STATE)throw new HttpError(503,'צריך להשלים את הגדרת השמירה באתר.');
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
-      if(path==='/auth/login'&&request.method==='POST'){
-        try{return await login(request,env,db);}catch(error){if(error instanceof HttpError)return loginPage(error.message,error.status);throw error;}
-      }
-      const current=await session(request,env);
-      if(!current){if(path.startsWith('/api/')||path.startsWith('/media/')||path==='/family-data.js')return json({error:'כדי להמשיך, יש להיכנס שוב לבית המשפחה.'},401);return loginPage();}
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
-      if(request.method==='POST')requireWrite(request,current);
-      if(path==='/auth/logout'&&request.method==='POST')return json({ok:true},200,{'Set-Cookie':cookie('')});
+      if(request.method==='POST'){
+        checkOrigin(request);
+        if(!equal(request.headers.get('X-Family-Token'),PUBLIC_WRITE_TOKEN))throw new HttpError(403,'יש לרענן את הדף לפני שמירת השינוי.');
+      }
       if(path==='/family-data.js'&&request.method==='GET'){
         const {people}=await db('people');const merged={...family,people:Object.fromEntries(Object.entries(family.people).map(([id,p])=>[id,{...p,name:people[id]?.name||p.name,birthday:people[id]?.birthday||p.birthday}]))};
-        return new Response('window.FAMILY_DATA='+JSON.stringify(merged)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(current.csrf)+';\nwindow.FAMILY_CLOUD=true;\n',{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+        return new Response('window.FAMILY_DATA='+JSON.stringify(merged)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(PUBLIC_WRITE_TOKEN)+';\nwindow.FAMILY_CLOUD=true;\n',{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
       }
       if(path==='/api/setup'&&request.method==='GET')return json({database:true,mediaConfigured:Boolean(configured(env)),limits:LIMITS});
       if(path==='/api/media'&&request.method==='GET')return json(await db('people'));
