@@ -1,0 +1,17 @@
+{
+  "name": "keha-family",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npx wrangler dev",
+    "deploy": "npx wrangler deploy",
+    "check": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "wrangler": "4.156.0"
+  }
+}

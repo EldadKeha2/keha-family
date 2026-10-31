@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f3e9">
+  <meta name="description" content="אילן היוחסין המשפחתי של יונה נקאש ושלמה קהא, שישה ענפים וחמישה דורות של סיפורים וזיכרונות.">
+  <title>השורשים שלנו · משפחות נקאש וקהא</title>
+  <link rel="icon" href="assets/medallion.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/readable.css">
+  <link rel="stylesheet" href="assets/gallery.css">
+  <link rel="stylesheet" href="assets/portal.css">
+  <script src="family-data.js" defer></script>
+  <script src="assets/dates.js" defer></script>
+  <script src="assets/portal.js" defer></script>
+  <script src="assets/app.js" defer></script>
+  <script src="assets/cloud.js" defer></script>
+</head>
+<body>
+  <div class="edge-ornament edge-right" aria-hidden="true"></div>
+  <div class="edge-ornament edge-left" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="#" id="homeLink" aria-label="חזרה לעץ המשפחה"><img src="assets/medallion.svg" alt="" width="40" height="40"><span>בית משפחת קהא</span></a>
+      <nav class="main-nav" aria-label="תצוגה"><button class="nav-link active" data-view="tree" aria-pressed="true">אילן היוחסין</button><button class="nav-link" data-view="directory" aria-pressed="false">בני המשפחה</button><button class="nav-link" data-view="videos" aria-pressed="false">סרטונים</button><button class="nav-link" data-view="photos" aria-pressed="false">תמונות משפחתיות</button><button class="nav-link" data-view="stories" aria-pressed="false">הסיפורים שלנו</button></nav>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="pageTitle">
+        <div class="eyebrow"><span></span> מדור לדור <span></span></div>
+        <h1 id="pageTitle">השורשים שלנו</h1>
+        <p class="intro-subtitle">אילן היוחסין של הגוזלים של יונה ושלמה</p>
+      </section>
+
+      <section class="family-workspace" aria-label="עץ המשפחה">
+        <div class="workspace-header">
+          <div class="workspace-title"><span class="section-diamond" aria-hidden="true">◇</span><div><h2 id="workspaceTitle">האילן המשפחתי</h2><p id="workspaceSubtitle">משורש משותף, שישה ענפים של אהבה</p></div></div>
+          <div class="workspace-actions">
+            <div class="search-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg><input id="searchInput" type="search" placeholder="חיפוש בן או בת משפחה" aria-label="חיפוש בני משפחה" autocomplete="off"><div class="search-results" id="searchResults" hidden></div></div>
+          </div>
+        </div>
+        <div class="branch-bar" id="branchBar" aria-label="בחירת ענף במשפחה"></div>
+        <div class="runtime-notice" id="runtimeNotice" role="status" hidden></div>
+
+        <div id="treeView">
+          <div class="tree-topline"><span id="treeBreadcrumb">כל המשפחה</span><div class="tree-mode"><button id="overviewButton" class="selected" aria-pressed="true">מבט משפחתי</button><button id="fullTreeButton" aria-pressed="false">העץ המלא</button></div></div>
+          <div class="tree-viewport" id="treeViewport" tabindex="0" aria-label="אילן יוחסין אינטראקטיבי. אפשר לגרור להזזה ולהשתמש בכפתורי התקרבות והרחקה.">
+            <div class="tree-background-mark" aria-hidden="true">❖</div>
+            <div class="tree-world" id="treeWorld"><svg class="tree-connectors" id="treeConnectors" aria-hidden="true"></svg><div id="treeNodes"></div></div>
+            <div class="canvas-hint" id="canvasHint"><span aria-hidden="true">✧</span> לחצו על שם לפתיחת האלבום · על ענף להצגת הדורות הבאים</div>
+            <div class="zoom-controls" aria-label="גודל התצוגה"><button id="zoomIn" aria-label="התקרבות">+</button><output id="zoomValue">100%</output><button id="zoomOut" aria-label="הרחקה">−</button><span class="control-divider"></span><button id="fitButton" class="fit-button" aria-label="התאמת העץ למסך" title="התאמה למסך"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg></button></div>
+          </div>
+        </div>
+        <div id="directoryView" hidden><div class="directory-heading"><p id="directoryCount"></p><span>לחיצה על כרטיס פותחת את האלבום האישי</span></div><div class="directory-grid" id="directoryGrid"></div><div class="empty-search" id="emptySearch" hidden>לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.</div></div>
+        <section id="videosView" class="portal-view" aria-label="סרטוני המשפחה" hidden>
+          <div class="collection-heading"><span class="collection-count" id="videosCount">רגעים ששווה לראות שוב</span><span class="collection-kicker">הסרטים של כולנו</span></div>
+          <div class="shared-media-grid video-grid" id="videosGrid"></div>
+          <div class="portal-empty" id="videosEmpty"><span class="empty-emblem" aria-hidden="true">▷</span><h3>עוד רגע, זיכרון בתנועה</h3><p>סרט מהחתונה, ברכה לסבתא או רגע קטן מהיום־יום.<br>הסרטון הראשון שלכם יתחיל את הגלריה.</p></div>
+          <div class="collection-upload" id="videosDropzone"><div><span class="small-eyebrow">מוסיפים רגע לאלבום</span><h3>יש לכם סרטון משפחתי?</h3><p>בחרו מהטלפון או מהמחשב, או גררו לכאן סרטון.<br>עד 90MB לסרטון · MP4, WebM, MOV, M4V</p></div><div class="upload-buttons"><button class="primary-button" data-upload-collection="videos">＋ העלאת סרטונים</button><button class="secondary-button mobile-camera" data-camera-collection="videos">צילום סרטון</button></div><div class="collection-upload-state" id="videosUploadState" role="status"></div><progress id="videosProgress" max="100" value="0" hidden aria-label="התקדמות העלאת הסרטונים"></progress></div>
+        </section>
+        <section id="photosView" class="portal-view" aria-label="תמונות משפחתיות" hidden>
+          <div class="collection-heading"><span class="collection-count" id="photosCount">אלבום משותף לכל המשפחה</span><span class="collection-kicker">יחד בתמונה</span></div>
+          <div class="shared-media-grid" id="photosGrid"></div>
+          <div class="portal-empty" id="photosEmpty"><span class="empty-emblem" aria-hidden="true">▧</span><h3>לכל תמונה יש סיפור</h3><p>מפגשים, טיולים וחגים; כל הרגעים שבהם אנחנו יחד.<br>הוסיפו תמונה וכתבו מי מופיע בה, מתי ואיפה צולמה.</p></div>
+          <div class="collection-upload" id="photosDropzone"><div><span class="small-eyebrow">האלבום של כולנו</span><h3>מצרפים זיכרון משפחתי</h3><p>בחרו תמונות מהטלפון או מהמחשב, או גררו לכאן.<br><span class="desktop-paste">אפשר גם להדביק צילום מסך עם <bdi>Ctrl+V</bdi> · </span>עד 50MB לתמונה</p></div><div class="upload-buttons"><button class="primary-button" data-upload-collection="photos">＋ העלאת תמונות</button><button class="secondary-button mobile-camera" data-camera-collection="photos">צילום תמונה</button></div><div class="collection-upload-state" id="photosUploadState" role="status"></div><progress id="photosProgress" max="100" value="0" hidden aria-label="התקדמות העלאת התמונות"></progress></div>
+        </section>
+        <section id="storiesView" class="portal-view stories-view" aria-label="יומן המשפחה" hidden>
+          <div class="stories-toolbar"><div><span class="small-eyebrow">הזיכרונות שעוברים מדור לדור</span><h3>לכל שנה, סיפור משלנו</h3></div><button class="primary-button" id="newStory">＋ הוספת סיפור</button></div>
+          <div class="timeline-filters"><label>קפיצה לשנה<select id="storyYearFilter"><option value="all">כל השנים</option></select></label><label>סדר התצוגה<select id="storySort"><option value="oldest">מהעבר להווה</option><option value="newest">מההווה לעבר</option></select></label><span id="storiesCount" role="status"></span></div>
+          <div class="story-timeline" id="storyTimeline"></div>
+          <div class="portal-empty" id="storiesEmpty"><span class="empty-emblem" aria-hidden="true">✎</span><h3>איך הסיפור שלנו התחיל?</h3><p>העלייה מתימן, הבית הראשון, אהבה או מסורת של חג.<br>כתבו זיכרון או העלו מסמך; כל סיפור יקבל מקום בשנה שלו.</p><button class="secondary-button" data-new-story>כותבים את הסיפור הראשון</button></div>
+        </section>
+        <div class="workspace-footer"><span><i class="mini-diamond"></i> חמישה דורות, סיפור אחד</span></div>
+      </section>
+      <footer class="site-footer"><div class="footer-rule" aria-hidden="true"><span>❖</span></div><p>הבית שלנו מתחיל כאן</p><span>קהא · חריזי · בקר · נובל · פיש · בלום</span></footer>
+    </main>
+  </div>
+
+  <input type="file" id="photoUploadInput" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple hidden>
+  <input type="file" id="personCameraInput" accept="image/*" capture="environment" hidden>
+  <input type="file" id="sharedPhotosInput" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple hidden>
+  <input type="file" id="sharedVideosInput" accept="video/mp4,video/webm,video/quicktime,video/x-m4v,.mp4,.webm,.mov,.m4v" multiple hidden>
+  <input type="file" id="sharedPhotosCamera" accept="image/*" capture="environment" hidden>
+  <input type="file" id="sharedVideosCamera" accept="video/*" capture="environment" hidden>
+  <dialog class="portal-dialog birthday-dialog" id="birthdayDialog" aria-labelledby="birthdayTitle"><button class="dialog-close" data-close-dialog="birthdayDialog" aria-label="סגירה">×</button><form id="birthdayForm"><span class="small-eyebrow">יום אחד, שמחה גדולה</span><h2 id="birthdayTitle">עדכון יום הולדת</h2><p id="birthdayPersonName"></p><div class="date-fields"><label>יום<input id="birthDay" name="day" inputmode="numeric" type="number" min="1" max="31" required></label><label>חודש<input id="birthMonth" name="month" inputmode="numeric" type="number" min="1" max="12" required></label><label>שנה<input id="birthYear" name="year" inputmode="numeric" type="number" min="1000" max="9999" required></label></div><p class="birthday-preview" id="birthdayPreview" role="status"></p><p class="form-error" id="birthdayError" role="alert"></p><div class="form-actions"><button class="primary-button" type="submit" id="saveBirthday">שמירת התאריך</button><button class="secondary-button" type="button" id="clearBirthday">תאריך לא ידוע</button><button class="secondary-button" type="button" data-close-dialog="birthdayDialog">ביטול</button></div></form></dialog>
+  <dialog class="portal-dialog story-editor-dialog" id="storyEditor" aria-labelledby="storyEditorTitle"><button class="dialog-close" data-close-dialog="storyEditor" aria-label="סגירה">×</button><form id="storyForm"><span class="small-eyebrow">עוד דף ביומן המשפחתי</span><h2 id="storyEditorTitle">מוסיפים סיפור משלנו</h2><div class="story-meta-fields"><label>באיזו שנה? <span aria-hidden="true">*</span><input type="number" id="storyYear" name="year" min="1" max="9999" inputmode="numeric" placeholder="למשל 1950" required></label><label>מי מספר או מספרת?<input type="text" id="storyAuthor" name="author" maxlength="100" autocomplete="name" placeholder="שם, אם תרצו"></label></div><label>כותרת הסיפור <span aria-hidden="true">*</span><input type="text" id="storyTitle" name="title" maxlength="200" placeholder="איזה זיכרון נרצה לשמור?" required></label><label>הסיפור שלנו<textarea id="storyBody" name="body" rows="9" maxlength="100000" placeholder="מכאן הכול התחיל…"></textarea></label><label class="story-attachment-label">אפשר גם לצרף סיפור או מסמך<input type="file" id="storyFiles" name="files" accept=".txt,.md,.pdf,.docx" multiple><span>TXT, Word, PDF או Markdown · עד 10MB לקובץ<br>טקסט מקובץ TXT או Markdown יופיע בסיפור אם השדה נשאר ריק. Word ו־PDF יישמרו כמסמכים מצורפים.</span></label><div id="existingStoryFiles" class="attachment-list"></div><p class="form-error" id="storyError" role="alert"></p><div class="form-actions"><button class="primary-button" type="submit" id="saveStory">שמירת הסיפור</button><button class="secondary-button" type="button" data-close-dialog="storyEditor">ביטול</button></div></form></dialog>
+  <dialog class="portal-dialog story-reader-dialog" id="storyReader" aria-labelledby="storyReaderTitle"><button class="dialog-close" data-close-dialog="storyReader" aria-label="סגירה">×</button><article id="storyReaderBody"></article></dialog>
+  <dialog class="person-dialog" id="personDialog" aria-labelledby="galleryTitle"><button class="dialog-close" id="closePerson" aria-label="סגירה">×</button><div class="person-dialog-body" id="personBody"></div></dialog>
+  <dialog class="lightbox" id="lightbox" aria-label="צפייה בתמונה"><button class="lightbox-close" id="closeLightbox" aria-label="סגירת התמונה">×</button><button class="lightbox-arrow prev" id="previousPhoto" aria-label="תמונה קודמת">‹</button><figure><img id="lightboxImage" alt=""><figcaption id="lightboxCaption"></figcaption><span class="lightbox-counter" id="lightboxCounter"></span></figure><button class="lightbox-arrow next" id="nextPhoto" aria-label="תמונה הבאה">›</button></dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <noscript><div class="noscript">כדי להציג את עץ המשפחה, יש לאפשר JavaScript בדפדפן.</div></noscript>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keha-family",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-31",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "FAMILY_STATE", "class_name": "FamilyState" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FamilyState"] }],
+  "vars": {
+    "HF_NAMESPACE": "",
+    "HF_BUCKET": "keha-family"
+  }
+}
