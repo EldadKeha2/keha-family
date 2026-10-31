@@ -53,7 +53,7 @@ test('visitors can open the site and data without a password or cookie',async()=
     const home=await f.call('/');assert.equal(home.status,200);assert.equal(await home.text(),'static assets');
     assert.equal((await f.call('/assets/style.css')).status,200);
     const script=await f.connect();assert.match(script,/window.LOCAL_FAMILY_SERVER=true/);assert.equal(script.includes(f.env.HF_SECRET_ACCESS_KEY),false);
-    assert.equal(Object.keys((await (await f.call('/api/media')).json()).people).length,81);
+    assert.equal(Object.keys((await (await f.call('/api/media')).json()).people).length,82);
     assert.equal((await f.call('/api/stories')).status,200);
     assert.equal((await f.call('/api/export')).status,200);
     f.env.FAMILY_PASSWORD='a-leftover-setting-is-ignored';assert.equal((await f.call('/')).status,200);
@@ -78,6 +78,33 @@ test('birthday validation, stale-write conflicts and durable reload',async()=>{
     for(const value of ['29.2.2001','1.1.9999','bad'])assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:value,expectedBirthday:'29.2.2000'}})).status,400);
     f.restart();assert.equal((await (await f.call('/api/people/yona')).json()).birthday,'29.2.2000');
     response=await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'',expectedBirthday:'29.2.2000'}});assert.equal((await response.json()).person.birthday,'1.1.1111');
+  }finally{await f.close();}
+});
+test('tree corrections update existing names and add a spouse without changing saved family content',async()=>{
+  const f=fixture();try{
+    await f.connect();
+    let response=await f.call('/api/people/bosmat/birthday',{method:'POST',body:{birthday:'2.3.1980',expectedBirthday:'1.1.1111'}});assert.equal(response.status,200);
+    response=await f.call('/api/people/bosmat/photos?filename=family.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(response.status,201);
+    const file=(await response.json()).file;
+    response=await f.call('/api/people/bosmat/profile',{method:'POST',body:{file}});assert.equal(response.status,200);
+    response=await f.call('/api/people/bosmat/caption',{method:'POST',body:{file,caption:'תיאור שנשמר לפני תיקון השם'}});assert.equal(response.status,200);
+    response=await f.call('/api/stories',{method:'POST',body:{title:'זיכרון משפחתי',year:2000,body:'סיפור שנשמר לפני העדכון'}});assert.equal(response.status,201);
+    const before=await (await f.call('/api/people/bosmat')).json();
+    for(const [id,name] of [['bosmat','בשמת מאיר'],['itzik','איציק'],['rami','רמי']]){
+      const person=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);person.name=name;
+      f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(person),id);
+    }
+    f.database.prepare('DELETE FROM people WHERE id=?').run('rachel-katan');
+    f.restart();
+    const after=await (await f.call('/api/people/bosmat')).json();
+    assert.equal(after.name,'בשמת קהא');assert.equal(after.birthday,before.birthday);assert.equal(after.profile,before.profile);assert.equal(after.profileIsManual,true);assert.deepEqual(after.gallery,before.gallery);
+    assert.equal((await (await f.call('/api/people/itzik')).json()).name,'איציק מאיר');
+    assert.equal((await (await f.call('/api/people/rami')).json()).name,'רמי גנדלמן');
+    const graph=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);
+    assert.equal(graph.people['rachel-katan'].name,'רחל קטן');assert.deepEqual(graph.units['u-yehiel'].people,['yehiel','rachel-katan']);
+    assert.equal((await (await f.call('/api/stories')).json()).stories[0].body,'סיפור שנשמר לפני העדכון');
+    assert.deepEqual(new Uint8Array(await (await f.call(after.gallery[0].src)).arrayBuffer()),new Uint8Array(photo));
+    f.restart();assert.equal((await (await f.call('/api/people/bosmat')).json()).revision,after.revision,'Applying the same tree twice must not change the person again');
   }finally{await f.close();}
 });
 test('personal uploads, captions, profile selection and ownership checks',async()=>{
@@ -127,7 +154,7 @@ test('missing storage configuration preserves text editing and explains upload l
     f.env.HF_ACCESS_KEY_ID='HFAK_TEST_ONLY';
     assert.equal((await f.call('/api/collections/videos/upload?filename=x.mp4',{method:'POST',body:'x',headers:{'Content-Length':String(LIMITS.video+1)}})).status,413);
     assert.equal((await f.call('/api/collections/photos/upload?filename=x.jpg',{method:'POST',body:'not an image',headers:{'Content-Length':'12'}})).status,415);
-    const backup=await f.call('/api/export');assert.match(backup.headers.get('Content-Disposition'),/family-backup.json/);assert.equal((await backup.json()).people.length,81);
+    const backup=await f.call('/api/export');assert.match(backup.headers.get('Content-Disposition'),/family-backup.json/);assert.equal((await backup.json()).people.length,82);
   }finally{await f.close();}
 });
 test('S3 signing scopes requests to the configured private bucket',async()=>{

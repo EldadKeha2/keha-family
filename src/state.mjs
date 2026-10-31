@@ -11,7 +11,14 @@ export class FamilyState {
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS meta(id TEXT PRIMARY KEY,value TEXT NOT NULL)');
-    for(const p of Object.values(family.people))this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
+    this.ctx.storage.transactionSync(()=>{
+      for(const p of Object.values(family.people)){
+        this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
+        // Names come from the family tree; keep birthdays and uploaded albums intact.
+        const person=this.person(p.id);
+        if(person.name!==p.name){person.name=p.name;this.savePerson(person);}
+      }
+    });
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
   person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');return JSON.parse(row.data);}
