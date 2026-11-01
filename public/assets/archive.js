@@ -101,7 +101,7 @@
   function renderCollection(key){
     if(scope()!==key)return;
     const collection=collections.get(key)||{items:[]},filter=filters.get(key)||'all',query=normalize(state.query);
-    const items=collection.items.filter(item=>(filter==='all'||item.kind===filter)&&(!query||normalize(item.name+' '+item.caption).includes(query)));
+    const items=collection.items.filter(item=>(filter==='all'||item.kind===filter)&&(!query||normalize(item.name+' '+item.caption+' '+(item.tags||[]).map(person=>person.name).join(' ')).includes(query)));
     window.FamilyMedia.register(key,items);
     const grid=$(gridId(key)),sameScope=grid.dataset.scope===key;
     const oldCards=new Map((sameScope?[...grid.children]:[]).filter(card=>card.dataset.mediaFile).map(card=>[card.dataset.mediaFile,card]));
@@ -128,6 +128,7 @@
     const wanted=new Set(cards);for(const child of [...grid.children])if(!wanted.has(child))child.remove();
     let anchor=grid.firstElementChild;for(const card of cards){if(card===anchor)anchor=anchor.nextElementSibling;else grid.insertBefore(card,anchor);}
     grid.dataset.scope=key;
+    window.FamilyTags.refresh(grid,items);
     if(selection&&grid.contains(active)){active.focus({preventScroll:true});active.setSelectionRange(...selection);}
     const nostalgia=key==='nostalgia',empty=$(nostalgia?'nostalgiaEmpty':'weddingMediaEmpty');empty.hidden=collection.items.length>0;
     $(nostalgia?'nostalgiaCount':'weddingMediaCount').textContent=`${items.length}${items.length!==collection.items.length?' מתוך '+collection.items.length:''} זיכרונות`;

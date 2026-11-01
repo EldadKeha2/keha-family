@@ -2,6 +2,8 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
+const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
+const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
 // One SQLite-backed object serializes updates for this family. Binary files live in HF.
 export class FamilyState {
@@ -11,6 +13,8 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS media_tags(media_id TEXT NOT NULL,person_id TEXT NOT NULL,PRIMARY KEY(media_id,person_id))');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS media_tags_person ON media_tags(person_id,media_id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_trash(id TEXT PRIMARY KEY,data TEXT NOT NULL,deleted_at TEXT NOT NULL,profile_selected INTEGER NOT NULL DEFAULT 0)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS meta(id TEXT PRIMARY KEY,value TEXT NOT NULL)');
@@ -40,22 +44,31 @@ export class FamilyState {
   person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');return JSON.parse(row.data);}
   savePerson(item){item.revision=uid();this.sql.exec('UPDATE people SET data=? WHERE id=?',JSON.stringify(item),item.id);}
   media(id){const row=this.rows('SELECT data FROM media WHERE id=?',id)[0];if(!row)throw new HttpError(404,'הקובץ לא נמצא.');return JSON.parse(row.data);}
-  personPhotos(id){return this.rows("SELECT data FROM media WHERE person_id=? AND category='personal' ORDER BY rowid",id).map(row=>JSON.parse(row.data));}
+  personMedia(id){return this.rows("SELECT DISTINCT m.data FROM media m LEFT JOIN media_tags t ON t.media_id=m.id WHERE (m.person_id=? AND m.category='personal') OR t.person_id=? ORDER BY m.rowid",id,id).map(row=>JSON.parse(row.data));}
+  personPhotos(id){return this.personMedia(id).filter(item=>mediaKind(item)==='photo');}
+  tagIds(id){return this.rows('SELECT person_id FROM media_tags WHERE media_id=? ORDER BY rowid',id).map(row=>row.person_id);}
+  tags(id){return this.rows('SELECT p.id,p.data FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=? ORDER BY t.rowid',id).map(row=>{const person=JSON.parse(row.data);return {id:person.id,name:person.name,extra:Boolean(person.extra)};});}
+  tagsRevision(id){return this.rows('SELECT value FROM meta WHERE id=?','tags:'+id)[0]?.value||'empty';}
+  touchTags(id){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','tags:'+id,uid());}
+  relatedPeople(item,tagIds=this.tagIds(item.id)){return [...new Set([...(item.category==='personal'?[item.personId]:[]),...tagIds])];}
+  touchPeople(ids,clearProfile=null){for(const id of new Set(ids)){const person=this.person(id);if(clearProfile&&person.profileId===clearProfile)person.profileId=null;this.savePerson(person);}}
   mediaScope(item){return item.category==='personal'?'personal:'+item.personId:item.category;}
-  mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,caption:item.caption||'',size:item.size,mime:item.mime,kind:item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document'),src:'/media/'+item.id,uploadedAt:item.createdAt,
+  mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:'/media/'+item.id,uploadedAt:item.createdAt,tags:this.tags(item.id),tagsRevision:this.tagsRevision(item.id),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
-  mediaChanged(item,operation){
+  mediaChanged(item,operation,ids=this.relatedPeople(item)){
     const scope=this.mediaScope(item);
-    return {saved:true,operation,scope,item:this.mediaPublic(item),
-      ...(item.category==='personal'?{person:this.snapshot(this.person(item.personId),this.personPhotos(item.personId))}:{collection:this.collection(item.category)}),
+    const people=Object.fromEntries([...new Set(ids)].map(id=>[id,this.snapshot(this.person(id),this.personMedia(id))]));
+    return {saved:true,operation,scope,item:this.mediaPublic(item),people,
+      ...(item.category==='personal'?{person:people[item.personId]}:{collection:this.collection(item.category)}),
       ...(item.category.startsWith('wedding:')?{wedding:this.wedding(item.category.slice(8))}:{})};
   }
-  touchMedia(item){if(item.category==='personal'){const person=this.person(item.personId);this.savePerson(person);}else this.touch(item.category);}
-  snapshot(person,photos,includeGallery=true){
-    const selected=photos.find(photo=>photo.id===person.profileId),profile=selected||photos[0];
-    return {...person,invalidBirthday:false,profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,
-      ...(includeGallery?{gallery:photos.map(photo=>this.mediaPublic(photo))}:{})};
+  touchMedia(item,ids=this.relatedPeople(item)){this.touchPeople(ids);if(item.category!=='personal')this.touch(item.category);}
+  snapshot(person,items,includeGallery=true){
+    const photos=items.filter(item=>mediaKind(item)==='photo'),videos=items.filter(item=>mediaKind(item)==='video');
+    const selected=photos.find(photo=>photo.id===person.profileId),profile=selected||photos.find(photo=>photo.category==='personal'&&photo.personId===person.id)||photos[0];
+    return {...person,invalidBirthday:false,profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,videoCount:videos.length,mediaCount:items.length,
+      ...(includeGallery?{gallery:items.map(item=>({...this.mediaPublic(item),linked:this.mediaScope(item)!=='personal:'+person.id}))}:{})};
   }
   collection(kind){
     validCollection(kind);
@@ -74,61 +87,113 @@ export class FamilyState {
     switch(action){
       case 'people':{
         const byPerson=new Map();
-        for(const row of this.rows("SELECT person_id,data FROM media WHERE category='personal' ORDER BY rowid")){if(!byPerson.has(row.person_id))byPerson.set(row.person_id,[]);byPerson.get(row.person_id).push(JSON.parse(row.data));}
-        const people=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,this.snapshot(JSON.parse(row.data),byPerson.get(row.id)||[],false)]));
+        for(const row of this.rows('SELECT m.data,t.person_id AS tagged_person FROM media m LEFT JOIN media_tags t ON t.media_id=m.id ORDER BY m.rowid')){
+          const item=JSON.parse(row.data);
+          for(const id of [...(item.category==='personal'?[item.personId]:[]),...(row.tagged_person?[row.tagged_person]:[])]){
+            if(!byPerson.has(id))byPerson.set(id,new Map());byPerson.get(id).set(item.id,item);
+          }
+        }
+        const people=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,this.snapshot(JSON.parse(row.data),[...(byPerson.get(row.id)?.values()||[])],false)]));
         return {people};
       }
-      case 'person':return this.snapshot(this.person(p.id),this.personPhotos(p.id));
+      case 'person':return this.snapshot(this.person(p.id),this.personMedia(p.id));
+      case 'tag.people':return {people:this.rows('SELECT data FROM people').map(row=>{const item=JSON.parse(row.data);return {id:item.id,name:item.name,extra:Boolean(item.extra),branch:family.people[item.id]?.branch||null};})};
       case 'birthday':{
         const person=this.person(p.id);if(person.birthday!==p.expectedBirthday)throw new HttpError(409,'התאריך עודכן בינתיים. סגרו את העריכה ופתחו אותה מחדש לפני שמירה.');
         const value=birthday(p.birthday),deathDate=family.people[p.id]?.deathDate;
         const time=date=>{const [d,m,y]=date.split('.').map(Number);return Date.UTC(y,m-1,d);};
         if(value!=='1.1.1111'&&deathDate&&time(value)>time(deathDate))throw new HttpError(400,'תאריך הלידה צריך להיות לפני תאריך הפטירה.');
-        person.birthday=value;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personPhotos(p.id))};
+        person.birthday=value;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
       }
       case 'media.add':{
         const item=p.item;
         if(item.category==='personal')this.person(item.personId);
         else validCollection(item.category);
         this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,JSON.stringify(item));
-        if(item.category==='personal'){const person=this.person(item.personId);this.savePerson(person);}else this.touch(item.category);
+        this.touchMedia(item);
         return {saved:true};
       }
       case 'media.get':return this.media(p.id);
+      case 'media.tags':{
+        const item=this.media(p.id);if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר לתייג אנשים בתמונות ובסרטונים.');
+        return {item:this.mediaPublic(item)};
+      }
+      case 'media.tags.save':{
+        const item=this.media(p.id);if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר לתייג אנשים בתמונות ובסרטונים.');
+        if(p.expectedRevision!==this.tagsRevision(item.id))throw new HttpError(409,'התיוגים עודכנו בינתיים. פתחו שוב את התיוגים לפני השמירה.');
+        if(!Array.isArray(p.personIds)||!Array.isArray(p.newNames)||p.personIds.length+p.newNames.length>150||p.newNames.length>50)throw new HttpError(400,'אפשר לתייג עד 150 אנשים בפריט.');
+        const ids=new Set();
+        for(const id of p.personIds){if(typeof id!=='string')throw new HttpError(400,'יש לבחור אנשים מהרשימה.');this.person(id);ids.add(id);}
+        const roster=this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data));
+        for(const value of p.newNames){
+          const name=text(value,'שם',120,true).replace(/\s+/g,' '),normalized=normalizedName(name);
+          if(!normalized)throw new HttpError(400,'יש להזין שם מלא.');
+          const matching=roster.filter(person=>normalizedName(person.name)===normalized);
+          if(matching.length>1)throw new HttpError(409,'יש כמה אנשים בשם '+name+'. בחרו את האדם המתאים מהרשימה.');
+          let person=matching[0];
+          if(!person){person={id:'extra-'+uid().slice(0,24),name,extra:true,birthday:'1.1.1111',profileId:null,revision:uid(),createdAt:new Date().toISOString()};this.sql.exec('INSERT INTO people(id,data) VALUES(?,?)',person.id,JSON.stringify(person));roster.push(person);}
+          ids.add(person.id);
+        }
+        const oldIds=this.tagIds(item.id),affected=this.relatedPeople(item,[...oldIds,...ids]);
+        if(oldIds.length!==ids.size||oldIds.some(id=>!ids.has(id))){
+          this.sql.exec('DELETE FROM media_tags WHERE media_id=?',item.id);
+          for(const id of ids)this.sql.exec('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)',item.id,id);
+          this.touchTags(item.id);
+          this.touchPeople(oldIds.filter(id=>!ids.has(id)&&!(item.category==='personal'&&item.personId===id)),item.id);
+          this.touchMedia(item,affected);
+        }
+        return this.mediaChanged(item,'tags',affected);
+      }
+      case 'media.untag':
+      case 'media.retag':{
+        const item=this.media(p.id),personId=typeof p.scope==='string'&&p.scope.startsWith('personal:')?p.scope.slice(9):null;
+        if(!personId||!['photo','video'].includes(mediaKind(item))||(item.category==='personal'&&item.personId===personId))throw new HttpError(400,'יש לערוך את התיוגים של הפריט באלבום הזה.');
+        const person=this.person(personId),ids=this.tagIds(item.id),affected=this.relatedPeople(item,[...ids,personId]);
+        const wasProfile=person.profileId===item.id;
+        if(action==='media.untag'){
+          if(!ids.includes(personId))throw new HttpError(404,'הפריט כבר לא מופיע באלבום הזה.');
+          this.sql.exec('DELETE FROM media_tags WHERE media_id=? AND person_id=?',item.id,personId);
+          if(wasProfile){person.profileId=null;this.savePerson(person);}
+        }else{
+          this.sql.exec('INSERT OR IGNORE INTO media_tags(media_id,person_id) VALUES(?,?)',item.id,personId);
+          if(p.restoreProfile===true&&mediaKind(item)==='photo'&&!person.profileId){person.profileId=item.id;this.savePerson(person);}
+        }
+        this.touchTags(item.id);this.touchMedia(item,affected);
+        return {...this.mediaChanged(item,action.slice(6),affected),wasProfile,contextScope:p.scope};
+      }
       case 'media.delete':{
         const item=this.media(p.id);
         if(this.mediaScope(item)!==p.scope)throw new HttpError(404,'הפריט לא נמצא באלבום הזה.');
         if(item.category==='attachment')throw new HttpError(400,'מסמך זה הוא חלק מסיפור.');
         if(item.category!=='personal')validCollection(item.category);
-        const person=item.personId?this.person(item.personId):null,selected=person?.profileId===item.id;
-        this.sql.exec('INSERT INTO media_trash(id,data,deleted_at,profile_selected) VALUES(?,?,?,?)',item.id,JSON.stringify(item),new Date().toISOString(),selected?1:0);
+        const affected=this.relatedPeople(item),selected=affected.filter(id=>this.person(id).profileId===item.id);
+        this.sql.exec('INSERT INTO media_trash(id,data,deleted_at,profile_selected) VALUES(?,?,?,?)',item.id,JSON.stringify({...item,_profilePeople:selected}),new Date().toISOString(),selected.includes(item.personId)?1:0);
         this.sql.exec('DELETE FROM media WHERE id=?',item.id);
-        if(selected){person.profileId=null;this.savePerson(person);}else this.touchMedia(item);
-        return this.mediaChanged(item,'delete');
+        this.touchPeople(selected,item.id);this.touchMedia(item,affected);
+        return this.mediaChanged(item,'delete',affected);
       }
       case 'media.restore':{
         const row=this.rows('SELECT data,profile_selected FROM media_trash WHERE id=?',p.id)[0];
         if(!row)throw new HttpError(404,'לא נמצא פריט שניתן לשחזר.');
-        const item=JSON.parse(row.data);
+        const {_profilePeople,...item}=JSON.parse(row.data);
         if(this.mediaScope(item)!==p.scope)throw new HttpError(404,'הפריט לא נמצא באלבום הזה.');
-        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,row.data);
+        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,JSON.stringify(item));
         this.sql.exec('DELETE FROM media_trash WHERE id=?',item.id);
-        const person=item.personId?this.person(item.personId):null;
-        if(row.profile_selected&&person&&!person.profileId){person.profileId=item.id;this.savePerson(person);}else this.touchMedia(item);
+        for(const id of _profilePeople||(row.profile_selected&&item.personId?[item.personId]:[])){const person=this.person(id);if(!person.profileId&&this.personPhotos(id).some(photo=>photo.id===item.id)){person.profileId=item.id;this.savePerson(person);}}
+        this.touchMedia(item);
         return this.mediaChanged(item,'restore');
       }
       case 'media.caption':{
         const caption=text(p.caption,'תיאור',5000),category=p.personId?'personal':p.kind;
-        const candidates=p.personId?this.personPhotos(p.personId):this.rows('SELECT data FROM media WHERE category=?',category).map(row=>JSON.parse(row.data));
+        const candidates=p.personId?this.personMedia(p.personId):this.rows('SELECT data FROM media WHERE category=?',category).map(row=>JSON.parse(row.data));
         const item=candidates.find(item=>item.file===p.file);if(!item)throw new HttpError(404,'הקובץ לא נמצא באלבום הזה.');
         item.caption=caption;item.updatedAt=new Date().toISOString();this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);
-        if(p.personId){const person=this.person(p.personId);this.savePerson(person);}else this.touch(p.kind);
-        return {saved:true};
+        this.touchMedia(item);return this.mediaChanged(item,'caption');
       }
       case 'profile':{
         const person=this.person(p.id),photos=this.personPhotos(p.id),item=photos.find(item=>item.file===p.file);
         if(!item)throw new HttpError(404,'בחרו תמונה מהאלבום של האדם הזה.');
-        person.profileId=item.id;this.savePerson(person);return {saved:true,person:this.snapshot(person,photos)};
+        person.profileId=item.id;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
       }
       case 'collection':return this.collection(p.kind);
       case 'weddings':return {weddings:couples.map(item=>this.wedding(item.id))};
@@ -166,7 +231,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:2,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data))};
+      case 'export':return {schemaVersion:2,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

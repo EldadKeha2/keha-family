@@ -44,7 +44,7 @@
   }
   function renderCollection(kind) {
     const collection = state.collections[kind], query = normalize(state.query);
-    const filtered = collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name).includes(query)));
+    const filtered = collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>person.name).join(' ')).includes(query)));
     const isVideo = kind === 'videos';
     window.FamilyMedia.register(kind,filtered);
     if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.videoCategory===state.videoCategory)));
@@ -91,6 +91,7 @@
       }
       if (!filtered.length && collection.items.length) grid.innerHTML='<p class="no-content-match">אין סרטונים או תמונות בבחירה הזו. אפשר לשנות את הקטגוריה או את החיפוש.</p>';
     }
+    window.FamilyTags.refresh($(kind+'Grid'),filtered);
     for(const area of $(kind+'Grid').querySelectorAll('textarea')) {
       const draft=drafts.get(captionKey(kind,area.dataset.sharedFile));
       if(draft?.dirty || area===document.activeElement)continue;

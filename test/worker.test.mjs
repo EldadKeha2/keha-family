@@ -328,3 +328,98 @@ test('new video uploads keep their chosen birthday category',async()=>{
     assert.equal(f.objects.size,1);
   }finally{await f.close();}
 });
+async function taggedUpload(f,path='/api/collections/photos',bytes=photo,name='together.jpg'){
+  const response=await f.call(path+'/upload?filename='+name,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}});assert.equal(response.status,201);
+  const result=await response.json();return result.collection.items[0];
+}
+async function setTags(f,item,personIds,newNames=[],revision){
+  const before=revision===undefined?(await (await f.call('/api/media/'+item.id+'/tags')).json()).item.tagsRevision:revision;
+  return f.call('/api/media/'+item.id+'/tags',{method:'POST',body:{personIds,newNames,expectedRevision:before}});
+}
+test('one shared photo appears immediately in every tagged personal album without copying it',async()=>{
+  const f=fixture();try{
+    await f.connect();const item=await taggedUpload(f),before=await f.call('/api/people/chantal');
+    const response=await setTags(f,item,['chantal','camille','chantal']);assert.equal(response.status,200);const changed=await response.json();
+    assert.deepEqual(changed.item.tags.map(person=>person.name),['שנטל פירוז','קמיל דה ווילה']);
+    for(const id of ['chantal','camille']){const person=changed.people[id];assert.equal(person.photoCount,1);assert.equal(person.mediaCount,1);assert.equal(person.gallery[0].id,item.id);assert.equal(person.gallery[0].src,item.src);assert.equal(person.gallery[0].linked,true);assert.equal(person.gallery[0].scope,'photos');}
+    assert.equal((await f.call('/api/people/chantal',{headers:{'If-None-Match':before.headers.get('ETag')}})).status,200);
+    assert.equal(f.objects.size,1);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media WHERE id=?').get(item.id).n,1);
+    const source=await (await f.call('/api/collections/photos')).json();assert.equal(source.count,1);assert.deepEqual(source.items[0].tags,changed.item.tags);
+    const revision=changed.item.tagsRevision;const same=await (await setTags(f,item,['camille','chantal'])).json();assert.equal(same.item.tagsRevision,revision,'Saving the same membership must not create duplicates or unnecessary revisions');
+    f.restart();const restored=await (await f.call('/api/people/camille')).json();assert.equal(restored.gallery[0].id,item.id);assert.equal(restored.photoCount,1);
+    assert.equal((await (await f.call('/api/media')).json()).people.chantal.photoCount,1);
+  }finally{await f.close();}
+});
+test('tagging an owner deduplicates the album, and captions stay shared across personal albums',async()=>{
+  const f=fixture();try{
+    await f.connect();const uploaded=await (await f.call('/api/people/chantal/photos?filename=mine.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json(),item=uploaded.person.gallery[0];
+    assert.equal((await setTags(f,item,['chantal','camille'])).status,200);
+    assert.equal((await (await f.call('/api/people/chantal')).json()).photoCount,1);assert.equal((await (await f.call('/api/people/camille')).json()).photoCount,1);
+    const response=await f.call('/api/people/camille/caption',{method:'POST',body:{file:item.file,caption:'שתינו יחד'}});assert.equal(response.status,200);
+    assert.equal((await (await f.call('/api/people/chantal')).json()).gallery[0].caption,'שתינו יחד');
+    await setTags(f,item,[]);assert.equal((await (await f.call('/api/people/chantal')).json()).photoCount,1,'The original owner keeps a photo even when their explicit tag is removed');assert.equal((await (await f.call('/api/people/camille')).json()).photoCount,0);
+    assert.equal((await f.call(item.src)).status,200);assert.equal(f.objects.size,1);
+  }finally{await f.close();}
+});
+test('tagged YouTube and uploaded videos appear as videos and never become profile photos',async()=>{
+  const f=fixture();try{
+    await f.connect();const youtube=(await (await f.call('/api/collections/videos')).json()).items[0];
+    await setTags(f,youtube,['yehiel']);let person=await (await f.call('/api/people/yehiel')).json();assert.equal(person.videoCount,1);assert.equal(person.photoCount,0);assert.equal(person.profile,null);assert.equal(person.gallery[0].provider,'youtube');
+    assert.equal((await f.call('/api/people/yehiel/profile',{method:'POST',body:{file:youtube.file}})).status,404);
+    const film=await taggedUpload(f,'/api/nostalgia',video,'old-film.mp4');await setTags(f,film,['yehiel']);person=await (await f.call('/api/people/yehiel')).json();assert.equal(person.videoCount,2);assert.equal(person.mediaCount,2);
+    f.restart();assert.equal((await (await f.call('/api/people/yehiel')).json()).videoCount,2);assert.equal(f.objects.size,1);
+  }finally{await f.close();}
+});
+test('adding a name creates a durable album and reuses existing canonical or newly added names',async()=>{
+  const f=fixture();try{
+    await f.connect();const item=await taggedUpload(f);
+    let response=await setTags(f,item,[],['שנטל פירוז','אורח חדש',' אורח   חדש ']);assert.equal(response.status,200);let changed=await response.json();assert.equal(changed.item.tags.length,2);
+    const added=changed.item.tags.find(person=>person.extra);assert.ok(added.id.startsWith('extra-'));assert.equal(changed.people[added.id].photoCount,1);
+    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,83);assert.equal((await (await f.call('/api/weddings')).json()).weddings.length,23);
+    const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people[added.id].name,'אורח חדש');assert.equal(bootstrap.people[added.id].extra,true);assert.ok(!Object.values(bootstrap.units).some(unit=>unit.people.includes(added.id)));
+    f.restart();response=await setTags(f,item,[],['אורח חדש']);changed=await response.json();assert.equal(changed.item.tags[0].id,added.id);assert.equal((await (await f.call('/api/tag-people')).json()).people.length,83);
+    assert.equal((await f.call('/api/people/'+added.id+'/photos?filename=portrait.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,201);
+    const backup=await (await f.call('/api/export')).json();assert.ok(backup.people.some(person=>person.id===added.id));assert.deepEqual(backup.tags,[{mediaId:item.id,personId:added.id}]);
+  }finally{await f.close();}
+});
+test('removing a linked item only removes that person\'s tag, with undo and profile fallback',async()=>{
+  const f=fixture();try{
+    await f.connect();const item=await taggedUpload(f,'/api/weddings/u-yehiel');await setTags(f,item,['chantal','camille']);
+    await f.call('/api/people/chantal/profile',{method:'POST',body:{file:item.file}});
+    let response=await f.call('/api/media/'+item.id+'/untag',{method:'POST',body:{scope:'personal:chantal'}});assert.equal(response.status,200);let result=await response.json();assert.equal(result.wasProfile,true);assert.equal(result.people.chantal.photoCount,0);assert.equal(result.people.chantal.profile,null);assert.equal(result.people.camille.photoCount,1);assert.equal(result.collection.count,1);
+    assert.equal((await f.call(item.src)).status,200);f.restart();assert.equal((await (await f.call('/api/people/chantal')).json()).photoCount,0);
+    response=await f.call('/api/media/'+item.id+'/retag',{method:'POST',body:{scope:'personal:chantal',restoreProfile:true}});result=await response.json();assert.equal(result.people.chantal.profile,item.src);assert.equal(result.people.chantal.profileIsManual,true);assert.equal(result.people.chantal.photoCount,1);
+    assert.equal((await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'personal:chantal'}})).status,404,'A linked view cannot accidentally delete the master file');
+    assert.equal((await (await f.call('/api/weddings/u-yehiel')).json()).mediaCount,1);
+    await setTags(f,item,['camille']);assert.equal((await (await f.call('/api/people/chantal')).json()).profile,null,'Removing a tag through the editor also clears a selected linked profile');
+  }finally{await f.close();}
+});
+test('global deletion and restoration update every tagged album and preserve manual profile choices',async()=>{
+  const f=fixture();try{
+    await f.connect();const item=await taggedUpload(f);await setTags(f,item,['chantal','camille']);
+    for(const id of ['chantal','camille'])await f.call('/api/people/'+id+'/profile',{method:'POST',body:{file:item.file}});
+    let result=await (await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'photos'}})).json();assert.equal(result.people.chantal.photoCount,0);assert.equal(result.people.camille.profile,null);
+    assert.equal((await (await f.call('/api/export')).json()).tags.length,0);assert.equal((await f.call('/api/media/'+item.id+'/tags')).status,404);
+    const second=await (await f.call('/api/people/chantal/photos?filename=new.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json();
+    await f.call('/api/people/chantal/profile',{method:'POST',body:{file:second.file}});
+    f.restart();result=await (await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:'photos'}})).json();
+    assert.equal(result.people.camille.profile,item.src);assert.equal(result.people.camille.profileIsManual,true);assert.equal(result.people.chantal.profile,second.person.gallery[0].src);assert.equal(result.people.chantal.photoCount,2);assert.equal(result.item.tags.length,2);assert.equal(f.objects.size,2);
+  }finally{await f.close();}
+});
+test('tagging validates input, prevents stale overwrites and rolls back invalid new names',async()=>{
+  const f=fixture();try{
+    await f.connect();const item=await taggedUpload(f),path='/api/media/'+item.id+'/tags';
+    const body={personIds:['chantal'],newNames:[],expectedRevision:'empty'};
+    assert.equal((await f.call(path,{method:'POST',body,clientHeaders:false})).status,403);assert.equal((await f.call(path,{method:'POST',body,headers:{Origin:'https://other.example'}})).status,403);
+    assert.equal((await f.call(path,{method:'POST',body})).status,200);
+    assert.equal((await f.call(path,{method:'POST',body:{...body,personIds:['camille'],newNames:['שם שלא יישמר']}})).status,409);
+    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,82);assert.equal((await (await f.call('/api/media/'+item.id+'/tags')).json()).item.tags[0].id,'chantal');
+    assert.equal((await setTags(f,item,['missing-person'])).status,404);
+    assert.equal((await setTags(f,item,[],['שם חדש',42])).status,400,'An invalid name rolls the whole operation back');
+    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,82);
+    assert.equal((await setTags(f,item,[],Array(51).fill('שם'))).status,400);assert.equal((await setTags(f,item,[],[' '.repeat(5)])).status,400);
+    const doc=await taggedUpload(f,'/api/nostalgia',new TextEncoder().encode('מכתב נוסטלגי'),'letter.txt');assert.equal((await f.call('/api/media/'+doc.id+'/tags')).status,400);
+    const row=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('camille').data);row.name='שנטל פירוז';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(row),'camille');
+    assert.equal((await setTags(f,item,[],['שנטל פירוז'])).status,409,'Ambiguous names require an explicit identity choice');
+  }finally{await f.close();}
+});

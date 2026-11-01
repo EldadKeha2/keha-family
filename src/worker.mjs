@@ -65,7 +65,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false}){
   const videoCategory=new URL(request.url).searchParams.get('group')||'family';
   if(category==='videos'&&!['family','special-birthdays'].includes(videoCategory))throw new HttpError(400,'קטגוריית הסרטון אינה מוכרת.');
   if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני העלאת קבצים.');
-  if(personId&&!family.people[personId])throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');
+  if(personId)await db('person',{id:personId});
   const media=await streamUpload(request,mixed||category==='videos'?LIMITS.video:LIMITS.photo);
   const id=uid(),original=filename(new URL(request.url).searchParams.get('filename'));
   let format;
@@ -142,12 +142,15 @@ export default {
       }
       if(path==='/family-data.js'&&request.method==='GET'){
         const {people}=await db('people');const merged={...family,people:Object.fromEntries(Object.entries(family.people).map(([id,p])=>[id,{...p,name:people[id]?.name||p.name,birthday:people[id]?.birthday||p.birthday}]))};
+        for(const person of Object.values(people))if(person.extra)merged.people[person.id]={id:person.id,name:person.name,firstName:person.name,lastName:'',birthday:person.birthday,extra:true,branch:null,generation:null,placeholder:false};
         return new Response('window.FAMILY_DATA='+JSON.stringify(merged)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(PUBLIC_WRITE_TOKEN)+';\nwindow.FAMILY_CLOUD=true;\n',{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
       }
       if(path==='/api/setup'&&request.method==='GET')return json({database:true,mediaConfigured:Boolean(configured(env)),limits:LIMITS});
       if(path==='/api/media'&&request.method==='GET')return json(await db('people'));
+      if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
+      if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:match[1]}));
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
@@ -160,8 +163,10 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
-        if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore)$/.exec(path))){
-          const body=await readJSON(request,2000);return json(await db('media.'+match[2],{id:match[1],scope:body.scope}));
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|untag|retag)$/.exec(path))){
+          const body=await readJSON(request,match[2]==='tags'?64000:2000);
+          if(match[2]==='tags')return json(await db('media.tags.save',{id:match[1],personIds:body.personIds,newNames:body.newNames,expectedRevision:body.expectedRevision}));
+          return json(await db('media.'+match[2],{id:match[1],scope:body.scope,restoreProfile:body.restoreProfile}));
         }
         if((match=/^\/api\/weddings\/([^/]+)\/(date|greetings|upload|caption)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2],kind=weddingCollection(id);

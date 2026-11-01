@@ -6,9 +6,10 @@
   const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null};
   const identity=item=>item.id||item.file;
   const current=()=>state.items[state.index];
+  const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
   let noticeTimer;
   function controls(item,scope){
-    return `<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="מחיקת ${safe(item.name)}">מחיקת הפריט</button>`:''}</div>`;
+    return `<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?'הסרת':'מחיקת'} ${safe(item.name)}${linked(item,scope)?' מהאלבום':''}">${linked(item,scope)?'הסרה מהאלבום':'מחיקת הפריט'}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
   }
   function register(scope,items){
     albums.set(scope,items);
@@ -30,6 +31,10 @@
     if(item.provider==='youtube'){link.removeAttribute('download');link.target='_blank';link.rel='noopener';}
     else {link.download=item.filename||'';link.removeAttribute('target');link.removeAttribute('rel');}
     $('mediaViewerDelete').hidden=!item.id;
+    $('mediaViewerDelete').textContent=linked(item,state.scope)?'הסרה מהאלבום':'מחיקת הפריט';
+    $('mediaViewerTags').innerHTML=window.FamilyTags.labels(item);
+    $('mediaViewerTag').hidden=!window.FamilyTags.taggable(item);
+    $('mediaViewerTag').textContent=item.tags?.length?'תיוג אנשים ('+item.tags.length+')':'תיוג אנשים';
   }
   function clearStage(){
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
@@ -69,12 +74,16 @@
   function requestDelete(scope,id){
     if(!app()?.apiEnabled){app()?.toast('השמירה אינה זמינה כרגע. נסו לרענן.');return;}
     const item=(albums.get(scope)||[]).find(item=>item.id===id);if(!item)return;
-    state.pending={scope,item};$('deleteMediaName').textContent=item.name||item.filename;
+    const isLinked=linked(item,scope),personName=isLinked?app().nameOf(scope.slice(9)):'';
+    state.pending={scope,item,isLinked};$('deleteMediaName').textContent=item.name||item.filename;
+    $('deleteMediaTitle').textContent=isLinked?'להסיר את הפריט מהאלבום של '+personName+'?':'האם אתה בטוח שאתה רוצה למחוק פריט זה?';
+    $('deleteMediaHint').textContent=isLinked?'התיוג של '+personName+' יוסר. הפריט ימשיך להופיע באלבום המקורי ובאלבומים של שאר המתויגים.':'הפריט יוסר מכל האלבומים שבהם הוא מופיע. מיד לאחר המחיקה אפשר לבחור ״ביטול מחיקה״.';
+    $('confirmMediaDelete').textContent=isLinked?'כן, הסר מהאלבום':'כן, מחק';
     $('deleteMediaError').textContent='';$('confirmMediaDelete').disabled=false;
     $('deleteMediaDialog').showModal();$('cancelMediaDelete').focus();
   }
-  async function change(item,scope,operation){
-    const response=await fetch('api/media/'+item.id+'/'+operation,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({scope})});
+  async function change(item,scope,operation,extra={}){
+    const response=await fetch('api/media/'+item.id+'/'+operation,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({scope,...extra})});
     let result;try{result=await response.json();}catch{throw Error('לא התקבלה תשובה מהשרת. נסו שוב.');}
     if(!response.ok)throw Error(result.error||'הפעולה לא נשמרה.');
     window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));return result;
@@ -96,13 +105,13 @@
   }
   async function confirmDelete(){
     if(!state.pending||state.deleting)return;
-    const {item,scope}=state.pending;state.deleting=true;
+    const {item,scope,isLinked}=state.pending;state.deleting=true;
     $('confirmMediaDelete').disabled=true;$('cancelMediaDelete').disabled=true;
     try{
-      await change(item,scope,'delete');$('deleteMediaDialog').close();
+      const result=await change(item,scope,isLinked?'untag':'delete');$('deleteMediaDialog').close();
       let restored=false;
-      const undo=async()=>{if(restored)return;restored=true;try{await change(item,scope,'restore');notify('הפריט הוחזר לאלבום ✓');}catch(error){restored=false;notify(error.message,{label:'ניסיון נוסף',run:undo});}};
-      notify('הפריט הוסר מהאלבום.',{label:'ביטול מחיקה',run:undo});
+      const undo=async()=>{if(restored)return;restored=true;try{await change(item,scope,isLinked?'retag':'restore',{restoreProfile:result.wasProfile===true});notify('הפריט הוחזר לאלבום ✓');}catch(error){restored=false;notify(error.message,{label:'ניסיון נוסף',run:undo});}};
+      notify('הפריט הוסר מהאלבום.',{label:isLinked?'ביטול ההסרה':'ביטול מחיקה',run:undo});
       if(!$('mediaViewer').open&&$('personDialog').open)$('personMediaNotice').querySelector('button')?.focus({preventScroll:true});
     }catch(error){$('deleteMediaError').textContent=error.message;}
     finally{state.deleting=false;$('confirmMediaDelete').disabled=false;$('cancelMediaDelete').disabled=false;}
@@ -115,6 +124,7 @@
     $('closeMediaViewer').addEventListener('click',()=>$('mediaViewer').close());
     $('mediaPrevious').addEventListener('click',()=>show(state.index-1));$('mediaNext').addEventListener('click',()=>show(state.index+1));
     $('mediaViewerDelete').addEventListener('click',()=>requestDelete(state.scope,current()?.id));
+    $('mediaViewerTag').addEventListener('click',()=>window.FamilyTags.open(current()?.id));
     $('confirmMediaDelete').addEventListener('click',confirmDelete);
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
@@ -122,11 +132,11 @@
     $('mediaViewer').addEventListener('close',()=>{clearStage();if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     $('mediaViewer').addEventListener('click',event=>{if(event.target===$('mediaViewer'))$('mediaViewer').close();});
     document.addEventListener('keydown',event=>{
-      if(!$('mediaViewer').open||$('deleteMediaDialog').open||event.target.closest('input,textarea'))return;
+      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||event.target.closest('input,textarea'))return;
       if(event.key==='ArrowRight'){event.preventDefault();show(state.index-1);}
       if(event.key==='ArrowLeft'){event.preventDefault();show(state.index+1);}
     });
   }
-  window.FamilyMedia={register,controls,open,openFrom,requestDelete};
+  window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify};
   document.addEventListener('DOMContentLoaded',init);
 })();

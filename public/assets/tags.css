@@ -1,0 +1,35 @@
+.media-controls .media-tag-button{background:#f4efdf;color:#826d43;border:1px solid #e1d3b5}
+.media-people-tags{display:flex;flex-wrap:wrap;gap:6px;padding:6px 13px 0}
+.media-people-tags:empty{display:none}
+.media-people-tags button{font:14px/1.6 var(--sans);padding:5px 10px;min-height:36px;border-radius:16px;color:#566b44;background:#eef2e6;border:1px solid #d8e0cb}
+.media-people-tags button:hover{border-color:#aaba93;background:#e4ebd8}
+.tag-people-dialog{width:650px;padding:30px}
+.tag-people-dialog h2{font-size:34px;margin-bottom:8px}
+.tag-media-name{font-size:18px;color:#6a7858;line-height:1.6;overflow-wrap:anywhere;margin:0 0 10px}
+.tag-help{font-size:15px;line-height:1.7;color:#85785e;margin:10px 0}
+.tag-selected-count{font-size:14px;color:#7c765f;margin:13px 0 7px}
+.selected-people{display:flex;gap:7px;flex-wrap:wrap;max-height:130px;overflow:auto;margin-bottom:16px;padding:2px}
+.selected-person-tag{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid #bacba8;border-radius:18px;background:#eaf0df;color:#4e6540;font-size:15px;min-height:40px}
+.selected-person-tag small{font-size:11px;color:#817349}.selected-person-tag>span{font-size:21px;line-height:1}
+.tag-selection-empty{font-size:15px;color:#9b8d72;padding:7px 0}
+.tag-search-label{display:flex;flex-direction:column;gap:7px;font-size:16px;color:#786a4d}
+.tag-people-results{max-height:270px;overflow:auto;border:1px solid #e3d9c4;border-radius:7px;background:#fffefa;overscroll-behavior:contain}
+.tag-person-option{display:flex;gap:12px;align-items:center;padding:10px 13px;border-bottom:1px solid #eee8d9;cursor:pointer;min-height:62px}
+.tag-person-option:last-child{border-bottom:0}.tag-person-option:hover{background:#f4f2e8}
+.tag-person-option:has(input:checked){background:#f0f4e9}
+.tag-people-dialog .tag-person-option input[type=checkbox]{width:21px;height:21px;min-width:21px;min-height:21px;accent-color:#647b50;margin:0;padding:0}
+.tag-person-option>span{display:flex;flex-direction:column;gap:1px}.tag-person-option strong{font-size:17px;font-weight:500}.tag-person-option small{font-size:12px;color:#8c8167}
+.tag-search-count{font-size:13px;color:#95896f;margin:8px 0}
+.tag-add-name{display:block;width:100%;min-height:46px;margin:12px 0 5px;padding:10px 14px;border:1px dashed #bcaa7b;border-radius:6px;color:#79653e;background:#f7f2e4;font-size:16px;overflow-wrap:anywhere}
+.tag-add-help{font-size:13px;line-height:1.7;color:#95846a;margin:7px 0}
+.tag-no-results{font-size:15px;color:#96856a;padding:18px 15px;text-align:center}
+.tag-people-dialog .form-actions{margin-top:16px}.tag-people-dialog .form-actions button{min-height:46px}
+.media-viewer .media-people-tags{padding:0;margin:0 0 13px}.media-viewer .media-people-tags button{color:#e2e9d7;border-color:#657657;background:#34432d}
+.media-viewer #mediaViewerTag{color:#e0d4ad;border:1px solid #6e704e}
+.personal-gallery-filters{margin:2px 0 20px}.personal-gallery-filters button{min-height:44px}
+.person-gallery-video{width:100%;aspect-ratio:16/9;object-fit:contain;background:#1e281c;display:block}
+.personal-video-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;aspect-ratio:16/9;width:100%;padding:18px;background:radial-gradient(ellipse at 50% 10%,#59664b,#23301f 85%);color:#f8f0dc}
+.personal-video-cover>span{display:grid;place-items:center;background:#a3382b;border-radius:10px;width:57px;height:40px;font:25px/1 Arial,sans-serif}.personal-video-cover strong{font:23px/1.4 var(--serif)}
+.linked-media-note{font-size:13px;line-height:1.6;color:#928163;margin:9px 13px 0}
+.personal-media-name{font-size:15px;color:#74694f;padding:8px 13px 0;overflow-wrap:anywhere}
+@media(max-width:600px){.tag-people-dialog{padding:28px 20px 20px}.tag-people-dialog h2{font-size:29px}.tag-people-results{max-height:230px}.tag-person-option{padding:9px 11px}.tag-person-option strong{font-size:16px}.selected-people{max-height:100px}.media-people-tags button{min-height:40px}.tag-people-dialog .form-actions{gap:8px}.tag-people-dialog .form-actions button{font-size:16px;padding:8px 12px}}
