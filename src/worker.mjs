@@ -62,6 +62,8 @@ async function streamUpload(request,maximum){
   return {size,head,body};
 }
 async function upload(request,env,db,ctx,{category,personId=null,mixed=false}){
+  const videoCategory=new URL(request.url).searchParams.get('group')||'family';
+  if(category==='videos'&&!['family','special-birthdays'].includes(videoCategory))throw new HttpError(400,'קטגוריית הסרטון אינה מוכרת.');
   if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני העלאת קבצים.');
   if(personId&&!family.people[personId])throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');
   const media=await streamUpload(request,mixed||category==='videos'?LIMITS.video:LIMITS.photo);
@@ -73,6 +75,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false}){
   }catch(error){await media.body.cancel();throw error;}
   const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:[category,personId||'shared'];
   const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,id+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
+  if(category==='videos')item.videoCategory=videoCategory;
   let transfer=Promise.resolve(),body=media.body;
   if(typeof FixedLengthStream!=='undefined'){
     const fixed=new FixedLengthStream(media.size);transfer=body.pipeTo(fixed.writable);body=fixed.readable;
@@ -123,7 +126,7 @@ async function story(request,env,db,ctx,id){
 function snapshot(request,result){const etag='"'+result.revision+'"';return request.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}}):json(result,200,{ETag:etag});}
 function secure(response){
   const headers=new Headers(response.headers);headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','same-origin');headers.set('X-Frame-Options','SAMEORIGIN');
-  headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'");
+  headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; frame-src 'self' https://www.youtube-nocookie.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'");
   headers.set('Cache-Control','private, no-store');return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 export default {
@@ -151,8 +154,15 @@ export default {
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia'}));
-      if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method))return await getObject(env,await db('media.get',{id:match[1]}),request);
+      if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
+        const item=await db('media.get',{id:match[1]});
+        if(item.provider==='youtube')return new Response(null,{status:302,headers:{Location:'https://www.youtube.com/watch?v='+item.youtubeId,'Cache-Control':'no-store'}});
+        return await getObject(env,item,request);
+      }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore)$/.exec(path))){
+          const body=await readJSON(request,2000);return json(await db('media.'+match[2],{id:match[1],scope:body.scope}));
+        }
         if((match=/^\/api\/weddings\/([^/]+)\/(date|greetings|upload|caption)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2],kind=weddingCollection(id);
           if(action==='upload')return await upload(request,env,db,ctx,{category:kind,mixed:true});

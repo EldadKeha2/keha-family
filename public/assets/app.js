@@ -38,9 +38,10 @@
     const unset = birthdayOf(p) === '1.1.1111';
     return `<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת הגלריה של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?' <span class="memorial-inline">ז״ל</span>':''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`;
   }
-  function toast(message) {
+  function toast(message,action) {
     clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
-    toastTimer = setTimeout(() => {$('toast').hidden = true;}, 6000);
+    if(action){const button=document.createElement('button');button.textContent=action.label;button.addEventListener('click',action.run);$('toast').append(button);}
+    toastTimer = setTimeout(() => {$('toast').hidden = true;}, action?20000:6000);
   }
   function renderBranches() {
     $('branchBar').innerHTML = `<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + data.branches.map(b => `<button class="branch-chip${state.branch===b.id?' active':''}" data-branch="${b.id}" style="--branch-color:${b.color}" aria-pressed="${state.branch===b.id}"><span class="chip-dot"></span>${safe(b.title)}</button>`).join('');
@@ -229,6 +230,7 @@
     if (!Array.isArray(item.gallery)) return;
     const personId = state.currentPerson;
     state.gallery = item.gallery;
+    window.FamilyMedia?.register('personal:'+personId,item.gallery);
     const photoCount = item.gallery.length;
     $('galleryCount').textContent = photoCount === 1 ? 'תמונה אחת' : photoCount ? `${photoCount} תמונות` : '';
     $('galleryEmpty').hidden = photoCount > 0;
@@ -242,7 +244,7 @@
         const draft = drafts.get(keyFor(personId, photo.file));
         const caption = draft?.dirty ? draft.value : photo.caption;
         const isProfile = item.profileIsManual && item.profileFile === photo.file;
-        return `<article class="gallery-photo"><button class="gallery-image" data-open-photo="${safe(photo.file)}" aria-label="פתיחת התמונה ${safe(photo.name)}"><img src="${safe(photo.src)}" alt="${safe(caption || photo.name)}" loading="lazy"></button><div class="photo-actions"><button class="profile-select${isProfile ? ' is-profile' : ''}" data-set-profile="${safe(photo.file)}" data-owner="${personId}" aria-pressed="${Boolean(isProfile)}" ${isProfile ? 'disabled' : ''}>${isProfile ? '✓ תמונת הפרופיל' : 'קביעה כתמונת פרופיל'}</button></div><div class="caption-editor"><label class="visually-hidden" for="caption-${safe(personId)}-${safe(encodeURIComponent(photo.file))}">כיתוב לתמונה ${safe(photo.name)}</label><textarea id="caption-${safe(personId)}-${safe(encodeURIComponent(photo.file))}" data-caption-file="${safe(photo.file)}" data-owner="${personId}" rows="2" maxlength="5000" placeholder="מי בתמונה? איפה ומתי? כתבו כאן…" ${apiEnabled ? '' : 'disabled'}>${safe(caption || '')}</textarea><div class="caption-toolbar"><span data-caption-status role="status">${draft?.dirty ? 'ממתין לשמירה…' : ''}</span><button data-save-caption="${safe(photo.file)}" data-owner="${personId}">שמירה</button></div></div></article>`;
+        return `<article class="gallery-photo"><button class="gallery-image" data-open-photo="${safe(photo.file)}" aria-label="פתיחת התמונה ${safe(photo.name)}"><img src="${safe(photo.src)}" alt="${safe(caption || photo.name)}" loading="lazy"></button><div class="photo-actions"><button class="profile-select${isProfile ? ' is-profile' : ''}" data-set-profile="${safe(photo.file)}" data-owner="${personId}" aria-pressed="${Boolean(isProfile)}" ${isProfile ? 'disabled' : ''}>${isProfile ? '✓ תמונת הפרופיל' : 'קביעה כתמונת פרופיל'}</button></div>${window.FamilyMedia?.controls(photo,'personal:'+personId)||''}<div class="caption-editor"><label class="visually-hidden" for="caption-${safe(personId)}-${safe(encodeURIComponent(photo.file))}">כיתוב לתמונה ${safe(photo.name)}</label><textarea id="caption-${safe(personId)}-${safe(encodeURIComponent(photo.file))}" data-caption-file="${safe(photo.file)}" data-owner="${personId}" rows="2" maxlength="5000" placeholder="מי בתמונה? איפה ומתי? כתבו כאן…" ${apiEnabled ? '' : 'disabled'}>${safe(caption || '')}</textarea><div class="caption-toolbar"><span data-caption-status role="status">${draft?.dirty ? 'ממתין לשמירה…' : ''}</span><button data-save-caption="${safe(photo.file)}" data-owner="${personId}">שמירה</button></div></div></article>`;
       }).join('');
       gallerySignature = signature;
       if (focusedFile) {
@@ -339,6 +341,7 @@
 
   function openPhoto(index) {
     if (!state.gallery.length) return;
+    if(window.FamilyMedia){window.FamilyMedia.open(state.gallery,index,'personal:'+state.currentPerson);return;}
     state.photoIndex = (index + state.gallery.length) % state.gallery.length;
     const photo = state.gallery[state.photoIndex];
     $('lightboxImage').src = photo.src;
@@ -500,7 +503,14 @@
     else if(e.key.startsWith('Arrow')){e.preventDefault();if(e.key==='ArrowLeft')camera.x+=50;if(e.key==='ArrowRight')camera.x-=50;if(e.key==='ArrowUp')camera.y+=50;if(e.key==='ArrowDown')camera.y-=50;applyCamera();}
   });
   let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.view==='tree')renderTree();},150);});
-  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],nameOf:id=>nameOf(data.people[id]),birthdayOf:id=>birthdayOf(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>{state.gallery=items;openPhoto(index);}};
+  window.addEventListener('family-media-changed',event=>{
+    const result=event.detail;if(!result.person)return;
+    const personId=result.person.id;
+    if(result.operation==='delete'){const key=keyFor(personId,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
+    updatePersonUI(personId,result.person);
+    if(state.currentPerson===personId&&$('personDialog').open)renderGallery(result.person);
+  });
+  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],nameOf:id=>nameOf(data.people[id]),birthdayOf:id=>birthdayOf(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
   renderBranches();renderView();
   if(apiEnabled){
     loadFamilyMedia();

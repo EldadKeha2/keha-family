@@ -101,7 +101,7 @@ test('tree corrections update existing names and add a spouse without changing s
     assert.equal((await (await f.call('/api/people/itzik')).json()).name,'איציק מאיר');
     assert.equal((await (await f.call('/api/people/rami')).json()).name,'רמי גנדלמן');
     const graph=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);
-    assert.equal(graph.people['rachel-katan'].name,'רחל קטן');assert.deepEqual(graph.units['u-yehiel'].people,['yehiel','rachel-katan']);
+    assert.equal(graph.people.chantal.name,'שנטל פירוז');assert.equal(graph.people.camille.name,'קמיל דה ווילה');assert.equal(graph.people['rachel-katan'].name,'רחל קטן');assert.deepEqual(graph.units['u-yehiel'].people,['yehiel','rachel-katan']);
     assert.equal((await (await f.call('/api/stories')).json()).stories[0].body,'סיפור שנשמר לפני העדכון');
     assert.deepEqual(new Uint8Array(await (await f.call(after.gallery[0].src)).arrayBuffer()),new Uint8Array(photo));
     f.restart();assert.equal((await (await f.call('/api/people/bosmat')).json()).revision,after.revision,'Applying the same tree twice must not change the person again');
@@ -230,7 +230,7 @@ test('nostalgia supports photos, video and downloadable documents without alteri
     const file=initial.items[0].file;assert.equal((await f.call('/api/nostalgia/caption',{method:'POST',body:{file,caption:'מכתב מהבית הישן'}})).status,200);
     const snapshot=await f.call('/api/nostalgia');assert.equal((await f.call('/api/nostalgia',{headers:{'If-None-Match':snapshot.headers.get('ETag')}})).status,304);
     f.restart();assert.equal((await (await f.call('/api/nostalgia')).json()).items[0].caption,'מכתב מהבית הישן');
-    assert.equal((await (await f.call('/api/collections/videos')).json()).count,0);assert.equal((await (await f.call('/api/weddings/u-root')).json()).mediaCount,0);
+    assert.equal((await (await f.call('/api/collections/videos')).json()).count,6);assert.equal((await (await f.call('/api/weddings/u-root')).json()).mediaCount,0);
     assert.equal((await f.call('/api/nostalgia/caption',{method:'POST',body:{file,caption:'x'},headers:{Origin:'https://foreign.example'}})).status,403);
   }finally{await f.close();}
 });
@@ -254,5 +254,77 @@ test('Yona death information is visible in family data and preserves existing bi
     assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.2015',expectedBirthday:person.birthday}})).status,400);
     const response=await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.1930',expectedBirthday:person.birthday}});assert.equal(response.status,200);
     f.restart();const restored=await (await f.call('/api/people/yona')).json();assert.equal(restored.birthday,'1.1.1930');assert.equal(restored.deathDate,'16.6.2010');
+  }finally{await f.close();}
+});
+test('special birthdays contain six unique YouTube videos and deletions survive deployment',async()=>{
+  const f=fixture();try{
+    await f.connect();const response=await f.call('/api/collections/videos'),initial=await response.json();
+    assert.equal(initial.count,6);assert.equal(new Set(initial.items.map(item=>item.youtubeId)).size,6);
+    assert.deepEqual(initial.items.map(item=>item.youtubeId),['LTTdcZUSF7A','bbsWuwVwHks','CqkreY-_mSs','KUP1WtKCtec','UerqNt1Hhc0','pws4Fk1jSFo']);
+    assert.ok(initial.items.every(item=>item.provider==='youtube'&&item.videoCategory==='special-birthdays'&&item.scope==='videos'&&/^[a-f0-9]{32}$/.test(item.id)));
+    const ora=initial.items.find(item=>item.youtubeId==='CqkreY-_mSs');assert.equal(ora.name,'אורה בת 60');
+    const redirect=await f.call(ora.src);assert.equal(redirect.status,302);assert.equal(redirect.headers.get('Location'),'https://www.youtube.com/watch?v=CqkreY-_mSs');
+    assert.equal(f.network.length,0,'Embedded videos do not upload or retrieve binary files');
+    assert.equal((await f.call('/api/media/'+ora.id+'/delete',{method:'POST',body:{scope:'photos'}})).status,404);
+    assert.equal((await f.call('/api/media/'+ora.id+'/delete',{method:'POST',body:{scope:'videos'},headers:{Origin:'https://foreign.example'}})).status,403);
+    const deleted=await (await f.call('/api/media/'+ora.id+'/delete',{method:'POST',body:{scope:'videos'}})).json();assert.equal(deleted.collection.count,5);
+    assert.notEqual(deleted.collection.revision,initial.revision);assert.equal((await f.call(ora.src)).status,404);
+    assert.equal((await f.call('/api/collections/videos',{headers:{'If-None-Match':response.headers.get('ETag')}})).status,200);
+    f.restart();assert.equal((await (await f.call('/api/collections/videos')).json()).count,5,'A source seed must not resurrect deleted videos');
+    assert.ok(!(await (await f.call('/api/export')).json()).media.some(item=>item.id===ora.id));
+    const restored=await (await f.call('/api/media/'+ora.id+'/restore',{method:'POST',body:{scope:'videos'}})).json();assert.equal(restored.collection.count,6);
+    f.restart();assert.equal((await (await f.call('/api/collections/videos')).json()).count,6);
+    assert.match((await f.call('/')).headers.get('Content-Security-Policy'),/frame-src 'self' https:\/\/www.youtube-nocookie.com/);
+  }finally{await f.close();}
+});
+test('personal photo deletion updates portraits, preserves dates and supports conservative undo',async()=>{
+  const f=fixture();try{
+    await f.connect();await f.call('/api/people/chantal/birthday',{method:'POST',body:{birthday:'2.3.1980',expectedBirthday:'1.1.1111'}});
+    for(const name of ['first.jpg','second.jpg'])assert.equal((await f.call('/api/people/chantal/photos?filename='+name,{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,201);
+    let person=await (await f.call('/api/people/chantal')).json();const [first,second]=person.gallery;
+    await f.call('/api/people/chantal/profile',{method:'POST',body:{file:first.file}});
+    const path='/api/media/'+first.id,body={scope:'personal:chantal'};
+    assert.equal((await f.call(path+'/delete',{method:'POST',body:{scope:'personal:yona'}})).status,404);
+    person=(await (await f.call(path+'/delete',{method:'POST',body})).json()).person;
+    assert.equal(person.name,'שנטל פירוז');assert.equal(person.birthday,'2.3.1980');assert.equal(person.photoCount,1);assert.equal(person.profile,second.src);assert.equal(person.profileIsManual,false);
+    assert.equal((await f.call(first.src)).status,404);assert.equal(f.objects.size,2,'Deleting a gallery item is reversible without removing the stored original');
+    f.restart();assert.equal((await (await f.call('/api/people/chantal')).json()).profile,second.src);
+    person=(await (await f.call(path+'/restore',{method:'POST',body})).json()).person;assert.equal(person.profile,first.src);assert.equal(person.profileIsManual,true);
+    await f.call(path+'/delete',{method:'POST',body});await f.call('/api/people/chantal/profile',{method:'POST',body:{file:second.file}});
+    person=(await (await f.call(path+'/restore',{method:'POST',body})).json()).person;assert.equal(person.profile,second.src,'Undo must not replace a new profile choice');
+    assert.deepEqual(new Uint8Array(await (await f.call(first.src)).arrayBuffer()),new Uint8Array(photo));
+    assert.equal((await (await f.call('/api/people/yona')).json()).photoCount,0);
+  }finally{await f.close();}
+});
+test('delete and restore isolate shared, wedding and nostalgia galleries and keep counters current',async()=>{
+  const f=fixture();try{
+    await f.connect();
+    for(const [root,scope]of [['/api/collections/photos','photos'],['/api/weddings/u-yehiel','wedding:u-yehiel'],['/api/nostalgia','nostalgia']]){
+      const result=await (await f.call(root+'/upload?filename=memory.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json(),item=result.collection.items[0];
+      const body={scope},path='/api/media/'+item.id;
+      assert.equal((await f.call(path+'/delete',{method:'POST',body,clientHeaders:false})).status,403);
+      let response=await f.call(path+'/delete',{method:'POST',body});assert.equal(response.status,200);let changed=await response.json();assert.equal(changed.collection.count,0);assert.notEqual(changed.collection.revision,result.collection.revision);
+      if(scope.startsWith('wedding:')){assert.equal(changed.wedding.mediaCount,0);assert.equal(changed.wedding.cover,null);}
+      f.restart();assert.equal((await f.call(item.src)).status,404);
+      assert.equal((await f.call(path+'/restore',{method:'POST',body:{scope:'videos'}})).status,404);
+      response=await f.call(path+'/restore',{method:'POST',body});assert.equal(response.status,200);changed=await response.json();assert.equal(changed.collection.count,1);
+      if(changed.wedding){assert.equal(changed.wedding.mediaCount,1);assert.equal(changed.wedding.cover,item.src);}
+      assert.deepEqual(new Uint8Array(await (await f.call(item.src)).arrayBuffer()),new Uint8Array(photo));
+    }
+    assert.equal((await (await f.call('/api/weddings/u-bosmat')).json()).mediaCount,0);assert.equal((await (await f.call('/api/collections/videos')).json()).count,6);
+    const form=new FormData();form.set('title','סיפור');form.set('year','2000');form.append('files',new File(['זיכרון'],'story.txt',{type:'text/plain'}));
+    const story=(await (await f.call('/api/stories',{method:'POST',body:form})).json()).story,id=story.attachments[0].src.split('/').pop();
+    assert.equal((await f.call('/api/media/'+id+'/delete',{method:'POST',body:{scope:'attachment'}})).status,400);
+    assert.equal((await f.call(story.attachments[0].src)).status,200);
+  }finally{await f.close();}
+});
+test('new video uploads keep their chosen birthday category',async()=>{
+  const f=fixture();try{
+    await f.connect();
+    const result=await (await f.call('/api/collections/videos/upload?filename=birthday.mp4&group=special-birthdays',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json();
+    assert.equal(result.collection.count,7);assert.equal(result.collection.items[0].videoCategory,'special-birthdays');assert.equal(result.collection.items[0].provider,undefined);
+    f.restart();assert.equal((await (await f.call('/api/collections/videos')).json()).items[0].videoCategory,'special-birthdays');
+    assert.equal((await f.call('/api/collections/videos/upload?filename=bad.mp4&group=other',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).status,400);
+    assert.equal(f.objects.size,1);
   }finally{await f.close();}
 });

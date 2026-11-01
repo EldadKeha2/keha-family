@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
+import {featuredVideos} from './featured-videos.mjs';
 
 // One SQLite-backed object serializes updates for this family. Binary files live in HF.
 export class FamilyState {
@@ -10,6 +11,7 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS media_trash(id TEXT PRIMARY KEY,data TEXT NOT NULL,deleted_at TEXT NOT NULL,profile_selected INTEGER NOT NULL DEFAULT 0)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS meta(id TEXT PRIMARY KEY,value TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS weddings(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
@@ -27,6 +29,11 @@ export class FamilyState {
         }
       }
       for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));
+      // Insert the oldest first because shared albums display the newest row first.
+      for(const item of [...featuredVideos].reverse()){
+        if(this.rows('SELECT id FROM media WHERE id=?',item.id).length||this.rows('SELECT id FROM media_trash WHERE id=?',item.id).length)continue;
+        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,NULL,?)',item.id,item.category,JSON.stringify(item));this.touch('videos');
+      }
     });
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
@@ -34,7 +41,17 @@ export class FamilyState {
   savePerson(item){item.revision=uid();this.sql.exec('UPDATE people SET data=? WHERE id=?',JSON.stringify(item),item.id);}
   media(id){const row=this.rows('SELECT data FROM media WHERE id=?',id)[0];if(!row)throw new HttpError(404,'הקובץ לא נמצא.');return JSON.parse(row.data);}
   personPhotos(id){return this.rows("SELECT data FROM media WHERE person_id=? AND category='personal' ORDER BY rowid",id).map(row=>JSON.parse(row.data));}
-  mediaPublic(item){return {file:item.file,filename:item.filename,name:item.name,caption:item.caption||'',size:item.size,mime:item.mime,kind:item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document'),src:'/media/'+item.id,uploadedAt:item.createdAt};}
+  mediaScope(item){return item.category==='personal'?'personal:'+item.personId:item.category;}
+  mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,caption:item.caption||'',size:item.size,mime:item.mime,kind:item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document'),src:'/media/'+item.id,uploadedAt:item.createdAt,
+    ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
+    ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
+  mediaChanged(item,operation){
+    const scope=this.mediaScope(item);
+    return {saved:true,operation,scope,item:this.mediaPublic(item),
+      ...(item.category==='personal'?{person:this.snapshot(this.person(item.personId),this.personPhotos(item.personId))}:{collection:this.collection(item.category)}),
+      ...(item.category.startsWith('wedding:')?{wedding:this.wedding(item.category.slice(8))}:{})};
+  }
+  touchMedia(item){if(item.category==='personal'){const person=this.person(item.personId);this.savePerson(person);}else this.touch(item.category);}
   snapshot(person,photos,includeGallery=true){
     const selected=photos.find(photo=>photo.id===person.profileId),profile=selected||photos[0];
     return {...person,invalidBirthday:false,profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,
@@ -78,6 +95,28 @@ export class FamilyState {
         return {saved:true};
       }
       case 'media.get':return this.media(p.id);
+      case 'media.delete':{
+        const item=this.media(p.id);
+        if(this.mediaScope(item)!==p.scope)throw new HttpError(404,'הפריט לא נמצא באלבום הזה.');
+        if(item.category==='attachment')throw new HttpError(400,'מסמך זה הוא חלק מסיפור.');
+        if(item.category!=='personal')validCollection(item.category);
+        const person=item.personId?this.person(item.personId):null,selected=person?.profileId===item.id;
+        this.sql.exec('INSERT INTO media_trash(id,data,deleted_at,profile_selected) VALUES(?,?,?,?)',item.id,JSON.stringify(item),new Date().toISOString(),selected?1:0);
+        this.sql.exec('DELETE FROM media WHERE id=?',item.id);
+        if(selected){person.profileId=null;this.savePerson(person);}else this.touchMedia(item);
+        return this.mediaChanged(item,'delete');
+      }
+      case 'media.restore':{
+        const row=this.rows('SELECT data,profile_selected FROM media_trash WHERE id=?',p.id)[0];
+        if(!row)throw new HttpError(404,'לא נמצא פריט שניתן לשחזר.');
+        const item=JSON.parse(row.data);
+        if(this.mediaScope(item)!==p.scope)throw new HttpError(404,'הפריט לא נמצא באלבום הזה.');
+        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,row.data);
+        this.sql.exec('DELETE FROM media_trash WHERE id=?',item.id);
+        const person=item.personId?this.person(item.personId):null;
+        if(row.profile_selected&&person&&!person.profileId){person.profileId=item.id;this.savePerson(person);}else this.touchMedia(item);
+        return this.mediaChanged(item,'restore');
+      }
       case 'media.caption':{
         const caption=text(p.caption,'תיאור',5000),category=p.personId?'personal':p.kind;
         const candidates=p.personId?this.personPhotos(p.personId):this.rows('SELECT data FROM media WHERE category=?',category).map(row=>JSON.parse(row.data));

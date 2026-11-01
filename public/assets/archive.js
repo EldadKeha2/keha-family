@@ -102,6 +102,7 @@
     if(scope()!==key)return;
     const collection=collections.get(key)||{items:[]},filter=filters.get(key)||'all',query=normalize(state.query);
     const items=collection.items.filter(item=>(filter==='all'||item.kind===filter)&&(!query||normalize(item.name+' '+item.caption).includes(query)));
+    window.FamilyMedia.register(key,items);
     const grid=$(gridId(key)),sameScope=grid.dataset.scope===key;
     const oldCards=new Map((sameScope?[...grid.children]:[]).filter(card=>card.dataset.mediaFile).map(card=>[card.dataset.mediaFile,card]));
     const cards=[];
@@ -110,11 +111,11 @@
       if(!card){
         card=document.createElement('article');card.className='shared-media-card';card.dataset.mediaFile=item.file;
         let viewer;
-        if(item.kind==='photo')viewer=`<button class="gallery-image" data-archive-photo="${safe(item.file)}" aria-label="פתיחת התמונה ${safe(item.name)}"><img src="${safe(item.src)}" alt="${safe(item.caption||item.name)}" loading="lazy"></button>`;
+        if(item.kind==='photo')viewer=`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(key)}" aria-label="פתיחת התמונה ${safe(item.name)}"><img src="${safe(item.src)}" alt="${safe(item.caption||item.name)}" loading="lazy"></button>`;
         else if(item.kind==='video')viewer=`<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||item.name)}"><source src="${safe(item.src)}" type="${safe(item.mime)}"></video></div><div class="video-file-info"><span>${safe(item.name)}</span><a href="${safe(item.src)}" download="${safe(item.filename)}">הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הסרטון לא מתנגן כאן. אפשר להוריד את המקור או להעלות MP4 עם H.264.</p>`;
         else viewer=`<a class="archive-document" href="${safe(item.src)}" download="${safe(item.filename)}"><span class="document-emblem" aria-hidden="true">▤</span><strong>${safe(item.name)}</strong><small>${safe(item.filename.split('.').pop().toUpperCase())} · ${(item.size/1024/1024).toFixed(1)}MB</small><span>הורדת המסמך ↓</span></a>`;
         const captionId='archive-caption-'+item.file.replace(/[^a-zA-Z0-9-]/g,'-');
-        card.innerHTML=viewer+`<div class="media-file-name">${safe(item.filename)}</div><div class="caption-editor"><label for="${captionId}">${item.kind==='photo'?'מי בתמונה? איפה ומתי?':item.kind==='video'?'מה רואים בסרטון?':'מה הסיפור של המסמך?'}</label><textarea id="${captionId}" rows="2" maxlength="5000" data-archive-caption="${safe(item.file)}" data-archive-scope="${safe(key)}" placeholder="כמה מילים שיעזרו לשמור את הזיכרון…"></textarea><div class="caption-toolbar"><span data-archive-caption-status role="status"></span><button data-save-archive-caption="${safe(item.file)}" data-archive-scope="${safe(key)}">שמירה</button></div></div>`;
+        card.innerHTML=viewer+`<div class="media-file-name">${safe(item.filename)}</div>`+window.FamilyMedia.controls(item,key)+`<div class="caption-editor"><label for="${captionId}">${item.kind==='photo'?'מי בתמונה? איפה ומתי?':item.kind==='video'?'מה רואים בסרטון?':'מה הסיפור של המסמך?'}</label><textarea id="${captionId}" rows="2" maxlength="5000" data-archive-caption="${safe(item.file)}" data-archive-scope="${safe(key)}" placeholder="כמה מילים שיעזרו לשמור את הזיכרון…"></textarea><div class="caption-toolbar"><span data-archive-caption-status role="status"></span><button data-save-archive-caption="${safe(item.file)}" data-archive-scope="${safe(key)}">שמירה</button></div></div>`;
         if(item.kind==='video')card.querySelector('video').addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;},true);
       }
       const draft=drafts.get(draftKey(key,item.file)),area=card.querySelector('textarea');
@@ -255,6 +256,14 @@
     for(const id of ['weddingUploadInput','nostalgiaUploadInput'])$(id).addEventListener('change',()=>addFiles($(id).dataset.scope,$(id).files));
     for(const id of ['weddingDropzone','nostalgiaDropzone'])$(id).addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(id).contains(event.relatedTarget))$(id).classList.remove('drag-over');});
     $('weddingBranchFilter').addEventListener('change',renderWeddings);$('weddingDateForm').addEventListener('submit',saveDate);$('clearWeddingDate').addEventListener('click',event=>saveDate(event,true));$('weddingGreetingForm').addEventListener('submit',saveGreeting);
+    window.addEventListener('family-media-changed',event=>{
+      const result=event.detail,key=result.scope;if(!result.collection||(key!=='nostalgia'&&!key.startsWith('wedding:')))return;
+      if(result.operation==='delete'){const id=draftKey(key,result.item.file);clearTimeout(drafts.get(id)?.timer);drafts.delete(id);}
+      collections.set(key,result.collection);
+      if(result.wedding){const id=result.wedding.id;summaries.set(id,result.wedding);if(details.has(id))details.set(id,{...details.get(id),...result.wedding,collection:result.collection});}
+      if(scope()===key)renderCollection(key);else window.FamilyMedia.register(key,result.collection.items);
+      if(state.view==='weddings'&&!state.weddingId)renderWeddings();
+    });
     $('shareWedding').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(location.href);toast('הקישור לעמוד החתונה הועתק ✓');}catch{toast('אפשר להעתיק את הקישור משורת הכתובת.');}});
     $('weddingDateDialog').addEventListener('click',event=>{if(event.target!==$('weddingDateDialog'))return;const rect=$('weddingDateDialog').getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)$('weddingDateDialog').close();});
     window.addEventListener('popstate',route);window.addEventListener('hashchange',route);
