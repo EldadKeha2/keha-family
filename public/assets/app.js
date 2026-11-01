@@ -87,6 +87,7 @@
   function renderTree() {
     const overview = state.branch === 'all' && state.mode === 'overview';
     const rootId = state.branch === 'all' ? data.root : branchFor(state.branch).unit;
+    const rootHistorySpace = data.units[rootId].people.some(id=>data.people[id].aliyahYear) ? 40 : 0;
     const gap = 36;
     const levelHeight = 340;
     const top = 70;
@@ -103,7 +104,7 @@
       widths.set(id,width);return width;
     }
     function place(id,left,depth) {
-      const unit=data.units[id], width=widths.get(id), x=left+width/2, y=top+depth*levelHeight;
+      const unit=data.units[id], width=widths.get(id), x=left+width/2, y=top+depth*levelHeight+(depth?rootHistorySpace:0);
       positions.push({id,unit,x,y,width:nodeWidth(unit),depth});
       const kids=children(unit);
       let right=left+width;
@@ -112,7 +113,8 @@
       const childCenters=[];
       for (const child of kids) {const w=widths.get(child);const childX=right-w/2;childCenters.push(childX);place(child,right-w,depth+1);right-=w+gap;}
       if(kids.length){
-        const start=y+261, middle=y+294, end=y+levelHeight-7;
+        const extra=depth===0?rootHistorySpace:0;
+        const start=y+261+extra, middle=y+294+extra, end=y+levelHeight-7+extra;
         lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);
         if(kids.length>1) lines.push(`<path d="M${Math.min(...childCenters)} ${middle}H${Math.max(...childCenters)}"/>`);
         for(const cx of childCenters) lines.push(`<path d="M${cx} ${middle}V${end}"/>`);
@@ -121,7 +123,7 @@
     const width=measure(rootId)+2*pad;
     place(rootId,pad,0);
     const maxDepth=Math.max(...positions.map(p=>p.depth));
-    const height=top+maxDepth*levelHeight+(overview?316:278)+30;
+    const height=top+maxDepth*levelHeight+(maxDepth?rootHistorySpace:0)+(overview?316:278)+30;
     camera.width=width;camera.height=height;
     const world=$('treeWorld');world.style.width=width+'px';world.style.height=height+'px';
     $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
