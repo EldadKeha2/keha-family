@@ -66,13 +66,18 @@
           const draft = drafts.get(captionKey(kind,item.file));
           const caption = draft?.dirty ? draft.value : item.caption;
           const viewer = item.provider==='youtube'
-            ? `<button class="youtube-poster" data-media-open="${safe(item.id)}" data-media-scope="videos" aria-label="ניגון ${safe(item.name)} בגלריה"><img src="${safe(item.poster)}" alt="${safe(item.name)}" loading="lazy"><span class="youtube-play" aria-hidden="true"><span>▶</span></span></button><div class="youtube-card-heading"><h3>${safe(item.name)}</h3><a href="${safe(item.watchUrl)}" target="_blank" rel="noopener">YouTube ↗</a></div><p class="video-category-label">ימי הולדת מיוחדים</p>`
+            ? `<button class="youtube-poster" data-media-open="${safe(item.id)}" data-media-scope="videos" aria-label="ניגון ${safe(item.name)} בגלריה"><img src="${safe(item.poster)}" alt="${safe(item.name)}" loading="lazy"><span class="youtube-play" aria-hidden="true"><span>▶</span></span><span class="youtube-poster-title" aria-hidden="true" hidden>${safe(item.name)}</span></button><div class="youtube-card-heading"><h3>${safe(item.name)}</h3><a href="${safe(item.watchUrl)}" target="_blank" rel="noopener">YouTube ↗</a></div><p class="video-category-label">ימי הולדת מיוחדים</p>`
             : isVideo
               ? `<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||item.name)}"><source src="${safe(item.src)}" type="${safe(item.mime)}">הדפדפן אינו תומך בניגון הסרטון.</video></div><div class="video-file-info"><span>${safe(item.name)}</span><a href="${safe(item.src)}" download>הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הפורמט הזה לא מתנגן בדפדפן הנוכחי. אפשר להוריד את המקור או להעלות גרסת MP4 בתקן H.264.</p>`
               : `<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${kind}" aria-label="פתיחת התמונה ${safe(item.name)}"><img src="${safe(item.src)}" alt="${safe(caption||item.name)}" loading="lazy"></button>`;
           const id = `shared-caption-${kind}-${encodeURIComponent(item.file)}`;
           card.innerHTML = viewer + window.FamilyMedia.controls(item,kind) + `<div class="caption-editor"><label for="${safe(id)}">${isVideo?'מה רואים בסרטון?':'מי בתמונה? איפה ומתי?'}</label><textarea id="${safe(id)}" data-shared-kind="${kind}" data-shared-file="${safe(item.file)}" rows="2" maxlength="5000" placeholder="כתבו כאן את הסיפור של הרגע הזה…" ${app()?.apiEnabled?'':'disabled'}>${safe(caption)}</textarea><div class="caption-toolbar"><span data-shared-status role="status">${draft?.dirty?'ממתין לשמירה…':''}</span><button data-save-shared="${safe(item.file)}" data-shared-kind="${kind}">שמירה</button></div></div>`;
           card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;},true);
+          if(item.provider==='youtube'){
+            const img=card.querySelector('.youtube-poster img');
+            const fallback=()=>{img.hidden=true;card.querySelector('.youtube-poster').classList.add('is-fallback');card.querySelector('.youtube-poster-title').hidden=false;};
+            img.addEventListener('error',fallback,{once:true});if(img.complete&&!img.naturalWidth)fallback();
+          }
         }
         card.style.setProperty('--card-index',Math.min(index,8));cards.push(card);
       }
