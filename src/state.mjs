@@ -26,10 +26,13 @@ export class FamilyState {
         this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
+        const nameChanged=person.name!==p.name;
         if(person.name!==p.name||person.deceased!==Boolean(p.deceased)||person.deathDate!==(p.deathDate||null)||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)){
           person.name=p.name;person.deceased=Boolean(p.deceased);person.deathDate=p.deathDate||null;
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
           this.savePerson(person);
+          // Tagged albums cache by revision; a canonical rename changes their labels too.
+          if(nameChanged)for(const row of this.rows('SELECT m.data FROM media m JOIN media_tags t ON t.media_id=m.id WHERE t.person_id=?',p.id))this.touchMedia(JSON.parse(row.data));
         }
       }
       for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));

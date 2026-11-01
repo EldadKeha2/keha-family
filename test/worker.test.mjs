@@ -90,7 +90,9 @@ test('tree corrections update existing names and add a spouse without changing s
     response=await f.call('/api/people/bosmat/caption',{method:'POST',body:{file,caption:'תיאור שנשמר לפני תיקון השם'}});assert.equal(response.status,200);
     response=await f.call('/api/stories',{method:'POST',body:{title:'זיכרון משפחתי',year:2000,body:'סיפור שנשמר לפני העדכון'}});assert.equal(response.status,201);
     const before=await (await f.call('/api/people/bosmat')).json();
-    for(const [id,name] of [['bosmat','בשמת מאיר'],['itzik','איציק'],['rami','רמי']]){
+    const tagged=await taggedUpload(f);await setTags(f,tagged,['memo','camille']);
+    const beforeTagged=await f.call('/api/collections/photos');
+    for(const [id,name] of [['bosmat','בשמת מאיר'],['itzik','איציק'],['rami','רמי'],['memo','ממו וארגאס'],['camille','קמיל דה ווילה']]){
       const person=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);person.name=name;
       f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(person),id);
     }
@@ -101,7 +103,10 @@ test('tree corrections update existing names and add a spouse without changing s
     assert.equal((await (await f.call('/api/people/itzik')).json()).name,'איציק מאיר');
     assert.equal((await (await f.call('/api/people/rami')).json()).name,'רמי גנדלמן');
     const graph=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);
-    assert.equal(graph.people.chantal.name,'שנטל פירוז');assert.equal(graph.people.camille.name,'קמיל דה ווילה');assert.equal(graph.people['rachel-katan'].name,'רחל קטן');assert.deepEqual(graph.units['u-yehiel'].people,['yehiel','rachel-katan']);
+    assert.equal(graph.people.chantal.name,'שנטל פירוז');assert.equal(graph.people.camille.name,'קמיל דה ויטה');assert.equal(graph.people.memo.name,'גיירמו וארגאס');assert.equal(graph.people.memo.firstName,'גיירמו');assert.equal(graph.people['rachel-katan'].name,'רחל קטן');assert.deepEqual(graph.units['u-yehiel'].people,['yehiel','rachel-katan']);
+    const renamedTags=await f.call('/api/collections/photos',{headers:{'If-None-Match':beforeTagged.headers.get('ETag')}});assert.equal(renamedTags.status,200,'A rename must refresh existing cached tag labels');
+    const taggedPhoto=(await renamedTags.json()).items[0];assert.equal(taggedPhoto.id,tagged.id);assert.deepEqual(taggedPhoto.tags.map(person=>person.name),['גיירמו וארגאס','קמיל דה ויטה']);
+    const roster=(await (await f.call('/api/tag-people')).json()).people;assert.equal(roster.find(person=>person.id==='memo').name,'גיירמו וארגאס');assert.equal(roster.find(person=>person.id==='camille').name,'קמיל דה ויטה');
     assert.equal((await (await f.call('/api/stories')).json()).stories[0].body,'סיפור שנשמר לפני העדכון');
     assert.deepEqual(new Uint8Array(await (await f.call(after.gallery[0].src)).arrayBuffer()),new Uint8Array(photo));
     f.restart();assert.equal((await (await f.call('/api/people/bosmat')).json()).revision,after.revision,'Applying the same tree twice must not change the person again');
@@ -340,7 +345,7 @@ test('one shared photo appears immediately in every tagged personal album withou
   const f=fixture();try{
     await f.connect();const item=await taggedUpload(f),before=await f.call('/api/people/chantal');
     const response=await setTags(f,item,['chantal','camille','chantal']);assert.equal(response.status,200);const changed=await response.json();
-    assert.deepEqual(changed.item.tags.map(person=>person.name),['שנטל פירוז','קמיל דה ווילה']);
+    assert.deepEqual(changed.item.tags.map(person=>person.name),['שנטל פירוז','קמיל דה ויטה']);
     for(const id of ['chantal','camille']){const person=changed.people[id];assert.equal(person.photoCount,1);assert.equal(person.mediaCount,1);assert.equal(person.gallery[0].id,item.id);assert.equal(person.gallery[0].src,item.src);assert.equal(person.gallery[0].linked,true);assert.equal(person.gallery[0].scope,'photos');}
     assert.equal((await f.call('/api/people/chantal',{headers:{'If-None-Match':before.headers.get('ETag')}})).status,200);
     assert.equal(f.objects.size,1);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media WHERE id=?').get(item.id).n,1);
