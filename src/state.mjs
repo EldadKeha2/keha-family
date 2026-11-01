@@ -20,8 +20,10 @@ export class FamilyState {
         this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
-        if(person.name!==p.name||person.deceased!==Boolean(p.deceased)||person.deathDate!==(p.deathDate||null)){
-          person.name=p.name;person.deceased=Boolean(p.deceased);person.deathDate=p.deathDate||null;this.savePerson(person);
+        if(person.name!==p.name||person.deceased!==Boolean(p.deceased)||person.deathDate!==(p.deathDate||null)||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)){
+          person.name=p.name;person.deceased=Boolean(p.deceased);person.deathDate=p.deathDate||null;
+          if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
+          this.savePerson(person);
         }
       }
       for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));
