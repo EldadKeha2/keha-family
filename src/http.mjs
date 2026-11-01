@@ -23,15 +23,19 @@ export function text(value,label,max,required=false){
   value=value.trim();if((required&&!value)||value.length>max)throw new HttpError(400,`${label}: יש להזין ${required?'טקסט ועד':'עד'} ${max.toLocaleString('en-US')} תווים.`);
   return value;
 }
-export function birthday(value){
-  if(typeof value!=='string')throw new HttpError(400,'יש להזין תאריך לידה.');
-  if(value.trim()===''||value==='1.1.1111')return '1.1.1111';
+export function calendarDate(value,label='תאריך'){
+  if(typeof value!=='string')throw new HttpError(400,`יש להזין ${label}.`);
   const m=/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/.exec(value.trim());
-  if(!m)throw new HttpError(400,'יש להזין תאריך לידה תקין.');
+  if(!m)throw new HttpError(400,`יש להזין ${label} תקין.`);
   const [d,mn,y]=m.slice(1).map(Number),date=new Date(Date.UTC(y,mn-1,d));
   const now=new Date(),today=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
   if(y<1000||date.getUTCFullYear()!==y||date.getUTCMonth()!==mn-1||date.getUTCDate()!==d||date.getTime()>today)throw new HttpError(400,'יש להזין תאריך אמיתי שאינו בעתיד.');
   return `${d}.${mn}.${y}`;
+}
+export function birthday(value){
+  if(typeof value!=='string')throw new HttpError(400,'יש להזין תאריך לידה.');
+  if(value.trim()===''||value==='1.1.1111')return '1.1.1111';
+  return calendarDate(value,'תאריך לידה');
 }
 export async function readJSON(request,max=1_000_000){
   const buffer=await boundedBody(request,max);

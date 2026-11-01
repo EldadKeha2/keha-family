@@ -29,9 +29,10 @@
   }
   function birthdayHTML(p) {
     const invalid = getMedia(p).invalidBirthday;
-    const value = birthdayOf(p), age = invalid || p.deceased ? null : window.FamilyDates.age(value);
+    const value = birthdayOf(p), death = p.deathDate ? window.FamilyDates.parse(p.deathDate) : null;
+    const age = invalid ? null : p.deceased ? death ? window.FamilyDates.age(value,death.date) : null : window.FamilyDates.age(value);
     const unknown = value === '1.1.1111';
-    return `<span class="birthday-line"><bdi>${safe(invalid ? 'תאריך לבדיקה' : unknown ? 'טרם הוזן' : value)}</bdi><button class="birthday-edit" data-edit-birthday="${p.id}" aria-label="עריכת יום ההולדת של ${safe(nameOf(p))}" title="עריכת יום הולדת"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z"/></svg></button></span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?'היה כיום בגיל':'גיל'} ${age}">${p.deceased?`(היה כיום בן ${age})`:`(${age})`}</span>` : ''}`;
+    return `<span class="birthday-line"><bdi>${safe(invalid ? 'תאריך לבדיקה' : unknown ? 'טרם הוזן' : value)}</bdi><button class="birthday-edit" data-edit-birthday="${p.id}" aria-label="עריכת יום ההולדת של ${safe(nameOf(p))}" title="עריכת יום הולדת"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z"/></svg></button></span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?'גיל בפטירה':'גיל'} ${age}">${p.deceased?`(${p.gender==='f'?'בת':'בן'} ${age} בפטירת${p.gender==='f'?'ה':'ו'})`:`(${age})`}</span>` : ''}${death?`<span class="person-death-date">${p.gender==='f'?'נפטרה':'נפטר'} ב־<bdi>${safe(p.deathDate)}</bdi></span>`:''}`;
   }
   function personCardHTML(p) {
     const unset = birthdayOf(p) === '1.1.1111';
@@ -65,13 +66,14 @@
     $('treeView').hidden = !isTree;
     $('directoryView').hidden = !isDirectory;
     $('branchBar').hidden = global;
-    const titles = {tree:['האילן המשפחתי','משורש משותף, שישה ענפים של אהבה'],directory:['כל בני המשפחה','האלבומים וימי ההולדת של כולנו'],videos:['סרטוני המשפחה','הקולות, הצחוק והרגעים שנשארים איתנו'],photos:['תמונות משפחתיות','אלבום אחד, אינספור זיכרונות משותפים'],stories:['הסיפורים שלנו','יומן משפחתי, מהעבר ועד היום']};
+    const titles = {tree:['האילן המשפחתי','משורש משותף, שישה ענפים של אהבה'],directory:['כל בני המשפחה','האלבומים וימי ההולדת של כולנו'],videos:['סרטוני המשפחה','הקולות, הצחוק והרגעים שנשארים איתנו'],photos:['תמונות משפחתיות','אלבום אחד, אינספור זיכרונות משותפים'],stories:['הסיפורים שלנו','יומן משפחתי, מהעבר ועד היום'],weddings:['החתונות שלנו','סיפורי האהבה, הברכות והרגעים מהיום המיוחד'],nostalgia:['פינת הנוסטלגיה','תמונות, סרטים ומכתבים שמחזירים אותנו הביתה']};
     const [title,subtitle] = titles[state.view] || titles.tree;
     $('workspaceTitle').textContent = title;
     $('workspaceSubtitle').textContent = subtitle;
     $('searchInput').placeholder = global ? state.view==='stories'?'חיפוש בסיפורים ובשנים':'חיפוש לפי כיתוב או שם קובץ' : 'חיפוש בן או בת משפחה';
     $('searchInput').setAttribute('aria-label', global?'חיפוש בתוכן המשפחתי':'חיפוש בני משפחה');
     window.FamilyPortal?.activate(state.view);
+    window.FamilyArchive?.activate(state.view);
     if (isTree) renderTree(); else if (isDirectory) renderDirectory();
   }
   function renderDirectory() {
@@ -348,7 +350,7 @@
 
   function showSearch() {
     const query=normalize(state.query);
-    if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);$('searchResults').hidden=true;return;}
+    if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyArchive?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory'){renderDirectory();$('searchResults').hidden=true;return;}
     if(!query){$('searchResults').hidden=true;return;}
     const matches=people.filter(p=>normalize(nameOf(p)).includes(query));
@@ -430,7 +432,7 @@
   document.addEventListener('input',event=>{if(event.target.matches('textarea[data-caption-file]'))editCaption(event.target);});
   document.addEventListener('focusout',event=>{if(event.target.matches('textarea[data-caption-file]'))saveCaption(keyFor(event.target.dataset.owner,event.target.dataset.captionFile));});
   document.addEventListener('paste',event=>{
-    if (!$('personDialog').open) {window.FamilyPortal?.acceptPaste(event);return;}
+    if (!$('personDialog').open) {if(!window.FamilyArchive?.acceptPaste(event))window.FamilyPortal?.acceptPaste(event);return;}
     if ($('lightbox').open) return;
     const files=Array.from(event.clipboardData?.items || []).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);
     if(files.length){event.preventDefault();addUploads(files,true);}
@@ -439,7 +441,7 @@
     if(Array.from(event.dataTransfer?.types || []).includes('Files')){
       event.preventDefault();
       if($('personDialog').open&&!$('lightbox').open)$('photoDropzone').classList.add('drag-over');
-      else window.FamilyPortal?.dragOver(event);
+      else {window.FamilyPortal?.dragOver(event);window.FamilyArchive?.dragOver(event);}
     }
   });
   $('personDialog').addEventListener('dragleave',event=>{if(!event.relatedTarget||!$('personDialog').contains(event.relatedTarget))$('photoDropzone')?.classList.remove('drag-over');});
@@ -447,7 +449,7 @@
     if(!event.dataTransfer?.files.length)return;
     event.preventDefault();
     if($('personDialog').open&&!$('lightbox').open){$('photoDropzone').classList.remove('drag-over');addUploads(event.dataTransfer.files);}
-    else if (!window.FamilyPortal?.acceptDrop(event)) toast('פתחו גלריה שאליה תרצו להוסיף את התמונות.');
+    else if (!window.FamilyArchive?.acceptDrop(event)&&!window.FamilyPortal?.acceptDrop(event)) toast('פתחו גלריה שאליה תרצו להוסיף את התמונות.');
   });
   $('photoUploadInput').addEventListener('change',()=>{if($('photoUploadInput').files.length)addUploads($('photoUploadInput').files);});
   $('personCameraInput').addEventListener('change',()=>{if($('personCameraInput').files.length)addUploads($('personCameraInput').files);});
@@ -496,7 +498,7 @@
     else if(e.key.startsWith('Arrow')){e.preventDefault();if(e.key==='ArrowLeft')camera.x+=50;if(e.key==='ArrowRight')camera.x-=50;if(e.key==='ArrowUp')camera.y+=50;if(e.key==='ArrowDown')camera.y-=50;applyCamera();}
   });
   let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.view==='tree')renderTree();},150);});
-  window.FamilyApp={getView:()=>state.view,getPerson:id=>data.people[id],nameOf:id=>nameOf(data.people[id]),birthdayOf:id=>birthdayOf(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>{state.gallery=items;openPhoto(index);}};
+  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],nameOf:id=>nameOf(data.people[id]),birthdayOf:id=>birthdayOf(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>{state.gallery=items;openPhoto(index);}};
   renderBranches();renderView();
   if(apiEnabled){
     loadFamilyMedia();

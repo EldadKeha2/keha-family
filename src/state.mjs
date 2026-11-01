@@ -1,5 +1,6 @@
 import family from './family.mjs';
-import {HttpError,json,fail,text,birthday,uid} from './http.mjs';
+import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
+import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 
 // One SQLite-backed object serializes updates for this family. Binary files live in HF.
 export class FamilyState {
@@ -11,13 +12,19 @@ export class FamilyState {
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS meta(id TEXT PRIMARY KEY,value TEXT NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS weddings(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS greetings(id TEXT PRIMARY KEY,wedding_id TEXT NOT NULL,data TEXT NOT NULL)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS greetings_wedding ON greetings(wedding_id)');
     this.ctx.storage.transactionSync(()=>{
       for(const p of Object.values(family.people)){
         this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
-        if(person.name!==p.name){person.name=p.name;this.savePerson(person);}
+        if(person.name!==p.name||person.deceased!==Boolean(p.deceased)||person.deathDate!==(p.deathDate||null)){
+          person.name=p.name;person.deceased=Boolean(p.deceased);person.deathDate=p.deathDate||null;this.savePerson(person);
+        }
       }
+      for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));
     });
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
@@ -25,18 +32,25 @@ export class FamilyState {
   savePerson(item){item.revision=uid();this.sql.exec('UPDATE people SET data=? WHERE id=?',JSON.stringify(item),item.id);}
   media(id){const row=this.rows('SELECT data FROM media WHERE id=?',id)[0];if(!row)throw new HttpError(404,'הקובץ לא נמצא.');return JSON.parse(row.data);}
   personPhotos(id){return this.rows("SELECT data FROM media WHERE person_id=? AND category='personal' ORDER BY rowid",id).map(row=>JSON.parse(row.data));}
-  mediaPublic(item){return {file:item.file,filename:item.filename,name:item.name,caption:item.caption||'',size:item.size,mime:item.mime,src:'/media/'+item.id,uploadedAt:item.createdAt};}
+  mediaPublic(item){return {file:item.file,filename:item.filename,name:item.name,caption:item.caption||'',size:item.size,mime:item.mime,kind:item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document'),src:'/media/'+item.id,uploadedAt:item.createdAt};}
   snapshot(person,photos,includeGallery=true){
     const selected=photos.find(photo=>photo.id===person.profileId),profile=selected||photos[0];
     return {...person,invalidBirthday:false,profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,
       ...(includeGallery?{gallery:photos.map(photo=>this.mediaPublic(photo))}:{})};
   }
   collection(kind){
-    if(!['photos','videos'].includes(kind))throw new HttpError(404,'הגלריה לא נמצאה.');
+    validCollection(kind);
     const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC',kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
     return {kind,items,count:items.length,revision:this.rows('SELECT value FROM meta WHERE id=?','collection:'+kind)[0]?.value||'empty'};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
+  wedding(id,details=false){
+    const pair=couple(id),record=JSON.parse(this.rows('SELECT data FROM weddings WHERE id=?',id)[0].data);
+    const collection=this.collection(weddingCollection(id));
+    const greetings=this.rows('SELECT data FROM greetings WHERE wedding_id=? ORDER BY rowid DESC',id).map(row=>JSON.parse(row.data));
+    return {...pair,...record,mediaCount:collection.count,greetingCount:greetings.length,cover:collection.items.find(item=>item.kind==='photo')?.src||null,
+      ...(details?{collection,greetings}:{})};
+  }
   run(action,p){
     switch(action){
       case 'people':{
@@ -48,13 +62,17 @@ export class FamilyState {
       case 'person':return this.snapshot(this.person(p.id),this.personPhotos(p.id));
       case 'birthday':{
         const person=this.person(p.id);if(person.birthday!==p.expectedBirthday)throw new HttpError(409,'התאריך עודכן בינתיים. סגרו את העריכה ופתחו אותה מחדש לפני שמירה.');
-        person.birthday=birthday(p.birthday);this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personPhotos(p.id))};
+        const value=birthday(p.birthday),deathDate=family.people[p.id]?.deathDate;
+        const time=date=>{const [d,m,y]=date.split('.').map(Number);return Date.UTC(y,m-1,d);};
+        if(value!=='1.1.1111'&&deathDate&&time(value)>time(deathDate))throw new HttpError(400,'תאריך הלידה צריך להיות לפני תאריך הפטירה.');
+        person.birthday=value;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personPhotos(p.id))};
       }
       case 'media.add':{
         const item=p.item;
         if(item.category==='personal')this.person(item.personId);
+        else validCollection(item.category);
         this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,JSON.stringify(item));
-        if(item.category==='personal'){const person=this.person(item.personId);this.savePerson(person);}else if(['photos','videos'].includes(item.category))this.touch(item.category);
+        if(item.category==='personal'){const person=this.person(item.personId);this.savePerson(person);}else this.touch(item.category);
         return {saved:true};
       }
       case 'media.get':return this.media(p.id);
@@ -72,6 +90,23 @@ export class FamilyState {
         person.profileId=item.id;this.savePerson(person);return {saved:true,person:this.snapshot(person,photos)};
       }
       case 'collection':return this.collection(p.kind);
+      case 'weddings':return {weddings:couples.map(item=>this.wedding(item.id))};
+      case 'wedding':return this.wedding(p.id,true);
+      case 'wedding.date':{
+        const old=this.wedding(p.id);
+        if(old.revision!==p.expectedRevision)throw new HttpError(409,'יום הנישואים עודכן בינתיים. פתחו שוב את העריכה לפני שמירה.');
+        if(typeof p.date!=='string')throw new HttpError(400,'יש להזין יום נישואים.');
+        const date=p.date.trim()?calendarDate(p.date,'יום נישואים'):'';
+        if(date==='1.1.1111')throw new HttpError(400,'בחרו שנה אמיתית, או סמנו שהתאריך לא ידוע.');
+        this.sql.exec('UPDATE weddings SET data=? WHERE id=?',JSON.stringify({id:p.id,date,revision:uid()}),p.id);
+        return {saved:true,wedding:this.wedding(p.id)};
+      }
+      case 'greeting.add':{
+        couple(p.id);
+        const item={id:uid().slice(0,24),weddingId:p.id,author:text(p.author||'','שם המברכים',100)||'מהמשפחה',body:text(p.body,'תוכן הברכה',10000,true),createdAt:new Date().toISOString()};
+        this.sql.exec('INSERT INTO greetings(id,wedding_id,data) VALUES(?,?,?)',item.id,p.id,JSON.stringify(item));
+        return {saved:true,greeting:item};
+      }
       case 'stories':return {stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)).sort((a,b)=>a.year-b.year||a.createdAt.localeCompare(b.createdAt)),revision:this.rows("SELECT value FROM meta WHERE id='stories'")[0]?.value||'empty'};
       case 'story.save':{
         const fields=p.fields,title=text(fields.title,'כותרת',200,true),author=text(fields.author||'','שם המספר או המספרת',100),body=text(fields.body||'','תוכן הסיפור',100000);
@@ -90,7 +125,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:1,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data))};
+      case 'export':return {schemaVersion:2,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

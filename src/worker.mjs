@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
+import {couple,weddingCollection} from './weddings.mjs';
 export {FamilyState} from './state.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
 // Public visitors receive this request marker with the page. It is not a password.
@@ -23,6 +24,16 @@ export function sniff(head,video=false){
   if(word(0,4)==='RIFF'&&word(8,12)==='WEBP')return {ext:'.webp',mime:'image/webp'};
   if(word(4,8)==='ftyp'&&['avif','avis'].includes(word(8,12)))return {ext:'.avif',mime:'image/avif'};
   throw new HttpError(415,'בחרו תמונת JPG, PNG, WebP, GIF או AVIF. תמונות HEIC יש להמיר ל־JPG.');
+}
+function archiveFormat(head,name){
+  try{return {...sniff(head),kind:'photo',maximum:LIMITS.photo};}catch{}
+  try{return {...sniff(head,true),kind:'video',maximum:LIMITS.video};}catch{}
+  const ext=name.match(/\.[^.]+$/)?.[0].toLowerCase(),word=new TextDecoder().decode(head);
+  const starts=bytes=>bytes.every((byte,index)=>head[index]===byte);
+  const types={'.pdf':'application/pdf','.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','.doc':'application/msword','.txt':'text/plain','.md':'text/markdown'};
+  const valid=ext==='.pdf'?word.trimStart().startsWith('%PDF-'):ext==='.docx'?starts([80,75,3,4]):ext==='.doc'?starts([208,207,17,224,161,177,26,225]):['.txt','.md'].includes(ext)&&!/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(word);
+  if(valid)return {ext,mime:types[ext],kind:'document',maximum:LIMITS.attachment};
+  throw new HttpError(415,'בחרו תמונה, סרטון MP4, WebM או MOV, או מסמך PDF, Word, TXT או Markdown.');
 }
 function filename(value){return String(value||'family').split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g,'_').slice(0,200)||'family';}
 async function streamUpload(request,maximum){
@@ -50,13 +61,18 @@ async function streamUpload(request,maximum){
   });
   return {size,head,body};
 }
-async function upload(request,env,db,ctx,{category,personId=null}){
+async function upload(request,env,db,ctx,{category,personId=null,mixed=false}){
   if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני העלאת קבצים.');
   if(personId&&!family.people[personId])throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');
-  const media=await streamUpload(request,category==='videos'?LIMITS.video:LIMITS.photo);
-  let format;try{format=sniff(media.head,category==='videos');}catch(error){await media.body.cancel();throw error;}
+  const media=await streamUpload(request,mixed||category==='videos'?LIMITS.video:LIMITS.photo);
   const id=uid(),original=filename(new URL(request.url).searchParams.get('filename'));
-  const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[category,personId||'shared',id+format.ext].join('/'),mime:format.mime,size:media.size,caption:'',createdAt:new Date().toISOString()};
+  let format;
+  try{
+    format=mixed?archiveFormat(media.head,original):sniff(media.head,category==='videos');
+    if(format.maximum&&media.size>format.maximum)throw new HttpError(413,format.kind==='document'?'אפשר להעלות מסמך עד 10MB.':'אפשר להעלות תמונה עד 50MB.');
+  }catch(error){await media.body.cancel();throw error;}
+  const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:[category,personId||'shared'];
+  const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,id+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
   let transfer=Promise.resolve(),body=media.body;
   if(typeof FixedLengthStream!=='undefined'){
     const fixed=new FixedLengthStream(media.size);transfer=body.pipeTo(fixed.writable);body=fixed.readable;
@@ -132,8 +148,23 @@ export default {
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:match[1]}));
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
+      if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
+      if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
+      if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia'}));
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method))return await getObject(env,await db('media.get',{id:match[1]}),request);
       if(request.method==='POST'){
+        if((match=/^\/api\/weddings\/([^/]+)\/(date|greetings|upload|caption)$/.exec(path))){
+          const id=decodeURIComponent(match[1]),action=match[2],kind=weddingCollection(id);
+          if(action==='upload')return await upload(request,env,db,ctx,{category:kind,mixed:true});
+          const body=await readJSON(request,64000);
+          if(action==='date')return json(await db('wedding.date',{id,date:body.date,expectedRevision:body.expectedRevision}));
+          if(action==='greetings')return json(await db('greeting.add',{id,author:body.author,body:body.body}),201);
+          return json(await db('media.caption',{kind,file:body.file,caption:body.caption}));
+        }
+        if((match=/^\/api\/nostalgia\/(upload|caption)$/.exec(path))){
+          if(match[1]==='upload')return await upload(request,env,db,ctx,{category:'nostalgia',mixed:true});
+          const body=await readJSON(request,40000);return json(await db('media.caption',{kind:'nostalgia',file:body.file,caption:body.caption}));
+        }
         if((match=/^\/api\/people\/([^/]+)\/(photos|caption|profile|birthday)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2];
           if(action==='photos')return await upload(request,env,db,ctx,{category:'personal',personId:id});

@@ -166,3 +166,93 @@ test('S3 signing scopes requests to the configured private bucket',async()=>{
   await assert.rejects(signedRequest(env,'../outside'),/הגדרת האחסון/);
   assert.throws(()=>sniff(new TextEncoder().encode('bad')),/בחרו תמונת/);
 });
+test('weddings include all couples and retain valid anniversary dates across restarts',async()=>{
+  const f=fixture();try{
+    await f.connect();const list=await (await f.call('/api/weddings')).json();assert.equal(list.weddings.length,23);
+    assert.ok(list.weddings.every(item=>item.people.length===2&&item.date===''));
+    assert.deepEqual(list.weddings.find(item=>item.id==='u-yehiel').people,['yehiel','rachel-katan']);
+    assert.equal((await f.call('/api/weddings/u-naama')).status,404);
+    const original=list.weddings.find(item=>item.id==='u-yehiel');
+    let response=await f.call('/api/weddings/u-yehiel/date',{method:'POST',body:{date:'1.1.2000',expectedRevision:original.revision}});assert.equal(response.status,200);
+    const changed=(await response.json()).wedding;assert.equal(changed.date,'1.1.2000');
+    assert.equal((await f.call('/api/weddings/u-yehiel/date',{method:'POST',body:{date:'2.1.2000',expectedRevision:original.revision}})).status,409);
+    for(const date of ['31.4.2000','29.2.2001','1.1.9999','1.1.1111','wrong',42])assert.equal((await f.call('/api/weddings/u-yehiel/date',{method:'POST',body:{date,expectedRevision:changed.revision}})).status,400);
+    f.restart();const restored=await (await f.call('/api/weddings/u-yehiel')).json();assert.equal(restored.date,'1.1.2000');assert.equal(restored.revision,changed.revision);
+    response=await f.call('/api/weddings/u-yehiel/date',{method:'POST',body:{date:'',expectedRevision:changed.revision}});assert.equal(response.status,200);assert.equal((await response.json()).wedding.date,'');
+    assert.equal((await f.call('/api/weddings/u-naama/date',{method:'POST',body:{date:'1.1.2000',expectedRevision:'x'}})).status,404);
+  }finally{await f.close();}
+});
+test('wedding galleries isolate couples, stream mixed media and retain captions',async()=>{
+  const f=fixture();try{
+    await f.connect();const root='/api/weddings/u-yehiel',other='/api/weddings/u-bosmat';
+    const pdf=new TextEncoder().encode('%PDF-1.4\nA wedding blessing\n%%EOF');
+    let photoFile;
+    for(const [name,bytes,kind]of [['ceremony.jpg',photo,'photo'],['celebration.mp4',video,'video'],['blessing.pdf',pdf,'document']]){
+      const response=await f.call(root+'/upload?filename='+name,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}});assert.equal(response.status,201);
+      const uploaded=await response.json(),item=uploaded.collection.items[0];assert.equal(item.kind,kind);
+      assert.deepEqual(new Uint8Array(await (await f.call(item.src)).arrayBuffer()),new Uint8Array(bytes));
+      if(kind==='photo')photoFile=item.file;
+      if(kind==='document')assert.match((await f.call(item.src)).headers.get('Content-Disposition'),/^attachment;/);
+      if(kind==='video'){const part=await f.call(item.src,{headers:{Range:'bytes=0-15'}});assert.equal(part.status,206);assert.deepEqual(new Uint8Array(await part.arrayBuffer()),new Uint8Array(video.subarray(0,16)));}
+    }
+    assert.equal((await f.call(root+'/caption',{method:'POST',body:{file:photoFile,caption:'בדרך לחופה'}})).status,200);
+    assert.equal((await f.call(other+'/caption',{method:'POST',body:{file:photoFile,caption:'Wrong couple'}})).status,404);
+    const metadata=await (await f.call(root)).json();assert.equal(metadata.mediaCount,3);assert.equal(metadata.collection.items.find(item=>item.file===photoFile).caption,'בדרך לחופה');
+    assert.equal((await (await f.call(other)).json()).mediaCount,0);
+    assert.equal((await (await f.call('/api/collections/photos')).json()).count,0);
+    assert.ok([...f.objects.keys()].every(key=>key.startsWith('/example-owner/keha-family/weddings/u-yehiel/')));
+    const count=f.objects.size;assert.equal((await f.call('/api/weddings/u-naama/upload?filename=x.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,404);assert.equal(f.objects.size,count);
+    f.restart();assert.equal((await (await f.call(root)).json()).mediaCount,3);
+  }finally{await f.close();}
+});
+test('wedding greetings are durable, separate for every couple and exported with anniversaries',async()=>{
+  const f=fixture();try{
+    await f.connect();const path='/api/weddings/u-eldad';
+    let response=await f.call(path+'/greetings',{method:'POST',body:{author:'משפחת קהא',body:'מזל טוב <3\nשתמיד תשמחו יחד!'}});assert.equal(response.status,201);
+    assert.equal((await response.json()).greeting.body,'מזל טוב <3\nשתמיד תשמחו יחד!');
+    for(const body of ['',null,'x'.repeat(10001)])assert.equal((await f.call(path+'/greetings',{method:'POST',body:{body}})).status,400);
+    assert.equal((await f.call('/api/weddings/u-naama/greetings',{method:'POST',body:{body:'מזל טוב'}})).status,404);
+    f.restart();const wedding=await (await f.call(path)).json();assert.equal(wedding.greetingCount,1);assert.equal(wedding.greetings[0].author,'משפחת קהא');
+    assert.equal((await (await f.call('/api/weddings/u-bosmat')).json()).greetingCount,0);
+    const backup=await (await f.call('/api/export')).json();assert.equal(backup.schemaVersion,2);assert.equal(backup.weddings.length,23);assert.equal(backup.greetings.length,1);assert.equal(backup.people.length,82);
+  }finally{await f.close();}
+});
+test('nostalgia supports photos, video and downloadable documents without altering other albums',async()=>{
+  const f=fixture();try{
+    await f.connect();const doc=new Uint8Array([208,207,17,224,161,177,26,225,0,0,0,0]);
+    const examples=[['old-photo.jpg',photo,'photo'],['old-film.mp4',video,'video'],['letter.txt',new TextEncoder().encode('מכתב משפחתי ישן'),'document'],['letter.doc',doc,'document']];
+    for(const[name,bytes,kind]of examples){
+      const response=await f.call('/api/nostalgia/upload?filename='+name,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}});assert.equal(response.status,201);
+      const item=(await response.json()).collection.items[0];assert.equal(item.kind,kind);const content=await f.call(item.src);assert.deepEqual(new Uint8Array(await content.arrayBuffer()),new Uint8Array(bytes));
+      if(kind==='document')assert.match(content.headers.get('Content-Disposition'),/^attachment;/);
+    }
+    const initial=await (await f.call('/api/nostalgia')).json();assert.equal(initial.count,4);
+    const file=initial.items[0].file;assert.equal((await f.call('/api/nostalgia/caption',{method:'POST',body:{file,caption:'מכתב מהבית הישן'}})).status,200);
+    const snapshot=await f.call('/api/nostalgia');assert.equal((await f.call('/api/nostalgia',{headers:{'If-None-Match':snapshot.headers.get('ETag')}})).status,304);
+    f.restart();assert.equal((await (await f.call('/api/nostalgia')).json()).items[0].caption,'מכתב מהבית הישן');
+    assert.equal((await (await f.call('/api/collections/videos')).json()).count,0);assert.equal((await (await f.call('/api/weddings/u-root')).json()).mediaCount,0);
+    assert.equal((await f.call('/api/nostalgia/caption',{method:'POST',body:{file,caption:'x'},headers:{Origin:'https://foreign.example'}})).status,403);
+  }finally{await f.close();}
+});
+test('mixed galleries reject invalid document signatures and enforce per-type upload limits',async()=>{
+  const f=fixture();try{
+    await f.connect();const pdf=new TextEncoder().encode(('%PDF-1.4\nExample').padEnd(200,' '));
+    for(const name of ['bad.pdf','bad.docx','bad.doc','page.html']){
+      const bytes=new TextEncoder().encode('This is not the specified document');assert.equal((await f.call('/api/nostalgia/upload?filename='+name,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}})).status,415);
+    }
+    assert.equal((await f.call('/api/nostalgia/upload?filename=big.pdf',{method:'POST',body:pdf,headers:{'Content-Length':String(LIMITS.attachment+1)}})).status,413);
+    assert.equal((await f.call('/api/weddings/u-root/upload?filename=big.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(LIMITS.photo+1)}})).status,413);
+    assert.equal(f.objects.size,0);
+    f.env.HF_ACCESS_KEY_ID='';assert.equal((await f.call('/api/nostalgia/upload?filename=photo.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,503);
+    assert.equal((await f.call('/api/weddings/u-root/greetings',{method:'POST',body:{body:'ברכה ללא קובץ'}})).status,201);
+  }finally{await f.close();}
+});
+test('Yona death information is visible in family data and preserves existing birthdays',async()=>{
+  const f=fixture();try{
+    await f.connect();const person=await (await f.call('/api/people/yona')).json();assert.equal(person.deceased,true);assert.equal(person.deathDate,'16.6.2010');
+    const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people.yona.deathDate,'16.6.2010');
+    assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.2015',expectedBirthday:person.birthday}})).status,400);
+    const response=await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.1930',expectedBirthday:person.birthday}});assert.equal(response.status,200);
+    f.restart();const restored=await (await f.call('/api/people/yona')).json();assert.equal(restored.birthday,'1.1.1930');assert.equal(restored.deathDate,'16.6.2010');
+  }finally{await f.close();}
+});

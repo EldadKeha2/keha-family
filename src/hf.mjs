@@ -37,6 +37,6 @@ export async function getObject(env,item,request,fetcher=fetch){
   if(!response.ok&&![304,416].includes(response.status)){await response.body?.cancel();throw new HttpError(response.status===404?404:502,'הקובץ אינו זמין כרגע.');}
   const output=new Headers({'Content-Type':item.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Accept-Ranges':'bytes'});
   for(const name of ['Content-Length','Content-Range','ETag','Last-Modified'])if(response.headers.has(name))output.set(name,response.headers.get(name));
-  if(item.category==='attachment')output.set('Content-Disposition',`attachment; filename*=UTF-8''${encode(item.filename)}`);
+  if(item.category==='attachment'||item.kind==='document')output.set('Content-Disposition',`attachment; filename*=UTF-8''${encode(item.filename)}`);
   return new Response(method==='HEAD'?null:response.body,{status:response.status,headers:output});
 }
