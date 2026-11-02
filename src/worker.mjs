@@ -2,6 +2,7 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
+import {calendarResponse} from './calendar.mjs';
 export {FamilyState} from './state.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
 // Public visitors receive this request marker with the page. It is not a password.
@@ -148,11 +149,15 @@ export default {
       if(path==='/api/setup'&&request.method==='GET')return json({database:true,mediaConfigured:Boolean(configured(env)),limits:LIMITS});
       if(path==='/api/media'&&request.method==='GET')return json(await db('people'));
       if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
+      if(path==='/api/calendar'&&request.method==='GET'){
+        const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+        return json(await calendarResponse(url.searchParams.get('date')||today,url.searchParams.get('mode')||'gregorian',(await db('people')).people,ctx));
+      }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
-      if((match=/^\/api\/collections\/(photos|videos)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:match[1]}));
+      if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:match[1]}));
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
@@ -163,9 +168,10 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
-        if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|untag|retag)$/.exec(path))){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|tag|untag|retag)$/.exec(path))){
           const body=await readJSON(request,match[2]==='tags'?64000:2000);
           if(match[2]==='tags')return json(await db('media.tags.save',{id:match[1],personIds:body.personIds,newNames:body.newNames,expectedRevision:body.expectedRevision}));
+          if(match[2]==='tag')return json(await db('media.tag',{id:match[1],personId:body.personId,name:body.name,tagged:body.tagged}));
           return json(await db('media.'+match[2],{id:match[1],scope:body.scope,restoreProfile:body.restoreProfile}));
         }
         if((match=/^\/api\/weddings\/([^/]+)\/(date|greetings|upload|caption)$/.exec(path))){
@@ -188,7 +194,7 @@ export default {
           if(action==='profile')return json(await db('profile',{id,file:body.file}));
           return json(await db('media.caption',{personId:id,file:body.file,caption:body.caption}));
         }
-        if((match=/^\/api\/collections\/(photos|videos)\/(upload|caption)$/.exec(path))){
+        if((match=/^\/api\/collections\/(photos|videos|gallery)\/(upload|caption)$/.exec(path))){
           if(match[2]==='upload')return await upload(request,env,db,ctx,{category:match[1]});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:match[1],file:body.file,caption:body.caption}));
         }

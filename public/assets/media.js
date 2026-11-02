@@ -32,7 +32,7 @@
     else {link.download=item.filename||'';link.removeAttribute('target');link.removeAttribute('rel');}
     $('mediaViewerDelete').hidden=!item.id;
     $('mediaViewerDelete').textContent=linked(item,state.scope)?'הסרה מהאלבום':'מחיקת הפריט';
-    $('mediaViewerTags').innerHTML=window.FamilyTags.labels(item);
+    window.FamilyTags.mountInline($('mediaTagPanel'),item);
     $('mediaViewerTag').hidden=!window.FamilyTags.taggable(item);
     $('mediaViewerTag').textContent=item.tags?.length?'תיוג אנשים ('+item.tags.length+')':'תיוג אנשים';
   }
@@ -129,7 +129,7 @@
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
-    $('mediaViewer').addEventListener('close',()=>{clearStage();if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
+    $('mediaViewer').addEventListener('close',()=>{clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     $('mediaViewer').addEventListener('click',event=>{if(event.target===$('mediaViewer'))$('mediaViewer').close();});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||event.target.closest('input,textarea'))return;

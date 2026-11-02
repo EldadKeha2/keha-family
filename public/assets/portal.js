@@ -5,8 +5,9 @@
   const app = () => window.FamilyApp;
   const notify = message => app()?.toast(message);
   const normalize = value => String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g, '').toLowerCase().trim();
-  const state = {view:'tree', query:'', videoCategory:'all', collections:{photos:{items:[]},videos:{items:[]}}, stories:[], storyRevision:null, editingStory:null, birthdayId:null};
-  const revisions = {}, signatures = {}, loading = {}, queues = {photos:[], videos:[]}, running = {}, drafts = new Map();
+  const state = {view:'tree', query:'', videoCategory:'all', collections:{photos:{items:[]},videos:{items:[]},gallery:{items:[]}}, stories:[], storyRevision:null, editingStory:null, birthdayId:null};
+  const collectionId=(kind,suffix)=>kind==='gallery'&&['Grid','Count','Empty'].includes(suffix)?'sharedGallery'+suffix:kind+suffix;
+  const revisions = {}, signatures = {}, loading = {}, queues = {photos:[], videos:[],gallery:[]}, running = {}, drafts = new Map();
   let ready = false;
   function canSave() {if (app()?.apiEnabled) return true;notify('כדי לשמור שינויים, פתחו את האתר באמצעות קובץ ההפעלה.');return false;}
   async function request(path, options={}) {
@@ -21,23 +22,23 @@
   function activate(view) {
     state.view = view;
     state.query = '';
-    for (const kind of ['photos','videos','stories']) {
+    for (const kind of ['photos','videos','gallery','stories']) {
       $(kind + 'View').hidden = view !== kind;
     }
     if (!ready) return;
-    if (view === 'photos' || view === 'videos') {renderCollection(view);refreshCollection(view,true);}
+    if (['photos','videos','gallery'].includes(view)) {renderCollection(view);refreshCollection(view,true);}
     if (view === 'stories') {renderStories();refreshStories(true);}
     if (view !== 'videos') $('videosGrid').querySelectorAll('video').forEach(video=>video.pause());
     flushCaptions();
   }
   function search(query) {
     state.query = query;
-    if (['photos','videos'].includes(state.view)) renderCollection(state.view);
+    if (['photos','videos','gallery'].includes(state.view)) renderCollection(state.view);
     else if (state.view === 'stories') renderStories();
   }
   function captionKey(kind, file) {return kind + '\u001f' + file;}
   function captionStatus(kind,file,message,failed=false) {
-    const area = [...$(kind+'Grid').querySelectorAll('textarea')].find(area=>area.dataset.sharedFile===file);
+    const area = [...$(collectionId(kind,'Grid')).querySelectorAll('textarea')].find(area=>area.dataset.sharedFile===file);
     if (!area) return;
     const status = area.closest('.shared-media-card').querySelector('[data-shared-status]');
     status.textContent = message;status.classList.toggle('save-error',failed);
@@ -45,16 +46,16 @@
   function renderCollection(kind) {
     const collection = state.collections[kind], query = normalize(state.query);
     const filtered = collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>person.name).join(' ')).includes(query)));
-    const isVideo = kind === 'videos';
+    const isVideo = kind === 'videos',compact=kind==='gallery';
     window.FamilyMedia.register(kind,filtered);
     if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.videoCategory===state.videoCategory)));
-    $(kind+'Count').textContent = collection.items.length ? `${filtered.length}${filtered.length!==collection.items.length?' מתוך '+collection.items.length:''} ${isVideo?'סרטונים':'תמונות'} באלבום המשותף` : isVideo?'רגעים ששווה לראות שוב':'אלבום משותף לכל המשפחה';
-    $(kind+'Empty').hidden = collection.items.length > 0;
+    $(collectionId(kind,'Count')).textContent = collection.items.length ? `${filtered.length}${filtered.length!==collection.items.length?' מתוך '+collection.items.length:''} ${isVideo?'סרטונים':'תמונות'} באלבום המשותף` : isVideo?'רגעים ששווה לראות שוב':'אלבום משותף לכל המשפחה';
+    $(collectionId(kind,'Empty')).hidden = collection.items.length > 0;
     const signature = filtered.map(item=>item.file+'|'+item.src).join('\u0000');
     if (signatures[kind] !== signature) {
       const active = document.activeElement, focusedFile = active?.dataset?.sharedFile;
       const selection = focusedFile ? [active.selectionStart,active.selectionEnd] : null;
-      const grid = $(kind+'Grid');
+      const grid = $(collectionId(kind,'Grid'));
       // Reuse existing cards so a new upload never interrupts a playing video.
       const previous = new Map([...grid.querySelectorAll('.shared-media-card')].map(card=>[card.dataset.mediaFile,card]));
       const cards = [];
@@ -62,7 +63,7 @@
         let card = previous.get(item.file);
         if (card && card.dataset.mediaSrc !== item.src) card = null;
         if (!card) {
-          card = document.createElement('article');card.className='shared-media-card';card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;
+          card = document.createElement('article');card.className='shared-media-card'+(compact?' compact-gallery-card':'');card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;
           const draft = drafts.get(captionKey(kind,item.file));
           const caption = draft?.dirty ? draft.value : item.caption;
           const viewer = item.provider==='youtube'
@@ -71,7 +72,7 @@
               ? `<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||item.name)}"><source src="${safe(item.src)}" type="${safe(item.mime)}">הדפדפן אינו תומך בניגון הסרטון.</video></div><div class="video-file-info"><span>${safe(item.name)}</span><a href="${safe(item.src)}" download>הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הפורמט הזה לא מתנגן בדפדפן הנוכחי. אפשר להוריד את המקור או להעלות גרסת MP4 בתקן H.264.</p>`
               : `<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${kind}" aria-label="פתיחת התמונה ${safe(item.name)}"><img src="${safe(item.src)}" alt="${safe(caption||item.name)}" loading="lazy"></button>`;
           const id = `shared-caption-${kind}-${encodeURIComponent(item.file)}`;
-          card.innerHTML = viewer + window.FamilyMedia.controls(item,kind) + `<div class="caption-editor"><label for="${safe(id)}">${isVideo?'מה רואים בסרטון?':'מי בתמונה? איפה ומתי?'}</label><textarea id="${safe(id)}" data-shared-kind="${kind}" data-shared-file="${safe(item.file)}" rows="2" maxlength="5000" placeholder="כתבו כאן את הסיפור של הרגע הזה…" ${app()?.apiEnabled?'':'disabled'}>${safe(caption)}</textarea><div class="caption-toolbar"><span data-shared-status role="status">${draft?.dirty?'ממתין לשמירה…':''}</span><button data-save-shared="${safe(item.file)}" data-shared-kind="${kind}">שמירה</button></div></div>`;
+          card.innerHTML = compact?viewer+`<div class="compact-photo-info"><span data-compact-tag-count="${safe(item.id)}">${item.tags?.length?'♧ '+item.tags.length+' מתויגים':'לתצוגה ותיוג'}</span><button class="compact-photo-delete" data-media-delete="${safe(item.id)}" data-media-scope="gallery" aria-label="מחיקת ${safe(item.name)}">×</button></div>`:viewer + window.FamilyMedia.controls(item,kind) + `<div class="caption-editor"><label for="${safe(id)}">${isVideo?'מה רואים בסרטון?':'מי בתמונה? איפה ומתי?'}</label><textarea id="${safe(id)}" data-shared-kind="${kind}" data-shared-file="${safe(item.file)}" rows="2" maxlength="5000" placeholder="כתבו כאן את הסיפור של הרגע הזה…" ${app()?.apiEnabled?'':'disabled'}>${safe(caption)}</textarea><div class="caption-toolbar"><span data-shared-status role="status">${draft?.dirty?'ממתין לשמירה…':''}</span><button data-save-shared="${safe(item.file)}" data-shared-kind="${kind}">שמירה</button></div></div>`;
           card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;},true);
           if(item.provider==='youtube'){
             const img=card.querySelector('.youtube-poster img');
@@ -91,8 +92,8 @@
       }
       if (!filtered.length && collection.items.length) grid.innerHTML='<p class="no-content-match">אין סרטונים או תמונות בבחירה הזו. אפשר לשנות את הקטגוריה או את החיפוש.</p>';
     }
-    window.FamilyTags.refresh($(kind+'Grid'),filtered);
-    for(const area of $(kind+'Grid').querySelectorAll('textarea')) {
+    window.FamilyTags.refresh($(collectionId(kind,'Grid')),filtered);
+    for(const area of $(collectionId(kind,'Grid')).querySelectorAll('textarea')) {
       const draft=drafts.get(captionKey(kind,area.dataset.sharedFile));
       if(draft?.dirty || area===document.activeElement)continue;
       const item=collection.items.find(item=>item.file===area.dataset.sharedFile);
@@ -165,7 +166,7 @@
     status.textContent=saved?`${saved} ${kind==='videos'?'סרטונים':'תמונות'} נשמרו ✓`:'לא נשמרו קבצים. אפשר לנסות שוב.';
     progress.hidden=true;zone.classList.remove('uploading');running[kind]=false;
   }
-  function allowSharedInput(){return ['photos','videos'].includes(state.view)&&!document.querySelector('dialog[open]');}
+  function allowSharedInput(){return ['photos','videos','gallery'].includes(state.view)&&!document.querySelector('dialog[open]');}
   function acceptDrop(event){if(!allowSharedInput())return false;$(state.view+'Dropzone').classList.remove('drag-over');addFiles(state.view,event.dataTransfer.files);return true;}
   function dragOver(){if(allowSharedInput())$(state.view+'Dropzone').classList.add('drag-over');}
   function acceptPaste(event){
@@ -234,7 +235,7 @@
     document.addEventListener('click',event=>{
       const close=event.target.closest('[data-close-dialog]');if(close){$(close.dataset.closeDialog).close();return;}
       const birthday=event.target.closest('[data-edit-birthday]');if(birthday){openBirthday(birthday.dataset.editBirthday);return;}
-      const upload=event.target.closest('[data-upload-collection]');if(upload){if(!canSave())return;const input=$(upload.dataset.uploadCollection==='videos'?'sharedVideosInput':'sharedPhotosInput');input.value='';input.click();return;}
+      const upload=event.target.closest('[data-upload-collection]');if(upload){if(!canSave())return;const input=$({videos:'sharedVideosInput',photos:'sharedPhotosInput',gallery:'sharedGalleryInput'}[upload.dataset.uploadCollection]);input.value='';input.click();return;}
       const camera=event.target.closest('[data-camera-collection]');if(camera){if(!canSave())return;const input=$(camera.dataset.cameraCollection==='videos'?'sharedVideosCamera':'sharedPhotosCamera');input.value='';input.click();return;}
       const save=event.target.closest('[data-save-shared]');if(save){saveCaption(captionKey(save.dataset.sharedKind,save.dataset.saveShared));return;}
       const category=event.target.closest('[data-video-category]');if(category){state.videoCategory=category.dataset.videoCategory;if(state.videoCategory!=='all')$('videoUploadCategory').value=state.videoCategory;renderCollection('videos');return;}
@@ -245,12 +246,12 @@
     });
     document.addEventListener('input',event=>{if(event.target.matches('textarea[data-shared-file]'))editCaption(event.target);if(event.target.closest('#birthdayForm'))previewBirthday();});
     document.addEventListener('focusout',event=>{if(event.target.matches('textarea[data-shared-file]'))saveCaption(captionKey(event.target.dataset.sharedKind,event.target.dataset.sharedFile));});
-    for(const[kind,ids]of Object.entries({photos:['sharedPhotosInput','sharedPhotosCamera'],videos:['sharedVideosInput','sharedVideosCamera']}))for(const id of ids)$(id).addEventListener('change',()=>{if($(id).files.length)addFiles(kind,$(id).files);});
-    for(const kind of ['photos','videos'])$(kind+'Dropzone').addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(kind+'Dropzone').contains(event.relatedTarget))$(kind+'Dropzone').classList.remove('drag-over');});
+    for(const[kind,ids]of Object.entries({photos:['sharedPhotosInput','sharedPhotosCamera'],videos:['sharedVideosInput','sharedVideosCamera'],gallery:['sharedGalleryInput']}))for(const id of ids)$(id).addEventListener('change',()=>{if($(id).files.length)addFiles(kind,$(id).files);$(id).value='';});
+    for(const kind of ['photos','videos','gallery'])$(kind+'Dropzone').addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(kind+'Dropzone').contains(event.relatedTarget))$(kind+'Dropzone').classList.remove('drag-over');});
     $('birthdayForm').addEventListener('submit',saveBirthday);$('storyForm').addEventListener('submit',saveStory);
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
-      const result=event.detail,kind=result.scope;if(!['photos','videos'].includes(kind)||!result.collection)return;
+      const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind)||!result.collection)return;
       if(result.operation==='delete'){const key=captionKey(kind,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
       state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
       if(state.view===kind)renderCollection(kind);else window.FamilyMedia.register(kind,result.collection.items);
@@ -258,12 +259,12 @@
     $('storyYearFilter').addEventListener('change',renderStories);$('storySort').addEventListener('change',renderStories);
     for(const id of ['birthdayDialog','storyEditor','storyReader'])$(id).addEventListener('click',event=>{if(event.target!==$(id))return;const rect=$(id).getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)$(id).close();});
     // Returning from the phone's gallery/camera refreshes the current shared view.
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(['photos','videos'].includes(state.view))refreshCollection(state.view);if(state.view==='stories')refreshStories();}});
-    setInterval(()=>{if(document.visibilityState==='hidden')return;if(['photos','videos'].includes(state.view))refreshCollection(state.view);if(state.view==='stories')refreshStories();},30000);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(['photos','videos','gallery'].includes(state.view))refreshCollection(state.view);if(state.view==='stories')refreshStories();}});
+    setInterval(()=>{if(document.visibilityState==='hidden')return;if(['photos','videos','gallery'].includes(state.view))refreshCollection(state.view);if(state.view==='stories')refreshStories();},30000);
     window.addEventListener('pagehide',flushCaptions);
-    window.addEventListener('beforeunload',event=>{const dirtyStory=$('storyEditor').open&&([...$('storyForm').querySelectorAll('input:not([type=file]),textarea')].some(field=>field.value)||$('storyFiles').files.length);if(running.photos||running.videos||dirtyStory){event.preventDefault();event.returnValue='';}});
+    window.addEventListener('beforeunload',event=>{const dirtyStory=$('storyEditor').open&&([...$('storyForm').querySelectorAll('input:not([type=file]),textarea')].some(field=>field.value)||$('storyFiles').files.length);if(running.photos||running.videos||running.gallery||dirtyStory){event.preventDefault();event.returnValue='';}});
     activate(state.view);
   }
-  window.FamilyPortal={activate,search,acceptDrop,acceptPaste,dragOver};
+  window.FamilyPortal={getCollection:kind=>state.collections[kind],activate,search,acceptDrop,acceptPaste,dragOver};
   document.addEventListener('DOMContentLoaded',init);
 })();

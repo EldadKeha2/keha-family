@@ -121,6 +121,16 @@ export class FamilyState {
         const item=this.media(p.id);if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר לתייג אנשים בתמונות ובסרטונים.');
         return {item:this.mediaPublic(item)};
       }
+      case 'media.tag':{
+        const item=this.media(p.id);
+        if(typeof p.tagged!=='boolean'||(Boolean(p.personId)===Boolean(p.name)))throw new HttpError(400,'יש לבחור אדם אחד לתיוג או להסרת תיוג.');
+        const ids=new Set(this.tagIds(item.id));
+        if(p.personId){if(typeof p.personId!=='string')throw new HttpError(400,'האדם לא נמצא.');this.person(p.personId);if(p.tagged)ids.add(p.personId);else ids.delete(p.personId);}
+        else if(!p.tagged)throw new HttpError(400,'יש לבחור את האדם שאת התיוג שלו רוצים להסיר.');
+        const result=this.run('media.tags.save',{id:item.id,personIds:[...ids],newNames:p.name?[p.name]:[],expectedRevision:this.tagsRevision(item.id)});
+        const person=p.personId?this.person(p.personId):result.item.tags.find(person=>normalizedName(person.name)===normalizedName(p.name.trim().replace(/\s+/g,' ')));
+        return {...result,tagged:p.tagged,taggedPerson:{id:person.id,name:person.name,extra:Boolean(person.extra)}};
+      }
       case 'media.tags.save':{
         const item=this.media(p.id);if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר לתייג אנשים בתמונות ובסרטונים.');
         if(p.expectedRevision!==this.tagsRevision(item.id))throw new HttpError(409,'התיוגים עודכנו בינתיים. פתחו שוב את התיוגים לפני השמירה.');

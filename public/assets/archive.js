@@ -29,7 +29,7 @@
   const post=(path,body)=>request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   function setStatus(id,message='',failed=false){$(id).textContent=message;$(id).classList.toggle('failed',failed);}
   function urlFor(view,id){return view==='weddings'?'#weddings'+(id?'/'+encodeURIComponent(id):''):view==='nostalgia'?'#nostalgia':'';}
-  function replaceRoute(){const hash=urlFor(state.view,state.weddingId);if(location.hash!==hash)history.replaceState(null,'',location.pathname+location.search+hash);}
+  function replaceRoute(){if(!['weddings','nostalgia'].includes(state.view))return;const hash=urlFor(state.view,state.weddingId);if(location.hash!==hash)history.replaceState(null,'',location.pathname+location.search+hash);}
   function route(){
     const [view,rawId]=location.hash.slice(1).split('/');
     if(view==='weddings'){
@@ -37,7 +37,7 @@
       state.weddingId=pairById.has(id)?id:null;state.query='';$('searchInput').value='';app().setView('weddings');
       if(rawId&&!state.weddingId)toast('הזוג לא נמצא. אפשר לבחור זוג מרשימת החתונות.');
     }else if(view==='nostalgia'){app().setView('nostalgia');}
-    else if(state.view==='weddings'||state.view==='nostalgia')app().setView('tree');
+    else if(!view&&(state.view==='weddings'||state.view==='nostalgia'))app().setView(matchMedia('(max-width:700px)').matches?'home':'tree');
   }
   function openWedding(id){
     if(id&&!pairById.has(id))return;

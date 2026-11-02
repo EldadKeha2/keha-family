@@ -17,6 +17,12 @@ function fixture(){
   const originalFetch=globalThis.fetch;
   globalThis.fetch=async(input,options)=>{
     const request=input instanceof Request?input:new Request(input,options),url=new URL(request.url);network.push(request);
+    if(url.hostname==='www.hebcal.com'){
+      assert.equal(url.searchParams.get('i'),'on','Use the Israel holiday calendar');
+      if(env.FAIL_HOLIDAYS)return new Response('Unavailable',{status:503});
+      const year=url.searchParams.get('year');
+      return Response.json({items:[{date:year+'-07-21',hebrew:'ראש חודש',title:'Rosh Chodesh',category:'roshchodesh'},{date:year+'-11-10',hebrew:'רֹאשׁ חוֹדֶשׁ כִּסְלֵו',title:'Rosh Chodesh Kislev',category:'roshchodesh'},{date:year+'-07-21T20:00:00+03:00',title:'Candle lighting',category:'candles'}]});
+    }
     if(url.hostname==='s3.hf.co'){
       assert.match(request.headers.get('Authorization')||'',/^AWS4-HMAC-SHA256 Credential=HFAK_TEST_ONLY\//);
       if(request.method==='PUT'){objects.set(url.pathname,{bytes:new Uint8Array(await request.arrayBuffer()),mime:request.headers.get('Content-Type')});return new Response(null,{status:200});}
@@ -426,5 +432,56 @@ test('tagging validates input, prevents stale overwrites and rolls back invalid 
     const doc=await taggedUpload(f,'/api/nostalgia',new TextEncoder().encode('מכתב נוסטלגי'),'letter.txt');assert.equal((await f.call('/api/media/'+doc.id+'/tags')).status,400);
     const row=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('camille').data);row.name='שנטל פירוז';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(row),'camille');
     assert.equal((await setTags(f,item,[],['שנטל פירוז'])).status,409,'Ambiguous names require an explicit identity choice');
+  }finally{await f.close();}
+});
+
+
+test('gallery uploads stay separate and automatic tag deltas preserve other people and durable album links',async()=>{
+  const f=fixture();try{
+    await f.connect();
+    const upload=await f.call('/api/collections/gallery/upload?filename=gallery.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(upload.status,201);
+    let collection=(await upload.json()).collection,item=collection.items[0];
+    assert.equal(collection.kind,'gallery');
+    const id=item.id,storageCount=f.objects.size;
+    const tag=(body)=>f.call('/api/media/'+id+'/tag',{method:'POST',body});
+    const results=await Promise.all([tag({personId:'yona',tagged:true}),tag({personId:'yehiel',tagged:true})]);
+    for(const response of results)assert.equal(response.status,200);
+    item=(await (await f.call('/api/media/'+id+'/tags')).json()).item;
+    assert.deepEqual(new Set(item.tags.map(person=>person.id)),new Set(['yona','yehiel']));
+    let result=await (await tag({name:'שם נוסף לבדיקה',tagged:true})).json();const extraId=result.taggedPerson.id;
+    assert.match(extraId,/^extra-/);result=await (await tag({name:'שם נוסף לבדיקה',tagged:true})).json();assert.equal(result.taggedPerson.id,extraId);
+    assert.equal((await tag({personId:'yona',tagged:false})).status,200);
+    assert.equal((await (await f.call('/api/people/yona')).json()).mediaCount,0);
+    assert.equal((await (await f.call('/api/people/yehiel')).json()).gallery[0].id,id);
+    assert.equal((await (await f.call('/api/collections/photos')).json()).items.length,0);
+    assert.equal(f.objects.size,storageCount,'Tagging must never duplicate files');
+    for(const body of [{personId:'yona'},{personId:'yona',name:'other',tagged:true},{name:'extra',tagged:false},{name:4,tagged:true}])assert.equal((await tag(body)).status,400);
+    assert.equal((await tag({personId:'bad-id',tagged:true})).status,404);
+    f.restart();assert.equal((await (await f.call('/api/people/'+extraId)).json()).gallery[0].id,id);
+    assert.equal((await f.call('/api/media/'+id+'/delete',{method:'POST',body:{scope:'gallery'}})).status,200);
+    assert.equal((await (await f.call('/api/people/yehiel')).json()).mediaCount,0);
+    assert.equal((await f.call('/api/media/'+id+'/restore',{method:'POST',body:{scope:'gallery'}})).status,200);
+    assert.equal((await (await f.call('/api/people/yehiel')).json()).gallery[0].id,id);
+    assert.equal((await f.call('/api/collections/gallery/upload?filename=video.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).status,415);
+  }finally{await f.close();}
+});
+test('Roi death date is canonical and limits birthdays without overwriting saved values',async()=>{
+  const f=fixture();try{
+    await f.connect();let person=await(await f.call('/api/people/roi')).json();assert.equal(person.deathDate,'21.7.2024');
+    let response=await f.call('/api/people/roi/birthday',{method:'POST',body:{birthday:'20.7.2000',expectedBirthday:person.birthday}});assert.equal(response.status,200);
+    f.restart();person=await(await f.call('/api/people/roi')).json();assert.equal(person.birthday,'20.7.2000');assert.equal(person.deathDate,'21.7.2024');
+    assert.equal((await f.call('/api/people/roi/birthday',{method:'POST',body:{birthday:'22.7.2024',expectedBirthday:person.birthday}})).status,400);
+  }finally{await f.close();}
+});
+test('calendar API reads edited birthdays, uses Israel holidays and survives the holiday service being unavailable',async()=>{
+  const f=fixture();try{
+    await f.connect();
+    for(const id of ['yehiel','ora']){const person=await(await f.call('/api/people/'+id)).json();assert.equal((await f.call('/api/people/'+id+'/birthday',{method:'POST',body:{birthday:'21.7.1970',expectedBirthday:person.birthday}})).status,200);}
+    let response=await f.call('/api/calendar?date=2026-07-02&mode=gregorian');assert.equal(response.status,200);let result=await response.json(),day=result.days.find(day=>day.date==='2026-07-21');
+    assert.equal(result.holidaysAvailable,true);assert.deepEqual(day.birthdays.map(person=>person.name).sort(),['אורה פיש','יחיאל קהא'].sort());assert.equal(day.holidays.length,1);assert.equal(day.birthdays[0].age,56);
+    response=await f.call('/api/calendar?date=2024-03-25&mode=hebrew');assert.equal(response.status,200);result=await response.json();assert.match(result.label,/אדר/);
+    f.env.FAIL_HOLIDAYS=true;result=await(await f.call('/api/calendar?date=2049-07-01')).json();assert.equal(result.holidaysAvailable,false);assert.equal(result.days.find(day=>day.date==='2049-07-21').birthdays.length,2);
+    for(const value of ['2026-02-30','bad','1800-01-01'])assert.equal((await f.call('/api/calendar?date='+value)).status,400);
+    assert.equal((await f.call('/api/calendar?date=2026-07-01&mode=bad')).status,400);
   }finally{await f.close();}
 });
