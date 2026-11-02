@@ -151,7 +151,7 @@ export default {
       if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
       if(path==='/api/calendar'&&request.method==='GET'){
         const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-        return json(await calendarResponse(url.searchParams.get('date')||today,url.searchParams.get('mode')||'gregorian',(await db('people')).people,ctx));
+        return json(await calendarResponse(url.searchParams.get('date')||today,url.searchParams.get('mode')||'gregorian',(await db('people')).people,ctx,url.searchParams.get('lang')||'he'));
       }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;

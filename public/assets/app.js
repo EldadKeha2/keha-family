@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  const I18n=window.FamilyI18n;
   const data = window.FAMILY_DATA;
   const $ = id => document.getElementById(id);
   const people = Object.values(data.people);
@@ -12,11 +13,11 @@
   let motionFrame=0,suppressClickUntil=0;
   const branchFor = id => data.branches.find(b => b.id === id);
   const getMedia = p => media.get(p.id) || {};
-  const nameOf = p => getMedia(p).name || p.name;
+  const nameOf = p => I18n.personName({...p,...getMedia(p)});
   const birthdayOf = p => getMedia(p).birthday || p.birthday;
-  const isPlaceholder = p => p.placeholder && nameOf(p) === p.name;
-  const branchTitle = p => p.extra?'שם נוסף באלבומים':branchFor(p.branch)?.title || 'השורשים של כולנו';
-  const generationName = n => ['','הדור הראשון','הדור השני','הדור השלישי','הדור הרביעי','הדור החמישי'][n] || `דור ${n}`;
+  const isPlaceholder = p => p.placeholder && (getMedia(p).name||p.name) === p.name;
+  const branchTitle = p => p.extra?I18n.t('שם נוסף באלבומים'):I18n.branchName(branchFor(p.branch)) || I18n.t('השורשים של כולנו');
+  const generationName = n => ['',I18n.t('הדור הראשון'),I18n.t('הדור השני'),I18n.t('הדור השלישי'),I18n.t('הדור הרביעי'),I18n.t('הדור החמישי')][n] || I18n.html`דור ${n}`;
   const escapeHTML = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safe = escapeHTML;
   const initials = p => nameOf(p).split(/\s+/).filter(Boolean).map(s => s[0]).slice(0,2).join('');
@@ -32,16 +33,17 @@
     return `<span class="portrait" aria-hidden="true">${silhouette}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
   }
   function birthdayHTML(p) {
-    if(p.extra)return '<span class="directory-branch">אלבום מתמונות וסרטונים שתויגו</span>';
+    if(p.extra)return I18n.t('<span class="directory-branch">אלבום מתמונות וסרטונים שתויגו</span>');
     const invalid = getMedia(p).invalidBirthday;
     const value = birthdayOf(p), death = p.deathDate ? window.FamilyDates.parse(p.deathDate) : null;
     const age = invalid ? null : p.deceased ? death ? window.FamilyDates.age(value,death.date) : null : window.FamilyDates.age(value);
     const unknown = value === '1.1.1111';
-    return `<span class="birthday-line"><bdi>${safe(invalid ? 'תאריך לבדיקה' : unknown ? 'טרם הוזן' : value)}</bdi><button class="birthday-edit" data-edit-birthday="${p.id}" aria-label="עריכת יום ההולדת של ${safe(nameOf(p))}" title="עריכת יום הולדת"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z"/></svg></button></span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?'גיל בפטירה':'גיל'} ${age}">${p.deceased?`(${p.gender==='f'?'בת':'בן'} ${age} בפטירת${p.gender==='f'?'ה':'ו'})`:`(${age})`}</span>` : ''}${death?`<span class="person-death-date">${p.gender==='f'?'נפטרה':'נפטר'} ב־<bdi>${safe(p.deathDate)}</bdi></span>`:''}${p.aliyahYear?`<span class="person-aliyah-year">${p.gender==='f'?'עלתה':'עלה'} לארץ ב־<bdi>${safe(p.aliyahYear)}</bdi></span>`:''}`;
+    if(I18n.isEnglish)return `<span class="birthday-line"><bdi>${safe(invalid?'Date needs checking':unknown?'Not added yet':I18n.date(value))}</bdi><button class="birthday-edit" data-edit-birthday="${p.id}" aria-label="Edit the birthday of ${safe(nameOf(p))}" title="Edit birthday">✎</button></span>${age!==null?`<span class="person-age">(${p.deceased?`aged ${age} at death`:age})</span>`:''}${death?`<span class="person-death-date">Died on <bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${p.aliyahYear?`<span class="person-aliyah-year">Moved to Israel in <bdi>${p.aliyahYear}</bdi></span>`:''}`;
+    return I18n.html`<span class="birthday-line"><bdi>${safe(invalid ? I18n.t('תאריך לבדיקה') : unknown ? I18n.t('טרם הוזן') : I18n.date(value))}</bdi><button class="birthday-edit" data-edit-birthday="${p.id}" aria-label="עריכת יום ההולדת של ${safe(nameOf(p))}" title="עריכת יום הולדת"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z"/></svg></button></span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?I18n.t('גיל בפטירה'):I18n.t('גיל')} ${age}">${p.deceased?I18n.html`(${p.gender==='f'?I18n.t('בת'):I18n.t('בן')} ${age} בפטירת${p.gender==='f'?I18n.t('ה'):I18n.t('ו')})`:`(${age})`}</span>` : ''}${death?I18n.html`<span class="person-death-date">${p.gender==='f'?I18n.t('נפטרה'):I18n.t('נפטר')} ב־<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${p.aliyahYear?I18n.html`<span class="person-aliyah-year">${p.gender==='f'?I18n.t('עלתה'):I18n.t('עלה')} לארץ ב־<bdi>${safe(p.aliyahYear)}</bdi></span>`:''}`;
   }
   function personCardHTML(p) {
     const unset = birthdayOf(p) === '1.1.1111';
-    return `<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת הגלריה של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?' <span class="memorial-inline">ז״ל</span>':''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`;
+    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת הגלריה של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`;
   }
   function toast(message,action) {
     clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -49,7 +51,7 @@
     toastTimer = setTimeout(() => {$('toast').hidden = true;}, action?20000:6000);
   }
   function renderBranches() {
-    $('branchBar').innerHTML = `<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + data.branches.map(b => `<button class="branch-chip${state.branch===b.id?' active':''}" data-branch="${b.id}" style="--branch-color:${b.color}" aria-pressed="${state.branch===b.id}"><span class="chip-dot"></span>${safe(b.title)}</button>`).join('');
+    $('branchBar').innerHTML = I18n.html`<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + data.branches.map(b => `<button class="branch-chip${state.branch===b.id?' active':''}" data-branch="${b.id}" style="--branch-color:${b.color}" aria-pressed="${state.branch===b.id}"><span class="chip-dot"></span>${safe(I18n.branchName(b))}</button>`).join('');
   }
   function selectBranch(id) {
     state.branch = id;
@@ -78,13 +80,13 @@
     $('treeView').hidden = !isTree;
     $('directoryView').hidden = !isDirectory;
     $('branchBar').hidden = global;
-    const titles = {home:['הבית שלנו','כל המשפחה, במקום אחד'],gallery:['הגלריה','תמונות, אנשים ורגעים ששומרים יחד'],calendar:['לוח שנה משפחתי','ימי הולדת, חגים ומועדים בלוח עברי ולועזי'],tree:['האילן המשפחתי','משורש משותף, שישה ענפים של אהבה'],directory:['כל בני המשפחה','האלבומים וימי ההולדת של כולנו'],videos:['סרטוני המשפחה','הקולות, הצחוק והרגעים שנשארים איתנו'],photos:['תמונות משפחתיות','אלבום אחד, אינספור זיכרונות משותפים'],stories:['הסיפורים שלנו','יומן משפחתי, מהעבר ועד היום'],weddings:['החתונות שלנו','סיפורי האהבה, הברכות והרגעים מהיום המיוחד'],nostalgia:['פינת הנוסטלגיה','תמונות, סרטים ומכתבים שמחזירים אותנו הביתה']};
+    const titles = {home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('ימי הולדת, חגים ומועדים בלוח עברי ולועזי')],tree:[I18n.t('האילן המשפחתי'),I18n.t('משורש משותף, שישה ענפים של אהבה')],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
     const [title,subtitle] = titles[state.view] || titles.tree;
     $('workspaceTitle').textContent = title;
     $('mobileViewTitle').textContent=title;
     $('workspaceSubtitle').textContent = subtitle;
-    $('searchInput').placeholder = global ? state.view==='stories'?'חיפוש בסיפורים ובשנים':'חיפוש לפי כיתוב, שם קובץ או אדם' : 'חיפוש בן או בת משפחה';
-    $('searchInput').setAttribute('aria-label', global?'חיפוש בתוכן המשפחתי':'חיפוש בני משפחה');
+    $('searchInput').placeholder = global ? state.view==='stories'?I18n.t('חיפוש בסיפורים ובשנים'):I18n.t('חיפוש לפי כיתוב, שם קובץ או אדם') : I18n.t('חיפוש בן או בת משפחה');
+    $('searchInput').setAttribute('aria-label', global?I18n.t('חיפוש בתוכן המשפחתי'):I18n.t('חיפוש בני משפחה'));
     window.FamilyPortal?.activate(state.view);
     window.FamilyArchive?.activate(state.view);
     window.FamilyCalendar?.activate(state.view);
@@ -93,9 +95,9 @@
   }
   function renderDirectory() {
     const query = normalize(state.query);
-    const selected = people.filter(p => (state.branch === 'all' || p.branch === state.branch) && (!query || normalize(nameOf(p)).includes(query)));
-    $('directoryCount').textContent = `${selected.length} כרטיסים${state.branch!=='all'?' · '+branchFor(state.branch).title:''}`;
-    $('directoryGrid').innerHTML = selected.map(p=>`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="פתיחת האלבום של ${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?' <span class="memorial-inline">ז״ל</span>':''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`).join('');
+    const selected = people.filter(p => (state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
+    $('directoryCount').textContent = I18n.html`${selected.length} ${I18n.isEnglish?I18n.word(selected.length,'card','cards'):I18n.t('כרטיסים')}${state.branch!=='all'?' · '+I18n.branchName(branchFor(state.branch)):''}`;
+    $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="פתיחת האלבום של ${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`).join('');
     $('emptySearch').hidden = selected.length > 0;
   }
 
@@ -121,10 +123,10 @@
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);const maxDepth=Math.max(...positions.map(item=>item.depth));height=top+maxDepth*levelHeight+(maxDepth?rootHistorySpace:0)+(phone?150:overview?316:278)+30;}
     camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.width=width+'px';world.style.height=height+'px';
     $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
-    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id===data.root)label='<span class="generation-label">כאן מתחיל הסיפור</span>';else if(depth===0||overview)label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(branch?.title||'')}</span>`;const open=overview&&unit.id!==data.root?`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(branch.title)}">${safe(branch.title)} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${unit.id}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${unit.people.map(id=>personCardHTML(data.people[id])).join('')}${open}</div>`;}).join('');
-    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?'כל המשפחה · ששת הענפים':'כל המשפחה · כל הדורות'):`יונה ושלמה › ${branchFor(state.branch).title}`;
+    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id===data.root)label=I18n.t('<span class="generation-label">כאן מתחיל הסיפור</span>');else if(depth===0||overview)label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${unit.id}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${unit.people.map(id=>personCardHTML(data.people[id])).join('')}${open}</div>`;}).join('');
+    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?I18n.t('כל המשפחה · ששת הענפים'):I18n.t('כל המשפחה · כל הדורות')):I18n.html`יונה ושלמה › ${I18n.branchName(branchFor(state.branch))}`;
     for(const [id,selected]of [['overviewButton',overview],['fullTreeButton',!overview]]){$(id).classList.toggle('selected',selected);$(id).setAttribute('aria-pressed',String(selected));}
-    $('canvasHint').innerHTML=phone?'<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בענפים · לחצו על שם לפתיחת האלבום':overview?'<span aria-hidden="true">✧</span> גררו ימינה ושמאלה בין הענפים · לחצו על שם לפתיחת האלבום':'<span aria-hidden="true">✧</span> גררו את העץ כדי לטייל בין הדורות · + להתקרבות';
+    $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בענפים · לחצו על שם לפתיחת האלבום'):overview?I18n.t('<span aria-hidden="true">✧</span> גררו ימינה ושמאלה בין הענפים · לחצו על שם לפתיחת האלבום'):I18n.t('<span aria-hidden="true">✧</span> גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     requestAnimationFrame(()=>{if(state.view!=='tree')return;const viewport=$('treeViewport'),fit=Math.min((viewport.clientWidth-30)/width,(viewport.clientHeight-70)/height,1.06);camera.scale=phone?fit:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):overview?Math.max(15,(viewport.clientHeight-55-height*camera.scale)/2):25;applyCamera();});
   }
   function applyCamera(){
@@ -160,7 +162,7 @@
     if(!p)return;
     const previous = getMedia(p);
     media.set(personId, {...previous, ...item});
-    if((previous.birthday||p.birthday)!==birthdayOf(p)||(previous.name||p.name)!==nameOf(p))window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id:personId}}));
+    if((previous.birthday||p.birthday)!==birthdayOf(p)||(previous.name||p.name)!==(item.name||p.name))window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id:personId}}));
     for (const node of document.querySelectorAll('[data-person]')) {
       if (node.dataset.person !== personId) continue;
       if (previous.profile !== item.profile) {
@@ -168,16 +170,16 @@
         if (portrait) portrait.outerHTML = portraitHTML(p);
       }
       const name = node.querySelector('.person-name');
-      if (name) name.innerHTML = safe(nameOf(p)) + (p.deceased ? ' <span class="memorial-inline">ז״ל</span>' : '');
+      if (name) name.innerHTML = safe(nameOf(p)) + (p.deceased ? I18n.t(' <span class="memorial-inline">ז״ל</span>') : '');
       const strong = node.querySelector('strong');
-      if (strong) strong.innerHTML = safe(nameOf(p)) + (p.deceased ? ' <span class="memorial-inline">ז״ל</span>' : '');
+      if (strong) strong.innerHTML = safe(nameOf(p)) + (p.deceased ? I18n.t(' <span class="memorial-inline">ז״ל</span>') : '');
       const birthday = node.closest('[data-person-card]')?.querySelector('[data-birthday-for]');
       const signature=[birthdayOf(p),getMedia(p).invalidBirthday,p.deceased,new Date().toDateString()].join('|');
       if (birthday && birthday.dataset.dateSignature !== signature) {birthday.innerHTML=birthdayHTML(p);birthday.dataset.dateSignature=signature;}
-      node.setAttribute('aria-label', 'פתיחת הגלריה של ' + nameOf(p));
+      node.setAttribute('aria-label', I18n.t('פתיחת הגלריה של ') + nameOf(p));
     }
     if (state.currentPerson === personId && $('personDialog').open) {
-      $('galleryTitle').textContent = 'הגלריה של ' + nameOf(p);
+      $('galleryTitle').textContent = I18n.t('הגלריה של ') + nameOf(p);
       const profileDate=$('profileBirthday'),signature=[birthdayOf(p),getMedia(p).invalidBirthday,p.deceased,new Date().toDateString()].join('|');
       if(profileDate && profileDate.dataset.dateSignature!==signature){profileDate.innerHTML=birthdayHTML(p);profileDate.dataset.dateSignature=signature;}
     }
@@ -193,7 +195,7 @@
     galleryRevision = null;
     gallerySignature = '';
     const p = data.people[personId];
-    $('personBody').innerHTML = `<header class="gallery-header"><div><h2 id="galleryTitle">הגלריה של ${safe(nameOf(p))}</h2><div class="profile-birthday" id="profileBirthday">${birthdayHTML(p)}</div><span id="galleryCount" class="gallery-count"></span></div></header><section class="photo-dropzone${apiEnabled ? '' : ' offline'}" id="photoDropzone" aria-label="אזור להעלאת תמונות"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 27v7h26v-7M20 28V6m-8 8 8-8 8 8"/></svg><button class="primary-button upload-photos" id="uploadPhotos" ${apiEnabled ? '' : 'disabled'}>הוספת תמונות</button><button class="secondary-button mobile-camera" id="capturePersonPhoto" ${apiEnabled ? '' : 'disabled'}>צילום תמונה</button><span>בחרו תמונות מהגלריה או מהמצלמה<span class="desktop-paste"> · אפשר לגרור לכאן או להדביק צילום עם <bdi>Ctrl+V</bdi></span></span></section><div id="uploadState" class="upload-state" role="status"></div><div class="archive-filters personal-gallery-filters" id="personalMediaFilters" aria-label="סינון האלבום האישי"><button data-person-media-filter="all" aria-pressed="true">הכול</button><button data-person-media-filter="photo" aria-pressed="false">תמונות</button><button data-person-media-filter="video" aria-pressed="false">סרטונים</button></div><div class="photo-gallery-grid" id="galleryGrid"></div><div class="gallery-empty-state" id="galleryEmpty" ${apiEnabled ? 'hidden' : ''}>${apiEnabled ? 'אין עדיין תמונות בגלריה' : 'השמירה אינה זמינה כרגע'}</div>`;
+    $('personBody').innerHTML = I18n.html`<header class="gallery-header"><div><h2 id="galleryTitle">הגלריה של ${safe(nameOf(p))}</h2><div class="profile-birthday" id="profileBirthday">${birthdayHTML(p)}</div><span id="galleryCount" class="gallery-count"></span></div></header><section class="photo-dropzone${apiEnabled ? '' : ' offline'}" id="photoDropzone" aria-label="אזור להעלאת תמונות"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 27v7h26v-7M20 28V6m-8 8 8-8 8 8"/></svg><button class="primary-button upload-photos" id="uploadPhotos" ${apiEnabled ? '' : 'disabled'}>הוספת תמונות</button><button class="secondary-button mobile-camera" id="capturePersonPhoto" ${apiEnabled ? '' : 'disabled'}>צילום תמונה</button><span>בחרו תמונות מהגלריה או מהמצלמה<span class="desktop-paste"> · אפשר לגרור לכאן או להדביק צילום עם <bdi>Ctrl+V</bdi></span></span></section><div id="uploadState" class="upload-state" role="status"></div><div class="archive-filters personal-gallery-filters" id="personalMediaFilters" aria-label="סינון האלבום האישי"><button data-person-media-filter="all" aria-pressed="true">הכול</button><button data-person-media-filter="photo" aria-pressed="false">תמונות</button><button data-person-media-filter="video" aria-pressed="false">סרטונים</button></div><div class="photo-gallery-grid" id="galleryGrid"></div><div class="gallery-empty-state" id="galleryEmpty" ${apiEnabled ? 'hidden' : ''}>${apiEnabled ? I18n.t('אין עדיין תמונות בגלריה') : I18n.t('השמירה אינה זמינה כרגע')}</div>`;
     if (!$('personDialog').open) $('personDialog').showModal();
     $('personDialog').scrollTop = 0;
     const cached = getMedia(p);
@@ -216,9 +218,9 @@
     const items=item.gallery.filter(media=>state.galleryFilter==='all'||media.kind===state.galleryFilter);
     state.gallery=items;window.FamilyMedia.register(scope,items);
     const photoCount=item.photoCount??item.gallery.filter(media=>media.kind==='photo').length,videoCount=item.videoCount||0;
-    $('galleryCount').textContent=[photoCount?(photoCount===1?'תמונה אחת':photoCount+' תמונות'):'',videoCount?(videoCount===1?'סרטון אחד':videoCount+' סרטונים'):''].filter(Boolean).join(' · ');
+    $('galleryCount').textContent=[photoCount?(photoCount===1?I18n.t('תמונה אחת'):photoCount+I18n.t(' תמונות')):'',videoCount?(videoCount===1?I18n.t('סרטון אחד'):videoCount+I18n.t(' סרטונים')):''].filter(Boolean).join(' · ');
     $('galleryEmpty').hidden=items.length>0;
-    $('galleryEmpty').textContent=item.gallery.length?'אין פריטים בבחירה הזו. אפשר לבחור בסוג אחר.':'אין עדיין תמונות או סרטונים באלבום';
+    $('galleryEmpty').textContent=item.gallery.length?I18n.t('אין פריטים בבחירה הזו. אפשר לבחור בסוג אחר.'):I18n.t('אין עדיין תמונות או סרטונים באלבום');
     $('personalMediaFilters').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.personMediaFilter===state.galleryFilter)));
     const grid=$('galleryGrid'),previous=new Map([...grid.children].map(card=>[card.dataset.mediaFile,card])),cards=[];
     for(const item of items){
@@ -226,16 +228,16 @@
       if(!card||card.dataset.mediaSrc!==item.src){
         card=document.createElement('article');card.className='gallery-photo';card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;
         let viewer;
-        if(item.provider==='youtube')viewer=`<button class="personal-video-cover" data-media-open="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="ניגון ${safe(item.name)} בגלריה"><span aria-hidden="true">▶</span><strong>${safe(item.name)}</strong></button>`;
-        else if(item.kind==='video')viewer=`<video class="person-gallery-video" controls playsinline preload="metadata" src="${safe(item.src)}" aria-label="${safe(item.name)}"></video><p class="video-codec-note" hidden>הסרטון לא מתנגן בדפדפן הזה. אפשר לפתוח אותו בגלריה ולהוריד את המקור.</p><div class="personal-media-name">${safe(item.name)}</div>`;
-        else viewer=`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(scope)}" aria-label="פתיחת התמונה ${safe(item.name)}"><img src="${safe(item.src)}" alt="${safe(item.caption||item.name)}" loading="lazy"></button>`;
-        const profile=item.kind==='photo'?`<div class="photo-actions"><button class="profile-select" data-set-profile="${safe(item.file)}" data-owner="${personId}">קביעה כתמונת פרופיל</button></div>`:'';
+        if(item.provider==='youtube')viewer=I18n.html`<button class="personal-video-cover" data-media-open="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="ניגון ${safe(I18n.mediaName(item))} בגלריה"><span aria-hidden="true">▶</span><strong>${safe(I18n.mediaName(item))}</strong></button>`;
+        else if(item.kind==='video')viewer=I18n.html`<video class="person-gallery-video" controls playsinline preload="metadata" src="${safe(item.src)}" aria-label="${safe(I18n.mediaName(item))}"></video><p class="video-codec-note" hidden>הסרטון לא מתנגן בדפדפן הזה. אפשר לפתוח אותו בגלריה ולהוריד את המקור.</p><div class="personal-media-name">${safe(I18n.mediaName(item))}</div>`;
+        else viewer=I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(scope)}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.src)}" alt="${safe(item.caption||I18n.mediaName(item))}" loading="lazy"></button>`;
+        const profile=item.kind==='photo'?I18n.html`<div class="photo-actions"><button class="profile-select" data-set-profile="${safe(item.file)}" data-owner="${personId}">קביעה כתמונת פרופיל</button></div>`:'';
         const captionId='caption-'+personId+'-'+encodeURIComponent(item.file);
-        card.innerHTML=viewer+(item.linked?'<p class="linked-media-note">מופיע באלבום הזה בזכות תיוג</p>':'')+profile+window.FamilyMedia.controls(item,scope)+`<div class="caption-editor"><label class="visually-hidden" for="${safe(captionId)}">כיתוב ל${item.kind==='video'?'סרטון':'תמונה'} ${safe(item.name)}</label><textarea id="${safe(captionId)}" data-caption-file="${safe(item.file)}" data-owner="${personId}" rows="2" maxlength="5000" placeholder="מי מופיע כאן? איפה ומתי? כתבו כאן…" ${apiEnabled?'':'disabled'}></textarea><div class="caption-toolbar"><span data-caption-status role="status"></span><button data-save-caption="${safe(item.file)}" data-owner="${personId}">שמירה</button></div></div>`;
+        card.innerHTML=viewer+(item.linked?I18n.t('<p class="linked-media-note">מופיע באלבום הזה בזכות תיוג</p>'):'')+profile+window.FamilyMedia.controls(item,scope)+I18n.html`<div class="caption-editor"><label class="visually-hidden" for="${safe(captionId)}">כיתוב ל${item.kind==='video'?I18n.t('סרטון'):I18n.t('תמונה')} ${safe(I18n.mediaName(item))}</label><textarea dir="auto" id="${safe(captionId)}" data-caption-file="${safe(item.file)}" data-owner="${personId}" rows="2" maxlength="5000" placeholder="מי מופיע כאן? איפה ומתי? כתבו כאן…" ${apiEnabled?'':'disabled'}></textarea><div class="caption-toolbar"><span data-caption-status role="status"></span><button data-save-caption="${safe(item.file)}" data-owner="${personId}">שמירה</button></div></div>`;
         card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;});
       }
       const profileButton=card.querySelector('.profile-select');
-      if(profileButton){const isProfile=Boolean(album.profileIsManual)&&album.profileFile===item.file;profileButton.classList.toggle('is-profile',isProfile);profileButton.disabled=isProfile;profileButton.setAttribute('aria-pressed',String(isProfile));profileButton.textContent=isProfile?'✓ תמונת הפרופיל':'קביעה כתמונת פרופיל';}
+      if(profileButton){const isProfile=Boolean(album.profileIsManual)&&album.profileFile===item.file;profileButton.classList.toggle('is-profile',isProfile);profileButton.disabled=isProfile;profileButton.setAttribute('aria-pressed',String(isProfile));profileButton.textContent=isProfile?I18n.t('✓ תמונת הפרופיל'):I18n.t('קביעה כתמונת פרופיל');}
       const area=card.querySelector('textarea'),draft=drafts.get(keyFor(personId,item.file));
       if(area!==document.activeElement)area.value=draft?.dirty?draft.value:item.caption||'';
       cards.push(card);
@@ -251,30 +253,30 @@
     galleryLoading = true;
     try {
       const headers = !force && galleryRevision ? {'If-None-Match':'"' + galleryRevision + '"'} : {};
-      const response = await fetch('api/people/' + encodeURIComponent(personId), {headers, cache:'no-store'});
+      const response = await I18n.fetch('api/people/' + encodeURIComponent(personId), {headers, cache:'no-store'});
       if (response.status === 304) return;
       const result = await response.json();
-      if (!response.ok) throw Error(result.error || 'לא ניתן לפתוח את הגלריה.');
+      if (!response.ok) throw Error(I18n.error(result.error) || I18n.t('לא ניתן לפתוח את הגלריה.'));
       updatePersonUI(personId, result);
       if (personId === state.currentPerson && $('personDialog').open) renderGallery(result);
     } catch(error) {
-      if (force && personId === state.currentPerson && $('personDialog').open) toast(error.message || 'לא ניתן לקרוא את הגלריה כרגע.');
+      if (force && personId === state.currentPerson && $('personDialog').open) toast(error.message || I18n.t('לא ניתן לקרוא את הגלריה כרגע.'));
     } finally {galleryLoading = false;}
   }
 
   async function chooseProfilePhoto(personId, file) {
     if (!apiEnabled) return;
     try {
-      const response = await fetch('api/people/' + encodeURIComponent(personId) + '/profile', {
+      const response = await I18n.fetch('api/people/' + encodeURIComponent(personId) + '/profile', {
         method:'POST', headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},
         body:JSON.stringify({file})
       });
       const result = await response.json();
-      if (!response.ok) throw Error(result.error || 'תמונת הפרופיל לא נשמרה.');
+      if (!response.ok) throw Error(I18n.error(result.error) || I18n.t('תמונת הפרופיל לא נשמרה.'));
       updatePersonUI(personId, result.person);
       if (state.currentPerson === personId && $('personDialog').open) renderGallery(result.person);
-      toast('תמונת הפרופיל של ' + nameOf(data.people[personId]) + ' עודכנה');
-    } catch(error) {toast(error.message || 'לא ניתן לשמור את תמונת הפרופיל כרגע.');}
+      toast(I18n.t('תמונת הפרופיל של ') + nameOf(data.people[personId]) + I18n.t(' עודכנה'));
+    } catch(error) {toast(error.message || I18n.t('לא ניתן לשמור את תמונת הפרופיל כרגע.'));}
   }
 
   function editCaption(area) {
@@ -286,7 +288,7 @@
     draft.dirty = true;
     draft.timer = setTimeout(() => saveCaption(key), 850);
     drafts.set(key, draft);
-    draftStatus(personId, file, 'ממתין לשמירה…');
+    draftStatus(personId, file, I18n.t('ממתין לשמירה…'));
   }
 
   async function saveCaption(key) {
@@ -295,19 +297,19 @@
     clearTimeout(draft.timer);
     draft.saving = true;
     const text = draft.value;
-    draftStatus(draft.personId, draft.file, 'שומר…');
+    draftStatus(draft.personId, draft.file, I18n.t('שומר…'));
     try {
-      const response = await fetch('api/people/' + encodeURIComponent(draft.personId) + '/caption', {
+      const response = await I18n.fetch('api/people/' + encodeURIComponent(draft.personId) + '/caption', {
         method:'POST', headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},
         body:JSON.stringify({file:draft.file,caption:text}), keepalive:true
       });
       const result = await response.json();
-      if (!response.ok) throw Error(result.error || 'הכיתוב לא נשמר.');
-      if (draft.value === text) {draft.dirty = false;draftStatus(draft.personId,draft.file,'נשמר ✓');}
+      if (!response.ok) throw Error(I18n.error(result.error) || I18n.t('הכיתוב לא נשמר.'));
+      if (draft.value === text) {draft.dirty = false;draftStatus(draft.personId,draft.file,I18n.t('נשמר ✓'));}
       else draft.timer = setTimeout(() => saveCaption(key), 150);
     } catch(error) {
-      draftStatus(draft.personId,draft.file,'לא נשמר · לחצו על שמירה',true);
-      toast(error.message || 'הכיתוב לא נשמר. נסו שוב.');
+      draftStatus(draft.personId,draft.file,I18n.t('לא נשמר · לחצו על שמירה'),true);
+      toast(error.message || I18n.t('הכיתוב לא נשמר. נסו שוב.'));
     } finally {draft.saving = false;}
   }
 
@@ -336,8 +338,8 @@
     if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory'){renderDirectory();$('searchResults').hidden=true;return;}
     if(!query){$('searchResults').hidden=true;return;}
-    const matches=people.filter(p=>normalize(nameOf(p)).includes(query));
-    $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button class="search-result" data-search-person="${p.id}"><span>${safe(nameOf(p))}${p.deceased?' ז״ל':''}</span><small>${safe(branchTitle(p))}</small></button>`).join(''):'<div class="search-empty">לא נמצא שם מתאים</div>';
+    const matches=people.filter(p=>normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
+    $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button class="search-result" data-search-person="${p.id}"><span>${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
     $('searchResults').hidden=false;
   }
 
@@ -345,23 +347,23 @@
     if (!apiEnabled || mediaLoading) return;
     mediaLoading = true;
     try {
-      const response = await fetch('api/media', {cache:'no-store'});
+      const response = await I18n.fetch('api/media', {cache:'no-store'});
       if (!response.ok) throw Error('connection');
       const result = await response.json();
       Object.entries(result.people).forEach(([personId,item])=>updatePersonUI(personId,item));
       $('runtimeNotice').hidden = true;
     } catch(error) {
-      $('runtimeNotice').textContent = 'החיבור לשמירה אינו זמין כרגע. נסו לרענן את הדף.';
+      $('runtimeNotice').textContent = I18n.t('החיבור לשמירה אינו זמין כרגע. נסו לרענן את הדף.');
       $('runtimeNotice').hidden = false;
     } finally {mediaLoading = false;}
   }
 
   function addUploads(files, fromClipboard=false) {
-    if (!apiEnabled) {toast('ההעלאה אינה זמינה כרגע. נסו לרענן את הדף.');return;}
+    if (!apiEnabled) {toast(I18n.t('ההעלאה אינה זמינה כרגע. נסו לרענן את הדף.'));return;}
     if (!state.currentPerson || !$('personDialog').open) return;
     const selected = Array.from(files).filter(file => /^image\/(jpeg|png|webp|gif|avif)$/i.test(file.type) || imageTypes.test(file.name));
-    if (!selected.length) {toast('בחרו תמונת JPG, PNG, WEBP, GIF או AVIF.');return;}
-    if (selected.length < files.length) toast('חלק מהקבצים אינם בפורמט נתמך. יתר התמונות יישמרו.');
+    if (!selected.length) {toast(I18n.t('בחרו תמונת JPG, PNG, WEBP, GIF או AVIF.'));return;}
+    if (selected.length < files.length) toast(I18n.t('חלק מהקבצים אינם בפורמט נתמך. יתר התמונות יישמרו.'));
     uploads.push({personId:state.currentPerson,files:selected,clipboard:fromClipboard});
     runUploads();
   }
@@ -375,26 +377,26 @@
       for (let i=0;i<batch.files.length;i++) {
         const file = batch.files[i];
         if (state.currentPerson === batch.personId && $('personDialog').open) {
-          $('uploadState').textContent = `מעלה תמונה ${i+1} מתוך ${batch.files.length}…`;
+          $('uploadState').textContent = I18n.html`מעלה תמונה ${i+1} מתוך ${batch.files.length}…`;
           $('photoDropzone').classList.add('uploading');
         }
         try {
-          if (file.size > 50*1024*1024) throw Error('אפשר להעלות עד 50MB לתמונה.');
+          if (file.size > 50*1024*1024) throw Error(I18n.t('אפשר להעלות עד 50MB לתמונה.'));
           const date = new Date().toISOString().replace(/[:.]/g,'-');
-          const filename = batch.clipboard ? 'צילום_מסך_' + date + '.png' : file.name;
-          const response = await fetch('api/people/' + encodeURIComponent(batch.personId) + '/photos?filename=' + encodeURIComponent(filename), {
+          const filename = batch.clipboard ? I18n.t('צילום_מסך_') + date + '.png' : file.name;
+          const response = await I18n.fetch('api/people/' + encodeURIComponent(batch.personId) + '/photos?filename=' + encodeURIComponent(filename), {
             method:'POST',headers:{'Content-Type':file.type || 'application/octet-stream','X-Family-Token':window.FAMILY_API_TOKEN},body:file
           });
           const result = await response.json();
-          if (!response.ok) throw Error(result.error || 'התמונה לא נשמרה.');
+          if (!response.ok) throw Error(I18n.error(result.error) || I18n.t('התמונה לא נשמרה.'));
           saved++;
           updatePersonUI(batch.personId,result.person);
           if (state.currentPerson === batch.personId && $('personDialog').open) renderGallery(result.person);
-        } catch(error) {toast((file.name ? file.name + ': ' : '') + (error.message || 'התמונה לא נשמרה.'));}
+        } catch(error) {toast((file.name ? file.name + ': ' : '') + (error.message || I18n.t('התמונה לא נשמרה.')));}
       }
       if (state.currentPerson === batch.personId && $('personDialog').open) {
         $('photoDropzone').classList.remove('uploading');
-        $('uploadState').textContent = saved === 1 ? 'התמונה נוספה לאלבום ✓' : saved ? `${saved} תמונות נוספו לאלבום ✓` : 'לא נשמרו תמונות. אפשר לנסות שוב.';
+        $('uploadState').textContent = saved === 1 ? I18n.t('התמונה נוספה לאלבום ✓') : saved ? I18n.html`${saved} תמונות נוספו לאלבום ✓` : I18n.t('לא נשמרו תמונות. אפשר לנסות שוב.');
       }
     }
     uploadRunning = false;
@@ -433,7 +435,7 @@
     if(!event.dataTransfer?.files.length)return;
     event.preventDefault();
     if($('personDialog').open&&!$('lightbox').open){$('photoDropzone').classList.remove('drag-over');addUploads(event.dataTransfer.files);}
-    else if (!window.FamilyArchive?.acceptDrop(event)&&!window.FamilyPortal?.acceptDrop(event)) toast('פתחו גלריה שאליה תרצו להוסיף את התמונות.');
+    else if (!window.FamilyArchive?.acceptDrop(event)&&!window.FamilyPortal?.acceptDrop(event)) toast(I18n.t('פתחו גלריה שאליה תרצו להוסיף את התמונות.'));
   });
   $('photoUploadInput').addEventListener('change',()=>{if($('photoUploadInput').files.length)addUploads($('photoUploadInput').files);});
   $('personCameraInput').addEventListener('change',()=>{if($('personCameraInput').files.length)addUploads($('personCameraInput').files);});
@@ -510,7 +512,7 @@
     setInterval(()=>{if(document.visibilityState!=='hidden')loadFamilyMedia();},30000);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){loadFamilyMedia();refreshOpenGallery(true);}});
   }else{
-    $('runtimeNotice').textContent='החיבור לשמירה אינו זמין כרגע. נסו לרענן את הדף.';
+    $('runtimeNotice').textContent=I18n.t('החיבור לשמירה אינו זמין כרגע. נסו לרענן את הדף.');
     $('runtimeNotice').hidden=false;
   }
 })();

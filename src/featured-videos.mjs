@@ -6,6 +6,6 @@ export const featuredVideos = [
   ['39dfd9ecbc3b4be9a5938b6b2d534e04','KUP1WtKCtec','רותי בת 60'],
   ['39dfd9ecbc3b4be9a5938b6b2d534e05','UerqNt1Hhc0','יונתן בר מצווה'],
   ['39dfd9ecbc3b4be9a5938b6b2d534e06','pws4Fk1jSFo','יחיאל 60'],
-].map(([id,youtubeId,name])=>({id,youtubeId,name,filename:name,file:id,category:'videos',
+].map(([id,youtubeId,name],index)=>({id,youtubeId,name,nameEn:['Yehiel turns 70 - Part 1','Yehiel turns 70 - Part 2','Ora turns 60','Ruth turns 60','Yonatan - Bar Mitzvah','Yehiel turns 60'][index],filename:name,file:id,category:'videos',
   videoCategory:'special-birthdays',provider:'youtube',kind:'video',mime:'video/youtube',
   size:0,caption:'',createdAt:'2026-11-01T00:00:00.000Z'}));

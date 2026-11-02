@@ -485,3 +485,19 @@ test('calendar API reads edited birthdays, uses Israel holidays and survives the
     assert.equal((await f.call('/api/calendar?date=2026-07-01&mode=bad')).status,400);
   }finally{await f.close();}
 });
+
+test('Hebrew and English tags resolve to one canonical person and additional names keep their original language',async()=>{
+ const f=fixture();try{
+  await f.connect();const upload=await f.call('/api/collections/gallery/upload?filename=bilingual.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(upload.status,201);const item=(await upload.json()).collection.items[0];
+  const add=name=>f.call('/api/media/'+item.id+'/tag',{method:'POST',body:{name,tagged:true}});
+  let result=await(await add('יחיאל קהא')).json();assert.equal(result.taggedPerson.id,'yehiel');
+  result=await(await add('Yehiel Keha')).json();assert.equal(result.taggedPerson.id,'yehiel');assert.equal(result.item.tags.length,1);assert.equal(result.item.tags[0].name,'יחיאל קהא');assert.equal(result.item.tags[0].nameEn,'Yehiel Keha');
+  result=await(await add('Camille De Vita')).json();assert.equal(result.taggedPerson.id,'camille');assert.equal((await(await f.call('/api/people/camille')).json()).gallery[0].id,item.id);
+  result=await(await add('אורחת חדשה')).json();const guest=result.taggedPerson.id;assert.equal(result.taggedPerson.name,'אורחת חדשה');assert.equal(result.taggedPerson.nameEn,null);
+  result=await(await add('A new guest')).json();assert.notEqual(result.taggedPerson.id,guest);assert.equal(result.taggedPerson.name,'A new guest');assert.equal(result.taggedPerson.nameEn,null);
+  assert.equal((await(await f.call('/api/tag-people')).json()).people.length,84);
+  f.restart();result=await(await f.call('/api/media/'+item.id+'/tags')).json();assert.equal(result.item.tags.find(p=>p.id==='yehiel').nameEn,'Yehiel Keha');assert.equal(result.item.tags.find(p=>p.id===guest).name,'אורחת חדשה');
+  const calendar=await(await f.call('/api/calendar?date=2026-11-01&lang=en-GB')).json();assert.equal(calendar.holidaysAvailable,true);assert.match(calendar.hebrewLabel,/Heshvan|Cheshvan|Kislev/);assert.equal(calendar.days.find(d=>d.date==='2026-11-10').holidays[0].name,'Rosh Chodesh Kislev');
+  const bootstrap=await(await f.call('/family-data.js')).text();assert.match(bootstrap,/Camille De Vita/);assert.match(bootstrap,/קמיל דה ויטה/);
+ }finally{await f.close();}
+});

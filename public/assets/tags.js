@@ -1,13 +1,14 @@
 (() => {
   'use strict';
+  const I18n=window.FamilyI18n;
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
   const stores=new Map(),roster=new Map();let rosterPromise=null,rosterTime=0,rosterVersion=0,modalWidget=null,modalStore=null,closeRequested=false,newCounter=0;
   async function request(path,options={}){
-    const response=await fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
-    let result;try{result=await response.json();}catch{throw Error('לא התקבלה תשובה מהשרת. נסו שוב.');}
-    if(!response.ok)throw Error(result.error||'התיוג לא נשמר.');return result;
+    const response=await I18n.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
+    let result;try{result=await response.json();}catch{throw Error(I18n.t('לא התקבלה תשובה מהשרת. נסו שוב.'));}
+    if(!response.ok)throw Error(I18n.error(result.error)||I18n.t('התיוג לא נשמר.'));return result;
   }
   function addPerson(person){if(!person?.id)return;const old=roster.get(person.id);roster.set(person.id,{...old,...person});rosterVersion++;}
   async function loadRoster(){
@@ -25,7 +26,7 @@
       catch(error){this.error=error.message;this.status='error';this.emit();}
     }
     enqueue(person,tagged){
-      const selected=this.selected();if(tagged&&!selected.has(person.id)&&selected.size>=150){this.error='אפשר לתייג עד 150 אנשים בפריט.';this.emit();return;}
+      const selected=this.selected();if(tagged&&!selected.has(person.id)&&selected.size>=150){this.error=I18n.t('אפשר לתייג עד 150 אנשים בפריט.');this.emit();return;}
       this.queue.push({key:person.id,name:person.name,tagged});this.error='';this.status='saving';this.emit();this.run();
     }
     async run(){
@@ -37,7 +38,7 @@
         if(op.key.startsWith('new:'))this.aliases.set(op.key,result.taggedPerson.id);
         addPerson(result.taggedPerson);this.item=result.item;this.saved=new Map(result.item.tags.map(person=>[person.id,person]));this.active=null;this.status=this.queue.length?'saving':'saved';
         window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));this.emit();this.run();
-      }catch(error){this.active=null;this.queue.unshift(op);this.error=error.message;this.status='error';this.emit();if(![...this.listeners].length)app()?.toast('תיוג לא נשמר: '+error.message);}
+      }catch(error){this.active=null;this.queue.unshift(op);this.error=error.message;this.status='error';this.emit();if(![...this.listeners].length)app()?.toast(I18n.t('תיוג לא נשמר: ')+error.message);}
     }
     retry(){if(!this.ready){this.load();return;}this.error='';this.status='saving';this.emit();this.run();}
     discard(){if(this.active)return;this.queue=[];this.error='';this.status='';this.emit();}
@@ -47,11 +48,11 @@
     constructor(host,store,inline=false){
       this.host=host;this.store=store;this.inline=inline;this.query='';this.version=-1;this.lastSelection='';
       const prefix=inline?'inline':'modal';
-      host.innerHTML=`<div class="tag-widget${inline?' inline-tag-widget':''}"><div class="tag-widget-heading"><h3>${inline?'מי מופיע כאן?':'בוחרים אנשים מהרשימה'}</h3><span data-tag-count></span></div><div class="selected-people" data-selected-people></div><p class="tag-autosave-status" data-tag-save-status role="status" aria-live="polite"></p><label class="tag-search-label" for="${prefix}TagPersonSearch">חיפוש או הוספת שם<input type="search" id="${prefix}TagPersonSearch" data-tag-search maxlength="120" placeholder="הקלידו שם פרטי או שם משפחה…" autocomplete="off"></label><p class="tag-search-count" data-tag-search-count></p><div class="tag-people-results" data-tag-results></div><button type="button" class="tag-add-name" data-tag-add hidden></button><p class="tag-add-help">כל סימון נשמר אוטומטית. שם חדש יקבל אלבום משלו.</p><div class="tag-error-actions" data-tag-error-actions hidden><button type="button" class="secondary-button" data-tag-retry>ניסיון נוסף</button><button type="button" data-tag-discard>ביטול השינוי שלא נשמר</button></div></div>`;
+      host.innerHTML=I18n.html`<div class="tag-widget${inline?' inline-tag-widget':''}"><div class="tag-widget-heading"><h3>${inline?I18n.t('מי מופיע כאן?'):I18n.t('בוחרים אנשים מהרשימה')}</h3><span data-tag-count></span></div><div class="selected-people" data-selected-people></div><p class="tag-autosave-status" data-tag-save-status role="status" aria-live="polite"></p><label class="tag-search-label" for="${prefix}TagPersonSearch">חיפוש או הוספת שם<input type="search" id="${prefix}TagPersonSearch" data-tag-search maxlength="120" placeholder="הקלידו שם פרטי או שם משפחה…" autocomplete="off"></label><p class="tag-search-count" data-tag-search-count></p><div class="tag-people-results" data-tag-results></div><button type="button" class="tag-add-name" data-tag-add hidden></button><p class="tag-add-help">כל סימון נשמר אוטומטית. שם חדש יקבל אלבום משלו.</p><div class="tag-error-actions" data-tag-error-actions hidden><button type="button" class="secondary-button" data-tag-retry>ניסיון נוסף</button><button type="button" data-tag-discard>ביטול השינוי שלא נשמר</button></div></div>`;
       this.input=host.querySelector('[data-tag-search]');this.results=host.querySelector('[data-tag-results]');this.selectedHost=host.querySelector('[data-selected-people]');this.status=host.querySelector('[data-tag-save-status]');
       this.listener=()=>this.render();store.listeners.add(this.listener);
       this.input.addEventListener('input',()=>{this.query=this.input.value;this.renderResults();});
-      this.input.addEventListener('keydown',event=>{if(event.key!=='Enter')return;event.preventDefault();const query=normalize(this.query),matches=[...roster.values()].filter(person=>normalize(person.name).includes(query));if(matches.length===1)this.choose(matches[0],true);else if(!host.querySelector('[data-tag-add]').hidden)this.addName();});
+      this.input.addEventListener('keydown',event=>{if(event.key!=='Enter')return;event.preventDefault();const query=normalize(this.query),matches=[...roster.values()].filter(person=>normalize(I18n.searchNames(person)).includes(query));if(matches.length===1)this.choose(matches[0],true);else if(!host.querySelector('[data-tag-add]').hidden)this.addName();});
       host.addEventListener('change',event=>{if(event.target.matches('[data-tag-person]'))this.choose(roster.get(event.target.dataset.tagPerson),event.target.checked);});
       host.addEventListener('click',event=>{
         const remove=event.target.closest('[data-remove-person-tag]');if(remove){const person=store.selected().get(remove.dataset.removePersonTag);if(person)store.enqueue(person,false);return;}
@@ -64,26 +65,26 @@
     choose(person,tagged){if(!person)return;this.store.enqueue(person,tagged);if(tagged){this.query='';this.input.value='';this.renderResults();this.input.focus({preventScroll:true});}}
     addName(){
       const name=this.query.trim().replace(/\s+/g,' ');if(!normalize(name)||name.length>120)return;
-      let person=[...roster.values()].find(person=>normalize(person.name)===normalize(name));
+      let person=[...roster.values()].find(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalize(alias)===normalize(name)));
       if(!person){const previous=[this.store.active,...this.store.queue].filter(Boolean).find(op=>normalize(op.name)===normalize(name));person={id:previous?.key||'new:'+newCounter++,name,isNew:true};}
       this.choose(person,true);
     }
     renderResults(){
-      const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>!query||normalize(person.name).includes(query)).sort((a,b)=>a.name.localeCompare(b.name,'he'));
+      const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>!query||normalize(I18n.searchNames(person)).includes(query)).sort((a,b)=>I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale));
       this.results.hidden=this.inline&&!query;
       const position=this.results.scrollTop;
-      this.results.innerHTML=names.slice(0,150).map(person=>`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}><span><strong>${safe(person.name)}</strong><small>${safe(person.extra?'שם נוסף באלבומים':window.FAMILY_DATA.branches.find(branch=>branch.id===person.branch)?.title||'השורשים של כולנו')}</small></span></label>`).join('')||'<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>';
+      this.results.innerHTML=names.slice(0,150).map(person=>`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}><span><strong>${safe(I18n.personName(person))}</strong><small>${safe(person.extra?I18n.t('שם נוסף באלבומים'):I18n.branchName(window.FAMILY_DATA.branches.find(branch=>branch.id===person.branch))||I18n.t('השורשים של כולנו'))}</small></span></label>`).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
       this.results.scrollTop=position;
-      this.host.querySelector('[data-tag-search-count]').textContent=this.inline&&!query?'':`${names.length} שמות ברשימה`;
-      const add=this.host.querySelector('[data-tag-add]');add.hidden=!this.store.ready||!query||names.length>0||[...selected.values()].some(person=>normalize(person.name)===query);add.textContent='＋ הוספת השם ״'+this.query.trim()+'״';this.version=rosterVersion;
+      this.host.querySelector('[data-tag-search-count]').textContent=this.inline&&!query?'':I18n.html`${names.length} ${I18n.isEnglish?I18n.word(names.length,'name in the list','names in the list'):I18n.t('שמות ברשימה')}`;
+      const add=this.host.querySelector('[data-tag-add]');add.hidden=!this.store.ready||!query||names.length>0||[...selected.values()].some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalize(alias)===query));add.textContent=I18n.t('＋ הוספת השם ״')+this.query.trim()+'״';this.version=rosterVersion;
     }
     render(){
       if(!this.host.isConnected)return;
       const selected=this.store.selected(),signature=JSON.stringify([...selected].map(([key,person])=>[key,person.name]));
-      if(this.lastSelection!==signature){this.selectedHost.innerHTML=[...selected].map(([key,person])=>`<button type="button" class="selected-person-tag" data-remove-person-tag="${safe(key)}" aria-label="הסרת התיוג של ${safe(person.name)}">${safe(person.name)}${person.isNew?'<small>שומר…</small>':''}<span aria-hidden="true">×</span></button>`).join('')||'<span class="tag-selection-empty">בחרו את האנשים שמופיעים כאן.</span>';this.lastSelection=signature;}
-      this.host.querySelector('[data-tag-count]').textContent=selected.size===1?'אדם אחד תויג':selected.size+' מתויגים';
+      if(this.lastSelection!==signature){this.selectedHost.innerHTML=[...selected].map(([key,person])=>I18n.html`<button type="button" class="selected-person-tag" data-remove-person-tag="${safe(key)}" aria-label="הסרת התיוג של ${safe(I18n.personName(person))}">${safe(I18n.personName(person))}${person.isNew?I18n.t('<small>שומר…</small>'):''}<span aria-hidden="true">×</span></button>`).join('')||I18n.t('<span class="tag-selection-empty">בחרו את האנשים שמופיעים כאן.</span>');this.lastSelection=signature;}
+      this.host.querySelector('[data-tag-count]').textContent=selected.size===1?I18n.t('אדם אחד תויג'):selected.size+I18n.t(' מתויגים');
       const state=this.store;this.input.disabled=!state.ready;this.status.className='tag-autosave-status '+(state.error?'failed':state.status);
-      this.status.textContent=state.error?'התיוג לא נשמר: '+state.error:state.status==='loading'?'טוען את רשימת האנשים…':state.busy?'שומר את התיוג…':state.status==='saved'?'✓ התיוג נשמר בהצלחה':'התיוגים נשמרים אוטומטית';
+      this.status.textContent=state.error?I18n.t('התיוג לא נשמר: ')+state.error:state.status==='loading'?I18n.t('טוען את רשימת האנשים…'):state.busy?I18n.t('שומר את התיוג…'):state.status==='saved'?I18n.t('✓ התיוג נשמר בהצלחה'):I18n.t('התיוגים נשמרים אוטומטית');
       this.host.querySelector('[data-tag-error-actions]').hidden=!state.error;
       if(this.version!==rosterVersion)this.renderResults();
       for(const checkbox of this.results.querySelectorAll('[data-tag-person]')){checkbox.checked=selected.has(checkbox.dataset.tagPerson);checkbox.disabled=!state.ready;}
@@ -91,13 +92,13 @@
     destroy(){this.store.listeners.delete(this.listener);}
   }
   function taggable(item){return Boolean(item.id)&&['photo','video'].includes(item.kind);}
-  function controls(item){return taggable(item)?`<button class="media-tag-button" data-edit-media-tags="${safe(item.id)}">${item.tags?.length?'תיוג אנשים ('+item.tags.length+')':'＋ תיוג אנשים'}</button>`:'';}
-  function labels(item){return `<div class="media-people-tags" data-media-tags-for="${safe(item.id)}">${(item.tags||[]).map(person=>`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(person.name)}">${safe(person.name)}</button>`).join('')}</div>`;}
+  function controls(item){return taggable(item)?`<button class="media-tag-button" data-edit-media-tags="${safe(item.id)}">${item.tags?.length?I18n.t('תיוג אנשים (')+item.tags.length+')':I18n.t('＋ תיוג אנשים')}</button>`:'';}
+  function labels(item){return `<div class="media-people-tags" data-media-tags-for="${safe(item.id)}">${(item.tags||[]).map(person=>I18n.html`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(I18n.personName(person))}">${safe(I18n.personName(person))}</button>`).join('')}</div>`;}
   function refresh(root,items){
     const byId=new Map(items.map(item=>[item.id,item]));
-    for(const row of root.querySelectorAll('[data-media-tags-for]')){const item=byId.get(row.dataset.mediaTagsFor);if(!item)continue;const signature=JSON.stringify(item.tags||[]);if(row.dataset.signature!==signature){row.innerHTML=(item.tags||[]).map(person=>`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(person.name)}">${safe(person.name)}</button>`).join('');row.dataset.signature=signature;}}
-    for(const button of root.querySelectorAll('[data-edit-media-tags]')){const item=byId.get(button.dataset.editMediaTags);if(item)button.textContent=item.tags?.length?'תיוג אנשים ('+item.tags.length+')':'＋ תיוג אנשים';}
-    for(const label of root.querySelectorAll('[data-compact-tag-count]')){const item=byId.get(label.dataset.compactTagCount);if(item)label.textContent=item.tags?.length?'♧ '+item.tags.length+' מתויגים':'לתצוגה ותיוג';}
+    for(const row of root.querySelectorAll('[data-media-tags-for]')){const item=byId.get(row.dataset.mediaTagsFor);if(!item)continue;const signature=JSON.stringify(item.tags||[]);if(row.dataset.signature!==signature){row.innerHTML=(item.tags||[]).map(person=>I18n.html`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(I18n.personName(person))}">${safe(I18n.personName(person))}</button>`).join('');row.dataset.signature=signature;}}
+    for(const button of root.querySelectorAll('[data-edit-media-tags]')){const item=byId.get(button.dataset.editMediaTags);if(item)button.textContent=item.tags?.length?I18n.t('תיוג אנשים (')+item.tags.length+')':I18n.t('＋ תיוג אנשים');}
+    for(const label of root.querySelectorAll('[data-compact-tag-count]')){const item=byId.get(label.dataset.compactTagCount);if(item)label.textContent=item.tags?.length?'♧ '+item.tags.length+I18n.t(' מתויגים'):I18n.t('לתצוגה ותיוג');}
   }
   function closeModal(){closeRequested=false;$('tagPeopleDialog').close();}
   function requestClose(){if(modalStore?.busy&&!modalStore.error){closeRequested=true;return;}if(modalStore?.error&&modalStore.busy)return;closeModal();}

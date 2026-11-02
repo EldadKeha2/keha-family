@@ -1,26 +1,27 @@
 (() => {
   'use strict';
+  const I18n=window.FamilyI18n;
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const destinations=[['tree','♧','אילן היוחסין','משורש אחד, משפחה שלמה'],['gallery','▦','הגלריה','תמונות ותיוגים, רגע אחרי רגע'],['calendar','▣','לוח שנה משפחתי','ימי הולדת, חגים וסיבות לחגוג'],['directory','♡','בני המשפחה','האנשים והאלבומים של כולנו'],['photos','▧','תמונות משפחתיות','האלבום המשותף שלנו'],['videos','▷','סרטונים','הקולות והצחוק שנשארים'],['weddings','♧','חתונות','סיפורי האהבה שלנו'],['stories','✎','הסיפורים שלנו','זיכרונות שעוברים מדור לדור'],['nostalgia','❖','פינת הנוסטלגיה','עוד מבט ברגעים של פעם']];
+  const destinations=[['tree','♧',I18n.t('אילן היוחסין'),I18n.t('משורש אחד, משפחה שלמה')],['gallery','▦',I18n.t('הגלריה'),I18n.t('תמונות ותיוגים, רגע אחרי רגע')],['calendar','▣',I18n.t('לוח שנה משפחתי'),I18n.t('ימי הולדת, חגים וסיבות לחגוג')],['directory','♡',I18n.t('בני המשפחה'),I18n.t('האנשים והאלבומים של כולנו')],['photos','▧',I18n.t('תמונות משפחתיות'),I18n.t('האלבום המשותף שלנו')],['videos','▷',(I18n.isEnglish?'Videos':I18n.t('סרטונים')),I18n.t('הקולות והצחוק שנשארים')],['weddings','♧',I18n.t('חתונות'),I18n.t('סיפורי האהבה שלנו')],['stories','✎',I18n.t('הסיפורים שלנו'),I18n.t('זיכרונות שעוברים מדור לדור')],['nostalgia','❖',I18n.t('פינת הנוסטלגיה'),I18n.t('עוד מבט ברגעים של פעם')]];
   const state={view:'tree',ready:false,items:[],index:0,paused:matchMedia('(prefers-reduced-motion: reduce)').matches,loading:false,loadedAt:0,failures:0};
   const tiles=()=>destinations.map(([view,icon,title,description],index)=>`<button class="home-tile home-tile-${view}" data-view="${view}" style="--tile-delay:${index*35}ms"><span class="home-tile-icon" aria-hidden="true">${icon}</span><span><strong>${title}</strong><small>${description}</small></span><span class="home-tile-arrow" aria-hidden="true">←</span></button>`).join('');
   function slide(index){
     if(!state.items.length){$('homeSlideImage').hidden=true;$('homeSlidePlaceholder').hidden=false;$('homeSlideCaption').textContent='';$('homeSlideCounter').textContent='';$('homeSlideOpen').disabled=true;return;}
     state.index=(index+state.items.length)%state.items.length;const item=state.items[state.index];$('homeSlideImage').hidden=false;$('homeSlidePlaceholder').hidden=true;$('homeSlideOpen').disabled=false;
-    $('homeSlideImage').src=item.src;$('homeSlideImage').alt=item.caption||item.name||'תמונה משפחתית';$('homeSlideCaption').textContent=item.caption||'';$('homeSlideCounter').textContent=`${state.index+1} / ${state.items.length}`;
+    $('homeSlideImage').src=item.src;$('homeSlideImage').alt=item.caption||I18n.mediaName(item)||I18n.t('תמונה משפחתית');$('homeSlideCaption').textContent=item.caption||'';$('homeSlideCounter').textContent=`${state.index+1} / ${state.items.length}`;
     $('homeSlidePrevious').disabled=$('homeSlideNext').disabled=state.items.length<2;
     window.FamilyMedia.register('photos',state.items);
   }
   async function load(){
     if(state.loading)return;state.loading=true;
-    try{const response=await fetch('api/collections/photos',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json(),old=state.items[state.index]?.id;state.items=data.items;state.loadedAt=Date.now();state.failures=0;slide(Math.max(0,state.items.findIndex(item=>item.id===old)));}
+    try{const response=await I18n.fetch('api/collections/photos',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json(),old=state.items[state.index]?.id;state.items=data.items;state.loadedAt=Date.now();state.failures=0;slide(Math.max(0,state.items.findIndex(item=>item.id===old)));}
     catch{if(!state.items.length)slide(0);}finally{state.loading=false;}
   }
   function activate(view){state.view=view;$('homeView').hidden=view!=='home';if(!state.ready||view!=='home')return;slide(state.index);load();}
-  function togglePause(){state.paused=!state.paused;$('homeSlidePause').textContent=state.paused?'▶':'Ⅱ';$('homeSlidePause').setAttribute('aria-label',state.paused?'הפעלת התמונות המתחלפות':'השהיית התמונות המתחלפות');}
+  function togglePause(){state.paused=!state.paused;$('homeSlidePause').textContent=state.paused?'▶':'Ⅱ';$('homeSlidePause').setAttribute('aria-label',state.paused?I18n.t('הפעלת התמונות המתחלפות'):I18n.t('השהיית התמונות המתחלפות'));}
   function init(){
-    state.ready=true;$('homeSlidePause').textContent=state.paused?'▶':'Ⅱ';$('homeSlidePause').setAttribute('aria-label',state.paused?'הפעלת התמונות המתחלפות':'השהיית התמונות המתחלפות');$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
+    state.ready=true;$('homeSlidePause').textContent=state.paused?'▶':'Ⅱ';$('homeSlidePause').setAttribute('aria-label',state.paused?I18n.t('הפעלת התמונות המתחלפות'):I18n.t('השהיית התמונות המתחלפות'));$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
     $('mobileMenuToggle').addEventListener('click',()=>$('mobileNavDialog').showModal());$('closeMobileMenu').addEventListener('click',()=>$('mobileNavDialog').close());
     $('homeSlidePrevious').addEventListener('click',()=>slide(state.index-1));$('homeSlideNext').addEventListener('click',()=>slide(state.index+1));$('homeSlidePause').addEventListener('click',togglePause);
     $('homeSlideOpen').addEventListener('click',()=>window.FamilyMedia.open(state.items,state.index,'photos'));

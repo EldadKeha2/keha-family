@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  const I18n=window.FamilyI18n;
   const $ = id => document.getElementById(id);
   const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const app = () => window.FamilyApp;
@@ -9,13 +10,13 @@
   const collectionId=(kind,suffix)=>kind==='gallery'&&['Grid','Count','Empty'].includes(suffix)?'sharedGallery'+suffix:kind+suffix;
   const revisions = {}, signatures = {}, loading = {}, queues = {photos:[], videos:[],gallery:[]}, running = {}, drafts = new Map();
   let ready = false;
-  function canSave() {if (app()?.apiEnabled) return true;notify('כדי לשמור שינויים, פתחו את האתר באמצעות קובץ ההפעלה.');return false;}
+  function canSave() {if (app()?.apiEnabled) return true;notify(I18n.t('כדי לשמור שינויים, פתחו את האתר באמצעות קובץ ההפעלה.'));return false;}
   async function request(path, options={}) {
-    const response = await fetch(path, {cache:'no-store', ...options, headers:{...(options.body ? {'X-Family-Token':window.FAMILY_API_TOKEN} : {}), ...options.headers}});
+    const response = await I18n.fetch(path, {cache:'no-store', ...options, headers:{...(options.body ? {'X-Family-Token':window.FAMILY_API_TOKEN} : {}), ...options.headers}});
     if (response.status === 304) return null;
     let result;
-    try {result = await response.json();} catch {console.error('Family API response',path,response.status,response.url,response.headers.get('Content-Type'));throw Error('לא התקבלה תשובה מהשרת. בדקו את החיבור ונסו שוב.');}
-    if (!response.ok) throw Error(result.error || 'השינוי לא נשמר.');
+    try {result = await response.json();} catch {console.error('Family API response',path,response.status,response.url,response.headers.get('Content-Type'));throw Error(I18n.t('לא התקבלה תשובה מהשרת. בדקו את החיבור ונסו שוב.'));}
+    if (!response.ok) throw Error(I18n.error(result.error) || I18n.t('השינוי לא נשמר.'));
     return result;
   }
   const jsonPost = (path, body) => request(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
@@ -45,11 +46,11 @@
   }
   function renderCollection(kind) {
     const collection = state.collections[kind], query = normalize(state.query);
-    const filtered = collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>person.name).join(' ')).includes(query)));
+    const filtered = collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
     const isVideo = kind === 'videos',compact=kind==='gallery';
     window.FamilyMedia.register(kind,filtered);
     if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.videoCategory===state.videoCategory)));
-    $(collectionId(kind,'Count')).textContent = collection.items.length ? `${filtered.length}${filtered.length!==collection.items.length?' מתוך '+collection.items.length:''} ${isVideo?'סרטונים':'תמונות'} באלבום המשותף` : isVideo?'רגעים ששווה לראות שוב':'אלבום משותף לכל המשפחה';
+    $(collectionId(kind,'Count')).textContent = collection.items.length ? I18n.html`${filtered.length}${filtered.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?(isVideo?I18n.word(filtered.length,'video','videos'):I18n.word(filtered.length,'photo','photos')):(isVideo?I18n.t('סרטונים'):I18n.t('תמונות'))} באלבום המשותף` : isVideo?I18n.t('רגעים ששווה לראות שוב'):I18n.t('אלבום משותף לכל המשפחה');
     $(collectionId(kind,'Empty')).hidden = collection.items.length > 0;
     const signature = filtered.map(item=>item.file+'|'+item.src).join('\u0000');
     if (signatures[kind] !== signature) {
@@ -67,12 +68,12 @@
           const draft = drafts.get(captionKey(kind,item.file));
           const caption = draft?.dirty ? draft.value : item.caption;
           const viewer = item.provider==='youtube'
-            ? `<button class="youtube-poster" data-media-open="${safe(item.id)}" data-media-scope="videos" aria-label="ניגון ${safe(item.name)} בגלריה"><img src="${safe(item.poster)}" alt="${safe(item.name)}" loading="lazy"><span class="youtube-play" aria-hidden="true"><span>▶</span></span><span class="youtube-poster-title" aria-hidden="true" hidden>${safe(item.name)}</span></button><div class="youtube-card-heading"><h3>${safe(item.name)}</h3><a href="${safe(item.watchUrl)}" target="_blank" rel="noopener">YouTube ↗</a></div><p class="video-category-label">ימי הולדת מיוחדים</p>`
+            ? I18n.html`<button class="youtube-poster" data-media-open="${safe(item.id)}" data-media-scope="videos" aria-label="ניגון ${safe(I18n.mediaName(item))} בגלריה"><img src="${safe(item.poster)}" alt="${safe(I18n.mediaName(item))}" loading="lazy"><span class="youtube-play" aria-hidden="true"><span>▶</span></span><span class="youtube-poster-title" aria-hidden="true" hidden>${safe(I18n.mediaName(item))}</span></button><div class="youtube-card-heading"><h3>${safe(I18n.mediaName(item))}</h3><a href="${safe(item.watchUrl)}" target="_blank" rel="noopener">YouTube ↗</a></div><p class="video-category-label">ימי הולדת מיוחדים</p>`
             : isVideo
-              ? `<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||item.name)}"><source src="${safe(item.src)}" type="${safe(item.mime)}">הדפדפן אינו תומך בניגון הסרטון.</video></div><div class="video-file-info"><span>${safe(item.name)}</span><a href="${safe(item.src)}" download>הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הפורמט הזה לא מתנגן בדפדפן הנוכחי. אפשר להוריד את המקור או להעלות גרסת MP4 בתקן H.264.</p>`
-              : `<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${kind}" aria-label="פתיחת התמונה ${safe(item.name)}"><img src="${safe(item.src)}" alt="${safe(caption||item.name)}" loading="lazy"></button>`;
+              ? I18n.html`<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||I18n.mediaName(item))}"><source src="${safe(item.src)}" type="${safe(item.mime)}">הדפדפן אינו תומך בניגון הסרטון.</video></div><div class="video-file-info"><span>${safe(I18n.mediaName(item))}</span><a href="${safe(item.src)}" download>הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הפורמט הזה לא מתנגן בדפדפן הנוכחי. אפשר להוריד את המקור או להעלות גרסת MP4 בתקן H.264.</p>`
+              : I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${kind}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.src)}" alt="${safe(caption||item.name)}" loading="lazy"></button>`;
           const id = `shared-caption-${kind}-${encodeURIComponent(item.file)}`;
-          card.innerHTML = compact?viewer+`<div class="compact-photo-info"><span data-compact-tag-count="${safe(item.id)}">${item.tags?.length?'♧ '+item.tags.length+' מתויגים':'לתצוגה ותיוג'}</span><button class="compact-photo-delete" data-media-delete="${safe(item.id)}" data-media-scope="gallery" aria-label="מחיקת ${safe(item.name)}">×</button></div>`:viewer + window.FamilyMedia.controls(item,kind) + `<div class="caption-editor"><label for="${safe(id)}">${isVideo?'מה רואים בסרטון?':'מי בתמונה? איפה ומתי?'}</label><textarea id="${safe(id)}" data-shared-kind="${kind}" data-shared-file="${safe(item.file)}" rows="2" maxlength="5000" placeholder="כתבו כאן את הסיפור של הרגע הזה…" ${app()?.apiEnabled?'':'disabled'}>${safe(caption)}</textarea><div class="caption-toolbar"><span data-shared-status role="status">${draft?.dirty?'ממתין לשמירה…':''}</span><button data-save-shared="${safe(item.file)}" data-shared-kind="${kind}">שמירה</button></div></div>`;
+          card.innerHTML = compact?viewer+I18n.html`<div class="compact-photo-info"><span data-compact-tag-count="${safe(item.id)}">${item.tags?.length?'♧ '+item.tags.length+I18n.t(' מתויגים'):I18n.t('לתצוגה ותיוג')}</span><button class="compact-photo-delete" data-media-delete="${safe(item.id)}" data-media-scope="gallery" aria-label="מחיקת ${safe(I18n.mediaName(item))}">×</button></div>`:viewer + window.FamilyMedia.controls(item,kind) + I18n.html`<div class="caption-editor"><label for="${safe(id)}">${isVideo?I18n.t('מה רואים בסרטון?'):I18n.t('מי בתמונה? איפה ומתי?')}</label><textarea dir="auto" id="${safe(id)}" data-shared-kind="${kind}" data-shared-file="${safe(item.file)}" rows="2" maxlength="5000" placeholder="כתבו כאן את הסיפור של הרגע הזה…" ${app()?.apiEnabled?'':'disabled'}>${safe(caption)}</textarea><div class="caption-toolbar"><span data-shared-status role="status">${draft?.dirty?I18n.t('ממתין לשמירה…'):''}</span><button data-save-shared="${safe(item.file)}" data-shared-kind="${kind}">שמירה</button></div></div>`;
           card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;},true);
           if(item.provider==='youtube'){
             const img=card.querySelector('.youtube-poster img');
@@ -90,7 +91,7 @@
         const area=[...grid.querySelectorAll('textarea')].find(area=>area.dataset.sharedFile===focusedFile);
         if(area){area.focus({preventScroll:true});area.setSelectionRange(...selection);}
       }
-      if (!filtered.length && collection.items.length) grid.innerHTML='<p class="no-content-match">אין סרטונים או תמונות בבחירה הזו. אפשר לשנות את הקטגוריה או את החיפוש.</p>';
+      if (!filtered.length && collection.items.length) grid.innerHTML=I18n.t('<p class="no-content-match">אין סרטונים או תמונות בבחירה הזו. אפשר לשנות את הקטגוריה או את החיפוש.</p>');
     }
     window.FamilyTags.refresh($(collectionId(kind,'Grid')),filtered);
     for(const area of $(collectionId(kind,'Grid')).querySelectorAll('textarea')) {
@@ -115,26 +116,26 @@
     const draft=drafts.get(key)||{kind,file,saving:false};
     clearTimeout(draft.timer);draft.value=area.value;draft.dirty=true;
     draft.timer=setTimeout(()=>saveCaption(key),800);drafts.set(key,draft);
-    captionStatus(kind,file,'ממתין לשמירה…');
+    captionStatus(kind,file,I18n.t('ממתין לשמירה…'));
   }
   async function saveCaption(key) {
     const draft=drafts.get(key);
     if(!draft?.dirty || draft.saving || !app()?.apiEnabled)return;
     clearTimeout(draft.timer);draft.saving=true;const text=draft.value;
-    captionStatus(draft.kind,draft.file,'שומר…');
+    captionStatus(draft.kind,draft.file,I18n.t('שומר…'));
     try {
       await request('api/collections/'+draft.kind+'/caption',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:draft.file,caption:text}),keepalive:true});
       const item=state.collections[draft.kind].items.find(item=>item.file===draft.file);if(item)item.caption=text;
-      if(draft.value===text){draft.dirty=false;captionStatus(draft.kind,draft.file,'נשמר ✓');}
+      if(draft.value===text){draft.dirty=false;captionStatus(draft.kind,draft.file,I18n.t('נשמר ✓'));}
       else draft.timer=setTimeout(()=>saveCaption(key),100);
-    }catch(error){captionStatus(draft.kind,draft.file,'לא נשמר · נסו שוב',true);notify(error.message);}finally{draft.saving=false;}
+    }catch(error){captionStatus(draft.kind,draft.file,I18n.t('לא נשמר · נסו שוב'),true);notify(error.message);}finally{draft.saving=false;}
   }
   function flushCaptions(){for(const[key,draft]of drafts)if(draft.dirty)saveCaption(key);}
   function addFiles(kind,files,clipboard=false) {
     if(!canSave())return;
     const candidates=[...files], selected=candidates.filter(file=>kind==='videos'?/^video\//i.test(file.type)||/\.(mp4|webm|mov|m4v)$/i.test(file.name):/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name));
-    if(!selected.length){notify(kind==='videos'?'בחרו סרטון MP4, WebM, MOV או M4V.':'בחרו תמונות מהגלריה או מהמצלמה.');return;}
-    if(selected.length<candidates.length)notify('חלק מהקבצים לא התאימו לגלריה הזו. שאר הקבצים יועלו.');
+    if(!selected.length){notify(kind==='videos'?I18n.t('בחרו סרטון MP4, WebM, MOV או M4V.'):I18n.t('בחרו תמונות מהגלריה או מהמצלמה.'));return;}
+    if(selected.length<candidates.length)notify(I18n.t('חלק מהקבצים לא התאימו לגלריה הזו. שאר הקבצים יועלו.'));
     const group=kind==='videos'?$('videoUploadCategory').value:'family';
     queues[kind].push(...selected.map(file=>({file,clipboard,group})));runUploads(kind);
   }
@@ -143,9 +144,9 @@
       const xhr=new XMLHttpRequest();xhr.open('POST','api/collections/'+kind+'/upload?filename='+encodeURIComponent(name)+(kind==='videos'?'&group='+encodeURIComponent(group):''));
       xhr.setRequestHeader('X-Family-Token',window.FAMILY_API_TOKEN);xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
       xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded/event.total*100));};
-      xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error('החיבור הסתיים בלי אישור שמירה. נסו לרענן.'));return;}if(xhr.status>=200&&xhr.status<300)resolve(result);else reject(Error(result.error||'הקובץ לא נשמר.'));};
-      xhr.onerror=()=>reject(Error('ההעלאה נקטעה. בדקו את החיבור ונסו שוב.'));
-      xhr.onabort=()=>reject(Error('ההעלאה בוטלה.'));xhr.send(file);
+      xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(I18n.t('החיבור הסתיים בלי אישור שמירה. נסו לרענן.')));return;}if(xhr.status>=200&&xhr.status<300)resolve(result);else reject(Error(I18n.error(result.error)||I18n.t('הקובץ לא נשמר.')));};
+      xhr.onerror=()=>reject(Error(I18n.t('ההעלאה נקטעה. בדקו את החיבור ונסו שוב.')));
+      xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));xhr.send(file);
     });
   }
   async function runUploads(kind) {
@@ -155,15 +156,15 @@
     while(queues[kind].length){
       const{file,clipboard,group}=queues[kind].shift();
       try{
-        if(file.size>(kind==='videos'?90*1024*1024:50*1024*1024))throw Error(kind==='videos'?'הסרטון גדול מ־90MB.':'התמונה גדולה מ־50MB.');
-        const filename=clipboard?'צילום_מסך_'+new Date().toISOString().replace(/[:.]/g,'-')+'.png':file.name;
-        progress.hidden=false;progress.value=0;status.textContent='מעלה '+filename+'…';
-        const result=await uploadFile(kind,file,filename,percent=>{progress.value=percent;status.textContent=percent===100?'ההעלאה הסתיימה, שומר את הקובץ…':`מעלה ${filename} · ${percent}%`;},group);
+        if(file.size>(kind==='videos'?90*1024*1024:50*1024*1024))throw Error(kind==='videos'?I18n.t('הסרטון גדול מ־90MB.'):I18n.t('התמונה גדולה מ־50MB.'));
+        const filename=clipboard?I18n.t('צילום_מסך_')+new Date().toISOString().replace(/[:.]/g,'-')+'.png':file.name;
+        progress.hidden=false;progress.value=0;status.textContent=I18n.t('מעלה ')+filename+'…';
+        const result=await uploadFile(kind,file,filename,percent=>{progress.value=percent;status.textContent=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הקובץ…'):I18n.html`מעלה ${filename} · ${percent}%`;},group);
         saved++;state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
         if(state.view===kind)renderCollection(kind);
       }catch(error){notify(file.name+': '+error.message);}
     }
-    status.textContent=saved?`${saved} ${kind==='videos'?'סרטונים':'תמונות'} נשמרו ✓`:'לא נשמרו קבצים. אפשר לנסות שוב.';
+    status.textContent=saved?I18n.html`${saved} ${kind==='videos'?I18n.t('סרטונים'):I18n.t('תמונות')} נשמרו ✓`:I18n.t('לא נשמרו קבצים. אפשר לנסות שוב.');
     progress.hidden=true;zone.classList.remove('uploading');running[kind]=false;
   }
   function allowSharedInput(){return ['photos','videos','gallery'].includes(state.view)&&!document.querySelector('dialog[open]');}
@@ -183,10 +184,10 @@
     $('birthdayError').textContent='';$('birthdayPreview').textContent='';$('birthdayDialog').showModal();
   }
   function birthdayValue(){return `${$('birthDay').value}.${$('birthMonth').value}.${$('birthYear').value}`;}
-  function previewBirthday(){const age=window.FamilyDates.age(birthdayValue());$('birthdayPreview').textContent=age===null?'':`הגיל שיופיע בכרטיס: (${age})`;}
+  function previewBirthday(){const age=window.FamilyDates.age(birthdayValue());$('birthdayPreview').textContent=age===null?'':I18n.html`הגיל שיופיע בכרטיס: (${age})`;}
   async function saveBirthday(event,clear=false){
     event.preventDefault();const button=$('saveBirthday');button.disabled=true;$('birthdayError').textContent='';
-    try{const result=await jsonPost('api/people/'+encodeURIComponent(state.birthdayId)+'/birthday',{birthday:clear?'':birthdayValue(),expectedBirthday:state.birthdayExpected});app().updatePerson(state.birthdayId,result.person);$('birthdayDialog').close();notify('יום ההולדת עודכן ✓');}
+    try{const result=await jsonPost('api/people/'+encodeURIComponent(state.birthdayId)+'/birthday',{birthday:clear?'':birthdayValue(),expectedBirthday:state.birthdayExpected});app().updatePerson(state.birthdayId,result.person);$('birthdayDialog').close();notify(I18n.t('יום ההולדת עודכן ✓'));}
     catch(error){$('birthdayError').textContent=error.message;}finally{button.disabled=false;}
   }
   async function refreshStories(force=false){
@@ -197,38 +198,38 @@
   function renderStories(){
     const yearFilter=$('storyYearFilter'),previousYear=yearFilter.value;
     const years=[...new Set(state.stories.map(story=>story.year))].sort((a,b)=>a-b);
-    yearFilter.innerHTML='<option value="all">כל השנים</option>'+years.map(year=>`<option value="${year}">${year}</option>`).join('');
+    yearFilter.innerHTML=I18n.t('<option value="all">כל השנים</option>')+years.map(year=>`<option value="${year}">${year}</option>`).join('');
     if(years.includes(Number(previousYear)))yearFilter.value=previousYear;
     const query=normalize(state.query),year=yearFilter.value,descending=$('storySort').value==='newest';
     const stories=state.stories.filter(story=>(year==='all'||story.year===Number(year))&&(!query||normalize(story.title+' '+story.body+' '+story.author+' '+story.year).includes(query))).sort((a,b)=>(a.year-b.year||a.createdAt.localeCompare(b.createdAt))*(descending?-1:1));
-    $('storiesCount').textContent=state.stories.length?(stories.length===1?'סיפור אחד ביומן':`${stories.length} סיפורים ביומן`):'';
+    $('storiesCount').textContent=state.stories.length?(stories.length===1?I18n.t('סיפור אחד ביומן'):I18n.html`${stories.length} סיפורים ביומן`):'';
     $('storiesEmpty').hidden=state.stories.length>0;
     const groups=new Map();for(const story of stories){if(!groups.has(story.year))groups.set(story.year,[]);groups.get(story.year).push(story);}
-    $('storyTimeline').innerHTML=[...groups].map(([year,entries])=>`<section class="timeline-year"><h4><bdi>${year}</bdi><span class="year-diamond" aria-hidden="true">◆</span></h4><div class="year-stories">${entries.map(story=>`<article class="story-card"><span class="story-overline">${safe(story.author||'מהיומן המשפחתי')}</span><h3><button data-open-story="${story.id}">${safe(story.title)}</button></h3><p>${safe(story.body.slice(0,230))}${story.body.length>230?'…':''}</p><div class="story-card-footer"><button class="read-story" data-open-story="${story.id}">לסיפור המלא ←</button>${story.attachments.length?`<span>${story.attachments.length} מסמכים מצורפים</span>`:''}<button class="edit-story" data-edit-story="${story.id}" aria-label="עריכת הסיפור ${safe(story.title)}">✎ עריכה</button></div></article>`).join('')}</div></section>`).join('');
-    if(!stories.length&&state.stories.length)$('storyTimeline').innerHTML='<p class="no-content-match">לא נמצאו סיפורים בבחירה הזו.</p>';
+    $('storyTimeline').innerHTML=[...groups].map(([year,entries])=>`<section class="timeline-year"><h4><bdi>${year}</bdi><span class="year-diamond" aria-hidden="true">◆</span></h4><div class="year-stories">${entries.map(story=>I18n.html`<article class="story-card"><span class="story-overline">${safe(story.author||I18n.t('מהיומן המשפחתי'))}</span><h3><button data-open-story="${story.id}">${safe(story.title)}</button></h3><p>${safe(story.body.slice(0,230))}${story.body.length>230?'…':''}</p><div class="story-card-footer"><button class="read-story" data-open-story="${story.id}">לסיפור המלא ←</button>${story.attachments.length?I18n.html`<span>${story.attachments.length} מסמכים מצורפים</span>`:''}<button class="edit-story" data-edit-story="${story.id}" aria-label="עריכת הסיפור ${safe(story.title)}">✎ עריכה</button></div></article>`).join('')}</div></section>`).join('');
+    if(!stories.length&&state.stories.length)$('storyTimeline').innerHTML=I18n.t('<p class="no-content-match">לא נמצאו סיפורים בבחירה הזו.</p>');
   }
   const attachmentHTML=attachments=>attachments.map(file=>`<a href="${safe(file.src)}" target="_blank" rel="noopener" download="${safe(file.name)}">▤ ${safe(file.name)} <span>↓</span></a>`).join('');
   function openStory(id){
     const story=state.stories.find(item=>item.id===id);if(!story)return;
-    $('storyReaderBody').innerHTML=`<span class="story-reader-year"><bdi>${story.year}</bdi></span><h2 id="storyReaderTitle">${safe(story.title)}</h2>${story.author?`<p class="story-reader-author">סיפור מאת ${safe(story.author)}</p>`:''}<div class="story-full-text">${safe(story.body)}</div>${story.attachments.length?`<div class="attachment-list"><h3>המסמכים שמלווים את הסיפור</h3>${attachmentHTML(story.attachments)}</div>`:''}<button class="secondary-button" data-edit-story="${story.id}">✎ עריכת הסיפור</button>`;
+    $('storyReaderBody').innerHTML=I18n.html`<span class="story-reader-year"><bdi>${story.year}</bdi></span><h2 id="storyReaderTitle">${safe(story.title)}</h2>${story.author?I18n.html`<p class="story-reader-author">סיפור מאת ${safe(story.author)}</p>`:''}<div class="story-full-text" dir="auto">${safe(story.body)}</div>${story.attachments.length?I18n.html`<div class="attachment-list"><h3>המסמכים שמלווים את הסיפור</h3>${attachmentHTML(story.attachments)}</div>`:''}<button class="secondary-button" data-edit-story="${story.id}">✎ עריכת הסיפור</button>`;
     $('storyReader').showModal();
   }
   function editStory(id=null){
     if(!canSave())return;const story=id?state.stories.find(item=>item.id===id):null;if(id&&!story)return;
     if($('storyReader').open)$('storyReader').close();state.editingStory=id;$('storyForm').reset();
     state.editingStoryUpdatedAt=story?.updatedAt||null;
-    $('storyEditorTitle').textContent=story?'עורכים סיפור משפחתי':'מוסיפים סיפור משלנו';
+    $('storyEditorTitle').textContent=story?I18n.t('עורכים סיפור משפחתי'):I18n.t('מוסיפים סיפור משלנו');
     $('storyYear').value=story?.year||'';$('storyTitle').value=story?.title||'';$('storyAuthor').value=story?.author||'';$('storyBody').value=story?.body||'';
-    $('existingStoryFiles').innerHTML=story?.attachments.length?'<span>מסמכים שכבר צורפו לסיפור:</span>'+attachmentHTML(story.attachments):'';
+    $('existingStoryFiles').innerHTML=story?.attachments.length?I18n.t('<span>מסמכים שכבר צורפו לסיפור:</span>')+attachmentHTML(story.attachments):'';
     $('storyError').textContent='';$('storyEditor').showModal();
   }
   async function saveStory(event){
     event.preventDefault();const button=$('saveStory'),files=[...$('storyFiles').files];
     $('storyError').textContent='';
-    if(files.length>10||files.some(file=>file.size>10*1024*1024)||files.reduce((sum,file)=>sum+file.size,0)>20*1024*1024){$('storyError').textContent='אפשר לצרף עד 10 קבצים, עד 10MB לקובץ ועד 20MB יחד.';return;}
-    button.disabled=true;button.textContent='שומר את הסיפור…';
-    try{const form=new FormData($('storyForm'));if(state.editingStory)form.set('expectedUpdatedAt',state.editingStoryUpdatedAt);await request('api/stories'+(state.editingStory?'/'+state.editingStory:''),{method:'POST',body:form});$('storyEditor').close();$('storyYearFilter').value='all';state.query='';$('searchInput').value='';await refreshStories(true);notify('עוד זיכרון נשמר ביומן המשפחתי ✓');}
-    catch(error){$('storyError').textContent=error.message;}finally{button.disabled=false;button.textContent='שמירת הסיפור';}
+    if(files.length>10||files.some(file=>file.size>10*1024*1024)||files.reduce((sum,file)=>sum+file.size,0)>20*1024*1024){$('storyError').textContent=I18n.t('אפשר לצרף עד 10 קבצים, עד 10MB לקובץ ועד 20MB יחד.');return;}
+    button.disabled=true;button.textContent=I18n.t('שומר את הסיפור…');
+    try{const form=new FormData($('storyForm'));if(state.editingStory)form.set('expectedUpdatedAt',state.editingStoryUpdatedAt);await request('api/stories'+(state.editingStory?'/'+state.editingStory:''),{method:'POST',body:form});$('storyEditor').close();$('storyYearFilter').value='all';state.query='';$('searchInput').value='';await refreshStories(true);notify(I18n.t('עוד זיכרון נשמר ביומן המשפחתי ✓'));}
+    catch(error){$('storyError').textContent=error.message;}finally{button.disabled=false;button.textContent=I18n.t('שמירת הסיפור');}
   }
   function init(){
     ready=true;
