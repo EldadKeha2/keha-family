@@ -61,7 +61,7 @@ export function familyCalendar(anchor,mode,people,holidays=[],today,language='he
   });
   return {...month,today,days,knownBirthdays:known.length,unknownBirthdays:members.length-known.length,birthdayCount:days.filter(day=>day.inMonth).reduce((n,day)=>n+day.birthdays.length,0)};
 }
-export function holidayUrl(year){return 'https://www.hebcal.com/hebcal?'+new URLSearchParams({v:'1',cfg:'json',year:String(year),month:'x',maj:'on',min:'on',mod:'on',nx:'on',mf:'on',ss:'on',i:'on',c:'off',s:'off',lg:'he'});}
+export function holidayUrl(year){return 'https://www.hebcal.com/hebcal?'+new URLSearchParams({v:'1',cfg:'json',year:String(year),month:'x',maj:'on',min:'on',mod:'on',nx:'on',mf:'on',ss:'on',i:'on',c:'off',s:'off',lg:'s'});}
 async function yearHolidays(year,ctx){
   const cached=holidayCache.get(year);if(cached?.expires>Date.now())return cached.items;
   if(holidayRequests.has(year))return holidayRequests.get(year);

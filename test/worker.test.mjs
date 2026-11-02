@@ -19,6 +19,7 @@ function fixture(){
     const request=input instanceof Request?input:new Request(input,options),url=new URL(request.url);network.push(request);
     if(url.hostname==='www.hebcal.com'){
       assert.equal(url.searchParams.get('i'),'on','Use the Israel holiday calendar');
+      assert.equal(url.searchParams.get('lg'),'s','Fetch English titles alongside the Hebrew field');
       if(env.FAIL_HOLIDAYS)return new Response('Unavailable',{status:503});
       const year=url.searchParams.get('year');
       return Response.json({items:[{date:year+'-07-21',hebrew:'ראש חודש',title:'Rosh Chodesh',category:'roshchodesh'},{date:year+'-11-10',hebrew:'רֹאשׁ חוֹדֶשׁ כִּסְלֵו',title:'Rosh Chodesh Kislev',category:'roshchodesh'},{date:year+'-07-21T20:00:00+03:00',title:'Candle lighting',category:'candles'}]});
