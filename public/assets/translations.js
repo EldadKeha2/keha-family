@@ -1,4 +1,4 @@
-// Authored interface strings only. User captions, stories and added names are never passed through this catalog.
+// Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
   "החיבור לאחסון המדיה עדיין בהגדרה. אפשר לעדכן תאריכים ולכתוב סיפורים; העלאת קבצים תתאפשר לאחר השלמת החיבור": "Media storage is still being connected. You can edit dates and write stories; file uploads will be available once the connection is complete",
   "אילן היוחסין המשפחתי של יונה נקאש ושלמה קהא, שישה ענפים וחמישה דורות של סיפורים וזיכרונות": "The family tree of Yona Nakash and Shlomo Keha: six branches and five generations of stories and memories",
@@ -597,5 +597,32 @@ window.FAMILY_TRANSLATIONS={
   "ו": "&",
   "צילום_מסך_": "Screenshot_",
   "נשמרו בראש הגלריה": "saved at the top of the gallery",
-  "התמונה נשמרה בראש הגלריה": "The photo was saved at the top of the gallery"
+  "התמונה נשמרה בראש הגלריה": "The photo was saved at the top of the gallery",
+  "עדכונים": "Updates",
+  "תזכורות משפחתיות, ישר למייל": "Family reminders, straight to your inbox",
+  "התזכורות המשפחתיות שלנו": "Our family reminders",
+  "תמונות בעמוד": "Photos per page",
+  "דפדוף בתמונות": "Browse photos",
+  "הקודם": "Previous",
+  "הבא": "Next",
+  "תמונות בגלריה": "photos in the gallery",
+  "בחרו עמוד תקין ועד 500 תמונות בעמוד.": "Choose a valid page with up to 500 photos.",
+  "עדכון תאריך פטירה": "Edit date of death",
+  "תאריך הפטירה עודכן ✓": "Date of death updated ✓",
+  "תאריך פטירה זמין לאדם המסומן כמי שנפטר.": "A date of death can be set for a person marked as deceased.",
+  "תאריך הפטירה צריך להיות אחרי תאריך הלידה.": "The date of death must be after the birth date.",
+  "כך ייראה המייל": "Email preview",
+  "תצוגה מקדימה של המייל": "Email preview",
+  "יש להזין כתובת מייל תקינה.": "Enter a valid email address.",
+  "בחרו אילו עדכונים לקבל.": "Choose which updates to receive.",
+  "בחרו אנשים וזוגות מהרשימה.": "Select people and couples from the list.",
+  "בחרו לפחות עדכון אחד.": "Choose at least one update.",
+  "יש לאשר קבלת עדכונים במייל.": "Please consent to receiving email updates.",
+  "שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.": "Email delivery is being set up. Registration will open soon.",
+  "קישור האישור אינו תקף או שפג תוקפו.": "The confirmation link is invalid or has expired.",
+  "הקישור אינו תקף. בקשו קישור חדש במייל.": "This link is invalid. Request a new link by email.",
+  "ההעדפות השתנו. פתחו שוב את הקישור האישי.": "Your preferences have changed. Reopen your personal link.",
+  "הקישור הוחלף. פתחו את המייל האחרון שקיבלתם.": "This link was replaced. Open the latest email you received.",
+  "שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.": "The email could not be sent. Please try again later.",
+  "מכסת השליחה היומית התמלאה. נסו שוב מחר.": "The daily email limit has been reached. Please try again tomorrow."
 };

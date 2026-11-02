@@ -3,7 +3,9 @@ import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal} fro
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
+import {updatesRoute,dispatchUpdates} from './updates.mjs';
 export {FamilyState} from './state.mjs';
+export {FamilyUpdates} from './updates.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
 // Public visitors receive this request marker with the page. It is not a password.
 export const PUBLIC_WRITE_TOKEN='family-public-v1';
@@ -137,12 +139,13 @@ export default {
       if(!env.FAMILY_STATE)throw new HttpError(503,'צריך להשלים את הגדרת השמירה באתר.');
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
-      if(request.method==='POST'){
+      if(request.method==='POST'&&path!=='/api/updates/one-click'){
         checkOrigin(request);
         if(!equal(request.headers.get('X-Family-Token'),PUBLIC_WRITE_TOKEN))throw new HttpError(403,'יש לרענן את הדף לפני שמירת השינוי.');
       }
+      if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);
       if(path==='/family-data.js'&&request.method==='GET'){
-        const {people}=await db('people');const merged={...family,people:Object.fromEntries(Object.entries(family.people).map(([id,p])=>[id,{...p,name:people[id]?.name||p.name,birthday:people[id]?.birthday||p.birthday}]))};
+        const {people}=await db('people');const merged={...family,people:Object.fromEntries(Object.entries(family.people).map(([id,p])=>[id,{...p,name:people[id]?.name||p.name,birthday:people[id]?.birthday||p.birthday,deathDate:people[id]?.deathDate??null}]))};
         for(const person of Object.values(people))if(person.extra)merged.people[person.id]={id:person.id,name:person.name,firstName:person.name,lastName:'',birthday:person.birthday,extra:true,branch:null,generation:null,placeholder:false};
         return new Response('window.FAMILY_DATA='+JSON.stringify(merged)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(PUBLIC_WRITE_TOKEN)+';\nwindow.FAMILY_CLOUD=true;\n',{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
       }
@@ -157,7 +160,15 @@ export default {
       let match;
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
-      if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:match[1]}));
+      if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){
+        const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q');
+        if(request.headers.has('If-None-Match')){
+          const current=await db('collection.revision',{kind});
+          const revision=current.revision+(kind==='gallery'?':'+Number(page||1)+':'+Number(size||100)+':'+encodeURIComponent((query||'').trim()):'');
+          if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});
+        }
+        return snapshot(request,await db('collection',{kind,page,size,query}));
+      }
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
@@ -186,11 +197,12 @@ export default {
           if(match[1]==='upload')return await upload(request,env,db,ctx,{category:'nostalgia',mixed:true});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:'nostalgia',file:body.file,caption:body.caption}));
         }
-        if((match=/^\/api\/people\/([^/]+)\/(photos|caption|profile|birthday)$/.exec(path))){
+        if((match=/^\/api\/people\/([^/]+)\/(photos|caption|profile|birthday|death-date)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2];
           if(action==='photos')return await upload(request,env,db,ctx,{category:'personal',personId:id});
           const body=await readJSON(request,40000);
           if(action==='birthday')return json(await db('birthday',{id,birthday:body.birthday,expectedBirthday:body.expectedBirthday}));
+          if(action==='death-date')return json(await db('death.date',{id,date:body.date,expectedDate:body.expectedDate}));
           if(action==='profile')return json(await db('profile',{id,file:body.file}));
           return json(await db('media.caption',{personId:id,file:body.file,caption:body.caption}));
         }
@@ -204,5 +216,9 @@ export default {
       if(path.startsWith('/api/')||path.startsWith('/media/'))throw new HttpError(404,'הפריט לא נמצא.');
       return secure(await env.ASSETS.fetch(request));
     }catch(error){return fail(error);}
+  },
+  async scheduled(controller,env,ctx){
+    const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
+    ctx.waitUntil(dispatchUpdates(env,db,controller.scheduledTime||Date.now()));
   }
 };

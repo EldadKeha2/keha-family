@@ -1,0 +1,10 @@
+import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+const args=process.argv.slice(2);
+const option=(...names)=>{for(let i=0;i<args.length;i++){for(const name of names){if(args[i]===name)return args[i+1];if(args[i].startsWith(name+'='))return args[i].slice(name.length+1);}}};
+const port=option('--port')||process.env.PORT||'8787',host=option('--host','--hostname','--ip')||'0.0.0.0';
+if(!/^\d{2,5}$/.test(port))throw Error('Invalid preview port');
+const command=fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js',import.meta.url));
+const child=spawn(process.execPath,[command,'dev','--local','--ip',host,'--port',port,'--show-interactive-dev-session=false'],{stdio:'inherit',env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>child.kill(signal));
+child.on('exit',code=>process.exit(code||0));

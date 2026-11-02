@@ -516,3 +516,38 @@ test('new gallery uploads stay first after tagging, caption edits and a durable 
   f.restart();assert.deepEqual((await(await f.call('/api/collections/gallery')).json()).items.map(item=>item.file),order);
  }finally{await f.close();}
 });
+
+test('gallery pagination defaults to 100, caps at 500, searches all pages and keeps new uploads first',async()=>{
+ const f=fixture();try{
+  for(let i=0;i<623;i++){
+   const id=i.toString(16).padStart(32,'0'),item={id,category:'gallery',file:id+'.jpg',name:'Photo '+i,caption:i===3?'Unique distant caption':'',mime:'image/jpeg',kind:'photo',key:'gallery/'+id,createdAt:new Date(2026,0,1,0,0,i).toISOString()};
+   f.database.prepare('INSERT INTO media(id,category,data) VALUES(?,?,?)').run(id,'gallery',JSON.stringify(item));
+  }
+  const first=await (await f.call('/api/collections/gallery')).json();assert.equal(first.items.length,100);assert.equal(first.count,623);assert.equal(first.pagination.pages,7);assert.equal(first.items[0].name,'Photo 622');
+  const next=await (await f.call('/api/collections/gallery?page=2&size=100')).json();assert.equal(next.items[0].name,'Photo 522');assert.ok(next.items.every(item=>!first.items.some(p=>p.id===item.id)));
+  const large=await (await f.call('/api/collections/gallery?page=2&size=500')).json();assert.equal(large.items.length,123);assert.equal(large.pagination.pages,2);
+  assert.equal((await f.call('/api/collections/gallery?size=501')).status,400);assert.equal((await f.call('/api/collections/gallery?page=0')).status,400);
+  const search=await (await f.call('/api/collections/gallery?q=Unique')).json();assert.equal(search.count,1);assert.equal(search.items[0].name,'Photo 3');
+  const tagId=(3).toString(16).padStart(32,'0');f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(tagId,'yehiel');
+  assert.equal((await (await f.call('/api/collections/gallery?q=Yehiel')).json()).count,1);assert.equal((await (await f.call('/api/collections/gallery?q='+encodeURIComponent('יחיאל'))).json()).count,1);
+  assert.equal((await (await f.call('/api/collections/gallery?q=%25')).json()).count,0,'Search treats SQL wildcards literally');
+  assert.equal((await (await f.call('/api/collections/gallery?page=999')).json()).pagination.page,7);
+ }finally{await f.close();}
+});
+test('editable death dates retain birthday validation, stale checks and saved data through redeployment',async()=>{
+ const f=fixture();try{
+  await f.connect();const p=await (await f.call('/api/people/roi')).json();
+  const r=await f.call('/api/people/roi/death-date',{method:'POST',body:{date:'22.7.2024',expectedDate:p.deathDate}});assert.equal(r.status,200);assert.equal((await r.json()).person.deathDate,'22.7.2024');
+  assert.equal((await f.call('/api/people/roi/death-date',{method:'POST',body:{date:'23.7.2024',expectedDate:p.deathDate}})).status,409);
+  f.restart();assert.equal((await (await f.call('/api/people/roi')).json()).deathDate,'22.7.2024');assert.match(await f.connect(),/22\.7\.2024/);
+  assert.equal((await f.call('/api/people/yehiel/death-date',{method:'POST',body:{date:'22.7.2024',expectedDate:''}})).status,400);
+ }finally{await f.close();}
+});
+test('unchanged gallery polling checks only its revision instead of loading the page again',async()=>{
+ const f=fixture();try{
+  const first=await f.call('/api/collections/gallery');const tag=first.headers.get('ETag');assert.equal(first.status,200);
+  const original=f.storage.sql.exec;let pageReads=0;f.storage.sql.exec=(q,...args)=>{if(q.startsWith('SELECT m.data FROM media m WHERE')||q.startsWith('SELECT count(*) AS n FROM media m WHERE'))pageReads++;return original(q,...args);};
+  const unchanged=await f.call('/api/collections/gallery',{headers:{'If-None-Match':tag}});assert.equal(unchanged.status,304);assert.equal(pageReads,0);
+  assert.equal((await f.call('/api/collections/gallery?size=500',{headers:{'If-None-Match':tag}})).status,200);assert.ok(pageReads>0);
+ }finally{await f.close();}
+});

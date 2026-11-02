@@ -11,9 +11,10 @@
     "run_worker_first": true
   },
   "durable_objects": {
-    "bindings": [{ "name": "FAMILY_STATE", "class_name": "FamilyState" }]
+    "bindings": [{ "name": "FAMILY_STATE", "class_name": "FamilyState" }, { "name": "FAMILY_UPDATES", "class_name": "FamilyUpdates" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FamilyState"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FamilyState"] }, { "tag": "v2-updates", "new_sqlite_classes": ["FamilyUpdates"] }],
+  "triggers": { "crons": ["0 * * * *"] },
   "vars": {
     "HF_BUCKET": "keha-family"
   }

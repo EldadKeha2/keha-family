@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx wrangler dev",
+    "dev": "node scripts/dev.mjs",
     "deploy": "npx wrangler deploy",
     "check": "node --test test/*.test.mjs"
   },

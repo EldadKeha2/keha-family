@@ -3,3 +3,14 @@ HF_ACCESS_KEY_ID=
 HF_SECRET_ACCESS_KEY=
 HF_NAMESPACE=
 HF_BUCKET=keha-family
+# Updates are disabled until a verified sender and the required secrets are configured.
+UPDATES_ENABLED=false
+SITE_ORIGIN=https://keha-family.eldadkeha.workers.dev
+EMAIL_FROM=
+EMAIL_PROVIDER=brevo
+BREVO_API_KEY=
+# Alternative provider, if a verified sending domain is already available:
+RESEND_API_KEY=
+# Generate a random secret of at least 32 characters; retain it to decrypt subscribers.
+UPDATES_SECRET=
+EMAIL_DAILY_LIMIT=290

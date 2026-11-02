@@ -27,8 +27,9 @@ export class FamilyState {
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
         const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn;
-        if(nameChanged||person.deceased!==Boolean(p.deceased)||person.deathDate!==(p.deathDate||null)||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)){
-          person.name=p.name;person.nameEn=p.nameEn;person.deceased=Boolean(p.deceased);person.deathDate=p.deathDate||null;
+        if(nameChanged||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)){
+          person.name=p.name;person.nameEn=p.nameEn;person.deceased=Boolean(p.deceased);
+          if(person.deathDate===undefined)person.deathDate=p.deathDate||null;
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
           this.savePerson(person);
           // Tagged albums cache by revision; a canonical rename changes their labels too.
@@ -74,10 +75,25 @@ export class FamilyState {
     return {...person,invalidBirthday:false,profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,videoCount:videos.length,mediaCount:items.length,
       ...(includeGallery?{gallery:items.map(item=>({...this.mediaPublic(item),linked:this.mediaScope(item)!=='personal:'+person.id}))}:{})};
   }
-  collection(kind){
+  collection(kind,options={}){
     validCollection(kind);
-    const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC',kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
-    return {kind,items,count:items.length,revision:this.rows('SELECT value FROM meta WHERE id=?','collection:'+kind)[0]?.value||'empty'};
+    const revision=this.rows('SELECT value FROM meta WHERE id=?','collection:'+kind)[0]?.value||'empty';
+    if(kind!=='gallery'){
+      const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC',kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
+      return {kind,items,count:items.length,revision};
+    }
+    const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120);
+    if(![100,200,300,400,500].includes(size)||!Number.isSafeInteger(requestedPage)||requestedPage<1)throw new HttpError(400,'בחרו עמוד תקין ועד 500 תמונות בעמוד.');
+    const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
+    let where='m.category=?';
+    if(query){
+      where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
+      args.push(like,like,like,like);
+    }
+    const total=this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n;
+    const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
+    const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
+    return {kind,items,count:total,revision:revision+':'+page+':'+size+':'+encodeURIComponent(query),pagination:{page,size,total,pages,query}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   wedding(id,details=false){
@@ -104,10 +120,19 @@ export class FamilyState {
       case 'tag.people':return {people:this.rows('SELECT data FROM people').map(row=>{const item=JSON.parse(row.data);return {id:item.id,name:item.name,nameEn:item.nameEn||null,extra:Boolean(item.extra),branch:family.people[item.id]?.branch||null};})};
       case 'birthday':{
         const person=this.person(p.id);if(person.birthday!==p.expectedBirthday)throw new HttpError(409,'התאריך עודכן בינתיים. סגרו את העריכה ופתחו אותה מחדש לפני שמירה.');
-        const value=birthday(p.birthday),deathDate=family.people[p.id]?.deathDate;
+        const value=birthday(p.birthday),deathDate=person.deathDate;
         const time=date=>{const [d,m,y]=date.split('.').map(Number);return Date.UTC(y,m-1,d);};
         if(value!=='1.1.1111'&&deathDate&&time(value)>time(deathDate))throw new HttpError(400,'תאריך הלידה צריך להיות לפני תאריך הפטירה.');
         person.birthday=value;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
+      }
+      case 'death.date':{
+        const person=this.person(p.id);
+        if(!person.deceased)throw new HttpError(400,'תאריך פטירה זמין לאדם המסומן כמי שנפטר.');
+        if((person.deathDate||'')!==p.expectedDate)throw new HttpError(409,'התאריך עודכן בינתיים. סגרו את העריכה ופתחו אותה מחדש לפני שמירה.');
+        const date=p.date?calendarDate(p.date,'תאריך פטירה'):null;
+        const time=value=>{const [d,m,y]=value.split('.').map(Number);return Date.UTC(y,m-1,d);};
+        if(date&&person.birthday!=='1.1.1111'&&time(date)<time(person.birthday))throw new HttpError(400,'תאריך הפטירה צריך להיות אחרי תאריך הלידה.');
+        person.deathDate=date;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
       }
       case 'media.add':{
         const item=p.item;
@@ -209,7 +234,9 @@ export class FamilyState {
         if(!item)throw new HttpError(404,'בחרו תמונה מהאלבום של האדם הזה.');
         person.profileId=item.id;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
       }
-      case 'collection':return this.collection(p.kind);
+      case 'collection':return this.collection(p.kind,p);
+      case 'collection.revision':validCollection(p.kind);return {revision:this.rows('SELECT value FROM meta WHERE id=?','collection:'+p.kind)[0]?.value||'empty'};
+      case 'dates':return {people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data))};
       case 'weddings':return {weddings:couples.map(item=>this.wedding(item.id))};
       case 'wedding':return this.wedding(p.id,true);
       case 'wedding.date':{
