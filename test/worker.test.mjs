@@ -502,3 +502,17 @@ test('Hebrew and English tags resolve to one canonical person and additional nam
   const bootstrap=await(await f.call('/family-data.js')).text();assert.match(bootstrap,/Camille De Vita/);assert.match(bootstrap,/קמיל דה ויטה/);
  }finally{await f.close();}
 });
+
+test('new gallery uploads stay first after tagging, caption edits and a durable reload',async()=>{
+ const f=fixture();try{
+  await f.connect();const files=[];
+  for(const name of ['older.jpg','first-new.jpg','second-new.jpg']){
+   const response=await f.call('/api/collections/gallery/upload?filename='+name,{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(response.status,201);const result=await response.json();files.push(result.file);assert.equal(result.collection.items[0].file,result.file);
+  }
+  const order=[...files].reverse(),collection=await(await f.call('/api/collections/gallery')).json();assert.deepEqual(collection.items.map(item=>item.file),order);
+  const older=collection.items.find(item=>item.file===files[0]);
+  assert.equal((await f.call('/api/media/'+older.id+'/tag',{method:'POST',body:{personId:'yehiel',tagged:true}})).status,200);
+  assert.equal((await f.call('/api/collections/gallery/caption',{method:'POST',body:{file:older.file,caption:'An older family photo'}})).status,200);
+  f.restart();assert.deepEqual((await(await f.call('/api/collections/gallery')).json()).items.map(item=>item.file),order);
+ }finally{await f.close();}
+});

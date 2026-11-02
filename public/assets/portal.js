@@ -104,9 +104,10 @@
   async function refreshCollection(kind,force=false) {
     if (!app()?.apiEnabled || loading[kind]) return;
     loading[kind] = true;
+    const requestedRevision=revisions[kind];
     try {
       const result = await request('api/collections/'+kind,{headers:!force&&revisions[kind]?{'If-None-Match':'"'+revisions[kind]+'"'}:{}});
-      if (!result) return;
+      if (!result || revisions[kind]!==requestedRevision) return;
       state.collections[kind]=result;revisions[kind]=result.revision;
       if(state.view===kind)renderCollection(kind);
     }catch(error){if(force)notify(error.message);}finally{loading[kind]=false;}
@@ -149,8 +150,22 @@
       xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));xhr.send(file);
     });
   }
+  function revealGalleryUploads(files) {
+    if(state.view!=='gallery'||!files.length||document.querySelector('dialog[open]'))return;
+    state.query='';$('searchInput').value='';renderCollection('gallery');
+    const uploaded=new Set(files),grid=$('sharedGalleryGrid');
+    const cards=[...grid.querySelectorAll('.compact-gallery-card')].filter(card=>uploaded.has(card.dataset.mediaFile));
+    if(!cards.length)return;
+    for(const card of cards)card.classList.add('recently-uploaded');
+    requestAnimationFrame(()=>{
+      if(state.view!=='gallery'||document.querySelector('dialog[open]'))return;
+      grid.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+      cards[0].querySelector('[data-media-open]')?.focus({preventScroll:true});
+    });
+    setTimeout(()=>{for(const card of cards)card.classList.remove('recently-uploaded');},6000);
+  }
   async function runUploads(kind) {
-    if(running[kind])return;running[kind]=true;let saved=0;
+    if(running[kind])return;running[kind]=true;let saved=0;const savedFiles=[];
     const status=$(kind+'UploadState'),progress=$(kind+'Progress'),zone=$(kind+'Dropzone');
     zone.classList.add('uploading');
     while(queues[kind].length){
@@ -160,12 +175,13 @@
         const filename=clipboard?I18n.t('צילום_מסך_')+new Date().toISOString().replace(/[:.]/g,'-')+'.png':file.name;
         progress.hidden=false;progress.value=0;status.textContent=I18n.t('מעלה ')+filename+'…';
         const result=await uploadFile(kind,file,filename,percent=>{progress.value=percent;status.textContent=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הקובץ…'):I18n.html`מעלה ${filename} · ${percent}%`;},group);
-        saved++;state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
+        saved++;savedFiles.push(result.file);state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
         if(state.view===kind)renderCollection(kind);
       }catch(error){notify(file.name+': '+error.message);}
     }
     status.textContent=saved?I18n.html`${saved} ${kind==='videos'?I18n.t('סרטונים'):I18n.t('תמונות')} נשמרו ✓`:I18n.t('לא נשמרו קבצים. אפשר לנסות שוב.');
     progress.hidden=true;zone.classList.remove('uploading');running[kind]=false;
+    if(kind==='gallery'&&saved){status.textContent=saved===1?I18n.t('התמונה נשמרה בראש הגלריה ✓'):I18n.html`${saved} תמונות נשמרו בראש הגלריה ✓`;revealGalleryUploads(savedFiles);}
   }
   function allowSharedInput(){return ['photos','videos','gallery'].includes(state.view)&&!document.querySelector('dialog[open]');}
   function acceptDrop(event){if(!allowSharedInput())return false;$(state.view+'Dropzone').classList.remove('drag-over');addFiles(state.view,event.dataTransfer.files);return true;}

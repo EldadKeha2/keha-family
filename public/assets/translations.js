@@ -595,5 +595,7 @@ window.FAMILY_TRANSLATIONS={
   "בחירת שפה": "Language",
   " ו": " & ",
   "ו": "&",
-  "צילום_מסך_": "Screenshot_"
+  "צילום_מסך_": "Screenshot_",
+  "נשמרו בראש הגלריה": "saved at the top of the gallery",
+  "התמונה נשמרה בראש הגלריה": "The photo was saved at the top of the gallery"
 };

@@ -16,3 +16,5 @@
   .home-tile strong,.home-tile .home-tile-icon,.home-tile .home-tile-arrow{color:var(--tile-ink)}
   .home-tile small{color:#655c4b}
 }
+.compact-gallery-grid{scroll-margin-top:20px}.compact-gallery-card.recently-uploaded{outline:2px solid #81976c;outline-offset:2px;box-shadow:0 0 0 4px #81976c18,0 4px 12px #59462c12}
+@media(prefers-reduced-motion:no-preference){.compact-gallery-card.recently-uploaded{animation:gallery-upload-arrive 1.6s ease-out}@keyframes gallery-upload-arrive{from{background:#e8eedc}to{background:#fffef8}}}
