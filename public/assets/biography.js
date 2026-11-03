@@ -8,8 +8,8 @@ let editor=null,controller=null,root=null;
 const copy=value=>JSON.parse(JSON.stringify(value));
 const titles=()=>({residences:tr('מדינות בהן התגוררתי','Countries I have lived in'),languages:tr('שפות','Languages'),occupation:tr('מקצוע','Profession'),jobs:tr('עבודות בהן עבדתי','Work history')});
 const countryName=code=>new Intl.DisplayNames([I().locale],{type:'region'}).of(code)||code;
-const flag=code=>countryCodes.includes(code)?String.fromCodePoint(...[...code].map(c=>127397+c.charCodeAt(0))):'';
-function flagHTML(code){return `<span class="biography-flag" aria-hidden="true">${flag(code)}</span>`;}
+const flagSVG=code=>countryCodes.includes(code)?`<svg viewBox="0 0 640 480" width="32" height="24" focusable="false" aria-hidden="true"><use href="assets/country-flags.svg#${code}"></use></svg>`:'';
+function flagHTML(code){return `<span class="biography-flag" aria-hidden="true">${flagSVG(code)}</span>`;}
 function period(item){
   const start=item.fromYear,end=item.toYear;
   if(item.current)return start?`<bdi>${start} – ${tr('היום','present')}</bdi>`:tr('כיום','Present');
@@ -71,7 +71,7 @@ function attach(host,handlers){
   root.addEventListener('change',event=>{
     if(!event.target.closest('[data-bio-form]'))return;updateDraft(event.target);
     if(event.target.dataset.bioField==='current')rerender();
-    if(event.target.dataset.bioField==='country'){const node=event.target.parentElement.querySelector('.biography-flag');if(node)node.textContent=flag(event.target.value);}
+    if(event.target.dataset.bioField==='country'){const node=event.target.parentElement.querySelector('.biography-flag');if(node)node.innerHTML=flagSVG(event.target.value);}
   });
   root.addEventListener('submit',async event=>{
     if(!event.target.matches('[data-bio-form]'))return;event.preventDefault();if(!editor||editor.saving)return;
