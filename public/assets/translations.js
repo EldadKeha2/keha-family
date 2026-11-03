@@ -1,7 +1,7 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
   "החיבור לאחסון המדיה עדיין בהגדרה. אפשר לעדכן תאריכים ולכתוב סיפורים; העלאת קבצים תתאפשר לאחר השלמת החיבור": "Media storage is still being connected. You can edit dates and write stories; file uploads will be available once the connection is complete",
-  "אילן היוחסין המשפחתי של יונה נקאש ושלמה קהא, שישה ענפים וחמישה דורות של סיפורים וזיכרונות": "The family tree of Yona Nakash and Shlomo Keha: six branches and five generations of stories and memories",
+  "אילן היוחסין של משפחת קהא, שישה ענפים וחמישה דורות של סיפורים וזיכרונות": "The Keha family tree: six branches and five generations of stories and memories",
   "אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה": "Upload several photos together. Open a photo, browse your memories and tag the people in it",
   "הפריט יוסר מכל האלבומים שבהם הוא מופיע. מיד לאחר המחיקה אפשר לבחור ״ביטול מחיקה״": "This item will be removed from every album where it appears. You can choose “Undo deletion” immediately afterwards",
   "אילן יוחסין אינטראקטיבי. אפשר לגרור להזזה ולהשתמש בכפתורי התקרבות והרחקה": "Interactive family tree. Drag to move around, or use the zoom controls",
@@ -289,7 +289,7 @@ window.FAMILY_TRANSLATIONS={
   "יום ההולדת עודכן": "Birthday updated",
   "ההעלאה לא הושלמה": "The upload did not finish",
   "יש כמה אנשים בשם": "There are several people named",
-  "משפחות נקאש וקהא": "The Nakash and Keha Families",
+  "משפחת קהא": "The Keha Family",
   "בחירת ענף במשפחה": "Choose a family branch",
   "קטגוריות סרטונים": "Video categories",
   "סרטונים משפחתיים": "Family Videos",
