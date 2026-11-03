@@ -6,7 +6,7 @@ const defaults={residences:[],languages:[],occupation:'',jobs:[]},sections=Objec
 const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z"/></svg>';
 let editor=null,controller=null,root=null;
 const copy=value=>JSON.parse(JSON.stringify(value));
-const titles=()=>({residences:tr('מדינות בהן התגוררתי','Countries I have lived in'),languages:tr('שפות','Languages'),occupation:tr('מקצוע','Profession'),jobs:tr('עבודות בהן עבדתי','Work history')});
+const titles=()=>({residences:tr('מדינות בהן התגוררתי','Countries I have lived in'),languages:tr('שפות','Languages'),occupation:tr('מקצוע','Profession'),jobs:tr('עבודות שבהם עבדתי','Work history')});
 const countryName=code=>new Intl.DisplayNames([I().locale],{type:'region'}).of(code)||code;
 const flagSVG=code=>countryCodes.includes(code)?`<svg viewBox="0 0 640 480" width="32" height="24" focusable="false" aria-hidden="true"><use href="assets/country-flags.svg#${code}"></use></svg>`:'';
 function flagHTML(code){return `<span class="biography-flag" aria-hidden="true">${flagSVG(code)}</span>`;}

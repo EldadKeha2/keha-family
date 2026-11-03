@@ -16,7 +16,7 @@ function fixture(english=false){
 test('biography renders localized country flags and read-only details safely in both interface languages',()=>{
  for(const english of [false,true]){
   const f=fixture(english),p={id:'a',residences:[{country:'IL',fromYear:1990,toYear:null,current:true}],languages:['עברית','<script>'],occupation:'A & B',jobs:[{employer:'Family studio',role:'Designer',fromYear:2000,toYear:2010,current:false}]};
-  const html=f.bio.render(p);assert.match(html,/country-flags\.svg#IL/);assert.match(html,english?/Israel/:/ישראל/);assert.match(html,/&lt;script&gt;/);assert.match(html,/A &amp; B/);assert.ok(!html.includes('<input'));assert.ok(!html.includes('<textarea'));assert.match(html,english?/Work history/:/עבודות בהן עבדתי/);
+  const html=f.bio.render(p);assert.match(html,/country-flags\.svg#IL/);assert.match(html,english?/Israel/:/ישראל/);assert.match(html,/&lt;script&gt;/);assert.match(html,/A &amp; B/);assert.ok(!html.includes('<input'));assert.ok(!html.includes('<textarea'));assert.match(html,english?/Work history/:/עבודות שבהם עבדתי/);
   const partial=f.bio.render(p,false);assert.ok(!partial.includes('Family studio'));assert.match(partial,/data-bio-edit="residences"[^>]*disabled/);
  }
 });
