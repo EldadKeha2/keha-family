@@ -1,0 +1,22 @@
+/* Automatic quota/unavailable-mode overlay, never exposed in navigation. */
+.family-maintenance{display:none;position:fixed;inset:0;z-index:2147483647;overflow:auto;place-items:center;padding:clamp(10px,3vw,28px);background:#f6ead4;font-family:Georgia,"Times New Roman",serif;color:#582921}
+html.family-maintenance-active{overflow:hidden}
+.family-maintenance *{box-sizing:border-box}
+.family-maintenance-card{width:min(100%,1100px);min-height: min(94vh,740px);position:relative;text-align:center;border:7px double #963e30;border-radius:15px;outline:4px solid #dfad4e;outline-offset:-16px;background:radial-gradient(circle at 50% 25%,#fffaf0,#f6ead4 76%);box-shadow:0 24px 70px #5b2b2430;padding:clamp(20px,3vw,44px) clamp(12px,3vw,45px) 16px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;gap:12px}
+.family-maintenance-ornament{color:#a54332;letter-spacing:12px;font-size:19px;max-width:100%;overflow:hidden;white-space:nowrap}
+.family-maintenance-brand{font-family:Georgia,serif;letter-spacing:1px;color:#753027;font-size:clamp(16px,2vw,24px);font-weight:bold}
+.family-maintenance-brand span{padding:0 8px;color:#c17d27}
+.family-maintenance-columns{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:clamp(14px,4vw,55px);align-items:start}
+.family-maintenance-columns section{min-width:0}
+.family-maintenance-columns h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(24px,3.6vw,44px);line-height:1.17;color:#762b28;margin:0 0 13px}
+.family-maintenance-columns p{font-size:clamp(17px,2.3vw,25px);font-weight:600;margin:0 0 9px}
+.family-maintenance-columns small{display:block;font-family:Arial,sans-serif;font-size:clamp(12px,1.4vw,16px);line-height:1.45;color:#765342}
+.family-maintenance-art{width:min(100%,800px);height:auto;max-height:42vh;overflow:visible}
+.grandma-hammer{transform-box:fill-box;transform-origin:84% 88%;animation:grandma-build 2.3s ease-in-out infinite}
+.grandma-brick{animation:grandma-lay 2.3s ease-in-out infinite}
+.family-maintenance-sparkles{animation:grandma-glimmer 2s ease-in-out infinite alternate}
+@keyframes grandma-build{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(8deg)}}
+@keyframes grandma-lay{0%,100%{transform:translate(0,0)}50%{transform:translate(0,-4px)}}
+@keyframes grandma-glimmer{from{opacity:.35}to{opacity:1}}
+@media(max-width:650px){.family-maintenance-card{padding:28px 15px 15px;min-height:90vh}.family-maintenance-columns{grid-template-columns:1fr;gap:15px}.family-maintenance-columns h1{font-size:25px;margin-bottom:4px}.family-maintenance-columns p{font-size:17px;margin-bottom:2px}.family-maintenance-columns small{font-size:12px}.family-maintenance-art{max-height:34vh}.family-maintenance-ornament{font-size:13px;letter-spacing:7px}}
+@media(prefers-reduced-motion:reduce){.grandma-hammer,.grandma-brick,.family-maintenance-sparkles{animation:none}}
