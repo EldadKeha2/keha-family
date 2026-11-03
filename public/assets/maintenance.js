@@ -2,6 +2,10 @@
   'use strict';
   // No public route, query parameter or navigation control can activate this screen.
   let active = false, recoveryTimer = null;
+  // A visitor can acknowledge the limitation once per tab; no public URL triggers this screen.
+  const bypassKey = 'keha-family-maintenance-continue';
+  let bypassed = false;
+  try { bypassed = sessionStorage.getItem(bypassKey) === '1'; } catch {}
   const unavailable = status => status === 429 || status === 1027;
   const apiPath = input => {
     try {
@@ -46,13 +50,29 @@
           </g>
           <g class="family-maintenance-sparkles" fill="#d49528"><path d="m751 83 7 20 20 7-20 7-7 20-7-20-20-7 20-7Z"/><path d="m685 25 4 12 12 4-12 4-4 12-4-12-12-4 12-4Z"/></g>
         </svg>
+        <div class="family-maintenance-continue" aria-label="אפשרות להמשיך לגלוש בעת מגבלת מכסה">
+          <p dir="rtl" lang="he">אפשר להמשיך לגלוש באתר, אך בשל מגבלות שימוש זמניות, ייתכן שחלק מהתמונות, המידע והאפשרויות לא יהיו זמינים.</p>
+          <p dir="ltr" lang="en">You can continue browsing, but some photos, information and features may be unavailable while usage limits are in effect.</p>
+          <button class="family-maintenance-enter" type="button"><span lang="he" dir="rtl">המשך לאתר בכל זאת</span><span lang="en" dir="ltr">Continue to the website anyway</span></button>
+        </div>
         <div class="family-maintenance-ornament bottom" aria-hidden="true">✦ ◆ ✦ ◆ ✦ ◆ ✦</div>
       </div>`;
+    screen.querySelector('.family-maintenance-enter').addEventListener('click', continueToSite);
     document.body.append(screen);
     return screen;
   }
+  function continueToSite() {
+    bypassed = true;
+    try { sessionStorage.setItem(bypassKey, '1'); } catch {}
+    active = false;
+    if (recoveryTimer) clearInterval(recoveryTimer);
+    recoveryTimer = null;
+    const screen = document.getElementById('familyMaintenanceScreen');
+    if (screen) screen.style.display = 'none';
+    document.documentElement.classList.remove('family-maintenance-active');
+  }
   function activate() {
-    if (active) return;
+    if (active || bypassed) return;
     active = true;
     const screen = mount(); screen.style.display = 'grid';
     document.documentElement.classList.add('family-maintenance-active');
@@ -62,7 +82,10 @@
     if (!active || document.visibilityState === 'hidden') return;
     try {
       const response = await nativeFetch('/api/health', {cache:'no-store'});
-      if (response.ok) location.reload();
+      if (response.ok) {
+        try { sessionStorage.removeItem(bypassKey); } catch {}
+        location.reload();
+      }
     } catch {}
   }
   const nativeFetch = window.fetch.bind(window);
