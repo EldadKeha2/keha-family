@@ -22,3 +22,16 @@ test('maintenance overlay has no manually navigable page or trigger',()=>{
   assert.match(js,/אנחנו מתנצלים/);
   assert.match(css,/prefers-reduced-motion/);
 });
+
+test('quota screen allows informed browsing without manual activation or repeated overlays in the same tab',()=>{
+  const js=read('../public/assets/maintenance.js');
+  const css=read('../public/assets/maintenance.css');
+  assert.match(js,/המשך לאתר בכל זאת/);
+  assert.match(js,/Continue to the website anyway/);
+  assert.match(js,/חלק מהתמונות, המידע והאפשרויות/);
+  assert.match(js,/sessionStorage\.setItem\(bypassKey, '1'\)/);
+  assert.match(js,/if \(active \|\| bypassed\) return/);
+  assert.match(js,/addEventListener\('click', continueToSite\)/);
+  assert.match(css,/family-maintenance-enter:focus-visible/);
+  assert.doesNotMatch(js,/URLSearchParams|location\.hash|query\.get\(/);
+});
