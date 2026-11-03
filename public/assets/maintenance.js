@@ -1,107 +1,108 @@
 (() => {
   'use strict';
-  // No public route, query parameter or navigation control can activate this screen.
-  let active = false, recoveryTimer = null;
-  // A visitor can acknowledge the limitation once per tab; no public URL triggers this screen.
-  const bypassKey = 'keha-family-maintenance-continue';
-  let bypassed = false;
-  try { bypassed = sessionStorage.getItem(bypassKey) === '1'; } catch {}
-  const unavailable = status => status === 429 || status === 1027;
-  const apiPath = input => {
-    try {
-      const url = new URL(typeof input === 'string' ? input : input.url, location.href);
-      return url.origin === location.origin && (url.pathname.startsWith('/api/') || url.pathname === '/family-data.js');
-    } catch { return false; }
+  // Automatic failure handling only: no navigation item, public URL or manual activation.
+  const bypassKey='keha-family-maintenance-continue';
+  let active=false,bypassed=false,recoveryTimer=null,previousFocus=null;
+  try{bypassed=sessionStorage.getItem(bypassKey)==='1';}catch{}
+  const unavailable=status=>status===0||status===402||status===429||status===1027||status>=500;
+  const nativeFetch=window.fetch.bind(window);
+  function familyURL(input){
+    try{const url=new URL(typeof input==='string'||input instanceof URL?input:input.url,location.href);return url.origin===location.origin?url:null;}catch{return null;}
+  }
+  function dataRequest(input){const url=familyURL(input);return Boolean(url&&(url.pathname.startsWith('/api/')||url.pathname.startsWith('/media/')||url.pathname==='/family-data.js'));}
+  function pageRoot(){return document.querySelector('.page-shell');}
+  function banner(){
+    let notice=document.getElementById('familyLimitedNotice');
+    if(!notice){
+      notice=document.createElement('div');notice.id='familyLimitedNotice';notice.className='family-limited-notice';notice.setAttribute('role','status');notice.setAttribute('data-i18n-skip','');
+      notice.innerHTML='<p lang="he" dir="rtl">גלישה מוגבלת: חלק מהתמונות, המידע והאפשרויות עשויים לא להיות זמינים כרגע.</p><p lang="en" dir="ltr">Limited browsing: some photos, information and features may be temporarily unavailable.</p>';
+      document.body.prepend(notice);
+    }
+    notice.hidden=false;
+  }
+  function mount(){
+    let screen=document.getElementById('familyMaintenanceScreen');if(screen)return screen;
+    screen=document.createElement('div');screen.id='familyMaintenanceScreen';screen.className='family-maintenance';screen.hidden=true;
+    screen.setAttribute('role','dialog');screen.setAttribute('aria-modal','true');screen.setAttribute('aria-labelledby','familyMaintenanceTitle');screen.setAttribute('aria-describedby','familyMaintenanceWarningHe familyMaintenanceWarningEn');screen.setAttribute('data-i18n-skip','');
+    screen.innerHTML=`<div class="family-maintenance-card">
+      <div class="family-maintenance-ornament" aria-hidden="true">✦ ◆ ✦ ◆ ✦ ◆ ✦</div>
+      <div class="family-maintenance-brand">בית משפחת קהא <span>·</span> KEHA FAMILY</div>
+      <div class="family-maintenance-columns">
+        <section dir="rtl" lang="he"><h1 id="familyMaintenanceTitle">האתר תחת שיפוצים כעת</h1><p>אנחנו מתנצלים על אי הנוחות</p><small>סבתא יונה עובדת על זה באהבה.</small></section>
+        <section dir="ltr" lang="en"><h1>The website is currently under maintenance</h1><p>We apologize for the inconvenience</p><small>GRANDMA is working on it with love.</small></section>
+      </div>
+      <div class="family-maintenance-art-wrap"><img class="family-maintenance-art" src="/assets/grandma-construction.png" width="1774" height="887" alt="סבתא יונה בונה קיר לבנים לצד תמרור עבודות תימני / Grandma building a brick wall beside a Yemeni roadworks sign"><span class="grandma-work-spark" aria-hidden="true">✦</span></div>
+      <div class="family-maintenance-continue">
+        <p id="familyMaintenanceWarningHe" dir="rtl" lang="he">עקב מגבלה או תקלה זמנית, ייתכן שחלק מהתמונות, המידע והאפשרויות לא יהיו זמינים. אפשר להמשיך לגלוש בכל זאת.</p>
+        <p id="familyMaintenanceWarningEn" dir="ltr" lang="en">A temporary limit or service issue may prevent some photos, information and features from loading. You can still continue browsing.</p>
+        <button class="family-maintenance-enter" type="button"><span lang="he" dir="rtl">המשך לאתר בכל זאת</span><span lang="en" dir="ltr">Continue to the website anyway</span></button>
+      </div>
+      <div class="family-maintenance-ornament bottom" aria-hidden="true">✦ ◆ ✦ ◆ ✦ ◆ ✦</div>
+    </div>`;
+    screen.querySelector('.family-maintenance-enter').addEventListener('click',continueToSite);
+    screen.addEventListener('keydown',event=>{if(active&&event.key==='Tab'){event.preventDefault();screen.querySelector('.family-maintenance-enter').focus();}});
+    document.body.append(screen);return screen;
+  }
+  function continueToSite(){
+    bypassed=true;try{sessionStorage.setItem(bypassKey,'1');}catch{}
+    active=false;if(recoveryTimer)clearInterval(recoveryTimer);recoveryTimer=null;
+    const screen=document.getElementById('familyMaintenanceScreen');if(screen){screen.hidden=true;screen.style.display='none';}
+    document.documentElement.classList.remove('family-maintenance-active');const root=pageRoot();if(root)root.inert=false;
+    banner();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
+  }
+  function activate(){
+    if(active)return;
+    if(bypassed){banner();return;}
+    if(!document.body)return;
+    previousFocus=document.activeElement;active=true;const screen=mount();screen.hidden=false;screen.style.display='grid';
+    document.documentElement.classList.add('family-maintenance-active');const root=pageRoot();if(root)root.inert=true;
+    screen.querySelector('.family-maintenance-enter').focus({preventScroll:true});
+    if(!recoveryTimer)recoveryTimer=setInterval(checkRecovery,120000);
+  }
+  async function checkRecovery(){
+    if(!active||document.visibilityState==='hidden')return;
+    try{
+      const response=await nativeFetch('/api/health',{cache:'no-store'});
+      if(response.ok&&(await response.json()).available===true){try{sessionStorage.removeItem(bypassKey);}catch{}location.reload();}
+    }catch{}
+  }
+  function observeResponse(input,response){
+    if(!dataRequest(input))return;
+    const type=response.headers.get('Content-Type')||'';
+    if(unavailable(response.status)||response.headers.get('X-Family-Storage-Limit')==='daily'||(response.ok&&/text\/html/i.test(type)))activate();
+  }
+  window.fetch=async(...args)=>{
+    try{const response=await nativeFetch(...args);observeResponse(args[0],response);return response;}
+    catch(error){if(error?.name!=='AbortError'&&dataRequest(args[0]))activate();throw error;}
   };
-  function mount() {
-    let screen = document.getElementById('familyMaintenanceScreen');
-    if (screen) return screen;
-    screen = document.createElement('div');
-    screen.id = 'familyMaintenanceScreen';
-    screen.className = 'family-maintenance';
-    screen.setAttribute('role','alert');
-    screen.setAttribute('aria-live','assertive');
-    screen.setAttribute('data-i18n-skip','');
-    screen.innerHTML = `
-      <div class="family-maintenance-card">
-        <div class="family-maintenance-ornament" aria-hidden="true">✦ ◆ ✦ ◆ ✦ ◆ ✦</div>
-        <div class="family-maintenance-brand">בית משפחת קהא <span>·</span> KEHA FAMILY</div>
-        <div class="family-maintenance-columns">
-          <section dir="rtl" lang="he"><h1>האתר תחת שיפוצים כעת</h1><p>אנחנו מתנצלים על אי הנוחות</p><small>סבתא יונה עובדת על זה באהבה. נשוב בקרוב!</small></section>
-          <section dir="ltr" lang="en"><h1>The website is currently under maintenance</h1><p>We apologize for the inconvenience</p><small>GRANDMA is working on it with love. We'll be back soon!</small></section>
-        </div>
-        <svg class="family-maintenance-art" viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="סבתא יונה בונה קיר לבנים ליד תמרור עבודות תימני">
-          <defs><pattern id="kehaBrick" width="112" height="42" patternUnits="userSpaceOnUse"><rect width="110" height="40" x="1" y="1" rx="5" fill="#bb6540" stroke="#7e372d" stroke-width="2"/><path d="M12 9h38M65 28h30" stroke="#e7a17d" stroke-width="3" opacity=".65"/></pattern></defs>
-          <path d="M0 323q140-15 260 0t290-2t270 2v38H0Z" fill="#e7d1ab"/>
-          <g transform="translate(46 90)"><path d="M110 0 220 205H0Z" fill="#f8b723" stroke="#872d27" stroke-width="13" stroke-linejoin="round"/><path d="M110 29 192 183H28Z" fill="#ffd86e" stroke="#fff1bd" stroke-width="3"/><g transform="translate(54 75)" fill="#262329"><circle cx="63" cy="9" r="15"/><path d="m48 6 17-22 26 2-2 13H51Z" fill="#812a33"/><path d="M53 24h25l19 35-15 12-22-21-5 41H37l2-42-29 30-12-13 43-42Z"/><path d="m50 88-24 51h20l28-43 25 47h20L82 81Z"/></g><rect x="18" y="201" width="10" height="38" rx="3" fill="#6c442a"/><rect x="190" y="201" width="10" height="38" rx="3" fill="#6c442a"/></g>
-          <g transform="translate(310 19)">
-            <ellipse cx="225" cy="298" rx="227" ry="17" fill="#c6ae8c" opacity=".75"/>
-            <g class="grandma-hammer" transform="translate(145 92)"><path d="M0 4 87 77" stroke="#7e462a" stroke-width="14" stroke-linecap="round"/><path d="m-25-18 44 7-5 30-48-6Z" fill="#676364" stroke="#363436" stroke-width="3"/></g>
-            <path d="M115 195q-25-97 55-115l57-4q73 14 89 121Z" fill="#29252c" stroke="#923b32" stroke-width="12"/>
-            <path d="M147 116q55 19 106 0l26 77H126Z" fill="#962f32"/><path d="M150 137h118" stroke="#f7b949" stroke-width="7" stroke-dasharray="7 8"/>
-            <ellipse cx="201" cy="89" rx="63" ry="68" fill="#e9b78b" stroke="#b57861" stroke-width="4"/>
-            <path d="M141 69q-8-72 57-76 68-2 67 72-55-26-124 4Z" fill="#f4ecdc" stroke="#aa9a87" stroke-width="4"/>
-            <path d="M127 48q-8-78 71-78 79 0 85 83-78-49-156-5Z" fill="#28252c" stroke="#e5a43e" stroke-width="9"/><path d="M130 21q72-40 147 10" fill="none" stroke="#9c3735" stroke-width="11"/>
-            <circle cx="171" cy="91" r="23" fill="none" stroke="#60483b" stroke-width="4"/><circle cx="229" cy="91" r="23" fill="none" stroke="#60483b" stroke-width="4"/><path d="M194 92h12" stroke="#60483b" stroke-width="4"/><path d="M160 89q11 12 22 0m36 0q11 12 22 0" stroke="#5a3c33" stroke-width="3" fill="none"/><path d="M184 122q19 22 41 0" stroke="#963d37" stroke-width="4" stroke-linecap="round" fill="none"/>
-            <path d="M116 174 66 236l35 20 55-56M287 174l44 62-34 18-54-54" fill="#e9b78b" stroke="#b57861" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-            <g class="grandma-brick" transform="translate(65 214)"><rect width="78" height="38" rx="5" fill="#bb6540" stroke="#85372e" stroke-width="4"/><path d="M12 11h44" stroke="#df9874" stroke-width="4"/></g>
-            <path d="M44 244h398v66H44Z" fill="url(#kehaBrick)" stroke="#883d2e" stroke-width="4"/>
-            <path d="M53 242h372" stroke="#e8ddc8" stroke-width="8" stroke-linecap="round"/>
-          </g>
-          <g class="family-maintenance-sparkles" fill="#d49528"><path d="m751 83 7 20 20 7-20 7-7 20-7-20-20-7 20-7Z"/><path d="m685 25 4 12 12 4-12 4-4 12-4-12-12-4 12-4Z"/></g>
-        </svg>
-        <div class="family-maintenance-continue" aria-label="אפשרות להמשיך לגלוש בעת מגבלת מכסה">
-          <p dir="rtl" lang="he">אפשר להמשיך לגלוש באתר, אך בשל מגבלות שימוש זמניות, ייתכן שחלק מהתמונות, המידע והאפשרויות לא יהיו זמינים.</p>
-          <p dir="ltr" lang="en">You can continue browsing, but some photos, information and features may be unavailable while usage limits are in effect.</p>
-          <button class="family-maintenance-enter" type="button"><span lang="he" dir="rtl">המשך לאתר בכל זאת</span><span lang="en" dir="ltr">Continue to the website anyway</span></button>
-        </div>
-        <div class="family-maintenance-ornament bottom" aria-hidden="true">✦ ◆ ✦ ◆ ✦ ◆ ✦</div>
-      </div>`;
-    screen.querySelector('.family-maintenance-enter').addEventListener('click', continueToSite);
-    document.body.append(screen);
-    return screen;
+  // Uploads use XMLHttpRequest, while regular data requests use fetch.
+  const proto=window.XMLHttpRequest?.prototype;
+  if(proto){
+    const open=proto.open,observed=new WeakMap();
+    proto.open=function(method,url,...args){
+      const previous=observed.get(this);if(previous)for(const [name,listener]of previous)this.removeEventListener(name,listener);
+      const result=open.call(this,method,url,...args);if(!dataRequest(url))return result;
+      const loaded=()=>{if(unavailable(this.status)||this.getResponseHeader('X-Family-Storage-Limit')==='daily')activate();},failed=()=>activate();
+      const listeners=[['load',loaded],['error',failed],['timeout',failed]];observed.set(this,listeners);
+      for(const [name,listener]of listeners)this.addEventListener(name,listener,{once:true});return result;
+    };
   }
-  function continueToSite() {
-    bypassed = true;
-    try { sessionStorage.setItem(bypassKey, '1'); } catch {}
-    active = false;
-    if (recoveryTimer) clearInterval(recoveryTimer);
-    recoveryTimer = null;
-    const screen = document.getElementById('familyMaintenanceScreen');
-    if (screen) screen.style.display = 'none';
-    document.documentElement.classList.remove('family-maintenance-active');
+  window.addEventListener('error',event=>{
+    const target=event.target,src=target?.currentSrc||target?.src||'',url=familyURL(src);
+    if(target?.tagName==='SCRIPT'&&url?.pathname==='/family-data.js'){activate();return;}
+    if(['IMG','VIDEO','IFRAME'].includes(target?.tagName)&&url?.pathname.startsWith('/media/'))activate();
+    if(/FAMILY_DATA|FAMILY_API_TOKEN|family-data\.js/.test(String(event.message||'')))activate();
+  },true);
+  window.addEventListener('load',event=>{
+    const frame=event.target;if(frame?.tagName!=='IFRAME'||!familyURL(frame.src)?.pathname.startsWith('/media/'))return;
+    try{const doc=frame.contentDocument;if(doc?.contentType==='application/json'&&/"error"\s*:/.test(doc.body?.textContent||''))activate();}catch{}
+  },true);
+  function checkStartup(){
+    if(window.FAMILY_DATA_AVAILABLE===false||!window.FAMILY_DATA)activate();
+    // A resource can fail during parsing, before its error event listener is installed.
+    for(const image of document.querySelectorAll('img[src*="/media/"]'))if(image.complete&&image.naturalWidth===0&&dataRequest(image.currentSrc||image.src)){activate();break;}
   }
-  function activate() {
-    if (active || bypassed) return;
-    active = true;
-    const screen = mount(); screen.style.display = 'grid';
-    document.documentElement.classList.add('family-maintenance-active');
-    if (!recoveryTimer) recoveryTimer = setInterval(checkRecovery, 120000);
-  }
-  async function checkRecovery() {
-    if (!active || document.visibilityState === 'hidden') return;
-    try {
-      const response = await nativeFetch('/api/health', {cache:'no-store'});
-      if (response.ok) {
-        try { sessionStorage.removeItem(bypassKey); } catch {}
-        location.reload();
-      }
-    } catch {}
-  }
-  const nativeFetch = window.fetch.bind(window);
-  window.fetch = async (...args) => {
-    const response = await nativeFetch(...args);
-    if (apiPath(args[0]) && (unavailable(response.status) || response.headers.get('X-Family-Storage-Limit') === 'daily')) activate();
-    return response;
-  };
-  // A failed dynamic bootstrap is also a reliable signal that the application cannot start.
-  window.addEventListener('error', event => {
-    const src = event.target?.src || '';
-    if (event.target?.tagName === 'SCRIPT' && /\/family-data\.js(?:[?#]|$)/.test(src)) activate();
-  }, true);
-  // Some edge failures return an HTML error page with HTTP 200 to script requests.
-  window.addEventListener('error', event => {
-    if (/FAMILY_DATA|FAMILY_API_TOKEN|family-data\.js/.test(String(event.message || ''))) activate();
-  });
-  window.FamilyMaintenance = {isActive: () => active};
+  // Deferred scripts run while readyState is "interactive", before the later data scripts.
+  if(document.readyState!=='complete')document.addEventListener('DOMContentLoaded',checkStartup,{once:true});else checkStartup();
+  window.FamilyMaintenance={isActive:()=>active};
 })();

@@ -47,5 +47,8 @@
   },
   "vars": {
     "HF_BUCKET": "keha-family"
+  },
+  "build": {
+    "command": "node scripts/build-family-fallback.mjs"
   }
 }
