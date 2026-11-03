@@ -20,3 +20,11 @@ html.family-maintenance-active{overflow:hidden}
 @keyframes grandma-glimmer{from{opacity:.35}to{opacity:1}}
 @media(max-width:650px){.family-maintenance-card{padding:28px 15px 15px;min-height:90vh}.family-maintenance-columns{grid-template-columns:1fr;gap:15px}.family-maintenance-columns h1{font-size:25px;margin-bottom:4px}.family-maintenance-columns p{font-size:17px;margin-bottom:2px}.family-maintenance-columns small{font-size:12px}.family-maintenance-art{max-height:34vh}.family-maintenance-ornament{font-size:13px;letter-spacing:7px}}
 @media(prefers-reduced-motion:reduce){.grandma-hammer,.grandma-brick,.family-maintenance-sparkles{animation:none}}
+
+/* Explicit opt-in to browse the portions still available under a quota limit. */
+.family-maintenance-continue{width:min(100%,790px);display:grid;gap:7px;justify-items:center;margin:4px auto 0}
+.family-maintenance-continue p{font-family:Arial,sans-serif;font-size:clamp(12px,1.5vw,16px);line-height:1.45;color:#684538;margin:0;max-width:720px}
+.family-maintenance-enter{appearance:none;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 16px;padding:12px 24px;margin:7px auto 2px;border:2px solid #79352b;border-radius:999px;background:#853a2e;color:#fff9ee;font:700 clamp(13px,1.6vw,17px) Arial,sans-serif;cursor:pointer;box-shadow:0 4px 0 #58251e;min-height:44px}
+.family-maintenance-enter:hover{background:#a44836}
+.family-maintenance-enter:focus-visible{outline:3px solid #dba64a;outline-offset:4px}
+@media(max-width:650px){.family-maintenance-continue{gap:5px}.family-maintenance-continue p{font-size:12px}.family-maintenance-enter{padding:11px 17px;font-size:13px}}
