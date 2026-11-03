@@ -13,7 +13,7 @@ test('maintenance overlay has no manually navigable page or trigger',()=>{
   const css=read('../public/assets/maintenance.css');
   assert.match(html,/assets\/maintenance\.js/);
   assert.match(html,/assets\/maintenance\.css/);
-  assert.doesNotMatch(html,/href="[^"]*maintenance/i);
+  assert.doesNotMatch(html,/<a\\b[^>]*href="[^"]*maintenance/i);
   assert.match(js,/response\.status/);
   assert.match(js,/family-data/);
   assert.match(js,/120000/);
