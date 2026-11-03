@@ -660,3 +660,12 @@ test('daily storage limits reach the maintenance screen without exposing interna
   f.env.FAMILY_STATE.get=()=>({fetch:async()=>{throw new Error('Unexpected query failure');}});const unrelated=await f.call('/api/health');assert.equal(unrelated.status,500);assert.equal(unrelated.headers.get('X-Family-Storage-Limit'),null);
  }finally{await f.close();}
 });
+test('Mila birthday correction keeps the stored year, applies once and does not invent an unknown year',async()=>{
+ const f=fixture();try{
+  const marker='birthday-mila-2026-11-03-owner-v1';assert.equal(f.database.prepare('SELECT value FROM meta WHERE id=?').get(marker),undefined);
+  const person=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('mila').data);person.birthday='7.9.2022';person.about='A saved biography';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(person),'mila');
+  f.restart();let result=await(await f.call('/api/people/mila/page')).json();assert.equal(result.person.birthday,'9.7.2022');assert.equal(result.person.about,'A saved biography');
+  const revision=result.person.revision;f.restart();result=await(await f.call('/api/people/mila/page')).json();assert.equal(result.person.revision,revision);
+  await f.connect();assert.equal((await f.call('/api/people/mila/birthday',{method:'POST',body:{birthday:'10.7.2022',expectedBirthday:'9.7.2022'}})).status,200);f.restart();assert.equal((await(await f.call('/api/people/mila/page')).json()).person.birthday,'10.7.2022');
+ }finally{await f.close();}
+});

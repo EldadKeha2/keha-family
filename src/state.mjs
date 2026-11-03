@@ -2,7 +2,7 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
-import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey} from './date-corrections.mjs';
+import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections} from './date-corrections.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -45,6 +45,14 @@ export class FamilyState {
       if(!this.rows('SELECT value FROM meta WHERE id=?',grandparentCorrectionKey).length){
         for(const [id,fields]of Object.entries(grandparentCorrections)){const person=this.person(id);Object.assign(person,fields);this.savePerson(person);}
         this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',grandparentCorrectionKey,'applied');
+      }
+      for(const correction of birthdayMonthDayCorrections){
+        if(this.rows('SELECT value FROM meta WHERE id=?',correction.key).length)continue;
+        const person=this.person(correction.id),match=/^\d{1,2}\.\d{1,2}\.(\d{4})$/.exec(person.birthday||'');
+        if(!match||person.birthday==='1.1.1111')continue;
+        let date;try{calendarDate(person.birthday,'תאריך לידה');date=calendarDate(correction.day+'.'+correction.month+'.'+match[1],'תאריך לידה');}catch{continue;}
+        if(person.birthday!==date){person.birthday=date;this.savePerson(person);}
+        this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',correction.key,'applied');
       }
       for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));
       // Insert the oldest first because shared albums display the newest row first.
