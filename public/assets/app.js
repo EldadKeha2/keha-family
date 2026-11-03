@@ -6,7 +6,7 @@
   const people = Object.values(data.people);
   const media = new Map();
   const phoneQuery=matchMedia('(max-width:700px)'),isPhone=()=>phoneQuery.matches;
-  const validViews=new Set(['home','tree','directory','gallery','calendar','videos','photos','stories','weddings','nostalgia','updates']);
+  const validViews=new Set(['home','tree','directory','gallery','calendar','videos','photos','stories','weddings','nostalgia','updates','person']);
   const requestedView=location.hash.slice(1).split('/')[0];
   const state = {view:validViews.has(requestedView)?(requestedView==='home'&&!isPhone()?'tree':requestedView):(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
@@ -81,7 +81,7 @@
     $('treeView').hidden = !isTree;
     $('directoryView').hidden = !isDirectory;
     $('branchBar').hidden = global;
-    const titles = {updates:[I18n.t('עדכונים'),I18n.t('תזכורות משפחתיות, ישר למייל')],home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('ימי הולדת, חגים ומועדים בלוח עברי ולועזי')],tree:[I18n.t('האילן המשפחתי'),I18n.t('משורש משותף, שישה ענפים של אהבה')],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
+    const titles = {person:[I18n.t('עמוד אישי'),I18n.t('סיפור חיים, תמונות וזיכרונות')],updates:[I18n.t('עדכונים'),I18n.t('תזכורות משפחתיות, ישר למייל')],home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה המשפחתית'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('ימי הולדת, חגים ומועדים בלוח עברי ולועזי')],tree:[I18n.t('האילן המשפחתי'),I18n.t('משורש משותף, שישה ענפים של אהבה')],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
     const [title,subtitle] = titles[state.view] || titles.tree;
     $('workspaceTitle').textContent = title;
     $('mobileViewTitle').textContent=title;
@@ -93,6 +93,7 @@
     window.FamilyCalendar?.activate(state.view);
     window.FamilyHome?.activate(state.view);
     window.FamilyUpdates?.activate(state.view);
+    window.FamilyPeople?.activate(state.view);
     if (isTree) renderTree(); else if (isDirectory) renderDirectory();
   }
   function renderDirectory() {
@@ -190,6 +191,7 @@
   }
 
   function openPerson(personId) {
+    if(window.FamilyPeople){window.FamilyPeople.open(personId);return;}
     if (!data.people[personId]) return;
     if($('calendarDayDialog').open)$('calendarDayDialog').close();
     flushDrafts();
@@ -339,6 +341,7 @@
 
   function showSearch() {
     const query=normalize(state.query);
+    if(state.view==='person'){$('searchResults').hidden=true;window.FamilyPeople?.search(state.query);return;}
     if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory'){renderDirectory();$('searchResults').hidden=true;return;}
     if(!query){$('searchResults').hidden=true;return;}
@@ -506,7 +509,7 @@
       if(state.currentPerson===personId&&$('personDialog').open)renderGallery(item);
     }
   });
-  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],getPeople:()=>people.map(person=>({...person,name:nameOf(person)})),nameOf:id=>data.people[id]?nameOf(data.people[id]):id,birthdayOf:id=>birthdayOf(data.people[id]),openPerson,updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
+  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],getPeople:()=>people.map(person=>({...person,name:nameOf(person)})),nameOf:id=>data.people[id]?nameOf(data.people[id]):id,birthdayOf:id=>birthdayOf(data.people[id]),openPerson,birthdayHTML:id=>birthdayHTML(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
   function simpleRoute(){const view=location.hash.slice(1).split('/')[0];if(['weddings','nostalgia'].includes(view))return;const target=validViews.has(view)?view:(!view?(isPhone()?'home':'tree'):null);if(target&&target!==state.view)setView(target,false);}
   window.addEventListener('hashchange',simpleRoute);window.addEventListener('popstate',simpleRoute);
   renderBranches();renderView();

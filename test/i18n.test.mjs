@@ -25,7 +25,7 @@ test('English localizes interface templates and errors without translating user 
 });
 test('all canonical people have English names and the user-specified spellings remain attached to stable identities',()=>{
  assert.equal(Object.keys(family.people).length,82);for(const person of Object.values(family.people))assert.ok(person.nameEn?.trim(),person.id);
- for(const [id,name]of Object.entries({adi:'Adi Mosacho',matteo:'Mathieu Pino',leni:'Lenny Gandelman',rivi:'Revital Gandelman',hila:'Hila Harizi','ariel-n':'Ariele Noble','ariel-f':'Ariel Fish',tidhar:'Tedi Fish',eddie:'Adi Fish',memo:'Gillermo Vargas'}))assert.equal(family.people[id].nameEn,name);
+ for(const [id,name]of Object.entries({adi:'Adi Mosacho',matteo:'Mathieu Pino',leni:'Leni Gandelman',rivi:'Revital Gandelman',hila:'Hila Harizi','ariel-n':'Ariele Noble','ariel-f':'Ariel Fish',tidhar:'Tedi Fish',eddie:'Adi Fish',memo:'Gillermo Vargas',itay:'Itai Gandelman',shay:'Shai Gandelman'}))assert.equal(family.people[id].nameEn,name);
  assert.equal(family.people.memo.name,'גיירמו וארגאס');assert.equal(family.people.camille.name,'קמיל דה ויטה');
 });
 test('US and UK dates have distinct formatting and both calendar languages keep the same birthday identity',()=>{

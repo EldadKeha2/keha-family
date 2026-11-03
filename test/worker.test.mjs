@@ -551,3 +551,55 @@ test('unchanged gallery polling checks only its revision instead of loading the 
   assert.equal((await f.call('/api/collections/gallery?size=500',{headers:{'If-None-Match':tag}})).status,200);assert.ok(pageReads>0);
  }finally{await f.close();}
 });
+
+test('personal pages paginate owned and tagged media by type with ten items and no duplicate links',async()=>{
+ const f=fixture();try{
+  for(let i=1;i<=25;i++){const id=(10000+i).toString(16).padStart(32,'0'),kind=i<=23?'photo':'video',item={id,category:'personal',personId:'yehiel',file:id+'.'+(kind==='photo'?'jpg':'mp4'),name:'Personal '+i,mime:kind==='photo'?'image/jpeg':'video/mp4',kind,createdAt:new Date().toISOString()};f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,'personal','yehiel',JSON.stringify(item));}
+  const id=(10001).toString(16).padStart(32,'0');f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(id,'yehiel');
+  const p1=await f.call('/api/people/yehiel/page'),data=await p1.json();assert.equal(data.albums.photos.total,23);assert.equal(data.albums.photos.items.length,10);assert.equal(data.albums.photos.pages,3);assert.equal(data.albums.videos.total,2);assert.equal(data.albums.documents.total,0);assert.equal(data.person.photoCount,23);assert.equal(data.person.gallery,undefined);
+  const p2=await (await f.call('/api/people/yehiel/page?photos=2')).json();assert.equal(p2.albums.photos.items.length,10);assert.ok(p2.albums.photos.items.every(item=>!data.albums.photos.items.some(p=>p.id===item.id)));
+  const p3=await (await f.call('/api/people/yehiel/page?photos=999')).json();assert.equal(p3.albums.photos.page,3);assert.equal(p3.albums.photos.items.length,3);
+  assert.equal((await f.call('/api/people/yehiel/page',{headers:{'If-None-Match':p1.headers.get('ETag')}})).status,304);
+  assert.equal((await f.call('/api/people/yehiel/page?photos=-1')).status,400);
+ }finally{await f.close();}
+});
+test('biographies store authored text, reject stale changes, and persist independently of dates and albums',async()=>{
+ const f=fixture();try{await f.connect();const first=await f.call('/api/people/yehiel/about',{method:'POST',body:{about:'My story <literal>\nשורה שנייה',expectedAbout:''}});assert.equal(first.status,200);
+  assert.equal((await f.call('/api/people/yehiel/about',{method:'POST',body:{about:'stale',expectedAbout:''}})).status,409);
+  f.restart();const data=await (await f.call('/api/people/yehiel/page')).json();assert.equal(data.person.about,'My story <literal>\nשורה שנייה');assert.equal(data.albums.photos.total,0);
+  assert.equal((await f.call('/api/people/yehiel/about',{method:'POST',body:{about:'x'.repeat(10001),expectedAbout:data.person.about}})).status,400);
+  const exported=await (await f.call('/api/export')).json();assert.equal(exported.people.find(p=>p.id==='yehiel').about,data.person.about);
+ }finally{await f.close();}
+});
+test('personal video and document uploads retain ownership, preview passive formats and exclude certificate scans from portraits',async()=>{
+ const f=fixture();try{
+  await f.connect();const upload=(kind,name,body)=>f.call('/api/people/yehiel/'+kind+'?layout=page&filename='+encodeURIComponent(name),{method:'POST',body,headers:{'Content-Length':String(body.length)}});
+  const v=await upload('videos','family.mp4',video);assert.equal(v.status,201);const vids=await v.json();assert.equal(vids.person.videoCount,1);assert.equal(vids.albums.videos.items.length,1);assert.equal(vids.person.gallery,undefined);
+  const pdf=new TextEncoder().encode('%PDF-1.7\nExample certificate\n%%EOF'),d=await upload('documents','certificate.pdf',pdf);assert.equal(d.status,201);const doc=await d.json();assert.equal(doc.person.documentCount,1);assert.equal(doc.person.profile,null);
+  const item=doc.albums.documents.items[0],download=await f.call(item.src);assert.match(download.headers.get('Content-Disposition'),/^attachment/);
+  const inline=await f.call(item.src+'?inline=1');assert.match(inline.headers.get('Content-Disposition'),/^inline/);assert.equal(inline.headers.get('Content-Type'),'application/pdf');
+  const scan=await upload('documents','certificate.jpg',photo);assert.equal(scan.status,201);const scanned=await scan.json();assert.equal(scanned.person.documentCount,2);assert.equal(scanned.person.photoCount,0);assert.equal(scanned.person.profile,null);
+  assert.equal((await f.call('/api/people/yehiel/profile',{method:'POST',body:{file:scanned.albums.documents.items[0].file}})).status,404);
+  assert.equal((await upload('documents','video.mp4',video)).status,415);
+  assert.equal((await (await f.call('/api/people/camille/page')).json()).albums.documents.total,0);
+ }finally{await f.close();}
+});
+test('opened-media captions update the shared item and social links expose no storage keys',async()=>{
+ const f=fixture();try{
+  await f.connect();const uploaded=await (await f.call('/api/collections/gallery/upload?filename=memory.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json(),item=uploaded.collection.items[0];
+  const result=await f.call('/api/media/'+item.id+'/caption',{method:'POST',body:{caption:'A <family> & memory',expectedCaption:''}});assert.equal(result.status,200);
+  assert.equal((await f.call('/api/media/'+item.id+'/caption',{method:'POST',body:{caption:'stale',expectedCaption:''}})).status,409);
+  const view=await (await f.call('/api/media/'+item.id+'/view')).json();assert.equal(view.item.caption,'A <family> & memory');assert.equal(view.item.key,undefined);
+  f.env.ASSETS.fetch=async()=>new Response('<html><head><title>Family</title></head><body>Family</body></html>');
+  const shared=await f.call('/?media='+item.id+'&lang=en-US'),html=await shared.text();assert.equal(shared.status,200);assert.match(html,/property="og:image"/);assert.match(html,/A &lt;family&gt; &amp; memory/);assert.ok(!html.includes(f.env.HF_SECRET_ACCESS_KEY));
+ }finally{await f.close();}
+});
+test('five explicit birth date corrections apply once and English spellings retain existing tag identities',async()=>{
+ const f=fixture();try{
+  const dates={avishai:'17.8.1933',shosh:'27.6.1951',mark:'20.1.1951',camille:'20.10.1993',sam:'18.10.1992'};
+  for(const [id,date]of Object.entries(dates))assert.equal((await (await f.call('/api/people/'+id)).json()).birthday,date);
+  const roster=(await (await f.call('/api/tag-people')).json()).people;for(const [id,name]of Object.entries({itay:'Itai Gandelman',leni:'Leni Gandelman',shay:'Shai Gandelman'}))assert.equal(roster.find(p=>p.id===id).nameEn,name);
+  await f.connect();assert.equal((await f.call('/api/people/camille/birthday',{method:'POST',body:{birthday:'21.10.1993',expectedBirthday:dates.camille}})).status,200);f.restart();assert.equal((await (await f.call('/api/people/camille')).json()).birthday,'21.10.1993');
+  const cal=await (await f.call('/api/calendar?date=2026-08-01')).json();assert.ok(cal.days.find(day=>day.date==='2026-08-17').birthdays.some(p=>p.id==='avishai'));
+ }finally{await f.close();}
+});

@@ -624,5 +624,21 @@ window.FAMILY_TRANSLATIONS={
   "ההעדפות השתנו. פתחו שוב את הקישור האישי.": "Your preferences have changed. Reopen your personal link.",
   "הקישור הוחלף. פתחו את המייל האחרון שקיבלתם.": "This link was replaced. Open the latest email you received.",
   "שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.": "The email could not be sent. Please try again later.",
-  "מכסת השליחה היומית התמלאה. נסו שוב מחר.": "The daily email limit has been reached. Please try again tomorrow."
+  "מכסת השליחה היומית התמלאה. נסו שוב מחר.": "The daily email limit has been reached. Please try again tomorrow.",
+  "הגלריה המשפחתית": "Family Gallery",
+  "עמוד אישי": "Personal page",
+  "סיפור חיים, תמונות וזיכרונות": "A life story, photos and memories",
+  "לא מפספסים אירוע משפחתי": "Remember every family occasion",
+  "ימי הולדת, ימי נישואים וימי זיכרון — ישר למייל.": "Birthdays, anniversaries and memorial days — straight to your inbox.",
+  "הרשמה לרשימת התפוצה ולעדכונים ←": "Subscribe to family updates →",
+  "שיתוף": "Share",
+  "מייל": "Email",
+  "העתקת קישור לתמונה": "Copy photo link",
+  "עריכת הכיתוב": "Edit caption",
+  "כיתוב לתמונה או לקובץ": "Photo or file caption",
+  "שמירת הכיתוב": "Save caption",
+  "טקסט האודות השתנה. פתחו שוב את העריכה לפני שמירה.": "The biography has changed. Reopen the editor before saving.",
+  "הכיתוב השתנה. פתחו שוב את העריכה לפני שמירה.": "The caption has changed. Reopen the editor before saving.",
+  "בחרו מספר עמוד תקין.": "Choose a valid page number.",
+  "בחרו מסמך או צילום תעודה.": "Choose a document or a certificate scan."
 };

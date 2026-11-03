@@ -64,16 +64,17 @@ async function streamUpload(request,maximum){
   });
   return {size,head,body};
 }
-async function upload(request,env,db,ctx,{category,personId=null,mixed=false}){
+async function upload(request,env,db,ctx,{category,personId=null,mixed=false,mediaType='photo'}){
   const videoCategory=new URL(request.url).searchParams.get('group')||'family';
   if(category==='videos'&&!['family','special-birthdays'].includes(videoCategory))throw new HttpError(400,'קטגוריית הסרטון אינה מוכרת.');
   if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני העלאת קבצים.');
   if(personId)await db('person',{id:personId});
-  const media=await streamUpload(request,mixed||category==='videos'?LIMITS.video:LIMITS.photo);
+  const media=await streamUpload(request,mediaType==='document'?LIMITS.attachment:mixed||category==='videos'||mediaType==='video'?LIMITS.video:LIMITS.photo);
   const id=uid(),original=filename(new URL(request.url).searchParams.get('filename'));
   let format;
   try{
-    format=mixed?archiveFormat(media.head,original):sniff(media.head,category==='videos');
+    format=mixed||mediaType==='document'?archiveFormat(media.head,original):sniff(media.head,category==='videos'||mediaType==='video');
+    if(mediaType==='document'){if(!['document','photo'].includes(format.kind))throw new HttpError(415,'בחרו מסמך או צילום תעודה.');format={...format,kind:'document',maximum:LIMITS.attachment};}
     if(format.maximum&&media.size>format.maximum)throw new HttpError(413,format.kind==='document'?'אפשר להעלות מסמך עד 10MB.':'אפשר להעלות תמונה עד 50MB.');
   }catch(error){await media.body.cancel();throw error;}
   const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:[category,personId||'shared'];
@@ -88,7 +89,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false}){
   await Promise.all([putObject(env,item.key,body,item.size,item.mime),transfer]);
   try{await db('media.add',{item});}
   catch(error){ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));throw error;}
-  if(personId)return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);
+  if(personId){const url=new URL(request.url);if(url.searchParams.get('layout')==='page')return json({saved:true,file:item.file,...await db('person.page',{id:personId,photos:url.searchParams.get('photos'),videos:url.searchParams.get('videos'),documents:url.searchParams.get('documents')})},201);return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);}
   return json({saved:true,file:item.file,collection:await db('collection',{kind:category})},201);
 }
 async function story(request,env,db,ctx,id){
@@ -159,6 +160,12 @@ export default {
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
+      if((match=/^\/api\/media\/([a-f0-9]{32})\/view$/.exec(path))&&request.method==='GET')return json(await db('media.public',{id:match[1]}));
+      if((match=/^\/api\/people\/([^/]+)\/page$/.exec(path))&&request.method==='GET'){
+        const id=decodeURIComponent(match[1]),pages=Object.fromEntries(['photos','videos','documents'].map(key=>[key,url.searchParams.get(key)]));
+        if(request.headers.has('If-None-Match')){const current=await db('person.revision',{id}),revision=current.revision+':'+Object.values(pages).map(value=>Number(value||1)).join(':');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
+        const result=await db('person.page',{id,...pages});return snapshot(request,{...result,revision:result.person.revision+':'+['photos','videos','documents'].map(key=>result.albums[key].page).join(':')});
+      }
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){
         const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q');
@@ -179,6 +186,7 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/caption$/.exec(path))){const body=await readJSON(request,40000);return json(await db('media.caption.id',{id:match[1],caption:body.caption,expectedCaption:body.expectedCaption}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|tag|untag|retag)$/.exec(path))){
           const body=await readJSON(request,match[2]==='tags'?64000:2000);
           if(match[2]==='tags')return json(await db('media.tags.save',{id:match[1],personIds:body.personIds,newNames:body.newNames,expectedRevision:body.expectedRevision}));
@@ -197,10 +205,11 @@ export default {
           if(match[1]==='upload')return await upload(request,env,db,ctx,{category:'nostalgia',mixed:true});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:'nostalgia',file:body.file,caption:body.caption}));
         }
-        if((match=/^\/api\/people\/([^/]+)\/(photos|caption|profile|birthday|death-date)$/.exec(path))){
+        if((match=/^\/api\/people\/([^/]+)\/(photos|videos|documents|about|caption|profile|birthday|death-date)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2];
-          if(action==='photos')return await upload(request,env,db,ctx,{category:'personal',personId:id});
+          if(['photos','videos','documents'].includes(action))return await upload(request,env,db,ctx,{category:'personal',personId:id,mediaType:{photos:'photo',videos:'video',documents:'document'}[action]});
           const body=await readJSON(request,40000);
+          if(action==='about')return json(await db('person.about',{id,about:body.about,expectedAbout:body.expectedAbout}));
           if(action==='birthday')return json(await db('birthday',{id,birthday:body.birthday,expectedBirthday:body.expectedBirthday}));
           if(action==='death-date')return json(await db('death.date',{id,date:body.date,expectedDate:body.expectedDate}));
           if(action==='profile')return json(await db('profile',{id,file:body.file}));
@@ -214,6 +223,13 @@ export default {
         throw new HttpError(404,'הפעולה לא נמצאה.');
       }
       if(path.startsWith('/api/')||path.startsWith('/media/'))throw new HttpError(404,'הפריט לא נמצא.');
+      if(path==='/'&&/^[a-f0-9]{32}$/.test(url.searchParams.get('media')||'')){
+        const {item}=await db('media.public',{id:url.searchParams.get('media')});
+        const response=await env.ASSETS.fetch(request),escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const title=item.caption||item.name,canonical=new URL('/',url.origin);canonical.searchParams.set('media',item.id);
+        const tags='<meta property="og:type" content="website"><meta property="og:title" content="'+escape(title)+'"><meta property="og:description" content="Keha Family"><meta property="og:url" content="'+escape(canonical.href)+'">'+(item.kind==='photo'?'<meta property="og:image" content="'+escape(new URL(item.src,url.origin).href)+'">':'');
+        const html=(await response.text()).replace('</head>',tags+'</head>');return secure(new Response(html,{headers:{'Content-Type':'text/html; charset=utf-8'}}));
+      }
       return secure(await env.ASSETS.fetch(request));
     }catch(error){return fail(error);}
   },

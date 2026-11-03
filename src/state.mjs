@@ -2,6 +2,7 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
+import {birthdayCorrections,correctionKey} from './date-corrections.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -35,6 +36,10 @@ export class FamilyState {
           // Tagged albums cache by revision; a canonical rename changes their labels too.
           if(nameChanged)for(const row of this.rows('SELECT m.data FROM media m JOIN media_tags t ON t.media_id=m.id WHERE t.person_id=?',p.id))this.touchMedia(JSON.parse(row.data));
         }
+      }
+      if(!this.rows('SELECT value FROM meta WHERE id=?',correctionKey).length){
+        for(const [id,date]of birthdayCorrections){const person=this.person(id);person.birthday=date;this.savePerson(person);}
+        this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',correctionKey,'applied');
       }
       for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));
       // Insert the oldest first because shared albums display the newest row first.
@@ -72,8 +77,23 @@ export class FamilyState {
   snapshot(person,items,includeGallery=true){
     const photos=items.filter(item=>mediaKind(item)==='photo'),videos=items.filter(item=>mediaKind(item)==='video');
     const selected=photos.find(photo=>photo.id===person.profileId),profile=selected||photos.find(photo=>photo.category==='personal'&&photo.personId===person.id)||photos[0];
-    return {...person,invalidBirthday:false,profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,videoCount:videos.length,mediaCount:items.length,
+    return {...person,invalidBirthday:false,profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,videoCount:videos.length,documentCount:items.filter(item=>mediaKind(item)==='document').length,mediaCount:items.length,
       ...(includeGallery?{gallery:items.map(item=>({...this.mediaPublic(item),linked:this.mediaScope(item)!=='personal:'+person.id}))}:{})};
+  }
+  personPage(id,options={}){
+    const person=this.person(id),owner="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?)";
+    const kind="COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(m.data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)";
+    const counts=Object.fromEntries(this.rows('SELECT '+kind+' AS kind,count(*) AS n FROM media m WHERE '+owner+' GROUP BY '+kind,id,id).map(row=>[row.kind,row.n]));
+    const albums={};
+    for(const [key,type]of [['photos','photo'],['videos','video'],['documents','document']]){
+      const requested=Number(options[key]||1);if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
+      const total=counts[type]||0,pages=Math.max(1,Math.ceil(total/10)),page=Math.min(requested,pages);
+      const items=this.rows('SELECT m.data FROM media m WHERE '+owner+' AND '+kind+'=? ORDER BY m.rowid DESC LIMIT 10 OFFSET ?',id,id,type,(page-1)*10).map(row=>this.mediaPublic(JSON.parse(row.data)));
+      albums[key]={items,page,pages,total,size:10};
+    }
+    const row=this.rows('SELECT m.data FROM media m WHERE '+owner+" AND "+kind+"='photo' ORDER BY CASE WHEN m.id=? THEN 0 WHEN m.category='personal' AND m.person_id=? THEN 1 ELSE 2 END,m.rowid LIMIT 1",id,id,person.profileId||'',id)[0];
+    const profile=row?JSON.parse(row.data):null;
+    return {person:{...person,about:person.about||'',profile:profile?'/media/'+profile.id:null,profileFile:profile?.file||null,profileIsManual:Boolean(profile&&profile.id===person.profileId),photoCount:counts.photo||0,videoCount:counts.video||0,documentCount:counts.document||0,mediaCount:Object.values(counts).reduce((n,v)=>n+v,0)},albums};
   }
   collection(kind,options={}){
     validCollection(kind);
@@ -117,6 +137,19 @@ export class FamilyState {
         return {people};
       }
       case 'person':return this.snapshot(this.person(p.id),this.personMedia(p.id));
+      case 'person.page':return this.personPage(p.id,p);
+      case 'person.revision':return {revision:this.person(p.id).revision};
+      case 'person.about':{
+        const person=this.person(p.id),about=text(p.about,'אודות',10000);
+        if((person.about||'')!==p.expectedAbout)throw new HttpError(409,'טקסט האודות השתנה. פתחו שוב את העריכה לפני שמירה.');
+        person.about=about;this.savePerson(person);return {saved:true,person:{...person}};
+      }
+      case 'media.public':return {item:this.mediaPublic(this.media(p.id))};
+      case 'media.caption.id':{
+        const item=this.media(p.id),caption=text(p.caption,'כיתוב',5000);
+        if((item.caption||'')!==p.expectedCaption)throw new HttpError(409,'הכיתוב השתנה. פתחו שוב את העריכה לפני שמירה.');
+        item.caption=caption;item.updatedAt=new Date().toISOString();this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchMedia(item);return this.mediaChanged(item,'caption');
+      }
       case 'tag.people':return {people:this.rows('SELECT data FROM people').map(row=>{const item=JSON.parse(row.data);return {id:item.id,name:item.name,nameEn:item.nameEn||null,extra:Boolean(item.extra),branch:family.people[item.id]?.branch||null};})};
       case 'birthday':{
         const person=this.person(p.id);if(person.birthday!==p.expectedBirthday)throw new HttpError(409,'התאריך עודכן בינתיים. סגרו את העריכה ופתחו אותה מחדש לפני שמירה.');
