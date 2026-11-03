@@ -2,14 +2,14 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
-import {birthdayCorrections,correctionKey} from './date-corrections.mjs';
+import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey} from './date-corrections.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
 // One SQLite-backed object serializes updates for this family. Binary files live in HF.
 export class FamilyState {
   constructor(ctx,env){
-    this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;
+    this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;this.peopleRevision=uid();this.peopleCache=null;
     this.sql.exec('CREATE TABLE IF NOT EXISTS people(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
@@ -28,10 +28,11 @@ export class FamilyState {
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
         const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn;
-        if(nameChanged||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)){
+        if(nameChanged||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)||(p.aliyahMonth&&person.aliyahMonth!==p.aliyahMonth)){
           person.name=p.name;person.nameEn=p.nameEn;person.deceased=Boolean(p.deceased);
           if(person.deathDate===undefined)person.deathDate=p.deathDate||null;
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
+          if(p.aliyahMonth)person.aliyahMonth=p.aliyahMonth;
           this.savePerson(person);
           // Tagged albums cache by revision; a canonical rename changes their labels too.
           if(nameChanged)for(const row of this.rows('SELECT m.data FROM media m JOIN media_tags t ON t.media_id=m.id WHERE t.person_id=?',p.id))this.touchMedia(JSON.parse(row.data));
@@ -40,6 +41,10 @@ export class FamilyState {
       if(!this.rows('SELECT value FROM meta WHERE id=?',correctionKey).length){
         for(const [id,date]of birthdayCorrections){const person=this.person(id);person.birthday=date;this.savePerson(person);}
         this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',correctionKey,'applied');
+      }
+      if(!this.rows('SELECT value FROM meta WHERE id=?',grandparentCorrectionKey).length){
+        for(const [id,fields]of Object.entries(grandparentCorrections)){const person=this.person(id);Object.assign(person,fields);this.savePerson(person);}
+        this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',grandparentCorrectionKey,'applied');
       }
       for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));
       // Insert the oldest first because shared albums display the newest row first.
@@ -52,9 +57,9 @@ export class FamilyState {
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
   person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');return JSON.parse(row.data);}
-  savePerson(item){item.revision=uid();this.sql.exec('UPDATE people SET data=? WHERE id=?',JSON.stringify(item),item.id);}
+  savePerson(item){item.revision=uid();this.sql.exec('UPDATE people SET data=? WHERE id=?',JSON.stringify(item),item.id);this.peopleRevision=uid();this.peopleCache=null;}
   media(id){const row=this.rows('SELECT data FROM media WHERE id=?',id)[0];if(!row)throw new HttpError(404,'הקובץ לא נמצא.');return JSON.parse(row.data);}
-  personMedia(id){return this.rows("SELECT DISTINCT m.data FROM media m LEFT JOIN media_tags t ON t.media_id=m.id WHERE (m.person_id=? AND m.category='personal') OR t.person_id=? ORDER BY m.rowid",id,id).map(row=>JSON.parse(row.data));}
+  personMedia(id){return this.rows("SELECT m.data FROM media m WHERE m.id IN (SELECT id FROM media WHERE person_id=? AND category='personal' UNION SELECT media_id FROM media_tags WHERE person_id=?) ORDER BY m.rowid",id,id).map(row=>JSON.parse(row.data));}
   personPhotos(id){return this.personMedia(id).filter(item=>mediaKind(item)==='photo');}
   tagIds(id){return this.rows('SELECT person_id FROM media_tags WHERE media_id=? ORDER BY rowid',id).map(row=>row.person_id);}
   tags(id){return this.rows('SELECT p.id,p.data FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=? ORDER BY t.rowid',id).map(row=>{const person=JSON.parse(row.data);return {id:person.id,name:person.name,nameEn:person.nameEn||null,extra:Boolean(person.extra)};});}
@@ -72,6 +77,41 @@ export class FamilyState {
     return {saved:true,operation,scope,item:this.mediaPublic(item),people,
       ...(item.category==='personal'?{person:people[item.personId]}:{collection:this.collection(item.category)}),
       ...(item.category.startsWith('wedding:')?{wedding:this.wedding(item.category.slice(8))}:{})};
+  }
+  patchTags(id,changes){
+    const item=this.media(id);
+    if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר לתייג אנשים בתמונות ובסרטונים.');
+    if(!Array.isArray(changes)||!changes.length||changes.length>150)throw new HttpError(400,'אפשר לתייג עד 150 אנשים בפריט.');
+    const oldIds=this.tagIds(id),ids=new Set(oldIds),resolved=[];let roster=null;
+    for(const change of changes){
+      if(!change||typeof change.tagged!=='boolean'||Boolean(change.personId)===Boolean(change.name))throw new HttpError(400,'יש לבחור אדם אחד לתיוג או להסרת תיוג.');
+      let person;
+      if(change.personId){if(typeof change.personId!=='string')throw new HttpError(400,'האדם לא נמצא.');person=this.person(change.personId);}
+      else{
+        if(!change.tagged)throw new HttpError(400,'יש לבחור את האדם שאת התיוג שלו רוצים להסיר.');
+        const name=text(change.name,'שם',120,true).replace(/\s+/g,' '),key=normalizedName(name);
+        if(!key)throw new HttpError(400,'יש להזין שם מלא.');
+        roster??=this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data));
+        const matches=roster.filter(p=>[p.name,p.nameEn].filter(Boolean).some(alias=>normalizedName(alias)===key));
+        if(matches.length>1)throw new HttpError(409,'יש כמה אנשים בשם '+name+'. בחרו את האדם המתאים מהרשימה.');
+        person=matches[0];
+        if(!person){person={id:'extra-'+uid().slice(0,24),name,extra:true,birthday:'1.1.1111',profileId:null,revision:uid(),createdAt:new Date().toISOString()};this.sql.exec('INSERT INTO people(id,data) VALUES(?,?)',person.id,JSON.stringify(person));roster.push(person);}
+      }
+      if(change.tagged)ids.add(person.id);else ids.delete(person.id);
+      resolved.push({key:typeof change.key==='string'?change.key.slice(0,150):person.id,id:person.id,name:person.name,nameEn:person.nameEn||null,extra:Boolean(person.extra)});
+    }
+    if(ids.size>150)throw new HttpError(400,'אפשר לתייג עד 150 אנשים בפריט.');
+    const removed=oldIds.filter(id=>!ids.has(id)),added=[...ids].filter(id=>!oldIds.includes(id));
+    const affected=this.relatedPeople(item,[...oldIds,...ids]);
+    if(removed.length||added.length){
+      for(const personId of removed)this.sql.exec('DELETE FROM media_tags WHERE media_id=? AND person_id=?',id,personId);
+      for(const personId of added)this.sql.exec('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)',id,personId);
+      this.touchTags(id);
+      this.touchPeople(removed.filter(personId=>!(item.category==='personal'&&item.personId===personId)),id);
+      this.touchMedia(item,affected);
+    }
+    // The changed image is sufficient. Never rebuild the gallery or tagged albums on a tag click.
+    return {saved:true,operation:'tags',scope:this.mediaScope(item),item:this.mediaPublic(item),affectedPersonIds:affected,taggedPeople:resolved};
   }
   touchMedia(item,ids=this.relatedPeople(item)){this.touchPeople(ids);if(item.category!=='personal')this.touch(item.category);}
   snapshot(person,items,includeGallery=true){
@@ -126,6 +166,7 @@ export class FamilyState {
   run(action,p){
     switch(action){
       case 'people':{
+        if(this.peopleCache)return this.peopleCache;
         const byPerson=new Map();
         for(const row of this.rows('SELECT m.data,t.person_id AS tagged_person FROM media m LEFT JOIN media_tags t ON t.media_id=m.id ORDER BY m.rowid')){
           const item=JSON.parse(row.data);
@@ -134,8 +175,9 @@ export class FamilyState {
           }
         }
         const people=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,this.snapshot(JSON.parse(row.data),[...(byPerson.get(row.id)?.values()||[])],false)]));
-        return {people};
+        return this.peopleCache={people,revision:this.peopleRevision};
       }
+      case 'people.revision':return {revision:this.peopleRevision};
       case 'person':return this.snapshot(this.person(p.id),this.personMedia(p.id));
       case 'person.page':return this.personPage(p.id,p);
       case 'person.revision':return {revision:this.person(p.id).revision};
@@ -180,6 +222,7 @@ export class FamilyState {
         const item=this.media(p.id);if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר לתייג אנשים בתמונות ובסרטונים.');
         return {item:this.mediaPublic(item)};
       }
+      case 'media.tags.patch':return this.patchTags(p.id,p.changes);
       case 'media.tag':{
         const item=this.media(p.id);
         if(typeof p.tagged!=='boolean'||(Boolean(p.personId)===Boolean(p.name)))throw new HttpError(400,'יש לבחור אדם אחד לתיוג או להסרת תיוג.');
@@ -196,7 +239,7 @@ export class FamilyState {
         if(!Array.isArray(p.personIds)||!Array.isArray(p.newNames)||p.personIds.length+p.newNames.length>150||p.newNames.length>50)throw new HttpError(400,'אפשר לתייג עד 150 אנשים בפריט.');
         const ids=new Set();
         for(const id of p.personIds){if(typeof id!=='string')throw new HttpError(400,'יש לבחור אנשים מהרשימה.');this.person(id);ids.add(id);}
-        const roster=this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data));
+        const roster=p.newNames.length?this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)):[];
         for(const value of p.newNames){
           const name=text(value,'שם',120,true).replace(/\s+/g,' '),normalized=normalizedName(name);
           if(!normalized)throw new HttpError(400,'יש להזין שם מלא.');
@@ -208,8 +251,8 @@ export class FamilyState {
         }
         const oldIds=this.tagIds(item.id),affected=this.relatedPeople(item,[...oldIds,...ids]);
         if(oldIds.length!==ids.size||oldIds.some(id=>!ids.has(id))){
-          this.sql.exec('DELETE FROM media_tags WHERE media_id=?',item.id);
-          for(const id of ids)this.sql.exec('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)',item.id,id);
+          for(const id of oldIds)if(!ids.has(id))this.sql.exec('DELETE FROM media_tags WHERE media_id=? AND person_id=?',item.id,id);
+          for(const id of ids)if(!oldIds.includes(id))this.sql.exec('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)',item.id,id);
           this.touchTags(item.id);
           this.touchPeople(oldIds.filter(id=>!ids.has(id)&&!(item.category==='personal'&&item.personId===id)),item.id);
           this.touchMedia(item,affected);

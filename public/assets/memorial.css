@@ -1,0 +1,38 @@
+body[data-active-view="memorial"] .search-wrap{display:none}
+.remembrance-intro{text-align:center;max-width:680px;margin:12px auto 46px}
+.remembrance-flower{font-size:34px;color:#a58a50;display:block;margin-bottom:20px}
+.remembrance-intro .small-eyebrow{color:#8c7548;letter-spacing:.08em;font-size:14px}
+.remembrance-intro h2{font-size:clamp(30px,4vw,46px);font-weight:500;line-height:1.35;color:#30372b;margin:14px 0 16px}
+.remembrance-intro>p:last-of-type{color:#6e7267;line-height:1.9;font-size:17px;margin:0}
+.remembrance-intro-line{display:block;width:70px;height:1px;background:#c7b78f;margin:26px auto 0}
+.remembrance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:26px;max-width:1050px;margin:auto}
+.remembrance-card{border:1px solid #ded5c0;border-radius:140px 140px 18px 18px;background:linear-gradient(#faf8f1,#fffefb);padding:22px 18px 24px;text-align:center;position:relative;overflow:hidden;box-shadow:0 7px 24px #51452907;transition:box-shadow .4s,border-color .4s}
+.remembrance-portrait{display:flex;align-items:center;justify-content:center;width:174px;height:196px;border-radius:90px 90px 12px 12px;overflow:hidden;margin:auto;background:#eae7db;border:5px solid #fffdf8;outline:1px solid #d4c8ab;box-shadow:0 4px 18px #4b3e2310;text-decoration:none}
+.remembrance-portrait img{width:100%;height:100%;object-fit:cover;filter:saturate(.7)}
+.remembrance-initials{font-size:52px;font-weight:400;color:#8b8b78}
+.remembrance-card-body{position:relative;z-index:1}
+.remembrance-blessing{font-size:12px;color:#8f8064;display:block;margin:22px 0 9px;letter-spacing:.05em}
+.remembrance-card h3{font-size:27px;font-weight:500;color:#30372b;margin:0 0 20px;line-height:1.3}
+.remembrance-card h3 a{color:inherit;text-decoration:none}
+.remembrance-dates{display:flex;justify-content:center;align-items:center;gap:15px;margin:0;color:#4e5549;font-size:15px}
+.remembrance-dates dt{font-size:12px;color:#858575;margin-bottom:5px}
+.remembrance-dates dd{margin:0}.remembrance-dates>span{color:#c6bda8}
+.remembrance-candle{height:105px;width:96px;margin:19px auto 0;position:relative}
+.candle-wax{position:absolute;bottom:15px;inset-inline-start:34px;width:28px;height:49px;border-radius:4px 4px 2px 2px;background:linear-gradient(90deg,#d8d2bd,#fffdf0 55%,#dfd5bc);border:1px solid #d3c9af;box-shadow:0 5px 7px #57503d13}
+.candle-wick{position:absolute;width:2px;height:8px;background:#5b5545;inset-inline-start:47px;bottom:63px}
+.candle-base{position:absolute;bottom:10px;width:53px;height:6px;border-radius:50%;background:#bcac85;inset-inline-start:22px;box-shadow:0 3px 5px #6f5d3d17}
+.candle-flame{position:absolute;width:14px;height:26px;bottom:70px;inset-inline-start:41px;border-radius:70% 30% 65% 35%;background:linear-gradient(#fff9c4,#f9cf6c 70%,#db923d);transform:rotate(-8deg);opacity:.28;transition:opacity .5s}
+.candle-halo{position:absolute;inset:-25px -10px 30px;background:radial-gradient(ellipse,#fbe3a569,transparent 70%);opacity:0;transition:opacity .6s}
+.candle-is-lit{border-color:#c8ae78;box-shadow:0 8px 32px #ad88471c}
+.candle-is-lit .candle-halo,.candle-is-lit .candle-flame{opacity:1}
+.candle-is-lit .candle-flame{box-shadow:0 0 13px #f6cf6dbb;animation:memorial-flame 3s ease-in-out infinite alternate}
+.remembrance-light{padding:10px 15px;border:1px solid #d4c29a;background:#f5efdf;color:#655436;border-radius:25px;font:inherit;font-size:14px;cursor:pointer;min-height:43px}
+.remembrance-light:hover{background:#eee3ca}.remembrance-light[aria-pressed=true]{background:#f9f1d9;border-color:#c9ab65;color:#725b2c}
+.remembrance-light:focus-visible,.remembrance-card a:focus-visible{outline:3px solid #9c824d;outline-offset:4px}
+.remembrance-memories-link{display:block;margin:20px auto 0;font-size:13px;color:#787b6a;text-decoration:none}
+.remembrance-memories-link:hover{text-decoration:underline}.remembrance-memories-link span{margin-inline-start:7px}
+.remembrance-closing{text-align:center;font-size:17px;color:#8b8068;margin:40px 0 10px;line-height:1.8}
+.home-tile-memorial{background:#f0e9d9;border-color:#d5c8a9}
+@keyframes memorial-flame{from{transform:rotate(-8deg) scale(.97,1)}to{transform:rotate(5deg) scale(1.04,.94)}}
+@media(max-width:700px){.remembrance-intro{margin:0 auto 30px}.remembrance-intro h2{font-size:30px}.remembrance-grid{gap:24px;grid-template-columns:1fr;max-width:350px}.remembrance-card{padding-top:22px}.remembrance-intro>p:last-of-type{font-size:15px}.remembrance-closing{font-size:15px}}
+@media(prefers-reduced-motion:reduce){.candle-is-lit .candle-flame{animation:none}.remembrance-card,.candle-flame,.candle-halo{transition:none}}

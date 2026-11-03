@@ -5,7 +5,7 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const keys=['photos','videos','documents'];
   const state={view:'tree',id:null,data:null,ready:false,loading:false,loadingKey:null,queued:false,pages:{photos:1,videos:1,documents:1},revision:null,aboutEditing:false,aboutDraft:'',aboutExpected:'',running:false,queue:[],status:'',error:''};
-  let picker=null,refreshTimer;
+  let picker=null,refreshTimer,tagsDirty=false;
   async function api(path,body){
     const response=await I.fetch(path,{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{},...(body?{body:JSON.stringify(body)}:{})});
     let result;try{result=await response.json();}catch{throw Error(tr('לא התקבלה תשובה מהשרת. נסו שוב.','The server did not respond. Please try again.'));}
@@ -105,9 +105,11 @@
     window.addEventListener('hashchange',route);window.addEventListener('popstate',route);
     const refresh=()=>{if(state.view!=='person'||!state.id||state.running)return;clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>load(true),150);};
     window.addEventListener('family-person-changed',event=>{if(event.detail.id===state.id)refresh();});
-    window.addEventListener('family-media-changed',event=>{if(event.detail.people?.[state.id]||event.detail.person?.id===state.id)refresh();});
+    window.addEventListener('family-media-changed',event=>{if(event.detail.affectedPersonIds?.includes(state.id)){tagsDirty=true;if(!$('mediaViewer').open&&!$('tagPeopleDialog').open){tagsDirty=false;refresh();}}else if(event.detail.people?.[state.id]||event.detail.person?.id===state.id)refresh();});
+    const finishTags=()=>{if(tagsDirty&&!document.querySelector('dialog[open]')){tagsDirty=false;refresh();}};
+    $('mediaViewer').addEventListener('close',finishTags);$('tagPeopleDialog').addEventListener('close',finishTags);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.view==='person')load();});
-    setInterval(()=>{if(document.visibilityState==='visible'&&state.view==='person'&&!state.aboutEditing)load();},30000);
+    setInterval(()=>{if(document.visibilityState==='visible'&&state.view==='person'&&!state.aboutEditing&&!document.querySelector('dialog[open]'))load();},120000);
     window.addEventListener('beforeunload',event=>{if(state.running||(state.aboutEditing&&state.aboutDraft!==state.aboutExpected)){event.preventDefault();event.returnValue='';}});
   }
   window.FamilyPeople={open,activate,search:()=>{}};document.addEventListener('DOMContentLoaded',init);

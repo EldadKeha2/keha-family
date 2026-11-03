@@ -146,16 +146,22 @@ export default {
       }
       if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);
       if(path==='/family-data.js'&&request.method==='GET'){
-        const {people}=await db('people');const merged={...family,people:Object.fromEntries(Object.entries(family.people).map(([id,p])=>[id,{...p,name:people[id]?.name||p.name,birthday:people[id]?.birthday||p.birthday,deathDate:people[id]?.deathDate??null}]))};
+        let people={},dataAvailable=true;
+        try{people=Object.fromEntries((await db('dates')).people.map(p=>[p.id,p]));}catch{dataAvailable=false;}
+        const merged={...family,people:Object.fromEntries(Object.entries(family.people).map(([id,p])=>[id,{...p,name:people[id]?.name||p.name,birthday:people[id]?.birthday||p.birthday,deathDate:people[id]?.deathDate===undefined?p.deathDate||null:people[id].deathDate}]))};
         for(const person of Object.values(people))if(person.extra)merged.people[person.id]={id:person.id,name:person.name,firstName:person.name,lastName:'',birthday:person.birthday,extra:true,branch:null,generation:null,placeholder:false};
-        return new Response('window.FAMILY_DATA='+JSON.stringify(merged)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(PUBLIC_WRITE_TOKEN)+';\nwindow.FAMILY_CLOUD=true;\n',{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+        return new Response('window.FAMILY_DATA='+JSON.stringify(merged)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(PUBLIC_WRITE_TOKEN)+';\nwindow.FAMILY_DATA_AVAILABLE='+dataAvailable+';\nwindow.FAMILY_CLOUD=true;\n',{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
       }
       if(path==='/api/setup'&&request.method==='GET')return json({database:true,mediaConfigured:Boolean(configured(env)),limits:LIMITS});
-      if(path==='/api/media'&&request.method==='GET')return json(await db('people'));
+      if(path==='/api/media'&&request.method==='GET'){
+        if(request.headers.has('If-None-Match')){const {revision}=await db('people.revision');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
+        return snapshot(request,await db('people'));
+      }
       if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
       if(path==='/api/calendar'&&request.method==='GET'){
         const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-        return json(await calendarResponse(url.searchParams.get('date')||today,url.searchParams.get('mode')||'gregorian',(await db('people')).people,ctx,url.searchParams.get('lang')||'he'));
+        const people=Object.fromEntries((await db('dates')).people.map(p=>[p.id,p]));
+        return json(await calendarResponse(url.searchParams.get('date')||today,url.searchParams.get('mode')||'gregorian',people,ctx,url.searchParams.get('lang')||'he'));
       }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
@@ -186,6 +192,7 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/tags\/patch$/.exec(path))){const body=await readJSON(request,64000);return json(await db('media.tags.patch',{id:match[1],changes:body.changes}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/caption$/.exec(path))){const body=await readJSON(request,40000);return json(await db('media.caption.id',{id:match[1],caption:body.caption,expectedCaption:body.expectedCaption}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|tag|untag|retag)$/.exec(path))){
           const body=await readJSON(request,match[2]==='tags'?64000:2000);

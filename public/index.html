@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="assets/i18n.css">
   <link rel="stylesheet" href="assets/updates.css">
   <link rel="stylesheet" href="assets/people.css">
+  <link rel="stylesheet" href="assets/memorial.css">
   <script src="family-data.js" defer></script>
   <script src="assets/translations.js" defer></script>
   <script src="assets/i18n.js" defer></script>
@@ -31,6 +32,7 @@
   <script src="assets/archive.js" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/home.js" defer></script>
+  <script src="assets/memorial.js" defer></script>
   <script src="assets/app.js" defer></script>
   <script src="assets/cloud.js" defer></script>
 </head>
@@ -41,7 +43,7 @@
     <header class="site-header">
       <a class="brand" href="#" id="homeLink" aria-label="חזרה לעץ המשפחה"><img src="assets/medallion.svg" alt="" width="40" height="40"><span>בית משפחת קהא</span></a>
       <div class="language-selector"><span class="language-switcher-label" data-i18n-skip dir="ltr"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg><bdi>Language/שפה</bdi></span><div class="language-switcher" role="group" aria-label="בחירת שפה" data-i18n-skip><button type="button" data-language="he" aria-label="עברית" title="עברית" aria-pressed="true"><img src="assets/flag-il.svg" alt="" width="28" height="20"><span class="visually-hidden">עברית</span></button><button type="button" data-language="en-US" aria-label="English (United States)" title="English (United States)" aria-pressed="false"><img src="assets/flag-us.svg" alt="" width="28" height="20"><span class="visually-hidden">English (US)</span></button><button type="button" data-language="en-GB" aria-label="English (United Kingdom)" title="English (United Kingdom)" aria-pressed="false"><img src="assets/flag-gb.svg" alt="" width="28" height="20"><span class="visually-hidden">English (UK)</span></button></div></div>
-      <div class="phone-navigation"><button class="phone-home-button" data-view="home" aria-label="מסך הבית">⌂ הבית</button><button id="mobileMenuToggle" aria-haspopup="dialog" aria-label="פתיחת תפריט העמודים"><span id="mobileViewTitle">הבית שלנו</span><span aria-hidden="true">☰</span></button></div><nav class="main-nav" id="mainNav" aria-label="תצוגה"><button class="nav-link active" data-view="tree" aria-pressed="true">אילן היוחסין</button><button class="nav-link" data-view="directory" aria-pressed="false">בני המשפחה</button><button class="nav-link" data-view="videos" aria-pressed="false">סרטונים</button><button class="nav-link" data-view="gallery" aria-pressed="false">הגלריה המשפחתית</button><button class="nav-link" data-view="calendar" aria-pressed="false">לוח שנה משפחתי</button><button class="nav-link" data-view="photos" aria-pressed="false">תמונות משפחתיות</button><button class="nav-link" data-view="stories" aria-pressed="false">הסיפורים שלנו</button><button class="nav-link" data-view="weddings" aria-pressed="false">חתונות</button><button class="nav-link" data-view="nostalgia" aria-pressed="false">פינת הנוסטלגיה</button><button class="nav-link" data-view="updates" aria-pressed="false">עדכונים</button></nav>
+      <div class="phone-navigation"><button class="phone-home-button" data-view="home" aria-label="מסך הבית">⌂ הבית</button><button id="mobileMenuToggle" aria-haspopup="dialog" aria-label="פתיחת תפריט העמודים"><span id="mobileViewTitle">הבית שלנו</span><span aria-hidden="true">☰</span></button></div><nav class="main-nav" id="mainNav" aria-label="תצוגה"><button class="nav-link active" data-view="tree" aria-pressed="true">אילן היוחסין</button><button class="nav-link" data-view="directory" aria-pressed="false">בני המשפחה</button><button class="nav-link" data-view="videos" aria-pressed="false">סרטונים</button><button class="nav-link" data-view="gallery" aria-pressed="false">הגלריה המשפחתית</button><button class="nav-link" data-view="calendar" aria-pressed="false">לוח שנה משפחתי</button><button class="nav-link" data-view="photos" aria-pressed="false">תמונות משפחתיות</button><button class="nav-link" data-view="stories" aria-pressed="false">הסיפורים שלנו</button><button class="nav-link" data-view="weddings" aria-pressed="false">חתונות</button><button class="nav-link" data-view="nostalgia" aria-pressed="false">פינת הנוסטלגיה</button><button class="nav-link" data-view="updates" aria-pressed="false">עדכונים</button><button class="nav-link" data-view="memorial" aria-pressed="false">לזכרם</button></nav>
     </header>
 
     <main>
@@ -78,6 +80,7 @@
           <p class="home-family-motto">קהא · חריזי · בקר · נובל · פיש · בלום</p>
         </section>
         <section id="personView" class="portal-view person-page-view" aria-label="עמוד אישי" hidden><div id="personPageContent"></div></section>
+        <section id="memorialView" class="portal-view remembrance-view" aria-label="לזכרם" hidden><div id="memorialContent"></div></section>
         <section id="updatesView" class="portal-view updates-view" aria-label="עדכונים" hidden><div id="updatesContent"></div></section>
         <section id="galleryView" class="portal-view compact-gallery-view" aria-label="הגלריה" hidden>
           <div class="collection-heading"><div><span class="small-eyebrow">רגעים קטנים, זיכרונות גדולים</span><h3 class="compact-gallery-title">הגלריה המשפחתית</h3><span class="collection-count" id="sharedGalleryCount"></span></div><button class="primary-button" data-upload-collection="gallery">＋ הוספת תמונות</button></div>

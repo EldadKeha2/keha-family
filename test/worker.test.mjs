@@ -68,7 +68,7 @@ test('visitors can open the site and data without a password or cookie',async()=
 });
 test('public visitors can save while cross-origin and malformed writes are rejected',async()=>{
   const f=fixture();try{
-    await f.connect();const body={birthday:'1.1.2000',expectedBirthday:'1.1.1111'};
+    await f.connect();const body={birthday:'1.1.2000',expectedBirthday:'16.10.1921'};
     assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,clientHeaders:false})).status,403);
     assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,headers:{'X-Family-Token':'wrong'}})).status,403);
     assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,headers:{Origin:'https://other.example'}})).status,403);
@@ -79,7 +79,7 @@ test('public visitors can save while cross-origin and malformed writes are rejec
 test('birthday validation, stale-write conflicts and durable reload',async()=>{
   const f=fixture();try{
     await f.connect();
-    const body={birthday:'29.2.2000',expectedBirthday:'1.1.1111'};
+    const body={birthday:'29.2.2000',expectedBirthday:'16.10.1921'};
     let response=await f.call('/api/people/yona/birthday',{method:'POST',body});assert.equal(response.status,200);assert.equal((await response.json()).person.birthday,'29.2.2000');
     assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body})).status,409);
     for(const value of ['29.2.2001','1.1.9999','bad'])assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:value,expectedBirthday:'29.2.2000'}})).status,400);
@@ -601,5 +601,50 @@ test('five explicit birth date corrections apply once and English spellings reta
   const roster=(await (await f.call('/api/tag-people')).json()).people;for(const [id,name]of Object.entries({itay:'Itai Gandelman',leni:'Leni Gandelman',shay:'Shai Gandelman'}))assert.equal(roster.find(p=>p.id===id).nameEn,name);
   await f.connect();assert.equal((await f.call('/api/people/camille/birthday',{method:'POST',body:{birthday:'21.10.1993',expectedBirthday:dates.camille}})).status,200);f.restart();assert.equal((await (await f.call('/api/people/camille')).json()).birthday,'21.10.1993');
   const cal=await (await f.call('/api/calendar?date=2026-08-01')).json();assert.ok(cal.days.find(day=>day.date==='2026-08-17').birthdays.some(p=>p.id==='avishai'));
+ }finally{await f.close();}
+});
+
+test('grandparent corrections migrate existing records once and preserve later edits, profiles and removed tags',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);await setTags(f,item,['yona']);await setTags(f,item,[]);
+  const marker='grandparents-2026-11-03-owner-v1';f.database.prepare('DELETE FROM meta WHERE id=?').run(marker);
+  for(const id of ['yona','shlomo']){const p=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);p.birthday='1.1.1111';p.aliyahYear=id==='yona'?1937:1935;p.deathDate=null;f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(p),id);}
+  f.restart();const yona=await(await f.call('/api/people/yona/page')).json(),shlomo=await(await f.call('/api/people/shlomo/page')).json();
+  assert.equal(yona.person.birthday,'16.10.1921');assert.equal(yona.person.aliyahYear,1934);assert.equal(yona.person.aliyahMonth,12);assert.equal(shlomo.person.birthday,'1.1.1907');assert.equal(shlomo.person.deathDate,'12.11.1996');assert.equal(shlomo.person.deceased,true);assert.equal(shlomo.person.aliyahYear,1932);
+  assert.equal((await(await f.call('/api/media/'+item.id+'/tags')).json()).item.tags.length,0);
+  assert.equal((await f.call('/api/people/shlomo/birthday',{method:'POST',body:{birthday:'2.1.1907',expectedBirthday:'1.1.1907'}})).status,200);
+  f.restart();assert.equal((await(await f.call('/api/people/shlomo/page')).json()).person.birthday,'2.1.1907');
+  const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people.yona.aliyahMonth,12);assert.equal(bootstrap.people.shlomo.deceased,true);
+ }finally{await f.close();}
+});
+test('tag batches touch only their image, preserve concurrent selections, are idempotent and return no albums',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await taggedUpload(f),b=await taggedUpload(f),patch=(item,changes)=>f.call('/api/media/'+item.id+'/tags/patch',{method:'POST',body:{changes}});
+  let r=await patch(a,[{personId:'yona',tagged:true},{personId:'shlomo',tagged:true}]);assert.equal(r.status,200);let result=await r.json();assert.equal(result.collection,undefined);assert.equal(result.people,undefined);assert.deepEqual(result.item.tags.map(p=>p.id),['yona','shlomo']);
+  const revision=result.item.tagsRevision;
+  result=await(await patch(a,[{personId:'yona',tagged:true}])).json();assert.equal(result.item.tagsRevision,revision);
+  await Promise.all([patch(a,[{personId:'yona',tagged:false}]),patch(a,[{personId:'roi',tagged:true}]),patch(b,[{personId:'camille',tagged:true}])]);
+  assert.deepEqual((await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags.map(p=>p.id),['shlomo','roi']);assert.deepEqual((await(await f.call('/api/media/'+b.id+'/tags')).json()).item.tags.map(p=>p.id),['camille']);
+  assert.equal((await patch(a,[{personId:'yona',tagged:true},{name:42,tagged:true}])).status,400);assert.ok(!(await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags.some(p=>p.id==='yona'),'An invalid batch rolls back every change');
+  const guest=await(await patch(b,[{key:'new:1',name:'A guest',tagged:true},{key:'new:2',name:'A guest',tagged:true}])).json();assert.equal(guest.taggedPeople[0].id,guest.taggedPeople[1].id);assert.equal(guest.item.tags.length,2);
+  assert.equal((await patch(b,[{personId:'camille',tagged:false}])).status,200);f.restart();assert.ok(!(await(await f.call('/api/media/'+b.id+'/tags')).json()).item.tags.some(p=>p.id==='camille'));
+ }finally{await f.close();}
+});
+test('tagging stays small with thousands of unrelated images, and unchanged people refreshes read no albums',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);
+  const insert=f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)'),tag=f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)');
+  f.database.exec('BEGIN');for(let n=1000;n<4000;n++){const id=n.toString(16).padStart(32,'0');insert.run(id,'gallery',null,JSON.stringify({id,category:'gallery',file:id+'.jpg',mime:'image/jpeg',kind:'photo',name:'Memory'}));tag.run(id,'yehiel');}f.database.exec('COMMIT');
+  const original=f.storage.sql.exec;let rows=0,queries=0;f.storage.sql.exec=(q,...args)=>{const result=original(q,...args);rows+=result.toArray().length;queries++;return result;};
+  const response=await f.call('/api/media/'+item.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'camille',tagged:true}]}});assert.equal(response.status,200);const body=await response.text();assert.ok(body.length<2000,body.length);assert.ok(rows<30,'Tagging read '+rows+' returned rows across '+queries+' queries');
+  const first=await f.call('/api/media'),etag=first.headers.get('ETag');assert.equal(first.status,200);rows=0;queries=0;
+  assert.equal((await f.call('/api/media',{headers:{'If-None-Match':etag}})).status,304);assert.equal(rows,0);assert.equal(queries,0);
+  rows=0;const script=await f.connect();assert.match(script,/window.FAMILY_DATA_AVAILABLE=true/);assert.ok(rows<150,'Bootstrap must not load media or tags');
+ }finally{await f.close();}
+});
+test('the family tree still receives valid JavaScript when database reads are unavailable',async()=>{
+ const f=fixture();try{
+  f.env.FAMILY_STATE.get=()=>({fetch:async()=>Response.json({error:'Unavailable'},{status:503})});
+  const response=await f.call('/family-data.js');assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/javascript/);const script=await response.text();assert.match(script,/window.FAMILY_DATA_AVAILABLE=false/);assert.match(script,/16\.10\.1921/);assert.match(script,/12\.11\.1996/);
  }finally{await f.close();}
 });

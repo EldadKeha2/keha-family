@@ -283,7 +283,8 @@
     $('birthdayForm').addEventListener('submit',saveBirthday);$('storyForm').addEventListener('submit',saveStory);
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
-      const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind)||!result.collection)return;
+      const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
+      if(!result.collection){if(result.item&&result.operation==='tags'){state.collections[kind].items=state.collections[kind].items.map(item=>item.id===result.item.id?{...item,...result.item}:item);if(state.view===kind)renderCollection(kind);}return;}
       if(result.operation==='delete'){const key=captionKey(kind,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
       if(kind==='gallery'){
         const page=state.collections.gallery.pagination||galleryPage;

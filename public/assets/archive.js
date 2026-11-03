@@ -259,7 +259,8 @@
     for(const id of ['weddingDropzone','nostalgiaDropzone'])$(id).addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(id).contains(event.relatedTarget))$(id).classList.remove('drag-over');});
     $('weddingBranchFilter').addEventListener('change',renderWeddings);$('weddingDateForm').addEventListener('submit',saveDate);$('clearWeddingDate').addEventListener('click',event=>saveDate(event,true));$('weddingGreetingForm').addEventListener('submit',saveGreeting);
     window.addEventListener('family-media-changed',event=>{
-      const result=event.detail,key=result.scope;if(!result.collection||(key!=='nostalgia'&&!key.startsWith('wedding:')))return;
+      const result=event.detail,key=result.scope;if(key!=='nostalgia'&&!key?.startsWith('wedding:'))return;
+      if(!result.collection){const album=collections.get(key);if(album&&result.item&&result.operation==='tags'){album.items=album.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);if(scope()===key)renderCollection(key);}return;}
       if(result.operation==='delete'){const id=draftKey(key,result.item.file);clearTimeout(drafts.get(id)?.timer);drafts.delete(id);}
       collections.set(key,result.collection);
       if(result.wedding){const id=result.wedding.id;summaries.set(id,result.wedding);if(details.has(id))details.set(id,{...details.get(id),...result.wedding,collection:result.collection});}

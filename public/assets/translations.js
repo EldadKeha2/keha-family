@@ -642,3 +642,5 @@ window.FAMILY_TRANSLATIONS={
   "בחרו מספר עמוד תקין.": "Choose a valid page number.",
   "בחרו מסמך או צילום תעודה.": "Choose a document or a certificate scan."
 };
+
+Object.assign(window.FAMILY_TRANSLATIONS,{"לזכרם":"In memory","מדליקים נר לזכרם":"Lighting a candle in their memory","הזיכרונות נשארים איתנו":"We carry their memories with us"});
