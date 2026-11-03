@@ -2,7 +2,8 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
-import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections} from './date-corrections.mjs';
+import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections} from './date-corrections.mjs';
+import {biographyDefaults,biographyValue} from './biography.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -45,6 +46,10 @@ export class FamilyState {
       if(!this.rows('SELECT value FROM meta WHERE id=?',grandparentCorrectionKey).length){
         for(const [id,fields]of Object.entries(grandparentCorrections)){const person=this.person(id);Object.assign(person,fields);this.savePerson(person);}
         this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',grandparentCorrectionKey,'applied');
+      }
+      if(!this.rows('SELECT value FROM meta WHERE id=?',memorialCorrectionKey).length){
+        for(const [id,fields]of Object.entries(memorialCorrections)){const person=this.person(id);Object.assign(person,fields);this.savePerson(person);}
+        this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',memorialCorrectionKey,'applied');
       }
       for(const correction of birthdayMonthDayCorrections){
         if(this.rows('SELECT value FROM meta WHERE id=?',correction.key).length)continue;
@@ -194,6 +199,13 @@ export class FamilyState {
         const person=this.person(p.id),about=text(p.about,'אודות',10000);
         if((person.about||'')!==p.expectedAbout)throw new HttpError(409,'טקסט האודות השתנה. פתחו שוב את העריכה לפני שמירה.');
         person.about=about;this.savePerson(person);return {saved:true,person:{...person}};
+      }
+      case 'person.biography':{
+        const person=this.person(p.id),value=biographyValue(p.section,p.value),expected=biographyValue(p.section,p.expectedValue);
+        const current=person[p.section]??biographyDefaults[p.section];
+        if(JSON.stringify(current)!==JSON.stringify(expected))throw new HttpError(409,'הפרטים השתנו. פתחו שוב את העריכה לפני שמירה.');
+        if(JSON.stringify(current)!==JSON.stringify(value)){person[p.section]=value;this.savePerson(person);}
+        return {saved:true,person:{...person}};
       }
       case 'media.public':return {item:this.mediaPublic(this.media(p.id))};
       case 'media.caption.id':{

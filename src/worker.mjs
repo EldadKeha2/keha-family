@@ -213,11 +213,12 @@ export default {
           if(match[1]==='upload')return await upload(request,env,db,ctx,{category:'nostalgia',mixed:true});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:'nostalgia',file:body.file,caption:body.caption}));
         }
-        if((match=/^\/api\/people\/([^/]+)\/(photos|videos|documents|about|caption|profile|birthday|death-date)$/.exec(path))){
+        if((match=/^\/api\/people\/([^/]+)\/(photos|videos|documents|about|biography|caption|profile|birthday|death-date)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2];
           if(['photos','videos','documents'].includes(action))return await upload(request,env,db,ctx,{category:'personal',personId:id,mediaType:{photos:'photo',videos:'video',documents:'document'}[action]});
           const body=await readJSON(request,40000);
           if(action==='about')return json(await db('person.about',{id,about:body.about,expectedAbout:body.expectedAbout}));
+          if(action==='biography')return json(await db('person.biography',{id,section:body.section,value:body.value,expectedValue:body.expectedValue}));
           if(action==='birthday')return json(await db('birthday',{id,birthday:body.birthday,expectedBirthday:body.expectedBirthday}));
           if(action==='death-date')return json(await db('death.date',{id,date:body.date,expectedDate:body.expectedDate}));
           if(action==='profile')return json(await db('profile',{id,file:body.file}));

@@ -56,6 +56,51 @@ function fixture(){
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
 
+test('biography sections persist independently, reject stale writes and never update another person',async()=>{
+ const f=fixture();try{
+  await f.connect();const save=(section,value,expectedValue,id='yehiel')=>f.call('/api/people/'+id+'/biography',{method:'POST',body:{section,value,expectedValue}});
+  const residences=[{country:'IL',fromYear:1970,toYear:1995,current:false},{country:'GB',fromYear:1995,toYear:null,current:true}];
+  let r=await save('residences',residences,[]);assert.equal(r.status,200);assert.deepEqual((await r.json()).person.residences,residences);
+  r=await save('languages',[' עברית ','English','English'],[]);assert.equal(r.status,200);assert.deepEqual((await r.json()).person.languages,['עברית','English']);
+  assert.equal((await save('occupation','Engineer <authored>','')).status,200);
+  const jobs=[{employer:'A & B',role:'Engineer',fromYear:1990,toYear:2000,current:false},{employer:'Family studio',role:'',fromYear:2001,toYear:null,current:true}];
+  assert.equal((await save('jobs',jobs,[])).status,200);
+  assert.equal((await save('residences',[],[])).status,409,'Another section being saved must not disable stale checks');
+  assert.equal((await save('occupation','Different profession','')).status,409);
+  assert.equal((await save('languages',['Français'],[],'camille')).status,200);
+  f.restart();const p=(await(await f.call('/api/people/yehiel/page')).json()).person;
+  assert.deepEqual(p.residences,residences);assert.deepEqual(p.jobs,jobs);assert.equal(p.occupation,'Engineer <authored>');assert.deepEqual(p.languages,['עברית','English']);
+  const other=(await(await f.call('/api/people/camille/page')).json()).person;assert.deepEqual(other.languages,['Français']);assert.equal(other.residences,undefined);assert.equal(other.occupation,undefined);
+  const exported=await(await f.call('/api/export')).json();assert.deepEqual(exported.people.find(p=>p.id==='yehiel').jobs,jobs);
+  const saved=await(await save('jobs',[],jobs)).json();assert.deepEqual(saved.person.jobs,[]);assert.deepEqual(saved.person.residences,residences);
+ }finally{await f.close();}
+});
+test('biography validation rejects malformed countries, years and sections without partially changing saved data',async()=>{
+ const f=fixture();try{
+  await f.connect();const save=(section,value,expectedValue=[])=>f.call('/api/people/yehiel/biography',{method:'POST',body:{section,value,expectedValue}});
+  const residence={country:'IL',fromYear:1980,toYear:1990,current:false};
+  for(const bad of [{...residence,country:'ZZ'},{...residence,fromYear:2000},{...residence,toYear:9999},{...residence,current:true},{...residence,fromYear:'1980'}])assert.equal((await save('residences',[residence,bad])).status,400);
+  for(const [section,value,expected]of [['__proto__',[],[]],['languages',['x'.repeat(81)],[]],['languages',['English',42],[]],['languages',Array(31).fill('English'),[]],['occupation','x'.repeat(201),''],['jobs',[{employer:'',role:'',fromYear:null,toYear:null,current:false}],[]]])assert.equal((await save(section,value,expected)).status,400);
+  assert.equal((await f.call('/api/people/yehiel/biography',{method:'POST',body:{section:'languages',value:['English']}})).status,400);
+  const person=(await(await f.call('/api/people/yehiel/page')).json()).person;for(const field of ['residences','languages','occupation','jobs'])assert.equal(person[field],undefined);
+  assert.equal((await f.call('/api/people/yehiel/biography',{method:'POST',clientHeaders:false,body:{section:'languages',value:['English'],expectedValue:[]}})).status,403);
+ }finally{await f.close();}
+});
+test('Elisheva memorial dates migrate existing records once while preserving profiles, authored content and later edits',async()=>{
+ const f=fixture();try{
+  await f.connect();const id='becker-parent';
+  const uploaded=await(await f.call('/api/people/'+id+'/photos?filename=memory.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json();
+  const old=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);old.birthday='1.1.1111';old.deathDate=null;old.about='A family memory';old.languages=['עברית'];
+  f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(old),id);f.database.prepare('DELETE FROM meta WHERE id=?').run('elisheva-memorial-2026-11-03-owner-v1');
+  f.restart();let p=(await(await f.call('/api/people/'+id+'/page')).json()).person;
+  assert.equal(p.birthday,'23.3.1942');assert.equal(p.deathDate,'8.5.1998');assert.equal(p.deceased,true);assert.equal(p.profile,uploaded.person.profile);assert.equal(p.about,'A family memory');assert.deepEqual(p.languages,['עברית']);
+  const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people[id].deceased,true);assert.equal(bootstrap.people[id].deathDate,'8.5.1998');
+  assert.equal((await f.call('/api/people/'+id+'/death-date',{method:'POST',body:{date:'9.5.1998',expectedDate:'8.5.1998'}})).status,200);
+  assert.equal((await f.call('/api/people/'+id+'/birthday',{method:'POST',body:{birthday:'24.3.1942',expectedBirthday:'23.3.1942'}})).status,200);
+  f.restart();p=(await(await f.call('/api/people/'+id+'/page')).json()).person;assert.equal(p.birthday,'24.3.1942');assert.equal(p.deathDate,'9.5.1998');
+ }finally{await f.close();}
+});
+
 test('visitors can open the site and data without a password or cookie',async()=>{
   const f=fixture();try{
     const home=await f.call('/');assert.equal(home.status,200);assert.equal(await home.text(),'static assets');

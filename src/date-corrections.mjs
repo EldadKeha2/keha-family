@@ -8,3 +8,7 @@ export const grandparentCorrections={
 };
 // Keep the year already entered on the live site; no year was supplied for this correction.
 export const birthdayMonthDayCorrections=[{id:'mila',day:9,month:7,key:'birthday-mila-2026-11-03-owner-v1'}];
+export const memorialCorrectionKey='elisheva-memorial-2026-11-03-owner-v1';
+export const memorialCorrections={
+  'becker-parent':{birthday:'23.3.1942',deathDate:'8.5.1998',deceased:true}
+};

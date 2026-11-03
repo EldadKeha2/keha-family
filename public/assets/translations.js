@@ -644,3 +644,12 @@ window.FAMILY_TRANSLATIONS={
 };
 
 Object.assign(window.FAMILY_TRANSLATIONS,{"לזכרם":"In memory","מדליקים נר לזכרם":"Lighting a candle in their memory","הזיכרונות נשארים איתנו":"We carry their memories with us"});
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  "פרטי האודות אינם תקינים.":"The biography details are invalid.",
+  "יש להזין שנה תקינה שאינה בעתיד.":"Enter a valid year that is not in the future.",
+  "שנת הסיום צריכה להיות מאוחרת משנת ההתחלה או זהה לה.":"The end year must be the same as or later than the start year.",
+  "יש לבחור מדינה מהרשימה.":"Choose a country from the list.",
+  "יש להזין מקום עבודה או תפקיד.":"Enter a workplace or a role.",
+  "הפרטים השתנו. פתחו שוב את העריכה לפני שמירה.":"These details have changed. Reopen the editor before saving.",
+  "מקצוע":"Profession","שפה":"Language","מקום עבודה":"Workplace","תפקיד":"Role"
+});
