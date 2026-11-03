@@ -12,7 +12,7 @@ export const PUBLIC_WRITE_TOKEN='family-public-v1';
 
 function client(db){return async(action,p={})=>{
   const response=await db.fetch(new Request('https://state.internal/',{method:'POST',body:JSON.stringify({action,...p}),headers:{'Content-Type':'application/json'}}));
-  const result=await response.json();if(!response.ok)throw new HttpError(response.status,result.error||'לא ניתן לשמור את השינוי.');return result;
+  const result=await response.json();if(!response.ok)throw new HttpError(response.status,result.error||'לא ניתן לשמור את השינוי.',result.code);return result;
 };}
 export function sniff(head,video=false){
   const starts=bytes=>bytes.every((byte,index)=>head[index]===byte),word=(a,b)=>new TextDecoder().decode(head.slice(a,b));
@@ -153,6 +153,7 @@ export default {
         return new Response('window.FAMILY_DATA='+JSON.stringify(merged)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(PUBLIC_WRITE_TOKEN)+';\nwindow.FAMILY_DATA_AVAILABLE='+dataAvailable+';\nwindow.FAMILY_CLOUD=true;\n',{headers:{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
       }
       if(path==='/api/setup'&&request.method==='GET')return json({database:true,mediaConfigured:Boolean(configured(env)),limits:LIMITS});
+      if(path==='/api/health'&&request.method==='GET')return json(await db('health'));
       if(path==='/api/media'&&request.method==='GET'){
         if(request.headers.has('If-None-Match')){const {revision}=await db('people.revision');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
         return snapshot(request,await db('people'));

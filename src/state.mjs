@@ -165,6 +165,7 @@ export class FamilyState {
   }
   run(action,p){
     switch(action){
+      case 'health':this.rows('SELECT value FROM meta WHERE id=?',correctionKey);return {available:true};
       case 'people':{
         if(this.peopleCache)return this.peopleCache;
         const byPerson=new Map();

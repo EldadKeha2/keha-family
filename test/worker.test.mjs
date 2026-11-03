@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFile} from 'node:fs/promises';
 import worker,{FamilyState,LIMITS,sniff} from '../src/worker.mjs';
 import {signedRequest} from '../src/hf.mjs';
+import {fail} from '../src/http.mjs';
 
 function fixture(){
   const database=new DatabaseSync(':memory:');
@@ -646,5 +647,16 @@ test('the family tree still receives valid JavaScript when database reads are un
  const f=fixture();try{
   f.env.FAMILY_STATE.get=()=>({fetch:async()=>Response.json({error:'Unavailable'},{status:503})});
   const response=await f.call('/family-data.js');assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/javascript/);const script=await response.text();assert.match(script,/window.FAMILY_DATA_AVAILABLE=false/);assert.match(script,/16\.10\.1921/);assert.match(script,/12\.11\.1996/);
+ }finally{await f.close();}
+});
+test('daily storage limits reach the maintenance screen without exposing internal errors',async()=>{
+ const f=fixture();try{
+  const initial=await f.call('/api/health');assert.equal(initial.status,200);assert.deepEqual(await initial.json(),{available:true});
+  f.env.FAMILY_STATE.get=()=>({fetch:async()=>fail(new Error('SQLITE_ERROR: rows read limit exceeded for this account'))});
+  const limited=await f.call('/api/health');assert.equal(limited.status,503);assert.equal(limited.headers.get('X-Family-Storage-Limit'),'daily');const body=await limited.json();assert.equal(body.code,'DAILY_STORAGE_LIMIT');assert.ok(!body.error.includes('SQLITE'));
+  assert.equal((await f.call('/api/setup')).status,200,'Configuration alone does not prove the database has recovered');
+  f.env.FAMILY_STATE.get=()=>({fetch:async()=>{throw new Error('Durable Object storage daily read limit reached');}});
+  assert.equal((await f.call('/api/health')).status,503,'Constructor failures must also be classified');
+  f.env.FAMILY_STATE.get=()=>({fetch:async()=>{throw new Error('Unexpected query failure');}});const unrelated=await f.call('/api/health');assert.equal(unrelated.status,500);assert.equal(unrelated.headers.get('X-Family-Storage-Limit'),null);
  }finally{await f.close();}
 });

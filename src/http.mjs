@@ -1,5 +1,5 @@
 export class HttpError extends Error {
-  constructor(status,message){super(message);this.status=status;}
+  constructor(status,message,code=null){super(message);this.status=status;this.code=code;}
 }
 export const utf8=new TextEncoder();
 export const hex=bytes=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
@@ -17,7 +17,11 @@ export function equal(a,b){
 export function json(value,status=200,headers={}){
   return new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
 }
-export function fail(error){return json({error:error instanceof HttpError?error.message:'לא ניתן להשלים את הפעולה כרגע. נסו שוב.'},error instanceof HttpError?error.status:500);}
+export function fail(error){
+  const message=String(error?.message||''),dailyLimit=error?.code==='DAILY_STORAGE_LIMIT'||/(?:rows? read|rows? written).*(?:limit|quota)|(?:sql|sqlite|storage|durable object).*(?:daily|per day|free tier).*(?:limit|quota)|(?:daily|per day).*(?:read|write).*(?:limit|quota)|(?:exceeded|exceeds).*(?:reads?|writes?).*(?:daily|per day)/i.test(message);
+  if(dailyLimit)return json({error:'מכסת השימוש היומית מוצתה. נסו שוב לאחר איפוס המכסה.',code:'DAILY_STORAGE_LIMIT'},503,{'X-Family-Storage-Limit':'daily'});
+  return json({error:error instanceof HttpError?error.message:'לא ניתן להשלים את הפעולה כרגע. נסו שוב.'},error instanceof HttpError?error.status:500);
+}
 export function text(value,label,max,required=false){
   if(typeof value!=='string')throw new HttpError(400,`${label}: יש להזין טקסט.`);
   value=value.trim();if((required&&!value)||value.length>max)throw new HttpError(400,`${label}: יש להזין ${required?'טקסט ועד':'עד'} ${max.toLocaleString('en-US')} תווים.`);

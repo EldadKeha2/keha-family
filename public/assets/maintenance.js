@@ -61,14 +61,14 @@
   async function checkRecovery() {
     if (!active || document.visibilityState === 'hidden') return;
     try {
-      const response = await nativeFetch('/api/setup', {cache:'no-store'});
+      const response = await nativeFetch('/api/health', {cache:'no-store'});
       if (response.ok) location.reload();
     } catch {}
   }
   const nativeFetch = window.fetch.bind(window);
   window.fetch = async (...args) => {
     const response = await nativeFetch(...args);
-    if (apiPath(args[0]) && unavailable(response.status)) activate();
+    if (apiPath(args[0]) && (unavailable(response.status) || response.headers.get('X-Family-Storage-Limit') === 'daily')) activate();
     return response;
   };
   // A failed dynamic bootstrap is also a reliable signal that the application cannot start.
