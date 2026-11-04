@@ -142,15 +142,15 @@ test('share cancellation stays quiet and unavailable sharing or clipboard expose
 test('missing-person games work with the available group photos and calculate score and sharing with the actual total',async()=>{
   const f=fixture({count:1});await f.start('missing');assert.match(f.html,/1 \/ 1/);await f.choose();assert.match(f.html,/<strong>100<\/strong>/);assert.match(f.html,/1 תשובה נכונה מתוך 1/);assert.equal((f.html.match(/data-game-review-question=/g)||[]).length,1);
 });
-test('the illustrated hunt gives twenty seconds after the image loads and immediate feedback when a target is found',async()=>{
+test('the illustrated hunt gives sixty seconds after the image loads and immediate feedback when a target is found',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,autoImages:false});assert.match(f.html,/data-game-start="chick"/);await f.start('chick');assert.equal(f.requests.length,0);assert.equal(f.seconds,'20');assert.equal(f.intervals.size,0);assert.match(f.html,/chick-clue/);f.load();assert.equal(f.intervals.size,1);await f.find(0,0);assert.match(f.nodes.get('chickFeedback').textContent,english?/try again/:/נסו שוב/);
-    for(let i=0;i<5;i++){const q=f.chickQuestions[i];if(i>0)f.load();assert.equal(f.seconds,'20');await f.find(q.target.x,q.target.y);assert.equal(f.intervals.size,0);assert.match(f.html,english?/Well done, you found/:/יפה מאוד, מצאת את/);assert.match(f.html,/chick-reveal-ring/);assert.doesNotMatch(f.html,/class="game-score"/);await f.next();}
+    const f=fixture({english,autoImages:false});assert.match(f.html,/data-game-start="chick"/);await f.start('chick');assert.equal(f.requests.length,0);assert.equal(f.seconds,'60');assert.equal(f.intervals.size,0);assert.match(f.html,/chick-clue/);f.load();assert.equal(f.intervals.size,1);await f.find(0,0);assert.match(f.nodes.get('chickFeedback').textContent,english?/try again/:/נסו שוב/);
+    for(let i=0;i<5;i++){const q=f.chickQuestions[i];if(i>0)f.load();assert.equal(f.seconds,'60');await f.find(q.target.x,q.target.y);assert.equal(f.intervals.size,0);assert.match(f.html,english?/Well done, you found/:/יפה מאוד, מצאת את/);assert.match(f.html,/chick-reveal-ring/);assert.doesNotMatch(f.html,/class="game-score"/);await f.next();}
     assert.match(f.html,/<strong>100<\/strong>/);assert.match(f.html,/5 correct answers|5 תשובות נכונות/);assert.equal((f.html.match(/data-game-review-question=/g)||[]).length,5);assert.match(f.html,/game-share-whatsapp/);
   }
 });
 test('hunt timeouts reveal one target, late clicks cannot score, and zoom or keyboard searching keeps the clock running',async()=>{
-  const f=fixture();await f.start('chick');f.keyboard('ArrowRight');assert.equal(f.nodes.get('chickProbe').hidden,false);await f.zoom();assert.equal(f.nodes.get('chickSceneStage').style.width,'225%');f.advance(20000);assert.match(f.html,/הזמן נגמר/);assert.equal(f.intervals.size,0);await f.find(f.chickQuestions[0].target.x,f.chickQuestions[0].target.y);await f.next();
+  const f=fixture();await f.start('chick');f.keyboard('ArrowRight');assert.equal(f.nodes.get('chickProbe').hidden,false);await f.zoom();assert.equal(f.nodes.get('chickSceneStage').style.width,'225%');f.advance(59900);assert.equal(f.seconds,'1');assert.doesNotMatch(f.html,/הזמן נגמר/);f.advance(100);assert.match(f.html,/הזמן נגמר/);assert.equal(f.intervals.size,0);await f.find(f.chickQuestions[0].target.x,f.chickQuestions[0].target.y);await f.next();
   for(let i=1;i<5;i++){const q=f.chickQuestions[i];await f.find(q.target.x,q.target.y);await f.next();}assert.match(f.html,/<strong>80<\/strong>/);await f.lobby();assert.equal(f.intervals.size,0);
 });
 test('trivia landing page saves a user question in the detected language with the selected correct answer',async()=>{

@@ -4,7 +4,7 @@ import {makeChickQuiz,withinChickTarget} from './chick.mjs';
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ROUND_SECONDS=15;
-const state={view:'tree',phase:'welcome',game:null,questions:[],index:0,answers:[],imageReady:false,deadline:null,error:'',serial:0,renderToken:0,zoom:1,cursor:{x:.5,y:.5},lastRemaining:20};
+const state={view:'tree',phase:'welcome',game:null,questions:[],index:0,answers:[],imageReady:false,deadline:null,error:'',serial:0,renderToken:0,zoom:1,cursor:{x:.5,y:.5},lastRemaining:60};
 let clock=null,nextPhoto=null,preloaded='';
 const editor={language:I.isEnglish?'en':'he',languageChosen:false,question:'',options:['','','',''],correctIndex:null,requestId:null,saving:false,status:'',error:''};
 const name=person=>I.personName(person);
@@ -15,11 +15,11 @@ const isTrivia=()=>state.game==='trivia';
 const isChick=()=>state.game==='chick';
 const isTextGame=()=>isKinship()||isTrivia();
 const total=()=>state.questions.length;
-const roundSeconds=()=>isChick()?20:ROUND_SECONDS;
+const roundSeconds=()=>isChick()?60:ROUND_SECONDS;
 const gameTitle=()=>isChick()?tr('איפה הגוזל?','Where’s the little bird?'):isKinship()?tr('מה הקשר?','What’s the relation?'):isMissing()?tr('מי חסר?','Who’s missing?'):isTrivia()?tr('טריוויה משפחתית','Family Trivia'):tr('מי זה?','Who is it?');
 const photoPrompt=()=>isMissing()?tr('מי חסר?','Who’s missing?'):tr('מי מופיע בתמונה?','Who appears in this photo?');
 function welcome(){
-  const games=[['photos','photos',tr('מי זה?','Who is it?'),tr('מזהים את הפנים בתמונות מהגלריה המשפחתית.','Recognize the faces in photos from the Family Gallery.')],['kinship','tree',tr('מה הקשר?','What’s the relation?'),tr('מחברים בין בני המשפחה, מקשרים קרובים ועד נכד של דודה.','Connect the family, from close relatives to an aunt’s grandson.')],['missing','directory',tr('מי חסר?','Who’s missing?'),tr('תמונה, ארבעה שמות — מי מהם לא מופיע בה?','One photo, four names — which person is not in it?')],['trivia','calendar',tr('טריוויה משפחתית','Family Trivia'),tr('ימי הולדת, סדר הלידה ושנות עלייה — כמה אתם זוכרים?','Birthdays, birth order and immigration years — how much do you remember?')],['chick','games',tr('איפה הגוזל?','Where’s the little bird?'),tr('מצאו את הקריקטורה המשפחתית באיור עמוס. 20 שניות ומשוב מיד כשמוצאים!','Find the family caricature in a busy illustration. 20 seconds and instant feedback!')]];
+  const games=[['photos','photos',tr('מי זה?','Who is it?'),tr('מזהים את הפנים בתמונות מהגלריה המשפחתית.','Recognize the faces in photos from the Family Gallery.')],['kinship','tree',tr('מה הקשר?','What’s the relation?'),tr('מחברים בין בני המשפחה, מקשרים קרובים ועד נכד של דודה.','Connect the family, from close relatives to an aunt’s grandson.')],['missing','directory',tr('מי חסר?','Who’s missing?'),tr('תמונה, ארבעה שמות — מי מהם לא מופיע בה?','One photo, four names — which person is not in it?')],['trivia','calendar',tr('טריוויה משפחתית','Family Trivia'),tr('ימי הולדת, סדר הלידה ושנות עלייה — כמה אתם זוכרים?','Birthdays, birth order and immigration years — how much do you remember?')],['chick','games',tr('איפה הגוזל?','Where’s the little bird?'),tr('מצאו את הקריקטורה המשפחתית באיור עמוס. דקה לחיפוש ומשוב מיד כשמוצאים!','Find the family caricature in a busy illustration. One minute to search and instant feedback!')]];
   return `<header class="family-game-intro"><span class="game-medallion" aria-hidden="true">❖</span><span class="small-eyebrow">${tr('המשפחה שלנו, מזווית קצת אחרת','Our family, from a different angle')}</span><h3>${tr('במה משחקים היום?','What shall we play?')}</h3><p>${tr('מזהים פנים או מפענחים קשרים? בחרו את האתגר שלכם.','Recognize faces or untangle family ties? Choose your challenge.')}</p></header><div class="family-game-choices">${games.map(([id,icon,title,description])=>`<button type="button" class="family-game-choice game-choice-${id}" data-game-start="${id}" ${id==='trivia'?'data-game-home="trivia"':''} ${state.phase==='loading'?'disabled':''}><span class="game-choice-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><use href="assets/home-icons.svg#${icon}"></use></svg></span><span><strong>${title}</strong><span>${description}</span><b>${state.phase==='loading'&&state.game===id?tr('מכין את האתגר…','Preparing your challenge…'):tr('בואו נשחק','Let’s play')} ${I.isEnglish?'→':'←'}</b></span></button>`).join('')}</div><div class="game-welcome game-lobby-rules"><div class="game-rules"><span><b>${tr('עד 10','Up to 10')}</b>${tr('שאלות בכל סיבוב','questions per round')}</span><span><b>4</b>${tr('אפשרויות במשחקי הבחירה','choices in the quiz games')}</span><span><b>15</b>${tr('שניות לכל שאלה','seconds per question')}</span></div><p>${tr('בוחרים תשובה וממשיכים מיד לשאלה הבאה. הציון והמשוב מחכים לכם בסוף! ב״איפה הגוזל?״ מקבלים משוב מיד.','Choose an answer and move straight to the next question. Your score and feedback await at the end! In ‘Where’s the little bird?’ you get instant feedback.')}</p>${state.error?`<p class="game-error" role="alert">${safe(state.error)}</p>`:''}</div>`;
 }
 function openTrivia(){stopClock();state.serial++;Object.assign(state,{game:'trivia',phase:'trivia-home',questions:[],answers:[],deadline:null,error:''});render();}
@@ -53,7 +53,7 @@ function chickClue(q){
 function chickRing(q){const t=q.target;return `<span class="chick-reveal-ring" aria-hidden="true" style="left:${(t.x-t.w/2)*100}%;top:${(t.y-t.h/2)*100}%;width:${t.w*100}%;height:${t.h*100}%"></span>`;}
 function chickQuestion(q){
   const revealed=state.phase==='revealed',found=state.answers[state.index]?.correct;
-  return `<h3 class="game-question-title" tabindex="-1">${tr('איפה הגוזל? מצאו את ','Where’s the little bird? Find ')}${safe(name(q.subject))}</h3><div class="chick-hunt-guide">${chickClue(q)}<div><strong>${safe(name(q.subject))}</strong><p>${tr('לחצו על הקריקטורה באיור. אפשר להגדיל ולגלול כדי לחפש.','Tap the caricature in the illustration. You can zoom in and scroll to search.')}</p></div><button type="button" class="secondary-button chick-zoom" data-game-find-zoom aria-pressed="${state.zoom>1}">${state.zoom>1?tr('הקטנה −','Zoom out −'):tr('הגדלה +','Zoom in +')}</button></div><p class="visually-hidden" id="chickKeyboardHint">${tr('במקלדת: הזיזו את הסמן בחיצים ולחצו Enter כדי לבחור.','Keyboard: move the marker with the arrow keys, then press Enter to select.')}</p><div class="chick-scene-scroll" id="chickSceneScroll" dir="ltr"><div class="chick-scene-stage" id="chickSceneStage" data-game-find-stage style="width:${state.zoom*100}%" tabindex="${revealed?'-1':'0'}" role="button" aria-label="${safe(tr('מצאו את ','Find ')+name(q.subject))}" aria-describedby="chickKeyboardHint"><img id="familyGamePhoto" src="${safe(q.src)}" width="${q.width}" height="${q.height}" alt="${safe(tr(q.title,q.titleEn))}" decoding="async" draggable="false"><span class="chick-probe" id="chickProbe" aria-hidden="true" hidden></span>${revealed?chickRing(q):''}</div></div><p class="game-image-error" id="gameImageError" role="alert" hidden>${tr('האיור לא נטען.','The illustration could not load.')} <button type="button" data-game-retry-image>${tr('טעינה מחדש','Try again')}</button></p><div class="chick-feedback${revealed&&found?' chick-found':''}" id="chickFeedback" role="status" tabindex="-1">${revealed?`<strong>${found?tr('יפה מאוד, מצאת את ','Well done, you found '):tr('הזמן נגמר! הנה ','Time’s up! Here is ')}${safe(name(q.subject))}${found?'!':' — '+tr('מסומן באיור.','marked in the illustration.')}</strong><button type="button" class="primary-button" data-game-find-next>${state.index===total()-1?tr('לתוצאות','See results'):tr('לאיור הבא','Next illustration')}</button>`:''}</div>`;
+  return `<h3 class="game-question-title" tabindex="-1">${tr('איפה הגוזל? מצאו את ','Where’s the little bird? Find ')}${safe(name(q.subject))}</h3><div class="chick-hunt-guide">${chickClue(q)}<div><strong>${safe(name(q.subject))}</strong><p>${tr('לחצו על הקריקטורה באיור. אפשר להגדיל ולגלול כדי לחפש.','Tap the caricature in the illustration. You can zoom in and scroll to search.')}</p></div><button type="button" class="secondary-button chick-zoom" data-game-find-zoom aria-pressed="${state.zoom>1}">${state.zoom>1?tr('הקטנה −','Zoom out −'):tr('הגדלה +','Zoom in +')}</button></div><p class="visually-hidden" id="chickKeyboardHint">${tr('במקלדת: הזיזו את הסמן בחיצים ולחצו Enter כדי לבחור.','Keyboard: move the marker with the arrow keys, then press Enter to select.')}</p><div class="chick-scene-scroll" id="chickSceneScroll" dir="ltr"><div class="chick-scene-stage" id="chickSceneStage" data-game-find-stage style="width:${state.zoom*100}%" tabindex="${revealed?'-1':'0'}" role="button" aria-label="${safe(tr('מצאו את ','Find ')+name(q.subject))}" aria-describedby="chickKeyboardHint"><img id="familyGamePhoto" src="${safe(q.src)}" width="${q.width}" height="${q.height}" alt="${safe(tr(q.title,q.titleEn))}" decoding="async" draggable="false"><span class="chick-probe" id="chickProbe" aria-hidden="true" hidden></span>${revealed?chickRing(q):''}</div></div><p class="game-image-error" id="gameImageError" role="alert" hidden>${tr('האיור לא נטען.','The illustration could not load.')} <button type="button" data-game-retry-image>${tr('טעינה מחדש','Try again')}</button></p><div class="chick-feedback${revealed&&found?' chick-found':''}" id="chickFeedback" role="status" tabindex="-1">${revealed?`${chickClue(q)}<strong>${found?tr('יפה מאוד, מצאת את ','Well done, you found '):tr('הזמן נגמר! הנה ','Time’s up! Here is ')}${safe(name(q.subject))}${found?'!':' — '+tr('מסומן באיור.','marked in the illustration.')}</strong><button type="button" class="primary-button" data-game-find-next>${state.index===total()-1?tr('לתוצאות','See results'):tr('לאיור הבא','Next illustration')}</button>`:''}</div>`;
 }
 function finishChick(found,round=state.index){
   if(!isChick()||state.phase!=='playing'||state.view!=='games'||round!==state.index||!state.deadline)return;
@@ -61,7 +61,7 @@ function finishChick(found,round=state.index){
   found=Boolean(found&&!expired);const q=state.questions[state.index],scroll=$('chickSceneScroll'),position={left:scroll?.scrollLeft||0,top:scroll?.scrollTop||0};
   stopClock();state.lastRemaining=Math.max(0,Math.ceil((state.deadline-Date.now())/1000));state.answers.push({id:q.id,correct:found,timedOut:!found,selectedId:found?q.subject.id:null});state.phase='revealed';state.deadline=null;state.imageReady=false;render();
   const viewport=$('chickSceneScroll');if(viewport){viewport.scrollLeft=position.left;viewport.scrollTop=position.top;}
-  $('familyGamesContent').querySelector('.chick-reveal-ring')?.scrollIntoView({block:'nearest',inline:'nearest'});$('chickFeedback')?.focus({preventScroll:true});
+  $('familyGamesContent').querySelector('.chick-reveal-ring')?.scrollIntoView({block:'nearest',inline:'nearest'});$('chickFeedback')?.scrollIntoView({block:'nearest'});$('chickFeedback')?.focus({preventScroll:true});
 }
 function findChick(x,y){
   if(!isChick()||state.phase!=='playing'||!state.imageReady)return;
@@ -70,10 +70,11 @@ function findChick(x,y){
   const marker=$('chickProbe');if(marker){marker.hidden=false;marker.style.left=x*100+'%';marker.style.top=y*100+'%';}
   $('chickFeedback').textContent=tr('עוד לא… נסו שוב, השעון ממשיך!','Not yet… try again, the clock is still running!');
 }
+function scrollToRound(){$('familyGamesContent').querySelector('.game-question-top')?.scrollIntoView({block:'start'});}
 function nextChick(){
   if(!isChick()||state.phase!=='revealed')return;
   if(state.index===total()-1)state.phase='finished';else{state.index++;state.phase='playing';state.zoom=1;state.cursor={x:.5,y:.5};}
-  render();$('familyGamesContent').querySelector(state.phase==='finished'?'[data-game-result]':'.game-question-title')?.focus({preventScroll:true});
+  render();if(state.phase==='playing')scrollToRound();$('familyGamesContent').querySelector(state.phase==='finished'?'[data-game-result]':'.game-question-title')?.focus({preventScroll:true});
 }
 function review(){
   return `<details class="kinship-review game-review"><summary>${tr('השאלות והתשובות הנכונות','Review questions and correct answers')}</summary><ol>${state.questions.map((q,index)=>{
@@ -130,7 +131,7 @@ function finishRound(answerId=null,round=state.index){
   stopClock();state.answers.push({id:q.id,correct:selected!==null&&selected===q.correctId,timedOut:selected===null,selectedId:selected});
   state.deadline=null;state.imageReady=false;
   if(state.index===total()-1)state.phase='finished';else state.index++;
-  render();$('familyGamesContent').querySelector(state.phase==='finished'?'[data-game-result]':'.game-question-title')?.focus({preventScroll:true});
+  render();if(state.phase==='playing')scrollToRound();$('familyGamesContent').querySelector(state.phase==='finished'?'[data-game-result]':'.game-question-title')?.focus({preventScroll:true});
 }
 function updateClock(){
   if(state.view!=='games'||state.phase!=='playing'||!state.deadline)return;
@@ -175,7 +176,7 @@ async function start(game='photos'){
     if(data.questions?.length!==10&&isTextGame())throw Error(tr('לא נמצאו מספיק שאלות כרגע. נסו שוב.','There are not enough questions available right now. Please try again.'));
     if(isMissing()&&!data.questions?.length)throw Error(tr('למשחק הזה צריך תמונות עם לפחות חמישה מתויגים. הוסיפו תיוגים בגלריה ונסו שוב.','This game needs photos with at least five tagged people. Add tags in the gallery and try again.'));
     if(!isMissing()&&!isChick()&&data.questions?.length!==10)throw Error(tr('כדי להתחיל צריך 10 תמונות מתאימות עם תיוגים בגלריה. כרגע זמינות למשחק ','The game needs 10 suitable tagged gallery photos. Currently available: ')+(data.available||0)+'.');
-    Object.assign(state,{phase:'playing',questions:data.questions,index:0,answers:[],imageReady:false,deadline:null,zoom:1,cursor:{x:.5,y:.5}});render();
+    Object.assign(state,{phase:'playing',questions:data.questions,index:0,answers:[],imageReady:false,deadline:null,zoom:1,cursor:{x:.5,y:.5}});render();scrollToRound();
   }catch(error){if(serial===state.serial){state.phase=isTrivia()?'trivia-home':'welcome';state.error=error.message;render();}}
 }
 function activate(view){
