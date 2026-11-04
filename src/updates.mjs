@@ -64,7 +64,11 @@ export function confirmationEmail(language,link){
 }
 export function managementEmail(language,link){
   const en=language!=='he',subject=en?'Your Keha Family preferences':'ההעדפות שלכם בעדכוני המשפחה',body=en?'Use your private link to choose your reminders or unsubscribe. Please keep this link private.':'בקישור האישי תוכלו לבחור אילו תזכורות לקבל או להסיר את ההרשמה. שמרו את הקישור לעצמכם.';
-  return {subject,html:shell(language,subject,`<h2>${escape(subject)}</h2><p style="line-height:1.9">${body}</p>${button(link,en?'Manage my updates':'ניהול העדכונים שלי')}`),text:subject+'\n'+body+'\n'+link};
+  return {subject,html:shell(language,subject,`<h2>${escape(subject)}</h2><p style="line-height:1.9">${body}</p>${button(link,en?'Update preferences or unsubscribe':'עדכון העדפות או הסרה מרשימת התפוצה')}`,subscriptionFooter(language,link,link)),text:subject+'\n'+body+'\n'+link};
+}
+function subscriptionFooter(language,manageLink,unsubscribeLink){
+  const en=language!=='he';
+  return `<div style="font-size:14px;line-height:2"><a href="${escape(manageLink)}" style="color:#4e6741;font-weight:bold">${en?'Update preferences':'עדכון העדפות'}</a> · <a href="${escape(unsubscribeLink)}" style="color:#765640;font-weight:bold">${en?'Unsubscribe':'הסרה מרשימת התפוצה'}</a></div>${en?'Both links open your private subscription page on the family website.':'שני הקישורים מובילים לעמוד ניהול ההרשמה האישי באתר המשפחה.'}`;
 }
 export function eventEmail(language,events,manageLink,unsubscribeLink){
   const en=language!=='he',subject=events.length===1?(events[0].type==='birthdays'?(en?'🎂 A family birthday today':'🎂 יום הולדת במשפחה היום'):events[0].type==='anniversaries'?(en?'💐 A family anniversary today':'💐 יום נישואים במשפחה היום'):(en?'🕯 In loving memory':'🕯 זוכרים באהבה')):(en?'Today in the Keha family':'היום במשפחת קהא');
@@ -75,7 +79,7 @@ export function eventEmail(language,events,manageLink,unsubscribeLink){
     lines.push(title+' '+names+'\n'+body);
     return `<div style="padding:24px 16px;text-align:center;margin:0 0 20px;border:1px solid ${memorial?'#d4c9b7':'#dac99e'};border-radius:12px;background:${memorial?'#f3efe7':'#fcf0da'}"><div style="font-size:38px;letter-spacing:5px">${memorial?'🕯':wedding?'💐 💛 💐':'🎈 🎈 🎂 🎈 🎈'}</div><h2 style="font-size:25px;color:${memorial?'#61574a':'#7d5a36'}">${title}</h2><h3 style="font-size:22px">${escape(names)}</h3><p style="font-size:16px;line-height:1.9">${escape(body)}</p>${memorial?'':'<div style="font-size:25px">'+(wedding?'✨ 💕 ✨':'🎉 🎁 🎈 🎉')+'</div>'}</div>`;
   }).join('');
-  const footer=`<a href="${escape(manageLink)}" style="color:#5c704b">${en?'Manage preferences':'ניהול ההעדפות'}</a> · <a href="${escape(unsubscribeLink)}" style="color:#5c704b">${en?'Unsubscribe':'הסרה מהעדכונים'}</a><br>${en?'You are receiving this because you confirmed your subscription.':'המייל נשלח כי אישרתם הרשמה לעדכונים.'}`;
+  const footer=subscriptionFooter(language,manageLink,unsubscribeLink)+`<br>${en?'You are receiving this because you confirmed your subscription.':'המייל נשלח כי אישרתם הרשמה לעדכונים.'}`;
   return {subject,html:shell(language,subject,cards,footer),text:subject+'\n\n'+lines.join('\n\n')+'\n\n'+(en?'Manage preferences: ':'ניהול העדכונים: ')+manageLink+'\n'+(en?'Unsubscribe: ':'הסרה: ')+unsubscribeLink};
 }
 
@@ -134,14 +138,28 @@ export class FamilyUpdates {
     if(!row||row.status!=='active')throw new HttpError(404,'הקישור אינו תקף. בקשו קישור חדש במייל.');
     return row;
   }
-  links(data){const base=new URL(this.env.SITE_ORIGIN).origin+'/?lang='+data.language;return {manage:base+'#updates/manage/'+data.manageToken,unsubscribe:base+'#updates/unsubscribe/'+data.manageToken,oneClick:new URL(this.env.SITE_ORIGIN).origin+'/api/updates/one-click?token='+data.manageToken};}
+  links(data){const base=new URL(this.env.SITE_ORIGIN).origin+'/?lang='+data.language,manage=base+'#updates/manage/'+data.manageToken;return {manage,unsubscribe:manage,oneClick:new URL(this.env.SITE_ORIGIN).origin+'/api/updates/one-click?token='+data.manageToken};}
+  requestAllowed(id,ip,now){
+    if(!this.tx(()=>this.rate('ip:'+ip,5,3600000,now)&&this.rate('email:'+id,2,3600000,now)&&this.rate('signups',45,86400000,now)))throw new HttpError(429,'נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר.');
+  }
+  async sendManagementLink(row,email,now){
+    const data=await this.decrypt(row.data);
+    await this.mail(email,managementEmail(data.language,this.links(data).manage),'manage/'+row.id+'/'+row.revision+'/'+Math.floor(now/3600000));
+  }
   async register(p){
     const email=normalizeEmail(p.email);if(p.consent!==true)throw new HttpError(400,'יש לאשר קבלת עדכונים במייל.');
     const prefs=preferences(p.preferences,p.people),language=langs.has(p.language)?p.language:'he',now=Date.now(),id=await this.digest('email:'+email),ip=await this.digest('ip:'+p.ip);
-    const allowed=this.tx(()=>this.rate('ip:'+ip,5,3600000,now)&&this.rate('email:'+id,2,3600000,now)&&this.rate('signups',45,86400000,now));
-    if(!allowed)return {saved:true,pending:true};
+    this.requestAllowed(id,ip,now);
     const manageToken=token(),confirmToken=token(),payload=await this.encrypt({email,language,preferences:prefs,manageToken}),hash=await sha256(confirmToken);
-    this.tx(()=>{this.sql.exec("INSERT INTO subscribers(id,pending,status,confirm_hash,confirm_expires,revision,updated) VALUES(?,?,'pending',?,?,?,?) ON CONFLICT(id) DO UPDATE SET pending=excluded.pending,confirm_hash=excluded.confirm_hash,confirm_expires=excluded.confirm_expires,updated=excluded.updated",id,payload,hash,now+86400000,token(),now);});
+    // Check inside the write transaction: a confirmation may finish during encryption.
+    const active=this.tx(()=>{
+      const current=this.rows('SELECT * FROM subscribers WHERE id=?',id)[0];
+      if(current?.status==='active')return current;
+      this.sql.exec("INSERT INTO subscribers(id,pending,status,confirm_hash,confirm_expires,revision,updated) VALUES(?,?,'pending',?,?,?,?) ON CONFLICT(id) DO UPDATE SET pending=excluded.pending,status='pending',confirm_hash=excluded.confirm_hash,confirm_expires=excluded.confirm_expires,updated=excluded.updated",id,payload,hash,now+86400000,token(),now);
+      return null;
+    });
+    // Only the mailbox owner receives the existing private link. Public responses stay identical.
+    if(active){await this.sendManagementLink(active,email,now);return {saved:true,pending:true};}
     const link=new URL(this.env.SITE_ORIGIN).origin+'/?lang='+language+'#updates/confirm/'+confirmToken;
     await this.mail(email,confirmationEmail(language,link),'confirm/'+hash);return {saved:true,pending:true};
   }
@@ -149,22 +167,29 @@ export class FamilyUpdates {
     if(typeof p.token!=='string'||!/^[a-f0-9]{64}$/.test(p.token))throw new HttpError(404,'קישור האישור אינו תקף או שפג תוקפו.');
     const hash=await sha256(p.token),row=this.rows('SELECT * FROM subscribers WHERE confirm_hash=?',hash)[0];
     if(!row?.pending||row.confirm_expires<Date.now())throw new HttpError(404,'קישור האישור אינו תקף או שפג תוקפו.');
-    const data=await this.decrypt(row.pending),manageHash=await sha256(data.manageToken);
+    const pending=await this.decrypt(row.pending),manageHash=await sha256(pending.manageToken);
     const revision=token();
-    this.tx(()=>{
-      const current=this.rows('SELECT confirm_hash FROM subscribers WHERE id=?',row.id)[0];if(current?.confirm_hash!==hash)throw new HttpError(409,'הקישור הוחלף. פתחו את המייל האחרון שקיבלתם.');
+    const activated=this.tx(()=>{
+      const current=this.rows('SELECT * FROM subscribers WHERE id=?',row.id)[0];if(current?.confirm_hash!==hash)throw new HttpError(409,'הקישור הוחלף. פתחו את המייל האחרון שקיבלתם.');
+      // Old duplicate-registration emails must also preserve the active subscription.
+      if(current.status==='active'){
+        this.sql.exec('UPDATE subscribers SET pending=NULL,confirm_hash=NULL,confirm_expires=NULL WHERE id=?',row.id);
+        return {data:current.data,revision:current.revision};
+      }
       this.sql.exec("UPDATE subscribers SET data=pending,pending=NULL,status='active',confirm_hash=NULL,confirm_expires=NULL,manage_hash=?,revision=?,updated=? WHERE id=?",manageHash,revision,Date.now(),row.id);
+      return {data:current.pending,revision};
     });
-    return {saved:true,confirmed:true,token:data.manageToken,preferences:data.preferences,language:data.language,revision};
+    const data=await this.decrypt(activated.data);
+    return {saved:true,confirmed:true,token:data.manageToken,email:data.email,preferences:data.preferences,language:data.language,revision:activated.revision};
   }
   async requestLink(p){
     const email=normalizeEmail(p.email),id=await this.digest('email:'+email),ip=await this.digest('ip:'+p.ip),now=Date.now();
-    if(!this.tx(()=>this.rate('ip:'+ip,5,3600000,now)&&this.rate('email:'+id,2,3600000,now)&&this.rate('signups',45,86400000,now)))return {saved:true};
+    this.requestAllowed(id,ip,now);
     const row=this.rows('SELECT * FROM subscribers WHERE id=?',id)[0];
-    if(row?.status==='active'){const data=await this.decrypt(row.data);try{await this.mail(email,managementEmail(data.language,this.links(data).manage),'manage/'+id+'/'+row.revision+'/'+Math.floor(now/3600000));}catch{/* The public response must not disclose subscription status. */}}
+    if(row?.status==='active')await this.sendManagementLink(row,email,now);
     return {saved:true};
   }
-  async getPreferences(p){const row=await this.subscriber(p.token),data=await this.decrypt(row.data);return {preferences:data.preferences,language:data.language,revision:row.revision};}
+  async getPreferences(p){const row=await this.subscriber(p.token),data=await this.decrypt(row.data);return {email:data.email,preferences:data.preferences,language:data.language,revision:row.revision};}
   async savePreferences(p){
     const row=await this.subscriber(p.token),data=await this.decrypt(row.data),prefs=preferences(p.preferences,p.people),revision=token();
     data.preferences=prefs;if(langs.has(p.language))data.language=p.language;const encrypted=await this.encrypt(data);

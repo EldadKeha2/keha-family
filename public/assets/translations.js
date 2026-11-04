@@ -624,6 +624,7 @@ window.FAMILY_TRANSLATIONS={
   "ההעדפות השתנו. פתחו שוב את הקישור האישי.": "Your preferences have changed. Reopen your personal link.",
   "הקישור הוחלף. פתחו את המייל האחרון שקיבלתם.": "This link was replaced. Open the latest email you received.",
   "שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.": "The email could not be sent. Please try again later.",
+  "נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר.": "Too many requests. Please try again later.",
   "מכסת השליחה היומית התמלאה. נסו שוב מחר.": "The daily email limit has been reached. Please try again tomorrow.",
   "הגלריה המשפחתית": "Family Gallery",
   "עמוד אישי": "Personal page",

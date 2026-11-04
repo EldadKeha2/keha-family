@@ -34,11 +34,15 @@ test('double opt-in encrypts addresses, stores only hashed tokens, and excludes 
   assert.equal(f.messages[0].body.from,'Keha Family <family@example.com>');assert.equal(f.messages[0].body.to.length,1);
  }finally{f.close();}
 });
-test('unconfirmed re-registration cannot change active preferences, and management rejects stale edits',async()=>{
+test('re-registering a normalized active address sends management without replacing its preferences or private link',async()=>{
  const f=fixture();try{
-  const active=await f.confirm(),prefs=f.all();prefs.birthdays.ids=['yehiel'];
-  await f.register('visitor@example.net',prefs);
+  const active=await f.confirm(),prefs=f.all(),original=f.db.exec('SELECT * FROM subscribers').toArray()[0];prefs.birthdays.ids=['yehiel'];
+  const duplicate=await f.call('/api/updates/register',{email:'  Visitor@EXAMPLE.NET  ',preferences:prefs,language:'en-US',consent:true});
+  assert.equal(duplicate.status,200);assert.deepEqual(await duplicate.json(),{saved:true,pending:true});
+  const mail=f.messages.at(-1).body;assert.match(mail.text,new RegExp('#updates/manage/'+active.token));assert.ok(!mail.text.includes('#updates/confirm/'));
+  const rows=f.db.exec('SELECT * FROM subscribers').toArray();assert.equal(rows.length,1);assert.deepEqual(rows[0],original);
   const before=await (await f.call('/api/updates/preferences',{token:active.token})).json();assert.equal(before.preferences.birthdays.ids,null);
+  assert.equal(before.email,'visitor@example.net');
   const saved=await f.call('/api/updates/save',{token:active.token,revision:before.revision,preferences:prefs,language:'en-GB'});assert.equal(saved.status,200);
   assert.equal((await f.call('/api/updates/save',{token:active.token,revision:before.revision,preferences:f.all()})).status,409);
   const after=await (await f.call('/api/updates/preferences',{token:active.token})).json();assert.deepEqual(after.preferences.birthdays.ids,['yehiel']);assert.equal(after.language,'en-GB');
@@ -46,9 +50,52 @@ test('unconfirmed re-registration cannot change active preferences, and manageme
  }finally{f.close();}
 });
 test('unsubscribing removes the encrypted address, cancels pending confirmations and supports one-click POST',async()=>{
- const f=fixture();try{const active=await f.confirm();await f.register();const confirmToken=f.messages.at(-1).body.text.match(/#updates\/confirm\/([a-f0-9]{64})/)[1];
+ const f=fixture();try{const confirmToken=await f.register(),legacy=f.db.exec('SELECT * FROM subscribers').toArray()[0],active=await (await f.call('/api/updates/confirm',{token:confirmToken})).json();
+  // Simulate a pending duplicate confirmation created before the new registration flow.
+  f.db.exec('UPDATE subscribers SET pending=?,confirm_hash=?,confirm_expires=?',legacy.pending,legacy.confirm_hash,legacy.confirm_expires);
+  assert.equal((await f.call('/api/updates/one-click?token='+active.token)).status,404);
+  assert.equal((await f.call('/api/updates/preferences',{token:active.token})).status,200);
   const request=new Request('https://family.example/api/updates/one-click?token='+active.token,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'List-Unsubscribe=One-Click'});
   assert.equal((await worker.fetch(request,f.env,{})).status,200);assert.equal((await f.call('/api/updates/preferences',{token:active.token})).status,404);assert.equal((await f.call('/api/updates/confirm',{token:confirmToken})).status,404);assert.equal(f.db.exec('SELECT data,pending FROM subscribers').toArray()[0].data,null);assert.equal((await f.call('/api/updates/unsubscribe',{token:active.token})).status,200);
+ }finally{f.close();}
+});
+test('legacy duplicate confirmation preserves later choices and the original active management token',async()=>{
+ const f=fixture();try{
+  const raw=await f.register(),legacy=f.db.exec('SELECT * FROM subscribers').toArray()[0],active=await (await f.call('/api/updates/confirm',{token:raw})).json(),prefs=f.all();prefs.birthdays.ids=['yehiel'];
+  const save=await (await f.call('/api/updates/save',{token:active.token,revision:active.revision,preferences:prefs,language:'en-GB'})).json();
+  f.db.exec('UPDATE subscribers SET pending=?,confirm_hash=?,confirm_expires=?',legacy.pending,legacy.confirm_hash,legacy.confirm_expires);
+  const response=await f.call('/api/updates/confirm',{token:raw}),confirmed=await response.json();
+  assert.equal(response.status,200);assert.equal(confirmed.token,active.token);assert.equal(confirmed.revision,save.revision);assert.deepEqual(confirmed.preferences,prefs);assert.equal(confirmed.language,'en-GB');
+  assert.equal(f.db.exec('SELECT pending FROM subscribers').toArray()[0].pending,null);assert.equal((await f.call('/api/updates/confirm',{token:raw})).status,404);
+ }finally{f.close();}
+});
+test('a signup racing with confirmation detects the newly active subscription inside its transaction',async()=>{
+ const f=fixture();try{
+  const raw=await f.register(),originalEncrypt=f.updates.encrypt.bind(f.updates);let reached,release;
+  const encrypting=new Promise(resolve=>reached=resolve),resume=new Promise(resolve=>release=resolve);
+  f.updates.encrypt=async value=>{const encrypted=await originalEncrypt(value);reached();await resume;return encrypted;};
+  const duplicate=f.call('/api/updates/register',{email:'visitor@example.net',preferences:f.all(),consent:true});await encrypting;
+  const active=await (await f.call('/api/updates/confirm',{token:raw})).json();release();assert.equal((await duplicate).status,200);
+  const row=f.db.exec('SELECT * FROM subscribers').toArray()[0];assert.equal(row.status,'active');assert.equal(row.pending,null);assert.equal(row.revision,active.revision);assert.match(f.messages.at(-1).body.text,new RegExp('#updates/manage/'+active.token));
+ }finally{f.close();}
+});
+test('management requests use the same private destination and report sending failures or throttling',async()=>{
+ const f=fixture();try{
+  const active=await f.confirm();f.fail(true);
+  assert.equal((await f.call('/api/updates/request-link',{email:'visitor@example.net'})).status,503);
+  assert.equal((await f.call('/api/updates/request-link',{email:'visitor@example.net'})).status,429);
+  f.fail(false);f.db.exec('DELETE FROM rate_limits');
+  assert.deepEqual(await (await f.call('/api/updates/request-link',{email:'nobody@example.net'})).json(),{saved:true});
+  const before=f.messages.length;assert.deepEqual(await (await f.call('/api/updates/request-link',{email:'visitor@example.net'})).json(),{saved:true});assert.equal(f.messages.length,before+1);
+  const mail=f.messages.at(-1).body;assert.match(mail.html,/עדכון העדפות/);assert.match(mail.html,/הסרה מרשימת התפוצה/);assert.ok([...mail.html.matchAll(/href="([^"]+)"/g)].every(match=>match[1].endsWith('#updates/manage/'+active.token)));
+ }finally{f.close();}
+});
+test('resubscribing after removal requires a fresh confirmation and leaves old removal links harmless',async()=>{
+ const f=fixture();try{
+  const old=await f.confirm();await f.call('/api/updates/unsubscribe',{token:old.token});f.db.exec('DELETE FROM rate_limits');
+  const raw=await f.register();assert.equal(f.db.exec('SELECT count(*) AS n FROM subscribers').toArray()[0].n,1);assert.equal(f.db.exec('SELECT status FROM subscribers').toArray()[0].status,'pending');
+  const active=await (await f.call('/api/updates/confirm',{token:raw})).json();assert.notEqual(active.token,old.token);
+  assert.equal((await f.call('/api/updates/unsubscribe',{token:old.token})).status,200);assert.equal((await f.call('/api/updates/preferences',{token:active.token})).status,200);
  }finally{f.close();}
 });
 test('confirmation expiry, consent, source checking, rate limits and provider failures are enforced',async()=>{
@@ -66,6 +113,7 @@ test('daily mail uses current dates, selected people, one delivery per day and s
   const dates=f.state.run('dates',{}),dispatch=()=>f.updates.dispatch({...dates,now:Date.parse('2026-11-03T07:00:00Z')});
   await f.updates.dispatch({...dates,now:Date.parse('2026-11-03T06:00:00Z')});assert.equal(f.messages.length,1);
   await dispatch();assert.equal(f.messages.length,2);assert.match(f.messages[1].body.html,/יחיאל קהא/);assert.match(f.messages[1].body.html,/🎂/);assert.ok(f.messages[1].body.headers['List-Unsubscribe']);
+  const eventMail=f.messages[1].body,links=[...eventMail.html.matchAll(/href="([^"]+)"/g)].map(match=>match[1]);assert.equal(links.length,2);assert.equal(links[0],links[1]);assert.ok(links[0].endsWith('#updates/manage/'+active.token));assert.equal((eventMail.text.match(new RegExp('#updates/manage/'+active.token,'g'))||[]).length,2);
   await dispatch();assert.equal(f.messages.length,2);
   await f.call('/api/updates/unsubscribe',{token:active.token});await f.updates.dispatch({...dates,now:Date.parse('2027-11-03T07:00:00Z')});assert.equal(f.messages.length,2);
  }finally{f.close();}
