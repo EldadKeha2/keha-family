@@ -5,7 +5,8 @@
 .person-family{display:flex;align-items:stretch;gap:0;margin:0 0 14px;border:1px solid #e0d4b9;border-radius:7px;background:#fbf8ef;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#c4b48c transparent}
 .person-family-group{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-width:max-content;padding:4px 9px;border:0;border-inline-end:1px solid #e4dac5;border-radius:0;background:transparent}
 .person-family-group:last-child{border-inline-end:0}
-.person-family-group[data-relative-kind="siblings"]{flex:0 1 auto;min-width:min-content}
+.person-family-group[data-relative-kind="siblings"]{flex:0 1 auto;min-width:180px}
+.person-family-group[data-relative-kind="siblings"]:has(>.person-family-empty){flex:0 0 auto;min-width:max-content}
 .person-family-group h3{font:17px/1.25 var(--serif);color:#5b7048;margin:0;white-space:nowrap;flex:0 0 auto}
 .person-family-list{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:8px;list-style:none;padding:2px 1px;margin:0;min-width:0}
 .person-family-group[data-relative-kind="siblings"] .person-family-list{flex:0 1 auto;min-width:72px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scrollbar-width:thin;scrollbar-color:#c4b48c transparent}
