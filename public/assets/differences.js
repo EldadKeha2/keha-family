@@ -70,6 +70,7 @@ function resume(){
 function loadImage(src){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve();image.onerror=()=>reject(Error('image'));image.src=src;});}
 async function loadRound(){
   const token=++state.token,puzzle=state.puzzles[state.index];stop();state.autoNextAt=null;state.error='';state.imagesReady=false;state.zoom=false;state.cursor={x:.5,y:.5};state.round=createDifferenceRound(puzzle,state.level);render();
+  root().querySelector('.diff-hud')?.scrollIntoView({block:'start'});
   root().querySelector('.game-question-title')?.focus({preventScroll:true});
   try{await Promise.all([loadImage(puzzle.original),loadImage(puzzle.edited)]);if(token!==state.token||!state.active)return;state.imagesReady=true;resume();}
   catch{if(token!==state.token||!state.active)return;state.error=tr('לא הצלחנו לטעון את התמונות. נסו שוב.','The photos could not load. Please try again.');updateView();}
