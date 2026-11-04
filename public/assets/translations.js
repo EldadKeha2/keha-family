@@ -700,3 +700,14 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
 });
 
 Object.assign(window.FAMILY_TRANSLATIONS,{'הרשמה לעדכונים':'Subscribe for updates'});
+
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  'תמונות נוסטלגיות':'Nostalgic photos',
+  'סרטוני נוסטלגיה':'Nostalgic videos',
+  'מסמכים מהעבר':'Documents from the past',
+  'הוספת זיכרונות':'Add memories',
+  '＋ העלאת מסמכים':'+ Upload documents',
+  'לא נמצאו זיכרונות מהסוג הזה בחיפוש.':'No memories of this type match your search.',
+  'כאן יש מקום לזיכרונות שלכם. הוסיפו את הראשון!':'There is room for your memories here. Add the first one!',
+  'תאריכי הלידה מעודכנים דרך מנהלי האתר בלבד.':'Birth dates are maintained by the site administrators.'
+});

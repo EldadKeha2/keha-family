@@ -51,7 +51,7 @@ function fixture(){
     const bootstrap=await call('/family-data.js');assert.equal(bootstrap.status,200);
     const script=await bootstrap.text();csrf=JSON.parse(/window.FAMILY_API_TOKEN=("[^"]+")/.exec(script)[1]);return script;
   }
-  return {env,call,connect,objects,network,database,storage,restart(){state=new FamilyState({storage},env);},flush:()=>Promise.allSettled(tasks),async close(){await Promise.allSettled(tasks);globalThis.fetch=originalFetch;database.close();}};
+  return {env,call,connect,objects,network,database,storage,ownerBirthday(path,{body}){const id=path.split('/')[3];return state.fetch(new Request('https://state.internal/',{method:'POST',body:JSON.stringify({action:'birthday',id,...body})}));},restart(){state=new FamilyState({storage},env);},flush:()=>Promise.allSettled(tasks),async close(){await Promise.allSettled(tasks);globalThis.fetch=originalFetch;database.close();}};
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
@@ -138,7 +138,7 @@ test('Elisheva memorial dates migrate existing records once while preserving pro
   assert.equal(p.birthday,'23.3.1942');assert.equal(p.deathDate,'8.5.1998');assert.equal(p.deceased,true);assert.equal(p.profile,uploaded.person.profile);assert.equal(p.about,'A family memory');assert.deepEqual(p.languages,['עברית']);
   const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people[id].deceased,true);assert.equal(bootstrap.people[id].deathDate,'8.5.1998');
   assert.equal((await f.call('/api/people/'+id+'/death-date',{method:'POST',body:{date:'9.5.1998',expectedDate:'8.5.1998'}})).status,200);
-  assert.equal((await f.call('/api/people/'+id+'/birthday',{method:'POST',body:{birthday:'24.3.1942',expectedBirthday:'23.3.1942'}})).status,200);
+  assert.equal((await f.ownerBirthday('/api/people/'+id+'/birthday',{method:'POST',body:{birthday:'24.3.1942',expectedBirthday:'23.3.1942'}})).status,200);
   f.restart();p=(await(await f.call('/api/people/'+id+'/page')).json()).person;assert.equal(p.birthday,'24.3.1942');assert.equal(p.deathDate,'9.5.1998');
  }finally{await f.close();}
 });
@@ -154,31 +154,36 @@ test('visitors can open the site and data without a password or cookie',async()=
     f.env.FAMILY_PASSWORD='a-leftover-setting-is-ignored';assert.equal((await f.call('/')).status,200);
   }finally{await f.close();}
 });
-test('public visitors can save while cross-origin and malformed writes are rejected',async()=>{
+test('birthdays are read-only for all public visitors while biography editing retains origin and token protection',async()=>{
   const f=fixture();try{
-    await f.connect();const body={birthday:'1.1.2000',expectedBirthday:'16.10.1921'};
-    assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,clientHeaders:false})).status,403);
-    assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,headers:{'X-Family-Token':'wrong'}})).status,403);
-    assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body,headers:{Origin:'https://other.example'}})).status,403);
-    const result=await f.call('/api/people/yona/birthday',{method:'POST',body});assert.equal(result.status,200);
-    assert.equal((await result.json()).person.birthday,'1.1.2000');
+    await f.connect();const before=(await(await f.call('/api/people/yona')).json()).birthday;
+    for(const birthday of ['1.1.2000','',before]){
+      const result=await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday,expectedBirthday:before}});
+      assert.equal(result.status,403);assert.equal((await result.json()).code,'BIRTHDAY_READ_ONLY');
+    }
+    assert.equal((await(await f.call('/api/people/yona')).json()).birthday,before);
+    const body={about:'A family story',expectedAbout:'',language:'he'};
+    assert.equal((await f.call('/api/people/yona/about',{method:'POST',body,clientHeaders:false})).status,403);
+    assert.equal((await f.call('/api/people/yona/about',{method:'POST',body,headers:{'X-Family-Token':'wrong'}})).status,403);
+    assert.equal((await f.call('/api/people/yona/about',{method:'POST',body,headers:{Origin:'https://other.example'}})).status,403);
+    const result=await f.call('/api/people/yona/about',{method:'POST',body});assert.equal(result.status,200);assert.equal((await result.json()).person.about,body.about);
   }finally{await f.close();}
 });
-test('birthday validation, stale-write conflicts and durable reload',async()=>{
+test('owner birthday updates retain validation, stale-write conflicts and durable reload',async()=>{
   const f=fixture();try{
     await f.connect();
     const body={birthday:'29.2.2000',expectedBirthday:'16.10.1921'};
-    let response=await f.call('/api/people/yona/birthday',{method:'POST',body});assert.equal(response.status,200);assert.equal((await response.json()).person.birthday,'29.2.2000');
-    assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body})).status,409);
-    for(const value of ['29.2.2001','1.1.9999','bad'])assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:value,expectedBirthday:'29.2.2000'}})).status,400);
+    let response=await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body});assert.equal(response.status,200);assert.equal((await response.json()).person.birthday,'29.2.2000');
+    assert.equal((await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body})).status,409);
+    for(const value of ['29.2.2001','1.1.9999','bad'])assert.equal((await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body:{birthday:value,expectedBirthday:'29.2.2000'}})).status,400);
     f.restart();assert.equal((await (await f.call('/api/people/yona')).json()).birthday,'29.2.2000');
-    response=await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'',expectedBirthday:'29.2.2000'}});assert.equal((await response.json()).person.birthday,'1.1.1111');
+    response=await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body:{birthday:'',expectedBirthday:'29.2.2000'}});assert.equal((await response.json()).person.birthday,'1.1.1111');
   }finally{await f.close();}
 });
 test('tree corrections update existing names and add a spouse without changing saved family content',async()=>{
   const f=fixture();try{
     await f.connect();
-    let response=await f.call('/api/people/bosmat/birthday',{method:'POST',body:{birthday:'2.3.1980',expectedBirthday:'1.1.1111'}});assert.equal(response.status,200);
+    let response=await f.ownerBirthday('/api/people/bosmat/birthday',{method:'POST',body:{birthday:'2.3.1980',expectedBirthday:'1.1.1111'}});assert.equal(response.status,200);
     response=await f.call('/api/people/bosmat/photos?filename=family.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(response.status,201);
     const file=(await response.json()).file;
     response=await f.call('/api/people/bosmat/profile',{method:'POST',body:{file}});assert.equal(response.status,200);
@@ -351,8 +356,8 @@ test('Yona death information is visible in family data and preserves existing bi
   const f=fixture();try{
     await f.connect();const person=await (await f.call('/api/people/yona')).json();assert.equal(person.deceased,true);assert.equal(person.deathDate,'16.6.2010');
     const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people.yona.deathDate,'16.6.2010');
-    assert.equal((await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.2015',expectedBirthday:person.birthday}})).status,400);
-    const response=await f.call('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.1930',expectedBirthday:person.birthday}});assert.equal(response.status,200);
+    assert.equal((await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.2015',expectedBirthday:person.birthday}})).status,400);
+    const response=await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.1930',expectedBirthday:person.birthday}});assert.equal(response.status,200);
     f.restart();const restored=await (await f.call('/api/people/yona')).json();assert.equal(restored.birthday,'1.1.1930');assert.equal(restored.deathDate,'16.6.2010');
   }finally{await f.close();}
 });
@@ -379,7 +384,7 @@ test('special birthdays contain six unique YouTube videos and deletions survive 
 });
 test('personal photo deletion updates portraits, preserves dates and supports conservative undo',async()=>{
   const f=fixture();try{
-    await f.connect();await f.call('/api/people/chantal/birthday',{method:'POST',body:{birthday:'2.3.1980',expectedBirthday:'1.1.1111'}});
+    await f.connect();await f.ownerBirthday('/api/people/chantal/birthday',{method:'POST',body:{birthday:'2.3.1980',expectedBirthday:'1.1.1111'}});
     for(const name of ['first.jpg','second.jpg'])assert.equal((await f.call('/api/people/chantal/photos?filename='+name,{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,201);
     let person=await (await f.call('/api/people/chantal')).json();const [first,second]=person.gallery;
     await f.call('/api/people/chantal/profile',{method:'POST',body:{file:first.file}});
@@ -557,15 +562,15 @@ test('gallery uploads stay separate and automatic tag deltas preserve other peop
 test('Roi death date is canonical and limits birthdays without overwriting saved values',async()=>{
   const f=fixture();try{
     await f.connect();let person=await(await f.call('/api/people/roi')).json();assert.equal(person.deathDate,'21.7.2024');
-    let response=await f.call('/api/people/roi/birthday',{method:'POST',body:{birthday:'20.7.2000',expectedBirthday:person.birthday}});assert.equal(response.status,200);
+    let response=await f.ownerBirthday('/api/people/roi/birthday',{method:'POST',body:{birthday:'20.7.2000',expectedBirthday:person.birthday}});assert.equal(response.status,200);
     f.restart();person=await(await f.call('/api/people/roi')).json();assert.equal(person.birthday,'20.7.2000');assert.equal(person.deathDate,'21.7.2024');
-    assert.equal((await f.call('/api/people/roi/birthday',{method:'POST',body:{birthday:'22.7.2024',expectedBirthday:person.birthday}})).status,400);
+    assert.equal((await f.ownerBirthday('/api/people/roi/birthday',{method:'POST',body:{birthday:'22.7.2024',expectedBirthday:person.birthday}})).status,400);
   }finally{await f.close();}
 });
 test('calendar API reads edited birthdays, uses Israel holidays and survives the holiday service being unavailable',async()=>{
   const f=fixture();try{
     await f.connect();
-    for(const id of ['yehiel','ora']){const person=await(await f.call('/api/people/'+id)).json();assert.equal((await f.call('/api/people/'+id+'/birthday',{method:'POST',body:{birthday:'21.7.1970',expectedBirthday:person.birthday}})).status,200);}
+    for(const id of ['yehiel','ora']){const person=await(await f.call('/api/people/'+id)).json();assert.equal((await f.ownerBirthday('/api/people/'+id+'/birthday',{method:'POST',body:{birthday:'21.7.1970',expectedBirthday:person.birthday}})).status,200);}
     let response=await f.call('/api/calendar?date=2026-07-02&mode=gregorian');assert.equal(response.status,200);let result=await response.json(),day=result.days.find(day=>day.date==='2026-07-21');
     assert.equal(result.holidaysAvailable,true);assert.deepEqual(day.birthdays.map(person=>person.name).sort(),['אורה פיש','יחיאל קהא'].sort());assert.equal(day.holidays.length,1);assert.equal(day.birthdays[0].age,56);
     response=await f.call('/api/calendar?date=2024-03-25&mode=hebrew');assert.equal(response.status,200);result=await response.json();assert.match(result.label,/אדר/);
@@ -706,7 +711,7 @@ test('five explicit birth date corrections apply once and English spellings reta
   const dates={avishai:'17.8.1933',shosh:'27.6.1951',mark:'20.1.1951',camille:'20.10.1993',sam:'18.10.1992'};
   for(const [id,date]of Object.entries(dates))assert.equal((await (await f.call('/api/people/'+id)).json()).birthday,date);
   const roster=(await (await f.call('/api/tag-people')).json()).people;for(const [id,name]of Object.entries({itay:'Itai Gandelman',leni:'Leni Gandelman',shay:'Shai Gandelman'}))assert.equal(roster.find(p=>p.id===id).nameEn,name);
-  await f.connect();assert.equal((await f.call('/api/people/camille/birthday',{method:'POST',body:{birthday:'21.10.1993',expectedBirthday:dates.camille}})).status,200);f.restart();assert.equal((await (await f.call('/api/people/camille')).json()).birthday,'21.10.1993');
+  await f.connect();assert.equal((await f.ownerBirthday('/api/people/camille/birthday',{method:'POST',body:{birthday:'21.10.1993',expectedBirthday:dates.camille}})).status,200);f.restart();assert.equal((await (await f.call('/api/people/camille')).json()).birthday,'21.10.1993');
   const cal=await (await f.call('/api/calendar?date=2026-08-01')).json();assert.ok(cal.days.find(day=>day.date==='2026-08-17').birthdays.some(p=>p.id==='avishai'));
  }finally{await f.close();}
 });
@@ -719,7 +724,7 @@ test('grandparent corrections migrate existing records once and preserve later e
   f.restart();const yona=await(await f.call('/api/people/yona/page')).json(),shlomo=await(await f.call('/api/people/shlomo/page')).json();
   assert.equal(yona.person.birthday,'16.10.1921');assert.equal(yona.person.aliyahYear,1934);assert.equal(yona.person.aliyahMonth,12);assert.equal(shlomo.person.birthday,'1.1.1907');assert.equal(shlomo.person.deathDate,'12.11.1996');assert.equal(shlomo.person.deceased,true);assert.equal(shlomo.person.aliyahYear,1932);
   assert.equal((await(await f.call('/api/media/'+item.id+'/tags')).json()).item.tags.length,0);
-  assert.equal((await f.call('/api/people/shlomo/birthday',{method:'POST',body:{birthday:'2.1.1907',expectedBirthday:'1.1.1907'}})).status,200);
+  assert.equal((await f.ownerBirthday('/api/people/shlomo/birthday',{method:'POST',body:{birthday:'2.1.1907',expectedBirthday:'1.1.1907'}})).status,200);
   f.restart();assert.equal((await(await f.call('/api/people/shlomo/page')).json()).person.birthday,'2.1.1907');
   const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people.yona.aliyahMonth,12);assert.equal(bootstrap.people.shlomo.deceased,true);
  }finally{await f.close();}
@@ -774,6 +779,6 @@ test('Mila birthday correction keeps the stored year, applies once and does not 
   const person=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('mila').data);person.birthday='7.9.2022';person.about='A saved biography';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(person),'mila');
   f.restart();let result=await(await f.call('/api/people/mila/page')).json();assert.equal(result.person.birthday,'9.7.2022');assert.equal(result.person.about,'A saved biography');
   const revision=result.person.revision;f.restart();result=await(await f.call('/api/people/mila/page')).json();assert.equal(result.person.revision,revision);
-  await f.connect();assert.equal((await f.call('/api/people/mila/birthday',{method:'POST',body:{birthday:'10.7.2022',expectedBirthday:'9.7.2022'}})).status,200);f.restart();assert.equal((await(await f.call('/api/people/mila/page')).json()).person.birthday,'10.7.2022');
+  await f.connect();assert.equal((await f.ownerBirthday('/api/people/mila/birthday',{method:'POST',body:{birthday:'10.7.2022',expectedBirthday:'9.7.2022'}})).status,200);f.restart();assert.equal((await(await f.call('/api/people/mila/page')).json()).person.birthday,'10.7.2022');
  }finally{await f.close();}
 });

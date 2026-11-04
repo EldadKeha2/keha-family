@@ -7,6 +7,8 @@ const title=()=>tr('תפוס תג׳חנון','Catch the Jachnun');
 const mark='<svg class="jachnun-mark" viewBox="0 0 64 48" aria-hidden="true"><path d="m13 33 26-22c9-7 24 8 16 15L29 46" fill="#b97435"/><ellipse cx="20" cy="34" rx="14" ry="10" transform="rotate(-35 20 34)" fill="#e9b66c"/><path d="M12 37c-3-4 6-12 12-10s4 9-1 11-8-1-6-4 6-3 6-1" fill="none" stroke="#87491e" stroke-width="2.5" stroke-linecap="round"/><path d="m30 20 12 10m-6-15 12 10" fill="none" stroke="#e9b66c" stroke-width="2"/></svg>';
 const state={phase:'setup',selected:DEFAULT_CHARACTER,people:[],loading:false,loaded:false,error:'',imageError:'',query:'',game:createSnake(),crops:new Map()};
 const request={name:'',requestId:null,busy:false,sent:false,error:''};
+const leaderboard={scores:[],limit:20,loaded:false,loading:false,error:'',serial:0};
+let scoreRun=null;
 let host=null,back=null,events=null,clock=null,gesture=null,photo=null,head=null,imageSerial=0;
 const $=selector=>host?.querySelector(selector);
 const person=()=>state.people.find(p=>p.id===state.selected);
@@ -21,11 +23,12 @@ export function mountJachnun(root,onBack){
   pauseJachnun();host=root;back=onBack;host.classList.add('has-family-jachnun');events=new AbortController();
   const on=(node,type,fn,options={})=>node.addEventListener(type,fn,{...options,signal:events.signal});
   on(host,'click',click);on(host,'change',change);on(host,'input',input);on(host,'keydown',keyboard);
-  on(host,'submit',event=>{if(event.target.matches('[data-jachnun-request-form]'))sendHeadRequest(event);});
+  on(host,'submit',event=>{if(event.target.matches('[data-jachnun-request-form]'))sendHeadRequest(event);else if(event.target.matches('[data-jachnun-score-form]'))saveScore(event);});
   on(host,'pointerdown',pointerDown);on(host,'pointermove',pointerMove,{passive:false});on(host,'pointerup',pointerUp);on(host,'pointercancel',()=>{gesture=null;});
   on(document,'visibilitychange',()=>{if(document.visibilityState==='hidden')pause();});
   render();$('.jachnun-heading')?.scrollIntoView({block:'start'});
   if(!state.loaded&&!state.loading)loadPeople();else if(person())loadHead();
+  if(!leaderboard.loaded&&!leaderboard.loading)loadLeaderboard();
 }
 async function loadPeople(){
   state.loading=true;state.error='';render();
@@ -57,7 +60,7 @@ function syncStart(){
 function headHTML(extra=''){return `<canvas width="160" height="160" class="jachnun-head ${extra}" data-jachnun-head role="img" aria-label="${safe(personName(person()))}"></canvas>`;}
 function setup(){
   const selected=person();
-  return `<header class="jachnun-heading" tabindex="-1"><span class="small-eyebrow">${tr('עוד ביס, עוד ראש','Another bite, another head')}</span><h3>${mark}${title()}</h3><p>${tr('הסנייק המשפחתי שלנו. אוספים ג׳חנונים, מגדלים שרשרת של ראשים ונזהרים מהקירות ומהשרשרת.','Our family’s take on Snake. Collect jachnun, grow a chain of heads, and avoid the walls and your own chain.')}</p></header><section class="jachnun-setup"><div class="jachnun-character-preview"><div class="jachnun-preview-chain">${headHTML('main-head')}${headHTML()}${headHTML()}${mark}</div><strong data-jachnun-name>${safe(personName(selected)||tr('סבתא יונה','Grandma Yona'))}</strong><span>${tr('ברירת המחדל: סבתא יונה','Default character: Grandma Yona')}</span></div><div class="jachnun-character-controls"><label for="jachnunSearch">${tr('עם מי משחקים?','Who’s playing?')}</label><input id="jachnunSearch" type="search" value="${safe(state.query)}" placeholder="${tr('חיפוש בן או בת משפחה','Search family members')}" autocomplete="off"><label for="jachnunCharacter" class="visually-hidden">${tr('בחירת בן משפחה','Choose a family member')}</label><select id="jachnunCharacter" ${state.loading?'disabled':''}>${options()}</select><p class="jachnun-three-lives">${lifeHeads(SNAKE_LIVES)} <span>${tr('שלוש פסילות. כל ג׳חנון מוסיף ראש אחד.','Three lives. Every jachnun adds one head.')}</span></p><details class="jachnun-crop"><summary>${tr('התאמת חיתוך הראש','Adjust head crop')}</summary>${[['zoom',tr('הגדלה','Zoom'),1,3,.05],['x',tr('מיקום אופקי','Horizontal position'),0,1,.01],['y',tr('מיקום אנכי','Vertical position'),0,1,.01]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-jachnun-crop="${key}" min="${min}" max="${max}" step="${step}" value="${crop()[key]}"></label>`).join('')}</details><button type="button" class="primary-button" data-jachnun-start disabled>${tr('טוענים את הראש…','Loading the head…')}</button><p class="game-error" role="alert">${safe(state.error)}</p><p class="game-error" data-jachnun-image-status role="alert" hidden></p><button type="button" class="quiet-button" data-jachnun-retry hidden>${tr('טעינה מחדש','Try again')}</button></div></section><p class="jachnun-instructions">${tr('במחשב: חיצים או WASD. בטלפון: החליקו על הלוח או השתמשו בכפתורי הכיוון. רווח להשהיה.','Computer: arrow keys or WASD. Phone: swipe the board or use the direction buttons. Space to pause.')}</p>${requestForm()}`;
+  return `<header class="jachnun-heading" tabindex="-1"><span class="small-eyebrow">${tr('עוד ביס, עוד ראש','Another bite, another head')}</span><h3>${mark}${title()}</h3><p>${tr('הסנייק המשפחתי שלנו. אוספים ג׳חנונים, מגדלים שרשרת של ראשים ונזהרים מהקירות ומהשרשרת.','Our family’s take on Snake. Collect jachnun, grow a chain of heads, and avoid the walls and your own chain.')}</p></header><section class="jachnun-setup"><div class="jachnun-character-preview"><div class="jachnun-preview-chain">${headHTML('main-head')}${headHTML()}${headHTML()}${mark}</div><strong data-jachnun-name>${safe(personName(selected)||tr('סבתא יונה','Grandma Yona'))}</strong><span>${tr('ברירת המחדל: סבתא יונה','Default character: Grandma Yona')}</span></div><div class="jachnun-character-controls"><label for="jachnunSearch">${tr('עם מי משחקים?','Who’s playing?')}</label><input id="jachnunSearch" type="search" value="${safe(state.query)}" placeholder="${tr('חיפוש בן או בת משפחה','Search family members')}" autocomplete="off"><label for="jachnunCharacter" class="visually-hidden">${tr('בחירת בן משפחה','Choose a family member')}</label><select id="jachnunCharacter" ${state.loading?'disabled':''}>${options()}</select><p class="jachnun-three-lives">${lifeHeads(SNAKE_LIVES)} <span>${tr('שלוש פסילות. כל ג׳חנון מוסיף ראש אחד.','Three lives. Every jachnun adds one head.')}</span></p><details class="jachnun-crop"><summary>${tr('התאמת חיתוך הראש','Adjust head crop')}</summary>${[['zoom',tr('הגדלה','Zoom'),1,3,.05],['x',tr('מיקום אופקי','Horizontal position'),0,1,.01],['y',tr('מיקום אנכי','Vertical position'),0,1,.01]].map(([key,label,min,max,step])=>`<label>${label}<input type="range" data-jachnun-crop="${key}" min="${min}" max="${max}" step="${step}" value="${crop()[key]}"></label>`).join('')}</details><button type="button" class="primary-button" data-jachnun-start disabled>${tr('טוענים את הראש…','Loading the head…')}</button><p class="game-error" role="alert">${safe(state.error)}</p><p class="game-error" data-jachnun-image-status role="alert" hidden></p><button type="button" class="quiet-button" data-jachnun-retry hidden>${tr('טעינה מחדש','Try again')}</button></div></section><p class="jachnun-instructions">${tr('במחשב: חיצים או WASD. בטלפון: החליקו על הלוח או השתמשו בכפתורי הכיוון. רווח להשהיה.','Computer: arrow keys or WASD. Phone: swipe the board or use the direction buttons. Space to pause.')}</p>${leaderboardPanel()}${requestForm()}`;
 }
 function options(){
   const query=state.query.trim().toLocaleLowerCase();
@@ -68,7 +71,7 @@ function options(){
 const directionLabels=()=>({up:tr('למעלה','Up'),right:tr('ימינה','Right'),down:tr('למטה','Down'),left:tr('שמאלה','Left')});
 function board(){
   const g=state.game,labels=directionLabels();
-  return `<header class="jachnun-heading jachnun-play-heading"><h3>${mark}${title()}</h3><span>${safe(personName(person()))}</span></header><div class="jachnun-hud"><span>${mark}<b data-jachnun-score>${g.score}</b><span>${tr('ג׳חנונים','jachnun')}</span></span>${lifeHeads(g.lives)}<button type="button" class="quiet-button" data-jachnun-pause ${!['playing','paused'].includes(state.phase)?'disabled':''}>${state.phase==='paused'?tr('ממשיכים','Resume'):tr('השהיה','Pause')}</button></div><div class="jachnun-board-wrap"><canvas class="jachnun-board" data-jachnun-board width="648" height="648" tabindex="0" role="img" aria-label="${safe(title()+': '+personName(person()))}" aria-describedby="jachnunHow"></canvas><div class="jachnun-overlay" data-jachnun-overlay ${state.phase==='playing'?'hidden':''}>${overlay()}</div></div><div class="jachnun-pad" dir="ltr" role="group" aria-label="${tr('כפתורי כיוון','Direction controls')}">${[['up','↑'],['left','←'],['down','↓'],['right','→']].map(([key,arrow])=>`<button type="button" data-jachnun-direction="${key}" aria-label="${labels[key]}" ${state.phase!=='playing'?'disabled':''}>${arrow}</button>`).join('')}</div><p id="jachnunHow" class="jachnun-instructions">${tr('חיצים או WASD · החלקה על הלוח · רווח להשהיה','Arrow keys or WASD · Swipe the board · Space to pause')}</p><p class="visually-hidden" role="status" data-jachnun-status></p>${state.phase==='finished'?completion():''}`;
+  return `<header class="jachnun-heading jachnun-play-heading"><h3>${mark}${title()}</h3><span>${safe(personName(person()))}</span></header><div class="jachnun-hud"><span>${mark}<b data-jachnun-score>${g.score}</b><span>${tr('ג׳חנונים','jachnun')}</span></span>${lifeHeads(g.lives)}<button type="button" class="quiet-button" data-jachnun-pause ${!['playing','paused'].includes(state.phase)?'disabled':''}>${state.phase==='paused'?tr('ממשיכים','Resume'):tr('השהיה','Pause')}</button></div><div class="jachnun-board-wrap"><canvas class="jachnun-board" data-jachnun-board width="648" height="648" tabindex="0" role="img" aria-label="${safe(title()+': '+personName(person()))}" aria-describedby="jachnunHow"></canvas><div class="jachnun-overlay" data-jachnun-overlay ${state.phase==='playing'?'hidden':''}>${overlay()}</div></div><div class="jachnun-pad" dir="ltr" role="group" aria-label="${tr('כפתורי כיוון','Direction controls')}">${[['up','↑'],['left','←'],['down','↓'],['right','→']].map(([key,arrow])=>`<button type="button" data-jachnun-direction="${key}" aria-label="${labels[key]}" ${state.phase!=='playing'?'disabled':''}>${arrow}</button>`).join('')}</div><p id="jachnunHow" class="jachnun-instructions">${tr('חיצים או WASD · החלקה על הלוח · רווח להשהיה','Arrow keys or WASD · Swipe the board · Space to pause')}</p><p class="visually-hidden" role="status" data-jachnun-status></p>${state.phase==='finished'?completion()+leaderboardPanel():''}`;
 }
 function overlay(){
   if(state.phase==='paused')return `<h4>${tr('רגע לנשום','Take a breather')}</h4><p>${tr('הג׳חנונים יחכו לכם.','The jachnun can wait.')}</p><button type="button" class="primary-button" data-jachnun-pause>${tr('ממשיכים לשחק','Resume game')}</button>`;
@@ -77,10 +80,10 @@ function overlay(){
   return '';
 }
 function shareText(){return tr('שיחקתי ב״תפוס תג׳חנון״ עם ','I played Catch the Jachnun with ')+personName(person())+tr(' ואכלתי ',' and ate ')+state.game.score+tr(' ג׳חנונים! נסו לעקוף אותי 🙂',' jachnun! Can you beat my score? 🙂')+'\n'+new URL('?lang='+encodeURIComponent(I.language||'he')+'#games',window.location.origin).href;}
-function completion(){const text=shareText();return `<section class="jachnun-completion" tabindex="-1"><h4>${tr('איזה תיאבון!','What an appetite!')}</h4><p>${tr('משתפים את התוצאה','Share your result')}</p><div class="game-share-icons"><a class="game-share-icon game-share-whatsapp" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><svg viewBox="0 0 24 24"><use href="assets/share-icons.svg#whatsapp"/></svg></a><a class="game-share-icon game-share-email" href="mailto:?subject=${encodeURIComponent(title())}&body=${encodeURIComponent(text)}" aria-label="${tr('מייל','Email')}"><svg viewBox="0 0 24 24"><use href="assets/share-icons.svg#email"/></svg></a><button type="button" class="game-share-icon game-share-messenger" data-jachnun-share aria-label="Messenger"><svg viewBox="0 0 24 24"><use href="assets/share-icons.svg#messenger"/></svg></button></div><p data-jachnun-share-status role="status"></p><textarea data-jachnun-share-fallback readonly hidden aria-label="${tr('תוצאה לשיתוף','Result to share')}"></textarea><button type="button" class="secondary-button" data-jachnun-settings>${tr('בחירת בן משפחה אחר','Choose another family member')}</button></section>`;}
+function completion(){const text=shareText();return `<section class="jachnun-completion" tabindex="-1"><h4>${tr('איזה תיאבון!','What an appetite!')}</h4><div data-jachnun-score-entry>${scoreForm()}</div><p>${tr('משתפים את התוצאה','Share your result')}</p><div class="game-share-icons"><a class="game-share-icon game-share-whatsapp" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"><svg viewBox="0 0 24 24"><use href="assets/share-icons.svg#whatsapp"/></svg></a><a class="game-share-icon game-share-email" href="mailto:?subject=${encodeURIComponent(title())}&body=${encodeURIComponent(text)}" aria-label="${tr('מייל','Email')}"><svg viewBox="0 0 24 24"><use href="assets/share-icons.svg#email"/></svg></a><button type="button" class="game-share-icon game-share-messenger" data-jachnun-share aria-label="Messenger"><svg viewBox="0 0 24 24"><use href="assets/share-icons.svg#messenger"/></svg></button></div><p data-jachnun-share-status role="status"></p><textarea data-jachnun-share-fallback readonly hidden aria-label="${tr('תוצאה לשיתוף','Result to share')}"></textarea><button type="button" class="secondary-button" data-jachnun-settings>${tr('בחירת בן משפחה אחר','Choose another family member')}</button></section>`;}
 function render(){
   if(!host)return;
-  host.innerHTML=`<section class="family-jachnun"><button type="button" class="game-lobby-button" data-jachnun-back>${I.isEnglish?'←':'→'} ${tr('בחירת משחק','Choose a game')}</button>${state.phase==='setup'?setup():board()}</section>`;
+  host.innerHTML=`<section class="family-jachnun"><button type="button" class="game-lobby-button" data-jachnun-back>${I.isEnglish?'←':'→'} ${tr('חזרה ללוח בחירת המשחקים','Back to game selection')}</button>${state.phase==='setup'?setup():board()}</section>`;
   syncStart();drawHeads();draw();
 }
 function drawHeads(){for(const canvas of host?.querySelectorAll('[data-jachnun-head]')||[]){const ctx=canvas.getContext('2d');ctx.clearRect(0,0,160,160);if(head)ctx.drawImage(head,0,0);}}
@@ -100,15 +103,16 @@ function schedule(){stopClock();if(host&&state.phase==='playing'&&document.visib
 function tick(){
   clock=null;if(!host||state.phase!=='playing'||document.visibilityState==='hidden')return;
   const before=state.game.score;state.game=advanceSnake(state.game);state.phase=state.game.phase;
-  if(state.phase!=='playing'){render();$('[data-jachnun-overlay]')?.querySelector('button')?.focus({preventScroll:true});if(state.phase==='finished')$('.jachnun-completion')?.scrollIntoView({block:'nearest'});return;}
+  if(state.phase!=='playing'){if(state.phase==='finished'&&scoreRun)scoreRun.score=state.game.score;render();$('[data-jachnun-overlay]')?.querySelector('button')?.focus({preventScroll:true});if(state.phase==='finished'){$('.jachnun-completion')?.scrollIntoView({block:'nearest'});loadLeaderboard(true);}return;}
   if(state.game.score!==before){$('[data-jachnun-score]').textContent=String(state.game.score);$('[data-jachnun-status]').textContent=tr('עוד ג׳חנון! עכשיו יש ','Another jachnun! Your chain has ')+state.game.body.length+tr(' ראשים.',' heads.');}
   draw();schedule();
 }
-function begin(restart=false){if(!head)return;stopClock();if(restart)state.game=createSnake();state.phase='playing';state.game={...state.game,phase:'playing'};render();$('[data-jachnun-board]')?.focus({preventScroll:true});$('.jachnun-hud')?.scrollIntoView({block:'start'});schedule();}
+function begin(restart=false){if(!head)return;stopClock();if(restart){state.game=createSnake();scoreRun={id:crypto.randomUUID().replaceAll('-',''),name:'',headId:state.selected,score:null,busy:false,saved:false,error:'',rank:null};}state.phase='playing';state.game={...state.game,phase:'playing'};render();$('[data-jachnun-board]')?.focus({preventScroll:true});$('.jachnun-hud')?.scrollIntoView({block:'start'});schedule();}
 function pause(){if(state.phase!=='playing')return;stopClock();state.phase='paused';render();}
 function resume(){if(state.phase!=='paused')return;state.phase='playing';render();$('[data-jachnun-board]')?.focus({preventScroll:true});schedule();}
 function change(event){if(event.target.id!=='jachnunCharacter'||state.phase!=='setup')return;state.selected=event.target.value;state.error='';state.imageError='';head=null;render();loadHead();}
 function input(event){
+  if(event.target.id==='jachnunScoreName'&&state.phase==='finished'&&scoreRun&&!scoreRun.busy&&!scoreRun.saved){scoreRun.name=event.target.value;return;}
   if(state.phase!=='setup')return;
   if(event.target.id==='jachnunRequestName'){request.name=event.target.value;request.requestId=null;request.sent=false;request.error='';syncRequest();return;}
   if(event.target.id==='jachnunSearch'){state.query=event.target.value;$('#jachnunCharacter').innerHTML=options();return;}
@@ -124,6 +128,7 @@ function click(event){
   if(target.closest('[data-jachnun-settings]')){stopClock();state.phase='setup';render();return;}
   if(target.closest('[data-jachnun-retry]')){state.loaded=false;loadPeople();return;}
   if(target.closest('[data-jachnun-share]')){share();return;}
+  if(target.closest('[data-jachnun-scores-refresh]')){loadLeaderboard(true);return;}
   const direction=target.closest('[data-jachnun-direction]');if(direction&&state.phase==='playing'){state.game=turnSnake(state.game,direction.dataset.jachnunDirection);$('[data-jachnun-board]')?.focus({preventScroll:true});}
 }
 function keyboard(event){
@@ -144,12 +149,55 @@ async function share(){
   catch(error){if(error.name==='AbortError')return;const node=$('[data-jachnun-share-fallback]');if(node){node.hidden=false;node.value=text;node.focus();node.select();}}
 }
 
+function scoreForm(){
+  if(!scoreRun)return '';
+  const run=scoreRun;
+  if(run.saved)return `<p class="jachnun-score-saved" role="status">${tr('התוצאה נשמרה בטבלת השיאים! המקום שלכם: ','Your score is on the leaderboard! Your rank: ')}<strong>${run.rank}</strong></p>`;
+  return `<p>${tr('אכלתם ','You ate ')}<strong>${run.score??state.game.score}</strong>${tr(' ג׳חנונים עם הראש של ',' jachnun with ')}<strong>${safe(personName(person()))}</strong>.</p><form class="jachnun-score-form" data-jachnun-score-form><label for="jachnunScoreName">${tr('באיזה שם להיכנס לטבלת השיאים?','What name should appear on the leaderboard?')}</label><div class="jachnun-score-row"><input id="jachnunScoreName" name="name" type="text" dir="auto" autocomplete="name" maxlength="60" required value="${safe(run.name)}" ${run.busy?'disabled':''}><button type="submit" class="primary-button" ${run.busy?'disabled':''}>${run.busy?tr('שומרים…','Saving…'):tr('שמירת השיא שלי','Save my score')}</button></div><p class="game-error" role="alert">${safe(run.error)}</p></form>`;
+}
+function syncScore(){const node=$('[data-jachnun-score-entry]');if(node)node.innerHTML=scoreForm();}
+function scoreHead(id){
+  const prepared=PREPARED_HEADS.find(head=>head.id===id),p=window.FAMILY_DATA?.people?.[id];
+  if(!prepared||!p)return '';
+  const c=prepared.crop;
+  return `<span class="jachnun-score-character"><span class="jachnun-score-photo" aria-hidden="true"><img src="${safe(prepared.src)}" width="40" height="40" alt="" loading="lazy" style="object-position:${c.x*100}% ${c.y*100}%;transform:scale(${c.zoom});transform-origin:${c.x*100}% ${c.y*100}%"></span><span dir="auto">${safe(personName(p))}</span></span>`;
+}
+function leaderboardPanel(){return `<section class="jachnun-leaderboard" aria-labelledby="jachnunLeaderboardTitle" data-jachnun-leaderboard>${leaderboardContent()}</section>`;}
+function leaderboardContent(){
+  const rows=leaderboard.scores.map((entry,index)=>`<tr${entry.id===scoreRun?.id?' class="is-your-score"':''}><td>${index+1}</td><th scope="row" dir="auto">${safe(entry.name)}</th><td class="jachnun-score-count">${entry.score}</td><td>${scoreHead(entry.headId)}</td></tr>`).join('');
+  return `<div class="jachnun-leaderboard-heading"><div><span class="small-eyebrow">${tr('מי הכי רעב במשפחה?','Who’s the hungriest in the family?')}</span><h4 id="jachnunLeaderboardTitle">${tr('טבלת השיאים','Leaderboard')}</h4></div><button type="button" class="quiet-button" data-jachnun-scores-refresh ${leaderboard.loading?'disabled':''}>${leaderboard.loading?tr('טוענים…','Loading…'):tr('רענון','Refresh')}</button></div><p class="jachnun-leaderboard-note">${tr('20 התוצאות המובילות במשפחה. מסיימים משחק, מזינים שם ונכנסים לתחרות!','The family’s top 20 scores. Finish a game, enter your name and join the competition!')}</p>${leaderboard.error?`<p class="game-error" role="alert">${safe(leaderboard.error)}</p>`:''}${rows?`<div class="jachnun-scores-scroll"><table><caption class="visually-hidden">${tr('שמות השחקנים, מספר הג׳חנונים והראש שנבחר','Player names, jachnun eaten and chosen character')}</caption><thead><tr><th scope="col">${tr('מקום','Rank')}</th><th scope="col">${tr('שם','Name')}</th><th scope="col">${tr('ג׳חנונים','Jachnun')}</th><th scope="col">${tr('הראש שנבחר','Played with')}</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<p class="jachnun-scores-empty" role="status">${leaderboard.loading?tr('טוענים את השיאים המשפחתיים…','Loading family scores…'):leaderboard.loaded?tr('הטבלה מחכה לשיא הראשון שלכם!','The first spot is waiting for you!'):tr('לא ניתן להציג את השיאים כרגע. אפשר לנסות לרענן.','Scores are unavailable right now. Try refreshing.')}</p>`}`;
+}
+function syncLeaderboard(){const node=$('[data-jachnun-leaderboard]');if(node)node.innerHTML=leaderboardContent();}
+async function loadLeaderboard(force=false){
+  if(leaderboard.loading&&!force)return;
+  const serial=++leaderboard.serial;leaderboard.loading=true;leaderboard.error='';syncLeaderboard();
+  try{
+    const response=await I.fetch('api/games/jachnun/scores'),data=await response.json();
+    if(!response.ok||!Array.isArray(data.scores))throw Error();
+    if(serial!==leaderboard.serial)return;
+    leaderboard.scores=data.scores;leaderboard.loaded=true;
+  }catch{if(serial===leaderboard.serial)leaderboard.error=tr('לא ניתן לטעון את טבלת השיאים כרגע. נסו לרענן.','The leaderboard could not load. Try refreshing.');}
+  finally{if(serial===leaderboard.serial){leaderboard.loading=false;syncLeaderboard();}}
+}
+async function saveScore(event){
+  event.preventDefault();const run=scoreRun;
+  if(state.phase!=='finished'||!run||run.busy||run.saved)return;
+  const name=run.name.normalize('NFKC').trim().replace(/\s+/g,' ');
+  if(!name||name.length>60||/[\u0000-\u001f\u007f]/.test(name)){run.error=tr('יש להזין שם באורך של עד 60 תווים.','Enter a name using up to 60 characters.');syncScore();return;}
+  run.busy=true;run.error='';syncScore();
+  try{
+    const response=await I.fetch('api/games/jachnun/scores',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({requestId:run.id,name,score:run.score,headId:run.headId})}),data=await response.json();
+    if(!response.ok||data.saved!==true||!Array.isArray(data.scores))throw Error();
+    run.saved=true;run.rank=data.rank;leaderboard.serial++;leaderboard.scores=data.scores;leaderboard.loaded=true;leaderboard.loading=false;leaderboard.error='';
+  }catch{run.error=tr('התוצאה לא נשמרה כרגע. השם והתוצאה נשמרו כאן כדי שתוכלו לנסות שוב.','Your score could not be saved. Your name and score are kept here so you can try again.');}
+  finally{run.busy=false;if(host&&state.phase==='finished'&&scoreRun===run){syncScore();syncLeaderboard();}}
+}
 function lifeHeads(lives){return `<span class="jachnun-lives" role="img" aria-label="${lives} ${tr('פסילות נותרו','lives remaining')}">${Array.from({length:SNAKE_LIVES},(_,i)=>`<span class="jachnun-life${i>=lives?' is-lost':''}" aria-hidden="true">${headHTML()}</span>`).join('')}</span>`;}
-function requestLabel(){return request.busy?tr('שולחים בקשה…','Sending request…'):request.sent?tr('הבקשה נשלחה','Request sent'):tr('דרוש שהראש שלך יופיע','Request your head');}
-function requestForm(){return `<section class="jachnun-request"><h4>${tr('הראש שלי לא נמצא ברשימת הראשים?','Is my head missing from the list?')}</h4><p>${tr('ברשימה מופיעים רק ראשים שהוכנו מתמונות פנים ברורות ומתאימות. אם הראש שלכם חסר, הזינו את שמכם ושלחו בקשה. אלדד יקבל מייל עם השם שהזנתם ויוכל להכין ראש נוסף.','The list includes heads prepared from clear, suitable portraits. If yours is missing, enter your name and send a request. Eldad will receive an email with your name so he can prepare another head.')}</p><form data-jachnun-request-form><label for="jachnunRequestName">${tr('השם המלא שלך','Your full name')}</label><div class="jachnun-request-row"><input id="jachnunRequestName" name="name" type="text" dir="auto" autocomplete="name" minlength="2" maxlength="100" required value="${safe(request.name)}" ${request.busy?'disabled':''}><button class="primary-button" type="submit" data-jachnun-request-submit ${request.busy||request.sent?'disabled':''}>${requestLabel()}</button></div><p class="game-error" data-jachnun-request-error role="alert">${safe(request.error)}</p><p class="jachnun-request-success" data-jachnun-request-status role="status">${request.sent?tr('הבקשה נשלחה לאלדד עם השם שהזנתם. תודה!','Your request was sent to Eldad with the name you entered. Thank you!'):''}</p></form></section>`;}
-function syncRequest(){const button=$('[data-jachnun-request-submit]');if(button){button.disabled=request.busy||request.sent;button.textContent=requestLabel();}const error=$('[data-jachnun-request-error]'),status=$('[data-jachnun-request-status]');if(error)error.textContent=request.error;if(status)status.textContent=request.sent?tr('הבקשה נשלחה לאלדד עם השם שהזנתם. תודה!','Your request was sent to Eldad with the name you entered. Thank you!'):'';}
+function requestLabel(){return request.busy?tr('שולחים בקשה…','Sending request…'):tr('דרוש שהראש שלך יופיע','Request your head');}
+function requestForm(){return `<section class="jachnun-request"><h4>${tr('הראש שלי לא נמצא ברשימת הראשים?','Is my head missing from the list?')}</h4><p>${tr('ברשימה מופיעים רק ראשים שהוכנו מתמונות פנים ברורות ומתאימות. אם הראש שלכם חסר, הזינו את שמכם ושלחו בקשה. הבקשה תגיע אלינו במייל עם השם שהזנתם כדי שנוכל להכין ראש נוסף.','The list includes heads prepared from clear, suitable portraits. If yours is missing, enter your name and send a request. Your request will reach us by email with your name so we can prepare another head.')}</p><form data-jachnun-request-form><label for="jachnunRequestName">${tr('השם המלא שלכם','Your full name')}</label><div class="jachnun-request-row"><input id="jachnunRequestName" name="name" type="text" dir="auto" autocomplete="name" minlength="2" maxlength="100" required value="${safe(request.name)}" ${request.busy?'disabled':''}><button class="primary-button" type="submit" data-jachnun-request-submit ${request.busy?'disabled':''}>${requestLabel()}</button></div><p class="game-error" data-jachnun-request-error role="alert">${safe(request.error)}</p><p class="jachnun-request-success" data-jachnun-request-status role="status">${request.sent?tr('הבקשה נשלחה אלינו, תודה! אפשר להזין שם נוסף ולשלוח בקשה נוספת.','Your request was sent to us. Thank you! You can enter another name and send another request.'):''}</p></form></section>`;}
+function syncRequest(){const button=$('[data-jachnun-request-submit]');if(button){button.disabled=request.busy;button.textContent=requestLabel();}const error=$('[data-jachnun-request-error]'),status=$('[data-jachnun-request-status]');if(error)error.textContent=request.error;if(status)status.textContent=request.sent?tr('הבקשה נשלחה אלינו, תודה! אפשר להזין שם נוסף ולשלוח בקשה נוספת.','Your request was sent to us. Thank you! You can enter another name and send another request.'):'';}
 async function sendHeadRequest(event){
-  event.preventDefault();if(request.busy||request.sent)return;
+  event.preventDefault();if(request.busy)return;
   const name=request.name.trim();
   if(name.length<2||name.length>100||(name.match(/\p{L}/gu)||[]).length<2){request.error=tr('יש להזין שם מלא תקין באורך 2–100 תווים.','Enter your full name using 2–100 characters.');syncRequest();return;}
   request.requestId??=crypto.randomUUID().replaceAll('-','');request.busy=true;request.error='';render();
@@ -158,7 +206,7 @@ async function sendHeadRequest(event){
     const data=await response.json();
     if(!response.ok)throw Error(response.status===429?tr('כבר נשלחה בקשה לאחרונה. נסו שוב מאוחר יותר.','A request was sent recently. Please try again later.'):response.status===400?tr('יש להזין שם מלא תקין באורך 2–100 תווים.','Enter your full name using 2–100 characters.'):tr('לא ניתן לשלוח את הבקשה כרגע. נסו שוב מאוחר יותר.','Your request could not be sent right now. Please try again later.'));
     if(data.sent!==true)throw Error(tr('השליחה לא אושרה. נסו שוב.','Delivery was not confirmed. Please try again.'));
-    request.sent=true;
+    request.sent=true;request.name='';request.requestId=null;
   }catch(error){request.error=error instanceof Error?error.message:tr('לא ניתן לשלוח את הבקשה כרגע. נסו שוב מאוחר יותר.','Your request could not be sent right now. Please try again later.');}
-  finally{request.busy=false;if(host&&state.phase==='setup')render();}
+  finally{request.busy=false;if(host&&state.phase==='setup'){render();if(request.sent)$('#jachnunRequestName')?.focus({preventScroll:true});}}
 }

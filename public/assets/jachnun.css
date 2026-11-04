@@ -3,3 +3,30 @@
 
 /* The remaining attempts use the selected character's reviewed head. */
 .jachnun-lives{display:inline-flex;align-items:center;gap:5px;direction:ltr;flex:none}.jachnun-life{position:relative;display:inline-flex;width:35px;height:35px}.jachnun-life .jachnun-head{width:35px;height:35px;box-sizing:border-box;border-width:2px;border-color:#aaba8a;background:#e8e0c9;box-shadow:none}.jachnun-life.is-lost{opacity:.32;filter:grayscale(1)}.jachnun-life.is-lost::after{content:'';position:absolute;top:3px;bottom:3px;left:50%;width:2px;transform:rotate(45deg);background:#8b6753}.jachnun-request{margin:28px 0 0;padding:22px 24px;border:1px solid #dfd1b3;border-radius:13px;background:#faf7ec}.jachnun-request h4{font:27px/1.5 var(--serif);color:#65774d;margin:0 0 8px}.jachnun-request>p{font:14px/1.9 var(--sans);color:#8d7957;margin:0 0 15px;max-width:720px}.jachnun-request label{display:block;font:14px/1.8 var(--sans);color:#7c704f;margin-bottom:6px}.jachnun-request-row{display:flex;gap:10px;align-items:stretch}.jachnun-request input{flex:1;min-width:0;max-width:380px;min-height:45px;box-sizing:border-box;border:1px solid #d5c8aa;border-radius:7px;background:#fffdf8;color:#6f6248;padding:9px 12px;font:15px var(--sans)}.jachnun-request .primary-button{min-height:45px;font-size:14px}.jachnun-request-success{color:#697f4a;font:14px/1.9 var(--sans)}.jachnun-request-success:empty,.jachnun-request .game-error:empty{display:none}@media(max-width:700px){.jachnun-life,.jachnun-life .jachnun-head{width:30px;height:30px}.jachnun-lives{gap:3px}.jachnun-request{padding:18px 14px;margin-top:20px}.jachnun-request h4{font-size:24px}.jachnun-request>p{font-size:13px}.jachnun-request-row{flex-direction:column}.jachnun-request input{max-width:none}.jachnun-request .primary-button{align-self:stretch}}
+
+/* Shared family scores; loaded on entry, at game end, or by an explicit refresh. */
+.jachnun-leaderboard{margin:28px 0 0;padding:24px;border:1px solid #d9d0b4;border-radius:13px;background:#fffdf6}
+.jachnun-leaderboard-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.jachnun-leaderboard h4{font:32px/1.4 var(--serif);color:#63784a;margin:3px 0}
+.jachnun-leaderboard-note,.jachnun-scores-empty{font:14px/1.8 var(--sans);color:#887452;margin:9px 0 16px}
+.jachnun-scores-scroll{overflow-x:auto;max-width:100%}
+.jachnun-leaderboard table{width:100%;border-collapse:collapse;font:15px/1.6 var(--sans);text-align:start;color:#6f6248}
+.jachnun-leaderboard th,.jachnun-leaderboard td{padding:11px 12px;border-bottom:1px solid #eae3d0;text-align:start;overflow-wrap:anywhere}
+.jachnun-leaderboard thead th{color:#63784a;background:#eff1df;font-size:13px;font-weight:600;white-space:nowrap}
+.jachnun-leaderboard tbody th{max-width:220px;font-weight:500}
+.jachnun-leaderboard tr:last-child td,.jachnun-leaderboard tr:last-child th{border-bottom:0}
+.jachnun-leaderboard tbody tr:first-child{background:#fbf0d8}
+.jachnun-leaderboard .is-your-score{background:#edf2df;box-shadow:inset 3px 0 #92aa6d}
+.jachnun-score-count{font-weight:700;font-size:21px;font-variant-numeric:tabular-nums;color:#63784a}
+.jachnun-score-character{display:flex;align-items:center;gap:9px;font-size:13px;line-height:1.5}
+.jachnun-score-photo{display:inline-block;flex:none;width:40px;height:40px;overflow:hidden;border-radius:50%;border:2px solid #d7dfc3;background:#eee8d4}
+.jachnun-score-photo img{display:block;width:100%;height:100%;object-fit:cover}
+.jachnun-score-form{text-align:start;margin:18px 0 20px;padding-top:16px;border-top:1px solid #d5ddbf}
+.jachnun-score-form label{display:block;font:15px/1.7 var(--sans);color:#63784a;margin:0 0 7px}
+.jachnun-score-row{display:flex;gap:9px}
+.jachnun-score-row input{box-sizing:border-box;min-width:0;flex:1;width:100%;min-height:45px;border:1px solid #c5d0ac;border-radius:7px;background:#fffdf8;color:#6f6248;padding:9px 12px;font:16px var(--sans)}
+.jachnun-score-row .primary-button{flex:none;font-size:14px}
+.jachnun-score-form .game-error:empty{display:none}
+.jachnun-completion .jachnun-score-saved{color:#526f31;background:#e4edce;border-radius:8px;padding:12px;font-size:16px}
+.jachnun-request input:focus-visible,.jachnun-score-row input:focus-visible{outline:2px solid #819b58;outline-offset:3px}
+@media(max-width:700px){.jachnun-leaderboard{padding:18px 12px;margin-top:22px}.jachnun-leaderboard h4{font-size:28px}.jachnun-leaderboard th,.jachnun-leaderboard td{padding:10px 6px;font-size:13px}.jachnun-leaderboard thead th{font-size:11px}.jachnun-leaderboard tbody th{max-width:100px}.jachnun-leaderboard-note{font-size:12px}.jachnun-score-character{font-size:11px;gap:6px}.jachnun-score-photo{width:32px;height:32px}.jachnun-score-row{flex-direction:column}.jachnun-score-row .primary-button{min-height:44px}.jachnun-score-count{font-size:19px!important}}

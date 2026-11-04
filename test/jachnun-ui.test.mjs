@@ -6,14 +6,14 @@ import * as engine from '../public/assets/jachnun.mjs';
 import {PREPARED_HEADS} from '../public/assets/jachnun-heads.mjs';
 import {webcrypto} from 'node:crypto';
 const source=(await readFile(new URL('../public/assets/jachnun.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'').replace(/export function /g,'function ');
-function fixture({english=false,fail=false,manualImages=false,requestStatus=200}={}){
+function fixture({english=false,fail=false,manualImages=false,requestStatus=200,scoreStatus=200,scores=[]}={}){
   const events=new Map(),nodes=new Map(),images=[],timers=new Map(),requests=[],copied=[],turns=[],writes=[];let timerId=0,backs=0;
   const context=new Proxy({},{get:()=>()=>{}});
   const node=()=>({style:{},disabled:false,hidden:false,textContent:'',innerHTML:'',getContext:()=>context,querySelector:()=>({focus(){}}),focus(){},select(){},scrollIntoView(){}});
   const root={innerHTML:'',classList:{add(){},remove(){}},querySelector(selector){if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);},querySelectorAll:()=>[node(),node(),node()],addEventListener(type,fn){events.set(type,fn);}};
   const document={visibilityState:'visible',createElement:node,addEventListener(type,fn){events.set(type,fn);}};
   const people={yona:{id:'yona',name:'יונה נקאש',nameEn:'Yona Nakash'},eldad:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha'}};
-  const window={location:{origin:'https://family.test'},FAMILY_DATA:{people},FamilyApp:{getPersonSummary:id=>({...people[id],profile:'/cached/'+id})},FamilyI18n:{isEnglish:english,language:english?'en':'he',locale:english?'en-US':'he-IL',personName:p=>english?p.nameEn:p.name,error:String,fetch:async (path,options)=>{requests.push(path);if(options?.method==='POST'){writes.push(JSON.parse(options.body));return Response.json(requestStatus===200?{sent:true}:{error:'failed'},{status:requestStatus});}if(fail)throw Error('Offline');return Response.json({people:{yona:{profile:'/media/yona'},eldad:{profile:'/media/eldad'}}});}}};
+  const window={location:{origin:'https://family.test'},FAMILY_DATA:{people},FamilyApp:{getPersonSummary:id=>({...people[id],profile:'/cached/'+id})},FamilyI18n:{isEnglish:english,language:english?'en':'he',locale:english?'en-US':'he-IL',personName:p=>english?p.nameEn:p.name,error:String,fetch:async (path,options)=>{requests.push(path);if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push(body);if(path.endsWith('/scores'))return Response.json(scoreStatus===200?{saved:true,id:body.requestId,rank:1,scores:[{id:body.requestId,name:body.name,score:body.score,headId:body.headId}],limit:20}:{error:'failed'},{status:scoreStatus});return Response.json(requestStatus===200?{sent:true}:{error:'failed'},{status:requestStatus});}if(fail)throw Error('Offline');if(path.endsWith('/scores'))return Response.json({scores,limit:20});return Response.json({people:{yona:{profile:'/media/yona'},eldad:{profile:'/media/eldad'}}});}}};
   class Image{constructor(){this.naturalWidth=414;this.naturalHeight=444;images.push(this);}set src(value){this.url=value;if(!manualImages)queueMicrotask(()=>this.onload());}}
   vm.runInNewContext(source+'\nwindow.test={mountJachnun,pauseJachnun};',{...engine,PREPARED_HEADS,crypto:webcrypto,turnSnake(state,direction){turns.push(direction);return engine.turnSnake(state,direction);},window,document,Image,Response,AbortController,URL,navigator:{clipboard:{async writeText(v){copied.push(v);}}},setTimeout(fn){const id=++timerId;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}});
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
@@ -22,7 +22,7 @@ function fixture({english=false,fail=false,manualImages=false,requestStatus=200}
 }
 test('both languages select Grandma Yona by default, use her real portrait, and wait for the head before playing',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,manualImages:true});f.mount();await f.flush();assert.match(f.html,english?/Catch the Jachnun/:/תפוס תג׳חנון/);assert.match(f.html,/<option value="yona" selected>/);assert.match(f.html,english?/Grandma Yona/:/סבתא יונה/);assert.deepEqual(f.requests,[]);assert.equal(f.images[0].url,PREPARED_HEADS.find(h=>h.id==='yona').src);assert.equal(f.nodes.get('[data-jachnun-start]').disabled,true);
+    const f=fixture({english,manualImages:true});f.mount();await f.flush();assert.match(f.html,english?/Catch the Jachnun/:/תפוס תג׳חנון/);assert.match(f.html,/<option value="yona" selected>/);assert.match(f.html,english?/Grandma Yona/:/סבתא יונה/);assert.deepEqual(f.requests,['api/games/jachnun/scores']);assert.equal(f.images[0].url,PREPARED_HEADS.find(h=>h.id==='yona').src);assert.equal(f.nodes.get('[data-jachnun-start]').disabled,true);
     await f.click('[data-jachnun-start]');assert.equal(f.timers.size,0);f.load();assert.equal(f.nodes.get('[data-jachnun-start]').disabled,false);await f.click('[data-jachnun-start]');assert.equal(f.timers.size,1);assert.equal((f.html.match(/class="jachnun-life"/g)||[]).length,3);assert.doesNotMatch(f.html,/♥|♡/);assert.match(f.html,/data-jachnun-direction="up"/);
   }
 });
@@ -40,7 +40,7 @@ test('space, tab visibility and leaving the games stop movement until an explici
   f.window.test.pauseJachnun();assert.equal(f.timers.size,0);f.mount();await f.flush();assert.match(f.html,/רגע לנשום/);assert.equal(f.timers.size,0);await f.click('[data-jachnun-back]');assert.equal(f.backs,1);assert.equal(f.timers.size,0);
 });
 test('profile changes and unavailable live media never replace the reviewed, fixed head snapshots',async()=>{
-  const f=fixture({fail:true});f.mount();await f.flush();assert.equal(f.images[0].url,PREPARED_HEADS.find(h=>h.id==='yona').src);assert.equal(f.nodes.get('[data-jachnun-start]').disabled,false);assert.deepEqual(f.requests,[]);
+  const f=fixture({fail:true});f.mount();await f.flush();assert.equal(f.images[0].url,PREPARED_HEADS.find(h=>h.id==='yona').src);assert.equal(f.nodes.get('[data-jachnun-start]').disabled,false);assert.deepEqual(f.requests,['api/games/jachnun/scores']);
 });
 
 test('phone swipes and direction buttons steer without moving for taps or cancelled gestures',async()=>{
@@ -57,12 +57,63 @@ test('phone swipes and direction buttons steer without moving for taps or cancel
 test('the head request explains missing heads, requires a name and sends only an explicit request',async()=>{
   for(const english of [false,true]){
     const f=fixture({english});f.mount();await f.flush();assert.match(f.html,english?/Is my head missing from the list/:/הראש שלי לא נמצא ברשימת הראשים/);assert.match(f.html,/id="jachnunRequestName"[^>]*required/);assert.match(f.html,english?/Request your head/:/דרוש שהראש שלך יופיע/);
-    const submit=()=>f.events.get('submit')({preventDefault(){},target:{matches:()=>true}});
+    const submit=()=>f.events.get('submit')({preventDefault(){},target:{matches:selector=>selector==='[data-jachnun-request-form]'}});
     submit();await f.flush();assert.equal(f.writes.length,0);
-    f.events.get('input')({target:{id:'jachnunRequestName',value:'אלדד קהא'}});submit();submit();await f.flush();assert.equal(f.writes.length,1);assert.equal(f.requests[0],'api/games/jachnun/head-request');assert.equal(f.writes[0].name,'אלדד קהא');assert.equal(f.writes[0].language,english?'en':'he');assert.match(f.writes[0].requestId,/^[a-f0-9]{32}$/);assert.match(f.html,english?/Your request was sent to Eldad/:/הבקשה נשלחה לאלדד/);submit();await f.flush();assert.equal(f.writes.length,1);
+    f.events.get('input')({target:{id:'jachnunRequestName',value:'אלדד קהא'}});submit();submit();await f.flush();assert.equal(f.writes.length,1);assert.equal(f.requests.at(-1),'api/games/jachnun/head-request');assert.equal(f.writes[0].name,'אלדד קהא');assert.equal(f.writes[0].language,english?'en':'he');assert.match(f.writes[0].requestId,/^[a-f0-9]{32}$/);assert.match(f.html,english?/Your request was sent to us/:/הבקשה נשלחה אלינו/);submit();await f.flush();assert.equal(f.writes.length,1);
   }
 });
 test('mail delivery errors never display success and preserve the name and id for a safe retry',async()=>{
   const f=fixture({requestStatus:503});f.mount();await f.flush();f.events.get('input')({target:{id:'jachnunRequestName',value:'Eldad Keha'}});
-  const submit=()=>f.events.get('submit')({preventDefault(){},target:{matches:()=>true}});submit();await f.flush();assert.match(f.html,/לא ניתן לשלוח/);assert.doesNotMatch(f.html,/הבקשה נשלחה לאלדד/);assert.match(f.html,/value="Eldad Keha"/);submit();await f.flush();assert.equal(f.writes.length,2);assert.equal(f.writes[0].requestId,f.writes[1].requestId);
+  const submit=()=>f.events.get('submit')({preventDefault(){},target:{matches:selector=>selector==='[data-jachnun-request-form]'}});submit();await f.flush();assert.match(f.html,/לא ניתן לשלוח/);assert.doesNotMatch(f.html,/הבקשה נשלחה אלינו/);assert.match(f.html,/value="Eldad Keha"/);submit();await f.flush();assert.equal(f.writes.length,2);assert.equal(f.writes[0].requestId,f.writes[1].requestId);
+});
+
+test('successful head requests clear the name, address us in the plural and immediately accept another request',async()=>{
+  for(const english of [false,true]){
+    const f=fixture({english});f.mount();await f.flush();
+    const submit=()=>f.events.get('submit')({preventDefault(){},target:{matches:selector=>selector==='[data-jachnun-request-form]'}});
+    assert.doesNotMatch(f.html,/Eldad will receive|אלדד יקבל/);
+    f.events.get('input')({target:{id:'jachnunRequestName',value:'אלדד קהא'}});submit();await f.flush();
+    assert.match(f.html,/id="jachnunRequestName"[^>]*value=""/);assert.equal(f.nodes.get('[data-jachnun-request-submit]').disabled,false);
+    assert.match(f.html,english?/Your request was sent to us/:/הבקשה נשלחה אלינו/);
+    f.events.get('input')({target:{id:'jachnunRequestName',value:'רותי חריזי'}});submit();await f.flush();
+    assert.equal(f.writes.length,2);assert.equal(f.writes[1].name,'רותי חריזי');assert.notEqual(f.writes[0].requestId,f.writes[1].requestId);
+    assert.match(f.html,/id="jachnunRequestName"[^>]*value=""/);
+  }
+});
+
+async function finishGame(f){
+  await f.click('[data-jachnun-start]');
+  for(let life=2;life>=0;life--){for(let i=0;i<18&&f.timers.size;i++)f.tick();if(life)await f.click('[data-jachnun-continue]');}
+  await f.flush();
+}
+const submitScore=f=>f.events.get('submit')({preventDefault(){},target:{matches:selector=>selector==='[data-jachnun-score-form]'}});
+
+test('finished games save the entered name, actual food count and chosen head once in either language',async()=>{
+  for(const english of [false,true]){
+    const f=fixture({english});f.mount();await f.flush();await f.select('eldad');
+    assert.doesNotMatch(f.html,/data-jachnun-score-form/);submitScore(f);await f.flush();assert.equal(f.writes.length,0);
+    await finishGame(f);assert.match(f.html,/data-jachnun-score-form/);
+    const score=Number(f.html.match(/<strong>(\d+)<\/strong>/)[1]);
+    f.events.get('input')({target:{id:'jachnunScoreName',value:'  Hungry Player  '}});submitScore(f);submitScore(f);await f.flush();
+    assert.equal(f.writes.length,1);assert.equal(f.writes[0].name,'Hungry Player');assert.equal(f.writes[0].score,score);assert.equal(f.writes[0].headId,'eldad');assert.match(f.writes[0].requestId,/^[a-f0-9]{32}$/);
+    assert.match(f.nodes.get('[data-jachnun-score-entry]').innerHTML,english?/Your score is on the leaderboard/:/התוצאה נשמרה בטבלת השיאים/);
+    const table=f.nodes.get('[data-jachnun-leaderboard]').innerHTML;assert.match(table,/Hungry Player/);assert.match(table,english?/Eldad Keha/:/אלדד קהא/);assert.match(table,/assets\/games\/heads\/eldad.jpg/);
+    submitScore(f);await f.flush();assert.equal(f.writes.length,1);
+    await f.click('[data-jachnun-restart]');assert.doesNotMatch(f.html,/data-jachnun-score-form/);assert.equal(f.timers.size,1);
+  }
+});
+
+test('failed score saves retain the entered name and run identifier for an idempotent retry',async()=>{
+  const f=fixture({scoreStatus:503});f.mount();await f.flush();await finishGame(f);
+  submitScore(f);await f.flush();assert.equal(f.writes.length,0);
+  f.events.get('input')({target:{id:'jachnunScoreName',value:'Player One'}});submitScore(f);await f.flush();
+  let form=f.nodes.get('[data-jachnun-score-entry]').innerHTML;assert.match(form,/value="Player One"/);assert.match(form,/התוצאה לא נשמרה/);assert.doesNotMatch(form,/התוצאה נשמרה בטבלת השיאים/);
+  submitScore(f);await f.flush();assert.equal(f.writes.length,2);assert.equal(f.writes[0].requestId,f.writes[1].requestId);
+});
+
+test('leaderboards show escaped player names and fixed character portraits without requesting live profile media',async()=>{
+  const f=fixture({scores:[{id:'1'.repeat(32),name:'<img src=x onerror=alert(1)>',score:12,headId:'yona'}]});f.mount();await f.flush();
+  const table=f.nodes.get('[data-jachnun-leaderboard]').innerHTML;
+  assert.match(table,/&lt;img src=x onerror=alert\(1\)&gt;/);assert.doesNotMatch(table,/<img src=x/);assert.match(table,/assets\/games\/heads\/yona.png/);
+  assert.deepEqual(f.requests,['api/games/jachnun/scores']);assert.equal(f.writes.length,0);
 });

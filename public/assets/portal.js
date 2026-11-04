@@ -211,6 +211,7 @@
     if(files.length){event.preventDefault();addFiles('photos',files,true);}
   }
   function openBirthday(id,mode='birth') {
+    if(mode!=='death')return;
     if(!canSave())return;state.birthdayId=id;state.dateMode=mode;
     $('birthdayTitle').textContent=I18n.t(mode==='death'?'עדכון תאריך פטירה':'עדכון יום הולדת');
     const value=mode==='death'?(app().getPerson(id).deathDate||''):app().birthdayOf(id),parts=window.FamilyDates.parse(value),known=parts&&parts.year!==1111;
@@ -222,6 +223,7 @@
   function birthdayValue(){return `${$('birthDay').value}.${$('birthMonth').value}.${$('birthYear').value}`;}
   function previewBirthday(){if(state.dateMode==='death'){$('birthdayPreview').textContent='';return;}const age=window.FamilyDates.age(birthdayValue());$('birthdayPreview').textContent=age===null?'':I18n.html`הגיל שיופיע בכרטיס: (${age})`;}
   async function saveBirthday(event,clear=false){
+    if(state.dateMode!=='death'){event.preventDefault();return;}
     event.preventDefault();const button=$('saveBirthday');button.disabled=true;$('birthdayError').textContent='';
     try{const death=state.dateMode==='death',result=await jsonPost('api/people/'+encodeURIComponent(state.birthdayId)+(death?'/death-date':'/birthday'),death?{date:clear?'':birthdayValue(),expectedDate:state.birthdayExpected}:{birthday:clear?'':birthdayValue(),expectedBirthday:state.birthdayExpected});app().updatePerson(state.birthdayId,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id:state.birthdayId}}));$('birthdayDialog').close();notify(I18n.t(death?'תאריך הפטירה עודכן ✓':'יום ההולדת עודכן ✓'));}
     catch(error){$('birthdayError').textContent=error.message;}finally{button.disabled=false;}
@@ -274,7 +276,6 @@
       const pager=event.target.closest('[data-gallery-next],[data-gallery-prev]');if(pager){if(pager.disabled)return;galleryPage.page=Math.max(1,galleryPage.page+(pager.hasAttribute('data-gallery-next')?1:-1));refreshCollection('gallery',true).then(()=>$('sharedGalleryGrid').scrollIntoView({block:'start',behavior:'instant'}));return;}
       const close=event.target.closest('[data-close-dialog]');if(close){$(close.dataset.closeDialog).close();return;}
       const death=event.target.closest('[data-edit-death]');if(death){openBirthday(death.dataset.editDeath,'death');return;}
-      const birthday=event.target.closest('[data-edit-birthday]');if(birthday){openBirthday(birthday.dataset.editBirthday);return;}
       const upload=event.target.closest('[data-upload-collection]');if(upload){if(!canSave())return;const input=$({videos:'sharedVideosInput',photos:'sharedPhotosInput',gallery:'sharedGalleryInput'}[upload.dataset.uploadCollection]);input.value='';input.click();return;}
       const camera=event.target.closest('[data-camera-collection]');if(camera){if(!canSave())return;const input=$(camera.dataset.cameraCollection==='videos'?'sharedVideosCamera':'sharedPhotosCamera');input.value='';input.click();return;}
       const save=event.target.closest('[data-save-shared]');if(save){saveCaption(captionKey(save.dataset.sharedKind,save.dataset.saveShared));return;}

@@ -149,6 +149,11 @@ export default {
       }
       if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);
       if(path==='/api/games/jachnun/head-request')return await headRequestRoute(request,env);
+      if(path==='/api/games/jachnun/scores'){
+        if(request.method==='GET')return json(await db('game.jachnun.scores'));
+        if(request.method==='POST')return json(await db('game.jachnun.score.add',await readJSON(request,4096)));
+        throw new HttpError(405,'הפעולה אינה נתמכת.');
+      }
       if(path==='/family-data.js'&&request.method==='GET'){
         let people={},dataAvailable=true;
         try{people=Object.fromEntries((await db('dates')).people.map(p=>[p.id,p]));}catch{dataAvailable=false;}
@@ -227,11 +232,11 @@ export default {
         }
         if((match=/^\/api\/people\/([^/]+)\/(photos|videos|documents|about|biography|caption|profile|birthday|death-date)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2];
+          if(action==='birthday')throw new HttpError(403,'תאריכי הלידה מעודכנים דרך מנהלי האתר בלבד.','BIRTHDAY_READ_ONLY');
           if(['photos','videos','documents'].includes(action))return await upload(request,env,db,ctx,{category:'personal',personId:id,mediaType:{photos:'photo',videos:'video',documents:'document'}[action]});
           const body=await readJSON(request,40000);
           if(action==='about')return json(await db('person.about',{id,about:body.about,expectedAbout:body.expectedAbout,language:body.language}));
           if(action==='biography')return json(await db('person.biography',{id,section:body.section,value:body.value,expectedValue:body.expectedValue,language:body.language}));
-          if(action==='birthday')return json(await db('birthday',{id,birthday:body.birthday,expectedBirthday:body.expectedBirthday}));
           if(action==='death-date')return json(await db('death.date',{id,date:body.date,expectedDate:body.expectedDate}));
           if(action==='profile')return json(await db('profile',{id,file:body.file}));
           return json(await db('media.caption',{personId:id,file:body.file,caption:body.caption}));

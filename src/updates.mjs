@@ -6,7 +6,7 @@ const token=()=>crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().repla
 const hex=value=>Array.from(value,b=>b.toString(16).padStart(2,'0')).join('');
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const langs=new Set(['he','en-US','en-GB']);
-export const HEAD_REQUEST_RECIPIENT='eldakeha@gmail.com';
+export const HEAD_REQUEST_RECIPIENT='eldadkeha@gmail.com';
 export function headRequestName(value){
   if(typeof value!=='string'||/[\u0000-\u001f\u007f]/.test(value))throw new HttpError(400,'יש להזין שם מלא תקין.');
   const name=value.normalize('NFKC').trim().replace(/\s+/g,' ');
@@ -156,13 +156,13 @@ export class FamilyUpdates {
     const name=headRequestName(p.name);
     if(typeof p.requestId!=='string'||!/^[a-f0-9]{32}$/.test(p.requestId))throw new HttpError(400,'יש לרענן את הטופס ולנסות שוב.');
     const language=langs.has(p.language)?p.language:'he',now=Date.now();
-    const fingerprint=await this.digest('head-name:'+name.toLocaleLowerCase()),id='head-request/'+p.requestId+'/'+fingerprint;
+    const fingerprint=await this.digest('head-name:'+HEAD_REQUEST_RECIPIENT+':'+name.toLocaleLowerCase()),id='head-request/'+p.requestId+'/'+fingerprint;
     const existing=this.rows('SELECT * FROM mail_requests WHERE id=?',id)[0];
     if(existing?.status==='sent')return {sent:true};
     if(!existing){
       const ip=await this.digest('head-ip:'+p.ip);
       this.tx(()=>{
-        for(const [key,limit,span] of [['head-ip:'+ip,3,3600000],['head-name:'+fingerprint,1,3600000],['head-all',30,86400000]])
+        for(const [key,limit,span] of [['head-ip:'+ip,12,3600000],['head-name:'+fingerprint,5,3600000],['head-all',30,86400000]])
           if(!this.rate(key,limit,span,now))throw new HttpError(429,'כבר נשלחה בקשה לאחרונה. נסו שוב מאוחר יותר.');
       });
     }

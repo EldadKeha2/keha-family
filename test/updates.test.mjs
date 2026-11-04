@@ -174,9 +174,9 @@ test('head requests require a valid name and cannot change the fixed recipient o
     for(const name of ['', '1', 'A', null, 'A\nB', 'a'.repeat(101)]){const r=await f.call(path,{name,requestId});assert.equal(r.status,400,await r.clone().text());}
     assert.equal(f.messages.length,0);assert.equal((await f.call(path)).status,405);
     const result=await f.call(path,{name:'  אלדד   קהא  ',language:'he',requestId,to:'attacker@example.com'});assert.equal(result.status,200,await result.clone().text());assert.deepEqual(await result.json(),{sent:true});
-    const message=f.messages[0].body;assert.equal(message.to[0].email,HEAD_REQUEST_RECIPIENT);assert.equal(message.to[0].email,'eldakeha@gmail.com');assert.match(message.subject,/תפוס תג׳חנון/);assert.match(message.textContent,/אלדד קהא/);assert.equal(f.db.exec('SELECT count(*) AS n FROM subscribers').toArray()[0].n,0);
+    const message=f.messages[0].body;assert.equal(message.to[0].email,HEAD_REQUEST_RECIPIENT);assert.equal(message.to[0].email,'eldadkeha@gmail.com');assert.match(message.subject,/תפוס תג׳חנון/);assert.match(message.textContent,/אלדד קהא/);assert.equal(f.db.exec('SELECT count(*) AS n FROM subscribers').toArray()[0].n,0);
     assert.equal((await f.call(path,{name:'אלדד קהא',requestId})).status,200);assert.equal(f.messages.length,1);
-    assert.equal((await f.call(path,{name:'אלדד קהא',requestId:'2'.repeat(32)})).status,429);assert.equal(f.messages.length,1);
+    assert.equal((await f.call(path,{name:'אלדד קהא',requestId:'2'.repeat(32)})).status,200);assert.equal(f.messages.length,2);
   }finally{f.close();}
 });
 test('head requests retain origin and token protection and safely escape the submitted name',async()=>{
@@ -185,7 +185,7 @@ test('head requests retain origin and token protection and safely escape the sub
     assert.equal((await f.call(path,body,{Origin:'https://other.example'})).status,403);
     assert.equal((await f.call(path,body,{'X-Family-Token':'wrong'})).status,403);
     assert.equal(f.messages.length,0);const r=await f.call(path,body);assert.equal(r.status,200);
-    const message=f.messages[0].body;assert.deepEqual(message.to,['eldakeha@gmail.com']);assert.match(message.subject,/Catch the Jachnun/);assert.match(message.html,/&lt;b&gt;Dan&lt;\/b&gt;/);assert.doesNotMatch(message.html,/<b>Dan<\/b>/);assert.match(message.text,/<b>Dan<\/b>/);
+    const message=f.messages[0].body;assert.deepEqual(message.to,['eldadkeha@gmail.com']);assert.match(message.subject,/Catch the Jachnun/);assert.match(message.html,/&lt;b&gt;Dan&lt;\/b&gt;/);assert.doesNotMatch(message.html,/<b>Dan<\/b>/);assert.match(message.text,/<b>Dan<\/b>/);
   }finally{f.close();}
 });
 test('head requests enforce small rate limits and never report a failed provider send as success',async()=>{
@@ -193,8 +193,8 @@ test('head requests enforce small rate limits and never report a failed provider
   try{
     f.fail(true);const body={name:'Test Person',language:'en-GB',requestId:'4'.repeat(32)},failed=await f.call(path,body);assert.equal(failed.status,503);assert.notEqual((await failed.json()).sent,true);
     const key=f.messages[0].body.headers.idempotencyKey;f.fail(false);assert.equal((await f.call(path,body)).status,200);assert.equal(f.messages[1].body.headers.idempotencyKey,key);assert.equal((await f.call(path,body)).status,200);assert.equal(f.messages.length,2);
-    for(const [name,id]of [['Another Name','5'],['Third Name','6']])assert.equal((await f.call(path,{name,requestId:id.repeat(32)})).status,200);
-    assert.equal((await f.call(path,{name:'Fourth Name',requestId:'7'.repeat(32)})).status,429);assert.equal(f.messages.length,4);
+    for(let n=1;n<=11;n++)assert.equal((await f.call(path,{name:'Another Person '+n,requestId:(n+10).toString(16).padStart(32,'0')})).status,200);
+    assert.equal((await f.call(path,{name:'Over Limit',requestId:'7'.repeat(32)})).status,429);assert.equal(f.messages.length,13);
     delete f.env.BREVO_API_KEY;const unconfigured=await f.call(path,{name:'Fifth Name',requestId:'8'.repeat(32)});assert.equal(unconfigured.status,503);assert.notEqual((await unconfigured.json()).sent,true);
   }finally{f.close();}
 });

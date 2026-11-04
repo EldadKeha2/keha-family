@@ -121,9 +121,22 @@
       }
       const draft=drafts.get(draftKey(key,item.file)),area=card.querySelector('textarea');
       if(area&&area!==document.activeElement)area.value=draft?.dirty?draft.value:item.caption||'';
-      cards.push(card);
+      card.dataset.mediaKind=item.kind;cards.push(card);
     }
-    if(!items.length&&collection.items.length){const previous=grid.querySelector('.no-content-match');cards.push(previous||Object.assign(document.createElement('p'),{className:'no-content-match',textContent:I18n.t('לא נמצאו זיכרונות בבחירה הזו. נסו לשנות את הסינון או את החיפוש.')}));}
+    if(key==='nostalgia'){
+      const groups=[],kinds=filter==='all'?['photo','video','document']:[filter];
+      const labels={photo:I18n.t('תמונות נוסטלגיות'),video:I18n.t('סרטוני נוסטלגיה'),document:I18n.t('מסמכים מהעבר')};
+      const actions={photo:I18n.t('＋ העלאת תמונות'),video:I18n.t('＋ העלאת סרטונים'),document:I18n.t('＋ העלאת מסמכים')};
+      for(const kind of kinds){
+        const kindCards=cards.filter(card=>card.dataset.mediaKind===kind);
+        const heading=grid.querySelector('[data-nostalgia-kind="'+kind+'"]')||document.createElement('header');
+        heading.className='nostalgia-media-heading';heading.dataset.nostalgiaKind=kind;
+        heading.innerHTML=`<h4>${labels[kind]} <span>(${kindCards.length})</span></h4><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="${kind}">${actions[kind]}</button>`;
+        groups.push(heading,...kindCards);
+        if(!kindCards.length){const empty=grid.querySelector('[data-nostalgia-empty="'+kind+'"]')||document.createElement('p');empty.className='nostalgia-kind-empty';empty.dataset.nostalgiaEmpty=kind;empty.textContent=I18n.t(query?'לא נמצאו זיכרונות מהסוג הזה בחיפוש.':'כאן יש מקום לזיכרונות שלכם. הוסיפו את הראשון!');groups.push(empty);}
+      }
+      cards.splice(0,cards.length,...groups);
+    }else if(!items.length&&collection.items.length){const previous=grid.querySelector('.no-content-match');cards.push(previous||Object.assign(document.createElement('p'),{className:'no-content-match',textContent:I18n.t('לא נמצאו זיכרונות בבחירה הזו. נסו לשנות את הסינון או את החיפוש.')}));}
     // Insert only new cards; do not detach playing videos during a background refresh.
     const active=document.activeElement,selection=active?.dataset?.archiveCaption?[active.selectionStart,active.selectionEnd]:null;
     const wanted=new Set(cards);for(const child of [...grid.children])if(!wanted.has(child))child.remove();
@@ -131,7 +144,7 @@
     grid.dataset.scope=key;
     window.FamilyTags.refresh(grid,items);
     if(selection&&grid.contains(active)){active.focus({preventScroll:true});active.setSelectionRange(...selection);}
-    const nostalgia=key==='nostalgia',empty=$(nostalgia?'nostalgiaEmpty':'weddingMediaEmpty');empty.hidden=collection.items.length>0;
+    const nostalgia=key==='nostalgia',empty=$(nostalgia?'nostalgiaEmpty':'weddingMediaEmpty');empty.hidden=nostalgia||collection.items.length>0;
     $(nostalgia?'nostalgiaCount':'weddingMediaCount').textContent=I18n.html`${items.length}${items.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?I18n.word(items.length,'memory','memories'):I18n.t('זיכרונות')}`;
     $(nostalgia?'nostalgiaFilters':'weddingMediaFilters').querySelectorAll('[data-archive-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.archiveFilter===filter)));
     updateUploadUI(key);
@@ -248,7 +261,7 @@
       if(event.target.closest('[data-wedding-back]')){openWedding(null);return;}
       const date=event.target.closest('[data-edit-wedding-date]');if(date){openDate(date.dataset.editWeddingDate);return;}
       if(event.target.closest('#editWeddingDate')){openDate(state.weddingId);return;}
-      const upload=event.target.closest('[data-archive-upload]');if(upload){if(!canSave())return;const key=scope();if(!key)return;const input=$(prefix(key)+'UploadInput');input.dataset.scope=key;input.value='';input.click();return;}
+      const upload=event.target.closest('[data-archive-upload]');if(upload){if(!canSave())return;const key=scope();if(!key)return;const input=$(prefix(key)+'UploadInput');const kind=upload.dataset.archiveKind;input.accept=kind==='photo'?'image/jpeg,image/png,image/webp,image/gif,image/avif':kind==='video'?'video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm':kind==='document'?'.pdf,.doc,.docx,.txt,.md':'image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm,.pdf,.doc,.docx,.txt,.md';input.dataset.scope=key;input.value='';input.click();return;}
       const filter=event.target.closest('[data-archive-filter]');if(filter){const key=scope();if(key){filters.set(key,filter.dataset.archiveFilter);renderCollection(key);}return;}
       const save=event.target.closest('[data-save-archive-caption]');if(save){saveCaption(draftKey(save.dataset.archiveScope,save.dataset.saveArchiveCaption));return;}
       const photo=event.target.closest('[data-archive-photo]');if(photo){const key=scope(),items=(collections.get(key)?.items||[]).filter(item=>item.kind==='photo');app().openSharedGallery(items,items.findIndex(item=>item.file===photo.dataset.archivePhoto));}

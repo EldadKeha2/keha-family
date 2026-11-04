@@ -1,6 +1,6 @@
 # Catch the Jachnun: prepared heads
 
-Reviewed on 4 November 2026. The game uses fixed copies of selected profile photographs with individual crop coordinates. Live profile changes or deletions do not alter these copies. Only the selected character’s photo is loaded; the chain and life markers reuse the same in-memory crop.
+Reviewed on 4 November 2026. The game uses fixed copies of selected profile photographs with individual crop coordinates. Live profile changes or deletions do not alter these copies. The chain and life markers reuse the selected character’s in-memory crop; leaderboard thumbnails reuse the same fixed snapshots.
 
 The photographs are copied byte for byte. Cropping is performed by the game canvas, using `public/assets/jachnun-heads.mjs`. New or replacement heads require an intentional update to that list and its matching asset.
 
@@ -26,4 +26,8 @@ The photographs are copied byte for byte. Cropping is performed by the game canv
 | yarden | /media/d91889e75b1443788a996c5281cd713f | yarden.png |
 | yona | /media/1c4f834f75894fa198b9d5477d495b13 | yona.png |
 
-Head requests require a name and are sent through the existing transactional mail provider to `eldakeha@gmail.com`. The server fixes the recipient, validates the name, deduplicates retries and limits request volume. The form reports success only after the provider accepts the message. Requests do not create mailing-list subscriptions.
+Head requests require a name and are sent through the existing transactional mail provider to `eldadkeha@gmail.com`. The server fixes the recipient, validates the name, deduplicates retries and limits request volume. The form reports success only after the provider accepts the message. Requests do not create mailing-list subscriptions.
+
+After a successful head request, the name field clears and a plural confirmation appears. A new name can be submitted immediately; failed sends preserve the name and request identifier for a safe retry.
+
+The shared leaderboard stores one named result per game in the existing FamilyState SQLite store, together with the number of jachnun eaten and the prepared character ID. The top twenty results are sorted by score, with a stable chronological order for ties. Loading occurs on game entry, game completion or an explicit refresh; no score requests are made on game ticks.
