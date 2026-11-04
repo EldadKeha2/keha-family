@@ -52,3 +52,11 @@ html[dir=rtl] .tree-guide-countdown{transform-origin:right}
 @media(min-width:1101px){body[data-active-view=tree] .tree-help-inline{font-size:14px;line-height:1.7}}
 @media(max-width:700px){.tree-guide-card{padding:13px 20px 17px}.tree-guide-card p{font-size:17px}.tree-guide-eyebrow{font-size:11px}}
 @media(prefers-reduced-motion:reduce){.tree-guide-card,.tree-guide-arrow-line,.tree-guide-target,.tree-guide-countdown{animation:none}.tree-guide-countdown{display:none}}
+
+/* Keep the desktop introduction on the right, using the family fez icon. */
+.tree-guide-fez{display:none}
+@media(min-width:701px){
+  .tree-guide-card,.tree-guide-card p,.tree-guide-card .tree-guide-eyebrow{text-align:right}
+  .tree-guide-card p{margin-right:0;margin-left:auto}
+  .tree-guide-fez{display:inline-block;width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-inline-end:7px}
+}
