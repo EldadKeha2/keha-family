@@ -36,7 +36,10 @@ export function stateFailure(error,initializing=false){
 }
 export function fail(error){
   if(isDailyStorageLimit(error))return json({error:'מכסת השימוש היומית מוצתה. נסו שוב לאחר איפוס המכסה.',code:'DAILY_STORAGE_LIMIT'},503,{'X-Family-Storage-Limit':'daily'});
-  return json({error:error instanceof HttpError?error.message:'לא ניתן להשלים את הפעולה כרגע. נסו שוב.',...(error instanceof HttpError&&error.code?{code:error.code}:{})},error instanceof HttpError?error.status:500);
+  const handled=error instanceof HttpError,retryAfter=handled&&Number.isInteger(error.retryAfter)&&error.retryAfter>0?error.retryAfter:0;
+  return json({error:handled?error.message:'לא ניתן להשלים את הפעולה כרגע. נסו שוב.',...(handled&&error.code?{code:error.code}:{}),...(retryAfter?{retryAfter}:{})},handled?error.status:500,{
+    ...(handled&&error.code?.startsWith('UPDATES_')?{'X-Family-Service-Error':'updates'}:{}),...(retryAfter?{'Retry-After':String(retryAfter)}:{})
+  });
 }
 export function text(value,label,max,required=false){
   if(typeof value!=='string')throw new HttpError(400,`${label}: יש להזין טקסט.`);

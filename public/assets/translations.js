@@ -625,6 +625,8 @@ window.FAMILY_TRANSLATIONS={
   "הקישור הוחלף. פתחו את המייל האחרון שקיבלתם.": "This link was replaced. Open the latest email you received.",
   "שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.": "The email could not be sent. Please try again later.",
   "נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר.": "Too many requests. Please try again later.",
+  "שירות המייל דחה את ההרשאה לשליחה. יש לבדוק את הגדרות שירות המייל.": "The email service rejected the sending authorization. Please check the email service settings.",
+  "שירות המייל הגיע למגבלת שליחה זמנית. נסו שוב מאוחר יותר.": "The email service has reached a temporary sending limit. Please try again later.",
   "מכסת השליחה היומית התמלאה. נסו שוב מחר.": "The daily email limit has been reached. Please try again tomorrow.",
   "הגלריה המשפחתית": "Family Gallery",
   "עמוד אישי": "Personal page",

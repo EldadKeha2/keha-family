@@ -9,7 +9,12 @@
   async function api(action,body){
     const response=await I.fetch('api/updates/'+action,{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{},...(body?{body:JSON.stringify(body)}:{})});
     let data;try{data=await response.json();}catch{throw Error(tr('לא התקבלה תשובה מהשרת. נסו שוב.','The server did not respond. Please try again.'));}
-    if(!response.ok)throw Error(I.error(data.error));return data;
+    if(!response.ok){
+      let message=I.error(data.error);
+      const retryAfter=Number(response.headers.get('Retry-After')||data.retryAfter);
+      if(data.code==='UPDATES_RATE_LIMIT'&&retryAfter>0){const minutes=Math.ceil(retryAfter/60);message+=' '+(minutes===1?tr('אפשר לנסות שוב בעוד כדקה.','Please try again in about a minute.'):tr('אפשר לנסות שוב בעוד כ־','Please try again in about ')+minutes+tr(' דקות.',' minutes.'));}
+      throw Error(message);
+    }return data;
   }
   function catalog(){
     const people=app().getPeople().filter(p=>!p.extra&&!p.placeholder);

@@ -22,7 +22,7 @@ async function fixture({hash='#updates',english=false,respond=()=>({})}={}){
   const window={FAMILY_API_TOKEN:'public-test-token',FAMILY_DATA:{units:{}},FamilyApp:{getPeople:()=>people,getPerson:id=>people.find(p=>p.id===id),nameOf:id=>people.find(p=>p.id===id).name,getView:()=>'updates'},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',locale:english?'en-US':'he-IL',searchNames:p=>p.name,error:v=>v,async fetch(url,options){
     const action=url.replace('api/updates/',''),body=options.body?JSON.parse(options.body):undefined;requests.push({action,body});
     if(action==='config')return Response.json({enabled:true});
-    const value=await respond(action,body);return Response.json(value?.body??value,{status:value?.status??200});
+    const value=await respond(action,body);return Response.json(value?.body??value,{status:value?.status??200,headers:value?.headers});
   }},addEventListener:(type,handler)=>windowHandlers.set(type,handler)};
   const document={getElementById:id=>nodes.get(id)||null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(type,handler)=>handlers.set('document:'+type,handler)};
   const history={replaceState(_state,_title,url){location.hash=url;}};
@@ -66,6 +66,13 @@ test('invalid private links never show default preferences or active save and re
   const f=await fixture({hash:'#updates/manage/'+'0'.repeat(64),respond:()=>({status:404,body:{error:'הקישור אינו תקף. בקשו קישור חדש במייל.'}})});
   assert.ok(!f.nodes.has('updatesForm'));assert.ok(!f.html.includes('data-updates-unsubscribe'));assert.match(f.nodes.get('updatesError').textContent,/הקישור אינו תקף/);
   await f.click('[data-updates-register]');assert.equal(f.location.hash,'#updates');assert.ok(f.nodes.has('updatesLinkForm'));
+});
+test('request throttling explains the wait beside the email form and preserves the entered address',async()=>{
+  for(const english of [false,true]){
+    const f=await fixture({english,respond:()=>({status:429,headers:{'Retry-After':'60'},body:{error:'Too many requests',code:'UPDATES_RATE_LIMIT',retryAfter:60}})});
+    f.input('updatesLinkEmail','owner@example.net');await f.submit('updatesLinkForm');
+    assert.match(f.nodes.get('updatesLinkError').textContent,english?/about a minute/:/כדקה/);assert.equal(f.nodes.get('updatesLinkEmail').value,'owner@example.net');assert.equal(f.nodes.get('updatesLinkMessage').textContent,'');assert.equal(f.location.hash,'#updates');
+  }
 });
 
 test('a slow response for a previous private link cannot replace the next subscriber preferences',async()=>{

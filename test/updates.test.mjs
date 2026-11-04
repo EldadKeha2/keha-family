@@ -6,6 +6,7 @@ import {eventsForDay,eventEmail,preferences,localDay} from '../src/updates.mjs';
 import family from '../src/family.mjs';
 
 function fixture(provider='resend'){
+  const previousNow=Date.now;let now=Date.parse('2026-11-04T03:10:00Z');Date.now=()=>now;
   const databases=[];
   function context(){const db=new DatabaseSync(':memory:');databases.push(db);const storage={sql:{exec(q,...args){const s=db.prepare(q),rows=s.columns().length?s.all(...args):(s.run(...args),[]);return {toArray:()=>rows};}},transactionSync(fn){db.exec('BEGIN');try{const v=fn();db.exec('COMMIT');return v;}catch(e){db.exec('ROLLBACK');throw e;}}};return {storage};}
   const env={UPDATES_ENABLED:'true',UPDATES_SECRET:'test-only-random-secret-of-at-least-thirty-two-characters',RESEND_API_KEY:'test-only-no-real-network',EMAIL_FROM:'family@example.com',SITE_ORIGIN:'https://family.example'};
@@ -13,12 +14,12 @@ function fixture(provider='resend'){
   const familyCtx=context(),updatesCtx=context(),state=new FamilyState(familyCtx,env),updates=new FamilyUpdates(updatesCtx,env);
   env.FAMILY_STATE={idFromName:n=>n,get:()=>state};env.FAMILY_UPDATES={idFromName:n=>n,get:()=>updates};env.ASSETS={fetch:async()=>new Response('site')};
   const messages=[],previous=globalThis.fetch;let sendFail=false;
-  globalThis.fetch=async(url,options)=>{assert.equal(url,provider==='brevo'?'https://api.brevo.com/v3/smtp/email':'https://api.resend.com/emails');if(provider==='brevo')assert.equal(options.headers['api-key'],env.BREVO_API_KEY);else assert.equal(options.headers.Authorization,'Bearer '+env.RESEND_API_KEY);messages.push({body:JSON.parse(options.body),key:options.headers['Idempotency-Key']});return Response.json(sendFail?{error:'provider failed'}:{id:'test-message'},{status:sendFail?503:200});};
+  globalThis.fetch=async(url,options)=>{assert.equal(url,provider==='brevo'?'https://api.brevo.com/v3/smtp/email':'https://api.resend.com/emails');if(provider==='brevo')assert.equal(options.headers['api-key'],env.BREVO_API_KEY);else assert.equal(options.headers.Authorization,'Bearer '+env.RESEND_API_KEY);messages.push({body:JSON.parse(options.body),key:options.headers['Idempotency-Key']});return Response.json(sendFail?{error:'provider failed'}:{id:'test-message'},{status:sendFail||200});};
   async function call(path,body,headers={}){return worker.fetch(new Request('https://family.example'+path,{method:body===undefined?'GET':'POST',headers:{'X-Family-Token':PUBLIC_WRITE_TOKEN,Origin:'https://family.example','Content-Type':'application/json','CF-Connecting-IP':'192.0.2.1',...headers},body:body===undefined?undefined:JSON.stringify(body)}),env,{waitUntil(){}});}
   const all=()=>({birthdays:{enabled:true,ids:null},anniversaries:{enabled:true,ids:null},memorials:{enabled:true,ids:null}});
   async function register(email='visitor@example.net',prefs=all()){const r=await call('/api/updates/register',{email,preferences:prefs,language:'he',consent:true});assert.equal(r.status,200,await r.clone().text());return (messages.at(-1).body.text||messages.at(-1).body.textContent).match(/#updates\/confirm\/([a-f0-9]{64})/)[1];}
   async function confirm(email){const confirmToken=await register(email);const r=await call('/api/updates/confirm',{token:confirmToken});assert.equal(r.status,200);return {confirmToken,...await r.json()};}
-  return {env,state,updates,call,messages,all,register,confirm,db:updatesCtx.storage.sql,fail(value){sendFail=value;},close(){globalThis.fetch=previous;databases.forEach(db=>db.close());}};
+  return {env,state,updates,call,messages,all,register,confirm,db:updatesCtx.storage.sql,advance(ms=60001){now+=ms;},fail(value){sendFail=value===true?503:value||0;},close(){Date.now=previousNow;globalThis.fetch=previous;databases.forEach(db=>db.close());}};
 }
 
 test('updates fail closed until sender setup and never pretend an email was sent',async()=>{
@@ -37,6 +38,7 @@ test('double opt-in encrypts addresses, stores only hashed tokens, and excludes 
 test('re-registering a normalized active address sends management without replacing its preferences or private link',async()=>{
  const f=fixture();try{
   const active=await f.confirm(),prefs=f.all(),original=f.db.exec('SELECT * FROM subscribers').toArray()[0];prefs.birthdays.ids=['yehiel'];
+  f.advance();
   const duplicate=await f.call('/api/updates/register',{email:'  Visitor@EXAMPLE.NET  ',preferences:prefs,language:'en-US',consent:true});
   assert.equal(duplicate.status,200);assert.deepEqual(await duplicate.json(),{saved:true,pending:true});
   const mail=f.messages.at(-1).body;assert.match(mail.text,new RegExp('#updates/manage/'+active.token));assert.ok(!mail.text.includes('#updates/confirm/'));
@@ -72,6 +74,7 @@ test('legacy duplicate confirmation preserves later choices and the original act
 test('a signup racing with confirmation detects the newly active subscription inside its transaction',async()=>{
  const f=fixture();try{
   const raw=await f.register(),originalEncrypt=f.updates.encrypt.bind(f.updates);let reached,release;
+  f.advance();
   const encrypting=new Promise(resolve=>reached=resolve),resume=new Promise(resolve=>release=resolve);
   f.updates.encrypt=async value=>{const encrypted=await originalEncrypt(value);reached();await resume;return encrypted;};
   const duplicate=f.call('/api/updates/register',{email:'visitor@example.net',preferences:f.all(),consent:true});await encrypting;
@@ -81,13 +84,43 @@ test('a signup racing with confirmation detects the newly active subscription in
 });
 test('management requests use the same private destination and report sending failures or throttling',async()=>{
  const f=fixture();try{
-  const active=await f.confirm();f.fail(true);
+  const active=await f.confirm();f.advance();f.fail(true);
   assert.equal((await f.call('/api/updates/request-link',{email:'visitor@example.net'})).status,503);
   assert.equal((await f.call('/api/updates/request-link',{email:'visitor@example.net'})).status,429);
   f.fail(false);f.db.exec('DELETE FROM rate_limits');
   assert.deepEqual(await (await f.call('/api/updates/request-link',{email:'nobody@example.net'})).json(),{saved:true});
   const before=f.messages.length;assert.deepEqual(await (await f.call('/api/updates/request-link',{email:'visitor@example.net'})).json(),{saved:true});assert.equal(f.messages.length,before+1);
   const mail=f.messages.at(-1).body;assert.match(mail.html,/עדכון העדפות/);assert.match(mail.html,/הסרה מרשימת התפוצה/);assert.ok([...mail.html.matchAll(/href="([^"]+)"/g)].every(match=>match[1].endsWith('#updates/manage/'+active.token)));
+ }finally{f.close();}
+});
+test('rapid requests return a local retry time and permitted management resends actually send new emails',async()=>{
+ const f=fixture();try{
+  const active=await f.confirm(),before=f.db.exec('SELECT * FROM rate_limits ORDER BY id').toArray();
+  const blocked=await f.call('/api/updates/request-link',{email:'visitor@example.net'}),body=await blocked.json();
+  assert.equal(blocked.status,429);assert.equal(body.code,'UPDATES_RATE_LIMIT');assert.equal(body.retryAfter,60);assert.equal(blocked.headers.get('Retry-After'),'60');assert.equal(blocked.headers.get('X-Family-Service-Error'),'updates');assert.equal(f.messages.length,1);
+  assert.deepEqual(f.db.exec('SELECT * FROM rate_limits ORDER BY id').toArray(),before);
+  for(let i=0;i<2;i++){f.advance();const sent=await f.call('/api/updates/request-link',{email:'visitor@example.net'});assert.equal(sent.status,200);}
+  assert.equal(f.messages.length,3);assert.notEqual(f.messages[1].key,f.messages[2].key);assert.match(f.messages[2].body.text,new RegExp('#updates/manage/'+active.token));
+ }finally{f.close();}
+});
+test('hourly and daily email limits remain enforced after allowing short-interval testing',async()=>{
+ const f=fixture();try{
+  await f.confirm();for(let i=0;i<7;i++){f.advance();assert.equal((await f.call('/api/updates/request-link',{email:'visitor@example.net'})).status,200);}
+  f.advance();const blocked=await f.call('/api/updates/request-link',{email:'visitor@example.net'});assert.equal(blocked.status,429);assert.ok((await blocked.json()).retryAfter>60);assert.equal(f.messages.length,8);
+  f.db.exec('DELETE FROM rate_limits');f.env.EMAIL_DAILY_LIMIT='1';f.advance();assert.equal((await f.call('/api/updates/request-link',{email:'visitor@example.net'})).status,200);
+  f.advance();const daily=await f.call('/api/updates/request-link',{email:'visitor@example.net'});assert.equal(daily.status,503);assert.equal((await daily.json()).code,'UPDATES_MAIL_DAILY_LIMIT');assert.equal(daily.headers.get('X-Family-Service-Error'),'updates');
+ }finally{f.close();}
+});
+test('provider failures are scoped to email while a real storage quota still signals site unavailability',async()=>{
+ for(const status of [401,403,429,503]){
+  const f=fixture('brevo');try{
+   f.fail(status);const response=await f.call('/api/updates/register',{email:'visitor@example.net',preferences:f.all(),consent:true}),body=await response.json();
+   assert.equal(response.status,503);assert.equal(response.headers.get('X-Family-Service-Error'),'updates');assert.equal(body.code,status===401||status===403?'UPDATES_MAIL_AUTH':status===429?'UPDATES_MAIL_PROVIDER_LIMIT':'UPDATES_MAIL_FAILED');assert.ok(!JSON.stringify(body).includes(f.env.BREVO_API_KEY));
+  }finally{f.close();}
+ }
+ const f=fixture();try{
+  f.db.exec=()=>{throw Error('SQLite daily read quota exceeded');};const response=await f.call('/api/updates/request-link',{email:'visitor@example.net'});
+  assert.equal(response.status,503);assert.equal((await response.json()).code,'DAILY_STORAGE_LIMIT');assert.equal(response.headers.get('X-Family-Storage-Limit'),'daily');assert.equal(response.headers.get('X-Family-Service-Error'),null);
  }finally{f.close();}
 });
 test('resubscribing after removal requires a fresh confirmation and leaves old removal links harmless',async()=>{

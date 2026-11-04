@@ -109,11 +109,11 @@ export class FamilyUpdates {
     const service=provider(this.env),now=Date.now(),maximum=service==='brevo'?290:90;
     const existing=this.rows('SELECT * FROM mail_requests WHERE id=?',id)[0];
     if(existing?.status==='sent')return;
-    if(existing?.status==='sending'&&now-existing.started<20000)throw new HttpError(503,'שליחת המייל עדיין מתבצעת.');
+    if(existing?.status==='sending'&&now-existing.started<20000)throw new HttpError(503,'שליחת המייל עדיין מתבצעת.','UPDATES_MAIL_PENDING');
     // An ambiguous attempt is only retried inside the provider's deduplication window.
-    if(existing&&now-existing.started>(service==='brevo'?25*60000:23*3600000))throw new HttpError(503,'שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.');
+    if(existing&&now-existing.started>(service==='brevo'?25*60000:23*3600000))throw new HttpError(503,'שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.','UPDATES_MAIL_UNCERTAIN');
     const {day}=localDay(),limit=Math.min(maximum,Math.max(1,Number(this.env.EMAIL_DAILY_LIMIT)||maximum));
-    if(!this.tx(()=>this.rate('mail:'+day,limit,86400000,now)))throw new HttpError(503,'מכסת השליחה היומית התמלאה. נסו שוב מחר.');
+    if(!this.tx(()=>this.rate('mail:'+day,limit,86400000,now)))throw new HttpError(503,'מכסת השליחה היומית התמלאה. נסו שוב מחר.','UPDATES_MAIL_DAILY_LIMIT');
     this.sql.exec("INSERT INTO mail_requests(id,status,started) VALUES(?,'sending',?) ON CONFLICT(id) DO UPDATE SET status='sending'",id,now);
     const headers=unsubscribe?{'List-Unsubscribe':'<'+unsubscribe+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'}:{};
     let response;
@@ -123,11 +123,13 @@ export class FamilyUpdates {
         response=await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',headers:{'Content-Type':'application/json','api-key':this.env.BREVO_API_KEY},body:JSON.stringify({sender:{name:'Keha Family',email:this.env.EMAIL_FROM},to:[{email}],subject:message.subject,htmlContent:message.html,textContent:message.text,headers:{...headers,idempotencyKey:uuid}}),signal:AbortSignal.timeout(15000)});
         if(!response.ok){let error;try{error=await response.clone().json();}catch{}if(error?.code==='duplicate_parameter'){this.sql.exec("UPDATE mail_requests SET status='sent' WHERE id=?",id);return;}}
       }else response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+this.env.RESEND_API_KEY,'Idempotency-Key':id},body:JSON.stringify({from:'Keha Family <'+this.env.EMAIL_FROM+'>',to:[email],...message,...(unsubscribe?{headers}:{})}),signal:AbortSignal.timeout(15000)});
-    }catch(error){this.sql.exec("UPDATE mail_requests SET status='uncertain' WHERE id=?",id);throw new HttpError(503,'שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.');}
+    }catch(error){this.sql.exec("UPDATE mail_requests SET status='uncertain' WHERE id=?",id);throw new HttpError(503,'שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.','UPDATES_MAIL_FAILED');}
     if(!response.ok){
       if(response.status>=400&&response.status<500)this.sql.exec('DELETE FROM mail_requests WHERE id=?',id);
       else this.sql.exec("UPDATE mail_requests SET status='uncertain' WHERE id=?",id);
-      throw new HttpError(503,'שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.');
+      if(response.status===401||response.status===403)throw new HttpError(503,'שירות המייל דחה את ההרשאה לשליחה. יש לבדוק את הגדרות שירות המייל.','UPDATES_MAIL_AUTH');
+      if(response.status===429)throw new HttpError(503,'שירות המייל הגיע למגבלת שליחה זמנית. נסו שוב מאוחר יותר.','UPDATES_MAIL_PROVIDER_LIMIT');
+      throw new HttpError(503,'שליחת המייל לא הושלמה. נסו שוב מאוחר יותר.','UPDATES_MAIL_FAILED');
     }
     this.sql.exec("UPDATE mail_requests SET status='sent' WHERE id=?",id);
   }
@@ -140,11 +142,20 @@ export class FamilyUpdates {
   }
   links(data){const base=new URL(this.env.SITE_ORIGIN).origin+'/?lang='+data.language,manage=base+'#updates/manage/'+data.manageToken;return {manage,unsubscribe:manage,oneClick:new URL(this.env.SITE_ORIGIN).origin+'/api/updates/one-click?token='+data.manageToken};}
   requestAllowed(id,ip,now){
-    if(!this.tx(()=>this.rate('ip:'+ip,5,3600000,now)&&this.rate('email:'+id,2,3600000,now)&&this.rate('signups',45,86400000,now)))throw new HttpError(429,'נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר.');
+    const limits=[['ip:'+ip,15,3600000],['email:'+id,8,3600000],['email-minute:'+id,1,60000],['signups',45,86400000]];
+    this.tx(()=>{
+      let retryAfter=0;
+      for(const [key,limit,span] of limits){
+        const window=Math.floor(now/span),row=this.rows('SELECT n FROM rate_limits WHERE id=?',key+':'+window)[0];
+        if((row?.n||0)>=limit)retryAfter=Math.max(retryAfter,Math.ceil(((window+1)*span-now)/1000));
+      }
+      if(retryAfter){const error=new HttpError(429,'נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר.','UPDATES_RATE_LIMIT');error.retryAfter=retryAfter;throw error;}
+      for(const [key,limit,span] of limits)this.rate(key,limit,span,now);
+    });
   }
   async sendManagementLink(row,email,now){
     const data=await this.decrypt(row.data);
-    await this.mail(email,managementEmail(data.language,this.links(data).manage),'manage/'+row.id+'/'+row.revision+'/'+Math.floor(now/3600000));
+    await this.mail(email,managementEmail(data.language,this.links(data).manage),'manage/'+row.id+'/'+row.revision+'/'+Math.floor(now/60000));
   }
   async register(p){
     const email=normalizeEmail(p.email);if(p.consent!==true)throw new HttpError(400,'יש לאשר קבלת עדכונים במייל.');
@@ -226,7 +237,7 @@ export class FamilyUpdates {
   async fetch(request){
     try{
       const {action,...p}=await request.json();
-      if(!updatesConfigured(this.env))throw new HttpError(503,'שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.');
+      if(!updatesConfigured(this.env))throw new HttpError(503,'שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.','UPDATES_NOT_CONFIGURED');
       const now=Date.now();this.sql.exec('DELETE FROM mail_requests WHERE started<?',now-7*86400000);this.sql.exec('DELETE FROM rate_limits WHERE expires<?',now);this.sql.exec("DELETE FROM subscribers WHERE status='pending' AND confirm_expires<?",now);this.sql.exec('DELETE FROM deliveries WHERE day<?',new Date(now-7*86400000).toISOString().slice(0,10));
       const methods={register:'register',confirm:'confirm','request-link':'requestLink',preferences:'getPreferences',save:'savePreferences',unsubscribe:'unsubscribe',dispatch:'dispatch'};
       if(!methods[action])throw new HttpError(404,'הפעולה אינה זמינה.');return json(await this[methods[action]](p));
@@ -245,7 +256,7 @@ export async function updatesRoute(request,env,db){
   }
   const action=path.slice('/api/updates/'.length);
   if(request.method!=='POST'||!['register','confirm','request-link','preferences','save','unsubscribe','one-click'].includes(action))throw new HttpError(404,'הפעולה אינה זמינה.');
-  if(!updatesConfigured(env))throw new HttpError(503,'שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.');
+  if(!updatesConfigured(env))throw new HttpError(503,'שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.','UPDATES_NOT_CONFIGURED');
   const oneClick=action==='one-click';let body;
   if(oneClick){const raw=decoder.decode(await boundedBody(request,128));if(raw!=='List-Unsubscribe=One-Click')throw new HttpError(400,'הפעולה אינה תקינה.');body={token:url.searchParams.get('token')};}
   else body=await readJSON(request,16000);

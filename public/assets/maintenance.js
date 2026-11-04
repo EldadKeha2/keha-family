@@ -71,8 +71,11 @@
   }
   function observeResponse(input,response){
     if(!dataRequest(input))return;
+    if(response.headers.get('X-Family-Storage-Limit')==='daily'){activate();return;}
+    // A handled email error belongs beside its form; a Worker/storage outage still opens maintenance.
+    if(familyURL(input)?.pathname.startsWith('/api/updates/')&&response.headers.get('X-Family-Service-Error')==='updates')return;
     const type=response.headers.get('Content-Type')||'';
-    if(unavailable(response.status)||response.headers.get('X-Family-Storage-Limit')==='daily'||(response.ok&&/text\/html/i.test(type)))activate();
+    if(unavailable(response.status)||(response.ok&&/text\/html/i.test(type)))activate();
   }
   window.fetch=async(...args)=>{
     try{const response=await nativeFetch(...args);observeResponse(args[0],response);return response;}

@@ -60,7 +60,9 @@ function browserFixture({available=true,session=new Map(),images=[],fetch:fetche
 test('failed or partial bootstrap raises the bilingual screen and continuation restores navigation once per tab',async()=>{
   const f=browserFixture({available:false});f.startup();assert.equal(f.window.FamilyMaintenance.isActive(),true);assert.equal(f.root.inert,true);
   const screen=f.screen();assert.match(screen.innerHTML,/המשך לאתר בכל זאת/);assert.match(screen.innerHTML,/Continue to the website anyway/);assert.match(screen.innerHTML,/חלק מהתמונות, המידע והאפשרויות/);assert.match(screen.innerHTML,/photos, information and features/);assert.match(screen.innerHTML,/grandma-construction\.png/);assert.equal(f.document.activeElement,screen.querySelector('.family-maintenance-enter'));
-  f.continue();assert.equal(f.window.FamilyMaintenance.isActive(),false);assert.equal(f.root.inert,false);assert.equal(screen.hidden,true);assert.equal(f.document.documentElement.classList.contains('family-maintenance-active'),false);assert.ok(f.document.getElementById('familyLimitedNotice'));assert.equal(f.intervals.size,0);
+  f.continue();assert.equal(f.window.FamilyMaintenance.isActive(),false);assert.equal(f.root.inert,false);assert.equal(screen.hidden,true);assert.equal(f.document.documentElement.classList.contains('family-maintenance-active'),false);assert.ok(f.document.getElementById('familyLimitedNotice'));
+  // Limited browsing retains one recovery check so a restored site can reload automatically.
+  assert.equal(f.intervals.size,1);assert.equal([...f.intervals.values()][0].ms,120000);
   const again=browserFixture({available:false,session:f.session});again.startup();assert.equal(again.window.FamilyMaintenance.isActive(),false);assert.equal(again.root.inert,false);assert.ok(again.document.getElementById('familyLimitedNotice'));assert.deepEqual(Object.keys(again.window.FamilyMaintenance),['isActive']);
 });
 test('healthy deferred data is allowed to finish before startup decides to show a warning',()=>{
@@ -82,11 +84,20 @@ test('validation errors, missing records, external failures and intentional canc
   const aborted=browserFixture({fetch:async()=>{throw new DOMException('Cancelled','AbortError');}});await assert.rejects(()=>aborted.window.fetch('/api/media'),{name:'AbortError'});assert.equal(aborted.window.FamilyMaintenance.isActive(),false);
   const offline=browserFixture({fetch:async()=>{throw new TypeError('Network unavailable');}});await assert.rejects(()=>offline.window.fetch('/api/media'));assert.equal(offline.window.FamilyMaintenance.isActive(),true);
 });
-test('uploads, broken family media and bootstrap script failures use the same acknowledgement',()=>{
+test('email request limits and provider failures stay in the form without masking a real outage',async()=>{
+  for(const path of ['/api/updates/register','/api/updates/request-link'])for(const status of [429,503]){
+    const response=Response.json({error:'Email request failed',code:status===429?'UPDATES_RATE_LIMIT':'UPDATES_MAIL_FAILED'},{status,headers:{'X-Family-Service-Error':'updates','Retry-After':'60'}}),f=browserFixture({fetch:async()=>response});
+    const result=await f.window.fetch(path);assert.equal(result,response);assert.equal(f.window.FamilyMaintenance.isActive(),false);assert.equal(result.headers.get('Retry-After'),'60');assert.match((await result.json()).code,/^UPDATES_/);
+  }
+  const outage=browserFixture({fetch:async()=>new Response('Worker unavailable',{status:503})});await outage.window.fetch('/api/updates/request-link');assert.equal(outage.window.FamilyMaintenance.isActive(),true);
+  const storage=browserFixture({fetch:async()=>Response.json({code:'DAILY_STORAGE_LIMIT'},{status:503,headers:{'X-Family-Service-Error':'updates','X-Family-Storage-Limit':'daily'}})});await storage.window.fetch('/api/updates/register');assert.equal(storage.window.FamilyMaintenance.isActive(),true);
+});
+test('uploads, broken family media and bootstrap script failures use the same acknowledgement',async()=>{
   for(const status of [429,500,503]){const f=browserFixture(),xhr=new f.window.XMLHttpRequest();xhr.open('POST','/api/collections/gallery/upload');xhr.status=status;xhr.dispatchEvent(new Event('load'));assert.equal(f.window.FamilyMaintenance.isActive(),true);}
   const offline=browserFixture(),xhr=new offline.window.XMLHttpRequest();xhr.open('POST','/api/people/mila/photos');xhr.dispatchEvent(new Event('error'));assert.equal(offline.window.FamilyMaintenance.isActive(),true);
   const reused=browserFixture(),request=new reused.window.XMLHttpRequest();request.open('POST','/api/collections/gallery/upload');request.open('POST','https://external.example/upload');request.status=503;request.dispatchEvent(new Event('load'));assert.equal(reused.window.FamilyMaintenance.isActive(),false);
-  for(const tagName of ['IMG','VIDEO','IFRAME']){const f=browserFixture();f.emit('error',{target:{tagName,src:'https://family.example/media/1234'}});assert.equal(f.window.FamilyMaintenance.isActive(),true);}
+  for(const tagName of ['IMG','VIDEO','IFRAME']){const f=browserFixture();f.emit('error',{target:{tagName,src:'https://family.example/media/1234'}});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMaintenance.isActive(),true);}
+  const healthy=browserFixture({fetch:async()=>Response.json({available:true})});healthy.emit('error',{target:{tagName:'IMG',src:'https://family.example/media/missing'}});await new Promise(resolve=>setImmediate(resolve));assert.equal(healthy.window.FamilyMaintenance.isActive(),false);
   const bootstrap=browserFixture();bootstrap.emit('error',{target:{tagName:'SCRIPT',src:'https://family.example/family-data.js'}});assert.equal(bootstrap.window.FamilyMaintenance.isActive(),true);
   const missingIcon=browserFixture();missingIcon.emit('error',{target:{tagName:'IMG',src:'https://family.example/assets/icon.png'}});assert.equal(missingIcon.window.FamilyMaintenance.isActive(),false);
   const iframe=browserFixture();iframe.emit('load',{target:{tagName:'IFRAME',src:'https://family.example/media/123',contentDocument:{contentType:'application/json',body:{textContent:'{"error":"Unavailable"}'}}}});assert.equal(iframe.window.FamilyMaintenance.isActive(),true);
