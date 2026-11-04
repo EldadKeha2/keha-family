@@ -686,3 +686,4 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   'פתיחת Instagram':'Open Instagram',
   'שיתוף התמונה':'Share this photo'
 });
+Object.assign(window.FAMILY_TRANSLATIONS,{'מחק פריט':'Delete item'});

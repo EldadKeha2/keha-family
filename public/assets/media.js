@@ -50,7 +50,8 @@
     if(item.provider==='youtube'){link.removeAttribute('download');link.target='_blank';link.rel='noopener';}
     else {link.download=item.filename||'';link.removeAttribute('target');link.removeAttribute('rel');}
     $('mediaViewerDelete').hidden=!item.id;
-    $('mediaViewerDelete').textContent=linked(item,state.scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט');
+    const deleteLabel=linked(item,state.scope)?I18n.t('הסרה מהאלבום'):tr('מחק פריט','Delete item');
+    $('mediaViewerDelete').querySelector('span').textContent=deleteLabel;$('mediaViewerDelete').title=deleteLabel;
     window.FamilyTags.mountInline($('mediaTagPanel'),item);
     $('mediaViewerTag').hidden=!window.FamilyTags.taggable(item);
     $('mediaViewerTag').textContent=item.tags?.length?I18n.t('תיוג אנשים (')+item.tags.length+')':I18n.t('תיוג אנשים');
