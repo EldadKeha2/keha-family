@@ -189,10 +189,12 @@ export class FamilyState {
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
       args.push(like,like,like,like);
     }
-    const total=this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n;
+    const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN NOT EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=m.id) THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
+    const filterCounts={all:counts.all_count,untagged:counts.untagged_count};
+    const total=query?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
-    return {kind,items,count:total,revision:revision+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='untagged'?':untagged':''),pagination:{page,size,total,pages,query,filter}};
+    return {kind,items,count:total,filterCounts,revision:revision+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='untagged'?':untagged':''),pagination:{page,size,total,pages,query,filter}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   wedding(id,details=false){

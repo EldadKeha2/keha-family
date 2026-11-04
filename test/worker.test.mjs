@@ -630,14 +630,14 @@ test('untagged gallery filtering covers every page, combines with search and sta
   }
   const all=await f.call('/api/collections/gallery'),allEtag=all.headers.get('ETag');
   const response=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':allEtag}});assert.equal(response.status,200,'All-photo and untagged snapshots use different cache keys');const etag=response.headers.get('ETag'),first=await response.json();
-  assert.equal(first.count,103);assert.equal(first.pagination.pages,2);assert.equal(first.pagination.filter,'untagged');assert.equal(first.items.length,100);assert.equal(first.items[0].id,id(204));assert.ok(first.items.every(item=>item.tags.length===0));
+  assert.equal(first.count,103);assert.deepEqual(first.filterCounts,{all:205,untagged:103});assert.equal(first.pagination.pages,2);assert.equal(first.pagination.filter,'untagged');assert.equal(first.items.length,100);assert.equal(first.items[0].id,id(204));assert.ok(first.items.every(item=>item.tags.length===0));
   const last=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.deepEqual(last.items.map(item=>item.id),[id(4),id(2),id(0)]);
-  const search='/api/collections/gallery?filter=untagged&q=Distant';assert.equal((await(await f.call(search)).json()).items[0].id,id(2));
+  const search='/api/collections/gallery?filter=untagged&q=Distant',searched=await(await f.call(search)).json();assert.equal(searched.items[0].id,id(2));assert.deepEqual(searched.filterCounts,{all:205,untagged:103});
   assert.equal((await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}})).status,304);
   const patch=tagged=>f.call('/api/media/'+id(2)+'/tags/patch',{method:'POST',body:{changes:[{personId:'yona',tagged}]}});
   assert.equal((await patch(true)).status,200);const changed=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.equal((await changed.json()).count,102);assert.equal((await(await f.call(search)).json()).count,0);
   assert.equal((await patch(false)).status,200);f.restart();assert.equal((await(await f.call(search)).json()).count,1);assert.equal((await(await f.call('/api/collections/gallery')).json()).count,205);
-  for(let n=0;n<205;n+=2)tag.run(id(n),'yona');const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
+  for(let n=0;n<205;n+=2)tag.run(id(n),'yona');const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.deepEqual(empty.filterCounts,{all:205,untagged:0});assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
   assert.equal((await f.call('/api/collections/gallery?filter=other')).status,400);
  }finally{await f.close();}
 });

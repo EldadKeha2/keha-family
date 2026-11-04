@@ -57,7 +57,11 @@
     $(collectionId(kind,'Empty')).hidden = (compact?filtered:collection.items).length > 0;
     if(compact){const p=collection.pagination||{page:1,size:galleryPage.size,total:collection.count||0,pages:1};
       $(collectionId(kind,'Count')).textContent=p.total+' '+I18n.t(untagged?'תמונות לא מתויגות':'תמונות בגלריה');
-      for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter===galleryPage.filter));
+      for(const button of document.querySelectorAll('[data-gallery-filter]')){
+        const filter=button.dataset.galleryFilter,count=collection.filterCounts?.[filter];
+        button.setAttribute('aria-pressed',String(filter===galleryPage.filter));
+        button.textContent=I18n.t(filter==='untagged'?'תמונות לא מתויגות':'כל התמונות')+(Number.isInteger(count)?' ('+count+')':'');
+      }
       const empty=$('sharedGalleryEmpty');
       empty.querySelector('h3').textContent=I18n.t(untagged?'לא נמצאו תמונות לא מתויגות':galleryPage.query?'לא נמצאו תמונות בחיפוש הזה':'כל רגע משפחתי מתחיל בתמונה');
       empty.querySelector('p').textContent=I18n.t(untagged||galleryPage.query?'אפשר להציג את כל התמונות או לשנות את החיפוש.':'אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.');
@@ -289,7 +293,12 @@
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
-      if(!result.collection){if(result.item&&result.operation==='tags'){state.collections[kind].items=state.collections[kind].items.map(item=>item.id===result.item.id?{...item,...result.item}:item);if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&galleryPage.filter==='untagged'){revisions.gallery=null;refreshCollection('gallery',true);}}return;}
+      if(!result.collection){if(result.item&&result.operation==='tags'){
+        const collection=state.collections[kind],previous=collection.items.find(item=>item.id===result.item.id);
+        if(kind==='gallery'&&collection.filterCounts&&previous){const delta=Number(!result.item.tags?.length)-Number(!previous.tags?.length);collection.filterCounts.untagged=Math.max(0,Math.min(collection.filterCounts.all,collection.filterCounts.untagged+delta));}
+        collection.items=collection.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
+        if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&galleryPage.filter==='untagged'){revisions.gallery=null;refreshCollection('gallery',true);}
+      }return;}
       if(result.operation==='delete'){const key=captionKey(kind,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
       if(kind==='gallery'){
         if(result.operation==='delete')window.FamilyMedia.register(kind,state.collections.gallery.items.filter(item=>item.id!==result.item.id&&(galleryPage.filter!=='untagged'||!item.tags?.length)));
