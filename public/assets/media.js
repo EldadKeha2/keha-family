@@ -29,9 +29,10 @@
   }
   function metadata(){
     const item=current();if(!item)return;
-    $('mediaViewerCaption').textContent=item.caption||'';
+    $('mediaViewerCaption').textContent=$('mediaHeaderCaption').textContent=item.caption||'';
     const descriptionLabel=item.kind==='video'?tr('הוסף תיאור לסרטון','Add a video description'):item.kind==='document'?tr('הוסף תיאור למסמך','Add a document description'):tr('הוסף תיאור לתמונה','Add a photo description');
-    $('editOpenedCaption').querySelector('span').textContent=I18n.isEnglish?'Add a description':descriptionLabel;$('editOpenedCaption').setAttribute('aria-label',descriptionLabel);$('editOpenedCaption').title=descriptionLabel;
+    const desktopDescriptionLabel=item.kind==='video'?tr('להוספת תיאור לסרטון','Add a video description'):item.kind==='document'?tr('להוספת תיאור למסמך','Add a document description'):tr('להוספת תיאור לתמונה','Add a photo description');
+    $('editOpenedCaption').querySelector('[data-media-caption-mobile]').textContent=I18n.isEnglish?'Add a description':descriptionLabel;$('editOpenedCaption').querySelector('[data-media-caption-desktop]').textContent=desktopDescriptionLabel;$('editOpenedCaption').setAttribute('aria-label',desktopDescriptionLabel);$('editOpenedCaption').title=desktopDescriptionLabel;
     const url=shareURL(item),label=(item.caption||I18n.mediaName(item)||'Keha Family').replace(/[\r\n]/g,' ');
     $('shareMediaWhatsApp').href='https://wa.me/?text='+encodeURIComponent(label+'\n'+url);
     $('shareMediaFacebook').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);

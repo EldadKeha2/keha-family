@@ -60,3 +60,43 @@
 .media-photo-actions button svg{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .media-photo-actions #openedProfilePhoto[hidden],.media-profile-icon [hidden]{display:none}
 @media(max-width:600px){.media-photo-actions{gap:6px}.media-photo-actions #mediaViewerDelete,.media-photo-actions #editOpenedCaption,.media-photo-actions #openedProfilePhoto{flex:1 1 0;max-width:none;min-width:0;padding:6px 5px;gap:4px;font-size:12px;line-height:1.4}.media-photo-actions button>span{min-width:0;overflow-wrap:anywhere}:root[lang^=en] .media-photo-actions #editOpenedCaption{white-space:normal}}
+
+/* Keep the phone layout; organize desktop tools into three mirrored groups. */
+.media-header-caption,[data-media-caption-desktop]{display:none}
+.media-viewer-tools,.media-manage-actions{display:contents}
+.media-photo-actions #mediaViewerDelete{order:0}.media-photo-actions #editOpenedCaption{order:1}.media-photo-actions #openedProfilePhoto{order:2}
+@media(min-width:701px){
+  .media-viewer-header h2{flex:0 0 auto}
+  .media-viewer-header .media-header-caption{display:block;flex:1;min-width:0;margin:0;padding:0 8px;color:#75674f;font:17px/1.5 var(--sans);text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}
+  .media-viewer-tools{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);grid-template-areas:"management share description";align-items:center;gap:10px;direction:ltr;padding:0 0 12px;border-bottom:1px solid #d8ceb7}
+  :root[dir=ltr] .media-viewer-tools{grid-template-areas:"description share management"}
+  .media-viewer-tools .media-photo-actions{display:contents}
+  .media-viewer-tools .media-manage-actions{grid-area:management;display:flex;align-items:center;justify-content:flex-start;gap:7px;min-width:0;direction:ltr}
+  :root[dir=ltr] .media-viewer-tools .media-manage-actions{direction:rtl}
+  .media-viewer-tools #editOpenedCaption{grid-area:description;justify-self:end;max-width:100%;font-size:12px;line-height:1.45;white-space:normal}
+  :root[dir=ltr] .media-viewer-tools #editOpenedCaption{justify-self:start;white-space:normal}
+  .media-viewer-tools .media-manage-actions #openedProfilePhoto,.media-viewer-tools .media-manage-actions #mediaViewerDelete{flex:0 1 auto;min-width:0;max-width:none;min-height:40px;margin:0;padding:6px 8px;font-size:12px;line-height:1.45;white-space:normal}
+  .media-viewer-tools .media-manage-actions button>span{min-width:0;overflow-wrap:anywhere}
+  .media-viewer-tools .media-photo-actions button svg{width:16px;height:16px;flex-basis:16px}
+  .media-viewer-tools #openedProfilePhoto[hidden]{display:none}
+  #mediaShareActions{grid-area:share;display:grid;grid-template-columns:auto repeat(6,auto);align-items:center;justify-content:center;gap:4px;margin:0;padding:0 10px;border:0;border-inline:1px solid #e2d9c5;direction:rtl}
+  :root[dir=ltr] #mediaShareActions{direction:ltr}
+  #mediaShareActions .media-share-heading{flex:initial;gap:5px;margin:0;font-size:12px;white-space:nowrap}
+  #mediaShareActions>a[id],#mediaShareActions>button[id]{width:36px;height:40px;min-width:36px;min-height:40px;padding:4px;flex-basis:36px}
+  #mediaShareActions .share-icon{width:28px;height:28px;flex-basis:28px}
+  #mediaShareActions #mediaShareStatus,#mediaShareActions #mediaLinkFallback,#mediaShareActions .instagram-share-help{grid-column:1/-1;min-width:0;max-width:100%}
+  .media-viewer-footer #mediaViewerCaption,[data-media-caption-mobile]{display:none}
+  [data-media-caption-desktop]{display:inline}
+  .media-viewer-tools #openedCaptionForm{grid-column:1/-1;grid-row:2;margin:0;direction:rtl}
+  :root[dir=ltr] .media-viewer-tools #openedCaptionForm{direction:ltr}
+  .media-viewer-footer .inline-tag-widget{margin-top:0;padding-top:12px;border-top:0}
+}
+@media(min-width:701px) and (max-width:1100px){
+  .media-viewer-tools{gap:7px}
+  .media-viewer-tools #editOpenedCaption,.media-viewer-tools .media-manage-actions #openedProfilePhoto,.media-viewer-tools .media-manage-actions #mediaViewerDelete{font-size:11px;padding-inline:6px;gap:5px}
+  :root[lang^=en] .media-viewer-tools .media-manage-actions #mediaViewerDelete{flex:0 0 auto;white-space:nowrap}
+  #mediaShareActions{padding-inline:7px;gap:3px}
+  #mediaShareActions>a[id],#mediaShareActions>button[id]{width:30px;min-width:30px;padding:2px;flex-basis:30px}
+  #mediaShareActions .share-icon{width:26px;height:26px;flex-basis:26px}
+  #mediaShareActions .media-share-heading{font-size:11px;gap:4px}
+}

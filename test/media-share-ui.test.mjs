@@ -76,3 +76,14 @@ test('the profile action follows the album owner gender when switching between p
   f.window.FamilyMedia.open([photo],0,'personal:guest');assert.equal(button.getAttribute('data-gender'),'unknown');
   f.window.FamilyMedia.open([photo],0,'gallery');assert.equal(button.hidden,true,'Only a personal album offers profile selection');
 });
+test('desktop header captions follow photo navigation and both screen sizes retain their own description labels',()=>{
+  for(const english of [false,true]){
+    const f=fixture({english}),photos=[{id:'a',kind:'photo',src:'/media/a',caption:'A family memory',tags:[]},{id:'b',kind:'photo',src:'/media/b',caption:'',tags:[]}];
+    f.window.FamilyMedia.open(photos,0,'gallery');
+    assert.equal(f.get('mediaHeaderCaption').textContent,'A family memory');assert.equal(f.get('mediaViewerCaption').textContent,'A family memory');
+    assert.equal(f.get('editOpenedCaption').querySelector('[data-media-caption-desktop]').textContent,english?'Add a photo description':'להוספת תיאור לתמונה');
+    assert.equal(f.get('editOpenedCaption').querySelector('[data-media-caption-mobile]').textContent,english?'Add a description':'הוסף תיאור לתמונה');
+    f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaHeaderCaption').textContent,'');assert.equal(f.get('mediaViewerCaption').textContent,'','Moving to an uncaptioned photo clears the previous description everywhere');
+    assert.equal(f.get('openedProfilePhoto').hidden,true,'The shared gallery does not offer profile selection');
+  }
+});
