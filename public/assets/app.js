@@ -113,7 +113,7 @@
     const rootHistorySpace=!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40:0;
     const desktopOverview=!phone&&overview;
     const gap=phone?20:desktopOverview?20:36,levelHeight=phone?195:desktopOverview?275:340,top=phone?40:desktopOverview?45:70,pad=phone?25:desktopOverview?32:48;
-    const positions=[],lines=[],widths=new Map();
+    const positions=[],lines=[],connections=[],widths=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
     const nodeWidth=unit=>unit.people.length===2?(phone?174:desktopOverview?300:320):(phone?80:desktopOverview?132:146);
     function measure(id){const unit=data.units[id],kids=children(unit),total=kids.reduce((sum,child)=>sum+measure(child),0)+Math.max(0,kids.length-1)*gap,width=Math.max(nodeWidth(unit),total);widths.set(id,width);return width;}
@@ -121,7 +121,7 @@
       const unit=data.units[id],width=widths.get(id),x=left+width/2,y=top+depth*levelHeight+(depth?rootHistorySpace:0);
       positions.push({id,unit,x,y,width:nodeWidth(unit),depth});const kids=children(unit),total=kids.reduce((sum,child)=>sum+widths.get(child),0)+Math.max(0,kids.length-1)*gap;let right=left+width-(width-total)/2;const centers=[];
       for(const child of kids){const w=widths.get(child);centers.push(right-w/2);place(child,right-w,depth+1);right-=w+gap;}
-      if(kids.length){const extra=depth===0?rootHistorySpace:0,start=y+(phone?115:261)+extra,middle=y+(phone?155:294)+extra,end=y+levelHeight-7+extra;lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);if(kids.length>1)lines.push(`<path d="M${Math.min(...centers)} ${middle}H${Math.max(...centers)}"/>`);for(const cx of centers)lines.push(`<path d="M${cx} ${middle}V${end}"/>`);}
+      if(kids.length)connections.push({id,x,y,centers,depth});
     }
     let width,height;
     if(phone&&overview){
@@ -129,14 +129,37 @@
       data.branches.forEach((branch,index)=>{const x=index%2===0?380:140,y=220+Math.floor(index/2)*170,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174,depth:1});lines.push(`<path d="M260 ${y-30}H${x}V${y-10}"/>`);});
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);const maxDepth=Math.max(...positions.map(item=>item.depth));height=top+maxDepth*levelHeight+(maxDepth?rootHistorySpace:0)+(phone?150:desktopOverview?260:overview?316:278)+30;}
     camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.width=width+'px';world.style.height=height+'px';
-    $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
     $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id===data.root)label=I18n.t('<span class="generation-label">כאן מתחיל הסיפור</span>');else if(depth===0||overview)label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${unit.id}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${unit.people.map(id=>personCardHTML(data.people[id])).join('')}${open}</div>`;}).join('');
+    let rootSpacingAdjustment=0,rootContentHeight=0;
+    if(!phone&&rootHistorySpace){
+      const rootElement=world.querySelector(`[data-unit="${rootId}"]`),firstChild=positions.find(item=>item.depth===1);
+      if(rootElement&&firstChild){
+        // Reserve space below the actual dates for the connector and branch labels.
+        rootContentHeight=rootElement.offsetHeight;
+        rootSpacingAdjustment=Math.max(0,top+rootContentHeight+96-firstChild.y);
+        if(rootSpacingAdjustment){
+          for(const item of positions)if(item.depth>0){item.y+=rootSpacingAdjustment;world.querySelector(`[data-unit="${item.id}"]`).style.top=item.y+'px';}
+          for(const connection of connections)if(connection.depth>0)connection.y+=rootSpacingAdjustment;
+          height+=rootSpacingAdjustment;camera.height=height;world.style.height=height+'px';
+        }
+      }
+    }
+    for(const {x,y,centers,depth} of connections){
+      const extra=depth===0?rootHistorySpace+rootSpacingAdjustment:0,historyRoot=depth===0&&rootContentHeight>0;
+      const start=historyRoot?y+rootContentHeight+12:y+(phone?115:261)+extra;
+      const middle=historyRoot?y+levelHeight+extra-60:y+(phone?155:294)+extra,end=y+levelHeight-7+extra;
+      lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);
+      if(centers.length>1)lines.push(`<path d="M${Math.min(...centers)} ${middle}H${Math.max(...centers)}"/>`);
+      for(const cx of centers)lines.push(`<path d="M${cx} ${middle}V${end}"/>`);
+    }
+    $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
+
     $('treeBreadcrumb').textContent=state.branch==='all'?(overview?I18n.t('כל המשפחה · ששת הענפים'):I18n.t('כל המשפחה · כל הדורות')):I18n.html`יונה ושלמה › ${I18n.branchName(branchFor(state.branch))}`;
     for(const [id,selected]of [['overviewButton',overview],['fullTreeButton',!overview]]){$(id).classList.toggle('selected',selected);$(id).setAttribute('aria-pressed',String(selected));}
     const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים · לחצו על שם לפתיחת האלבום'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     $('treeHelpInline').textContent=phone?'':guidance;
     $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בענפים · לחצו על שם לפתיחת האלבום'):'';
-    requestAnimationFrame(()=>{if(state.view!=='tree')return;const viewport=$('treeViewport');const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);camera.scale=phone?fit:desktopOverview?0.6:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;applyCamera();});
+    requestAnimationFrame(()=>{if(state.view!=='tree')return;const viewport=$('treeViewport');const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);camera.scale=phone?fit:desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;applyCamera();});
   }
   function applyCamera(){
     $('treeWorld').style.transform=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
