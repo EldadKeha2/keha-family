@@ -54,7 +54,7 @@
     window.FamilyMedia.register(kind,filtered,{retainCurrent:untagged});
     if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.videoCategory===state.videoCategory)));
     $(collectionId(kind,'Count')).textContent = collection.items.length ? I18n.html`${filtered.length}${filtered.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?(isVideo?I18n.word(filtered.length,'video','videos'):I18n.word(filtered.length,'photo','photos')):(isVideo?I18n.t('סרטונים'):I18n.t('תמונות'))} באלבום המשותף` : isVideo?I18n.t('רגעים ששווה לראות שוב'):I18n.t('אלבום משותף לכל המשפחה');
-    $(collectionId(kind,'Empty')).hidden = filtered.length > 0;
+    $(collectionId(kind,'Empty')).hidden = (compact?filtered:collection.items).length > 0;
     if(compact){const p=collection.pagination||{page:1,size:galleryPage.size,total:collection.count||0,pages:1};
       $(collectionId(kind,'Count')).textContent=p.total+' '+I18n.t(untagged?'תמונות לא מתויגות':'תמונות בגלריה');
       for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter===galleryPage.filter));
@@ -103,7 +103,7 @@
         const area=[...grid.querySelectorAll('textarea')].find(area=>area.dataset.sharedFile===focusedFile);
         if(area){area.focus({preventScroll:true});area.setSelectionRange(...selection);}
       }
-      if (!filtered.length && collection.items.length) grid.innerHTML=I18n.t('<p class="no-content-match">אין סרטונים או תמונות בבחירה הזו. אפשר לשנות את הקטגוריה או את החיפוש.</p>');
+      if (!compact && !filtered.length && collection.items.length) grid.innerHTML=I18n.t('<p class="no-content-match">אין סרטונים או תמונות בבחירה הזו. אפשר לשנות את הקטגוריה או את החיפוש.</p>');
     }
     window.FamilyTags.refresh($(collectionId(kind,'Grid')),filtered);
     for(const area of $(collectionId(kind,'Grid')).querySelectorAll('textarea')) {
