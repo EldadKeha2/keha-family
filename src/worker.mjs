@@ -3,7 +3,7 @@ import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stat
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
-import {updatesRoute,dispatchUpdates} from './updates.mjs';
+import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
 export {FamilyState} from './state.mjs';
 export {FamilyUpdates} from './updates.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
@@ -148,6 +148,7 @@ export default {
         if(!equal(request.headers.get('X-Family-Token'),PUBLIC_WRITE_TOKEN))throw new HttpError(403,'יש לרענן את הדף לפני שמירת השינוי.');
       }
       if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);
+      if(path==='/api/games/jachnun/head-request')return await headRequestRoute(request,env);
       if(path==='/family-data.js'&&request.method==='GET'){
         let people={},dataAvailable=true;
         try{people=Object.fromEntries((await db('dates')).people.map(p=>[p.id,p]));}catch{dataAvailable=false;}

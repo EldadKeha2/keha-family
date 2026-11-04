@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import worker,{FamilyState,FamilyUpdates,PUBLIC_WRITE_TOKEN} from '../src/worker.mjs';
-import {eventsForDay,eventEmail,preferences,localDay} from '../src/updates.mjs';
+import {eventsForDay,eventEmail,preferences,localDay,HEAD_REQUEST_RECIPIENT} from '../src/updates.mjs';
 import family from '../src/family.mjs';
 
 function fixture(provider='resend'){
@@ -166,4 +166,35 @@ test('recurrences handle leap days, memorials, unknown dates, full names and lan
 
 test('Brevo supports the free-plan sender transport while retaining the same private opt-in flow',async()=>{
  const f=fixture('brevo');try{const active=await f.confirm();const mail=f.messages[0].body;assert.equal(mail.sender.name,'Keha Family');assert.equal(mail.sender.email,'family@example.com');assert.deepEqual(mail.to,[{email:'visitor@example.net'}]);assert.match(mail.headers.idempotencyKey,/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-a[a-f0-9]{3}-[a-f0-9]{12}$/);assert.equal((await f.call('/api/updates/preferences',{token:active.token})).status,200);}finally{f.close();}
+});
+
+test('head requests require a valid name and cannot change the fixed recipient or subscription state',async()=>{
+  const f=fixture('brevo'),path='/api/games/jachnun/head-request',requestId='1'.repeat(32);
+  try{
+    for(const name of ['', '1', 'A', null, 'A\nB', 'a'.repeat(101)]){const r=await f.call(path,{name,requestId});assert.equal(r.status,400,await r.clone().text());}
+    assert.equal(f.messages.length,0);assert.equal((await f.call(path)).status,405);
+    const result=await f.call(path,{name:'  אלדד   קהא  ',language:'he',requestId,to:'attacker@example.com'});assert.equal(result.status,200,await result.clone().text());assert.deepEqual(await result.json(),{sent:true});
+    const message=f.messages[0].body;assert.equal(message.to[0].email,HEAD_REQUEST_RECIPIENT);assert.equal(message.to[0].email,'eldakeha@gmail.com');assert.match(message.subject,/תפוס תג׳חנון/);assert.match(message.textContent,/אלדד קהא/);assert.equal(f.db.exec('SELECT count(*) AS n FROM subscribers').toArray()[0].n,0);
+    assert.equal((await f.call(path,{name:'אלדד קהא',requestId})).status,200);assert.equal(f.messages.length,1);
+    assert.equal((await f.call(path,{name:'אלדד קהא',requestId:'2'.repeat(32)})).status,429);assert.equal(f.messages.length,1);
+  }finally{f.close();}
+});
+test('head requests retain origin and token protection and safely escape the submitted name',async()=>{
+  const f=fixture(),path='/api/games/jachnun/head-request',body={name:'<b>Dan</b>',language:'en-US',requestId:'3'.repeat(32)};
+  try{
+    assert.equal((await f.call(path,body,{Origin:'https://other.example'})).status,403);
+    assert.equal((await f.call(path,body,{'X-Family-Token':'wrong'})).status,403);
+    assert.equal(f.messages.length,0);const r=await f.call(path,body);assert.equal(r.status,200);
+    const message=f.messages[0].body;assert.deepEqual(message.to,['eldakeha@gmail.com']);assert.match(message.subject,/Catch the Jachnun/);assert.match(message.html,/&lt;b&gt;Dan&lt;\/b&gt;/);assert.doesNotMatch(message.html,/<b>Dan<\/b>/);assert.match(message.text,/<b>Dan<\/b>/);
+  }finally{f.close();}
+});
+test('head requests enforce small rate limits and never report a failed provider send as success',async()=>{
+  const f=fixture('brevo'),path='/api/games/jachnun/head-request';
+  try{
+    f.fail(true);const body={name:'Test Person',language:'en-GB',requestId:'4'.repeat(32)},failed=await f.call(path,body);assert.equal(failed.status,503);assert.notEqual((await failed.json()).sent,true);
+    const key=f.messages[0].body.headers.idempotencyKey;f.fail(false);assert.equal((await f.call(path,body)).status,200);assert.equal(f.messages[1].body.headers.idempotencyKey,key);assert.equal((await f.call(path,body)).status,200);assert.equal(f.messages.length,2);
+    for(const [name,id]of [['Another Name','5'],['Third Name','6']])assert.equal((await f.call(path,{name,requestId:id.repeat(32)})).status,200);
+    assert.equal((await f.call(path,{name:'Fourth Name',requestId:'7'.repeat(32)})).status,429);assert.equal(f.messages.length,4);
+    delete f.env.BREVO_API_KEY;const unconfigured=await f.call(path,{name:'Fifth Name',requestId:'8'.repeat(32)});assert.equal(unconfigured.status,503);assert.notEqual((await unconfigured.json()).sent,true);
+  }finally{f.close();}
 });

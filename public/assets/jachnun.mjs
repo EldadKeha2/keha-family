@@ -38,6 +38,7 @@ export function headCrop(width,height,{zoom=1.5,x=.5,y=.34}={}) {
   const size=Math.min(width,height)/Math.max(1,Math.min(3,zoom));
   return {x:Math.max(0,Math.min(width-size,width*x-size/2)),y:Math.max(0,Math.min(height-size,height*y-size/2)),size};
 }
-export function snakeCharacters(family={},summaries={}) {
-  return Object.values(family).map(p=>({...p,...summaries[p.id]})).filter(p=>p.id&&p.profile&&!p.placeholder&&!p.extra);
+export function snakeCharacters(family={},prepared=[]) {
+  return prepared.filter(head=>family[head.id]&&!family[head.id].placeholder&&!family[head.id].extra)
+    .map(head=>({...family[head.id],profile:head.src,preparedCrop:{...head.crop}}));
 }

@@ -33,7 +33,14 @@ test('jachnun never spawns on a head, including the last free cell, and filling 
 test('head cropping stays within portrait and landscape photos, including manual edge positions',()=>{
   for(const [w,h] of [[414,444],[1200,400],[300,900]])for(const zoom of [1,1.35,3])for(const x of [0,.5,1])for(const y of [0,.34,1]){const c=headCrop(w,h,{zoom,x,y});assert.ok(c.x>=0&&c.y>=0);assert.ok(c.x+c.size<=w+.001&&c.y+c.size<=h+.001);}
 });
-test('only real family members with profile images are offered and live names and photos take precedence',()=>{
-  const people=snakeCharacters({yona:{id:'yona',name:'יונה',nameEn:'Yona'},eldad:{id:'eldad',name:'אלדד'},placeholder:{id:'placeholder',placeholder:true},extra:{id:'extra',extra:true}}, {yona:{profile:'/yona'},eldad:{name:'שם עדכני',profile:'/new'},placeholder:{profile:'/placeholder'},extra:{profile:'/extra'}});
-  assert.deepEqual(people.map(p=>p.id),['yona','eldad']);assert.equal(people[1].name,'שם עדכני');assert.equal(people[0].nameEn,'Yona');assert.ok(snakeDelay(90)>=105);assert.ok(snakeDelay(0)>snakeDelay(12));
+test('only reviewed snapshots are offered and a changed profile cannot alter their images or crops',()=>{
+  const family={yona:{id:'yona',name:'יונה',nameEn:'Yona',profile:'/changed'},eldad:{id:'eldad',name:'אלדד',profile:'/good-live-but-not-reviewed'},placeholder:{id:'placeholder',placeholder:true},extra:{id:'extra',extra:true}};
+  const prepared=[{id:'yona',src:'assets/games/heads/yona.png',crop:{zoom:1.35,x:.58,y:.43}},{id:'placeholder',src:'/placeholder'},{id:'extra',src:'/extra'}];
+  const people=snakeCharacters(family,prepared);assert.deepEqual(people.map(p=>p.id),['yona']);assert.equal(people[0].profile,'assets/games/heads/yona.png');assert.equal(people[0].nameEn,'Yona');assert.deepEqual(people[0].preparedCrop,prepared[0].crop);assert.equal(family.yona.profile,'/changed');assert.ok(snakeDelay(90)>=105);assert.ok(snakeDelay(0)>snakeDelay(12));
+});
+
+test('every prepared head has an independent local image and explicit reviewed crop coordinates',async()=>{
+  const {PREPARED_HEADS}=await import('../public/assets/jachnun-heads.mjs');const {readFile}=await import('node:fs/promises');
+  assert.ok(PREPARED_HEADS.length>=10);assert.equal(PREPARED_HEADS[0].id,'yona');assert.equal(new Set(PREPARED_HEADS.map(h=>h.id)).size,PREPARED_HEADS.length);
+  for(const head of PREPARED_HEADS){assert.match(head.src,/^assets\/games\/heads\/[a-z-]+\.(png|jpg)$/);assert.ok(head.crop.zoom>=1&&head.crop.zoom<=3);assert.ok(head.crop.x>=0&&head.crop.x<=1);assert.ok(head.crop.y>=0&&head.crop.y<=1);const bytes=await readFile(new URL('../public/'+head.src,import.meta.url));assert.ok(bytes.length>1000);assert.ok(bytes[0]===137||bytes[0]===255);}
 });

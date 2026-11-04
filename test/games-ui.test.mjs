@@ -182,7 +182,7 @@ test('the puzzle opens its own bilingual platform without quiz requests and paus
 
 test('Catch the Jachnun opens from both game lobbies, pauses on leaving and returns to the lobby',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english});assert.match(f.html,english?/Catch the Jachnun/:/לתפוס תגחנון/);await f.start('jachnun');assert.equal(f.jachnunMounts,1);assert.equal(f.requests.length,0);
+    const f=fixture({english});assert.match(f.html,english?/Catch the Jachnun/:/תפוס תג׳חנון/);await f.start('jachnun');assert.equal(f.jachnunMounts,1);assert.equal(f.requests.length,0);
     const before=f.jachnunPauses;f.window.FamilyGames.activate('tree');assert.ok(f.jachnunPauses>before);f.window.FamilyGames.activate('games');assert.equal(f.jachnunMounts,2);f.backFromJachnun();assert.match(f.html,/data-game-start="jachnun"/);
   }
 });

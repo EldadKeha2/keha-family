@@ -6,6 +6,18 @@ const token=()=>crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().repla
 const hex=value=>Array.from(value,b=>b.toString(16).padStart(2,'0')).join('');
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const langs=new Set(['he','en-US','en-GB']);
+export const HEAD_REQUEST_RECIPIENT='eldakeha@gmail.com';
+export function headRequestName(value){
+  if(typeof value!=='string'||/[\u0000-\u001f\u007f]/.test(value))throw new HttpError(400,'יש להזין שם מלא תקין.');
+  const name=value.normalize('NFKC').trim().replace(/\s+/g,' ');
+  if(name.length<2||name.length>100||(name.match(/\p{L}/gu)||[]).length<2)throw new HttpError(400,'יש להזין שם מלא באורך 2–100 תווים.');
+  return name;
+}
+export function headRequestEmail(name,language='he'){
+  const en=language!=='he',subject=en?'Head request — Catch the Jachnun':'בקשת ראש — תפוס תג׳חנון';
+  const line=en?'A family member asked to join the game’s head list.':'בן או בת משפחה ביקשו להצטרף לרשימת הראשים במשחק.';
+  return {subject,html:shell(language,subject,`<h2>${escape(subject)}</h2><p>${line}</p><p style="font-size:23px;font-weight:bold" dir="auto">${escape(name)}</p><p>${en?'Choose a clear portrait, prepare the head and add it to the game.':'יש לבחור תמונת פנים ברורה, להכין את הראש ולהוסיף אותו למשחק.'}</p>`),text:subject+'\n\n'+line+'\n\n'+name};
+}
 const provider=env=>env.EMAIL_PROVIDER||(env.BREVO_API_KEY?'brevo':'resend');
 export function updatesConfigured(env){
   try{return Boolean(env.FAMILY_UPDATES&&(['brevo','resend'].includes(provider(env)))&&(provider(env)==='brevo'?env.BREVO_API_KEY:env.RESEND_API_KEY)&&/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(env.EMAIL_FROM||'')&&env.UPDATES_SECRET?.length>=32&&new URL(env.SITE_ORIGIN).protocol==='https:'&&env.UPDATES_ENABLED==='true');}catch{return false;}
@@ -140,6 +152,23 @@ export class FamilyUpdates {
     if(!row||row.status!=='active')throw new HttpError(404,'הקישור אינו תקף. בקשו קישור חדש במייל.');
     return row;
   }
+  async headRequest(p){
+    const name=headRequestName(p.name);
+    if(typeof p.requestId!=='string'||!/^[a-f0-9]{32}$/.test(p.requestId))throw new HttpError(400,'יש לרענן את הטופס ולנסות שוב.');
+    const language=langs.has(p.language)?p.language:'he',now=Date.now();
+    const fingerprint=await this.digest('head-name:'+name.toLocaleLowerCase()),id='head-request/'+p.requestId+'/'+fingerprint;
+    const existing=this.rows('SELECT * FROM mail_requests WHERE id=?',id)[0];
+    if(existing?.status==='sent')return {sent:true};
+    if(!existing){
+      const ip=await this.digest('head-ip:'+p.ip);
+      this.tx(()=>{
+        for(const [key,limit,span] of [['head-ip:'+ip,3,3600000],['head-name:'+fingerprint,1,3600000],['head-all',30,86400000]])
+          if(!this.rate(key,limit,span,now))throw new HttpError(429,'כבר נשלחה בקשה לאחרונה. נסו שוב מאוחר יותר.');
+      });
+    }
+    await this.mail(HEAD_REQUEST_RECIPIENT,headRequestEmail(name,language),id);
+    return {sent:true};
+  }
   links(data){const base=new URL(this.env.SITE_ORIGIN).origin+'/?lang='+data.language,manage=base+'#updates/manage/'+data.manageToken;return {manage,unsubscribe:manage,oneClick:new URL(this.env.SITE_ORIGIN).origin+'/api/updates/one-click?token='+data.manageToken};}
   requestAllowed(id,ip,now){
     const limits=[['ip:'+ip,15,3600000],['email:'+id,8,3600000],['email-minute:'+id,1,60000],['signups',45,86400000]];
@@ -239,10 +268,19 @@ export class FamilyUpdates {
       const {action,...p}=await request.json();
       if(!updatesConfigured(this.env))throw new HttpError(503,'שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.','UPDATES_NOT_CONFIGURED');
       const now=Date.now();this.sql.exec('DELETE FROM mail_requests WHERE started<?',now-7*86400000);this.sql.exec('DELETE FROM rate_limits WHERE expires<?',now);this.sql.exec("DELETE FROM subscribers WHERE status='pending' AND confirm_expires<?",now);this.sql.exec('DELETE FROM deliveries WHERE day<?',new Date(now-7*86400000).toISOString().slice(0,10));
-      const methods={register:'register',confirm:'confirm','request-link':'requestLink',preferences:'getPreferences',save:'savePreferences',unsubscribe:'unsubscribe',dispatch:'dispatch'};
+      const methods={register:'register',confirm:'confirm','request-link':'requestLink',preferences:'getPreferences',save:'savePreferences',unsubscribe:'unsubscribe',dispatch:'dispatch','head-request':'headRequest'};
       if(!methods[action])throw new HttpError(404,'הפעולה אינה זמינה.');return json(await this[methods[action]](p));
     }catch(error){return fail(error);}
   }
+}
+
+export async function headRequestRoute(request,env){
+  if(request.method!=='POST')throw new HttpError(405,'הפעולה אינה נתמכת.');
+  if(!updatesConfigured(env))throw new HttpError(503,'לא ניתן לשלוח את הבקשה כרגע. נסו שוב מאוחר יותר.');
+  const body=await readJSON(request,2000);
+  // The recipient is fixed on the server; visitors can submit only a name.
+  const payload={action:'head-request',name:body.name,language:body.language,requestId:body.requestId,ip:request.headers.get('CF-Connecting-IP')||'unknown'};
+  return env.FAMILY_UPDATES.get(env.FAMILY_UPDATES.idFromName('keha-updates')).fetch(new Request('https://updates.internal/',{method:'POST',body:JSON.stringify(payload)}));
 }
 
 export async function updatesRoute(request,env,db){
