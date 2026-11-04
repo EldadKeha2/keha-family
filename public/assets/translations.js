@@ -687,3 +687,4 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   'שיתוף התמונה':'Share this photo'
 });
 Object.assign(window.FAMILY_TRANSLATIONS,{'מחק פריט':'Delete item'});
+Object.assign(window.FAMILY_TRANSLATIONS,{'הורדת תמונה':'Download photo','הורדת סרטון':'Download video','הורדת מסמך':'Download document'});

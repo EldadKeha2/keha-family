@@ -27,7 +27,6 @@
   }
   function metadata(){
     const item=current();if(!item)return;
-    $('mediaViewerTitle').textContent=item.kind==='video'?tr('סרטון משפחתי','Family video'):item.kind==='document'?tr('מסמך משפחתי','Family document'):tr('תמונה משפחתית','Family photo');
     $('mediaViewerCaption').textContent=item.caption||'';
     const descriptionLabel=item.kind==='video'?tr('הוסף תיאור לסרטון','Add a video description'):item.kind==='document'?tr('הוסף תיאור למסמך','Add a document description'):tr('הוסף תיאור לתמונה','Add a photo description');
     $('editOpenedCaption').querySelector('span').textContent=descriptionLabel;$('editOpenedCaption').setAttribute('aria-label',descriptionLabel);$('editOpenedCaption').title=descriptionLabel;
@@ -46,7 +45,8 @@
     $('mediaViewerCounter').textContent=`${state.index+1} / ${state.items.length}`;
     $('mediaPrevious').hidden=$('mediaNext').hidden=state.items.length<2;
     const link=$('mediaOriginal');link.href=item.watchUrl||item.src;
-    link.textContent=item.provider==='youtube'?I18n.t('צפייה ביוטיוב ↗'):I18n.t('הורדת המקור ↓');
+    const downloadLabel=item.kind==='video'?tr('הורדת סרטון','Download video'):item.kind==='document'?tr('הורדת מסמך','Download document'):tr('הורדת תמונה','Download photo');
+    link.querySelector('span').textContent=item.provider==='youtube'?I18n.t('צפייה ביוטיוב ↗'):downloadLabel;link.querySelector('svg').hidden=item.provider==='youtube';link.title=item.provider==='youtube'?I18n.t('צפייה ביוטיוב ↗'):downloadLabel;
     if(item.provider==='youtube'){link.removeAttribute('download');link.target='_blank';link.rel='noopener';}
     else {link.download=item.filename||'';link.removeAttribute('target');link.removeAttribute('rel');}
     $('mediaViewerDelete').hidden=!item.id;
