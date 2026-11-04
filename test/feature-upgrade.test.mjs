@@ -105,7 +105,7 @@ test('missing-person API uses only gallery photos with more than four tags and r
     for(const q of result.questions){assert.ok(Number.parseInt(q.id,16)<211);assert.equal(q.options.filter(o=>tagged.includes(o.id)).length,3);assert.ok(!tagged.includes(q.correctId));assert.ok(!q.options.some(o=>o.id==='yona'));}
     assert.deepEqual(f.database.prepare('SELECT * FROM media_tags ORDER BY media_id,person_id').all(),before);
     f.database.prepare('DELETE FROM media_tags WHERE media_id=?').run((200).toString(16).padStart(32,'0'));f.database.prepare('DELETE FROM media_tags WHERE media_id=?').run((201).toString(16).padStart(32,'0'));
-    const insufficient=await(await f.call('/api/games/who-is-missing')).json();assert.deepEqual(insufficient.questions,[]);assert.equal(insufficient.available,9);
+    const insufficient=await(await f.call('/api/games/who-is-missing')).json();assert.equal(insufficient.questions.length,9);assert.equal(insufficient.required,1);assert.equal(insufficient.available,9);
   }finally{f.close();}
 });
 test('trivia API uses current saved profile facts and leaves people and tags unchanged',async()=>{

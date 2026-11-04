@@ -8,6 +8,7 @@ import {memorialPeriod} from './memorial.mjs';
 import {makeQuiz,makeMissingQuiz} from '../public/assets/quiz.mjs';
 import {makeKinshipQuiz,kinshipPool} from '../public/assets/kinship.mjs';
 import {makeTriviaQuiz,triviaPool} from '../public/assets/trivia.mjs';
+import {triviaLanguage,validateTriviaQuestion,mixTriviaQuestions} from './trivia-questions.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -28,6 +29,8 @@ export class FamilyState {
   initialize(){
     this.sql.exec('CREATE TABLE IF NOT EXISTS people(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS memorial_candles(person_id TEXT NOT NULL,period TEXT NOT NULL,visitor_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(person_id,period,visitor_id))');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS trivia_questions(id TEXT PRIMARY KEY,language TEXT NOT NULL,data TEXT NOT NULL,created_at TEXT NOT NULL)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS trivia_question_language ON trivia_questions(language,created_at)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
@@ -214,8 +217,15 @@ export class FamilyState {
       }
       case 'game.kinship':return {questions:makeKinshipQuiz(family,this.run('people').people),available:kinshipPool(family).length,required:10};
       case 'game.trivia':{
-        const people=this.run('people').people,questions=makeTriviaQuiz(family,people);
-        return {questions:questions.length===10?questions:[],available:triviaPool(family,people).pool.length,required:10};
+        const language=triviaLanguage(p.language),people=this.run('people').people,custom=this.rows('SELECT id,data FROM trivia_questions WHERE language=? ORDER BY random() LIMIT 30',language).map(row=>({id:row.id,...JSON.parse(row.data)}));
+        const questions=mixTriviaQuestions(makeTriviaQuiz(family,people),custom);
+        return {questions:questions.length===10?questions:[],available:triviaPool(family,people).pool.length+this.rows('SELECT count(*) n FROM trivia_questions WHERE language=?',language)[0].n,required:10};
+      }
+      case 'trivia.question.add':{
+        const question=validateTriviaQuestion(p),previous=this.rows('SELECT data FROM trivia_questions WHERE id=?',p.requestId)[0];
+        if(previous&&previous.data!==JSON.stringify(question))throw new HttpError(409,'הבקשה כבר נשמרה עם תוכן אחר. רעננו את הטופס.');
+        if(!previous)this.sql.exec('INSERT INTO trivia_questions(id,language,data,created_at) VALUES(?,?,?,?)',p.requestId,question.language,JSON.stringify(question),new Date(Date.now()).toISOString());
+        return {saved:true,id:p.requestId,language:question.language};
       }
       case 'game.missing':
       case 'game.quiz':{
@@ -226,7 +236,7 @@ export class FamilyState {
         const tags=new Map();
         if(rows.length){const ids=rows.map(row=>JSON.parse(row.data).id);for(const row of this.rows('SELECT media_id,person_id FROM media_tags WHERE media_id IN ('+ids.map(()=>'?').join(',')+')',...ids)){if(!tags.has(row.media_id))tags.set(row.media_id,[]);tags.get(row.media_id).push(row.person_id);}}
         const questions=(missing?makeMissingQuiz:makeQuiz)(rows.map(row=>{const item=JSON.parse(row.data);return {id:item.id,kind:'photo',tags:tags.get(item.id)||[]};}),roster);
-        return {questions:questions.length===10?questions:[],available:questions.length,required:10};
+        return {questions:missing||questions.length===10?questions:[],available:questions.length,required:missing?1:10};
       }
       case 'health':this.rows('SELECT value FROM meta WHERE id=?',correctionKey);return {available:true};
       case 'people':{
@@ -419,7 +429,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:2,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data))};
+      case 'export':return {schemaVersion:2,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at}))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

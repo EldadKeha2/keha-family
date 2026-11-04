@@ -670,3 +670,13 @@ Object.assign(window.FAMILY_TRANSLATIONS,{"משחקי משפחה":"Family Games"
 Object.assign(window.FAMILY_TRANSLATIONS,{"הקישו על תמונה או שם לפתיחת העמוד האישי":"Tap a photo or name to open their personal page."});
 
 Object.assign(window.FAMILY_TRANSLATIONS,{"הוסף תיאור לתמונה":"Add a photo description","הוסף תיאור לסרטון":"Add a video description","הוסף תיאור למסמך":"Add a document description","לשיתוף":"Share"});
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  'בחרו עברית או אנגלית לשאלה.':'Choose Hebrew or English for the question.',
+  'מלאו את פרטי השאלה.':'Fill in the question details.',
+  'השאלה צריכה להכיל בין 5 ל־500 תווים.':'The question must contain between 5 and 500 characters.',
+  'מלאו ארבע תשובות, עד 160 תווים לכל תשובה.':'Enter four answers, up to 160 characters each.',
+  'ארבע התשובות צריכות להיות שונות זו מזו.':'The four answers must be different from each other.',
+  'סמנו איזו תשובה היא הנכונה.':'Mark the correct answer.',
+  'רעננו את הטופס ונסו לשמור שוב.':'Refresh the form and try saving again.',
+  'הבקשה כבר נשמרה עם תוכן אחר. רעננו את הטופס.':'This request was already saved with different content. Refresh the form.'
+});
