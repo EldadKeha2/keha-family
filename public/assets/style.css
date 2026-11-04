@@ -61,23 +61,30 @@ html[dir=rtl] .tree-guide-countdown{transform-origin:right}
   .tree-guide-fez{display:inline-block;width:30px;height:30px;object-fit:contain;vertical-align:middle;margin-inline-end:7px}
 }
 
-/* Side captions for Yona and Shlomo only; the other family cards retain their layout. */
+/* Names and birthdays stay below the root portraits; life events sit alongside. */
 @media(min-width:701px){
   .tree-unit[data-unit="u-root"]{align-items:stretch}
-  .tree-unit[data-unit="u-root"].couple:before{left:calc(50% - 77px);right:calc(50% - 77px);top:calc(50% - 4.5px)}
-  .tree-unit[data-unit="u-root"]>.union-diamond{top:calc(50% - 11.5px)}
-  .tree-unit .root-person-card{width:380px;min-width:380px;flex:0 0 380px;flex-direction:row-reverse;align-items:center;justify-content:flex-start;gap:18px;padding:0 4px 9px}
+  .tree-unit[data-unit="u-root"].couple:before{left:calc(50% - 91px);right:calc(50% - 91px);top:65px}
+  .tree-unit[data-unit="u-root"]>.union-diamond{top:58px}
+  .tree-unit .root-person-card{width:380px;min-width:380px;flex:0 0 380px;flex-direction:row-reverse;align-items:flex-start;justify-content:flex-start;gap:12px;padding:0 4px 9px}
   .tree-unit .root-person-card+.root-person-card{flex-direction:row}
-  .root-person-card .root-person-portrait{width:118px;flex:0 0 118px;margin:0}
-  .root-person-card .portrait{margin:0}
-  .root-person-details{flex:1;min-width:0;text-align:start}
-  .root-person-card .root-person-name{align-items:flex-start;text-align:start;margin:0}
-  .tree-unit[data-unit="u-root"] .root-person-card .person-name{max-width:none;font-size:24px;line-height:1.45;white-space:nowrap;min-height:0}
+  .root-person-identity{width:146px;flex:0 0 146px;text-align:center}
+  .root-person-card .root-person-portrait{width:100%;margin:0}
+  .root-person-card .portrait{margin:0 0 10px}
+  .root-person-details{flex:0 1 auto;width:max-content;max-width:214px;min-width:0;padding-top:10px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;text-align:end}
+  .root-person-card+.root-person-card .root-person-details{align-items:flex-start;text-align:start}
+  .tree-unit[data-unit="u-root"] .root-person-card .person-name{max-width:none;font-size:24px;line-height:1.45;white-space:nowrap;min-height:0;text-align:center}
   .root-person-card .memorial-inline{display:inline;font-size:14px;white-space:nowrap}
-  .tree-unit .root-person-card .person-birthday{align-items:flex-start;font-size:17px;line-height:1.6;gap:1px;margin-top:5px;text-align:start}
-  .root-person-card .birthday-line{justify-content:flex-start;min-height:26px}
-  .root-person-card.memorial .person-age{font-size:14px;min-height:22px}
-  html[lang^=en] .root-person-card .person-birthday bdi{font-size:16px}
+  .tree-unit .root-person-card .root-person-birth{align-items:center;font-size:15px;line-height:1.5;gap:0;margin-top:2px;text-align:center}
+  .root-person-card .birthday-line{justify-content:center;min-height:26px}
+  .root-life-event{max-width:100%}
+  .root-event-label{display:block;font-size:14px;line-height:1.5;color:#8a7d63}
+  .root-event-value{display:block;font-size:17px;line-height:1.6;color:#847354}
+  .root-event-value bdi{white-space:nowrap}
+  .root-event-age{display:inline;font-size:14px;white-space:nowrap;color:#677456}
+  html[lang^=en] .tree-unit[data-unit="u-root"] .root-person-card .person-name{font-size:22px}
+  html[lang^=en] .root-person-card .memorial-inline{font-size:11px}
+  html[lang^=en] .root-person-card .root-person-birth bdi{font-size:15px}
+  html[lang^=en] .root-event-value{font-size:16px}
 }
-
 .tree-unit[data-unit="u-root"] .person-age{order:4}
