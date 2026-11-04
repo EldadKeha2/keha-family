@@ -97,3 +97,24 @@ test('the relationship game API reuses saved portraits and never changes people 
     assert.deepEqual(f.database.prepare('SELECT id,data FROM people ORDER BY id').all(),before);assert.equal(f.database.prepare('SELECT count(*) n FROM media').get().n,media);
   }finally{f.close();}
 });
+test('missing-person API uses only gallery photos with more than four tags and returns one absent choice',async()=>{
+  const f=fixture();try{
+    const insert=f.database.prepare('INSERT INTO media(id,category,data) VALUES(?,?,?)'),tag=f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)'),tagged=['eldad','bosmat','naama','rivi','amit'];
+    for(let i=0;i<14;i++){const id=(i+200).toString(16).padStart(32,'0'),kind=i===13?'video':'photo';insert.run(id,i===12?'personal':'gallery',JSON.stringify({id,kind,mime:kind==='photo'?'image/jpeg':'video/mp4',caption:'Answer must not leak'}));for(const personId of tagged.slice(0,i===11?4:5))tag.run(id,personId);}
+    const before=f.database.prepare('SELECT * FROM media_tags ORDER BY media_id,person_id').all(),response=await f.call('/api/games/who-is-missing');assert.equal(response.status,200);const result=await response.json();assert.equal(result.questions.length,10);assert.ok(!JSON.stringify(result).includes('Answer must not leak'));
+    for(const q of result.questions){assert.ok(Number.parseInt(q.id,16)<211);assert.equal(q.options.filter(o=>tagged.includes(o.id)).length,3);assert.ok(!tagged.includes(q.correctId));assert.ok(!q.options.some(o=>o.id==='yona'));}
+    assert.deepEqual(f.database.prepare('SELECT * FROM media_tags ORDER BY media_id,person_id').all(),before);
+    f.database.prepare('DELETE FROM media_tags WHERE media_id=?').run((200).toString(16).padStart(32,'0'));f.database.prepare('DELETE FROM media_tags WHERE media_id=?').run((201).toString(16).padStart(32,'0'));
+    const insufficient=await(await f.call('/api/games/who-is-missing')).json();assert.deepEqual(insufficient.questions,[]);assert.equal(insufficient.available,9);
+  }finally{f.close();}
+});
+test('trivia API uses current saved profile facts and leaves people and tags unchanged',async()=>{
+  const f=fixture();try{
+    for(const row of f.database.prepare('SELECT id,data FROM people').all()){
+      const person=JSON.parse(row.data);person.birthday='9.11.1985';person.about='PRIVATE BIOGRAPHY';if(person.aliyahYear)person.aliyahYear=2001;f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(person),row.id);
+    }
+    const before=f.database.prepare('SELECT id,data FROM people ORDER BY id').all(),response=await f.call('/api/games/trivia');assert.equal(response.status,200);const result=await response.json();assert.equal(result.questions.length,10);assert.ok(result.available>=10);assert.ok(!JSON.stringify(result).includes('PRIVATE BIOGRAPHY'));
+    for(const q of result.questions){const answer=q.options.find(o=>o.id===q.correctId);assert.equal(q.options.length,4);if(q.topic==='birth-year')assert.equal(answer.name,'1985');else if(q.topic==='birth-month')assert.equal(answer.name,'נובמבר');else if(q.topic==='aliyah-year')assert.equal(answer.name,'2001');else assert.fail('Birth order must not be guessed for same-date siblings');}
+    assert.deepEqual(f.database.prepare('SELECT id,data FROM people ORDER BY id').all(),before);assert.equal(f.database.prepare('SELECT count(*) n FROM media_tags').get().n,0);
+  }finally{f.close();}
+});

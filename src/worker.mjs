@@ -165,6 +165,8 @@ export default {
       if(path==='/api/memorial'&&request.method==='GET')return json(await db('memorial',{visitorId:/^[a-f0-9]{32}$/.test(request.headers.get('X-Candle-Visitor')||'')?request.headers.get('X-Candle-Visitor'):null}));
       if(path==='/api/games/who-is-it'&&request.method==='GET')return json(await db('game.quiz'));
       if(path==='/api/games/relationships'&&request.method==='GET')return json(await db('game.kinship'));
+      if(path==='/api/games/who-is-missing'&&request.method==='GET')return json(await db('game.missing'));
+      if(path==='/api/games/trivia'&&request.method==='GET')return json(await db('game.trivia'));
       if(path==='/api/calendar'&&request.method==='GET'){
         const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
         const people=Object.fromEntries((await db('dates')).people.map(p=>[p.id,p]));

@@ -36,6 +36,28 @@ export function makeQuiz(items,people,count=10,random=Math.random,now=new Date(D
   }
   return questions;
 }
+export function makeMissingQuiz(items,people,count=10,random=Math.random){
+  const roster=Object.values(people),byId=new Map(roster.map(p=>[p.id,p])),questions=[],seen=new Set();
+  const aliases=person=>[normalize(person.name),normalize(person.nameEn)].filter(Boolean);
+  const eligible=person=>person&&person.id!=='yona'&&aliases(person).length>0;
+  for(const item of shuffled(items,random)){
+    if(seen.has(item.id)||item.kind!=='photo')continue;
+    const tagged=new Set((item.tags||[]).map(p=>typeof p==='string'?p:p.id).filter(Boolean));
+    if(tagged.size<5)continue;
+    const taggedPeople=[...tagged].map(id=>byId.get(id)).filter(Boolean),taggedNames=new Set(taggedPeople.flatMap(aliases));
+    const present=[],names=new Set();
+    for(const person of shuffled(taggedPeople.filter(eligible),random)){
+      const labels=aliases(person);if(labels.some(label=>names.has(label)))continue;
+      present.push(person);labels.forEach(label=>names.add(label));if(present.length===3)break;
+    }
+    if(present.length!==3)continue;
+    const absent=shuffled(roster.filter(p=>eligible(p)&&!tagged.has(p.id)&&!aliases(p).some(label=>taggedNames.has(label))),random)[0];
+    if(!absent)continue;
+    seen.add(item.id);questions.push({id:item.id,kind:'missing',src:item.src||'/media/'+item.id,correctId:absent.id,options:shuffled([...present,absent],random).map(({id,name,nameEn})=>({id,name,nameEn}))});
+    if(questions.length===count)break;
+  }
+  return questions;
+}
 export function quizGrade(correct,total=10){
   if(!Number.isInteger(correct)||!Number.isInteger(total)||total<1||correct<0||correct>total)throw Error('Invalid score');
   const score=Math.round(correct/total*100);return {correct,total,score,level:score>=80?'expert':score>=40?'familiar':'reunion'};

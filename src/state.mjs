@@ -5,8 +5,9 @@ import {featuredVideos} from './featured-videos.mjs';
 import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections} from './date-corrections.mjs';
 import {biographyDefaults,biographyValue,contentField} from './biography.mjs';
 import {memorialPeriod} from './memorial.mjs';
-import {makeQuiz} from '../public/assets/quiz.mjs';
+import {makeQuiz,makeMissingQuiz} from '../public/assets/quiz.mjs';
 import {makeKinshipQuiz,kinshipPool} from '../public/assets/kinship.mjs';
+import {makeTriviaQuiz,triviaPool} from '../public/assets/trivia.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -212,12 +213,19 @@ export class FamilyState {
         return {saved:true,id:person.id,candle:this.candleState(person,p.visitorId)};
       }
       case 'game.kinship':return {questions:makeKinshipQuiz(family,this.run('people').people),available:kinshipPool(family).length,required:10};
+      case 'game.trivia':{
+        const people=this.run('people').people,questions=makeTriviaQuiz(family,people);
+        return {questions:questions.length===10?questions:[],available:triviaPool(family,people).pool.length,required:10};
+      }
+      case 'game.missing':
       case 'game.quiz':{
+        const missing=action==='game.missing';
         const roster=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,{...family.people[row.id],...JSON.parse(row.data)}]));
-        const rows=this.rows("SELECT m.data FROM media m WHERE m.category='gallery' AND COALESCE(json_extract(m.data,'$.kind'),'photo')='photo' AND EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=m.id) ORDER BY random() LIMIT 60");
+        const tagged=missing?'(SELECT count(*) FROM media_tags t WHERE t.media_id=m.id)>4':'EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=m.id)';
+        const rows=this.rows("SELECT m.data FROM media m WHERE m.category='gallery' AND COALESCE(json_extract(m.data,'$.kind'),'photo')='photo' AND "+tagged+" ORDER BY random() LIMIT 60");
         const tags=new Map();
         if(rows.length){const ids=rows.map(row=>JSON.parse(row.data).id);for(const row of this.rows('SELECT media_id,person_id FROM media_tags WHERE media_id IN ('+ids.map(()=>'?').join(',')+')',...ids)){if(!tags.has(row.media_id))tags.set(row.media_id,[]);tags.get(row.media_id).push(row.person_id);}}
-        const questions=makeQuiz(rows.map(row=>{const item=JSON.parse(row.data);return {id:item.id,kind:'photo',tags:tags.get(item.id)||[]};}),roster);
+        const questions=(missing?makeMissingQuiz:makeQuiz)(rows.map(row=>{const item=JSON.parse(row.data);return {id:item.id,kind:'photo',tags:tags.get(item.id)||[]};}),roster);
         return {questions:questions.length===10?questions:[],available:questions.length,required:10};
       }
       case 'health':this.rows('SELECT value FROM meta WHERE id=?',correctionKey);return {available:true};

@@ -7,13 +7,15 @@ import {quizGrade} from '../public/assets/quiz.mjs';
 const source=(await readFile(new URL('../public/assets/games.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 const questions=Array.from({length:10},(_,i)=>({id:'photo-'+i,src:'/media/photo-'+i,correctId:'p0',options:Array.from({length:4},(_,j)=>({id:'p'+j,name:'אדם '+j,nameEn:'Person '+j}))}));
 const kinshipQuestions=questions.map(q=>({...q,kind:'kinship',subject:{id:'rivi',name:'ריוי גנדלמן',nameEn:'Revital Gandelman',gender:'f',profile:'/media/rivi'},reference:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha',gender:'m',profile:'/media/eldad'},options:[{id:'p0',name:'בת דודה',nameEn:'First cousin'},{id:'p1',name:'אחות',nameEn:'Sister'},{id:'p2',name:'אחיינית',nameEn:'Niece'},{id:'p3',name:'נכדה',nameEn:'Granddaughter'}]}));
-function fixture({english=false,autoImages=true,count=10}={}){
-  let now=100000,intervalId=0;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[];
+const triviaQuestions=questions.map(q=>({...q,kind:'trivia',subject:kinshipQuestions[0].subject,prompt:'באיזו שנה נולדה ריוי גנדלמן?',promptEn:'In which year was Revital Gandelman born?',options:q.options.map((o,i)=>({...o,name:String(1970+i),nameEn:String(1970+i)}))}));
+function fixture({english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false}={}){
+  let now=100000,intervalId=0,prevented=false;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[];
   class Node{
     constructor(){this.handlers=new Map();this.dataset={};this.style={setProperty(){}};this.attributes={};this.disabled=false;this.hidden=false;this.complete=autoImages;this.naturalWidth=autoImages?100:0;this.textContent='';}
     addEventListener(kind,callback){this.handlers.set(kind,callback);}
     setAttribute(name,value){this.attributes[name]=value;}
     focus(){}
+    select(){}
     querySelector(selector){return selector==='[data-game-result]'?nodes.get('result'):selector==='.game-question-title'?nodes.get('heading'):null;}
     querySelectorAll(selector){return selector==='[data-game-option]'?this.options||[]:[];}
     set innerHTML(value){
@@ -25,15 +27,19 @@ function fixture({english=false,autoImages=true,count=10}={}){
     }
     get innerHTML(){return this.html||'';}
   }
-  for(const id of ['familyGamesContent','gamesView','result'])nodes.set(id,new Node());
+  for(const id of ['familyGamesContent','gamesView','result','gameShareStatus','gameShareFallback'])nodes.set(id,new Node());
+  nodes.get('gameShareFallback').hidden=true;
   const document={visibilityState:'visible',getElementById:id=>nodes.get(id),addEventListener:(kind,callback)=>documentEvents.set(kind,callback)};
-  const window={FamilyI18n:{isEnglish:english,personName:p=>english?p.nameEn:p.name,error:String,fetch:async path=>{requests.push(path);return {ok:true,json:async()=>({questions:(path.endsWith('relationships')?kinshipQuestions:questions).slice(0,count),available:count})};}},FamilyApp:{getView:()=> 'games'}};
+  const window={location:{origin:'https://family.test',pathname:'/',href:'https://family.test/?media=private-image&lang=he#games'},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',personName:p=>english?p?.nameEn:p?.name,error:String,fetch:async path=>{requests.push(path);return {ok:true,json:async()=>({questions:(path.endsWith('relationships')?kinshipQuestions:path.endsWith('/trivia')?triviaQuestions:questions).slice(0,count),available:count})};}},FamilyApp:{getView:()=> 'games'}};
+  const navigator={clipboard:{async writeText(value){if(clipboardError)throw Error('Clipboard unavailable');copied.push(value);}}};
+  if(nativeShare)navigator.share=async data=>{shared.push(data);if(shareError)throw Object.assign(Error('Share unavailable'),{name:shareError});};
   const FakeDate=class extends Date{static now(){return now;}};
-  vm.runInNewContext(source,{window,document,quizGrade,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
+  vm.runInNewContext(source,{window,document,navigator,URL,quizGrade,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
   documentEvents.get('DOMContentLoaded')();
   const root=nodes.get('familyGamesContent'),flush=()=>new Promise(resolve=>setImmediate(resolve));
-  async function click(selector,node={},detail=1){root.handlers.get('click')({detail,target:{closest:s=>s===selector?node:null}});await flush();}
-  return {window,nodes,intervals,document,requests,get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
+  async function click(selector,node={},detail=1){prevented=false;root.handlers.get('click')({detail,preventDefault(){prevented=true;},target:{closest:s=>s===selector?node:null}});await flush();}
+  return {window,nodes,intervals,document,requests,shared,copied,get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
+    messenger:()=>click('[data-game-share-messenger]'),
     start:(game='photos')=>click('[data-game-start]',{dataset:{gameStart:game}}),lobby:()=>click('[data-game-lobby]'),choose:(id='p0',round=Number(root.options[0].dataset.gameRound),detail=1)=>click('[data-game-option]',{dataset:{gameOption:id,gameRound:String(round)}},detail),
     load(image=nodes.get('familyGamePhoto')){image.handlers.get('load')();},error(image=nodes.get('familyGamePhoto')){image.handlers.get('error')();},
     jump(ms){now+=ms;for(const interval of intervals.values())interval.next=Math.max(interval.next,now);},
@@ -86,4 +92,37 @@ test('players can choose either game, and the relationship quiz shows two profil
 });
 test('relationship timeouts advance without feedback and choosing another game clears the running clock',async()=>{
   const f=fixture();await f.start('kinship');f.advance(15000);assert.equal(f.round,'1');assert.doesNotMatch(f.html,/kinship-review|class="game-score"/);await f.lobby();assert.equal(f.intervals.size,0);f.advance(60000);assert.match(f.html,/family-game-choices/);
+});
+test('all four games provide a ten-question review and localized score sharing only at the end',async()=>{
+  for(const english of [false,true])for(const game of ['photos','kinship','missing','trivia']){
+    const f=fixture({english});for(const id of ['photos','kinship','missing','trivia'])assert.match(f.html,new RegExp('data-game-start="'+id+'"'));
+    await f.start(game);assert.equal(f.requests.at(-1),'api/games/'+({photos:'who-is-it',kinship:'relationships',missing:'who-is-missing',trivia:'trivia'})[game]);
+    if(game==='missing')assert.match(f.html,english?/Who’s missing\?/:/מי חסר\?/);
+    if(game==='trivia'){assert.match(f.html,english?/In which year was Revital/:/באיזו שנה נולדה ריוי/);assert.match(f.html,/src="\/media\/rivi"/);}
+    for(let i=0;i<10;i++){assert.doesNotMatch(f.html,/game-result-sharing|data-game-review-question|class="game-score"/);await f.choose(i<6?'p0':'p1');}
+    assert.equal((f.html.match(/data-game-review-question=/g)||[]).length,10);assert.match(f.html,/<strong>60<\/strong>/);assert.match(f.html,/game-share-whatsapp/);assert.match(f.html,/game-share-email/);assert.match(f.html,/data-game-share-messenger/);
+    if(['photos','missing'].includes(game)){assert.equal((f.html.match(/class="game-review-photo"/g)||[]).length,10);assert.match(f.html,/loading="lazy"/);}
+    const href=f.html.match(/href="(https:\/\/wa\.me\/\?text=[^"]+)"/)[1],text=new URL(href).searchParams.get('text');assert.match(text,/60\/100/);assert.match(text,english?/6 correct answers/:/6 תשובות נכונות/);assert.ok(text.includes('https://family.test/?lang='+(english?'en-US':'he')+'#games'));assert.doesNotMatch(text,/private-image|media=/);
+    const email=f.html.match(/href="(mailto:[^"]+)"/)[1].replaceAll('&amp;','&'),params=new URLSearchParams(email.split('?')[1]);assert.equal(params.get('body'),text);assert.ok(params.get('subject'));
+    assert.equal(f.intervals.size,0);
+  }
+});
+test('the missing-person timer waits for photos and the trivia timer starts on the question',async()=>{
+  const photo=fixture({autoImages:false});await photo.start('missing');photo.advance(20000);assert.equal(photo.round,'0');assert.equal(photo.intervals.size,0);photo.load();photo.advance(15000);assert.equal(photo.round,'1');assert.doesNotMatch(photo.html,/data-game-review-question/);
+  const trivia=fixture({autoImages:false});await trivia.start('trivia');assert.equal(trivia.intervals.size,1);trivia.advance(150000);assert.match(trivia.html,/<strong>0<\/strong>/);assert.match(trivia.html,/10 שאלות הסתיימו/);assert.equal((trivia.html.match(/הזמן הסתיים ללא תשובה/g)||[]).length,10);
+});
+test('Messenger shares the complete result natively or copies it for the Messenger conversation',async()=>{
+  for(const nativeShare of [true,false]){
+    const f=fixture({nativeShare});await f.messenger();assert.equal(f.shared.length,0);assert.equal(f.copied.length,0);
+    await f.start('missing');for(let i=0;i<10;i++)await f.choose();await f.messenger();
+    if(nativeShare){assert.equal(f.prevented,true);assert.equal(f.shared.length,1);assert.match(f.shared[0].title,/מי חסר/);assert.match(f.shared[0].text,/100\/100/);assert.equal(f.shared[0].url,'https://family.test/?lang=he#games');}
+    else{assert.equal(f.prevented,false,'The Messenger link opens via the normal user click');assert.equal(f.copied.length,1);assert.match(f.copied[0],/100\/100/);assert.match(f.nodes.get('gameShareStatus').textContent,/התוצאה הועתקה/);}
+  }
+});
+test('share cancellation stays quiet and unavailable sharing or clipboard exposes selectable result text',async()=>{
+  for(const setup of [{nativeShare:true,shareError:'AbortError'},{nativeShare:true,shareError:'NotAllowedError'},{clipboardError:true}]){
+    const f=fixture(setup);await f.start('trivia');for(let i=0;i<10;i++)await f.choose();await f.messenger();
+    if(setup.shareError==='AbortError'){assert.equal(f.nodes.get('gameShareStatus').textContent,'');assert.equal(f.nodes.get('gameShareFallback').hidden,true);}
+    else{assert.equal(f.nodes.get('gameShareFallback').hidden,false);assert.match(f.nodes.get('gameShareFallback').value,/100\/100/);assert.match(f.nodes.get('gameShareFallback').value,/טריוויה משפחתית/);}
+  }
 });
