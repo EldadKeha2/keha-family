@@ -698,3 +698,5 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   'אפשר להציג את כל התמונות או לשנות את החיפוש.':'Show all photos or change your search.',
   'בחרו סינון תמונות תקין.':'Choose a valid photo filter.'
 });
+
+Object.assign(window.FAMILY_TRANSLATIONS,{'הרשמה לעדכונים':'Subscribe for updates'});

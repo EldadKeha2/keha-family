@@ -11,6 +11,7 @@ function fixture({english=false,native=true,files=true,cancel=false,clipboard=tr
     constructor(){this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.classList={toggle(){}};this.children=new Map();}
     addEventListener(type,callback){this.handlers.set(type,callback);}
     setAttribute(key,value){this[key]=value;}
+    getAttribute(key){return key in this?String(this[key]):null;}
     removeAttribute(key){delete this[key];}
     querySelector(selector){if(!this.children.has(selector))this.children.set(selector,new Node());return this.children.get(selector);}
     querySelectorAll(){return [];}
@@ -64,4 +65,14 @@ test('tagging can keep the current photo open while the untagged album updates b
   f.window.FamilyMedia.register('gallery',[],{retainCurrent:true});assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/b');
   f.window.FamilyMedia.register('gallery',[]);assert.equal(f.get('mediaViewer').open,false,'An actual deletion can still close the last photo');
   f.window.FamilyMedia.openFrom('gallery','b');assert.equal(f.get('mediaViewer').open,false,'The retained photo must not leak into the filtered album on reopening');
+});
+test('the profile action follows the album owner gender when switching between personal albums',()=>{
+  const f=fixture(),owners={rachel:{gender:'f'},avishai:{gender:'m'}};
+  f.window.FamilyApp.getPerson=id=>owners[id];
+  const photo={id:'group',kind:'photo',src:'/media/group',file:'group.jpg',tags:[{id:'avishai',gender:'m'}]};
+  const button=f.get('openedProfilePhoto'),hair=button.querySelector('[data-profile-hair]');
+  f.window.FamilyMedia.open([photo],0,'personal:rachel');assert.equal(button.hidden,false);assert.equal(button.getAttribute('data-gender'),'f');assert.equal(hair.getAttribute('hidden'),null);
+  f.window.FamilyMedia.open([photo],0,'personal:avishai');assert.equal(button.getAttribute('data-gender'),'m');assert.equal(hair.getAttribute('hidden'),'');
+  f.window.FamilyMedia.open([photo],0,'personal:guest');assert.equal(button.getAttribute('data-gender'),'unknown');
+  f.window.FamilyMedia.open([photo],0,'gallery');assert.equal(button.hidden,true,'Only a personal album offers profile selection');
 });

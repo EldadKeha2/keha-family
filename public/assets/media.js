@@ -42,7 +42,9 @@
     $('downloadForInstagram').href=item.src;$('downloadForInstagram').download=item.filename||'';
     $('downloadForInstagram').textContent=item.kind==='video'?tr('הורדת הסרטון','Download video'):tr('הורדת התמונה','Download photo');
     $('mediaShareStatus').textContent='';$('mediaLinkFallback').hidden=true;
-    $('openedProfilePhoto').hidden=!(state.scope?.startsWith('personal:')&&item.kind==='photo');
+    const ownerId=state.scope?.startsWith('personal:')?state.scope.slice(9):null,owner=ownerId&&(app()?.getPerson?.(ownerId)||window.FAMILY_DATA?.people?.[ownerId]),gender=['m','f'].includes(owner?.gender)?owner.gender:'unknown',profileButton=$('openedProfilePhoto');
+    profileButton.hidden=!(ownerId&&item.kind==='photo');profileButton.setAttribute('data-gender',gender);
+    const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
     $('mediaViewerCounter').textContent=`${state.index+1} / ${state.items.length}`;
     $('mediaPrevious').hidden=$('mediaNext').hidden=state.items.length<2;
