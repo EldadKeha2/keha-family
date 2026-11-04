@@ -51,7 +51,8 @@ test('language options support keyboard selection and escaped custom languages w
  const f=fixture(true);await f.handlers.get('click')(f.event('[data-bio-edit]',{dataset:{bioEdit:'languages'},disabled:false}));
  f.handlers.get('input')(f.event('[data-bio-form]',{matches:s=>s==='[data-bio-language-search]',value:'Spanish'}));
  await f.handlers.get('keydown')({...f.event('[data-bio-form]',{matches:s=>s==='[data-bio-language-search]'}),key:'Enter'});
- assert.match(f.bio.render(f.people.a),/country-flags\.svg#ES/);assert.equal(f.requests.length,0);
+ assert.match(f.bio.render(f.people.a),/country-flags\.svg#ES/);assert.equal(f.requests.length,0);assert.match(f.bio.render(f.people.a),/aria-expanded="false"/);
+ await f.handlers.get('click')(f.event('[data-bio-language-search]'));assert.match(f.bio.render(f.people.a),/aria-expanded="true"/);
  f.handlers.get('input')(f.event('[data-bio-form]',{matches:s=>s==='[data-bio-language-search]',value:'<script>custom</script>'}));
  await f.handlers.get('click')(f.event('[data-bio-language-add]',{dataset:{bioLanguageAdd:'0'}}));
  const html=f.bio.render(f.people.a);assert.match(html,/&lt;script&gt;custom&lt;\/script&gt;/);assert.ok(!html.includes('<script>custom'));

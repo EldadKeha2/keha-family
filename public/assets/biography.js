@@ -33,8 +33,9 @@ function updateLanguageOptions(){
 function chooseLanguage(index){
   if(!editor||editor.section!=='languages'||editor.saving||editor.draft.length>=30)return;
   const option=languageOptions()[index];if(!option||editor.draft.some(value=>languageKey(value)===languageKey(option.value)))return;
-  editor.draft.push(option.value);editor.languageQuery='';editor.languageIndex=0;editor.languageOpen=true;rerender(true);
+  editor.draft.push(option.value);editor.languageQuery='';editor.languageIndex=0;closeLanguageSelection();
 }
+function closeLanguageSelection(){editor.languageOpen=false;rerender(true);editor.languageOpen=false;updateLanguageOptions();}
 function period(item){
   const start=item.fromYear,end=item.toYear;
   if(item.current)return start?`<bdi>${start} – ${tr('היום','present')}</bdi>`:tr('כיום','Present');
@@ -81,8 +82,9 @@ function updateDraft(target){
 function attach(host,handlers){
   root=host;controller=handlers;
   root.addEventListener('click',event=>{
+    if(event.target.matches('[data-bio-language-search]')&&editor?.section==='languages'){editor.languageOpen=true;updateLanguageOptions();return;}
     const language=event.target.closest('[data-bio-language-add]');if(language){chooseLanguage(Number(language.dataset.bioLanguageAdd));return;}
-    const removeLanguage=event.target.closest('[data-bio-language-remove]');if(removeLanguage&&editor?.section==='languages'&&!editor.saving){editor.draft.splice(Number(removeLanguage.dataset.bioLanguageRemove),1);rerender(true);return;}
+    const removeLanguage=event.target.closest('[data-bio-language-remove]');if(removeLanguage&&editor?.section==='languages'&&!editor.saving){editor.draft.splice(Number(removeLanguage.dataset.bioLanguageRemove),1);closeLanguageSelection();return;}
     const edit=event.target.closest('[data-bio-edit]');
     if(edit&&!edit.disabled){
       if(controller.isBlocked())return;
