@@ -3,6 +3,10 @@ import {HttpError,text} from './http.mjs';
 
 const countries=new Set(countryCodes);
 export const biographyDefaults={residences:[],languages:[],occupation:'',jobs:[]};
+export function contentField(section,language='he'){
+  if(!['he','en','en-US','en-GB'].includes(language))throw new HttpError(400,'שפת התוכן אינה תקינה.');
+  return ['about','occupation','jobs'].includes(section)&&language!=='he'?section+'En':section;
+}
 function invalid(){throw new HttpError(400,'פרטי האודות אינם תקינים.');}
 function year(value){
   if(value===null||value==='')return null;

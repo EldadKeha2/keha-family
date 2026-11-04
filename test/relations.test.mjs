@@ -16,7 +16,7 @@ test('Elisheva has her own siblings and children from the existing tree',()=>{
   assert.deepEqual(relatives('becker-parent'),{partners:['israel-becker'],parents:['yona','shlomo'],children:['yuval','tammy'],siblings:['ruti','yehiel','avigail','ora','shosh']});
 });
 test('a partner shares the children without inheriting their partner’s siblings',()=>{
-  assert.deepEqual(relatives('rachel-katan'),{partners:['yehiel'],parents:[],children:['bosmat','eldad','naama'],siblings:[]});
+  assert.deepEqual(relatives('rachel-katan'),{partners:['yehiel'],parents:[],children:['bosmat','eldad','naama'],siblings:['itzhak-katan']});
   assert.deepEqual(relatives('israel-becker'),{partners:['becker-parent'],parents:[],children:['yuval','tammy'],siblings:[]});
 });
 test('Eldad has Adi and his two siblings, with no children inferred',()=>{
@@ -43,4 +43,10 @@ test('every known parent also lists the viewed person as a child',()=>{
   for(const id of Object.keys(family.people))for(const parent of relatives(id).parents){
     assert.ok(relatives(parent).children.includes(id),`${parent} must be a parent of ${id}`);
   }
+});
+test('additional relatives appear only as the explicitly linked person’s sibling',()=>{
+  assert.deepEqual(relatives('itzhak-katan'),{partners:[],parents:[],children:[],siblings:['rachel-katan']});
+  assert.deepEqual(relatives('natan-fish'),{partners:[],parents:[],children:[],siblings:['eddie']});
+  assert.deepEqual(relatives('eddie').siblings,['natan-fish']);
+  for(const id of ['eldad','yehiel','ora','yona'])assert.ok(!relatives(id).siblings.some(id=>['itzhak-katan','natan-fish'].includes(id)));
 });

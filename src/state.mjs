@@ -3,7 +3,9 @@ import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from '.
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
 import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections} from './date-corrections.mjs';
-import {biographyDefaults,biographyValue} from './biography.mjs';
+import {biographyDefaults,biographyValue,contentField} from './biography.mjs';
+import {memorialPeriod} from './memorial.mjs';
+import {makeQuiz} from '../public/assets/quiz.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -23,6 +25,7 @@ export class FamilyState {
   }
   initialize(){
     this.sql.exec('CREATE TABLE IF NOT EXISTS people(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS memorial_candles(person_id TEXT NOT NULL,period TEXT NOT NULL,visitor_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(person_id,period,visitor_id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
@@ -41,8 +44,8 @@ export class FamilyState {
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
         const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn;
-        if(nameChanged||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)||(p.aliyahMonth&&person.aliyahMonth!==p.aliyahMonth)){
-          person.name=p.name;person.nameEn=p.nameEn;person.deceased=Boolean(p.deceased);
+        if(nameChanged||Boolean(person.extended)!==Boolean(p.extended)||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)||(p.aliyahMonth&&person.aliyahMonth!==p.aliyahMonth)){
+          person.name=p.name;person.nameEn=p.nameEn;person.extended=Boolean(p.extended);person.deceased=Boolean(p.deceased);
           if(person.deathDate===undefined)person.deathDate=p.deathDate||null;
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
           if(p.aliyahMonth)person.aliyahMonth=p.aliyahMonth;
@@ -192,8 +195,29 @@ export class FamilyState {
     return {...pair,...record,mediaCount:collection.count,greetingCount:greetings.length,cover:collection.items.find(item=>item.kind==='photo')?.src||null,
       ...(details?{collection,greetings}:{})};
   }
+  candleState(person,visitorId){
+    const cycle=memorialPeriod(person.deathDate),row=this.rows('SELECT count(*) AS n FROM memorial_candles WHERE person_id=? AND period=?',person.id,cycle.period)[0];
+    const lit=Boolean(visitorId&&this.rows('SELECT 1 AS lit FROM memorial_candles WHERE person_id=? AND period=? AND visitor_id=?',person.id,cycle.period,visitorId).length);
+    return {...cycle,count:row.n,lit};
+  }
   run(action,p){
     switch(action){
+      case 'memorial':return {candles:Object.fromEntries(this.rows("SELECT data FROM people WHERE json_extract(data,'$.deceased')=1").map(row=>{const person=JSON.parse(row.data);return [person.id,this.candleState(person,p.visitorId)];}))};
+      case 'candle.light':{
+        const person=this.person(p.id);if(!person.deceased)throw new HttpError(400,'אפשר להדליק נר בעמוד לזכרם בלבד.');
+        if(typeof p.visitorId!=='string'||!/^[a-f0-9]{32}$/.test(p.visitorId))throw new HttpError(400,'לא ניתן לזהות את ההדלקה. רעננו את העמוד ונסו שוב.');
+        const {period}=memorialPeriod(person.deathDate);
+        this.sql.exec('INSERT OR IGNORE INTO memorial_candles(person_id,period,visitor_id,created_at) VALUES(?,?,?,?)',person.id,period,p.visitorId,new Date(Date.now()).toISOString());
+        return {saved:true,id:person.id,candle:this.candleState(person,p.visitorId)};
+      }
+      case 'game.quiz':{
+        const roster=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,{...family.people[row.id],...JSON.parse(row.data)}]));
+        const rows=this.rows("SELECT m.data FROM media m WHERE m.category='gallery' AND COALESCE(json_extract(m.data,'$.kind'),'photo')='photo' AND EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=m.id) ORDER BY random() LIMIT 60");
+        const tags=new Map();
+        if(rows.length){const ids=rows.map(row=>JSON.parse(row.data).id);for(const row of this.rows('SELECT media_id,person_id FROM media_tags WHERE media_id IN ('+ids.map(()=>'?').join(',')+')',...ids)){if(!tags.has(row.media_id))tags.set(row.media_id,[]);tags.get(row.media_id).push(row.person_id);}}
+        const questions=makeQuiz(rows.map(row=>{const item=JSON.parse(row.data);return {id:item.id,kind:'photo',tags:tags.get(item.id)||[]};}),roster);
+        return {questions:questions.length===10?questions:[],available:questions.length,required:10};
+      }
       case 'health':this.rows('SELECT value FROM meta WHERE id=?',correctionKey);return {available:true};
       case 'people':{
         if(this.peopleCache)return this.peopleCache;
@@ -212,15 +236,15 @@ export class FamilyState {
       case 'person.page':return this.personPage(p.id,p);
       case 'person.revision':return {revision:this.person(p.id).revision};
       case 'person.about':{
-        const person=this.person(p.id),about=text(p.about,'אודות',10000);
-        if((person.about||'')!==p.expectedAbout)throw new HttpError(409,'טקסט האודות השתנה. פתחו שוב את העריכה לפני שמירה.');
-        person.about=about;this.savePerson(person);return {saved:true,person:{...person}};
+        const person=this.person(p.id),about=text(p.about,'אודות',10000),field=contentField('about',p.language);
+        if((person[field]||'')!==p.expectedAbout)throw new HttpError(409,'טקסט האודות השתנה. פתחו שוב את העריכה לפני שמירה.');
+        person[field]=about;this.savePerson(person);return {saved:true,person:{...person}};
       }
       case 'person.biography':{
         const person=this.person(p.id),value=biographyValue(p.section,p.value),expected=biographyValue(p.section,p.expectedValue);
-        const current=person[p.section]??biographyDefaults[p.section];
+        const field=contentField(p.section,p.language),current=person[field]??biographyDefaults[p.section];
         if(JSON.stringify(current)!==JSON.stringify(expected))throw new HttpError(409,'הפרטים השתנו. פתחו שוב את העריכה לפני שמירה.');
-        if(JSON.stringify(current)!==JSON.stringify(value)){person[p.section]=value;this.savePerson(person);}
+        if(JSON.stringify(current)!==JSON.stringify(value)){person[field]=value;this.savePerson(person);}
         return {saved:true,person:{...person}};
       }
       case 'media.public':return {item:this.mediaPublic(this.media(p.id))};

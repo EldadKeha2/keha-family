@@ -17,7 +17,7 @@ function fixture(english=false){
 test('biography renders localized country flags and read-only details safely in both interface languages',()=>{
  for(const english of [false,true]){
   const f=fixture(english),p={id:'a',residences:[{country:'IL',fromYear:1990,toYear:null,current:true}],languages:['עברית','<script>'],occupation:'A & B',jobs:[{employer:'Family studio',role:'Designer',fromYear:2000,toYear:2010,current:false}]};
-  const html=f.bio.render(p);assert.match(html,/country-flags\.svg#IL/);assert.match(html,english?/Israel/:/ישראל/);assert.match(html,/&lt;script&gt;/);assert.match(html,/A &amp; B/);assert.ok(!html.includes('<input'));assert.ok(!html.includes('<textarea'));assert.match(html,english?/Work history/:/עבודות שבהן עבדתי/);
+  p.occupationEn=p.occupation;p.jobsEn=p.jobs;const html=f.bio.render(p);assert.match(html,/country-flags\.svg#IL/);assert.match(html,english?/Israel/:/ישראל/);assert.match(html,/&lt;script&gt;/);assert.match(html,/A &amp; B/);assert.ok(!html.includes('<input'));assert.ok(!html.includes('<textarea'));assert.match(html,english?/Work history/:/עבודות שבהן עבדתי/);
   const partial=f.bio.render(p,false);assert.ok(!partial.includes('Family studio'));assert.match(partial,/data-bio-edit="residences"[^>]*disabled/);
  }
 });
@@ -32,6 +32,14 @@ test('an in-flight biography save remains attached to its original person after 
  assert.equal(f.saved[0].id,'a');assert.equal(f.bio.isEditing(),true);assert.match(f.bio.render(f.people.b),/value="Writer"/);assert.equal(f.finishCount,0);
  const second=f.handlers.get('submit')(f.event('[data-bio-form]'));assert.equal(f.requests[1].id,'b');f.requests[1].reject(Error('Save failed'));await second;
  assert.equal(f.bio.isDirty(),true);assert.match(f.bio.render(f.people.b),/Save failed/);assert.match(f.bio.render(f.people.b),/value="Writer"/);
+});
+test('profession and work history display and edit only the active content language',async()=>{
+  for(const english of [false,true]){
+    const f=fixture(english);Object.assign(f.people.a,{occupation:'מקצוע עברי בלבד',occupationEn:'English profession only',jobs:[{employer:'עבודה עברית בלבד',role:'',fromYear:null,toYear:null,current:false}],jobsEn:[{employer:'English workplace only',role:'',fromYear:null,toYear:null,current:false}]});
+    const html=f.bio.render(f.people.a);assert.ok(html.includes(english?'English profession only':'מקצוע עברי בלבד'));assert.ok(!html.includes(english?'מקצוע עברי בלבד':'English profession only'));assert.ok(html.includes(english?'English workplace only':'עבודה עברית בלבד'));assert.ok(!html.includes(english?'עבודה עברית בלבד':'English workplace only'));
+    await f.handlers.get('click')(f.event('[data-bio-edit]',{dataset:{bioEdit:'occupation'},disabled:false}));
+    const pending=f.handlers.get('submit')(f.event('[data-bio-form]'));assert.equal(f.requests[0].body.language,english?'en':'he');assert.equal(f.requests[0].body.expectedValue,english?'English profession only':'מקצוע עברי בלבד');f.requests[0].resolve({person:f.people.a});await pending;
+  }
 });
 test('searchable language selection preserves existing text, prevents bilingual duplicates, and saves flags with labels',async()=>{
  const f=fixture();f.people.a.languages=['עברית','A family dialect'];

@@ -33,3 +33,7 @@
   .person-relative-link .person-name{font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){.person-relative-link{transition:none}}
+
+.directory-tabs{display:flex;gap:7px;padding:10px 26px 3px}.directory-tabs button{border:1px solid #d8c8a7;border-radius:20px;background:#fcf9f0;color:#7b7058;min-height:42px;padding:7px 18px;font:15px var(--sans)}.directory-tabs button[aria-selected=true]{background:#64734f;color:#fffdf4;border-color:#64734f}
+
+.media-share-actions .share-icon{width:22px;height:22px;flex:0 0 22px}.media-share-actions a,.media-share-actions button{gap:7px}.media-share-actions #shareMediaMessenger{color:#7552ab;background:#f2edfb;border-color:#d5c8ed}.media-share-actions #shareMediaEmail{color:#9d654c;background:#fbefe5;border-color:#e8cfba}.media-share-actions #copyMediaLink{color:#427b76;background:#eaf3ee;border-color:#bcd6cb}

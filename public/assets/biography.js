@@ -4,6 +4,7 @@ import {resolveLanguage,languageKey,languageLabel,searchLanguages} from './langu
 const I=()=>window.FamilyI18n,tr=(he,en)=>I().isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const defaults={residences:[],languages:[],occupation:'',jobs:[]},sections=Object.keys(defaults);
+const contentKey=section=>I().isEnglish&&['occupation','jobs'].includes(section)?section+'En':section;
 const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z"/></svg>';
 let editor=null,controller=null,root=null;
 const copy=value=>JSON.parse(JSON.stringify(value));
@@ -66,7 +67,7 @@ function form(){
 }
 function render(person,available=true){
   return `<div class="person-biography">${sections.map(section=>{
-    const active=editor?.id===person.id&&editor.section===section,value=person[section]??defaults[section],title=titles()[section];
+    const active=editor?.id===person.id&&editor.section===section,value=person[contentKey(section)]??defaults[section],title=titles()[section];
     const content=available?display(section,value):'';
     return `<section class="biography-section" data-bio-section="${section}"><header><h4>${title}</h4><button class="biography-pencil" type="button" data-bio-edit="${section}" aria-label="${tr('עריכת ','Edit ')+title}" title="${tr('עריכת ','Edit ')+title}" ${!available||editor?'disabled':''}>${pencil}</button></header>${active?form():content||`<p class="biography-empty">${available?tr('טרם נוספו פרטים','No details added yet'):tr('הפרטים אינם זמינים כרגע','Details are currently unavailable')}</p>`}</section>`;
   }).join('')}</div>`;
@@ -89,7 +90,7 @@ function attach(host,handlers){
     if(edit&&!edit.disabled){
       if(controller.isBlocked())return;
       const person=controller.person(),section=edit.dataset.bioEdit;if(!person||!sections.includes(section))return;
-      const value=copy(person[section]??defaults[section]);editor={id:person.id,section,expected:copy(value),draft:value,saving:false,error:'',languageQuery:'',languageOpen:section==='languages',languageIndex:0};
+      const value=copy(person[contentKey(section)]??defaults[section]);editor={id:person.id,section,language:I().isEnglish?'en':'he',expected:copy(value),draft:value,saving:false,error:'',languageQuery:'',languageOpen:section==='languages',languageIndex:0};
       if((section==='residences'||section==='jobs')&&!editor.draft.length)add();else rerender(true);return;
     }
     if(event.target.closest('[data-bio-cancel]')&&editor&&!editor.saving){editor=null;rerender();controller.finished();return;}
@@ -119,7 +120,7 @@ function attach(host,handlers){
     // Capture the person and editor before the asynchronous save. Navigation must never retarget it.
     const active=editor,{id,section,draft,expected}=active;active.saving=true;active.error='';rerender();
     try{
-      const result=await controller.save(id,{section,value:copy(draft),expectedValue:copy(expected)});
+      const result=await controller.save(id,{section,language:active.language,value:copy(draft),expectedValue:copy(expected)});
       controller.saved(id,result.person);
       if(editor===active){editor=null;rerender();controller.finished();}
     }catch(error){if(editor===active){active.saving=false;active.error=error.message;rerender();}}

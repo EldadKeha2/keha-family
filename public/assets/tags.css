@@ -24,8 +24,8 @@
 .tag-add-help{font-size:13px;line-height:1.7;color:#95846a;margin:7px 0}
 .tag-no-results{font-size:15px;color:#96856a;padding:18px 15px;text-align:center}
 .tag-people-dialog .form-actions{margin-top:16px}.tag-people-dialog .form-actions button{min-height:46px}
-.media-viewer .media-people-tags{padding:0;margin:0 0 13px}.media-viewer .media-people-tags button{color:#e2e9d7;border-color:#657657;background:#34432d}
-.media-viewer #mediaViewerTag{color:#e0d4ad;border:1px solid #6e704e}
+.media-viewer .media-people-tags{padding:0;margin:0 0 13px}.media-viewer .media-people-tags button{color:#62754d;border-color:#cbd2b8;background:#eef2e3}
+.media-viewer #mediaViewerTag{color:#64734f;border:1px solid #d1c5a7}
 .personal-gallery-filters{margin:2px 0 20px}.personal-gallery-filters button{min-height:44px}
 .person-gallery-video{width:100%;aspect-ratio:16/9;object-fit:contain;background:#1e281c;display:block}
 .personal-video-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;aspect-ratio:16/9;width:100%;padding:18px;background:radial-gradient(ellipse at 50% 10%,#59664b,#23301f 85%);color:#f8f0dc}

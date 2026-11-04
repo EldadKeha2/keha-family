@@ -19,32 +19,32 @@
 .media-controls button:first-child{color:#61734e;background:#eef1e7;border:1px solid #dde3d1}
 .media-delete,.media-controls .media-delete{color:#94553f;background:transparent;border:1px solid #e7d9cc}
 .media-controls .media-delete:hover{background:#f9eee6}
-.media-viewer{width:min(1120px,calc(100vw - 28px));max-width:none;max-height:94vh;max-height:94dvh;padding:0;border:1px solid #a69c7a;border-radius:12px;background:#1e261c;color:#fffdf4;overflow:auto;box-shadow:0 20px 100px #0005;overscroll-behavior:contain}
-.media-viewer::backdrop{background:#172014ed;backdrop-filter:blur(4px)}
+.media-viewer{width:min(1120px,calc(100vw - 28px));max-width:none;max-height:94vh;max-height:94dvh;padding:0;border:1px solid #a69c7a;border-radius:12px;background:#fbf7ed;color:#554c39;overflow:auto;box-shadow:0 20px 100px #0005;overscroll-behavior:contain}
+.media-viewer::backdrop{background:#66573e99;backdrop-filter:blur(4px)}
 .media-viewer-header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:15px 20px}
 .media-viewer-header h2{font:27px/1.4 var(--serif);margin:0;overflow-wrap:anywhere}
 .media-viewer-header button{flex-shrink:0;width:44px;font-size:29px;line-height:1}
-.media-stage{display:flex;justify-content:center;align-items:center;min-height:200px;background:#10170f}
+.media-stage{display:flex;justify-content:center;align-items:center;min-height:200px;background:#ede5d4}
 .media-stage img{display:block;max-width:100%;max-height:62vh;max-height:62dvh;object-fit:contain}
 .media-stage.is-video{aspect-ratio:16/9;max-height:64vh;max-height:64dvh;min-height:200px;width:100%;margin:auto}
 .media-stage video,.media-stage iframe{display:block;width:100%;height:100%;min-height:200px;border:0;object-fit:contain}
 .media-viewer-footer{padding:14px 22px 18px}
 .media-viewer-footer p{font:17px/1.8 var(--sans);margin:0 0 12px;white-space:pre-wrap;max-height:17vh;overflow:auto}
-.media-viewer-footer .media-playback-note{color:#c4c8b7;font-size:14px}
+.media-viewer-footer .media-playback-note{color:#8e8065;font-size:14px}
 .media-viewer-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .media-viewer-paging{display:flex;align-items:center;gap:8px}
-.media-viewer-paging button{background:#34402c;min-width:44px;font-size:20px}
-.media-viewer-counter{font:14px/1.5 Arial,sans-serif;color:#c4c8b7;direction:ltr;white-space:nowrap}
+.media-viewer-paging button{background:#ece5d4;min-width:44px;font-size:20px}
+.media-viewer-counter{font:14px/1.5 Arial,sans-serif;color:#8e8065;direction:ltr;white-space:nowrap}
 .media-viewer-links{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.media-viewer-links a{color:#e0d4ad;font-size:15px;min-height:44px;display:flex;align-items:center}
-.media-viewer .media-delete{color:#e6b3a1;border-color:#7b5e4c}
+.media-viewer-links a{color:#7c754e;font-size:15px;min-height:44px;display:flex;align-items:center}
+.media-viewer .media-delete{color:#9b6248;border-color:#ddc7b4}
 .media-document-preview{padding:35px;font-size:20px;line-height:1.8}
 .delete-media-dialog{width:490px}
 .delete-media-dialog h2{font-size:31px;padding:0}
 .delete-media-dialog>p{font-size:18px;line-height:1.8;overflow-wrap:anywhere}
 .delete-media-dialog .delete-media-hint{font-size:15px;color:#83735a}
 .delete-confirm-button{background:#934f3b;border:1px solid #934f3b;border-radius:6px;color:#fffdf6;font-size:17px;padding:10px 20px;min-height:49px}
-.media-viewer-notice{margin:12px 0 0;padding:9px 12px;background:#34402c;border-radius:6px;font-size:15px}
+.media-viewer-notice{margin:12px 0 0;padding:9px 12px;background:#ece5d4;border-radius:6px;font-size:15px}
 .media-viewer-notice button,.toast button{margin-inline-start:14px;text-decoration:underline;text-underline-offset:4px;font:inherit;min-height:44px;color:inherit}
 .media-inline-notice{padding:9px 15px;margin:0 36px 18px 0;background:#edf1e4;color:#526443;border:1px solid #cfdbbd;border-radius:6px;font-size:16px}
 .media-inline-notice button{font:inherit;min-height:44px;padding:8px 12px;text-decoration:underline;text-underline-offset:4px}

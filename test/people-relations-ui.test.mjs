@@ -72,3 +72,11 @@ test('parent links open the parent page and unknown parents stay empty',async()=
   assert.ok(!group(f.html,'parents').includes('data-person-relative'));
   assert.match(group(f.html,'parents'),/טרם נוספו פרטים/);
 });
+test('About displays the active language without falling back to text in the other language',async()=>{
+  for(const english of [false,true]){
+    const f=await fixture('eldad',{english,overrides:{eldad:{about:'סיפור בעברית בלבד',aboutEn:'English story only'}}});
+    assert.ok(f.html.includes(english?'English story only':'סיפור בעברית בלבד'));
+    assert.ok(!f.html.includes(english?'סיפור בעברית בלבד':'English story only'));
+  }
+  const empty=await fixture('eldad',{english:true,overrides:{eldad:{about:'סיפור בעברית בלבד'}}});assert.ok(!empty.html.includes('סיפור בעברית בלבד'));
+});

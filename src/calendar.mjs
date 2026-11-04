@@ -47,7 +47,7 @@ function birthdayParts(value){
 }
 export function familyCalendar(anchor,mode,people,holidays=[],today,language='he'){
   const locale=language==='en-GB'?'en-GB':language.startsWith('en')?'en-US':'he-IL',english=locale!=='he-IL';
-  const month=monthWindow(anchor,mode,language),members=Object.values(people).filter(person=>!person.extra),known=members.map(person=>({person,born:birthdayParts(person.birthday)})).filter(item=>item.born);
+  const month=monthWindow(anchor,mode,language),members=Object.values(people).filter(person=>!person.extra&&!person.extended),known=members.map(person=>({person,born:birthdayParts(person.birthday)})).filter(item=>item.born);
   const holidayDays=new Map();
   for(const holiday of holidays){if(!holidayDays.has(holiday.date))holidayDays.set(holiday.date,[]);holidayDays.get(holiday.date).push(holiday);}
   const days=month.dates.map(value=>{

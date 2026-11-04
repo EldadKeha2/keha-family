@@ -162,6 +162,8 @@ export default {
         return snapshot(request,await db('people'));
       }
       if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
+      if(path==='/api/memorial'&&request.method==='GET')return json(await db('memorial',{visitorId:/^[a-f0-9]{32}$/.test(request.headers.get('X-Candle-Visitor')||'')?request.headers.get('X-Candle-Visitor'):null}));
+      if(path==='/api/games/who-is-it'&&request.method==='GET')return json(await db('game.quiz'));
       if(path==='/api/calendar'&&request.method==='GET'){
         const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
         const people=Object.fromEntries((await db('dates')).people.map(p=>[p.id,p]));
@@ -196,6 +198,7 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/memorial\/([^/]+)\/candles$/.exec(path))){const body=await readJSON(request,1000);return json(await db('candle.light',{id:decodeURIComponent(match[1]),visitorId:body.visitorId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/tags\/patch$/.exec(path))){const body=await readJSON(request,64000);return json(await db('media.tags.patch',{id:match[1],changes:body.changes}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/caption$/.exec(path))){const body=await readJSON(request,40000);return json(await db('media.caption.id',{id:match[1],caption:body.caption,expectedCaption:body.expectedCaption}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|tag|untag|retag)$/.exec(path))){
@@ -220,8 +223,8 @@ export default {
           const id=decodeURIComponent(match[1]),action=match[2];
           if(['photos','videos','documents'].includes(action))return await upload(request,env,db,ctx,{category:'personal',personId:id,mediaType:{photos:'photo',videos:'video',documents:'document'}[action]});
           const body=await readJSON(request,40000);
-          if(action==='about')return json(await db('person.about',{id,about:body.about,expectedAbout:body.expectedAbout}));
-          if(action==='biography')return json(await db('person.biography',{id,section:body.section,value:body.value,expectedValue:body.expectedValue}));
+          if(action==='about')return json(await db('person.about',{id,about:body.about,expectedAbout:body.expectedAbout,language:body.language}));
+          if(action==='biography')return json(await db('person.biography',{id,section:body.section,value:body.value,expectedValue:body.expectedValue,language:body.language}));
           if(action==='birthday')return json(await db('birthday',{id,birthday:body.birthday,expectedBirthday:body.expectedBirthday}));
           if(action==='death-date')return json(await db('death.date',{id,date:body.date,expectedDate:body.expectedDate}));
           if(action==='profile')return json(await db('profile',{id,file:body.file}));
