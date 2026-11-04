@@ -153,6 +153,16 @@ test('hunt timeouts reveal one target, late clicks cannot score, and zoom or key
   const f=fixture();await f.start('chick');f.keyboard('ArrowRight');assert.equal(f.nodes.get('chickProbe').hidden,false);await f.zoom();assert.equal(f.nodes.get('chickSceneStage').style.width,'225%');f.advance(59900);assert.equal(f.seconds,'1');assert.doesNotMatch(f.html,/הזמן נגמר/);f.advance(100);assert.match(f.html,/הזמן נגמר/);assert.equal(f.intervals.size,0);await f.find(f.chickQuestions[0].target.x,f.chickQuestions[0].target.y);await f.next();
   for(let i=1;i<5;i++){const q=f.chickQuestions[i];await f.find(q.target.x,q.target.y);await f.next();}assert.match(f.html,/<strong>80<\/strong>/);await f.lobby();assert.equal(f.intervals.size,0);
 });
+test('three hunt mistakes score zero and automatically advance once, including after leaving and returning',async()=>{
+  const f=fixture();await f.start('chick');
+  for(let i=0;i<3;i++)await f.find(0,0);
+  assert.match(f.html,/שלוש טעויות/);assert.match(f.html,/chick-reveal-ring/);assert.equal(f.intervals.size,1);
+  f.advance(1100);assert.match(f.html,/שלוש טעויות/);
+  f.window.FamilyGames.activate('tree');assert.equal(f.intervals.size,0);f.jump(5000);f.window.FamilyGames.activate('games');f.advance(100);assert.doesNotMatch(f.html,/שלוש טעויות/);
+  for(let i=1;i<5;i++){const q=f.chickQuestions[i];await f.find(q.target.x,q.target.y);await f.next();}
+  assert.match(f.html,/<strong>80<\/strong>/);assert.equal(f.intervals.size,0);
+  await f.lobby();f.advance(10000);assert.match(f.html,/family-game-choices/);
+});
 test('trivia landing page saves a user question in the detected language with the selected correct answer',async()=>{
   const f=fixture();await f.openTrivia();assert.match(f.html,/data-trivia-question-form/);assert.match(f.html,/data-game-start="trivia"/);assert.equal(f.requests.length,0);
   f.input('triviaNewQuestion','Who immigrated to Israel in 1932?');assert.equal(f.nodes.get('triviaQuestionLanguage').value,'en');for(let i=0;i<4;i++)f.input('triviaAnswer'+i,['Shlomo','Yona','Ruth','Eldad'][i]);f.correct(0);await f.submit();assert.equal(f.writes.length,1);assert.equal(f.writes[0].body.language,'en');assert.equal(f.writes[0].body.correctIndex,0);assert.equal(f.writes[0].body.options[0],'Shlomo');assert.match(f.html,/השאלה נוספה למאגר/);assert.match(f.html,/רק במשחק באנגלית/);
