@@ -14,8 +14,9 @@
   host.innerHTML=`<svg class="tree-guide-arrow" aria-hidden="true"><defs><marker id="treeGuideArrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1L6 4L1 7"/></marker></defs><path class="tree-guide-arrow-line" marker-end="url(#treeGuideArrowhead)"/></svg><aside class="tree-guide-card" role="status" aria-live="polite"><span class="tree-guide-eyebrow">${tr('כל שם הוא סיפור','Every name tells a story')}</span><p>${tr('לחץ על שם לפתיחת העמוד האישי','Click a name to open their personal page')}</p><button type="button" class="tree-guide-close" aria-label="${tr('סגירת ההדרכה','Dismiss tip')}">×</button><span class="tree-guide-countdown" aria-hidden="true"></span></aside>`;
   viewport.append(host);
   const view=viewport.getBoundingClientRect(),r=name.getBoundingClientRect(),card=host.querySelector('.tree-guide-card'),arrow=host.querySelector('.tree-guide-arrow');
-  const w=Math.min(300,view.width-28),h=card.getBoundingClientRect().height,tx=r.left-view.left+r.width/2,ty=r.top-view.top+r.height/2,small=view.width<600;
-  const x=small?Math.max(14,(view.width-w)/2):Math.max(14,Math.min(view.width-w-14,tx-w-70));
+  card.dir=window.FamilyI18n.isEnglish?'ltr':'rtl';
+  const w=Math.min(300,view.width-28),h=card.getBoundingClientRect().height,tx=r.left-view.left+r.width/2,ty=r.top-view.top+r.height/2,leftSpace=(name.closest('.tree-unit')?.getBoundingClientRect().left??r.left)-view.left,small=view.width<600||leftSpace<w+40;
+  const x=small?Math.max(14,(view.width-w)/2):Math.max(14,Math.min(view.width-w-14,leftSpace-w-26));
   const y=small?Math.min(view.height-h-20,Math.max(12,ty+36)):Math.max(14,Math.min(view.height-h-20,ty-h/2-16));
   card.style.width=w+'px';card.style.left=x+'px';card.style.top=y+'px';
   const sx=small?x+w*.75:x+w+4,sy=small?y-3:y+h*.65;
