@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {countryCodes} from '../public/assets/countries.mjs';
-const source=(await readFile(new URL('../public/assets/biography.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
+import {resolveLanguage,languageKey,languageLabel,searchLanguages} from '../public/assets/languages.mjs';
+const source=(await readFile(new URL('../public/assets/biography.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 function fixture(english=false){
  const handlers=new Map(),requests=[],saved=[],people={a:{id:'a'},b:{id:'b'}};let person=people.a,finishCount=0;
  const window={FamilyI18n:{isEnglish:english,locale:english?'en-US':'he-IL'}};
- vm.runInContext(source,vm.createContext({window,countryCodes,Intl,console}));
- const bio=window.FamilyBiography,root={addEventListener:(type,handler)=>handlers.set(type,handler),querySelector:()=>({focus(){}})};
+ vm.runInContext(source,vm.createContext({window,countryCodes,resolveLanguage,languageKey,languageLabel,searchLanguages,Intl,console}));
+ const bio=window.FamilyBiography,nodes=new Map(),root={addEventListener:(type,handler)=>handlers.set(type,handler),querySelector:selector=>{if(!nodes.has(selector))nodes.set(selector,{focus(){},setAttribute(){},removeAttribute(){},querySelector:()=>({scrollIntoView(){}})});return nodes.get(selector);}};
  bio.attach(root,{person:()=>person,isBlocked:()=>false,render(){},save(id,body){return new Promise((resolve,reject)=>requests.push({id,body,resolve,reject}));},saved:(id,value)=>{saved.push({id,value});Object.assign(people[id],value);},finished(){finishCount++;}});
  const event=(selector,properties={})=>({preventDefault(){},target:{closest:s=>s===selector?{...properties}:null,matches:s=>s===selector,...properties}});
  return {bio,people,requests,saved,handlers,event,switchTo(id){bio.reset();person=people[id];},get finishCount(){return finishCount;}};
@@ -31,4 +32,30 @@ test('an in-flight biography save remains attached to its original person after 
  assert.equal(f.saved[0].id,'a');assert.equal(f.bio.isEditing(),true);assert.match(f.bio.render(f.people.b),/value="Writer"/);assert.equal(f.finishCount,0);
  const second=f.handlers.get('submit')(f.event('[data-bio-form]'));assert.equal(f.requests[1].id,'b');f.requests[1].reject(Error('Save failed'));await second;
  assert.equal(f.bio.isDirty(),true);assert.match(f.bio.render(f.people.b),/Save failed/);assert.match(f.bio.render(f.people.b),/value="Writer"/);
+});
+test('searchable language selection preserves existing text, prevents bilingual duplicates, and saves flags with labels',async()=>{
+ const f=fixture();f.people.a.languages=['עברית','A family dialect'];
+ await f.handlers.get('click')(f.event('[data-bio-edit]',{dataset:{bioEdit:'languages'},disabled:false}));
+ const input=value=>f.event('[data-bio-form]',{matches:s=>s==='[data-bio-language-search]',value});
+ f.handlers.get('input')(input('français'));
+ await f.handlers.get('click')(f.event('[data-bio-language-add]',{dataset:{bioLanguageAdd:'0'}}));
+ let html=f.bio.render(f.people.a);assert.match(html,/country-flags\.svg#FR/);assert.match(html,/צרפתית/);assert.match(html,/A family dialect/);assert.match(html,/role="combobox"/);
+ f.handlers.get('input')(input('Hebrew'));await f.handlers.get('click')(f.event('[data-bio-language-add]',{dataset:{bioLanguageAdd:'0'}}));
+ const pending=f.handlers.get('submit')(f.event('[data-bio-form]'));
+ assert.deepEqual(JSON.parse(JSON.stringify(f.requests[0].body.value)),['עברית','A family dialect','French']);
+ assert.deepEqual(JSON.parse(JSON.stringify(f.requests[0].body.expectedValue)),['עברית','A family dialect']);
+ f.requests[0].resolve({person:{id:'a',languages:f.requests[0].body.value}});await pending;
+ html=f.bio.render(f.people.a);assert.match(html,/country-flags\.svg#IL/);assert.match(html,/country-flags\.svg#FR/);assert.ok(!html.includes('<input'));
+});
+test('language options support keyboard selection and escaped custom languages without submitting the form',async()=>{
+ const f=fixture(true);await f.handlers.get('click')(f.event('[data-bio-edit]',{dataset:{bioEdit:'languages'},disabled:false}));
+ f.handlers.get('input')(f.event('[data-bio-form]',{matches:s=>s==='[data-bio-language-search]',value:'Spanish'}));
+ await f.handlers.get('keydown')({...f.event('[data-bio-form]',{matches:s=>s==='[data-bio-language-search]'}),key:'Enter'});
+ assert.match(f.bio.render(f.people.a),/country-flags\.svg#ES/);assert.equal(f.requests.length,0);
+ f.handlers.get('input')(f.event('[data-bio-form]',{matches:s=>s==='[data-bio-language-search]',value:'<script>custom</script>'}));
+ await f.handlers.get('click')(f.event('[data-bio-language-add]',{dataset:{bioLanguageAdd:'0'}}));
+ const html=f.bio.render(f.people.a);assert.match(html,/&lt;script&gt;custom&lt;\/script&gt;/);assert.ok(!html.includes('<script>custom'));
+ await f.handlers.get('click')(f.event('[data-bio-language-remove]',{dataset:{bioLanguageRemove:'0'}}));
+ const afterRemoval=f.bio.render(f.people.a),selection=afterRemoval.match(/<ul class="biography-languages biography-language-selection">([\s\S]*?)<\/ul>/)[1];
+ assert.ok(!selection.includes('country-flags.svg#ES'));assert.match(selection,/&lt;script&gt;custom&lt;\/script&gt;/);
 });

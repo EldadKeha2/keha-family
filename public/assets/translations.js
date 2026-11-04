@@ -653,3 +653,11 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   "הפרטים השתנו. פתחו שוב את העריכה לפני שמירה.":"These details have changed. Reopen the editor before saving.",
   "מקצוע":"Profession","שפה":"Language","מקום עבודה":"Workplace","תפקיד":"Role"
 });
+Object.assign(window.FAMILY_TRANSLATIONS,{
+ "פתיחת העמוד האישי של":"Open the personal page of",
+ "גררו ימינה ושמאלה בין הענפים":"Drag left or right between the branches",
+ "צבטו להגדלה · גררו לטיול בין הענפים":"Pinch to zoom · Drag to explore the branches",
+ "הדרכה לפתיחת עמוד אישי":"How to open a personal page",
+ "לחץ על שם לפתיחת העמוד האישי · על ענף להצגת הדורות הבאים":"Click a name to open their personal page · Open a branch to see more generations",
+ "לחיצה על כרטיס פותחת את העמוד האישי":"Click a card to open their personal page"
+});

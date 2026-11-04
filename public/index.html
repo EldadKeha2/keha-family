@@ -38,6 +38,7 @@
   <script src="assets/calendar.js" defer></script>
   <script src="assets/home.js" defer></script>
   <script src="assets/memorial.js" defer></script>
+  <script src="assets/tree-guide.js" defer></script>
   <script src="assets/app.js" defer></script>
   <script src="assets/cloud.js" defer></script>
 </head>
@@ -67,11 +68,11 @@
           <div class="tree-viewport" id="treeViewport" tabindex="0" aria-label="אילן יוחסין אינטראקטיבי. אפשר לגרור להזזה ולהשתמש בכפתורי התקרבות והרחקה.">
             <div class="tree-background-mark" aria-hidden="true">❖</div>
             <div class="tree-world" id="treeWorld"><svg class="tree-connectors" id="treeConnectors" aria-hidden="true"></svg><div id="treeNodes"></div></div>
-            <div class="canvas-hint" id="canvasHint"><span aria-hidden="true">✧</span> לחצו על שם לפתיחת האלבום · על ענף להצגת הדורות הבאים</div>
-            <div class="zoom-controls" aria-label="גודל התצוגה"><button id="zoomIn" aria-label="התקרבות">+</button><output id="zoomValue">100%</output><button id="zoomOut" aria-label="הרחקה">−</button><span class="control-divider"></span><button id="fitButton" class="fit-button" aria-label="התאמת העץ למסך" title="התאמה למסך"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg></button></div>
+            <div class="canvas-hint" id="canvasHint"><span aria-hidden="true">✧</span> לחץ על שם לפתיחת העמוד האישי · על ענף להצגת הדורות הבאים</div>
+            <div class="zoom-controls" aria-label="גודל התצוגה"><button id="zoomIn" aria-label="התקרבות">+</button><output id="zoomValue">100%</output><button id="zoomOut" aria-label="הרחקה">−</button><span class="control-divider"></span><button id="fitButton" class="fit-button" aria-label="התאמת העץ למסך" title="התאמה למסך"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg></button><button id="treeGuideButton" class="tree-guide-help" aria-label="הדרכה לפתיחת עמוד אישי" title="הדרכה לפתיחת עמוד אישי">?</button></div>
           </div>
         </div>
-        <div id="directoryView" hidden><div class="directory-heading"><p id="directoryCount"></p><span>לחיצה על כרטיס פותחת את האלבום האישי</span></div><div class="directory-grid" id="directoryGrid"></div><div class="empty-search" id="emptySearch" hidden>לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.</div></div>
+        <div id="directoryView" hidden><div class="directory-heading"><p id="directoryCount"></p><span>לחיצה על כרטיס פותחת את העמוד האישי</span></div><div class="directory-grid" id="directoryGrid"></div><div class="empty-search" id="emptySearch" hidden>לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.</div></div>
         <section id="homeView" class="phone-home-view" aria-label="הבית המשפחתי" hidden>
           <header class="phone-home-intro"><img src="assets/fez.svg" alt="" width="55" height="55"><div><span class="small-eyebrow">מהשורשים שלנו, אל הרגע הבא</span><h2>הבית שלנו מתחיל כאן</h2><p>כל המשפחה, הסיפורים והרגעים שלנו.</p></div></header>
           <section class="family-slideshow" aria-label="רגעים מהאלבום המשפחתי"><button id="homeSlideOpen" class="home-slide-open" aria-label="פתיחת התמונה המשפחתית"><img id="homeSlideImage" alt="" hidden><span class="home-slide-placeholder" id="homeSlidePlaceholder"><span aria-hidden="true">❖</span><strong>הרגעים שלנו, ביחד</strong><small>תמונות מהאלבום המשפחתי יתחלפו כאן.</small></span></button><div class="home-slide-caption" id="homeSlideCaption"></div><div class="home-slide-controls"><button id="homeSlidePrevious" aria-label="התמונה המשפחתית הקודמת">→</button><span id="homeSlideCounter"></span><button id="homeSlideNext" aria-label="התמונה המשפחתית הבאה">←</button><button id="homeSlidePause" aria-label="השהיית התמונות המתחלפות">Ⅱ</button></div></section>

@@ -29,3 +29,26 @@
 /* Preserve the chronology on every family card: immigration before death. */
 .person-birthday .person-aliyah-year{order:2}
 .person-birthday .person-death-date{order:3}
+
+/* A brief, dismissible introduction to personal pages. */
+.tree-guide-layer{position:absolute;inset:0;z-index:9;pointer-events:none;overflow:hidden}
+.tree-guide-arrow{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.tree-guide-arrow-line{fill:none;stroke:#a7833d;stroke-width:2.2;stroke-linecap:round;stroke-dasharray:5 5;animation:tree-guide-dash 1.5s linear infinite}
+.tree-guide-arrow marker path{fill:none;stroke:#a7833d;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.tree-guide-card{position:absolute;box-sizing:border-box;width:min(300px,calc(100% - 28px));padding:17px 24px 20px;background:#fffaf0;border:1px solid #cab179;border-radius:12px;box-shadow:0 8px 28px #70552c25;color:#5b6648;pointer-events:auto;overflow:hidden;animation:tree-guide-appear .3s ease-out}
+.tree-guide-card .tree-guide-eyebrow{font-size:12px;letter-spacing:.03em;color:#a18550;display:block;margin-inline-end:20px}
+.tree-guide-card p{font:600 19px/1.65 var(--sans);margin:5px 0 0;max-width:250px}
+.tree-guide-close{position:absolute;top:5px;inset-inline-end:6px;width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:#a48a5d;font:25px/1 Arial,sans-serif;cursor:pointer}
+.tree-guide-close:hover{background:#eee4ce;color:#5b6648}
+.tree-guide-close:focus-visible,.tree-guide-help:focus-visible{outline:2px solid #788b5f;outline-offset:2px}
+.tree-guide-countdown{position:absolute;bottom:0;inset-inline:0;height:3px;background:#bd9c58;transform-origin:left;animation:tree-guide-progress 8s linear forwards}
+html[dir=rtl] .tree-guide-countdown{transform-origin:right}
+.tree-guide-target{outline:2px dashed #b29457;outline-offset:4px;border-radius:3px;animation:tree-guide-glow 1.6s ease-in-out 3}
+.zoom-controls .tree-guide-help{font:bold 17px/1 Georgia,serif;color:#8d774c}
+@keyframes tree-guide-progress{to{transform:scaleX(0)}}
+@keyframes tree-guide-dash{to{stroke-dashoffset:-20}}
+@keyframes tree-guide-glow{50%{box-shadow:0 0 0 7px #d7bc7b2b}}
+@keyframes tree-guide-appear{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(min-width:1101px){body[data-active-view=tree] .tree-help-inline{font-size:14px;line-height:1.7}}
+@media(max-width:700px){.tree-guide-card{padding:13px 20px 17px}.tree-guide-card p{font-size:17px}.tree-guide-eyebrow{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.tree-guide-card,.tree-guide-arrow-line,.tree-guide-target,.tree-guide-countdown{animation:none}.tree-guide-countdown{display:none}}

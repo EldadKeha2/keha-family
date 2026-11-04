@@ -45,7 +45,7 @@
   }
   function personCardHTML(p) {
     const unset = birthdayOf(p) === '1.1.1111';
-    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת הגלריה של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`;
+    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`;
   }
   function toast(message,action) {
     clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -76,6 +76,7 @@
   }
   function renderView() {
     document.body.dataset.activeView=state.view;
+    if(state.view!=='tree')window.FamilyTreeGuide?.hide();
     const isTree = state.view === 'tree';
     const isDirectory = state.view === 'directory';
     const global = !isTree && !isDirectory;
@@ -103,11 +104,12 @@
     const query = normalize(state.query);
     const selected = people.filter(p => (state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
     $('directoryCount').textContent = I18n.html`${selected.length} ${I18n.isEnglish?I18n.word(selected.length,'card','cards'):I18n.t('כרטיסים')}${state.branch!=='all'?' · '+I18n.branchName(branchFor(state.branch)):''}`;
-    $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="פתיחת האלבום של ${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`).join('');
+    $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`).join('');
     $('emptySearch').hidden = selected.length > 0;
   }
 
   function renderTree() {
+    window.FamilyTreeGuide?.hide();
     const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview';
     const rootId=state.branch==='all'?data.root:branchFor(state.branch).unit;
     const rootHistorySpace=!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40:0;
@@ -156,10 +158,10 @@
 
     $('treeBreadcrumb').textContent=state.branch==='all'?(overview?I18n.t('כל המשפחה · ששת הענפים'):I18n.t('כל המשפחה · כל הדורות')):I18n.html`יונה ושלמה › ${I18n.branchName(branchFor(state.branch))}`;
     for(const [id,selected]of [['overviewButton',overview],['fullTreeButton',!overview]]){$(id).classList.toggle('selected',selected);$(id).setAttribute('aria-pressed',String(selected));}
-    const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים · לחצו על שם לפתיחת האלבום'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
+    const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     $('treeHelpInline').textContent=phone?'':guidance;
-    $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בענפים · לחצו על שם לפתיחת האלבום'):'';
-    requestAnimationFrame(()=>{if(state.view!=='tree')return;const viewport=$('treeViewport');const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);camera.scale=phone?fit:desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;applyCamera();});
+    $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בין הענפים'):'';
+    requestAnimationFrame(()=>{if(state.view!=='tree')return;const viewport=$('treeViewport');const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);camera.scale=phone?fit:desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;applyCamera();window.FamilyTreeGuide?.show();});
   }
   function applyCamera(){
     $('treeWorld').style.transform=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
@@ -213,7 +215,7 @@
       const birthday = node.closest('[data-person-card]')?.querySelector('[data-birthday-for]');
       const signature=[birthdayOf(p),getMedia(p).invalidBirthday,p.deceased,p.deathDate,new Date().toDateString()].join('|');
       if (birthday && birthday.dataset.dateSignature !== signature) {birthday.innerHTML=birthdayHTML(p);birthday.dataset.dateSignature=signature;}
-      node.setAttribute('aria-label', I18n.t('פתיחת הגלריה של ') + nameOf(p));
+      node.setAttribute('aria-label', I18n.t('פתיחת העמוד האישי של ') + nameOf(p));
     }
     if (state.currentPerson === personId && $('personDialog').open) {
       $('galleryTitle').textContent = I18n.t('הגלריה של ') + nameOf(p);
