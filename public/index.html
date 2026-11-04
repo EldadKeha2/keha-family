@@ -54,7 +54,7 @@
     <main>
       <section class="family-workspace" aria-label="עץ המשפחה">
         <div class="workspace-header">
-          <div class="workspace-title"><span class="section-diamond" aria-hidden="true">◇</span><div><h2 id="workspaceTitle">האילן המשפחתי</h2><p id="workspaceSubtitle">משורש משותף, שישה ענפים של אהבה</p></div></div>
+          <div class="workspace-title"><span class="section-diamond" aria-hidden="true">◇</span><div><h2 id="workspaceTitle">האילן המשפחתי</h2><p id="workspaceSubtitle">משורש משותף, שישה ענפים של אהבה</p><p id="workspaceDetail" class="workspace-detail" hidden></p></div></div>
           <div class="workspace-actions">
             <div class="search-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg><input id="searchInput" type="search" placeholder="חיפוש בן או בת משפחה" aria-label="חיפוש בני משפחה" autocomplete="off"><div class="search-results" id="searchResults" hidden></div></div>
           </div>
@@ -88,7 +88,7 @@
           <div class="collection-upload" id="galleryDropzone"><div><span class="small-eyebrow">עוד מקום לזיכרונות שלנו</span><h3>מוסיפים תמונות לגלריה</h3><p>בחרו כמה תמונות יחד או גררו אותן לכאן · עד 50MB לתמונה.</p></div><button class="primary-button" data-upload-collection="gallery">＋ בחירת תמונות</button><div id="galleryUploadState" class="collection-upload-state" role="status"></div><progress id="galleryProgress" max="100" value="0" hidden aria-label="התקדמות העלאת התמונות"></progress></div>
         </section>
         <section id="calendarView" class="portal-view family-calendar-view" aria-label="לוח שנה משפחתי" hidden><div class="calendar-updates-banner"><span aria-hidden="true">✉</span><div><strong>לא מפספסים אירוע משפחתי</strong><span>ימי הולדת, ימי נישואים וימי זיכרון — ישר למייל.</span></div><a href="#updates">הרשמה לרשימת התפוצה ולעדכונים ←</a></div>
-          <header class="family-calendar-intro"><img src="assets/fez.svg" alt="" width="62" height="62"><div><span class="small-eyebrow">סיבות להיפגש, ימים לזכור</span><h3>השנה המשפחתית שלנו</h3><p>ימי הולדת, חגים ומועדים · לוח עברי ולועזי</p></div></header>
+          <div class="calendar-after-updates-divider" aria-hidden="true"></div>
           <div class="calendar-toolbar"><div class="calendar-mode" aria-label="בחירת לוח"><button data-calendar-mode="gregorian" aria-pressed="true">לועזי</button><button data-calendar-mode="hebrew" aria-pressed="false">עברי</button></div><label class="calendar-jump-label">קפיצה לחודש<input type="month" id="calendarJump" min="1900-01" max="2200-12" aria-label="קפיצה לחודש לועזי"></label><button class="secondary-button" id="calendarToday">החודש הנוכחי</button></div>
           <div class="calendar-month-heading"><button id="calendarPrevious" aria-label="החודש הקודם">→</button><div><h3 id="calendarMonthTitle"></h3><p id="calendarMonthSubtitle"></p></div><button id="calendarNext" aria-label="החודש הבא">←</button></div><p id="calendarStatus" class="archive-status" role="status"></p><div class="calendar-warning" id="calendarWarning" hidden><span>החגים לא נטענו כרגע. ימי ההולדת והתאריכים מוצגים כרגיל.</span><button id="calendarRetry">ניסיון נוסף</button></div>
           <div class="calendar-weekdays" aria-hidden="true"><span>ראשון</span><span>שני</span><span>שלישי</span><span>רביעי</span><span>חמישי</span><span>שישי</span><span>שבת</span></div><div id="calendarGrid" class="family-calendar-grid"></div>
