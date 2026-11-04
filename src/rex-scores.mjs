@@ -1,6 +1,6 @@
 import {HttpError,text} from './http.mjs';
 import {PREPARED_HEADS} from '../public/assets/jachnun-heads.mjs';
-import {FOODS,basketPoints} from '../public/assets/rex.mjs';
+import {FOODS,basketPoints,MAX_COLLECTIBLES} from '../public/assets/rex.mjs';
 
 export const REX_SCORE_LIMIT=20;
 export function rexScore(value){
@@ -10,8 +10,8 @@ export function rexScore(value){
   if(!PREPARED_HEADS.some(head=>head.id===value.headId))throw new HttpError(400,'הראש שנבחר אינו ברשימת הראשים של המשחק.');
   if(!value.basket||typeof value.basket!=='object'||Array.isArray(value.basket))throw new HttpError(400,'סל המאכלים אינו תקין.');
   const basket={};
-  // At most one collectible per plant, with a gap of at least 1.35 seconds.
-  for(const food of FOODS){const count=value.basket[food.id];if(!Number.isSafeInteger(count)||count<0||count>223)throw new HttpError(400,'סל המאכלים אינו תקין.');basket[food.id]=count;}
-  if(Object.values(basket).reduce((a,b)=>a+b,0)>223||value.score!==basketPoints(basket))throw new HttpError(400,'הניקוד אינו תואם למאכלים שנאספו.');
+  // Includes food-only sections and all food retained across the three lives.
+  for(const food of FOODS){const count=value.basket[food.id];if(!Number.isSafeInteger(count)||count<0||count>MAX_COLLECTIBLES)throw new HttpError(400,'סל המאכלים אינו תקין.');basket[food.id]=count;}
+  if(Object.values(basket).reduce((a,b)=>a+b,0)>MAX_COLLECTIBLES||value.score!==basketPoints(basket))throw new HttpError(400,'הניקוד אינו תואם למאכלים שנאספו.');
   return {id:value.requestId,name,score:value.score,headId:value.headId,basket};
 }
