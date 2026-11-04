@@ -78,7 +78,7 @@ html[dir=rtl] .tree-guide-countdown{transform-origin:right}
   .tree-unit .root-person-card .root-person-birth{align-items:center;font-size:15px;line-height:1.5;gap:0;margin-top:2px;text-align:center}
   .root-person-card .birthday-line{justify-content:center;min-height:26px}
   .root-life-event{max-width:100%}
-  .root-event-label{display:block;font-size:14px;line-height:1.5;color:#8a7d63}
+  .root-event-label{display:block;font-size:14px;line-height:1.5;color:#8a7d63;text-align:center}
   .root-event-value{display:block;font-size:17px;line-height:1.6;color:#847354}
   .root-event-value bdi{white-space:nowrap}
   .root-event-age{display:inline;font-size:14px;white-space:nowrap;color:#677456}
