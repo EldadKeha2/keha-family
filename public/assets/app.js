@@ -171,6 +171,18 @@
         }
       }
     }
+    if(desktopOverview){
+      const buttons=[...world.querySelectorAll('.branch-open')];
+      if(buttons.length){
+        // Keep every branch button below the tallest card, including memorial dates.
+        const captionTop=Math.max(...buttons.map(button=>button.offsetTop),...buttons.flatMap(button=>[...button.parentElement.querySelectorAll('.person-card')].map(card=>card.offsetHeight+14)));
+        for(const button of buttons){
+          button.style.top=captionTop+'px';
+          height=Math.max(height,button.parentElement.offsetTop+captionTop+button.offsetHeight+24);
+        }
+        camera.height=height;world.style.height=height+'px';
+      }
+    }
     for(const {x,y,centers,depth} of connections){
       const extra=depth===0?rootHistorySpace+rootSpacingAdjustment:0,historyRoot=depth===0&&rootContentHeight>0;
       const start=historyRoot?y+rootContentHeight+12:y+(phone?115:261)+extra;
