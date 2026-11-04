@@ -72,7 +72,7 @@ export const englishNames={
   "yonatan-f": "Yonatan Fish",
   "shosh": "Shosh Bloom",
   "mark": "Mark Bloom",
-  "ilan": "Ilan Bloom",
+  "ilan": "Elan Blum",
   "rivka": "Rebecca Meskin",
   "emmy": "Emmy Bloom",
   "lola": "Lola Bloom",

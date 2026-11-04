@@ -553,16 +553,19 @@
       touches.set(event.pointerId,{x:event.clientX,y:event.clientY});
       if(touches.size===2){const [a,b]=[...touches.values()],rect=viewport.getBoundingClientRect();pinch={distance:Math.hypot(a.x-b.x,a.y-b.y),scale:camera.scale,x:(a.x+b.x)/2-rect.left,y:(a.y+b.y)/2-rect.top,cameraX:camera.x,cameraY:camera.y};drag=null;for(const id of touches.keys())viewport.setPointerCapture(id);suppressClickUntil=performance.now()+500;return;}
     }else if(event.target.closest('button'))return;
-    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:camera.x,y:camera.y,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,vx:0,vy:0,started:false,touch:event.pointerType==='touch'};
+    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:camera.x,y:camera.y,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,vx:0,vy:0,started:false,touch:event.pointerType==='touch',nativeScroll:event.pointerType==='touch'&&isPhone()&&viewport.dataset.overview==='true'};
   });
   viewport.addEventListener('pointermove',event=>{
     if(touches.has(event.pointerId))touches.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(pinch&&touches.size===2){const [a,b]=[...touches.values()],rect=viewport.getBoundingClientRect(),scale=Math.max(.035,Math.min(3.5,pinch.scale*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,pinch.distance)));camera.x=(a.x+b.x)/2-rect.left-(pinch.x-pinch.cameraX)*scale/pinch.scale;camera.y=(a.y+b.y)/2-rect.top-(pinch.y-pinch.cameraY)*scale/pinch.scale;camera.scale=scale;clampCamera();applyCamera();suppressClickUntil=performance.now()+500;return;}
     if(!drag||event.pointerId!==drag.id)return;
-    if(!drag.started&&Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>6){drag.started=true;viewport.setPointerCapture(event.pointerId);viewport.classList.add('dragging');}
+    if(!drag.started&&Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>6){
+      if(drag.nativeScroll&&Math.abs(event.clientY-drag.startY)>=Math.abs(event.clientX-drag.startX))return;
+      drag.started=true;viewport.setPointerCapture(event.pointerId);viewport.classList.add('dragging');
+    }
     if(!drag.started)return;
     const dt=Math.max(1,event.timeStamp-drag.time);drag.vx=.4*drag.vx+.6*(event.clientX-drag.lastX)/dt;drag.vy=.4*drag.vy+.6*(event.clientY-drag.lastY)/dt;drag.lastX=event.clientX;drag.lastY=event.clientY;drag.time=event.timeStamp;
-    camera.x=drag.x+event.clientX-drag.startX;camera.y=drag.y+event.clientY-drag.startY;clampCamera();applyCamera();suppressClickUntil=performance.now()+400;
+    camera.x=drag.x+event.clientX-drag.startX;camera.y=drag.y+(drag.nativeScroll?0:event.clientY-drag.startY);clampCamera();applyCamera();suppressClickUntil=performance.now()+400;
   });
   function momentum(vx,vy){
     if(!isPhone()||Math.hypot(vx,vy)<.08)return;let previous=performance.now();
@@ -570,8 +573,8 @@
   }
   function endDrag(event){
     const ended=drag;touches.delete(event.pointerId);pinch=null;drag=null;viewport.classList.remove('dragging');
-    if(touches.size===1){const [id,point]=[...touches][0];drag={id,startX:point.x,startY:point.y,x:camera.x,y:camera.y,lastX:point.x,lastY:point.y,time:event.timeStamp,vx:0,vy:0,started:true,touch:true};}
-    else if(ended?.started&&ended.touch){suppressClickUntil=performance.now()+400;if(event.timeStamp-ended.time<90)momentum(Math.max(-3,Math.min(3,ended.vx)),Math.max(-3,Math.min(3,ended.vy)));}
+    if(touches.size===1){const [id,point]=[...touches][0];drag={id,startX:point.x,startY:point.y,x:camera.x,y:camera.y,lastX:point.x,lastY:point.y,time:event.timeStamp,vx:0,vy:0,started:true,touch:true,nativeScroll:isPhone()&&viewport.dataset.overview==='true'};}
+    else if(ended?.started&&ended.touch){suppressClickUntil=performance.now()+400;if(event.timeStamp-ended.time<90)momentum(Math.max(-3,Math.min(3,ended.vx)),ended.nativeScroll?0:Math.max(-3,Math.min(3,ended.vy)));}
   }
   viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointercancel',event=>{touches.clear();pinch=null;drag=null;viewport.classList.remove('dragging');stopTreeMotion();});
   viewport.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey){event.preventDefault();const rect=viewport.getBoundingClientRect();zoom(event.deltaY<0?1.1:1/1.1,event.clientX-rect.left,event.clientY-rect.top);}}, {passive:false});
