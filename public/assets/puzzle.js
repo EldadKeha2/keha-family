@@ -21,7 +21,7 @@ export function mountPuzzle(root,onBack){
   const on=(node,type,callback)=>node.addEventListener(type,callback,{signal:events.signal});
   on(host,'click',click);on(host,'pointerdown',pointerDown);on(host,'pointermove',pointerMove);on(host,'pointerup',pointerUp);on(host,'pointercancel',cancelDrag);on(host,'keydown',keyboard);
   on(document,'visibilitychange',()=>{if(document.visibilityState==='hidden'){pauseTime();cancelDrag();}else startTime();});
-  render();if(!state.photos.length&&!state.loading)loadPhotos();
+  render();$(state.phase==='setup'?'.puzzle-intro':state.phase==='finished'?'.puzzle-completion':'.puzzle-game-header')?.scrollIntoView({block:'start',behavior:'smooth'});if(!state.photos.length&&!state.loading)loadPhotos();
 }
 
 async function loadPhotos(){
@@ -66,7 +66,7 @@ async function startPuzzle(){
   try{
     await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(Error(tr('התמונה לא נטענה. בחרו תמונה אחרת או נסו שוב.','The photo could not load. Choose another photo or try again.')));image.src=state.photo.src;});
     if(serial!==state.serial)return;
-    state.layout=makePuzzle(state.count,image.naturalWidth/image.naturalHeight);state.placed=new Set();state.order=shuffledPieces(state.layout.pieces).map(piece=>piece.id);state.selected=null;state.cursor=0;state.elapsed=0;state.zoom=1;state.hint=false;state.edgesOnly=false;state.phase='playing';state.loading=false;render();$('[data-puzzle-board]')?.scrollIntoView({block:'nearest',behavior:'smooth'});
+    state.layout=makePuzzle(state.count,image.naturalWidth/image.naturalHeight);state.placed=new Set();state.order=shuffledPieces(state.layout.pieces).map(piece=>piece.id);state.selected=null;state.cursor=0;state.elapsed=0;state.zoom=1;state.hint=false;state.edgesOnly=false;state.phase='playing';state.loading=false;render();$('.puzzle-game-header')?.scrollIntoView({block:'start',behavior:'smooth'});
   }catch(error){if(serial===state.serial){state.loading=false;state.error=error.message;render();}}
 }
 function announce(message){const node=$('[data-puzzle-status]');if(node)node.textContent=message;}
@@ -85,7 +85,7 @@ function place(id,x,y){
 }
 function click(event){
   if(event.target.closest('[data-puzzle-back]')){pausePuzzle();back?.();return;}
-  if(event.target.closest('[data-puzzle-settings]')){pauseTime();state.serial++;state.loading=false;state.phase='setup';render();return;}
+  if(event.target.closest('[data-puzzle-settings]')){pauseTime();state.serial++;state.loading=false;state.phase='setup';render();$('.puzzle-intro')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
   const level=event.target.closest('[data-puzzle-level]');if(level){if(state.loading)return;state.count=Number(level.dataset.puzzleLevel);render();return;}
   const photo=event.target.closest('[data-puzzle-photo]');if(photo){if(state.loading)return;state.photo=state.photos.find(item=>item.id===photo.dataset.puzzlePhoto);render();return;}
   if(event.target.closest('[data-puzzle-play]')){startPuzzle();return;}
