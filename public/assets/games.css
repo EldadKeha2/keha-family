@@ -25,6 +25,7 @@
 /* Compact square game tiles, including two columns on phones. */
 .family-game-choices{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
 .family-game-choice{display:flex;flex-direction:column;align-items:center;text-align:center;aspect-ratio:1;box-sizing:border-box;padding:22px 18px;gap:12px;grid-column:auto}
+.family-game-choices>button.family-game-choice{grid-column:auto / span 1}
 .family-game-choice>.game-choice-icon{width:54px;height:54px;flex:0 0 54px;border-radius:15px}
 .family-game-choice>.game-choice-icon svg{width:43px;height:43px}
 .family-game-choice>span:last-child{flex:1;width:100%;align-items:center;gap:9px}
