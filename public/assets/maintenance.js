@@ -45,7 +45,10 @@
   }
   function continueToSite(){
     bypassed=true;try{sessionStorage.setItem(bypassKey,'1');}catch{}
-    active=false;if(recoveryTimer)clearInterval(recoveryTimer);recoveryTimer=null;
+    active=false;
+    // Keep checking in limited browsing mode, so quota recovery restores the full site.
+    if(!recoveryTimer)recoveryTimer=setInterval(checkRecovery,120000);
+    void checkRecovery();
     const screen=document.getElementById('familyMaintenanceScreen');if(screen){screen.hidden=true;screen.style.display='none';}
     document.documentElement.classList.remove('family-maintenance-active');const root=pageRoot();if(root)root.inert=false;
     banner();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
@@ -60,7 +63,7 @@
     if(!recoveryTimer)recoveryTimer=setInterval(checkRecovery,120000);
   }
   async function checkRecovery(){
-    if(!active||document.visibilityState==='hidden')return;
+    if((!active&&!bypassed)||document.visibilityState==='hidden')return;
     try{
       const response=await nativeFetch('/api/health',{cache:'no-store'});
       if(response.ok&&(await response.json()).available===true){try{sessionStorage.removeItem(bypassKey);}catch{}location.reload();}
@@ -90,7 +93,12 @@
   window.addEventListener('error',event=>{
     const target=event.target,src=target?.currentSrc||target?.src||'',url=familyURL(src);
     if(target?.tagName==='SCRIPT'&&url?.pathname==='/family-data.js'){activate();return;}
-    if(['IMG','VIDEO','IFRAME'].includes(target?.tagName)&&url?.pathname.startsWith('/media/'))activate();
+    if(['IMG','VIDEO','IFRAME'].includes(target?.tagName)&&url?.pathname.startsWith('/media/')){
+      // An individual missing media file is not proof of a Cloudflare quota outage.
+      void nativeFetch('/api/health',{cache:'no-store'}).then(async response=>{
+        if(!response.ok||(await response.json()).available!==true)activate();
+      }).catch(()=>activate());
+    }
     if(/FAMILY_DATA|FAMILY_API_TOKEN|family-data\.js/.test(String(event.message||'')))activate();
   },true);
   window.addEventListener('load',event=>{
