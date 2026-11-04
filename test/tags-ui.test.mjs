@@ -42,3 +42,8 @@ test('exact first names rank before embedded matches, reset search scroll, and s
   assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="shay"')<html.indexOf('data-tag-person="avishai"'));assert.match(html,/הורים:/);
   widget.query='מתן';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="matan-g"/);assert.match(widget.results.innerHTML,/data-tag-person="matan-f"/);assert.match(widget.results.innerHTML,/גבי/);assert.match(widget.results.innerHTML,/תומר/);f.tags.clearInline(host);
 });
+test('tagging starts with one instruction and the search field, without empty or repeated help text',()=>{
+  const f=fixture(),host=new NodeStub();f.tags.mountInline(host,photo('compact-image'));const widget=host._tagWidget;
+  assert.match(host.innerHTML,/תייגו מי מופיע כאן/);assert.ok(host.innerHTML.indexOf('data-tag-search-area')<host.innerHTML.indexOf('data-selected-people'));assert.doesNotMatch(host.innerHTML,/tag-add-help|התיוגים נשמרים אוטומטית|בחרו את האנשים/);assert.equal(widget.selectedHost.innerHTML,'');assert.equal(widget.status.textContent,'');assert.equal(host.querySelector('[data-tag-count]').textContent,'');
+  widget.store.saved.set('yona',family.people.yona);widget.render();assert.match(widget.selectedHost.innerHTML,/יונה/);assert.match(widget.selectedHost.innerHTML,/data-remove-person-tag/);assert.equal(host.querySelector('[data-tag-count]').textContent,'אדם אחד תויג');f.tags.clearInline(host);
+});

@@ -680,3 +680,9 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   'רעננו את הטופס ונסו לשמור שוב.':'Refresh the form and try saving again.',
   'הבקשה כבר נשמרה עם תוכן אחר. רעננו את הטופס.':'This request was already saved with different content. Refresh the form.'
 });
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  'תייגו מי מופיע כאן':'Tag who appears here',
+  'הורדת התמונה':'Download photo',
+  'פתיחת Instagram':'Open Instagram',
+  'שיתוף התמונה':'Share this photo'
+});

@@ -9,6 +9,7 @@
   const current=()=>state.items[state.index];
   const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
   let noticeTimer,expectedCaption='',captionEditing=false;
+  let instagramPrepared={id:null,file:null};
   const tr=(he,en)=>I18n.isEnglish?en:he;
   function shareURL(item){const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);url.hash='gallery';return url.href;}
 
@@ -34,6 +35,11 @@
     $('shareMediaWhatsApp').href='https://wa.me/?text='+encodeURIComponent(label+'\n'+url);
     $('shareMediaFacebook').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);
     $('shareMediaEmail').href='mailto:?subject='+encodeURIComponent(label)+'&body='+encodeURIComponent(label+'\n\n'+url);
+    if(instagramPrepared.id!==identity(item)){instagramPrepared={id:identity(item),file:null};$('shareMediaInstagram').disabled=false;$('shareMediaInstagram').removeAttribute('aria-busy');}
+    $('shareMediaInstagram').hidden=item.kind==='document';
+    $('instagramShareHelp').hidden=true;
+    $('downloadForInstagram').href=item.src;$('downloadForInstagram').download=item.filename||'';
+    $('downloadForInstagram').textContent=item.kind==='video'?tr('הורדת הסרטון','Download video'):tr('הורדת התמונה','Download photo');
     $('mediaShareStatus').textContent='';$('mediaLinkFallback').hidden=true;
     $('openedProfilePhoto').hidden=!(state.scope?.startsWith('personal:')&&item.kind==='photo');
     $('openedCaptionForm').hidden=!captionEditing;
@@ -48,6 +54,35 @@
     window.FamilyTags.mountInline($('mediaTagPanel'),item);
     $('mediaViewerTag').hidden=!window.FamilyTags.taggable(item);
     $('mediaViewerTag').textContent=item.tags?.length?I18n.t('תיוג אנשים (')+item.tags.length+')':I18n.t('תיוג אנשים');
+  }
+  async function instagramFallback(item){
+    if(identity(current()||{})!==identity(item)||!$('mediaViewer').open)return;
+    $('instagramShareHelp').hidden=false;
+    const url=shareURL(item);
+    try{await navigator.clipboard.writeText(url);if(identity(current()||{})!==identity(item)||!$('mediaViewer').open)return;$('mediaShareStatus').textContent=tr('הקישור הועתק. אפשר להדביק אותו בהודעה ב-Instagram, או להוריד את התמונה ולהעלות אותה.','Link copied. Paste it into an Instagram message, or download the photo and upload it.');}
+    catch{if(identity(current()||{})!==identity(item)||!$('mediaViewer').open)return;$('mediaLinkFallback').value=url;$('mediaLinkFallback').hidden=false;$('mediaShareStatus').textContent=tr('אפשר להוריד את התמונה ולהעלות ב-Instagram, או להעתיק את הקישור להודעה.','Download the photo to upload on Instagram, or copy the link into a message.');}
+  }
+  async function shareInstagram(event){
+    event.preventDefault();const item=current();if(!item)return;
+    const id=identity(item),button=$('shareMediaInstagram'),isCurrent=()=>identity(current()||{})===id&&$('mediaViewer').open;
+    if(!navigator.share||!navigator.canShare||item.provider==='youtube'){await instagramFallback(item);return;}
+    const type=item.mime||'',extensions={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/avif':'avif','video/mp4':'mp4','video/webm':'webm'};
+    if(!extensions[type]){await instagramFallback(item);return;}
+    button.disabled=true;button.setAttribute('aria-busy','true');
+    try{
+      let file=instagramPrepared.id===id?instagramPrepared.file:null;
+      if(!file){
+        $('mediaShareStatus').textContent=tr('מכינים את התמונה לשיתוף…','Preparing the photo to share…');
+        const response=await I18n.fetch(item.src,{cache:'force-cache'});if(!response.ok)throw Error('Media unavailable');
+        const blob=await response.blob();if(!isCurrent())return;
+        file=new File([blob],'family-memory.'+extensions[type],{type});instagramPrepared={id,file};
+      }
+      if(!navigator.canShare({files:[file]})){await instagramFallback(item);return;}
+      if(navigator.userActivation?.isActive===false){$('mediaShareStatus').textContent=tr('התמונה מוכנה. לחצו שוב על Instagram ובחרו אותו בחלון השיתוף.','The photo is ready. Tap Instagram again, then choose it in the sharing menu.');return;}
+      $('mediaShareStatus').textContent=tr('בחרו Instagram בחלון השיתוף של הטלפון.','Choose Instagram in your phone’s sharing menu.');
+      await navigator.share({files:[file],title:item.caption||I18n.mediaName(item)||'Keha Family'});
+    }catch(error){if(!isCurrent())return;if(error.name==='AbortError'){$('mediaShareStatus').textContent='';return;}await instagramFallback(item);}
+    finally{if(isCurrent()){button.disabled=false;button.removeAttribute('aria-busy');}}
   }
   function clearStage(){
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
@@ -144,6 +179,7 @@
     $('editOpenedCaption').addEventListener('click',()=>{const item=current();if(!item)return;captionEditing=true;expectedCaption=item.caption||'';$('openedCaptionText').value=expectedCaption;$('openedCaptionError').textContent='';$('openedCaptionForm').hidden=false;$('openedCaptionText').focus();});
     $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;$('openedCaptionForm').hidden=true;});
     $('openedCaptionForm').addEventListener('submit',saveOpenedCaption);
+    $('shareMediaInstagram').addEventListener('click',shareInstagram);
     $('shareMediaMessenger').addEventListener('click',async event=>{
       const item=current();if(!item){event.preventDefault();return;}const url=shareURL(item),title=item.caption||I18n.mediaName(item)||'Keha Family';
       if(navigator.share){event.preventDefault();try{await navigator.share({title,url});}catch(error){if(error.name!=='AbortError'){$('mediaShareStatus').textContent=tr('אפשר להעתיק את הקישור ולשלוח ב-Messenger.','Copy the link and send it in Messenger.');}}return;}
@@ -166,7 +202,7 @@
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
-    $('mediaViewer').addEventListener('close',()=>{const url=new URL(location.href);if(url.searchParams.has('media')){url.searchParams.delete('media');history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
+    $('mediaViewer').addEventListener('close',()=>{instagramPrepared={id:null,file:null};const url=new URL(location.href);if(url.searchParams.has('media')){url.searchParams.delete('media');history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     $('mediaViewer').addEventListener('click',event=>{if(event.target===$('mediaViewer'))$('mediaViewer').close();});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||event.target.closest('input,textarea'))return;
