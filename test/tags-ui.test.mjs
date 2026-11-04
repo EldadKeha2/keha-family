@@ -11,10 +11,10 @@ class NodeStub extends EventTarget{
  replaceChildren(){}
  focus(){}
 }
-function fixture(){
+function fixture(respond){
  const nodes=new Map(),requests=[],events=[];
  const window={FAMILY_DATA:family,FamilyApp:{apiEnabled:true,toast(){}},addEventListener(){},dispatchEvent(event){events.push(event);}};
- window.FamilyI18n={t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),isEnglish:false,locale:'he-IL',personName:p=>p.name,searchNames:p=>p.name,branchName:p=>p?.title||'',error:v=>v,fetch:async(path,options)=>{requests.push({path,body:options?.body?JSON.parse(options.body):null});const id=path.split('/')[2];return Response.json({item:{id,kind:'photo',tags:[],tagsRevision:'new'},taggedPeople:[]});}};
+ window.FamilyI18n={t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),isEnglish:false,locale:'he-IL',personName:p=>p.name,searchNames:p=>p.name,branchName:p=>p?.title||'',error:v=>v,fetch:async(path,options)=>{requests.push({path,body:options?.body?JSON.parse(options.body):null});const id=path.split('/')[2];return respond?respond(id):Response.json({item:{id,kind:'photo',tags:[],tagsRevision:'new'},taggedPeople:[]});}};
  const document={addEventListener(){},getElementById(id){if(!nodes.has(id))nodes.set(id,{open:false});return nodes.get(id);}};
  const context=vm.createContext({window,document,Response,AbortController,CustomEvent,clearTimeout,setTimeout});vm.runInContext(source,context);
  return {tags:window.FamilyTags,requests,events};
@@ -44,6 +44,22 @@ test('exact first names rank before embedded matches, reset search scroll, and s
 });
 test('tagging starts with one instruction and the search field, without empty or repeated help text',()=>{
   const f=fixture(),host=new NodeStub();f.tags.mountInline(host,photo('compact-image'));const widget=host._tagWidget;
-  assert.match(host.innerHTML,/תייגו מי מופיע כאן/);assert.ok(host.innerHTML.indexOf('data-tag-search-area')<host.innerHTML.indexOf('data-selected-people'));assert.doesNotMatch(host.innerHTML,/tag-add-help|התיוגים נשמרים אוטומטית|בחרו את האנשים/);assert.equal(widget.selectedHost.innerHTML,'');assert.equal(widget.status.textContent,'');assert.equal(host.querySelector('[data-tag-count]').textContent,'');
+  assert.match(host.innerHTML,/תייגו מי מופיע כאן/);assert.match(host.innerHTML,/class="tag-heading-icon"/);assert.ok(host.innerHTML.indexOf('data-tag-search-area')<host.innerHTML.indexOf('data-selected-people'));assert.ok(host.innerHTML.indexOf('data-tag-save-status')<host.innerHTML.indexOf('data-selected-people'));assert.doesNotMatch(host.innerHTML,/tag-add-help|התיוגים נשמרים אוטומטית|בחרו את האנשים/);assert.equal(widget.selectedHost.innerHTML,'');assert.equal(widget.status.textContent,'');assert.equal(host.querySelector('[data-tag-count]').textContent,'');
   widget.store.saved.set('yona',family.people.yona);widget.render();assert.match(widget.selectedHost.innerHTML,/יונה/);assert.match(widget.selectedHost.innerHTML,/data-remove-person-tag/);assert.equal(host.querySelector('[data-tag-count]').textContent,'אדם אחד תויג');f.tags.clearInline(host);
+});
+test('newest tags stay first while saving, after the response and when reopening the image',async()=>{
+  let complete;
+  const f=fixture(id=>new Promise(resolve=>{complete=ids=>resolve(Response.json({item:{...photo(id),tags:ids.map(id=>family.people[id]),tagsRevision:'saved'},taggedPeople:[]}));})),host=new NodeStub();
+  f.tags.mountInline(host,{...photo('ordered-image'),tags:[family.people.yona]});const widget=host._tagWidget,store=widget.store;
+  store.enqueue(family.people.shlomo,true);store.enqueue(family.people.roi,true);
+  assert.deepEqual([...store.selected().keys()],['roi','shlomo','yona']);
+  const first=store.run();store.enqueue(family.people.camille,true);
+  assert.deepEqual([...store.selected().keys()],['camille','roi','shlomo','yona']);
+  complete(['roi','shlomo','yona']);await first;
+  assert.deepEqual([...store.selected().keys()],['camille','roi','shlomo','yona'],'A response must not move a later pending selection to the bottom');
+  const second=store.run();complete(['camille','roi','shlomo','yona']);await second;
+  assert.deepEqual([...store.selected().keys()],['camille','roi','shlomo','yona']);assert.equal(widget.status.textContent,'✓ התיוג נשמר בהצלחה');
+  assert.ok(widget.selectedHost.innerHTML.indexOf('data-remove-person-tag="camille"')<widget.selectedHost.innerHTML.indexOf('data-remove-person-tag="roi"'));
+  f.tags.clearInline(host);f.tags.mountInline(host,photo('ordered-image'));
+  assert.deepEqual([...host._tagWidget.store.selected().keys()],['camille','roi','shlomo','yona']);f.tags.clearInline(host);
 });

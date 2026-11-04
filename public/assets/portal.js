@@ -8,7 +8,7 @@
   const normalize = value => String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g, '').toLowerCase().trim();
   const state = {view:'tree', query:'', videoCategory:'all', collections:{photos:{items:[]},videos:{items:[]},gallery:{items:[]}}, stories:[], storyRevision:null, editingStory:null, birthdayId:null};
   const collectionId=(kind,suffix)=>kind==='gallery'&&['Grid','Count','Empty'].includes(suffix)?'sharedGallery'+suffix:kind+suffix;
-  const galleryPage={page:1,size:100,query:''};let gallerySearchTimer;
+  const galleryPage={page:1,size:100,query:'',filter:'all'};let gallerySearchTimer;
   const revisions = {}, signatures = {}, loading = {}, queues = {photos:[], videos:[],gallery:[]}, running = {}, drafts = new Map();
   let ready = false;
   function canSave() {if (app()?.apiEnabled) return true;notify(I18n.t('כדי לשמור שינויים, פתחו את האתר באמצעות קובץ ההפעלה.'));return false;}
@@ -49,14 +49,18 @@
   }
   function renderCollection(kind) {
     const collection = state.collections[kind], query = normalize(state.query);
-    const filtered = kind==='gallery'?collection.items:collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
-    const isVideo = kind === 'videos',compact=kind==='gallery';
-    window.FamilyMedia.register(kind,filtered);
+    const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter!=='untagged'||!item.tags?.length):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
+    const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged';
+    window.FamilyMedia.register(kind,filtered,{retainCurrent:untagged});
     if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.videoCategory===state.videoCategory)));
     $(collectionId(kind,'Count')).textContent = collection.items.length ? I18n.html`${filtered.length}${filtered.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?(isVideo?I18n.word(filtered.length,'video','videos'):I18n.word(filtered.length,'photo','photos')):(isVideo?I18n.t('סרטונים'):I18n.t('תמונות'))} באלבום המשותף` : isVideo?I18n.t('רגעים ששווה לראות שוב'):I18n.t('אלבום משותף לכל המשפחה');
-    $(collectionId(kind,'Empty')).hidden = collection.items.length > 0;
+    $(collectionId(kind,'Empty')).hidden = filtered.length > 0;
     if(compact){const p=collection.pagination||{page:1,size:galleryPage.size,total:collection.count||0,pages:1};
-      $(collectionId(kind,'Count')).textContent=p.total+' '+I18n.t('תמונות בגלריה');
+      $(collectionId(kind,'Count')).textContent=p.total+' '+I18n.t(untagged?'תמונות לא מתויגות':'תמונות בגלריה');
+      for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter===galleryPage.filter));
+      const empty=$('sharedGalleryEmpty');
+      empty.querySelector('h3').textContent=I18n.t(untagged?'לא נמצאו תמונות לא מתויגות':galleryPage.query?'לא נמצאו תמונות בחיפוש הזה':'כל רגע משפחתי מתחיל בתמונה');
+      empty.querySelector('p').textContent=I18n.t(untagged||galleryPage.query?'אפשר להציג את כל התמונות או לשנות את החיפוש.':'אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.');
       for(const control of document.querySelectorAll('[data-gallery-pager]')){control.hidden=!p.total;control.querySelector('[data-gallery-page-label]').textContent=I18n.isEnglish?`Page ${p.page} of ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} of ${p.total}`:`עמוד ${p.page} מתוך ${p.pages} · תמונות ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} מתוך ${p.total}`;control.querySelector('[data-gallery-prev]').disabled=p.page<=1;control.querySelector('[data-gallery-next]').disabled=p.page>=p.pages;control.querySelector('[data-gallery-size]').value=String(p.size);}
     }
     const signature = filtered.map(item=>item.file+'|'+item.src).join('\u0000');
@@ -114,7 +118,7 @@
     if(loading[kind]){if(kind==='gallery'&&force)loading.galleryQueued=true;return;}
     loading[kind] = true;
     const requestedRevision=revisions[kind],requestedGallery=JSON.stringify(galleryPage);
-    const pageQuery=kind==='gallery'?'?'+new URLSearchParams({page:galleryPage.page,size:galleryPage.size,q:galleryPage.query}):'';
+    const pageQuery=kind==='gallery'?'?'+new URLSearchParams({page:galleryPage.page,size:galleryPage.size,q:galleryPage.query,filter:galleryPage.filter}):'';
     try {
       const result = await request('api/collections/'+kind+pageQuery,{headers:!force&&revisions[kind]?{'If-None-Match':'"'+revisions[kind]+'"'}:{}});
       if (!result || revisions[kind]!==requestedRevision||(kind==='gallery'&&JSON.stringify(galleryPage)!==requestedGallery)) return;
@@ -186,7 +190,7 @@
         const filename=clipboard?I18n.t('צילום_מסך_')+new Date().toISOString().replace(/[:.]/g,'-')+'.png':file.name;
         progress.hidden=false;progress.value=0;status.textContent=I18n.t('מעלה ')+filename+'…';
         const result=await uploadFile(kind,file,filename,percent=>{progress.value=percent;status.textContent=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הקובץ…'):I18n.html`מעלה ${filename} · ${percent}%`;},group);
-        saved++;savedFiles.push(result.file);if(kind==='gallery'){galleryPage.page=1;galleryPage.size=100;galleryPage.query='';state.query='';$('searchInput').value='';}state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
+        saved++;savedFiles.push(result.file);if(kind==='gallery'){galleryPage.page=1;galleryPage.size=100;galleryPage.query='';galleryPage.filter='all';state.query='';$('searchInput').value='';}state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
         if(state.view===kind)renderCollection(kind);
       }catch(error){notify(file.name+': '+error.message);}
     }
@@ -262,6 +266,7 @@
   function init(){
     ready=true;
     document.addEventListener('click',event=>{
+      const galleryFilter=event.target.closest('[data-gallery-filter]');if(galleryFilter){const filter=galleryFilter.dataset.galleryFilter;if(!['all','untagged'].includes(filter)||filter===galleryPage.filter)return;galleryPage.filter=filter;galleryPage.page=1;clearTimeout(gallerySearchTimer);for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter===filter));refreshCollection('gallery',true);return;}
       const pager=event.target.closest('[data-gallery-next],[data-gallery-prev]');if(pager){if(pager.disabled)return;galleryPage.page=Math.max(1,galleryPage.page+(pager.hasAttribute('data-gallery-next')?1:-1));refreshCollection('gallery',true).then(()=>$('sharedGalleryGrid').scrollIntoView({block:'start',behavior:'instant'}));return;}
       const close=event.target.closest('[data-close-dialog]');if(close){$(close.dataset.closeDialog).close();return;}
       const death=event.target.closest('[data-edit-death]');if(death){openBirthday(death.dataset.editDeath,'death');return;}
@@ -284,11 +289,12 @@
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
-      if(!result.collection){if(result.item&&result.operation==='tags'){state.collections[kind].items=state.collections[kind].items.map(item=>item.id===result.item.id?{...item,...result.item}:item);if(state.view===kind)renderCollection(kind);}return;}
+      if(!result.collection){if(result.item&&result.operation==='tags'){state.collections[kind].items=state.collections[kind].items.map(item=>item.id===result.item.id?{...item,...result.item}:item);if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&galleryPage.filter==='untagged'){revisions.gallery=null;refreshCollection('gallery',true);}}return;}
       if(result.operation==='delete'){const key=captionKey(kind,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
       if(kind==='gallery'){
+        if(result.operation==='delete')window.FamilyMedia.register(kind,state.collections.gallery.items.filter(item=>item.id!==result.item.id&&(galleryPage.filter!=='untagged'||!item.tags?.length)));
         const page=state.collections.gallery.pagination||galleryPage;
-        if(page.page!==1||page.size!==100||page.query){revisions.gallery=null;refreshCollection('gallery',true);return;}
+        if(page.page!==1||page.size!==100||page.query||galleryPage.filter!=='all'){revisions.gallery=null;refreshCollection('gallery',true);return;}
       }
       state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
       if(state.view===kind)renderCollection(kind);else window.FamilyMedia.register(kind,result.collection.items);

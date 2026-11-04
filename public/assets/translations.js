@@ -688,3 +688,13 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
 });
 Object.assign(window.FAMILY_TRANSLATIONS,{'מחק פריט':'Delete item'});
 Object.assign(window.FAMILY_TRANSLATIONS,{'הורדת תמונה':'Download photo','הורדת סרטון':'Download video','הורדת מסמך':'Download document'});
+
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  'סינון תמונות בגלריה':'Filter gallery photos',
+  'כל התמונות':'All photos',
+  'תמונות לא מתויגות':'Untagged photos',
+  'לא נמצאו תמונות לא מתויגות':'No untagged photos found',
+  'לא נמצאו תמונות בחיפוש הזה':'No photos match this search',
+  'אפשר להציג את כל התמונות או לשנות את החיפוש.':'Show all photos or change your search.',
+  'בחרו סינון תמונות תקין.':'Choose a valid photo filter.'
+});

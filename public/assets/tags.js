@@ -35,7 +35,17 @@
   class TagStore {
     constructor(id,item){this.id=id;this.item=item||{id,tags:[]};this.saved=new Map((item?.tags||[]).map(person=>[person.id,person]));this.queue=[];this.active=[];this.aliases=new Map();this.listeners=new Set();this.error='';this.status='';this.ready=Boolean(item?.tags&&item.tagsRevision);this.timer=null;this.loading=null;}
     get busy(){return Boolean(this.active.length||this.queue.length);}
-    selected(){const selected=new Map(this.saved);for(const op of [...this.active,...this.queue]){const key=this.aliases.get(op.key)||op.key;if(op.tagged)selected.set(key,{...roster.get(key),id:key,name:op.name,isNew:key.startsWith('new:')});else selected.delete(key);}return selected;}
+    selected(){
+      let selected=new Map(this.saved);
+      for(const op of [...this.active,...this.queue]){
+        const key=this.aliases.get(op.key)||op.key;
+        if(op.tagged){
+          const person={...roster.get(key),id:key,name:op.name,isNew:key.startsWith('new:')};
+          if(selected.has(key))selected.set(key,person);else selected=new Map([[key,person],...selected]);
+        }else selected.delete(key);
+      }
+      return selected;
+    }
     emit(){for(const listener of this.listeners)listener();if(closeRequested&&modalStore===this&&!this.busy&&!this.error)closeModal();}
     async load(){
       if(this.loading)return this.loading;
@@ -72,7 +82,7 @@
       this.host=host;this.store=store;this.inline=inline;this.query='';this.version=-1;this.lastSelection='';
       this.events=new AbortController();const on=(element,type,handler)=>element.addEventListener(type,handler,{signal:this.events.signal});
       const prefix=inline?'inline':'modal';
-      host.innerHTML=I18n.html`<div class="tag-widget${inline?' inline-tag-widget':''}"><div class="tag-widget-heading"><h3>${I18n.t('תייגו מי מופיע כאן')}</h3><span data-tag-count></span></div><div class="tag-search-area" data-tag-search-area><label class="tag-search-label" for="${prefix}TagPersonSearch"><span class="visually-hidden">חיפוש או הוספת שם</span><input type="search" id="${prefix}TagPersonSearch" data-tag-search maxlength="120" placeholder="הקלידו שם פרטי או שם משפחה…" autocomplete="off"></label><p class="tag-search-count" data-tag-search-count></p><div class="tag-people-results" data-tag-results></div><button type="button" class="tag-add-name" data-tag-add hidden></button></div><div class="selected-people" data-selected-people></div><p class="tag-autosave-status" data-tag-save-status role="status" aria-live="polite"></p><div class="tag-error-actions" data-tag-error-actions hidden><button type="button" class="secondary-button" data-tag-retry>ניסיון נוסף</button><button type="button" data-tag-discard>ביטול השינוי שלא נשמר</button></div></div>`;
+      host.innerHTML=I18n.html`<div class="tag-widget${inline?' inline-tag-widget':''}"><div class="tag-widget-heading"><h3><svg class="tag-heading-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13l-7 7a2 2 0 0 1-3 0l-7-7V4h9l8 6a2 2 0 0 1 0 3Z"/><circle cx="7.5" cy="8" r="1"/></svg><span>${I18n.t('תייגו מי מופיע כאן')}</span></h3><span data-tag-count></span></div><div class="tag-search-area" data-tag-search-area><label class="tag-search-label" for="${prefix}TagPersonSearch"><span class="visually-hidden">חיפוש או הוספת שם</span><input type="search" id="${prefix}TagPersonSearch" data-tag-search maxlength="120" placeholder="הקלידו שם פרטי או שם משפחה…" autocomplete="off"></label><p class="tag-search-count" data-tag-search-count></p><div class="tag-people-results" data-tag-results></div><button type="button" class="tag-add-name" data-tag-add hidden></button></div><p class="tag-autosave-status" data-tag-save-status role="status" aria-live="polite"></p><div class="tag-error-actions" data-tag-error-actions hidden><button type="button" class="secondary-button" data-tag-retry>ניסיון נוסף</button><button type="button" data-tag-discard>ביטול השינוי שלא נשמר</button></div><div class="selected-people" data-selected-people></div></div>`;
       this.input=host.querySelector('[data-tag-search]');this.results=host.querySelector('[data-tag-results]');this.selectedHost=host.querySelector('[data-selected-people]');this.status=host.querySelector('[data-tag-save-status]');
       this.widget=host.querySelector('.tag-widget');this.searchArea=host.querySelector('[data-tag-search-area]');this.dialog=host.closest?.('dialog')||null;this.searchActive=false;this.searchFrame=null;
       this.listener=()=>this.render();store.listeners.add(this.listener);

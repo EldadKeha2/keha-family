@@ -200,7 +200,7 @@ test('tree corrections update existing names and add a spouse without changing s
     const graph=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);
     assert.equal(graph.people.chantal.name,'שנטל פירוז');assert.equal(graph.people.camille.name,'קמיל דה ויטה');assert.equal(graph.people.memo.name,'גיירמו וארגאס');assert.equal(graph.people.memo.firstName,'גיירמו');assert.equal(graph.people['rachel-katan'].name,'רחל קטן');assert.deepEqual(graph.units['u-yehiel'].people,['yehiel','rachel-katan']);
     const renamedTags=await f.call('/api/collections/photos',{headers:{'If-None-Match':beforeTagged.headers.get('ETag')}});assert.equal(renamedTags.status,200,'A rename must refresh existing cached tag labels');
-    const taggedPhoto=(await renamedTags.json()).items[0];assert.equal(taggedPhoto.id,tagged.id);assert.deepEqual(taggedPhoto.tags.map(person=>person.name),['גיירמו וארגאס','קמיל דה ויטה']);
+    const taggedPhoto=(await renamedTags.json()).items[0];assert.equal(taggedPhoto.id,tagged.id);assert.deepEqual(taggedPhoto.tags.map(person=>person.name),['קמיל דה ויטה','גיירמו וארגאס']);
     const roster=(await (await f.call('/api/tag-people')).json()).people;assert.equal(roster.find(person=>person.id==='memo').name,'גיירמו וארגאס');assert.equal(roster.find(person=>person.id==='camille').name,'קמיל דה ויטה');
     assert.equal((await (await f.call('/api/stories')).json()).stories[0].body,'סיפור שנשמר לפני העדכון');
     assert.deepEqual(new Uint8Array(await (await f.call(after.gallery[0].src)).arrayBuffer()),new Uint8Array(photo));
@@ -440,7 +440,7 @@ test('one shared photo appears immediately in every tagged personal album withou
   const f=fixture();try{
     await f.connect();const item=await taggedUpload(f),before=await f.call('/api/people/chantal');
     const response=await setTags(f,item,['chantal','camille','chantal']);assert.equal(response.status,200);const changed=await response.json();
-    assert.deepEqual(changed.item.tags.map(person=>person.name),['שנטל פירוז','קמיל דה ויטה']);
+    assert.deepEqual(changed.item.tags.map(person=>person.name),['קמיל דה ויטה','שנטל פירוז']);
     for(const id of ['chantal','camille']){const person=changed.people[id];assert.equal(person.photoCount,1);assert.equal(person.mediaCount,1);assert.equal(person.gallery[0].id,item.id);assert.equal(person.gallery[0].src,item.src);assert.equal(person.gallery[0].linked,true);assert.equal(person.gallery[0].scope,'photos');}
     assert.equal((await f.call('/api/people/chantal',{headers:{'If-None-Match':before.headers.get('ETag')}})).status,200);
     assert.equal(f.objects.size,1);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media WHERE id=?').get(item.id).n,1);
@@ -622,6 +622,25 @@ test('gallery pagination defaults to 100, caps at 500, searches all pages and ke
   assert.equal((await (await f.call('/api/collections/gallery?page=999')).json()).pagination.page,7);
  }finally{await f.close();}
 });
+test('untagged gallery filtering covers every page, combines with search and stays current after tag changes',async()=>{
+ const f=fixture();try{
+  await f.connect();const insert=f.database.prepare('INSERT INTO media(id,category,data) VALUES(?,?,?)'),tag=f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)'),id=n=>n.toString(16).padStart(32,'0');
+  for(let n=0;n<205;n++){
+   const item={id:id(n),category:'gallery',file:id(n)+'.jpg',name:'Photo '+n,caption:n===2?'Distant untagged memory':'',mime:'image/jpeg',kind:'photo'};insert.run(item.id,'gallery',JSON.stringify(item));if(n%2)tag.run(item.id,'yona');
+  }
+  const all=await f.call('/api/collections/gallery'),allEtag=all.headers.get('ETag');
+  const response=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':allEtag}});assert.equal(response.status,200,'All-photo and untagged snapshots use different cache keys');const etag=response.headers.get('ETag'),first=await response.json();
+  assert.equal(first.count,103);assert.equal(first.pagination.pages,2);assert.equal(first.pagination.filter,'untagged');assert.equal(first.items.length,100);assert.equal(first.items[0].id,id(204));assert.ok(first.items.every(item=>item.tags.length===0));
+  const last=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.deepEqual(last.items.map(item=>item.id),[id(4),id(2),id(0)]);
+  const search='/api/collections/gallery?filter=untagged&q=Distant';assert.equal((await(await f.call(search)).json()).items[0].id,id(2));
+  assert.equal((await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}})).status,304);
+  const patch=tagged=>f.call('/api/media/'+id(2)+'/tags/patch',{method:'POST',body:{changes:[{personId:'yona',tagged}]}});
+  assert.equal((await patch(true)).status,200);const changed=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.equal((await changed.json()).count,102);assert.equal((await(await f.call(search)).json()).count,0);
+  assert.equal((await patch(false)).status,200);f.restart();assert.equal((await(await f.call(search)).json()).count,1);assert.equal((await(await f.call('/api/collections/gallery')).json()).count,205);
+  for(let n=0;n<205;n+=2)tag.run(id(n),'yona');const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
+  assert.equal((await f.call('/api/collections/gallery?filter=other')).status,400);
+ }finally{await f.close();}
+});
 test('editable death dates retain birthday validation, stale checks and saved data through redeployment',async()=>{
  const f=fixture();try{
   await f.connect();const p=await (await f.call('/api/people/roi')).json();
@@ -708,12 +727,14 @@ test('grandparent corrections migrate existing records once and preserve later e
 test('tag batches touch only their image, preserve concurrent selections, are idempotent and return no albums',async()=>{
  const f=fixture();try{
   await f.connect();const a=await taggedUpload(f),b=await taggedUpload(f),patch=(item,changes)=>f.call('/api/media/'+item.id+'/tags/patch',{method:'POST',body:{changes}});
-  let r=await patch(a,[{personId:'yona',tagged:true},{personId:'shlomo',tagged:true}]);assert.equal(r.status,200);let result=await r.json();assert.equal(result.collection,undefined);assert.equal(result.people,undefined);assert.deepEqual(result.item.tags.map(p=>p.id),['yona','shlomo']);
+  let r=await patch(a,[{personId:'yona',tagged:true},{personId:'shlomo',tagged:true}]);assert.equal(r.status,200);let result=await r.json();assert.equal(result.collection,undefined);assert.equal(result.people,undefined);assert.deepEqual(result.item.tags.map(p=>p.id),['shlomo','yona']);
   const revision=result.item.tagsRevision;
-  result=await(await patch(a,[{personId:'yona',tagged:true}])).json();assert.equal(result.item.tagsRevision,revision);
+  result=await(await patch(a,[{personId:'yona',tagged:true}])).json();assert.equal(result.item.tagsRevision,revision);assert.deepEqual(result.item.tags.map(p=>p.id),['shlomo','yona'],'Repeating an existing tag must not change its position');
   await Promise.all([patch(a,[{personId:'yona',tagged:false}]),patch(a,[{personId:'roi',tagged:true}]),patch(b,[{personId:'camille',tagged:true}])]);
-  assert.deepEqual((await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags.map(p=>p.id),['shlomo','roi']);assert.deepEqual((await(await f.call('/api/media/'+b.id+'/tags')).json()).item.tags.map(p=>p.id),['camille']);
+  assert.deepEqual((await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags.map(p=>p.id),['roi','shlomo']);assert.deepEqual((await(await f.call('/api/media/'+b.id+'/tags')).json()).item.tags.map(p=>p.id),['camille']);
   assert.equal((await patch(a,[{personId:'yona',tagged:true},{name:42,tagged:true}])).status,400);assert.ok(!(await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags.some(p=>p.id==='yona'),'An invalid batch rolls back every change');
+  result=await(await patch(a,[{personId:'yona',tagged:true}])).json();assert.deepEqual(result.item.tags.map(p=>p.id),['yona','roi','shlomo'],'A removed tag added again becomes the newest');
+  f.restart();assert.deepEqual((await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags.map(p=>p.id),['yona','roi','shlomo'],'Newest-first order survives a restart');
   const guest=await(await patch(b,[{key:'new:1',name:'A guest',tagged:true},{key:'new:2',name:'A guest',tagged:true}])).json();assert.equal(guest.taggedPeople[0].id,guest.taggedPeople[1].id);assert.equal(guest.item.tags.length,2);
   assert.equal((await patch(b,[{personId:'camille',tagged:false}])).status,200);f.restart();assert.ok(!(await(await f.call('/api/media/'+b.id+'/tags')).json()).item.tags.some(p=>p.id==='camille'));
  }finally{await f.close();}

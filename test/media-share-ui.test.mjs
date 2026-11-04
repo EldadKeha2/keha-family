@@ -54,3 +54,14 @@ test('a photo changed or closed during preparation is never shared or attached t
     const f=fixture({defer:true});f.open('a');const pending=f.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.pending.length,1);if(close)f.close();else f.open('b');f.pending[0](new Blob(['old-photo'],{type:'image/jpeg'}));await pending;assert.equal(f.shared.length,0);assert.equal(f.copied.length,0);if(!close)assert.equal(f.get('shareMediaInstagram').disabled,false);
   }
 });
+test('tagging can keep the current photo open while the untagged album updates behind it',()=>{
+  const f=fixture();f.open('a');
+  const next={id:'b',kind:'photo',src:'/media/b',name:'Next photo',tags:[]};
+  f.window.FamilyMedia.register('gallery',[next],{retainCurrent:true});
+  assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');
+  f.window.FamilyMedia.requestDelete('gallery','a');assert.equal(f.get('deleteMediaDialog').open,true,'The retained photo still supports its normal actions');f.get('deleteMediaDialog').close();
+  f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaOriginal').href,'/media/b');
+  f.window.FamilyMedia.register('gallery',[],{retainCurrent:true});assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/b');
+  f.window.FamilyMedia.register('gallery',[]);assert.equal(f.get('mediaViewer').open,false,'An actual deletion can still close the last photo');
+  f.window.FamilyMedia.openFrom('gallery','b');assert.equal(f.get('mediaViewer').open,false,'The retained photo must not leak into the filtered album on reopening');
+});

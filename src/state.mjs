@@ -99,7 +99,7 @@ export class FamilyState {
   personMedia(id){return this.rows("SELECT m.data FROM media m WHERE m.id IN (SELECT id FROM media WHERE person_id=? AND category='personal' UNION SELECT media_id FROM media_tags WHERE person_id=?) ORDER BY m.rowid",id,id).map(row=>JSON.parse(row.data));}
   personPhotos(id){return this.personMedia(id).filter(item=>mediaKind(item)==='photo');}
   tagIds(id){return this.rows('SELECT person_id FROM media_tags WHERE media_id=? ORDER BY rowid',id).map(row=>row.person_id);}
-  tags(id){return this.rows('SELECT p.id,p.data FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=? ORDER BY t.rowid',id).map(row=>{const person=JSON.parse(row.data);return {id:person.id,name:person.name,nameEn:person.nameEn||null,extra:Boolean(person.extra)};});}
+  tags(id){return this.rows('SELECT p.id,p.data FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=? ORDER BY t.rowid DESC',id).map(row=>{const person=JSON.parse(row.data);return {id:person.id,name:person.name,nameEn:person.nameEn||null,extra:Boolean(person.extra)};});}
   tagsRevision(id){return this.rows('SELECT value FROM meta WHERE id=?','tags:'+id)[0]?.value||'empty';}
   touchTags(id){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','tags:'+id,uid());}
   relatedPeople(item,tagIds=this.tagIds(item.id)){return [...new Set([...(item.category==='personal'?[item.personId]:[]),...tagIds])];}
@@ -179,10 +179,12 @@ export class FamilyState {
       const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC',kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
       return {kind,items,count:items.length,revision};
     }
-    const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120);
+    const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120),filter=options.filter||'all';
+    if(!['all','untagged'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
     if(![100,200,300,400,500].includes(size)||!Number.isSafeInteger(requestedPage)||requestedPage<1)throw new HttpError(400,'בחרו עמוד תקין ועד 500 תמונות בעמוד.');
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
+    if(filter==='untagged')where+=' AND NOT EXISTS (SELECT 1 FROM media_tags untagged WHERE untagged.media_id=m.id)';
     if(query){
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
       args.push(like,like,like,like);
@@ -190,7 +192,7 @@ export class FamilyState {
     const total=this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n;
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
-    return {kind,items,count:total,revision:revision+':'+page+':'+size+':'+encodeURIComponent(query),pagination:{page,size,total,pages,query}};
+    return {kind,items,count:total,revision:revision+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='untagged'?':untagged':''),pagination:{page,size,total,pages,query,filter}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   wedding(id,details=false){

@@ -16,10 +16,12 @@
   function controls(item,scope){
     return I18n.html`<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?I18n.t('הסרת'):I18n.t('מחיקת')} ${safe(I18n.mediaName(item))}${linked(item,scope)?I18n.t(' מהאלבום'):''}">${linked(item,scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט')}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
   }
-  function register(scope,items){
+  function register(scope,items,{retainCurrent=false}={}){
     albums.set(scope,items);
     if(!$('mediaViewer')?.open||state.scope!==scope)return;
-    const id=state.activeId,index=items.findIndex(item=>identity(item)===id);
+    const id=state.activeId,active=current();let index=items.findIndex(item=>identity(item)===id);
+    // Keep the photo being tagged open even after it leaves the untagged filter.
+    if(retainCurrent&&!state.deleting&&index<0&&active){items=[...items];index=Math.min(state.index,items.length);items.splice(index,0,active);}
     state.items=items;
     if(!items.length){$('mediaViewer').close();return;}
     if(index<0)show(Math.min(state.index,items.length-1));
@@ -53,8 +55,6 @@
     const deleteLabel=linked(item,state.scope)?I18n.t('הסרה מהאלבום'):tr('מחק פריט','Delete item');
     $('mediaViewerDelete').querySelector('span').textContent=deleteLabel;$('mediaViewerDelete').title=deleteLabel;
     window.FamilyTags.mountInline($('mediaTagPanel'),item);
-    $('mediaViewerTag').hidden=!window.FamilyTags.taggable(item);
-    $('mediaViewerTag').textContent=item.tags?.length?I18n.t('תיוג אנשים (')+item.tags.length+')':I18n.t('תיוג אנשים');
   }
   async function instagramFallback(item){
     if(identity(current()||{})!==identity(item)||!$('mediaViewer').open)return;
@@ -124,7 +124,7 @@
   function openFrom(scope,id){const items=albums.get(scope)||[];open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
   function requestDelete(scope,id){
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
-    const item=(albums.get(scope)||[]).find(item=>item.id===id);if(!item)return;
+    const item=(albums.get(scope)||[]).find(item=>item.id===id)||(state.scope===scope&&current()?.id===id?current():null);if(!item)return;
     const isLinked=linked(item,scope),personName=isLinked?app().nameOf(scope.slice(9)):'';
     state.pending={scope:scope.startsWith('link:')?item.scope:scope,item,isLinked};$('deleteMediaName').textContent=item.name||item.filename;
     $('deleteMediaTitle').textContent=isLinked?I18n.t('להסיר את הפריט מהאלבום של ')+personName+'?':I18n.t('האם אתה בטוח שאתה רוצה למחוק פריט זה?');
@@ -198,7 +198,6 @@
     $('closeMediaViewer').addEventListener('click',()=>$('mediaViewer').close());
     $('mediaPrevious').addEventListener('click',()=>show(state.index-1));$('mediaNext').addEventListener('click',()=>show(state.index+1));
     $('mediaViewerDelete').addEventListener('click',()=>requestDelete(state.scope,current()?.id));
-    $('mediaViewerTag').addEventListener('click',()=>window.FamilyTags.open(current()?.id));
     $('confirmMediaDelete').addEventListener('click',confirmDelete);
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});

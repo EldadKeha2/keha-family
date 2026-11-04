@@ -8,7 +8,7 @@
 .tag-media-name{font-size:18px;color:#6a7858;line-height:1.6;overflow-wrap:anywhere;margin:0 0 10px}
 .tag-help{font-size:15px;line-height:1.7;color:#85785e;margin:10px 0}
 .tag-selected-count{font-size:14px;color:#7c765f;margin:13px 0 7px}
-.selected-people{display:flex;gap:7px;flex-wrap:wrap;max-height:130px;overflow:auto;margin-bottom:16px;padding:2px}
+.selected-people{display:flex;gap:7px;flex-wrap:wrap;max-height:none;overflow:visible;margin-bottom:16px;padding:2px}
 .selected-person-tag{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid #bacba8;border-radius:18px;background:#eaf0df;color:#4e6540;font-size:15px;min-height:40px}
 .selected-person-tag small{font-size:11px;color:#817349}.selected-person-tag>span{font-size:21px;line-height:1}
 .tag-selection-empty{font-size:15px;color:#9b8d72;padding:7px 0}
@@ -25,14 +25,13 @@
 .tag-no-results{font-size:15px;color:#96856a;padding:18px 15px;text-align:center}
 .tag-people-dialog .form-actions{margin-top:16px}.tag-people-dialog .form-actions button{min-height:46px}
 .media-viewer .media-people-tags{padding:0;margin:0 0 13px}.media-viewer .media-people-tags button{color:#62754d;border-color:#cbd2b8;background:#eef2e3}
-.media-viewer #mediaViewerTag{color:#64734f;border:1px solid #d1c5a7}
 .personal-gallery-filters{margin:2px 0 20px}.personal-gallery-filters button{min-height:44px}
 .person-gallery-video{width:100%;aspect-ratio:16/9;object-fit:contain;background:#1e281c;display:block}
 .personal-video-cover{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;aspect-ratio:16/9;width:100%;padding:18px;background:radial-gradient(ellipse at 50% 10%,#59664b,#23301f 85%);color:#f8f0dc}
 .personal-video-cover>span{display:grid;place-items:center;background:#a3382b;border-radius:10px;width:57px;height:40px;font:25px/1 Arial,sans-serif}.personal-video-cover strong{font:23px/1.4 var(--serif)}
 .linked-media-note{font-size:13px;line-height:1.6;color:#928163;margin:9px 13px 0}
 .personal-media-name{font-size:15px;color:#74694f;padding:8px 13px 0;overflow-wrap:anywhere}
-@media(max-width:600px){.tag-people-dialog{padding:28px 20px 20px}.tag-people-dialog h2{font-size:29px}.tag-people-results{max-height:230px}.tag-person-option{padding:9px 11px}.tag-person-option strong{font-size:16px}.selected-people{max-height:100px}.media-people-tags button{min-height:40px}.tag-people-dialog .form-actions{gap:8px}.tag-people-dialog .form-actions button{font-size:16px;padding:8px 12px}}
+@media(max-width:600px){.tag-people-dialog{padding:28px 20px 20px}.tag-people-dialog h2{font-size:29px}.tag-people-results{max-height:230px}.tag-person-option{padding:9px 11px}.tag-person-option strong{font-size:16px}.media-people-tags button{min-height:40px}.tag-people-dialog .form-actions{gap:8px}.tag-people-dialog .form-actions button{font-size:16px;padding:8px 12px}}
 
 @media(max-width:700px){
   .media-viewer.tag-search-active,.tag-people-dialog.tag-search-active{position:fixed;inset-block-start:calc(var(--tag-visible-top,0px) + 8px);inset-block-end:auto;margin-block:0;max-height:calc(var(--tag-visible-height,100dvh) - 16px);overflow-y:auto;scroll-padding-block-start:calc(var(--tag-header-height,0px) + 8px)}
@@ -42,4 +41,4 @@
   .tag-widget.is-searching .tag-people-results{margin-top:4px;max-height:var(--tag-results-height,160px);scroll-padding-block:4px}
 }
 /* One instruction, followed immediately by the search field. */
-.tag-widget .tag-widget-heading{margin-bottom:8px}.tag-widget .tag-widget-heading h3{font-size:22px}.tag-widget .tag-widget-heading>span:empty,.tag-widget .selected-people:empty,.tag-widget .tag-autosave-status:empty,.tag-widget .tag-search-count:empty{display:none}.tag-widget .tag-search-label{gap:0}.tag-widget .selected-people:not(:empty){margin-top:10px;margin-bottom:0}.tag-widget .tag-search-count{margin:5px 0}.tag-widget .tag-autosave-status{min-height:0;margin:7px 0 0;font-size:13px}@media(max-width:700px){.tag-widget .tag-widget-heading h3{font-size:20px}.tag-widget .tag-widget-heading>span{font-size:12px}}
+.tag-widget .tag-widget-heading{margin-bottom:8px}.tag-widget .tag-widget-heading h3{display:flex;align-items:center;gap:8px;font-size:22px}.tag-heading-icon{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.tag-widget .tag-widget-heading>span:empty,.tag-widget .selected-people:empty,.tag-widget .tag-autosave-status:empty,.tag-widget .tag-search-count:empty{display:none}.tag-widget .tag-search-label{gap:0}.tag-widget .selected-people:not(:empty){margin-top:10px;margin-bottom:0}.tag-widget .tag-search-count{margin:5px 0}.tag-widget .tag-autosave-status{min-height:0;margin:7px 0 0;font-size:13px}@media(max-width:700px){.tag-widget .tag-widget-heading h3{font-size:20px}.tag-widget .tag-widget-heading>span{font-size:12px}}
