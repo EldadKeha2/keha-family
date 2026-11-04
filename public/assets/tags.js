@@ -92,8 +92,17 @@
       if(this.dialog)on(this.dialog,'close',()=>this.endSearch());
       if(window.visualViewport)on(window.visualViewport,'resize',()=>{if(this.searchActive)this.revealSearch();});
       on(this.input,'keydown',event=>{if(event.key!=='Enter')return;event.preventDefault();const query=normalize(this.query),matches=[...roster.values()].filter(person=>Number.isFinite(matchRank(person,query))),exact=matches.filter(person=>matchRank(person,query)===0);if(exact.length===1)this.choose(exact[0],true);else if(matches.length===1)this.choose(matches[0],true);else if(!host.querySelector('[data-tag-add]').hidden)this.addName();});
+      on(this.results,'pointerdown',event=>{if(event.button===0&&event.target.closest('.tag-person-option'))event.preventDefault();});
       on(host,'change',event=>{if(event.target.matches('[data-tag-person]'))this.choose(roster.get(event.target.dataset.tagPerson),event.target.checked);});
       on(host,'click',event=>{
+        const option=event.target.closest('.tag-person-option');
+        if(option){
+          const checkbox=option.querySelector('[data-tag-person]');
+          if(event.target===checkbox)return;
+          event.preventDefault();
+          if(checkbox&&!checkbox.disabled){checkbox.checked=!checkbox.checked;this.choose(roster.get(checkbox.dataset.tagPerson),checkbox.checked);}
+          return;
+        }
         const remove=event.target.closest('[data-remove-person-tag]');if(remove){const person=store.selected().get(remove.dataset.removePersonTag);if(person)store.enqueue(person,false);return;}
         if(event.target.closest('[data-tag-add]'))this.addName();
         if(event.target.closest('[data-tag-retry]'))store.retry();

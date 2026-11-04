@@ -42,3 +42,4 @@
 }
 /* One instruction, followed immediately by the search field. */
 .tag-widget .tag-widget-heading{margin-bottom:8px}.tag-widget .tag-widget-heading h3{display:flex;align-items:center;gap:8px;font-size:22px}.tag-heading-icon{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.tag-widget .tag-widget-heading>span:empty,.tag-widget .selected-people:empty,.tag-widget .tag-autosave-status:empty,.tag-widget .tag-search-count:empty{display:none}.tag-widget .tag-search-label{gap:0}.tag-widget .selected-people:not(:empty){margin-top:10px;margin-bottom:0}.tag-widget .tag-search-count{margin:5px 0}.tag-widget .tag-autosave-status{min-height:0;margin:7px 0 0;font-size:13px}@media(max-width:700px){.tag-widget .tag-widget-heading h3{font-size:20px}.tag-widget .tag-widget-heading>span{font-size:12px}}
+:root[lang^=en] .tag-widget .tag-widget-heading h3{white-space:nowrap;flex-shrink:0}
