@@ -39,3 +39,5 @@
 .media-share-actions .share-icon{width:22px;height:22px;flex:0 0 22px}.media-share-actions a,.media-share-actions button{gap:7px}.media-share-actions #shareMediaMessenger{color:#7552ab;background:#f2edfb;border-color:#d5c8ed}.media-share-actions #shareMediaEmail{color:#9d654c;background:#fbefe5;border-color:#e8cfba}.media-share-actions #copyMediaLink{color:#427b76;background:#eaf3ee;border-color:#bcd6cb}
 
 #mediaShareActions a,#mediaShareActions button{inline-size:44px;min-block-size:44px;flex:0 0 44px;padding:8px;gap:0;border-radius:50%}#mediaShareActions #mediaShareStatus{flex-basis:100%}#mediaShareActions #mediaShareStatus:empty{display:none}
+
+.opened-caption{flex-wrap:wrap}.opened-caption>button{display:inline-flex;align-items:center;gap:7px;min-width:0;white-space:normal;font-size:14px;padding:7px 11px}.opened-caption>button svg{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.opened-caption>p{flex:1 1 220px;min-width:0}#mediaShareActions .media-share-heading{flex:0 0 100%;margin:0 0 2px;color:#927c50;font-size:14px}

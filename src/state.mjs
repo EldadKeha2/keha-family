@@ -6,6 +6,7 @@ import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorr
 import {biographyDefaults,biographyValue,contentField} from './biography.mjs';
 import {memorialPeriod} from './memorial.mjs';
 import {makeQuiz} from '../public/assets/quiz.mjs';
+import {makeKinshipQuiz,kinshipPool} from '../public/assets/kinship.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -210,6 +211,7 @@ export class FamilyState {
         this.sql.exec('INSERT OR IGNORE INTO memorial_candles(person_id,period,visitor_id,created_at) VALUES(?,?,?,?)',person.id,period,p.visitorId,new Date(Date.now()).toISOString());
         return {saved:true,id:person.id,candle:this.candleState(person,p.visitorId)};
       }
+      case 'game.kinship':return {questions:makeKinshipQuiz(family,this.run('people').people),available:kinshipPool(family).length,required:10};
       case 'game.quiz':{
         const roster=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,{...family.people[row.id],...JSON.parse(row.data)}]));
         const rows=this.rows("SELECT m.data FROM media m WHERE m.category='gallery' AND COALESCE(json_extract(m.data,'$.kind'),'photo')='photo' AND EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=m.id) ORDER BY random() LIMIT 60");

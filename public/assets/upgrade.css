@@ -27,3 +27,11 @@
   body[data-active-view=tree] .tree-mobile-person-hint{display:flex;align-items:center;justify-content:center;gap:7px;margin:7px 12px 4px;padding:7px 10px;border:1px solid #e0d2af;border-radius:8px;background:#f8f2e3;color:#7a6b46;font:13px/1.55 var(--sans);text-align:start}
   .tree-mobile-person-hint svg{width:22px;height:25px;flex:0 0 22px}
 }
+
+@media(max-width:700px){
+  #homeTiles .home-tile,#mobileMenuTiles .home-tile{overflow:hidden;gap:8px;min-width:0}
+  #homeTiles .home-tile>span:nth-child(2),#mobileMenuTiles .home-tile>span:nth-child(2){flex:1 1 0;min-width:0}
+  #homeTiles .home-tile strong,#mobileMenuTiles .home-tile strong{display:block;font-size:clamp(16px,4.4vw,20px);line-height:1.35;max-inline-size:100%;white-space:normal;overflow-wrap:anywhere}
+  #homeTiles .home-tile small,#mobileMenuTiles .home-tile small{max-inline-size:100%;overflow-wrap:anywhere}
+  #homeTiles .home-tile-tree strong,#homeTiles .home-tile-memorial strong{font-size:22px}
+}

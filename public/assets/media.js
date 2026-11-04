@@ -28,6 +28,8 @@
     const item=current();if(!item)return;
     $('mediaViewerTitle').textContent=item.kind==='video'?tr('סרטון משפחתי','Family video'):item.kind==='document'?tr('מסמך משפחתי','Family document'):tr('תמונה משפחתית','Family photo');
     $('mediaViewerCaption').textContent=item.caption||'';
+    const descriptionLabel=item.kind==='video'?tr('הוסף תיאור לסרטון','Add a video description'):item.kind==='document'?tr('הוסף תיאור למסמך','Add a document description'):tr('הוסף תיאור לתמונה','Add a photo description');
+    $('editOpenedCaption').querySelector('span').textContent=descriptionLabel;$('editOpenedCaption').setAttribute('aria-label',descriptionLabel);$('editOpenedCaption').title=descriptionLabel;
     const url=shareURL(item),label=(item.caption||I18n.mediaName(item)||'Keha Family').replace(/[\r\n]/g,' ');
     $('shareMediaWhatsApp').href='https://wa.me/?text='+encodeURIComponent(label+'\n'+url);
     $('shareMediaFacebook').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);

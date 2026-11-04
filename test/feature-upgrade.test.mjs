@@ -88,3 +88,12 @@ test('game endpoint supplies ten valid questions without exposing album metadata
 test('three feedback levels cover every score from zero to ten',()=>{
   for(let n=0;n<=10;n++){const g=quizGrade(n);assert.equal(g.score,n*10);assert.equal(g.level,n>=8?'expert':n>=4?'familiar':'reunion');}
 });
+test('the relationship game API reuses saved portraits and never changes people or media',async()=>{
+  const f=fixture();try{
+    let i=100;for(const person of Object.values(family.people)){const id=(i++).toString(16).padStart(32,'0');f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,'personal',person.id,JSON.stringify({id,category:'personal',personId:person.id,kind:'photo',mime:'image/jpeg',file:'gallery/'+id+'.jpg'}));}
+    const before=f.database.prepare('SELECT id,data FROM people ORDER BY id').all(),media=f.database.prepare('SELECT count(*) n FROM media').get().n;
+    const response=await f.call('/api/games/relationships');assert.equal(response.status,200);const data=await response.json();assert.equal(data.questions.length,10);assert.ok(data.available>1000);
+    for(const q of data.questions){assert.match(q.subject.profile,/^\/media\/[a-f0-9]{32}$/);assert.match(q.reference.profile,/^\/media\/[a-f0-9]{32}$/);assert.ok(q.options.some(o=>o.id===q.correctId));}
+    assert.deepEqual(f.database.prepare('SELECT id,data FROM people ORDER BY id').all(),before);assert.equal(f.database.prepare('SELECT count(*) n FROM media').get().n,media);
+  }finally{f.close();}
+});
