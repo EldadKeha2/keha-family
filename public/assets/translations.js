@@ -666,3 +666,5 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
 });
 
 Object.assign(window.FAMILY_TRANSLATIONS,{"משחקי משפחה":"Family Games","בני משפחה נוספים":"Extended family","המשפחה שלנו":"Our family","קבוצות בני משפחה":"Family groups","העתקת הקישור ופתיחת Messenger":"Copy link and open Messenger","שפת התוכן אינה תקינה.":"The content language is invalid.","לא ניתן לזהות את ההדלקה. רעננו את העמוד ונסו שוב.":"Refresh the page and try lighting your candle again.","אפשר להדליק נר בעמוד לזכרם בלבד.":"Candles can only be lit for a person in the memorial."});
+
+Object.assign(window.FAMILY_TRANSLATIONS,{"הקישו על תמונה או שם לפתיחת העמוד האישי":"Tap a photo or name to open their personal page."});

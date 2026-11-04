@@ -26,7 +26,7 @@
   }
   function metadata(){
     const item=current();if(!item)return;
-    $('mediaViewerTitle').textContent=I18n.mediaName(item)||I18n.t('זיכרון משפחתי');
+    $('mediaViewerTitle').textContent=item.kind==='video'?tr('סרטון משפחתי','Family video'):item.kind==='document'?tr('מסמך משפחתי','Family document'):tr('תמונה משפחתית','Family photo');
     $('mediaViewerCaption').textContent=item.caption||'';
     const url=shareURL(item),label=(item.caption||I18n.mediaName(item)||'Keha Family').replace(/[\r\n]/g,' ');
     $('shareMediaWhatsApp').href='https://wa.me/?text='+encodeURIComponent(label+'\n'+url);

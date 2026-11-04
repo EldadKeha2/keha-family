@@ -18,3 +18,12 @@
 }
 .compact-gallery-grid{scroll-margin-top:20px}.compact-gallery-card.recently-uploaded{outline:2px solid #81976c;outline-offset:2px;box-shadow:0 0 0 4px #81976c18,0 4px 12px #59462c12}
 @media(prefers-reduced-motion:no-preference){.compact-gallery-card.recently-uploaded{animation:gallery-upload-arrive 1.6s ease-out}@keyframes gallery-upload-arrive{from{background:#e8eedc}to{background:#fffef8}}}
+
+.home-tile-icon svg{display:block;width:38px;height:38px;overflow:visible}.tree-mobile-person-hint{display:none}
+@media(max-width:700px){
+  .home-tile-updates{--tile-surface:#e1ebef;--tile-line:#acc5cf;--tile-ink:#456d7c}.home-tile-games{--tile-surface:#eee4f3;--tile-line:#c3abcf;--tile-ink:#715582}.home-tile-memorial{--tile-surface:#f3e9d4;--tile-line:#d4bd88;--tile-ink:#7b683e;grid-column:1/-1;min-height:88px}
+  .home-tile .home-tile-icon{display:grid;place-items:center;width:42px;height:48px;border-radius:13px;background:#fffaf077;border:1px solid #ffffff80;box-shadow:0 3px 7px #715b2d09;flex:0 0 42px}.home-tile .home-tile-icon svg{width:35px;height:35px}.home-tile strong{font-size:clamp(19px,5.1vw,22px)}
+  .home-tile-tree .home-tile-icon,.home-tile-memorial .home-tile-icon{width:50px;height:54px;flex-basis:50px}.home-tile-tree .home-tile-icon svg,.home-tile-memorial .home-tile-icon svg{width:43px;height:43px}.home-tile-memorial .home-tile-arrow{display:block;margin-inline-start:auto;font-size:25px;color:#a68d56}
+  body[data-active-view=tree] .tree-mobile-person-hint{display:flex;align-items:center;justify-content:center;gap:7px;margin:7px 12px 4px;padding:7px 10px;border:1px solid #e0d2af;border-radius:8px;background:#f8f2e3;color:#7a6b46;font:13px/1.55 var(--sans);text-align:start}
+  .tree-mobile-person-hint svg{width:22px;height:25px;flex:0 0 22px}
+}
