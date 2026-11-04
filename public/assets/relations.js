@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   function forPerson(family,personId) {
-    const empty=()=>({partners:[],children:[],siblings:[]}),people=family?.people||{},units=family?.units||{},person=people[personId];
+    const empty=()=>({partners:[],parents:[],children:[],siblings:[]}),people=family?.people||{},units=family?.units||{},person=people[personId];
     if(!person)return empty();
     const unit=units[person.unit]||Object.values(units).find(item=>item.people?.includes(personId));
     if(!unit?.people?.includes(personId))return empty();
@@ -11,6 +11,7 @@
     const parent=unit.people[0]===personId?units[unit.parent]:null;
     return {
       partners:known(unit.people),
+      parents:known(parent?.people||[]),
       children:known(childIds(unit)),
       siblings:known(parent?childIds(parent).filter(id=>id!==unit.people[0]):[])
     };

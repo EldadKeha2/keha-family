@@ -28,15 +28,17 @@
     return `<section class="person-album" id="personAlbum-${key}" data-person-drop="${key}" aria-label="${title}"><header><div><span class="small-eyebrow">${tr('כל פריט, חלק מהסיפור','Every item is part of the story')}</span><h3>${title}<small>${a.total}</small></h3></div><button class="primary-button" type="button" data-person-upload="${key}">＋ ${upload}</button></header>${key==='photos'?`<p class="person-album-help">${tr('גם התמונות שתויגו בגלריה המשפחתית מופיעות כאן. לחצו על תמונה לצפייה ולפעולות נוספות.','Photos tagged in the Family Gallery appear here too. Open a photo to view it and see its options.')}</p>`:''}<div class="person-album-grid person-grid-${key}">${a.items.map(item=>card(key,item)).join('')}</div>${!a.total?`<p class="person-album-empty">${tr('עוד מקום לזיכרון הבא. אפשר להוסיף כמה קבצים יחד.','Room for the next memory. You can upload several files together.')}</p>`:pager(key,a)}<p class="person-upload-limit">${key==='photos'?tr('עד 50MB לתמונה · אפשר גם לגרור או להדביק תמונה','Up to 50MB per photo · Drag or paste photos here'):key==='videos'?tr('MP4, WebM או MOV · עד 90MB לסרטון','MP4, WebM or MOV · Up to 90MB per video'):tr('PDF, Word, TXT או צילום תעודה · עד 10MB לקובץ','PDF, Word, TXT or certificate scans · Up to 10MB per file')}</p></section>`;
   }
 
-  function relativeCard(id) {
+  function relativeCard(id,kind) {
     const person=app().getPersonSummary(id),name=app().nameOf(id),initials=name.split(/\s+/).filter(Boolean).map(part=>part[0]).slice(0,2).join('');
+    const role=kind==='parents'?({m:tr('אבא','Father'),f:tr('אמא','Mother')}[person.gender]||tr('הורה','Parent')):'';
     const image=person.profile?`<img class="profile-photo" src="${safe(person.profile)}" alt="" loading="lazy" decoding="async">`:`<span class="person-relative-initials">${safe(initials)}</span>`;
-    return `<li><a class="person-relative-link" href="#person/${encodeURIComponent(id)}" data-person-relative="${safe(id)}" data-person="${safe(id)}" aria-label="${safe(tr('פתיחת העמוד האישי של ','Open the personal page of ')+name)}"><span class="portrait" aria-hidden="true">${image}</span><span class="person-name">${safe(name)}${person.deceased?`&nbsp;<span class="memorial-inline">${tr('ז״ל','in memory')}</span>`:''}</span></a></li>`;
+    return `<li><a class="person-relative-link" href="#person/${encodeURIComponent(id)}" data-person-relative="${safe(id)}" data-person="${safe(id)}" ${role?`title="${safe(role)}" `:''}aria-label="${safe((role?role+': ':'')+tr('פתיחת העמוד האישי של ','Open the personal page of ')+name)}"><span class="portrait" aria-hidden="true">${image}</span><span class="person-name">${safe(name)}${person.deceased?`&nbsp;<span class="memorial-inline">${tr('ז״ל','in memory')}</span>`:''}</span></a></li>`;
   }
   function relationsHTML(person) {
-    const relatives=window.FamilyRelations?.forPerson(window.FAMILY_DATA,person.id)||{partners:[],children:[],siblings:[]};
-    const groups=[['partners',tr('בן/בת זוג','Partner')],['children',tr('ילדים','Children')],['siblings',tr('אחים/אחיות','Siblings')]];
-    return `<section class="person-family" aria-label="${tr('משפחה קרובה','Close family')}">${groups.map(([key,title])=>`<section class="person-family-group" data-relative-kind="${key}" aria-labelledby="personFamily-${key}"><h3 id="personFamily-${key}">${title}</h3>${relatives[key].length?`<ul class="person-family-list">${relatives[key].map(relativeCard).join('')}</ul>`:`<p class="person-family-empty">${tr('טרם נוספו פרטים','No details added yet')}</p>`}</section>`).join('')}</section>`;
+    const relatives=window.FamilyRelations?.forPerson(window.FAMILY_DATA,person.id)||{partners:[],parents:[],children:[],siblings:[]};
+    const groups=[['partners',tr('בן/בת זוג','Partner')],['parents',tr('הורים','Parents')],['children',tr('ילדים','Children')],['siblings',tr('אחים/אחיות','Siblings')]];
+    const emptyLabel=tr('טרם נוספו פרטים','No details added yet');
+    return `<section class="person-family" aria-label="${tr('משפחה קרובה','Close family')}">${groups.map(([key,title])=>`<section class="person-family-group" data-relative-kind="${key}" aria-labelledby="personFamily-${key}"><h3 id="personFamily-${key}">${title}</h3>${relatives[key].length?`<ul class="person-family-list">${relatives[key].map(id=>relativeCard(id,key)).join('')}</ul>`:`<p class="person-family-empty" title="${emptyLabel}"><span aria-hidden="true">—</span><span class="visually-hidden">${emptyLabel}</span></p>`}</section>`).join('')}</section>`;
   }
 
   function render(){

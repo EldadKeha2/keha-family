@@ -2,12 +2,13 @@
 @media(max-width:700px){.person-page-view{padding:0 13px 25px}.person-page-breadcrumb{font-size:12px;gap:7px;flex-wrap:wrap;padding:8px 0}.person-page-breadcrumb>button{font-size:11px}.person-page-hero{gap:19px;padding:25px 4px}.person-page-portrait{width:94px;height:119px;padding:4px}.person-page-hero h2{font-size:31px;line-height:1.3;margin:7px 0}.person-page-hero .small-eyebrow{font-size:11px}.person-page-emblem{display:none}.person-page-dates{font-size:13px}.person-page-dates .birthday-line{font-size:14px}.person-page-dates .birthday-edit{width:34px;height:40px;padding:7px}.person-page-dates .person-age{font-size:13px}.person-about{padding:17px 16px}.person-about h3,.person-album h3{font-size:27px}.person-about-text{font-size:16px}.person-about-placeholder{font-size:14px}.person-album{padding:24px 0}.person-album>header{gap:8px;align-items:flex-end}.person-album>header .primary-button{font-size:12px;padding:8px 10px}.person-album .small-eyebrow{font-size:10px}.person-album-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.person-grid-videos,.person-grid-documents{grid-template-columns:repeat(2,minmax(0,1fr))}.person-album-help{font-size:12px}.person-album-pager{gap:10px;font-size:12px}.person-album-pager button{min-width:65px;padding:9px 12px;font-size:13px}.person-file-title{font-size:12px}.person-media-documents{padding:10px}.person-document-icon{font-size:35px}.calendar-updates-banner{gap:10px;flex-wrap:wrap;padding:14px}.calendar-updates-banner strong{font-size:21px}.calendar-updates-banner div>span{font-size:12px}.calendar-updates-banner>a{margin-inline-start:0;font-size:13px;flex-basis:100%;text-align:center}.media-share-actions{gap:7px}.media-share-actions a,.media-share-actions button{font-size:12px;padding:6px 9px;min-height:42px}.media-share-actions>span:first-child{font-size:12px}.media-stage.is-document{height:56dvh}}
 
 /* Compact, single-row family links directly above the biography. */
-.person-family{display:flex;align-items:stretch;gap:0;margin:0 0 14px;border:1px solid #e0d4b9;border-radius:7px;background:#fbf8ef;overflow:hidden}
-.person-family-group{display:flex;align-items:center;gap:8px;flex:1 1 0;min-width:0;padding:4px 9px;border:0;border-inline-end:1px solid #e4dac5;border-radius:0;background:transparent}
+.person-family{display:flex;align-items:stretch;gap:0;margin:0 0 14px;border:1px solid #e0d4b9;border-radius:7px;background:#fbf8ef;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#c4b48c transparent}
+.person-family-group{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-width:max-content;padding:4px 9px;border:0;border-inline-end:1px solid #e4dac5;border-radius:0;background:transparent}
 .person-family-group:last-child{border-inline-end:0}
-.person-family-group[data-relative-kind="partners"]{flex:0 0 auto;max-width:26%}
+.person-family-group[data-relative-kind="siblings"]{flex:0 1 auto;min-width:min-content}
 .person-family-group h3{font:17px/1.25 var(--serif);color:#5b7048;margin:0;white-space:nowrap;flex:0 0 auto}
-.person-family-list{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;list-style:none;padding:2px 1px;margin:0;min-width:0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scrollbar-width:thin;scrollbar-color:#c4b48c transparent}
+.person-family-list{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:8px;list-style:none;padding:2px 1px;margin:0;min-width:0}
+.person-family-group[data-relative-kind="siblings"] .person-family-list{flex:0 1 auto;min-width:72px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-inline:contain;scrollbar-width:thin;scrollbar-color:#c4b48c transparent}
 .person-family-list>li{flex:0 0 auto;min-width:0}
 .person-relative-link{display:flex;flex-direction:row;align-items:center;gap:6px;padding:2px 3px;min-height:42px;border-radius:5px;white-space:nowrap;color:#5d644b;transition:background .15s}
 .person-relative-link:hover{background:#f0eddf}
@@ -24,9 +25,9 @@
 .tree-unit [data-person="becker-parent"] .person-name{white-space:nowrap;max-width:none}
 @media(max-width:700px){
   .person-family{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#c4b48c transparent}
-  .person-family-group,.person-family-group[data-relative-kind="partners"]{flex:0 0 auto;width:max-content;max-width:none;padding:4px 8px;gap:7px}
+  .person-family-group,.person-family-group[data-relative-kind="siblings"]{flex:0 0 auto;min-width:max-content;padding:4px 8px;gap:7px}
   .person-family-group h3{font-size:16px}
-  .person-family-list{overflow:visible;gap:7px}
+  .person-family-list,.person-family-group[data-relative-kind="siblings"] .person-family-list{flex:0 0 auto;overflow:visible;gap:7px;min-width:0}
   .person-relative-link{min-height:44px}
   .person-relative-link .person-name{font-size:12px}
 }

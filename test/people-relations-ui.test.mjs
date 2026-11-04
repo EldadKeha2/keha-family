@@ -27,12 +27,18 @@ async function fixture(id='eldad',{english=false,overrides={}}={}){
 }
 const group=(html,key)=>html.match(new RegExp('<section class="person-family-group" data-relative-kind="'+key+'"[\\s\\S]*?<\\/section>'))[0];
 
-test('personal pages show three localized family groups with cached profile photos and one page request',async()=>{
+test('personal pages show four localized family groups in order, with cached photos and one page request',async()=>{
   for(const english of [false,true]){
     const f=await fixture('eldad',{english,overrides:{adi:{profile:'/media/adi.jpg'}}});
     assert.match(f.html,english?/Close family/:/משפחה קרובה/);
     assert.match(group(f.html,'partners'),/href="#person\/adi"/);
     assert.match(group(f.html,'partners'),/src="\/media\/adi.jpg"/);
+    assert.match(group(f.html,'parents'),/href="#person\/yehiel"/);
+    assert.match(group(f.html,'parents'),/href="#person\/rachel-katan"/);
+    assert.match(group(f.html,'parents'),english?/title="Father"/:/title="אבא"/);
+    assert.match(group(f.html,'parents'),english?/title="Mother"/:/title="אמא"/);
+    assert.match(group(f.html,'parents'),english?/>Parents<\//:/>הורים<\//);
+    assert.deepEqual([...f.html.matchAll(/data-relative-kind="([^"]+)"/g)].map(match=>match[1]),['partners','parents','children','siblings']);
     assert.match(group(f.html,'siblings'),/href="#person\/bosmat"/);
     assert.match(group(f.html,'siblings'),/href="#person\/naama"/);
     assert.ok(!group(f.html,'children').includes('data-person-relative'));
@@ -52,6 +58,17 @@ test('a relative link opens the selected personal page once and preserves native
   assert.deepEqual(await f.clickRelative('bosmat'),{prevented:true,stopped:true});
   assert.equal(f.location.hash,'#person/bosmat');assert.equal(f.requests.length,2);
   assert.match(group(f.html,'partners'),/href="#person\/itzik"/);
+  assert.match(group(f.html,'parents'),/href="#person\/yehiel"/);
   assert.match(group(f.html,'children'),/href="#person\/naomi"/);
   assert.match(group(f.html,'children'),/href="#person\/noga"/);
+});
+test('parent links open the parent page and unknown parents stay empty',async()=>{
+  const f=await fixture();
+  assert.deepEqual(await f.clickRelative('yehiel'),{prevented:true,stopped:true});
+  assert.equal(f.location.hash,'#person/yehiel');
+  assert.match(group(f.html,'parents'),/href="#person\/yona"/);
+  assert.match(group(f.html,'parents'),/href="#person\/shlomo"/);
+  await f.clickRelative('rachel-katan');
+  assert.ok(!group(f.html,'parents').includes('data-person-relative'));
+  assert.match(group(f.html,'parents'),/טרם נוספו פרטים/);
 });
