@@ -94,13 +94,13 @@
     if($('mobileNavDialog').open)$('mobileNavDialog').close();
     state.view = view;
     if (previous !== view) {state.query='';$('searchInput').value='';}
-    document.querySelectorAll('[data-view]').forEach(el => {el.classList.toggle('active',el.dataset.view === view);el.setAttribute('aria-pressed',String(el.dataset.view === view));});
     $('searchResults').hidden = true;
     renderView();
     if(previous!==view&&isPhone())window.scrollTo({top:0,behavior:'instant'});
   }
   function renderView() {
     document.body.dataset.activeView=state.view;
+    document.querySelectorAll('[data-view]').forEach(el => {el.classList.toggle('active',el.dataset.view === state.view);el.setAttribute('aria-pressed',String(el.dataset.view === state.view));});
     if(state.view!=='tree')window.FamilyTreeGuide?.hide();
     const isTree = state.view === 'tree';
     const isDirectory = state.view === 'directory';
