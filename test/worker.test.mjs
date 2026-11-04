@@ -56,6 +56,48 @@ function fixture(){
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
 
+test('renaming canonical people on startup has bounded work independent of thousands of tagged images',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);await setTags(f,item,['yona','shlomo']);
+  assert.equal((await f.call('/api/people/yona/profile',{method:'POST',body:{file:item.file}})).status,200);
+  const insert=f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)'),tag=f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)');
+  f.database.exec('BEGIN');
+  for(let n=1000;n<4000;n++){
+   const id=n.toString(16).padStart(32,'0');insert.run(id,'gallery',null,JSON.stringify({id,category:'gallery',file:id+'.jpg',mime:'image/jpeg',kind:'photo',name:'Saved photo',caption:'Saved caption'}));
+   for(const person of ['yona','shlomo','yehiel','ruti','avishai','camille','sam','mark'])tag.run(id,person);
+  }
+  for(const row of f.database.prepare('SELECT id,data FROM people').all()){const p=JSON.parse(row.data);delete p.nameEn;if(p.id==='yona')p.about='Saved biography';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(p),p.id);}
+  f.database.exec('COMMIT');
+  const mediaBefore=f.database.prepare('SELECT id,data FROM media ORDER BY id').all(),tagsBefore=f.database.prepare('SELECT media_id,person_id FROM media_tags ORDER BY media_id,person_id').all();
+  const original=f.storage.sql.exec;let writes=0,returnedRows=0;const queries=[];
+  f.storage.sql.exec=(query,...args)=>{queries.push(query);if(/^UPDATE people/.test(query))writes++;const r=original(query,...args);returnedRows+=r.toArray().length;return r;};
+  f.restart();f.storage.sql.exec=original;
+  assert.ok(writes<200,'A rename must not write each tagged album: '+writes);assert.ok(returnedRows<500,'Startup must not read every tagged image: '+returnedRows);
+  assert.ok(!queries.some(q=>/JOIN media_tags/.test(q)),'A canonical rename must not traverse media-tag links');
+  assert.deepEqual(f.database.prepare('SELECT id,data FROM media ORDER BY id').all(),mediaBefore);assert.deepEqual(f.database.prepare('SELECT media_id,person_id FROM media_tags ORDER BY media_id,person_id').all(),tagsBefore);
+  const page=await(await f.call('/api/people/yona/page')).json();assert.equal(page.person.nameEn,'Yona Nakash');assert.equal(page.person.profile,item.src);assert.equal(page.person.about,'Saved biography');assert.equal(page.person.birthday,'16.10.1921');assert.equal(page.person.photoCount,3001);
+ }finally{await f.close();}
+});
+test('a quota failure during initialization is safely reported, does not repeat initialization and recovers after UTC reset',async t=>{
+ const f=fixture();try{
+  const original=f.storage.sql.exec;let queries=0;
+  f.storage.sql.exec=(q,...args)=>{queries++;if(q.startsWith('SELECT'))throw Error('SQLITE_ERROR: rows read limit exceeded for this account');return original(q,...args);};
+  f.restart();const afterInit=queries;
+  for(let n=0;n<3;n++){const response=await f.call('/api/health');assert.equal(response.status,503);assert.equal((await response.json()).code,'DAILY_STORAGE_LIMIT');}
+  assert.equal(queries,afterInit,'Failed initialization must not be retried for every request');
+  f.storage.sql.exec=original;const now=Date.now(),nextDay=now-now%86400000+86402000;t.mock.method(Date,'now',()=>nextDay);
+  const recovered=await f.call('/api/health');assert.equal(recovered.status,200);assert.deepEqual(await recovered.json(),{available:true});
+ }finally{await f.close();}
+});
+test('initialization errors expose only a fixed category and retry after a bounded cooldown',async t=>{
+ const f=fixture();try{
+  const original=f.storage.sql.exec;let queries=0;
+  f.storage.sql.exec=(q,...args)=>{queries++;if(q.startsWith('SELECT'))throw Error('no such column: private-record-should-never-be-returned');return original(q,...args);};
+  f.restart();const afterInit=queries,response=await f.call('/api/health'),body=await response.json();assert.equal(response.status,503);assert.equal(body.code,'STATE_SCHEMA_ERROR');assert.ok(!JSON.stringify(body).includes('private-record'));assert.equal(queries,afterInit);
+  f.storage.sql.exec=original;const later=Date.now()+60001;t.mock.method(Date,'now',()=>later);assert.equal((await f.call('/api/health')).status,200);
+ }finally{await f.close();}
+});
+
 test('biography sections persist independently, reject stale writes and never update another person',async()=>{
  const f=fixture();try{
   await f.connect();const save=(section,value,expectedValue,id='yehiel')=>f.call('/api/people/'+id+'/biography',{method:'POST',body:{section,value,expectedValue}});
@@ -702,7 +744,7 @@ test('daily storage limits reach the maintenance screen without exposing interna
   assert.equal((await f.call('/api/setup')).status,200,'Configuration alone does not prove the database has recovered');
   f.env.FAMILY_STATE.get=()=>({fetch:async()=>{throw new Error('Durable Object storage daily read limit reached');}});
   assert.equal((await f.call('/api/health')).status,503,'Constructor failures must also be classified');
-  f.env.FAMILY_STATE.get=()=>({fetch:async()=>{throw new Error('Unexpected query failure');}});const unrelated=await f.call('/api/health');assert.equal(unrelated.status,500);assert.equal(unrelated.headers.get('X-Family-Storage-Limit'),null);
+  f.env.FAMILY_STATE.get=()=>({fetch:async()=>{throw new Error('Unexpected query failure');}});const unrelated=await f.call('/api/health');assert.equal(unrelated.status,503);assert.equal(unrelated.headers.get('X-Family-Storage-Limit'),null);assert.equal((await unrelated.json()).code,'STATE_UNREACHABLE');
  }finally{await f.close();}
 });
 test('Mila birthday correction keeps the stored year, applies once and does not invent an unknown year',async()=>{

@@ -1,5 +1,5 @@
 import family from './family.mjs';
-import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal} from './http.mjs';
+import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
@@ -11,8 +11,11 @@ export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,at
 export const PUBLIC_WRITE_TOKEN='family-public-v1';
 
 function client(db){return async(action,p={})=>{
-  const response=await db.fetch(new Request('https://state.internal/',{method:'POST',body:JSON.stringify({action,...p}),headers:{'Content-Type':'application/json'}}));
-  const result=await response.json();if(!response.ok)throw new HttpError(response.status,result.error||'לא ניתן לשמור את השינוי.',result.code);return result;
+  let response;
+  try{response=await db.fetch(new Request('https://state.internal/',{method:'POST',body:JSON.stringify({action,...p}),headers:{'Content-Type':'application/json'}}));}
+  catch(error){throw stateFailure(error);}
+  let result;try{result=await response.json();}catch{throw new HttpError(503,'לא ניתן להשלים את הפעולה כרגע. נסו שוב.','STATE_INVALID_RESPONSE');}
+  if(!response.ok)throw new HttpError(response.status,result.error||'לא ניתן לשמור את השינוי.',result.code||(response.status>=500?'STATE_REQUEST_FAILED':null));return result;
 };}
 export function sniff(head,video=false){
   const starts=bytes=>bytes.every((byte,index)=>head[index]===byte),word=(a,b)=>new TextDecoder().decode(head.slice(a,b));

@@ -17,10 +17,26 @@ export function equal(a,b){
 export function json(value,status=200,headers={}){
   return new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
 }
+export function isDailyStorageLimit(error){
+  return error?.code==='DAILY_STORAGE_LIMIT'||/(?:rows? read|rows? written).*(?:limit|quota)|(?:sql|sqlite|storage|durable object).*(?:daily|per day|free tier).*(?:limit|quota)|(?:daily|per day).*(?:read|write).*(?:limit|quota)|(?:exceeded|exceeds).*(?:reads?|writes?).*(?:daily|per day)/i.test(String(error?.message||''));
+}
+// Public diagnostics are fixed categories, never raw exceptions, records or credentials.
+export function stateFailure(error,initializing=false){
+  const message=String(error?.message||'');let code=initializing?'STATE_INITIALIZATION_FAILED':'STATE_UNREACHABLE';
+  if(isDailyStorageLimit(error))code='DAILY_STORAGE_LIMIT';
+  else if(/SQLITE_FULL|database or disk is full/i.test(message))code='STATE_STORAGE_FULL';
+  else if(/no such (?:table|column)|has no column|syntax error/i.test(message))code='STATE_SCHEMA_ERROR';
+  else if(error instanceof SyntaxError)code='STATE_INVALID_DATA';
+  else if(initializing&&error instanceof HttpError&&error.status===404)code='STATE_REFERENCE_ERROR';
+  else if(/exceeded.*CPU|CPU.*(?:limit|exceeded)/i.test(message))code='STATE_CPU_LIMIT';
+  else if(/exceeded.*memory|memory.*(?:limit|exceeded)/i.test(message))code='STATE_MEMORY_LIMIT';
+  else if(error?.overloaded)code='STATE_OVERLOADED';
+  else if(/namespace.*(?:not found|not exist)|not bound|binding.*(?:missing|not found)/i.test(message))code='STATE_BINDING_ERROR';
+  return new HttpError(503,'לא ניתן להשלים את הפעולה כרגע. נסו שוב.',code);
+}
 export function fail(error){
-  const message=String(error?.message||''),dailyLimit=error?.code==='DAILY_STORAGE_LIMIT'||/(?:rows? read|rows? written).*(?:limit|quota)|(?:sql|sqlite|storage|durable object).*(?:daily|per day|free tier).*(?:limit|quota)|(?:daily|per day).*(?:read|write).*(?:limit|quota)|(?:exceeded|exceeds).*(?:reads?|writes?).*(?:daily|per day)/i.test(message);
-  if(dailyLimit)return json({error:'מכסת השימוש היומית מוצתה. נסו שוב לאחר איפוס המכסה.',code:'DAILY_STORAGE_LIMIT'},503,{'X-Family-Storage-Limit':'daily'});
-  return json({error:error instanceof HttpError?error.message:'לא ניתן להשלים את הפעולה כרגע. נסו שוב.'},error instanceof HttpError?error.status:500);
+  if(isDailyStorageLimit(error))return json({error:'מכסת השימוש היומית מוצתה. נסו שוב לאחר איפוס המכסה.',code:'DAILY_STORAGE_LIMIT'},503,{'X-Family-Storage-Limit':'daily'});
+  return json({error:error instanceof HttpError?error.message:'לא ניתן להשלים את הפעולה כרגע. נסו שוב.',...(error instanceof HttpError&&error.code?{code:error.code}:{})},error instanceof HttpError?error.status:500);
 }
 export function text(value,label,max,required=false){
   if(typeof value!=='string')throw new HttpError(400,`${label}: יש להזין טקסט.`);

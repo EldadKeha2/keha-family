@@ -1,5 +1,5 @@
 import family from './family.mjs';
-import {HttpError,json,fail,text,birthday,calendarDate,uid} from './http.mjs';
+import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
 import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections} from './date-corrections.mjs';
@@ -11,6 +11,17 @@ const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mi
 export class FamilyState {
   constructor(ctx,env){
     this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;this.peopleRevision=uid();this.peopleCache=null;
+    this.initializationError=null;this.nextInitializationAttempt=0;this.initializeState();
+  }
+  initializeState(){
+    try{this.initialize();this.initializationError=null;this.nextInitializationAttempt=0;}
+    catch(error){
+      this.peopleCache=null;this.initializationError=stateFailure(error,true);
+      const now=Date.now();
+      this.nextInitializationAttempt=this.initializationError.code==='DAILY_STORAGE_LIMIT'?now-now%86400000+86401000:now+60000;
+    }
+  }
+  initialize(){
     this.sql.exec('CREATE TABLE IF NOT EXISTS people(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
@@ -24,6 +35,7 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS greetings(id TEXT PRIMARY KEY,wedding_id TEXT NOT NULL,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS greetings_wedding ON greetings(wedding_id)');
     this.ctx.storage.transactionSync(()=>{
+      let labelsChanged=false;const revised=new Set();
       for(const p of Object.values(family.people)){
         this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
         // Names come from the family tree; keep birthdays and uploaded albums intact.
@@ -35,8 +47,7 @@ export class FamilyState {
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
           if(p.aliyahMonth)person.aliyahMonth=p.aliyahMonth;
           this.savePerson(person);
-          // Tagged albums cache by revision; a canonical rename changes their labels too.
-          if(nameChanged)for(const row of this.rows('SELECT m.data FROM media m JOIN media_tags t ON t.media_id=m.id WHERE t.person_id=?',p.id))this.touchMedia(JSON.parse(row.data));
+          revised.add(p.id);if(nameChanged)labelsChanged=true;
         }
       }
       if(!this.rows('SELECT value FROM meta WHERE id=?',correctionKey).length){
@@ -63,8 +74,13 @@ export class FamilyState {
       // Insert the oldest first because shared albums display the newest row first.
       for(const item of [...featuredVideos].reverse()){
         if(this.rows('SELECT id FROM media_trash WHERE id=?',item.id).length)continue;
-        if(this.rows('SELECT id FROM media WHERE id=?',item.id).length){const old=this.media(item.id);if(old.nameEn!==item.nameEn){old.nameEn=item.nameEn;this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(old),old.id);this.touchMedia(old);}continue;}
+        if(this.rows('SELECT id FROM media WHERE id=?',item.id).length){const old=this.media(item.id);if(old.nameEn!==item.nameEn){old.nameEn=item.nameEn;this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(old),old.id);labelsChanged=true;}continue;}
         this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,NULL,?)',item.id,item.category,JSON.stringify(item));this.touch('videos');
+      }
+      if(labelsChanged){
+        // Invalidate each person's cache once. Never visit or retag every photo on startup.
+        for(const row of this.rows('SELECT data FROM people')){const person=JSON.parse(row.data);if(!revised.has(person.id))this.savePerson(person);}
+        for(const kind of ['gallery','photos','videos','nostalgia',...couples.map(pair=>weddingCollection(pair.id))])this.touch(kind);
       }
     });
   }
@@ -374,7 +390,11 @@ export class FamilyState {
     }
   }
   async fetch(request){
-    try{const {action,...p}=await request.json();return json(this.ctx.storage.transactionSync(()=>this.run(action,p)));}
+    try{
+      if(this.initializationError&&Date.now()>=this.nextInitializationAttempt)this.initializeState();
+      if(this.initializationError)throw this.initializationError;
+      const {action,...p}=await request.json();return json(this.ctx.storage.transactionSync(()=>this.run(action,p)));
+    }
     catch(error){return fail(error);}
   }
 }
