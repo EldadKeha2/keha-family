@@ -86,5 +86,8 @@ html[dir=rtl] .tree-guide-countdown{transform-origin:right}
   html[lang^=en] .root-person-card .memorial-inline{font-size:11px}
   html[lang^=en] .root-person-card .root-person-birth bdi{font-size:15px}
   html[lang^=en] .root-event-value{font-size:16px}
+  html[lang^=en] .root-person-identity{width:190px;flex-basis:190px}
+  html[lang^=en] .root-person-details{max-width:170px}
+  html[lang^=en] .tree-unit[data-unit="u-root"].couple:before{left:calc(50% - 113px);right:calc(50% - 113px)}
 }
 .tree-unit[data-unit="u-root"] .person-age{order:4}
