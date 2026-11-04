@@ -1,4 +1,4 @@
-import {mountPuzzle,pausePuzzle} from './puzzle.js';
+import {mountPuzzle,pausePuzzle} from './puzzle.js?v=family-puzzle-v2';
 import {quizGrade} from './quiz.mjs';
 import {makeChickQuiz,withinChickTarget} from './chick.mjs?v=family-search-v4';
 import './differences.js?v=20261104.1';

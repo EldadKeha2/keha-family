@@ -86,8 +86,8 @@ function place(id,x,y){
 function click(event){
   if(event.target.closest('[data-puzzle-back]')){pausePuzzle();back?.();return;}
   if(event.target.closest('[data-puzzle-settings]')){pauseTime();state.serial++;state.loading=false;state.phase='setup';render();$('.puzzle-intro')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
-  const level=event.target.closest('[data-puzzle-level]');if(level){if(state.loading)return;state.count=Number(level.dataset.puzzleLevel);render();return;}
-  const photo=event.target.closest('[data-puzzle-photo]');if(photo){if(state.loading)return;state.photo=state.photos.find(item=>item.id===photo.dataset.puzzlePhoto);render();return;}
+  const level=event.target.closest('[data-puzzle-level]');if(level){state.count=Number(level.dataset.puzzleLevel);render();return;}
+  const photo=event.target.closest('[data-puzzle-photo]');if(photo){if(state.loading){state.serial++;state.loading=false;}state.photo=state.photos.find(item=>item.id===photo.dataset.puzzlePhoto);render();return;}
   if(event.target.closest('[data-puzzle-play]')){startPuzzle();return;}
   if(event.target.closest('[data-puzzle-retry]')){loadPhotos();return;}
   if(event.target.closest('[data-puzzle-hint]')){state.hint=!state.hint;$('[data-puzzle-hint]').setAttribute('aria-pressed',String(state.hint));$('.puzzle-picture-hint').classList.toggle('is-visible',state.hint);return;}
