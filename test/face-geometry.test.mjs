@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition} from '../public/assets/face-geometry.mjs';
+import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect} from '../public/assets/face-geometry.mjs';
 import {faceRect} from '../src/faces.mjs';
 
 test('normalized face positions survive portrait, landscape and phone display sizes',()=>{
@@ -27,4 +27,10 @@ test('the name picker prefers the right of a face and stays within narrow or key
 });
 test('a manually selected face at an image edge remains a valid server rectangle',()=>{
  for(const size of [{width:250,height:700},{width:900,height:250}])for(const point of [{x:0,y:0},{x:1,y:1},{x:.5,y:.5}])assert.doesNotThrow(()=>faceRect(manualRect(point,size)));
+});
+test('sideways and upside-down detection rectangles map back onto the unchanged original photo',()=>{
+ const original={x:.13,y:.22,width:.17,height:.29};
+ for(const [turn,rect]of [[90,{x:1-original.y-original.height,y:original.x,width:original.height,height:original.width}],[180,{x:1-original.x-original.width,y:1-original.y-original.height,width:original.width,height:original.height}],[270,{x:original.y,y:1-original.x-original.width,width:original.height,height:original.width}]]){
+  const restored=unrotateRect(rect,turn);for(const key of Object.keys(original))assert.ok(Math.abs(restored[key]-original[key])<1e-12);assert.doesNotThrow(()=>faceRect(restored));
+ }
 });

@@ -135,7 +135,7 @@
     c.loading=load(c).catch(error=>{c.loadError=true;if(error.name!=='AbortError')announce(c,tr('אפשר להוסיף תיוג פנים אחרי שהחיבור יחזור.','Face tags can be added when the connection returns.'));throw error;});c.loading.catch(()=>{});
     const imageReady=()=>new Promise(resolve=>{if(image.complete&&image.naturalWidth)resolve();else on(image,'load',resolve,{once:true});});
     await imageReady();if(!live(c))return;place(c);
-    try{const detector=await import('./face-detector.mjs?v=1'),found=await detector.detectFaces(item.id,image,c.events.signal);if(!live(c))return;c.detected=found.map(face=>({id:uuid(),rect:face.rect,score:face.score,revision:null}));stage.dataset.faceDetection='ready';stage.dataset.faceEngine=found.engine;paint(c);}
+    try{const detector=await import('./face-detector.mjs?v=2'),found=await detector.detectFaces(item.id,image,c.events.signal);if(!live(c))return;c.detected=found.map(face=>({id:uuid(),rect:face.rect,score:face.score,revision:null}));stage.dataset.faceDetection='ready';stage.dataset.faceEngine=found.engine;paint(c);}
     catch(error){if(live(c)&&error.name!=='AbortError'){stage.dataset.faceDetection='manual';console.warn('Face detection unavailable:',error.message);announce(c,tr('אפשר ללחוץ על הפנים בתמונה ולתייג גם ידנית.','You can click a face to tag it manually.'));}}
   }
   function update(item){if(current?.item.id===item.id)current.item=item;}

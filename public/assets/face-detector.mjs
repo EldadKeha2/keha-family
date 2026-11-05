@@ -9,7 +9,7 @@ async function run(){
   if(job.signal?.aborted){job.reject(new DOMException('Cancelled','AbortError'));return run();}
   active=job;
   try{
-    if(!worker){worker=new Worker(new URL('./face-detection-worker.mjs?v=1',import.meta.url),{type:'module'});worker.onmessage=event=>{if(event.data.id!==active?.id)return;if(event.data.faces)event.data.faces.engine=event.data.engine||'mediapipe';finish(event.data.error?Error(event.data.error):null,event.data.faces);};worker.onerror=()=>{worker?.terminate();worker=null;finish(Error('Face detection is unavailable'));};}
+    if(!worker){worker=new Worker(new URL('./face-detection-worker.mjs?v=2',import.meta.url),{type:'module'});worker.onmessage=event=>{if(event.data.id!==active?.id)return;if(event.data.faces)event.data.faces.engine=event.data.engine||'mediapipe';finish(event.data.error?Error(event.data.error):null,event.data.faces);};worker.onerror=()=>{worker?.terminate();worker=null;finish(Error('Face detection is unavailable'));};}
     const scale=Math.min(1,1920/Math.max(job.image.naturalWidth,job.image.naturalHeight)),bitmap=await createImageBitmap(job.image,{resizeWidth:Math.max(1,Math.round(job.image.naturalWidth*scale)),resizeHeight:Math.max(1,Math.round(job.image.naturalHeight*scale))});
     if(job.signal?.aborted){bitmap.close();return finish(new DOMException('Cancelled','AbortError'));}
     job.timer=setTimeout(()=>{worker?.terminate();worker=null;finish(Error('Face detection timed out'));},25000);

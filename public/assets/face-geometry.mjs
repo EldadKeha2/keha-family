@@ -1,5 +1,11 @@
 export function intersection(a,b){return Math.max(0,Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y));}
 export function sameRegion(a,b){const area=intersection(a,b);return area/Math.max(.000001,Math.min(a.width*a.height,b.width*b.height))>.55;}
+export function unrotateRect(rect,turn){
+  if(turn===90)return {x:rect.y,y:1-rect.x-rect.width,width:rect.height,height:rect.width};
+  if(turn===180)return {x:1-rect.x-rect.width,y:1-rect.y-rect.height,width:rect.width,height:rect.height};
+  if(turn===270)return {x:1-rect.y-rect.height,y:rect.x,width:rect.height,height:rect.width};
+  return {...rect};
+}
 export function clampRect(rect){
   const x=Math.max(0,Math.min(.995,rect.x)),y=Math.max(0,Math.min(.995,rect.y));
   return {x,y,width:Math.max(.005,Math.min(1-x,rect.width)),height:Math.max(.005,Math.min(1-y,rect.height))};
