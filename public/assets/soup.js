@@ -14,7 +14,7 @@ const $=selector=>host?.querySelector(selector);
 const busy=()=>Boolean(pending);
 const later=(fn,delay)=>{const id=setTimeout(()=>{animationTimers.delete(id);fn();},delay);animationTimers.add(id);};
 function stopFeedbackAnimations(){for(const animation of feedbackAnimations)animation?.cancel?.();feedbackAnimations=[];}
-function clearNotice(){notice=null;stopFeedbackAnimations();}
+function clearNotice(){notice=null;stopFeedbackAnimations();const live=$('[data-soup-live]');if(live)live.textContent='';}
 function pulseFeedback(button){
   stopFeedbackAnimations();
   if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)return;
