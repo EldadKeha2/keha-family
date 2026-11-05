@@ -10,7 +10,7 @@ const source=(await readFile(new URL('../public/assets/games.js',import.meta.url
 const questions=Array.from({length:10},(_,i)=>({id:'photo-'+i,src:'/media/photo-'+i,correctId:'p0',options:Array.from({length:4},(_,j)=>({id:'p'+j,name:'אדם '+j,nameEn:'Person '+j}))}));
 const kinshipQuestions=questions.map(q=>({...q,kind:'kinship',subject:{id:'rivi',name:'ריוי גנדלמן',nameEn:'Revital Gandelman',gender:'f',profile:'/media/rivi'},reference:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha',gender:'m',profile:'/media/eldad'},options:[{id:'p0',name:'בת דודה',nameEn:'First cousin'},{id:'p1',name:'אחות',nameEn:'Sister'},{id:'p2',name:'אחיינית',nameEn:'Niece'},{id:'p3',name:'נכדה',nameEn:'Granddaughter'}]}));
 const triviaQuestions=questions.map(q=>({...q,kind:'trivia',subject:kinshipQuestions[0].subject,prompt:'באיזו שנה נולדה ריוי גנדלמן?',promptEn:'In which year was Revital Gandelman born?',options:q.options.map((o,i)=>({...o,name:String(1970+i),nameEn:String(1970+i)}))}));
-function fixture({english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false}={}){
+function fixture({entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false}={}){
   let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
   const chickQuestions=makeChickQuiz(()=>.5);
   class Node{
@@ -35,7 +35,7 @@ function fixture({english=false,autoImages=true,count=10,nativeShare=false,share
   for(const id of ['familyGamesContent','gamesView','result','gameShareStatus','gameShareFallback'])nodes.set(id,new Node());
   nodes.get('gameShareFallback').hidden=true;
   const document={visibilityState:'visible',getElementById:id=>nodes.get(id),addEventListener:(kind,callback)=>documentEvents.set(kind,callback)};
-  const window={location:{origin:'https://family.test',pathname:'/',href:'https://family.test/?media=private-image&lang=he#games'},FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:english,language:english?'en-US':'he',personName:p=>english?p?.nameEn:p?.name,error:String,fetch:async(path,options)=>{requests.push(path);if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push({path,body});return {ok:true,json:async()=>({saved:true,language:body.language})};}const base=path.split('?')[0],selected=base.endsWith('relationships')?kinshipQuestions:base.endsWith('/trivia')?triviaQuestions:questions;return {ok:true,json:async()=>({questions:selected.slice(0,count).map(q=>customTrivia&&base.endsWith('/trivia')?{...q,subject:null,prompt:'שאלה מותאמת <script>',promptEn:'Custom question <script>'}:q),available:count})};}},FamilyApp:{getView:()=> 'games'}};
+  const window={location:{origin:'https://family.test',pathname:'/',href:entryUrl||'https://family.test/?media=private-image&lang=he#games'},FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:english,language:english?'en-US':'he',personName:p=>english?p?.nameEn:p?.name,error:String,fetch:async(path,options)=>{requests.push(path);if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push({path,body});return {ok:true,json:async()=>({saved:true,language:body.language})};}const base=path.split('?')[0],selected=base.endsWith('relationships')?kinshipQuestions:base.endsWith('/trivia')?triviaQuestions:questions;return {ok:true,json:async()=>({questions:selected.slice(0,count).map(q=>customTrivia&&base.endsWith('/trivia')?{...q,subject:null,prompt:'שאלה מותאמת <script>',promptEn:'Custom question <script>'}:q),available:count})};}},FamilyApp:{getView:()=> 'games'}};
   const navigator={clipboard:{async writeText(value){if(clipboardError)throw Error('Clipboard unavailable');copied.push(value);}}};
   if(nativeShare)navigator.share=async data=>{shared.push(data);if(shareError)throw Object.assign(Error('Share unavailable'),{name:shareError});};
   const FakeDate=class extends Date{static now(){return now;}};
@@ -197,4 +197,12 @@ test('the secret soup game has a bilingual tile and independent kitchen lifecycl
 
 test('Shlomo’s bilingual dance can be paused and resumed without starting a game or issuing a request',async()=>{
   for(const english of [false,true]){const f=fixture({english});assert.match(f.html,/shlomo-dance-frames/);assert.match(f.html,english?/Let’s play!/:/בואו נשחק!/);assert.doesNotMatch(f.html,/game-lobby-rules/);const stage={dataset:{dancing:'true'}},button={closest:()=>stage,setAttribute(name,value){this[name]=value;}};await f.click('[data-shlomo-dance]',button);assert.equal(stage.dataset.dancing,'false');assert.equal(button['aria-pressed'],'false');assert.equal(button.textContent,english?'Resume dance':'ממשיכים לרקוד');await f.click('[data-shlomo-dance]',button);assert.equal(stage.dataset.dancing,'true');assert.equal(button['aria-pressed'],'true');assert.equal(f.requests.length,0);}
+});
+
+test('a direct recipe link opens the kitchen intro in either language once and still allows returning to game selection',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=soup#games'});
+  assert.equal(f.soupMounts,1);assert.equal(f.requests.length,0);f.backFromSoup();assert.match(f.html,/family-game-choices/);assert.equal(f.soupMounts,1);f.window.FamilyGames.activate('games');assert.equal(f.soupMounts,1);assert.match(f.html,/family-game-choices/);
+ }
+ const unknown=fixture({entryUrl:'https://family.test/?game=unknown#games'});assert.equal(unknown.soupMounts,0);assert.match(unknown.html,/family-game-choices/);assert.equal(unknown.requests.length,0);
 });

@@ -1,7 +1,7 @@
 import {mountPuzzle,pausePuzzle} from './puzzle.js?v=return-lobby-v3';
 import {mountJachnun,pauseJachnun} from './jachnun.js?v=leaderboard-v3';
 import {mountRex,pauseRex} from './rex.js?v=2';
-import {mountSoup,pauseSoup} from './soup.js?v=yemeni-portions-v6';
+import {mountSoup,pauseSoup} from './soup.js?v=fixed-kitchen-v7';
 import {quizGrade} from './quiz.mjs';
 import {makeChickQuiz,withinChickTarget} from './chick.mjs?v=family-search-v4';
 import './differences.js?v=20261104.2';
@@ -11,6 +11,7 @@ const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 const ROUND_SECONDS=15;
 const state={view:'tree',phase:'welcome',game:null,questions:[],index:0,answers:[],imageReady:false,deadline:null,error:'',serial:0,renderToken:0,zoom:1,cursor:{x:.5,y:.5},lastRemaining:60,mistakes:0,autoNextAt:null};
 let clock=null,advanceClock=null,nextPhoto=null,preloaded='';
+let initialSoupLink=new URL(window.location.href).searchParams.get('game')==='soup';
 const editor={language:I.isEnglish?'en':'he',languageChosen:false,question:'',options:['','','',''],correctIndex:null,requestId:null,saving:false,status:'',error:''};
 const name=person=>I.personName(person);
 function stopClock(){if(clock!==null)clearInterval(clock);if(advanceClock!==null)clearInterval(advanceClock);clock=null;advanceClock=null;}
@@ -214,6 +215,7 @@ function activate(view){
   if(view!=='games')pauseRex();
   if(view!=='games')pauseJachnun();
   stopClock();state.view=view;$('gamesView').hidden=view!=='games';if(view!=='games')pausePuzzle();if(window.FamilyDifferences?.activate(view))return;if(view!=='games')return;
+  if(initialSoupLink){initialSoupLink=false;start('soup');return;}
   if(state.phase==='playing'&&state.deadline&&Date.now()>=state.deadline){if(isChick())finishChick(false);else finishRound(null);return;}render();
 }
 function init(){
