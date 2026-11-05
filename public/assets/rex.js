@@ -1,13 +1,14 @@
-import {FOODS,GROUND,WORLD_HEIGHT,PLAYER,RUNNER_LIVES,createRunner,jumpRunner,advanceRunner,remainingMs} from './rex.mjs?v=2';
+import {FOODS,GROUND,WORLD_HEIGHT,PLAYER,RUNNER_LIVES,makeEncounter,createRunner,jumpRunner,advanceRunner,remainingMs} from './rex.mjs?v=3';
 import {DEFAULT_CHARACTER,headCrop,snakeCharacters} from './jachnun.mjs?v=2';
 import {PREPARED_HEADS} from './jachnun-heads.mjs?v=1';
 
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const title=()=>tr('תימנירקס','Yemeanite Rex');
-const state={phase:'setup',selected:DEFAULT_CHARACTER,query:'',game:null,people:[],imageError:'',loading:false,ready:false};
+const state={phase:'setup',selected:DEFAULT_CHARACTER,query:'',game:null,people:[],imageError:'',loading:false,ready:false,demo:null};
 const scores={rows:[],loaded:false,loading:false,error:'',serial:0};
 const images=new Map();
+const runId=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
 let host=null,back=null,events=null,frame=null,timer=null,lastFrame=0,head=null,imageSerial=0,run=null,floats=[];
 const $=selector=>host?.querySelector(selector);
 const selected=()=>state.people.find(p=>p.id===state.selected);
@@ -20,7 +21,7 @@ function stop(){if(frame!==null)cancelAnimationFrame(frame);if(timer!==null)clea
 // Detaching stops drawing, but the original five-minute deadline keeps running.
 export function pauseRex(){stop();events?.abort();events=null;host?.classList.remove('has-family-rex');host=null;}
 export function mountRex(root,onBack){
-  pauseRex();host=root;back=onBack;host.classList.add('has-family-rex');events=new AbortController();
+  pauseRex();host=root;back=onBack;state.demo=makeEncounter({pattern:'mixed'});host.classList.add('has-family-rex');events=new AbortController();
   const on=(node,type,fn,options={})=>node.addEventListener(type,fn,{...options,signal:events.signal});
   state.people=snakeCharacters(window.FAMILY_DATA?.people||{},PREPARED_HEADS);
   state.people.sort((a,b)=>a.id===DEFAULT_CHARACTER?-1:b.id===DEFAULT_CHARACTER?1:name(a).localeCompare(name(b),I.locale));
@@ -67,7 +68,7 @@ function loadHead(){
   if(images.has(person.id)){prepare(images.get(person.id));return;}
   const image=new Image();image.decoding='async';image.onload=()=>{images.set(person.id,image);prepare(image);};image.onerror=()=>{if(token!==imageSerial)return;state.imageError=tr('הראש לא נטען. נסו שוב או בחרו דמות אחרת.','The portrait could not load. Try again or choose another character.');syncImage();};image.src=person.profile;
 }
-function begin(){if(!state.ready)return;stop();floats=[];state.game=createRunner({now:Date.now(),width:worldWidth()});state.phase='playing';run={id:crypto.randomUUID().replaceAll('-',''),headId:state.selected,name:'',busy:false,saved:false,error:'',rank:null};render();$('[data-rex-board]')?.focus({preventScroll:true});$('.rex-hud')?.scrollIntoView({block:'start'});animate();}
+function begin(){if(!state.ready)return;stop();floats=[];state.game=createRunner({now:Date.now(),width:worldWidth()});state.phase='playing';run={id:runId(),headId:state.selected,name:'',busy:false,saved:false,error:'',rank:null};render();$('[data-rex-board]')?.focus({preventScroll:true});$('.rex-hud')?.scrollIntoView({block:'start'});animate();}
 function finish(){if(state.phase==='finished')return;stop();state.game.reason??=state.game.lives===0?'lives':'time';state.game.phase='finished';state.phase='finished';floats=[];render();$('.rex-finish')?.focus({preventScroll:true});$('.rex-finish')?.scrollIntoView({block:'start'});loadScores(true);}
 function updateTime(){if(!host||state.phase!=='playing')return;const left=remainingMs(state.game,Date.now());if(left<=0){finish();return;}const node=$('[data-rex-time]');if(node)node.textContent=clockText(left);const wrap=$('[data-rex-time-wrap]');if(wrap)wrap.dataset.urgent=String(left<=30000);}
 function animate(){if(!host||state.phase!=='playing'||document.visibilityState==='hidden')return;if(timer===null)timer=setInterval(updateTime,200);if(frame===null)frame=requestAnimationFrame(tick);}
@@ -168,7 +169,7 @@ function drawRunner(ctx,player,distance,now,recoverUntil=0){
 function draw(){
   const canvas=$('[data-rex-board]')||$('[data-rex-demo]');if(!canvas)return;const ctx=canvas.getContext('2d'),game=state.game,now=Date.now(),demo=state.phase==='setup',distance=demo?0:game.distance;
   ctx.clearRect(0,0,canvas.width,canvas.height);ctx.save();if(demo)ctx.translate(0,-90);scene(ctx,canvas.width,demo?410:canvas.height,distance);
-  if(demo){drawRunner(ctx,{...PLAYER,y:GROUND-PLAYER.height},0,now);[{x:310,width:30,height:58},{x:354,width:30,height:50},{x:610,width:34,height:68},{x:860,width:30,height:55}].forEach(plant=>drawKhat(ctx,plant));drawFood(ctx,'jachnun',347,GROUND-132);drawFood(ctx,'malawach',475,GROUND-34);drawFood(ctx,'kubaneh',690,GROUND-145);drawFood(ctx,'lahoh',785,GROUND-35);}
+  if(demo){drawRunner(ctx,{...PLAYER,y:GROUND-PLAYER.height},0,now);const layout=state.demo;for(const plant of layout.plants)drawKhat(ctx,{...plant,x:300+plant.x});for(const food of layout.foods)drawFood(ctx,food.kind,300+food.x,food.y);}
   else{for(const plant of game.plants)drawKhat(ctx,plant);for(const food of game.foods)drawFood(ctx,food.kind,food.x,food.y);drawRunner(ctx,game.player,game.distance,now,game.recoverUntil);floats=floats.filter(item=>item.until>now);for(const item of floats){ctx.globalAlpha=(item.until-now)/850;ctx.fillStyle='#506e3f';ctx.font='bold 24px sans-serif';ctx.textAlign='center';ctx.fillText('+'+item.points,item.x,item.y-(850-(item.until-now))*.045);ctx.globalAlpha=1;}}
   ctx.restore();
 }

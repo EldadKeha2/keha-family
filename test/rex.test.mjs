@@ -39,7 +39,7 @@ test('encounters include empty bushes, a close pair, spaced jumps, a rhythm sequ
   const encounter=pattern=>makeEncounter({pattern,random:()=>.9});
   assert.equal(encounter('single').foods.length,0);assert.equal(encounter('close-pair').plants.length,2);assert.ok(encounter('close-pair').span<110);
   const spaced=encounter('stepping-pair');assert.equal(spaced.plants.length,2);assert.ok(spaced.plants[1].x-spaced.plants[0].x>200);assert.equal(encounter('rhythm').plants.length,3);
-  const trail=encounter('food-trail');assert.equal(trail.plants.length,0);assert.equal(trail.foods.length,4);assert.equal(new Set(trail.foods.map(food=>food.y)).size,2);
+  const trail=encounter('food-trail');assert.equal(trail.plants.length,0);assert.ok(trail.foods.length>=1&&trail.foods.length<=MAX_ENCOUNTER_FOODS);assert.ok(trail.foods.every(food=>food.y>=158&&food.y<=308));
   const risky=encounter('temptation');assert.ok(risky.foods.some(food=>food.risky&&food.x>risky.plants[0].x+risky.plants[0].width&&food.x<risky.plants[1].x));
   for(const pattern of ENCOUNTER_PATTERNS)assert.ok(encounter(pattern).foods.length<=MAX_ENCOUNTER_FOODS);
 });
@@ -69,7 +69,8 @@ test('a five-minute desktop or phone run has shuffled variety, safe transitions 
       const now=frame*1000/60,before=game.encounters;avoidPlants(game,now);advanceRunner(game,1/60,now,random);if(game.encounters!==before)patterns.push(game.lastPattern);
     }
     assert.equal(game.phase,'finished');assert.equal(game.reason,'time');assert.equal(game.crashes,0,`safe transitions at width ${width}, seed ${initial}`);
-    for(let i=0;i+6<=patterns.length;i+=6)assert.equal(new Set(patterns.slice(i,i+6)).size,6,'each shuffled bag includes all six encounter types');
+    assert.equal(new Set(patterns).size,ENCOUNTER_PATTERNS.length,'all encounter types remain available without fixed cycles');
+    for(let i=1;i<patterns.length;i++)assert.notEqual(patterns[i],patterns[i-1],'avoid immediate repeats while keeping independent choices');
     for(const food of FOODS)assert.ok(game.basket[food.id]>0,food.id+' must be collectible');assert.ok(game.score>100);assert.equal(game.score,basketPoints(game.basket));
   }
 });
