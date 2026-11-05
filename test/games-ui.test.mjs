@@ -192,5 +192,5 @@ test('Catch the Jachnun opens from both game lobbies, pauses on leaving and retu
 });
 
 test('the secret soup game has a bilingual tile and independent kitchen lifecycle with no quiz requests',async()=>{
- for(const english of [false,true]){const f=fixture({english});assert.match(f.html,english?/The Secret in the Pot/:/הסוד שבסיר/);await f.start('soup');assert.equal(f.soupMounts,1);assert.equal(f.requests.length,0);const pauses=f.soupPauses;f.window.FamilyGames.activate('tree');assert.ok(f.soupPauses>pauses);f.window.FamilyGames.activate('games');assert.equal(f.soupMounts,2);f.backFromSoup();assert.match(f.html,/data-game-start="soup"/);}
+ for(const english of [false,true]){const f=fixture({english});assert.match(f.html,english?/The Secret Recipe/:/המתכון הסודי/);assert.match(f.html,english?/Crack the secret of Grandma Yona’s Yemeni soup/:/פצחו את סוד המרק התימני של סבתא יונה/);assert.deepEqual([...f.html.matchAll(/data-game-start="([^"]+)"/g)].map(m=>m[1]).slice(-2),['rex','soup']);await f.start('soup');assert.equal(f.soupMounts,1);assert.equal(f.requests.length,0);const pauses=f.soupPauses;f.window.FamilyGames.activate('tree');assert.ok(f.soupPauses>pauses);f.window.FamilyGames.activate('games');assert.equal(f.soupMounts,2);f.backFromSoup();assert.match(f.html,/data-game-start="soup"/);}
 });

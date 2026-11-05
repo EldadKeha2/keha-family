@@ -22,25 +22,23 @@
 
 .game-choice-puzzle .game-choice-icon svg{fill:#dfe8cd;stroke:#8e9d75;stroke-width:1.5;stroke-linejoin:round}
 
-/* Compact square game tiles, including two columns on phones. */
-.family-game-choices{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
-.family-game-choice{display:flex;flex-direction:column;align-items:center;text-align:center;aspect-ratio:1;box-sizing:border-box;padding:22px 18px;gap:12px;grid-column:auto}
+/* Game cards grow with their text instead of constraining it to a fixed square. */
+.family-game-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:auto;gap:16px;align-items:stretch}
 .family-game-choices>button.family-game-choice{grid-column:auto / span 1}
-.family-game-choice>.game-choice-icon{width:54px;height:54px;flex:0 0 54px;border-radius:15px}
-.family-game-choice>.game-choice-icon svg{width:43px;height:43px}
-.family-game-choice>span:last-child{flex:1;width:100%;align-items:center;gap:9px}
-.family-game-choice strong{font-size:28px;line-height:1.25;overflow-wrap:anywhere}
-.family-game-choice>span>span{font-size:14px;line-height:1.6;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-.family-game-choice b{margin-top:auto;padding-top:7px;font-size:14px}
-@media(max-width:980px){.family-game-choices{grid-template-columns:repeat(2,minmax(0,1fr))}.family-game-choice{padding:20px;gap:13px;max-height:340px}.family-game-choice strong{font-size:29px}}
-@media(max-width:700px){.family-game-choices{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.family-game-choice{padding:14px 9px 12px;gap:9px;aspect-ratio:1;min-height:145px;max-height:none;border-radius:14px}.family-game-choice>.game-choice-icon{width:39px;height:39px;flex-basis:39px;border-radius:11px}.family-game-choice>.game-choice-icon svg{width:31px;height:31px}.family-game-choice>span:last-child{gap:6px}.family-game-choice strong{font-size:22px;line-height:1.2}.family-game-choice>span>span{display:none}.family-game-choice b{font-size:11px;padding-top:4px}}
-@media(max-width:350px){.family-game-choices{gap:8px}.family-game-choice{padding:11px 7px;min-height:136px}.family-game-choice strong{font-size:20px}}
-
-/* Short descriptions stay visible inside every game tile, including on phones. */
-.family-game-choice{overflow:hidden;padding:20px 16px;gap:10px}
-.family-game-choice>span:last-child{min-height:0;overflow:hidden;gap:7px}
-.family-game-choice strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-width:100%;flex-shrink:0}
-.family-game-choice>span>.game-choice-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-width:100%;font-size:14px;line-height:1.5;flex-shrink:0}
-.family-game-choice b{flex-shrink:0;padding-top:4px}
-@media(max-width:700px){.family-game-choice{min-height:198px;padding:12px 9px;gap:7px}.family-game-choice>.game-choice-icon{width:34px;height:34px;flex-basis:34px}.family-game-choice>.game-choice-icon svg{width:28px;height:28px}.family-game-choice>span:last-child{gap:5px}.family-game-choice strong{font-size:21px;line-height:1.2;min-height:2.4em}.family-game-choice>span>.game-choice-description{font-size:12px;line-height:1.4;-webkit-line-clamp:3}.family-game-choice b{font-size:11px;line-height:1.3;padding-top:3px}}
-@media(max-width:350px){.family-game-choice{min-height:190px;padding:11px 7px;gap:6px}.family-game-choice strong{font-size:20px}.family-game-choice>span>.game-choice-description{font-size:11.5px}}
+.family-game-choice{display:flex;flex-direction:column;align-items:center;text-align:center;aspect-ratio:auto;height:auto;min-height:264px;max-height:none;min-width:0;box-sizing:border-box;padding:22px 18px;gap:12px;overflow:visible}
+.family-game-choice>.game-choice-icon{width:50px;height:50px;flex:0 0 50px;border-radius:14px}
+.family-game-choice>.game-choice-icon svg{width:40px;height:40px}
+.family-game-choice>span:last-child{display:flex;flex-direction:column;flex:1 0 auto;width:100%;min-width:0;align-items:center;gap:10px;overflow:visible}
+.family-game-choice strong{display:block;max-width:100%;font-size:28px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+.family-game-choice>span>.game-choice-description{display:block;max-width:100%;font-size:15px;line-height:1.6;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+.family-game-choice b{display:block;max-width:100%;margin-top:auto;padding-top:8px;font-size:15px;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+@media(max-width:980px){.family-game-choices{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+ .family-games-view{padding-inline:10px}.family-game-choices{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+ .family-game-choice{min-height:250px;padding:18px 11px;gap:12px;border-radius:15px}
+ .family-game-choice>.game-choice-icon{width:44px;height:44px;flex-basis:44px}.family-game-choice>.game-choice-icon svg{width:34px;height:34px}
+ .family-game-choice>span:last-child{gap:9px}.family-game-choice strong{font-size:23px;line-height:1.3}
+ .family-game-choice>span>.game-choice-description{font-size:14px;line-height:1.6}.family-game-choice b{font-size:14px;line-height:1.5;padding-top:10px}
+ .family-game-intro h3{overflow-wrap:anywhere}.family-game-intro>p,.game-lobby-rules p{overflow-wrap:anywhere}
+}
+@media(max-width:360px){.family-game-choices{gap:10px}.family-game-choice{padding:16px 9px}.family-game-choice strong{font-size:22px}}
