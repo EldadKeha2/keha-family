@@ -1,0 +1,22 @@
+/* Separate, touch-friendly tabs, with the family's engraved gold detail. */
+@media(min-width:701px){
+  .site-header .main-nav{gap:10px;align-items:stretch;padding:15px 0 5px;position:relative}
+  .site-header .main-nav:before{content:'';position:absolute;top:0;inset-inline:0;height:1px;background:linear-gradient(90deg,transparent,#d0bb91 15%,#d0bb91 85%,transparent)}
+  .site-header .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid #cdb78e;border-radius:7px;background:linear-gradient(#fffdf7,#f5eddd);color:#716145;box-shadow:inset 0 0 0 2px #fffaf0,0 2px 4px #7053260a;font-size:16px;line-height:1.4;transition:background .18s,border-color .18s,box-shadow .18s}
+  .site-header .main-nav .nav-link:before{content:'';width:6px;height:6px;border:1px solid #ad8c50;transform:rotate(45deg);flex-shrink:0}
+  .site-header .main-nav .nav-link:hover{border-color:#9c7c43;background:#eee4ce;box-shadow:inset 0 0 0 2px #fffaf0,0 3px 9px #70532615}
+  .site-header .main-nav .nav-link.active{color:#fffaf0;border-color:#596c48;background:#596c48;box-shadow:inset 0 0 0 2px #ffffff1c,0 3px 8px #40532f20}
+  .site-header .main-nav .nav-link.active:before{border-color:#ecd4a0}
+  .site-header .main-nav .nav-link.active:after{display:none}
+  .site-header .main-nav .nav-link:focus-visible{outline:3px solid #aa884b;outline-offset:3px}
+}
+.home-tile-nursery{--tile-surface:#f4e0d5;--tile-line:#d3ae96;--tile-ink:#895c42}
+/* Nursery pairs with memorial, leaving both the same size as the other small tiles. */
+#homeTiles .home-tile-memorial,#mobileMenuTiles .home-tile-memorial{grid-column:auto;min-height:100px}
+#mobileMenuTiles .home-tile-memorial{min-height:86px}
+#homeTiles .home-tile-memorial strong{font-size:clamp(16px,4.4vw,20px)}
+#homeTiles .home-tile-memorial .home-tile-icon,#mobileMenuTiles .home-tile-memorial .home-tile-icon{width:42px;height:48px;flex-basis:42px}
+#homeTiles .home-tile-memorial .home-tile-icon svg,#mobileMenuTiles .home-tile-memorial .home-tile-icon svg{width:35px;height:35px}
+#homeTiles .home-tile-memorial .home-tile-arrow,#mobileMenuTiles .home-tile-memorial .home-tile-arrow{display:none}
+@media(max-width:430px){#mobileMenuTiles .home-tile-memorial{min-height:81px}}
+@media(prefers-reduced-motion:reduce){.site-header .main-nav .nav-link{transition:none}}

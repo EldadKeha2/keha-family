@@ -11,6 +11,7 @@ import {makeTriviaQuiz,triviaPool} from '../public/assets/trivia.mjs';
 import {triviaLanguage,validateTriviaQuestion,mixTriviaQuestions} from './trivia-questions.mjs';
 import {jachnunScore,JACHNUN_SCORE_LIMIT} from './jachnun-scores.mjs';
 import {rexScore,REX_SCORE_LIMIT} from './rex-scores.mjs';
+import {nurseryCollection} from './nursery.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -181,6 +182,13 @@ export class FamilyState {
   collection(kind,options={}){
     validCollection(kind);
     const revision=this.rows('SELECT value FROM meta WHERE id=?','collection:'+kind)[0]?.value||'empty';
+    if(kind.startsWith('nursery:')){
+      const requested=Number(options.page||1),size=10;
+      if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
+      const total=this.rows('SELECT count(*) AS n FROM media WHERE category=?',kind)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
+      const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC LIMIT ? OFFSET ?',kind,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
+      return {kind,items,count:total,revision:revision+':'+page,pagination:{page,pages,size,total}};
+    }
     if(kind!=='gallery'){
       const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC',kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
       return {kind,items,count:items.length,revision};
@@ -217,6 +225,15 @@ export class FamilyState {
   }
   run(action,p){
     switch(action){
+      case 'nursery':{
+        const albums={};
+        // One bounded index query supplies covers and counts, without reading other galleries.
+        for(const row of this.rows("SELECT latest.category,latest.n,m.data FROM (SELECT category,count(*) AS n,max(rowid) AS newest FROM media WHERE category>='nursery:' AND category<'nursery;' GROUP BY category) latest JOIN media m ON m.rowid=latest.newest")){
+          const id=row.category.slice(8);try{nurseryCollection(id);}catch{continue;}
+          const item=JSON.parse(row.data);albums[id]={count:row.n,cover:'/media/'+item.id};
+        }
+        return {albums};
+      }
       case 'memorial':return {candles:Object.fromEntries(this.rows("SELECT data FROM people WHERE json_extract(data,'$.deceased')=1").map(row=>{const person=JSON.parse(row.data);return [person.id,this.candleState(person,p.visitorId)];}))};
       case 'candle.light':{
         const person=this.person(p.id);if(!person.deceased)throw new HttpError(400,'אפשר להדליק נר בעמוד לזכרם בלבד.');

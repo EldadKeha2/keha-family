@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import worker,{FamilyState,LIMITS,sniff} from '../src/worker.mjs';
 import {signedRequest} from '../src/hf.mjs';
 import {fail} from '../src/http.mjs';
+import family from '../src/family.mjs';
 
 function fixture(){
   const database=new DatabaseSync(':memory:');
@@ -55,6 +56,53 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+
+test('nursery albums isolate baby photos from profile pictures and other albums, and use the existing gallery actions',async()=>{
+ const f=fixture();try{
+  await f.connect();assert.deepEqual(await(await f.call('/api/nursery')).json(),{albums:{}});
+  const upload=async(id,n)=>{const response=await f.call('/api/nursery/'+id+'/upload?filename=baby-'+n+'.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(response.status,201);return (await response.json()).collection.items[0];};
+  const first=await upload('yona',1),second=await upload('yona',2),other=await upload('shlomo',3);
+  assert.equal(first.scope,'nursery:yona');assert.equal(other.scope,'nursery:shlomo');assert.equal(first.kind,'photo');
+  let album=await(await f.call('/api/nursery/yona')).json();assert.deepEqual(album.items.map(item=>item.id),[second.id,first.id]);assert.equal(album.count,2);
+  let summary=(await(await f.call('/api/nursery')).json()).albums;assert.deepEqual(summary.yona,{count:2,cover:second.src});assert.equal(summary.shlomo.cover,other.src);
+  for(const id of ['yona','shlomo']){const p=await(await f.call('/api/people/'+id+'/page')).json();assert.equal(p.person.profile,null);assert.equal(p.albums.photos.total,0);}
+  assert.equal((await(await f.call('/api/collections/gallery')).json()).count,0);
+  let response=await f.call('/api/media/'+second.id+'/caption',{method:'POST',body:{caption:'A first smile',expectedCaption:''}});assert.equal(response.status,200);assert.equal((await response.json()).collection.items[0].caption,'A first smile');
+  assert.equal((await f.call('/api/media/'+first.id+'/delete',{method:'POST',body:{scope:'nursery:shlomo'}})).status,404);
+  assert.equal((await f.call('/api/media/'+second.id+'/delete',{method:'POST',body:{scope:'nursery:yona'}})).status,200);
+  summary=(await(await f.call('/api/nursery')).json()).albums;assert.equal(summary.yona.count,1);assert.equal(summary.yona.cover,first.src);
+  assert.equal((await f.call('/api/media/'+second.id+'/restore',{method:'POST',body:{scope:'nursery:yona'}})).status,200);
+  f.restart();album=await(await f.call('/api/nursery/yona')).json();assert.equal(album.count,2);assert.equal(album.items.find(item=>item.id===second.id).caption,'A first smile');
+  const exportData=await(await f.call('/api/export')).json();assert.equal(exportData.media.filter(item=>item.category==='nursery:yona').length,2);
+  assert.equal((await f.call(first.src)).status,200);
+ }finally{await f.close();}
+});
+test('nursery accepts newly added core relatives automatically, rejects extended or tag-only relatives and only accepts photos',async()=>{
+ const f=fixture(),id='nursery-future-test';try{
+  await f.connect();const extended=Object.values(family.people).find(p=>p.extended);assert.ok(extended);
+  for(const personId of [extended.id,'extra-guest','not-a-relative']){
+   assert.equal((await f.call('/api/nursery/'+personId)).status,404);
+   assert.equal((await f.call('/api/nursery/'+personId+'/upload?filename=baby.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,404);
+  }
+  assert.equal(f.objects.size,0,'Ineligible members must be rejected before uploading bytes');
+  family.people[id]={id,name:'קרובת משפחה חדשה',nameEn:'New relative',birthday:'1.1.2026',gender:'f',branch:'keha',generation:6};f.restart();
+  assert.equal((await f.call('/api/nursery/'+id)).status,200);
+  assert.equal((await f.call('/api/nursery/'+id+'/upload?filename=new-baby.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,201);
+  assert.equal((await(await f.call('/api/nursery')).json()).albums[id].count,1);
+  assert.equal((await f.call('/api/nursery/yona/upload?filename=video.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).status,415);
+ }finally{delete family.people[id];await f.close();}
+});
+test('nursery galleries paginate ten photos at a time and keep other family members separate',async()=>{
+ const f=fixture();try{
+  await f.connect();const files=[];
+  for(let n=0;n<12;n++){const response=await f.call('/api/nursery/yona/upload?filename=baby-'+n+'.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(response.status,201);files.unshift((await response.json()).file);}
+  const page1=await(await f.call('/api/nursery/yona')).json(),page2=await(await f.call('/api/nursery/yona?page=2')).json();
+  assert.deepEqual(page1.items.map(item=>item.file),files.slice(0,10));assert.deepEqual(page2.items.map(item=>item.file),files.slice(10));assert.equal(page1.pagination.pages,2);assert.equal(page1.pagination.total,12);
+  assert.equal((await f.call('/api/nursery/yona?page=0')).status,400);assert.equal((await f.call('/api/nursery/yona?page=1.5')).status,400);
+  assert.equal((await(await f.call('/api/nursery/shlomo')).json()).count,0);
+  assert.equal((await f.call('/api/nursery/yona',{headers:{'If-None-Match':'"'+page1.revision+'"'}})).status,304);
+ }finally{await f.close();}
+});
 
 test('renaming canonical people on startup has bounded work independent of thousands of tagged images',async()=>{
  const f=fixture();try{

@@ -711,3 +711,11 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   'כאן יש מקום לזיכרונות שלכם. הוסיפו את הראשון!':'There is room for your memories here. Add the first one!',
   'תאריכי הלידה מעודכנים דרך מנהלי האתר בלבד.':'Birth dates are maintained by the site administrators.'
 });
+
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  "התינוקייה":"The Nursery",
+  "ההתחלה של כולנו":"Where we all began",
+  "החיוכים הראשונים של כולנו":"Our very first smiles",
+  "אלבום התינוקייה לא נמצא במשפחה שלנו.":"This baby album is not part of our family.",
+  "אלבום התינוקייה לא נמצא במשפחה שלנו":"This baby album is not part of our family"
+});

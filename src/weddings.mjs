@@ -1,5 +1,6 @@
 import family from './family.mjs';
 import {HttpError} from './http.mjs';
+import {nurseryCollection} from './nursery.mjs';
 
 // Stable family-unit IDs keep wedding dates and albums attached to the same couple.
 export const couples=Object.values(family.units)
@@ -13,6 +14,7 @@ export function couple(id){
 export const weddingCollection=id=>'wedding:'+couple(id).id;
 export function validCollection(kind){
   if(['photos','videos','gallery','nostalgia'].includes(kind))return kind;
+  if(typeof kind==='string'&&kind.startsWith('nursery:'))return nurseryCollection(kind.slice(8));
   if(typeof kind==='string'&&kind.startsWith('wedding:'))return weddingCollection(kind.slice(8));
   throw new HttpError(404,'הגלריה לא נמצאה.');
 }

@@ -4,6 +4,7 @@ import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
 import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
+import {nurseryCollection} from './nursery.mjs';
 export {FamilyState} from './state.mjs';
 export {FamilyUpdates} from './updates.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
@@ -80,7 +81,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
     if(mediaType==='document'){if(!['document','photo'].includes(format.kind))throw new HttpError(415,'בחרו מסמך או צילום תעודה.');format={...format,kind:'document',maximum:LIMITS.attachment};}
     if(format.maximum&&media.size>format.maximum)throw new HttpError(413,format.kind==='document'?'אפשר להעלות מסמך עד 10MB.':'אפשר להעלות תמונה עד 50MB.');
   }catch(error){await media.body.cancel();throw error;}
-  const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:[category,personId||'shared'];
+  const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:category.startsWith('nursery:')?['nursery',category.slice(8)]:[category,personId||'shared'];
   const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,id+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
   if(category==='videos')item.videoCategory=videoCategory;
   let transfer=Promise.resolve(),body=media.body;
@@ -173,6 +174,7 @@ export default {
         return snapshot(request,await db('people'));
       }
       if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
+      if(path==='/api/nursery'&&request.method==='GET')return json(await db('nursery'));
       if(path==='/api/memorial'&&request.method==='GET')return json(await db('memorial',{visitorId:/^[a-f0-9]{32}$/.test(request.headers.get('X-Candle-Visitor')||'')?request.headers.get('X-Candle-Visitor'):null}));
       if(path==='/api/games/who-is-it'&&request.method==='GET')return json(await db('game.quiz'));
       if(path==='/api/games/relationships'&&request.method==='GET')return json(await db('game.kinship'));
@@ -186,6 +188,7 @@ export default {
       }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
+      if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/view$/.exec(path))&&request.method==='GET')return json(await db('media.public',{id:match[1]}));
       if((match=/^\/api\/people\/([^/]+)\/page$/.exec(path))&&request.method==='GET'){
@@ -214,6 +217,7 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/nursery\/([^/]+)\/upload$/.exec(path)))return await upload(request,env,db,ctx,{category:nurseryCollection(decodeURIComponent(match[1]))});
         if((match=/^\/api\/memorial\/([^/]+)\/candles$/.exec(path))){const body=await readJSON(request,1000);return json(await db('candle.light',{id:decodeURIComponent(match[1]),visitorId:body.visitorId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/tags\/patch$/.exec(path))){const body=await readJSON(request,64000);return json(await db('media.tags.patch',{id:match[1],changes:body.changes}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/caption$/.exec(path))){const body=await readJSON(request,40000);return json(await db('media.caption.id',{id:match[1],caption:body.caption,expectedCaption:body.expectedCaption}));}
