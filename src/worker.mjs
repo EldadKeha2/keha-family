@@ -134,7 +134,7 @@ async function story(request,env,db,ctx,id){
 function snapshot(request,result){const etag='"'+result.revision+'"';return request.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}}):json(result,200,{ETag:etag});}
 function secure(response){
   const headers=new Headers(response.headers);headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','same-origin');headers.set('X-Frame-Options','SAMEORIGIN');
-  headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; frame-src 'self' https://www.youtube-nocookie.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'");
+  headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; frame-src 'self' https://www.youtube-nocookie.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'");
   headers.set('Cache-Control','private, no-store');return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 export default {
@@ -188,6 +188,7 @@ export default {
       }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
+      if((match=/^\/api\/media\/([a-f0-9]{32})\/faces$/.exec(path))&&request.method==='GET')return json(await db('media.faces',{id:match[1]}));
       if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/view$/.exec(path))&&request.method==='GET')return json(await db('media.public',{id:match[1]}));
@@ -217,6 +218,7 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/save$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.save',{id:match[1],faceId:body.faceId,personId:body.personId,rect:body.rect,expectedRevision:body.expectedRevision}));}
         if((match=/^\/api\/nursery\/([^/]+)\/upload$/.exec(path)))return await upload(request,env,db,ctx,{category:nurseryCollection(decodeURIComponent(match[1]))});
         if((match=/^\/api\/memorial\/([^/]+)\/candles$/.exec(path))){const body=await readJSON(request,1000);return json(await db('candle.light',{id:decodeURIComponent(match[1]),visitorId:body.visitorId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/tags\/patch$/.exec(path))){const body=await readJSON(request,64000);return json(await db('media.tags.patch',{id:match[1],changes:body.changes}));}

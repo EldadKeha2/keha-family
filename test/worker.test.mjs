@@ -57,6 +57,43 @@ function fixture(){
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
 
+test('a face label atomically adds an ordinary tag, preserves other people, and follows the same photo across albums',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),faceId='a'.repeat(32),rect={x:.2,y:.1,width:.17,height:.22};await setTags(f,item,['shlomo']);
+  const response=await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId,personId:'yona',rect,expectedRevision:null}});assert.equal(response.status,200);const result=await response.json();
+  assert.equal(result.operation,'faces');assert.deepEqual(result.item.tags.map(p=>p.id),['yona','shlomo']);assert.equal(result.face.person.id,'yona');assert.deepEqual(result.face.rect,rect);assert.equal(result.face.id,faceId);
+  for(const id of ['yona','shlomo']){const person=await(await f.call('/api/people/'+id+'/page')).json();assert.equal(person.albums.photos.items[0].id,item.id);}
+  f.restart();const saved=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(saved.faces[0].id,faceId);assert.equal(saved.faces[0].person.nameEn,'Yona Nakash');
+  const backup=await(await f.call('/api/export')).json();assert.equal(backup.faceTags[0].mediaId,item.id);assert.equal(backup.faceTags[0].personId,'yona');assert.equal(f.objects.size,1,'Face coordinates must not duplicate photo files');
+ }finally{await f.close();}
+});
+test('face edits reject stale or duplicate regions, remain isolated by photo, and clearing a face preserves ordinary tags',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await taggedUpload(f),b=await taggedUpload(f),id='b'.repeat(32),rect={x:.1,y:.2,width:.2,height:.3};
+  const save=(item,body)=>f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:id,personId:'yona',rect,expectedRevision:null,...body}});
+  let response=await save(a,{});const face=(await response.json()).face;assert.ok(face.revision);
+  assert.equal((await save(a,{personId:'shlomo'})).status,409);assert.equal((await save(a,{faceId:'c'.repeat(32)})).status,409);
+  response=await save(a,{personId:'shlomo',expectedRevision:face.revision});assert.equal(response.status,200);const edited=(await response.json()).face;assert.equal(edited.person.id,'shlomo');assert.notEqual(edited.revision,face.revision);
+  assert.equal((await(await f.call('/api/media/'+b.id+'/faces')).json()).faces.length,0);
+  assert.equal((await save(a,{personId:null,expectedRevision:edited.revision})).status,200);
+  const tags=(await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags;assert.deepEqual(tags.map(p=>p.id),['shlomo','yona']);assert.equal((await(await f.call('/api/media/'+a.id+'/faces')).json()).faces.length,0);
+ }finally{await f.close();}
+});
+test('face inputs are bounded, invalid saves are atomic, and ordinary tag removal and undo also hide and restore face labels',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),faceId='d'.repeat(32),rect={x:.4,y:.2,width:.1,height:.2};
+  const save=body=>f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId,personId:'yona',rect,expectedRevision:null,...body}});
+  for(const bad of [{rect:{...rect,x:-.1}},{rect:{...rect,width:0}},{rect:{...rect,x:.99}},{personId:'missing-person'},{faceId:'not-an-id'}])assert.ok((await save(bad)).status>=400);
+  assert.equal((await(await f.call('/api/media/'+item.id+'/tags')).json()).item.tags.length,0);assert.equal((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces.length,0);
+  assert.equal((await save({})).status,200);
+  assert.equal((await f.call('/api/media/'+item.id+'/untag',{method:'POST',body:{scope:'personal:yona'}})).status,200);assert.equal((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces.length,0);
+  assert.equal((await f.call('/api/media/'+item.id+'/retag',{method:'POST',body:{scope:'personal:yona'}})).status,200);assert.equal((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces[0].id,faceId);
+  assert.equal((await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:item.scope}})).status,200);assert.equal((await f.call('/api/media/'+item.id+'/faces')).status,404);
+  assert.equal((await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:item.scope}})).status,200);assert.equal((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces[0].personId,'yona');
+  const film=(await(await f.call('/api/collections/videos')).json()).items[0];assert.equal((await f.call('/api/media/'+film.id+'/faces')).status,400);
+ }finally{await f.close();}
+});
+
 test('nursery albums isolate baby photos from profile pictures and other albums, and use the existing gallery actions',async()=>{
  const f=fixture();try{
   await f.connect();assert.deepEqual(await(await f.call('/api/nursery')).json(),{albums:{}});
@@ -196,7 +233,7 @@ test('visitors can open the site and data without a password or cookie',async()=
     const home=await f.call('/');assert.equal(home.status,200);assert.equal(await home.text(),'static assets');
     assert.equal((await f.call('/assets/style.css')).status,200);
     const script=await f.connect();assert.match(script,/window.LOCAL_FAMILY_SERVER=true/);assert.equal(script.includes(f.env.HF_SECRET_ACCESS_KEY),false);
-    assert.equal(Object.keys((await (await f.call('/api/media')).json()).people).length,84);
+    assert.equal(Object.keys((await (await f.call('/api/media')).json()).people).length,87);
     assert.equal((await f.call('/api/stories')).status,200);
     assert.equal((await f.call('/api/export')).status,200);
     f.env.FAMILY_PASSWORD='a-leftover-setting-is-ignored';assert.equal((await f.call('/')).status,200);
@@ -307,7 +344,7 @@ test('missing storage configuration preserves text editing and explains upload l
     f.env.HF_ACCESS_KEY_ID='HFAK_TEST_ONLY';
     assert.equal((await f.call('/api/collections/videos/upload?filename=x.mp4',{method:'POST',body:'x',headers:{'Content-Length':String(LIMITS.video+1)}})).status,413);
     assert.equal((await f.call('/api/collections/photos/upload?filename=x.jpg',{method:'POST',body:'not an image',headers:{'Content-Length':'12'}})).status,415);
-    const backup=await f.call('/api/export');assert.match(backup.headers.get('Content-Disposition'),/family-backup.json/);assert.equal((await backup.json()).people.length,84);
+    const backup=await f.call('/api/export');assert.match(backup.headers.get('Content-Disposition'),/family-backup.json/);assert.equal((await backup.json()).people.length,87);
   }finally{await f.close();}
 });
 test('S3 signing scopes requests to the configured private bucket',async()=>{
@@ -367,7 +404,7 @@ test('wedding greetings are durable, separate for every couple and exported with
     assert.equal((await f.call('/api/weddings/u-naama/greetings',{method:'POST',body:{body:'מזל טוב'}})).status,404);
     f.restart();const wedding=await (await f.call(path)).json();assert.equal(wedding.greetingCount,1);assert.equal(wedding.greetings[0].author,'משפחת קהא');
     assert.equal((await (await f.call('/api/weddings/u-bosmat')).json()).greetingCount,0);
-    const backup=await (await f.call('/api/export')).json();assert.equal(backup.schemaVersion,2);assert.equal(backup.weddings.length,23);assert.equal(backup.greetings.length,1);assert.equal(backup.people.length,84);
+    const backup=await (await f.call('/api/export')).json();assert.equal(backup.schemaVersion,2);assert.equal(backup.weddings.length,23);assert.equal(backup.greetings.length,1);assert.equal(backup.people.length,87);
   }finally{await f.close();}
 });
 test('nostalgia supports photos, video and downloadable documents without altering other albums',async()=>{
@@ -528,9 +565,9 @@ test('adding a name creates a durable album and reuses existing canonical or new
     await f.connect();const item=await taggedUpload(f);
     let response=await setTags(f,item,[],['שנטל פירוז','אורח חדש',' אורח   חדש ']);assert.equal(response.status,200);let changed=await response.json();assert.equal(changed.item.tags.length,2);
     const added=changed.item.tags.find(person=>person.extra);assert.ok(added.id.startsWith('extra-'));assert.equal(changed.people[added.id].photoCount,1);
-    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,85);assert.equal((await (await f.call('/api/weddings')).json()).weddings.length,23);
+    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,88);assert.equal((await (await f.call('/api/weddings')).json()).weddings.length,23);
     const bootstrap=JSON.parse(/window.FAMILY_DATA=(.+);/.exec(await f.connect())[1]);assert.equal(bootstrap.people[added.id].name,'אורח חדש');assert.equal(bootstrap.people[added.id].extra,true);assert.ok(!Object.values(bootstrap.units).some(unit=>unit.people.includes(added.id)));
-    f.restart();response=await setTags(f,item,[],['אורח חדש']);changed=await response.json();assert.equal(changed.item.tags[0].id,added.id);assert.equal((await (await f.call('/api/tag-people')).json()).people.length,85);
+    f.restart();response=await setTags(f,item,[],['אורח חדש']);changed=await response.json();assert.equal(changed.item.tags[0].id,added.id);assert.equal((await (await f.call('/api/tag-people')).json()).people.length,88);
     assert.equal((await f.call('/api/people/'+added.id+'/photos?filename=portrait.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).status,201);
     const backup=await (await f.call('/api/export')).json();assert.ok(backup.people.some(person=>person.id===added.id));assert.deepEqual(backup.tags,[{mediaId:item.id,personId:added.id}]);
   }finally{await f.close();}
@@ -566,10 +603,10 @@ test('tagging validates input, prevents stale overwrites and rolls back invalid 
     assert.equal((await f.call(path,{method:'POST',body,clientHeaders:false})).status,403);assert.equal((await f.call(path,{method:'POST',body,headers:{Origin:'https://other.example'}})).status,403);
     assert.equal((await f.call(path,{method:'POST',body})).status,200);
     assert.equal((await f.call(path,{method:'POST',body:{...body,personIds:['camille'],newNames:['שם שלא יישמר']}})).status,409);
-    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,84);assert.equal((await (await f.call('/api/media/'+item.id+'/tags')).json()).item.tags[0].id,'chantal');
+    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,87);assert.equal((await (await f.call('/api/media/'+item.id+'/tags')).json()).item.tags[0].id,'chantal');
     assert.equal((await setTags(f,item,['missing-person'])).status,404);
     assert.equal((await setTags(f,item,[],['שם חדש',42])).status,400,'An invalid name rolls the whole operation back');
-    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,84);
+    assert.equal((await (await f.call('/api/tag-people')).json()).people.length,87);
     assert.equal((await setTags(f,item,[],Array(51).fill('שם'))).status,400);assert.equal((await setTags(f,item,[],[' '.repeat(5)])).status,400);
     const doc=await taggedUpload(f,'/api/nostalgia',new TextEncoder().encode('מכתב נוסטלגי'),'letter.txt');assert.equal((await f.call('/api/media/'+doc.id+'/tags')).status,400);
     const row=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('camille').data);row.name='שנטל פירוז';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(row),'camille');
@@ -637,7 +674,7 @@ test('Hebrew and English tags resolve to one canonical person and additional nam
   result=await(await add('Camille De Vita')).json();assert.equal(result.taggedPerson.id,'camille');assert.equal((await(await f.call('/api/people/camille')).json()).gallery[0].id,item.id);
   result=await(await add('אורחת חדשה')).json();const guest=result.taggedPerson.id;assert.equal(result.taggedPerson.name,'אורחת חדשה');assert.equal(result.taggedPerson.nameEn,null);
   result=await(await add('A new guest')).json();assert.notEqual(result.taggedPerson.id,guest);assert.equal(result.taggedPerson.name,'A new guest');assert.equal(result.taggedPerson.nameEn,null);
-  assert.equal((await(await f.call('/api/tag-people')).json()).people.length,86);
+  assert.equal((await(await f.call('/api/tag-people')).json()).people.length,89);
   f.restart();result=await(await f.call('/api/media/'+item.id+'/tags')).json();assert.equal(result.item.tags.find(p=>p.id==='yehiel').nameEn,'Yehiel Keha');assert.equal(result.item.tags.find(p=>p.id===guest).name,'אורחת חדשה');
   const calendar=await(await f.call('/api/calendar?date=2026-11-01&lang=en-GB')).json();assert.equal(calendar.holidaysAvailable,true);assert.match(calendar.hebrewLabel,/Heshvan|Cheshvan|Kislev/);assert.equal(calendar.days.find(d=>d.date==='2026-11-10').holidays[0].name,'Rosh Chodesh Kislev');
   const bootstrap=await(await f.call('/family-data.js')).text();assert.match(bootstrap,/Camille De Vita/);assert.match(bootstrap,/קמיל דה ויטה/);

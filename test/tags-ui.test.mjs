@@ -12,14 +12,29 @@ class NodeStub extends EventTarget{
  focus(){}
 }
 function fixture(respond){
- const nodes=new Map(),requests=[],events=[];
- const window={FAMILY_DATA:family,FamilyApp:{apiEnabled:true,toast(){}},addEventListener(){},dispatchEvent(event){events.push(event);}};
+ const nodes=new Map(),requests=[],events=[],windowHandlers=new Map();let init;
+ const window={FAMILY_DATA:family,FamilyApp:{apiEnabled:true,toast(){}},addEventListener(type,fn){if(!windowHandlers.has(type))windowHandlers.set(type,[]);windowHandlers.get(type).push(fn);},dispatchEvent(event){events.push(event);for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
  window.FamilyI18n={t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),isEnglish:false,locale:'he-IL',personName:p=>p.name,searchNames:p=>p.name,branchName:p=>p?.title||'',error:v=>v,fetch:async(path,options)=>{requests.push({path,body:options?.body?JSON.parse(options.body):null});const id=path.split('/')[2];return respond?respond(id):Response.json({item:{id,kind:'photo',tags:[],tagsRevision:'new'},taggedPeople:[]});}};
- const document={addEventListener(){},getElementById(id){if(!nodes.has(id))nodes.set(id,{open:false});return nodes.get(id);}};
+ const document={addEventListener(type,fn){if(type==='DOMContentLoaded')init=fn;},getElementById(id){if(!nodes.has(id))nodes.set(id,new NodeStub());return nodes.get(id);}};
  const context=vm.createContext({window,document,Response,AbortController,CustomEvent,clearTimeout,setTimeout});vm.runInContext(source,context);
- return {tags:window.FamilyTags,requests,events};
+ init();return {tags:window.FamilyTags,requests,events,emit:detail=>window.dispatchEvent(new CustomEvent('family-media-changed',{detail}))};
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});
+
+test('a saved face immediately updates the ordinary tagging widget and survives reopening a stale gallery card',()=>{
+ const f=fixture(),host=new NodeStub();f.tags.mountInline(host,photo('a'));
+ f.emit({operation:'faces',item:{...photo('a'),tags:[family.people.yona],tagsRevision:'face-label'}});
+ assert.ok(host._tagWidget.store.selected().has('yona'));assert.match(host._tagWidget.selectedHost.innerHTML,/יונה נקאש/);
+ f.tags.clearInline(host);f.tags.mountInline(host,photo('a'));assert.ok(host._tagWidget.store.selected().has('yona'));assert.equal(f.requests.length,0);
+});
+
+test('a face saved during an ordinary tag request cannot be removed by its older response',async()=>{
+ let resolveFirst,calls=0;const f=fixture(()=>{calls++;if(calls===1)return new Promise(resolve=>{resolveFirst=resolve;});return Response.json({item:{...photo('a'),tags:[family.people.yona,family.people.shlomo],tagsRevision:'latest'}});}),host=new NodeStub();f.tags.mountInline(host,photo('a'));
+ const store=host._tagWidget.store;store.enqueue(family.people.shlomo,true);const saving=store.run();await new Promise(resolve=>setImmediate(resolve));
+ f.emit({operation:'faces',item:{...photo('a'),tags:[family.people.yona],tagsRevision:'face-newer'}});
+ resolveFirst(Response.json({item:{...photo('a'),tags:[family.people.shlomo],tagsRevision:'older'},taggedPeople:[]}));await saving;
+ assert.deepEqual([...store.selected().keys()],['yona','shlomo']);assert.equal(calls,2);assert.equal(store.error,'');
+});
 test('switching images removes old checkbox and remove-button listeners from the reused tagging panel',async()=>{
  const f=fixture(),host=new NodeStub(),calls=[];
  f.tags.mountInline(host,photo('image-a'));const a=host._tagWidget.store;a.enqueue=(person,tagged)=>calls.push(['a',person.id,tagged]);

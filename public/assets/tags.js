@@ -18,6 +18,7 @@
     const name=id=>I18n.personName(data.people[id]),branch=I18n.branchName(data.branches.find(b=>b.id===person.branch));
     if(parent)return [branch,(I18n.isEnglish?'Parents: ':'הורים: ')+parent.people.map(name).join(' / ')].filter(Boolean).join(' · ');
     const partner=unit?.people?.find(id=>id!==person.id);if(partner)return [branch,(I18n.isEnglish?'Partner: ':'בן/בת זוג: ')+name(partner)].filter(Boolean).join(' · ');
+    if(p?.parents?.length)return (I18n.isEnglish?'Parents: ':'הורים: ')+p.parents.map(name).join(' / ');
     if(p?.siblings?.length)return (I18n.isEnglish?'Sibling of ':'אח/אחות של ')+p.siblings.map(name).join(' / ');
     return person.extra?I18n.t('שם נוסף באלבומים'):branch||I18n.t('השורשים של כולנו');
   }
@@ -33,7 +34,7 @@
     rosterPromise=request('api/tag-people').then(result=>{result.people.forEach(addPerson);rosterTime=Date.now();}).finally(()=>{rosterPromise=null;});return rosterPromise;
   }
   class TagStore {
-    constructor(id,item){this.id=id;this.item=item||{id,tags:[]};this.saved=new Map((item?.tags||[]).map(person=>[person.id,person]));this.queue=[];this.active=[];this.aliases=new Map();this.listeners=new Set();this.error='';this.status='';this.ready=Boolean(item?.tags&&item.tagsRevision);this.timer=null;this.loading=null;}
+    constructor(id,item){this.id=id;this.item=item||{id,tags:[]};this.saved=new Map((item?.tags||[]).map(person=>[person.id,person]));this.queue=[];this.active=[];this.aliases=new Map();this.listeners=new Set();this.error='';this.status='';this.ready=Boolean(item?.tags&&item.tagsRevision);this.timer=null;this.loading=null;this.refreshPending=false;}
     get busy(){return Boolean(this.active.length||this.queue.length);}
     selected(){
       let selected=new Map(this.saved);
@@ -69,6 +70,7 @@
         const result=await request('api/media/'+this.id+'/tags/patch',{method:'POST',keepalive:true,body:JSON.stringify({changes})});
         if(result.item.id!==this.id)throw Error(I18n.t('התיוג לא נשמר.'));
         for(const person of result.taggedPeople){if(person.key.startsWith('new:'))this.aliases.set(person.key,person.id);addPerson(person);}
+        if(this.refreshPending){const latest=await request('api/media/'+this.id+'/tags');result.item=latest.item;this.refreshPending=false;}
         this.item=result.item;this.saved=new Map(result.item.tags.map(person=>[person.id,person]));this.active=[];this.status=this.queue.length?'saving':'saved';
         window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));this.emit();if(this.queue.length)this.schedule();
       }catch(error){this.active=[];this.queue=[...batch,...this.queue];this.error=error.message;this.status='error';this.emit();if(![...this.listeners].length)app()?.toast(I18n.t('תיוג לא נשמר: ')+error.message);}
@@ -181,6 +183,11 @@
   }
   function clearInline(host){host._tagWidget?.destroy();delete host._tagWidget;delete host.dataset.media;host.replaceChildren();}
   function init(){
+    window.addEventListener('family-media-changed',event=>{
+      const result=event.detail,item=result.item,store=item&&stores.get(item.id);if(!store||result.operation!=='faces')return;
+      if(store.active.length)store.refreshPending=true;
+      store.item=item;store.saved=new Map((item.tags||[]).map(person=>[person.id,person]));store.ready=true;store.emit();
+    });
     window.addEventListener('pagehide',()=>{for(const store of stores.values())store.run();});
     document.addEventListener('click',async event=>{
       const edit=event.target.closest('[data-edit-media-tags]');if(edit){open(edit.dataset.editMediaTags);return;}
@@ -192,5 +199,14 @@
     window.addEventListener('beforeunload',event=>{if([...stores.values()].some(store=>store.busy)){event.preventDefault();event.returnValue='';}});
   }
   for(const person of Object.values(window.FAMILY_DATA.people))addPerson(person);rosterTime=Date.now();
-  window.FamilyTags={controls,labels,refresh,open,taggable,mountInline,clearInline};document.addEventListener('DOMContentLoaded',init);
+  async function findPeople(query='',preferred=[]){
+    await loadRoster();const normalized=normalize(query),first=new Set(preferred);
+    return [...roster.values()].filter(person=>Number.isFinite(matchRank(person,normalized))).sort((a,b)=>matchRank(a,normalized)-matchRank(b,normalized)||(first.has(b.id)-first.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale)).slice(0,50).map(person=>({...person,context:personContext(person)}));
+  }
+  async function flush(id){
+    const store=stores.get(id);if(!store)return;
+    await store.load();if(store.error)throw Error(store.error);if(!store.busy)return;
+    await new Promise((resolve,reject)=>{const check=()=>{if(store.error||!store.busy){store.listeners.delete(check);if(store.error)reject(Error(store.error));else resolve();}};store.listeners.add(check);store.run();check();});
+  }
+  window.FamilyTags={controls,labels,refresh,open,taggable,mountInline,clearInline,findPeople,flush};document.addEventListener('DOMContentLoaded',init);
 })();

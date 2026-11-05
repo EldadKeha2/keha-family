@@ -719,3 +719,14 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   "אלבום התינוקייה לא נמצא במשפחה שלנו.":"This baby album is not part of our family.",
   "אלבום התינוקייה לא נמצא במשפחה שלנו":"This baby album is not part of our family"
 });
+
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  "בחרו אזור פנים תקין בתמונה.":"Choose a valid face area in the photo.",
+  "אזור הפנים צריך להיות בתוך התמונה.":"The face area must stay within the photo.",
+  "אפשר לתייג פנים בתמונות בלבד.":"Face labels can only be added to photos.",
+  "אזור הפנים אינו תקין.":"This face area is invalid.",
+  "תיוג הפנים עודכן בינתיים. פתחו אותו מחדש לפני שמירה.":"This face label has changed. Reopen it before saving.",
+  "בחרו אדם מרשימת בני המשפחה.":"Choose a person from the family list.",
+  "אפשר לתייג עד 150 אזורי פנים בתמונה.":"You can label up to 150 face areas in a photo.",
+  "אזור הפנים הזה כבר תויג. פתחו אותו מחדש כדי לשנות את השם.":"This face area is already labelled. Reopen it to change the name."
+});

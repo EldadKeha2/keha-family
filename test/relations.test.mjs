@@ -50,3 +50,11 @@ test('additional relatives appear only as the explicitly linked person’s sibli
   assert.deepEqual(relatives('eddie').siblings,['natan-fish']);
   for(const id of ['eldad','yehiel','ora','yona'])assert.ok(!relatives(id).siblings.some(id=>['itzhak-katan','natan-fish'].includes(id)));
 });
+test('Robin and her children are additional relatives with only the explicitly supplied parents',()=>{
+ assert.deepEqual(relatives('robin'),{partners:[],parents:['mark'],children:['matthew-robin','lily'],siblings:['ilan','raya','orit']});
+ assert.deepEqual(relatives('matthew-robin'),{partners:[],parents:['robin'],children:[],siblings:['lily']});
+ assert.deepEqual(relatives('lily'),{partners:[],parents:['robin'],children:[],siblings:['matthew-robin']});
+ assert.deepEqual(relatives('mark').children,['ilan','raya','orit','robin']);assert.deepEqual(relatives('shosh').children,['ilan','raya','orit']);
+ for(const id of ['ilan','raya','orit'])assert.ok(relatives(id).siblings.includes('robin'));
+ for(const id of ['robin','matthew-robin','lily']){assert.equal(family.people[id].extended,true);assert.equal(family.people[id].unit,undefined);}
+});

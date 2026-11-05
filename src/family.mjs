@@ -5,7 +5,10 @@ const family={"title":"השורשים שלנו","people":{"yona":{"id":"yona","f
 // Additional relatives have personal pages but no unit in the main tree.
 Object.assign(family.people,{
   'itzhak-katan':{id:'itzhak-katan',name:'יצחק קטן',nameEn:'Itzhak Katan',firstName:'יצחק',lastName:'קטן',gender:'m',extended:true,birthday:'1.1.1111',siblings:['rachel-katan']},
-  'natan-fish':{id:'natan-fish',name:'נתן פיש',nameEn:'Natan Fish',firstName:'נתן',lastName:'פיש',gender:'m',extended:true,birthday:'1.1.1111',siblings:['eddie']}
+  'natan-fish':{id:'natan-fish',name:'נתן פיש',nameEn:'Natan Fish',firstName:'נתן',lastName:'פיש',gender:'m',extended:true,birthday:'1.1.1111',siblings:['eddie']},
+  'robin':{id:'robin',name:'רובין',nameEn:'Robin',firstName:'רובין',lastName:'',gender:'f',extended:true,birthday:'1.1.1111',parents:['mark'],siblings:['ilan','raya','orit']},
+  'matthew-robin':{id:'matthew-robin',name:'מתיו',nameEn:'Matthew',firstName:'מתיו',lastName:'',gender:'',extended:true,birthday:'1.1.1111',parents:['robin']},
+  'lily':{id:'lily',name:'לילי',nameEn:'Lily',firstName:'לילי',lastName:'',gender:'',extended:true,birthday:'1.1.1111',parents:['robin']}
 });
 for(const [id,birthday]of birthdayCorrections)family.people[id].birthday=birthday;
 for(const [id,fields]of Object.entries(grandparentCorrections))Object.assign(family.people[id],fields);

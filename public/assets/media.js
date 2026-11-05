@@ -58,6 +58,7 @@
     const deleteLabel=I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,state.scope)?I18n.t('הסרה מהאלבום'):tr('מחק פריט','Delete item');
     $('mediaViewerDelete').querySelector('span').textContent=deleteLabel;$('mediaViewerDelete').title=deleteLabel;
     window.FamilyTags.mountInline($('mediaTagPanel'),item);
+    window.FamilyFaces?.update(item);
   }
   async function instagramFallback(item){
     if(identity(current()||{})!==identity(item)||!$('mediaViewer').open)return;
@@ -89,6 +90,7 @@
     finally{if(isCurrent()){button.disabled=false;button.removeAttribute('aria-busy');}}
   }
   function clearStage(){
+    window.FamilyFaces?.clear();
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
     $('mediaStage').replaceChildren();
   }
@@ -110,7 +112,7 @@
       video.addEventListener('error',()=>{$('mediaPlaybackNote').textContent=I18n.t('הסרטון לא מתנגן בדפדפן הזה. אפשר להוריד את המקור או להעלות MP4 עם H.264.');$('mediaPlaybackNote').hidden=false;});stage.append(video);
       $('mediaPlaybackNote').hidden=true;
     }else if(item.kind==='photo'||item.mime?.startsWith('image/')){
-      const img=document.createElement('img');img.src=item.src+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;
+      const img=document.createElement('img');img.src=item.src+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;window.FamilyFaces?.mount(stage,img,item);
     }else if(['application/pdf','text/plain','text/markdown'].includes(item.mime)){
       const frame=document.createElement('iframe');frame.src=item.src+'?inline=1';frame.title=I18n.mediaName(item);frame.referrerPolicy='same-origin';stage.append(frame);$('mediaPlaybackNote').hidden=true;
     }else{
