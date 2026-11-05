@@ -1,7 +1,7 @@
 import {mountPuzzle,pausePuzzle} from './puzzle.js?v=return-lobby-v3';
 import {mountJachnun,pauseJachnun} from './jachnun.js?v=leaderboard-v3';
 import {mountRex,pauseRex} from './rex.js?v=2';
-import {mountSoup,pauseSoup} from './soup.js?v=intro-text-v8';
+import {mountSoup,pauseSoup} from './soup.js?v=clear-feedback-v9';
 import {quizGrade} from './quiz.mjs';
 import {makeChickQuiz,withinChickTarget} from './chick.mjs?v=family-search-v4';
 import './differences.js?v=20261104.2';

@@ -7,16 +7,27 @@ const title=()=>tr('המתכון הסודי','The Secret Recipe');
 const ADD_DURATION=2800,STIR_DURATION=3600;
 const ingredient=id=>INGREDIENTS.find(item=>item.id===id);
 const name=item=>I.isEnglish?item.en:item.he;
-let game=createSoup(),host=null,back=null,events=null,clock=null,pending=null,flight=null,serial=0;
+let game=createSoup(),host=null,back=null,events=null,clock=null,pending=null,flight=null,serial=0,notice=null;
+let feedbackAnimations=[];
 const animationTimers=new Set();
 const $=selector=>host?.querySelector(selector);
 const busy=()=>Boolean(pending);
 const later=(fn,delay)=>{const id=setTimeout(()=>{animationTimers.delete(id);fn();},delay);animationTimers.add(id);};
+function stopFeedbackAnimations(){for(const animation of feedbackAnimations)animation?.cancel?.();feedbackAnimations=[];}
+function clearNotice(){notice=null;stopFeedbackAnimations();}
+function pulseFeedback(button){
+  stopFeedbackAnimations();
+  if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)return;
+  const note=$('[data-soup-feedback]');
+  if(button?.animate)feedbackAnimations.push(button.animate([{transform:'scale(1)'},{transform:'scale(.96)',offset:.3},{transform:'scale(1)'}],{duration:320,easing:'ease-out'}));
+  if(note?.animate)feedbackAnimations.push(note.animate([{opacity:.35,transform:'translateY(5px)',boxShadow:'0 0 0 3px #c4a36c88'},{opacity:1,transform:'translateY(0)',boxShadow:'0 0 0 0 #c4a36c00'}],{duration:650,easing:'ease-out'}));
+}
+function announceAction(kind,text,button){notice={kind,text};sync();pulseFeedback(button);}
 function cancelAnimation(){for(const id of animationTimers)clearTimeout(id);animationTimers.clear();flight?.remove();flight=null;const chef=$('[data-soup-chef]');if(chef)chef.dataset.pose='idle';const scene=$('[data-soup-kitchen]');if(scene)scene.dataset.stirring='false';for(const source of host?.querySelectorAll('[data-picked]')||[])delete source.dataset.picked;}
 function commitPending(){if(!pending||pending.applied||pending.kind==='stir')return;if(pending.id==='water'){game=heatSoup(fillSoupWater(game),Date.now());startClock();}else game=addIngredient(game,pending.id);pending.applied=true;}
 function settleAnimation(){commitPending();cancelAnimation();pending=null;serial++;}
 function stopClock(){if(clock!==null)clearInterval(clock);clock=null;}
-export function pauseSoup(){settleAnimation();stopClock();events?.abort();events=null;host?.classList.remove('has-family-soup','soup-screen-active');host=null;}
+export function pauseSoup(){clearNotice();settleAnimation();stopClock();events?.abort();events=null;host?.classList.remove('has-family-soup','soup-screen-active');host=null;}
 export function mountSoup(root,onBack){
   pauseSoup();host=root;back=onBack;host.classList.add('has-family-soup');events=new AbortController();
   const on=(node,type,fn)=>node.addEventListener(type,fn,{signal:events.signal});
@@ -91,8 +102,12 @@ function brothColour(){
   }
   return `rgb(${rgb.map(Math.round).join(',')})`;
 }
-function feedback(){return game.feedback==='water'?tr('לפני שמבשלים, צריך למלא מים בסיר.','Before cooking, fill the pot with water.'):game.feedback==='boil'?tr('המים צריכים לרתוח. הפעילו את הכיריים וחכו לבעבוע.','The water needs to boil. Turn on the stove and wait for the bubbles.'):game.feedback==='recipe'?tr('סבתא טועמת ומחייכת: ״עוד לא… זה עדיין לא הטעם הסודי שלי.״ שנו את המצרכים או את הכמויות ונסו שוב.','Grandma tastes and smiles: “Not quite… that isn’t my secret flavour yet.” Adjust the ingredients or amounts and try again.'):'';}
-function kitchen(backButton){return `<header class="soup-play-toolbar soup-play-heading" tabindex="-1">${backButton}<h3>${title()}</h3></header><section class="soup-pot-summary" aria-label="${tr('תכולת הסיר','Pot contents')}"><h4>${tr('כבר בסיר','In the pot')}</h4><div data-soup-contents>${contents()}</div></section><section class="soup-fixed-stage" aria-label="${tr('המטבח של סבתא יונה','Grandma Yona’s kitchen')}">${scene()}${controls()}</section><section class="soup-products-panel"><header><strong>${tr('מדף המצרכים','Ingredient shelf')}</strong><small>${tr('גללו בתוך המדף לעוד מצרכים','Scroll the shelf for more ingredients')}</small></header><div class="soup-products-scroll" data-soup-products tabindex="0" role="region" aria-label="${tr('מדף מצרכים נגלל — כל לחיצה מוסיפה את הכמות הרשומה','Scrollable ingredients — each tap adds the amount shown')}">${pantry(game.order)}</div></section><footer class="soup-play-footer"><div class="soup-live-message" data-soup-live role="status"></div><p class="soup-feedback" data-soup-feedback role="alert">${safe(feedback())}</p><div class="soup-action-buttons"><button type="button" class="primary-button soup-finish" data-soup-finish>${tr('סיימתי את המתכון','My recipe is ready')}</button><button type="button" class="quiet-button soup-new-pot" data-soup-reset aria-label="${tr('מתחילים עם סיר חדש','Start with a fresh pot')}">${tr('סיר חדש','New pot')}</button></div></footer>`;}
+function feedback(){
+  if(notice)return notice.text;
+  const text=game.feedback==='water'?tr('לפני שמבשלים, צריך למלא מים בסיר.','Before cooking, fill the pot with water.'):game.feedback==='boil'?tr('המים צריכים לרתוח. הפעילו את הכיריים וחכו לבעבוע.','The water needs to boil. Turn on the stove and wait for the bubbles.'):game.feedback==='recipe'?tr('סבתא טועמת ומחייכת: ״עוד לא… זה עדיין לא הטעם הסודי שלי.״ שנו את המצרכים או את הכמויות ונסו שוב.','Grandma tastes and smiles: “Not quite… that isn’t my secret flavour yet.” Adjust the ingredients or amounts and try again.'):'';
+  return text&&game.attempts?tr('ניסיון ','Attempt ')+game.attempts+': '+text:text;
+}
+function kitchen(backButton){return `<header class="soup-play-toolbar soup-play-heading" tabindex="-1">${backButton}<h3>${title()}</h3></header><section class="soup-pot-summary" aria-label="${tr('תכולת הסיר','Pot contents')}"><h4>${tr('כבר בסיר','In the pot')}</h4><div data-soup-contents>${contents()}</div></section><section class="soup-fixed-stage" aria-label="${tr('המטבח של סבתא יונה','Grandma Yona’s kitchen')}">${scene()}${controls()}</section><section class="soup-products-panel"><header><strong>${tr('מדף המצרכים','Ingredient shelf')}</strong><small>${tr('כל לחיצה מוסיפה מנה אחת. גללו לעוד מצרכים','One portion per tap. Scroll for more')}</small></header><div class="soup-products-scroll" data-soup-products tabindex="0" role="region" aria-label="${tr('מדף מצרכים נגלל — כל לחיצה מוסיפה את הכמות הרשומה','Scrollable ingredients — each tap adds the amount shown')}">${pantry(game.order)}</div></section><footer class="soup-play-footer"><div class="soup-live-message" data-soup-live role="status"></div><p class="soup-feedback" data-soup-feedback role="alert" aria-atomic="true">${safe(feedback())}</p><div class="soup-action-buttons"><button type="button" class="primary-button soup-finish" data-soup-finish>${tr('סיימתי את המתכון','My recipe is ready')}</button><button type="button" class="quiet-button soup-new-pot" data-soup-reset aria-label="${tr('מתחילים עם סיר חדש','Start with a fresh pot')}">${tr('סיר חדש','New pot')}</button></div></footer>`;}
 function success(){return `<section class="soup-success" tabindex="-1"><div class="soup-success-sparkles" aria-hidden="true">✧ <span>✦</span> ✧</div><span class="small-eyebrow">${tr('הסוד המשפחתי התגלה','The family secret is out')}</span><h3>${tr('הצלחת!!!','You did it!!!')}</h3><h4>${tr('פענחתם את המתכון הסודי של סבתא יונה','You cracked Grandma Yona’s secret recipe')}</h4><p>${tr('זה בדיוק הטעם שממלא את הבית בזיכרונות. סבתא יונה הייתה גאה בכם!','That’s the taste that fills a home with memories. Grandma Yona would be proud!')}</p><div class="soup-success-scene">${scene()}</div><div class="soup-revealed-recipe"><h4>${tr('הסוד שבסיר','The secret in the pot')}</h4><ul>${Object.entries(SECRET_RECIPE).map(([id,amount])=>`<li>${ingredientIcon(id)}<strong>${name(ingredient(id))}</strong><bdi>${amountText(ingredient(id),amount)}</bdi></li>`).join('')}<li>${ingredientIcon('water')}<strong>${tr('מים רותחים','Boiling water')}</strong><span>✓</span></li></ul></div><p class="soup-attempts">${game.attempts===1?tr('פענחתם בניסיון הראשון!','You solved it on your first try!'):tr('פענחתם אחרי ','Solved in ')+game.attempts+tr(' ניסיונות טעימה.',' tasting attempts.')}</p><div class="soup-success-actions"><button type="button" class="primary-button" data-soup-reset>${tr('מבשלים שוב','Cook again')}</button><button type="button" class="secondary-button" data-soup-back>${tr('חזרה ללוח בחירת המשחקים','Back to game selection')}</button></div></section>`;}
 function render(){
   if(!host)return;
@@ -112,14 +127,16 @@ function sync(){
   const scene=$('[data-soup-kitchen]');if(scene){scene.dataset.water=String(game.water||game.phase==='intro');scene.dataset.heat=String(game.heat);scene.dataset.heating=String(game.heat&&!game.boiled);scene.dataset.boiled=String(game.boiled);scene.style.setProperty('--soup-broth',brothColour());}
   const potContents=$('[data-soup-contents]');if(potContents){const markup=contents();if(potContents.innerHTML!==markup)potContents.innerHTML=markup;}
   const floating=$('[data-soup-floating]');if(floating){const markup=floatingFood();if(floating.innerHTML!==markup)floating.innerHTML=markup;}
-  const note=$('[data-soup-feedback]');if(note)note.textContent=feedback();
+  const note=$('[data-soup-feedback]');if(note){const message=feedback();if(note.textContent!==message)note.textContent=message;note.dataset.kind=notice?.kind||(game.feedback?'error':'');}
 }
 function startClock(){stopClock();if(host&&game.phase==='playing'&&game.heat&&!game.boiled&&document.visibilityState!=='hidden')clock=setInterval(()=>{game=updateSoup(game,Date.now());sync();if(game.boiled)stopClock();},150);}
 function finishAnimation(){commitPending();const action=pending;cancelAnimation();pending=null;sync();const message=$('[data-soup-live]');if(!message)return;if(action?.kind==='stir'){message.textContent=tr('ערבוב עדין. הכמויות נשארו בדיוק כפי שהיו.','Gently stirred. Ingredients and amounts are unchanged.');return;}const id=action?.id;if(id)message.textContent=id==='water'?tr('סבתא הדליקה אש. המים מתחממים…','Grandma lit the flame. The water is heating…'):tr('סבתא הכניסה לסיר: ','Grandma added: ')+name(ingredient(id))+' · '+amountText(ingredient(id),ingredient(id).step);}
 function animateAdd(id,button){
   if(game.phase!=='playing'||busy())return;
-  if(id!=='water'&&!game.water){game={...game,feedback:'water'};sync();return;}
+  clearNotice();
+  if(id!=='water'&&!game.water){game={...game,feedback:'water'};sync();pulseFeedback(button);return;}
   const next=id==='water'?fillSoupWater(game):addIngredient(game,id);if(next===game)return;
+  game={...game,feedback:null};sync();
   pending={kind:'add',id,applied:false};if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){finishAnimation();return;}const token=++serial,chefNode=$('[data-soup-chef]'),potNode=$('[data-soup-pot]');
   const source=button.querySelector('.soup-ingredient-icon')||button.querySelector('svg')||button,buttonBox=source.getBoundingClientRect(),chefBox=chefNode?.getBoundingClientRect(),potBox=potNode?.getBoundingClientRect();
   button.dataset.picked='true';
@@ -136,6 +153,7 @@ function animateAdd(id,button){
 }
 function animateStir(){
   if(game.phase!=='playing'||busy()||!game.water)return;
+  clearNotice();
   pending={kind:'stir',applied:true};sync();
   if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){finishAnimation();return;}
   const token=++serial,scene=$('[data-soup-kitchen]'),chefNode=$('[data-soup-chef]');
@@ -149,8 +167,17 @@ function click(event){
   const add=event.target.closest('[data-soup-add]');if(add){animateAdd(add.dataset.soupAdd,add);return;}
   const water=event.target.closest('[data-soup-water]');if(water){animateAdd('water',water);return;}
   if(event.target.closest('[data-soup-stir]')){animateStir();return;}
-  if(event.target.closest('[data-soup-heat]')){if(busy())return;if(!game.water)game={...game,feedback:'water'};else game=heatSoup(game,Date.now());sync();startClock();return;}
-  const remove=event.target.closest('[data-soup-remove]');if(remove&&!busy()){game=removeIngredient(game,remove.dataset.soupRemove);sync();return;}
-  if(event.target.closest('[data-soup-finish]')&&!busy()){game=tasteSoup(game,Date.now());if(game.phase==='success'){stopClock();render();$('.soup-success')?.focus({preventScroll:true});$('.soup-success')?.scrollIntoView({block:'start'});}else sync();return;}
-  if(event.target.closest('[data-soup-reset]')&&!busy()){stopClock();game={...createSoup(),phase:'playing'};render();$('.soup-play-heading')?.focus({preventScroll:true});}
+  if(event.target.closest('[data-soup-heat]')){if(busy())return;clearNotice();if(!game.water)game={...game,feedback:'water'};else game=heatSoup(game,Date.now());sync();startClock();return;}
+  const remove=event.target.closest('[data-soup-remove]');if(remove&&!busy()){
+    const id=remove.dataset.soupRemove,next=removeIngredient(game,id);if(next===game)return;
+    clearNotice();game=next;announceAction('remove',tr('הסרנו מהסיר: ','Removed from the pot: ')+name(ingredient(id))+' · '+amountText(ingredient(id),ingredient(id).step),remove);return;
+  }
+  const finish=event.target.closest('[data-soup-finish]');if(finish&&!busy()){
+    clearNotice();game=tasteSoup(game,Date.now());
+    if(game.phase==='success'){stopClock();render();$('.soup-success')?.focus({preventScroll:true});$('.soup-success')?.scrollIntoView({block:'start'});}else{sync();pulseFeedback(finish);}return;
+  }
+  if(event.target.closest('[data-soup-reset]')&&!busy()){
+    clearNotice();stopClock();game={...createSoup(),phase:'playing'};render();
+    const button=$('[data-soup-reset]');announceAction('reset',tr('הסיר התרוקן. סיר חדש מוכן לבישול!','The pot is empty. A fresh pot is ready!'),button);button?.focus({preventScroll:true});
+  }
 }

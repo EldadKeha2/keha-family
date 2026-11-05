@@ -86,3 +86,22 @@ test('each added hawaij portion deepens the broth, including beyond three drawn 
  for(let i=0;i<4;i++)await f.remove('hawaij');assert.equal(colour(),unspiced);
  await f.click('[data-soup-reset]');assert.equal(colour(),'#819294');assert.equal(f.game.contents.hawaij,undefined);
 });
+
+test('every repeated tasting visibly refreshes feedback with the correct attempt number, including reduced motion',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english});f.mount();await f.click('[data-soup-start]');let previous='';
+  for(let attempt=1;attempt<=3;attempt++){
+   const before=f.animations.length;await f.click('[data-soup-finish]');const note=f.nodes.get('[data-soup-feedback]');assert.equal(f.game.attempts,attempt);assert.equal(f.game.feedback,'water');assert.match(note.textContent,new RegExp((english?'Attempt ':'ניסיון ')+attempt+':'));assert.notEqual(note.textContent,previous);assert.equal(note.dataset.kind,'error');assert.ok(f.animations.length>before);assert.equal(f.timers.size,0);previous=note.textContent;
+  }
+ }
+ const quiet=fixture({reducedMotion:true});quiet.mount();await quiet.click('[data-soup-start]');await quiet.click('[data-soup-finish]');const first=quiet.nodes.get('[data-soup-feedback]').textContent;await quiet.click('[data-soup-finish]');assert.notEqual(quiet.nodes.get('[data-soup-feedback]').textContent,first);assert.equal(quiet.animations.length,0);
+});
+test('removing one portion and starting a new pot confirm the action, and a repeated reset still responds without retaining stale feedback',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english});await prepared(f);await f.add('potato');f.advance(3000);await f.add('potato');f.advance(3000);
+  await f.remove('potato');assert.equal(f.game.contents.potato,1);let note=f.nodes.get('[data-soup-feedback]');assert.equal(note.dataset.kind,'remove');assert.match(note.textContent,english?/Removed from the pot/:/הסרנו מהסיר/);assert.match(note.textContent,english?/Potatoes/:/תפוחי אדמה/);
+  await f.click('[data-soup-reset]');assert.equal(f.game.water,false);assert.equal(f.game.attempts,0);assert.equal(Object.keys(f.game.contents).length,0);note=f.nodes.get('[data-soup-feedback]');assert.equal(note.dataset.kind,'reset');assert.match(note.textContent,english?/fresh pot is ready/:/סיר חדש מוכן/);assert.equal(f.timers.size,0);
+  const before=f.animations.length;await f.click('[data-soup-reset]');assert.ok(f.animations.length>before);assert.equal(f.nodes.get('[data-soup-feedback]').dataset.kind,'reset');assert.equal(f.game.attempts,0);
+  await f.add('potato');assert.equal(f.game.contents.potato,undefined);assert.equal(f.nodes.get('[data-soup-feedback]').dataset.kind,'error');assert.match(f.nodes.get('[data-soup-feedback]').textContent,english?/fill the pot with water/:/למלא מים/);
+ }
+});
