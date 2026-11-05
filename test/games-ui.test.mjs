@@ -46,7 +46,7 @@ function fixture({english=false,autoImages=true,count=10,nativeShare=false,share
   return {window,nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
     messenger:()=>click('[data-game-share-messenger]'),
     openTrivia:()=>click('[data-game-start]',{dataset:{gameStart:'trivia',gameHome:'trivia'}}),
-    input(id,value){nodes.get(id).value=value;root.handlers.get('input')({target:{id,value}});},
+    click,input(id,value){nodes.get(id).value=value;root.handlers.get('input')({target:{id,value}});},
     correct(index){root.handlers.get('change')({target:{dataset:{triviaCorrect:String(index)}}});},
     async submit(){root.handlers.get('submit')({preventDefault(){},target:{matches:()=>true}});await flush();},
     find:(x,y)=>click('[data-game-find-stage]',nodes.get('chickSceneStage'),1,{clientX:x*1000,clientY:y*700}),
@@ -60,9 +60,9 @@ function fixture({english=false,autoImages=true,count=10,nativeShare=false,share
     visibility(value){document.visibilityState=value;documentEvents.get('visibilitychange')();}
   };
 }
-test('both languages explain fifteen seconds and hide age and gender selection rules, including errors',async()=>{
+test('both languages omit the general lobby rules and hide age and gender selection criteria, including errors',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,count:9});assert.match(f.html,/15/);assert.doesNotMatch(f.html,/מגדר|גילים|gender|similar ages/);
+    const f=fixture({english,count:9});assert.doesNotMatch(f.html,/game-lobby-rules|מגדר|גילים|gender|similar ages/);
     await f.start();assert.match(f.html,/game-error/);assert.doesNotMatch(f.html,/מגדר|גילים|gender|similar ages/);
   }
 });
@@ -193,4 +193,8 @@ test('Catch the Jachnun opens from both game lobbies, pauses on leaving and retu
 
 test('the secret soup game has a bilingual tile and independent kitchen lifecycle with no quiz requests',async()=>{
  for(const english of [false,true]){const f=fixture({english});assert.match(f.html,english?/The Secret Recipe/:/המתכון הסודי/);assert.match(f.html,english?/Crack the secret of Grandma Yona’s Yemeni soup/:/פצחו את סוד המרק התימני של סבתא יונה/);assert.deepEqual([...f.html.matchAll(/data-game-start="([^"]+)"/g)].map(m=>m[1]).slice(-2),['rex','soup']);await f.start('soup');assert.equal(f.soupMounts,1);assert.equal(f.requests.length,0);const pauses=f.soupPauses;f.window.FamilyGames.activate('tree');assert.ok(f.soupPauses>pauses);f.window.FamilyGames.activate('games');assert.equal(f.soupMounts,2);f.backFromSoup();assert.match(f.html,/data-game-start="soup"/);}
+});
+
+test('Shlomo’s bilingual dance can be paused and resumed without starting a game or issuing a request',async()=>{
+  for(const english of [false,true]){const f=fixture({english});assert.match(f.html,/shlomo-dance-frames/);assert.match(f.html,english?/Let’s play!/:/בואו נשחק!/);assert.doesNotMatch(f.html,/game-lobby-rules/);const stage={dataset:{dancing:'true'}},button={closest:()=>stage,setAttribute(name,value){this[name]=value;}};await f.click('[data-shlomo-dance]',button);assert.equal(stage.dataset.dancing,'false');assert.equal(button['aria-pressed'],'false');assert.equal(button.textContent,english?'Resume dance':'ממשיכים לרקוד');await f.click('[data-shlomo-dance]',button);assert.equal(stage.dataset.dancing,'true');assert.equal(button['aria-pressed'],'true');assert.equal(f.requests.length,0);}
 });
