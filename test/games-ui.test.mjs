@@ -11,7 +11,7 @@ const questions=Array.from({length:10},(_,i)=>({id:'photo-'+i,src:'/media/photo-
 const kinshipQuestions=questions.map(q=>({...q,kind:'kinship',subject:{id:'rivi',name:'ריוי גנדלמן',nameEn:'Revital Gandelman',gender:'f',profile:'/media/rivi'},reference:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha',gender:'m',profile:'/media/eldad'},options:[{id:'p0',name:'בת דודה',nameEn:'First cousin'},{id:'p1',name:'אחות',nameEn:'Sister'},{id:'p2',name:'אחיינית',nameEn:'Niece'},{id:'p3',name:'נכדה',nameEn:'Granddaughter'}]}));
 const triviaQuestions=questions.map(q=>({...q,kind:'trivia',subject:kinshipQuestions[0].subject,prompt:'באיזו שנה נולדה ריוי גנדלמן?',promptEn:'In which year was Revital Gandelman born?',options:q.options.map((o,i)=>({...o,name:String(1970+i),nameEn:String(1970+i)}))}));
 function fixture({entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false}={}){
-  let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
+  let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null,northMounts=0,northPauses=0,northBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
   const chickQuestions=makeChickQuiz(()=>.5);
   class Node{
     constructor(){this.handlers=new Map();this.dataset={};this.style={setProperty(){}};this.attributes={};this.disabled=false;this.hidden=false;this.complete=autoImages;this.naturalWidth=autoImages?100:0;this.textContent='';}
@@ -39,11 +39,11 @@ function fixture({entryUrl=null,english=false,autoImages=true,count=10,nativeSha
   const navigator={clipboard:{async writeText(value){if(clipboardError)throw Error('Clipboard unavailable');copied.push(value);}}};
   if(nativeShare)navigator.share=async data=>{shared.push(data);if(shareError)throw Object.assign(Error('Share unavailable'),{name:shareError});};
   const FakeDate=class extends Date{static now(){return now;}};
-  vm.runInNewContext(source,{window,document,navigator,URL,crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},quizGrade,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
+  vm.runInNewContext(source,{window,document,navigator,URL,crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},quizGrade,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
   documentEvents.get('DOMContentLoaded')();
   const root=nodes.get('familyGamesContent'),flush=()=>new Promise(resolve=>setImmediate(resolve));
   async function click(selector,node={},detail=1,position={}){prevented=false;root.handlers.get('click')({...position,detail,preventDefault(){prevented=true;},target:{closest:s=>s===selector?node:null}});await flush();}
-  return {window,nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
+  return {window,nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get northMounts(){return northMounts;},get northPauses(){return northPauses;},backFromNorth(){northBack();},get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
     messenger:()=>click('[data-game-share-messenger]'),
     openTrivia:()=>click('[data-game-start]',{dataset:{gameStart:'trivia',gameHome:'trivia'}}),
     click,input(id,value){nodes.get(id).value=value;root.handlers.get('input')({target:{id,value}});},
@@ -205,4 +205,23 @@ test('a direct recipe link opens the kitchen intro in either language once and s
   assert.equal(f.soupMounts,1);assert.equal(f.requests.length,0);f.backFromSoup();assert.match(f.html,/family-game-choices/);assert.equal(f.soupMounts,1);f.window.FamilyGames.activate('games');assert.equal(f.soupMounts,1);assert.match(f.html,/family-game-choices/);
  }
  const unknown=fixture({entryUrl:'https://family.test/?game=unknown#games'});assert.equal(unknown.soupMounts,0);assert.match(unknown.html,/family-game-choices/);assert.equal(unknown.requests.length,0);
+});
+
+
+test('Heading North opens its own bilingual memorial game, pauses on navigation and returns without quiz requests',async()=>{
+  for(const english of [false,true]){
+    const f=fixture({english});assert.match(f.html,english?/Heading North/:/נוסעים לצפון/);assert.match(f.html,/data-game-start="north"/);
+    await f.start('north');assert.equal(f.northMounts,1);assert.equal(f.requests.length,0);
+    const pauses=f.northPauses;f.window.FamilyGames.activate('tree');assert.ok(f.northPauses>pauses);
+    f.window.FamilyGames.activate('games');assert.equal(f.northMounts,2);f.backFromNorth();
+    assert.match(f.html,/family-game-choices/);assert.equal(f.requests.length,0);
+  }
+});
+
+test('a direct northbound link opens once and still allows staying in the game selection lobby',()=>{
+  for(const english of [false,true]){
+    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=north#games'});
+    assert.equal(f.northMounts,1);assert.equal(f.requests.length,0);f.backFromNorth();
+    assert.match(f.html,/family-game-choices/);f.window.FamilyGames.activate('games');assert.equal(f.northMounts,1);
+  }
 });
