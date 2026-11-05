@@ -3,13 +3,13 @@
 .nursery-intro{text-align:center;max-width:680px;margin:4px auto 25px}
 .nursery-intro-icon{display:grid;place-items:center;margin:0 auto 12px;width:68px;height:68px;border:1px solid #d9c59e;border-radius:22px;background:#f5ecd9;box-shadow:inset 0 0 0 4px #fffaf0,0 5px 14px #88672c0a}
 .nursery-intro-icon svg{width:49px;height:49px}
-.nursery-intro h2{font:38px/1.3 var(--serif);color:var(--nursery-ink);margin:7px 0 10px}
-.nursery-intro p{font-size:16px;line-height:1.8;color:#857453;margin:0 auto;max-width:540px}
-.nursery-intro-ornament{display:flex;align-items:center;justify-content:center;gap:14px;color:#ab8b50;letter-spacing:5px;margin-top:16px;font-size:16px}
+.nursery-intro h2{font:calc(38px * var(--a11y-text-scale,1))/1.3 var(--serif);color:var(--nursery-ink);margin:7px 0 10px}
+.nursery-intro p{font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.8;color:#857453;margin:0 auto;max-width:540px}
+.nursery-intro-ornament{display:flex;align-items:center;justify-content:center;gap:14px;color:#ab8b50;letter-spacing:5px;margin-top:16px;font-size:calc(16px * var(--a11y-text-scale,1))}
 .nursery-intro-ornament:before,.nursery-intro-ornament:after{content:'';display:block;width:88px;height:1px;background:#d6c5a2}
 .nursery-index-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #e3d5b9;padding-top:17px}
-.nursery-index-heading h3{font:25px/1.4 var(--serif);margin:0;color:var(--nursery-ink)}
-.nursery-index-heading>span{color:#8a7752;font-size:13px}
+.nursery-index-heading h3{font:calc(25px * var(--a11y-text-scale,1))/1.4 var(--serif);margin:0;color:var(--nursery-ink)}
+.nursery-index-heading>span{color:#8a7752;font-size:calc(13px * var(--a11y-text-scale,1))}
 .nursery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:20px 16px}
 .nursery-card{display:flex;flex-direction:column;align-items:center;min-width:0;text-decoration:none;color:var(--nursery-ink);padding:8px 8px 12px;border:1px solid #ddceb1;border-radius:9px;background:#fffdf7;box-shadow:0 4px 12px #6e50200a;transition:transform .18s,border-color .18s,box-shadow .18s}
 .nursery-card:hover{transform:translateY(-3px);border-color:#b49359;box-shadow:0 7px 18px #6e502017}
@@ -17,45 +17,45 @@
 .nursery-frame{position:relative;width:100%;aspect-ratio:1;display:grid;place-items:center;padding:9px;border:1px solid #b79a62;border-radius:6px;background:linear-gradient(45deg,#e5d6b8,#fcf4df 45%,#deca9d);box-shadow:inset 0 0 0 3px #fdf5e5,inset 0 0 0 4px #c7ab74;overflow:hidden}
 .nursery-frame:after{content:'';position:absolute;inset:6px;border:1px solid #c3a66c;border-radius:2px;pointer-events:none}
 .nursery-frame img{display:block;width:100%;height:100%;aspect-ratio:1;object-fit:cover;border-radius:2px}
-.nursery-frame-corner{position:absolute;bottom:0;inset-inline-end:0;display:grid;place-items:center;width:24px;height:24px;border-start-start-radius:8px;color:#a78951;background:#fbf4e4;font-size:15px;box-shadow:0 0 0 1px #d6c194}
+.nursery-frame-corner{position:absolute;bottom:0;inset-inline-end:0;display:grid;place-items:center;width:24px;height:24px;border-start-start-radius:8px;color:#a78951;background:#fbf4e4;font-size:calc(15px * var(--a11y-text-scale,1));box-shadow:0 0 0 1px #d6c194}
 .nursery-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:radial-gradient(ellipse at 50% 35%,#fffaf0,#f0e6d1);border-radius:2px}
 .nursery-placeholder svg{width:59px;height:59px;opacity:.75}
-.nursery-placeholder>span{font-size:11px;color:#8c7956}
-.nursery-card>strong{display:block;font-size:17px;line-height:1.5;text-align:center;margin:10px 0 5px;overflow-wrap:anywhere}
-.nursery-card-action{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:auto;border:1px solid #e4d8c1;border-radius:5px;padding:5px 8px;background:#f7f1e4;color:#8a6e42;font-size:12px;min-height:29px}
+.nursery-placeholder>span{font-size:calc(11px * var(--a11y-text-scale,1));color:#8c7956}
+.nursery-card>strong{display:block;font-size:calc(17px * var(--a11y-text-scale,1));line-height:1.5;text-align:center;margin:10px 0 5px;overflow-wrap:anywhere}
+.nursery-card-action{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:auto;border:1px solid #e4d8c1;border-radius:5px;padding:5px 8px;background:#f7f1e4;color:#8a6e42;font-size:calc(12px * var(--a11y-text-scale,1));min-height:29px}
 .has-baby-photos .nursery-card-action{color:#546b44;border-color:#d2dbc5;background:#f1f4e8}
-.nursery-status{font-size:14px;line-height:1.7;color:#5d744c;margin:11px 0 16px;min-height:0}
+.nursery-status{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.7;color:#5d744c;margin:11px 0 16px;min-height:0}
 .nursery-status:empty{display:none}
 .nursery-status.is-error{color:#9b4739}
 .nursery-status button{font-size:inherit;text-decoration:underline;text-underline-offset:3px;margin-inline-start:8px}
-.nursery-no-match{text-align:center;padding:36px 15px;color:#89754e;font-size:16px}
+.nursery-no-match{text-align:center;padding:36px 15px;color:#89754e;font-size:calc(16px * var(--a11y-text-scale,1))}
 .nursery-breadcrumb{margin-top:5px;flex-wrap:wrap}
 .nursery-album-hero{display:flex;align-items:center;gap:20px;padding:24px 0;border-block:1px solid #e2d5ba;margin:20px 0 0}
 .nursery-album-emblem{width:90px;height:90px;display:grid;place-items:center;border:1px solid #d5be92;border-radius:22px;background:#f4ead5;box-shadow:inset 0 0 0 4px #fffaf0;flex-shrink:0}
 .nursery-album-emblem svg{width:62px;height:62px}
-.nursery-album-hero h2{font:38px/1.3 var(--serif);margin:4px 0;color:var(--nursery-ink);overflow-wrap:anywhere}
-.nursery-album-hero p{font-size:16px;color:#8a7552;margin:5px 0 0}
-.nursery-hero-diamond{margin-inline-start:auto;font-size:37px;color:#b5975c}
+.nursery-album-hero h2{font:calc(38px * var(--a11y-text-scale,1))/1.3 var(--serif);margin:4px 0;color:var(--nursery-ink);overflow-wrap:anywhere}
+.nursery-album-hero p{font-size:calc(16px * var(--a11y-text-scale,1));color:#8a7552;margin:5px 0 0}
+.nursery-hero-diamond{margin-inline-start:auto;font-size:calc(37px * var(--a11y-text-scale,1));color:#b5975c}
 .nursery-album-heading{border-top:0;padding-block:19px 11px}
-.nursery-album-heading h3{font:27px/1.4 var(--serif);margin:0 0 4px;color:var(--nursery-ink)}
-.nursery-album-heading .primary-button,.nursery-dropzone .primary-button,.nursery-empty-album .primary-button{font-size:16px;min-height:44px;padding:10px 14px}
-.nursery-album-help{font-size:14px;line-height:1.8;color:#8a7958;margin:0 0 20px}
+.nursery-album-heading h3{font:calc(27px * var(--a11y-text-scale,1))/1.4 var(--serif);margin:0 0 4px;color:var(--nursery-ink)}
+.nursery-album-heading .primary-button,.nursery-dropzone .primary-button,.nursery-empty-album .primary-button{font-size:calc(16px * var(--a11y-text-scale,1));min-height:44px;padding:10px 14px}
+.nursery-album-help{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.8;color:#8a7958;margin:0 0 20px}
 .nursery-photo-card .compact-photo-info>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .nursery-empty-album{text-align:center;border:1px dashed #ccb58b;border-radius:9px;background:#faf5e9;padding:25px 16px;margin-bottom:22px}
 .nursery-empty-album>span svg{width:62px;height:62px;opacity:.75}
-.nursery-empty-album h3{font:28px/1.4 var(--serif);color:var(--nursery-ink);margin:12px 0 7px}
-.nursery-empty-album p{font-size:15px;line-height:1.7;color:#887451;margin:0 0 16px}
+.nursery-empty-album h3{font:calc(28px * var(--a11y-text-scale,1))/1.4 var(--serif);color:var(--nursery-ink);margin:12px 0 7px}
+.nursery-empty-album p{font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.7;color:#887451;margin:0 0 16px}
 .nursery-dropzone{margin-top:25px;border:1px solid #dac59c;border-radius:9px;background:#f8f1e2;position:relative;overflow:hidden}
 .nursery-dropzone:before{content:'';position:absolute;inset-block:0;inset-inline-end:0;width:17px;background:url('ornament.svg') repeat-y center/17px auto;opacity:.5;pointer-events:none}
-.nursery-dropzone p{font-size:14px;line-height:1.8}
+.nursery-dropzone p{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.8}
 .nursery-dropzone .nursery-upload-status{width:100%;margin:0;color:#59714a;overflow-wrap:anywhere}
 .nursery-dropzone progress{width:100%;accent-color:#718254;min-height:12px}
 .nursery-pager{margin-top:18px}
 .nursery-drag-over .nursery-dropzone{outline:3px solid #a99158;outline-offset:4px;background:#efe7d2}
 body[data-active-view=nursery][data-nursery-mode=album] .workspace-actions{display:none}
 @media(max-width:700px){
-  .nursery-view{padding:0 12px 25px}.nursery-intro{margin:2px auto 21px}.nursery-intro h2{font-size:29px}.nursery-intro p{font-size:14px;line-height:1.8}.nursery-intro-icon{width:57px;height:57px;border-radius:18px}.nursery-intro-icon svg{width:43px;height:43px}
-  .nursery-index-heading{align-items:flex-start;flex-direction:column;gap:4px;margin-bottom:13px}.nursery-index-heading h3{font-size:24px}.nursery-index-heading>span{font-size:12px}.nursery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 10px}.nursery-card{padding:6px 6px 10px}.nursery-frame{padding:8px}.nursery-card>strong{font-size:16px}.nursery-card-action{font-size:11px;padding:5px 6px}.nursery-placeholder svg{width:46px;height:46px}.nursery-placeholder>span{font-size:10px}.nursery-placeholder{gap:5px}
-  .nursery-album-hero{gap:12px;padding:18px 0}.nursery-album-emblem{width:65px;height:65px;border-radius:17px}.nursery-album-emblem svg{width:47px;height:47px}.nursery-album-hero h2{font-size:29px}.nursery-album-hero p{font-size:14px}.nursery-hero-diamond{display:none}.nursery-album-heading h3{font-size:25px}.nursery-album-heading .primary-button{font-size:14px;padding:9px 11px}.nursery-album-help{font-size:13px}.nursery-photo-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.nursery-empty-album h3{font-size:26px}.nursery-empty-album p{font-size:14px}.nursery-pager{gap:7px}.nursery-pager>span{font-size:12px}.nursery-pager button{font-size:13px;padding:8px 10px}.nursery-dropzone{padding-inline-end:24px}
+  .nursery-view{padding:0 12px 25px}.nursery-intro{margin:2px auto 21px}.nursery-intro h2{font-size:calc(29px * var(--a11y-text-scale,1))}.nursery-intro p{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.8}.nursery-intro-icon{width:57px;height:57px;border-radius:18px}.nursery-intro-icon svg{width:43px;height:43px}
+  .nursery-index-heading{align-items:flex-start;flex-direction:column;gap:4px;margin-bottom:13px}.nursery-index-heading h3{font-size:calc(24px * var(--a11y-text-scale,1))}.nursery-index-heading>span{font-size:calc(12px * var(--a11y-text-scale,1))}.nursery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 10px}.nursery-card{padding:6px 6px 10px}.nursery-frame{padding:8px}.nursery-card>strong{font-size:calc(16px * var(--a11y-text-scale,1))}.nursery-card-action{font-size:calc(11px * var(--a11y-text-scale,1));padding:5px 6px}.nursery-placeholder svg{width:46px;height:46px}.nursery-placeholder>span{font-size:calc(10px * var(--a11y-text-scale,1))}.nursery-placeholder{gap:5px}
+  .nursery-album-hero{gap:12px;padding:18px 0}.nursery-album-emblem{width:65px;height:65px;border-radius:17px}.nursery-album-emblem svg{width:47px;height:47px}.nursery-album-hero h2{font-size:calc(29px * var(--a11y-text-scale,1))}.nursery-album-hero p{font-size:calc(14px * var(--a11y-text-scale,1))}.nursery-hero-diamond{display:none}.nursery-album-heading h3{font-size:calc(25px * var(--a11y-text-scale,1))}.nursery-album-heading .primary-button{font-size:calc(14px * var(--a11y-text-scale,1));padding:9px 11px}.nursery-album-help{font-size:calc(13px * var(--a11y-text-scale,1))}.nursery-photo-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.nursery-empty-album h3{font-size:calc(26px * var(--a11y-text-scale,1))}.nursery-empty-album p{font-size:calc(14px * var(--a11y-text-scale,1))}.nursery-pager{gap:7px}.nursery-pager>span{font-size:calc(12px * var(--a11y-text-scale,1))}.nursery-pager button{font-size:calc(13px * var(--a11y-text-scale,1));padding:8px 10px}.nursery-dropzone{padding-inline-end:24px}
 }
 @media(prefers-reduced-motion:reduce){.nursery-card{transition:none}.nursery-card:hover{transform:none}}

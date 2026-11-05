@@ -6,11 +6,14 @@
   const people = Object.values(data.people);
   const media = new Map();
   const phoneQuery=matchMedia('(max-width:700px)'),isPhone=()=>phoneQuery.matches;
+  const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
   const validViews=new Set(['home','tree','directory','gallery','calendar','videos','photos','stories','weddings','nostalgia','updates','memorial','person','games','nursery']);
   const requestedView=location.hash.slice(1).split('/')[0];
   const state = {view:validViews.has(requestedView)?(requestedView==='home'&&!isPhone()?'tree':requestedView):(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
-  let motionFrame=0,suppressClickUntil=0;
+  let motionFrame=0,suppressClickUntil=0,treeRenderVersion=0,treeCameraApplied=false;
+  const treeTextScale=()=>Math.max(1,Math.min(2,(Number(window.FamilyAccessibility?.getSettings?.().text)||100)/100));
+  let observedTextScale=treeTextScale();
   const branchFor = id => data.branches.find(b => b.id === id);
   const getMedia = p => media.get(p.id) || {};
   const nameOf = p => I18n.personName({...p,...getMedia(p)});
@@ -137,16 +140,18 @@
     $('emptySearch').hidden = selected.length > 0;
   }
 
-  function renderTree() {
+  function renderTree(preserveCamera=false) {
     window.FamilyTreeGuide?.hide();
+    const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
+    const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(viewport.clientWidth/2-camera.x)/(camera.width*camera.scale),y:(viewport.clientHeight/2-camera.y)/(camera.height*camera.scale)}:null;
     const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview';
     const rootId=state.branch==='all'?data.root:branchFor(state.branch).unit;
-    const rootHistorySpace=!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40:0;
+    const rootHistorySpace=!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
     const desktopOverview=!phone&&overview;
-    const gap=phone?20:desktopOverview?20:36,levelHeight=phone?195:desktopOverview?275:340,top=phone?40:desktopOverview?45:70,pad=phone?25:desktopOverview?32:48;
+    const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?195:desktopOverview?275:340)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
     const positions=[],lines=[],connections=[],widths=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
-    const nodeWidth=unit=>!phone&&unit.id===data.root?788:unit.people.length===2?(phone?174:desktopOverview?300:320):(phone?80:desktopOverview?132:146);
+    const nodeWidth=unit=>(!phone&&unit.id===data.root?788:unit.people.length===2?(phone?174:desktopOverview?300:320):(phone?80:desktopOverview?132:146))*textScale;
     function measure(id){const unit=data.units[id],kids=children(unit),total=kids.reduce((sum,child)=>sum+measure(child),0)+Math.max(0,kids.length-1)*gap,width=Math.max(nodeWidth(unit),total);widths.set(id,width);return width;}
     function place(id,left,depth){
       const unit=data.units[id],width=widths.get(id),x=left+width/2,y=top+depth*levelHeight+(depth?rootHistorySpace:0);
@@ -156,10 +161,10 @@
     }
     let width,height;
     if(phone&&overview){
-      width=520;height=740;const root=data.units[data.root];positions.push({id:root.id,unit:root,x:260,y:45,width:174,depth:0});lines.push('<path d="M260 158V530"/>');
-      data.branches.forEach((branch,index)=>{const x=index%2===0?380:140,y=220+Math.floor(index/2)*170,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174,depth:1});lines.push(`<path d="M260 ${y-30}H${x}V${y-10}"/>`);});
-    }else{width=measure(rootId)+2*pad;place(rootId,pad,0);const maxDepth=Math.max(...positions.map(item=>item.depth));height=top+maxDepth*levelHeight+(maxDepth?rootHistorySpace:0)+(phone?150:desktopOverview?260:overview?316:278)+30;}
-    camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.width=width+'px';world.style.height=height+'px';
+      width=520*textScale;height=740*textScale;const root=data.units[data.root];positions.push({id:root.id,unit:root,x:260*textScale,y:45*textScale,width:174*textScale,depth:0});lines.push(`<path d="M${260*textScale} ${158*textScale}V${530*textScale}"/>`);
+      data.branches.forEach((branch,index)=>{const x=(index%2===0?380:140)*textScale,y=(220+Math.floor(index/2)*170)*textScale,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174*textScale,depth:1});lines.push(`<path d="M${260*textScale} ${y-30*textScale}H${x}V${y-10*textScale}"/>`);});
+    }else{width=measure(rootId)+2*pad;place(rootId,pad,0);const maxDepth=Math.max(...positions.map(item=>item.depth));height=top+maxDepth*levelHeight+(maxDepth?rootHistorySpace:0)+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
+    camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.setProperty('--a11y-tree-scale',String(textScale));world.style.width=width+'px';world.style.height=height+'px';
     $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${unit.id}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${unit.people.map(id=>personCardHTML(data.people[id])).join('')}${open}</div>`;}).join('');
     let rootSpacingAdjustment=0,rootContentHeight=0;
     if(!phone&&rootHistorySpace){
@@ -167,7 +172,7 @@
       if(rootElement&&firstChild){
         // Reserve space below the actual dates for the connector and branch labels.
         rootContentHeight=rootElement.offsetHeight;
-        rootSpacingAdjustment=Math.max(0,top+rootContentHeight+96-firstChild.y);
+        rootSpacingAdjustment=Math.max(0,top+rootContentHeight+96*textScale-firstChild.y);
         if(rootSpacingAdjustment){
           for(const item of positions)if(item.depth>0){item.y+=rootSpacingAdjustment;world.querySelector(`[data-unit="${item.id}"]`).style.top=item.y+'px';}
           for(const connection of connections)if(connection.depth>0)connection.y+=rootSpacingAdjustment;
@@ -179,18 +184,18 @@
       const buttons=[...world.querySelectorAll('.branch-open')];
       if(buttons.length){
         // Keep every branch button below the tallest card, including memorial dates.
-        const captionTop=Math.max(...buttons.map(button=>button.offsetTop),...buttons.flatMap(button=>[...button.parentElement.querySelectorAll('.person-card')].map(card=>card.offsetHeight+14)));
+        const captionTop=Math.max(...buttons.map(button=>button.offsetTop),...buttons.flatMap(button=>[...button.parentElement.querySelectorAll('.person-card')].map(card=>card.offsetHeight+14*textScale)));
         for(const button of buttons){
           button.style.top=captionTop+'px';
-          height=Math.max(height,button.parentElement.offsetTop+captionTop+button.offsetHeight+24);
+          height=Math.max(height,button.parentElement.offsetTop+captionTop+button.offsetHeight+24*textScale);
         }
         camera.height=height;world.style.height=height+'px';
       }
     }
     for(const {x,y,centers,depth} of connections){
       const extra=depth===0?rootHistorySpace+rootSpacingAdjustment:0,historyRoot=depth===0&&rootContentHeight>0;
-      const start=historyRoot?y+rootContentHeight+12:y+(phone?115:261)+extra;
-      const middle=historyRoot?y+levelHeight+extra-60:y+(phone?155:294)+extra,end=y+levelHeight-7+extra;
+      const start=historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
+      const middle=historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra,end=y+levelHeight-7*textScale+extra;
       lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);
       if(centers.length>1)lines.push(`<path d="M${Math.min(...centers)} ${middle}H${Math.max(...centers)}"/>`);
       for(const cx of centers)lines.push(`<path d="M${cx} ${middle}V${end}"/>`);
@@ -202,13 +207,14 @@
     const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     $('treeHelpInline').textContent=phone?'':guidance;
     $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בין הענפים'):'';
-    requestAnimationFrame(()=>{if(state.view!=='tree')return;const viewport=$('treeViewport');const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);camera.scale=phone?fit:desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;applyCamera();window.FamilyTreeGuide?.show();});
+    requestAnimationFrame(()=>{if(state.view!=='tree'||renderVersion!==treeRenderVersion)return;const viewport=$('treeViewport');if(previous){camera.scale=previous.scale;camera.x=viewport.clientWidth/2-previous.x*width*camera.scale;camera.y=viewport.clientHeight/2-previous.y*height*camera.scale;clampCamera();}else{const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);camera.scale=phone?fit*textScale:desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;}treeCameraApplied=true;applyCamera();window.FamilyTreeGuide?.show();});
   }
   function applyCamera(){
     $('treeWorld').style.transform=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
     $('zoomValue').textContent=Math.round(camera.scale*100)+'%';
   }
   function stopTreeMotion(){if(motionFrame)cancelAnimationFrame(motionFrame);motionFrame=0;}
+  window.addEventListener('family-accessibility-changed',()=>{if(reducedMotion())stopTreeMotion();const next=treeTextScale();if(next!==observedTextScale){observedTextScale=next;if(state.view==='tree')renderTree(true);}});
   function clampCamera(){
     if(!isPhone())return;const viewport=$('treeViewport'),w=camera.width*camera.scale,h=camera.height*camera.scale;
     camera.x=w<viewport.clientWidth-20?(viewport.clientWidth-w)/2:Math.max(viewport.clientWidth-w-65,Math.min(65,camera.x));
@@ -569,8 +575,8 @@
     camera.x=drag.x+event.clientX-drag.startX;camera.y=drag.y+(drag.nativeScroll?0:event.clientY-drag.startY);clampCamera();applyCamera();suppressClickUntil=performance.now()+400;
   });
   function momentum(vx,vy){
-    if(!isPhone()||Math.hypot(vx,vy)<.08)return;let previous=performance.now();
-    const step=now=>{const dt=Math.min(32,now-previous);previous=now;camera.x+=vx*dt;camera.y+=vy*dt;vx*=Math.pow(.91,dt/16);vy*=Math.pow(.91,dt/16);clampCamera();applyCamera();if(Math.hypot(vx,vy)>.025)motionFrame=requestAnimationFrame(step);else motionFrame=0;};motionFrame=requestAnimationFrame(step);
+    if(!isPhone()||reducedMotion()||Math.hypot(vx,vy)<.08)return;let previous=performance.now();
+    const step=now=>{if(reducedMotion()){stopTreeMotion();return;}const dt=Math.min(32,now-previous);previous=now;camera.x+=vx*dt;camera.y+=vy*dt;vx*=Math.pow(.91,dt/16);vy*=Math.pow(.91,dt/16);clampCamera();applyCamera();if(Math.hypot(vx,vy)>.025)motionFrame=requestAnimationFrame(step);else motionFrame=0;};motionFrame=requestAnimationFrame(step);
   }
   function endDrag(event){
     const ended=drag;touches.delete(event.pointerId);pinch=null;drag=null;viewport.classList.remove('dragging');
