@@ -1,5 +1,5 @@
 /* A familiar driver, one last dash north. All selectors stay inside the game. */
-.family-games-content.has-family-north{max-width:1160px}
+.family-games-content.has-family-north{max-width:970px}
 .family-north{--north-ink:#173e43;--north-teal:#173f44;--north-deep:#102e34;--north-copper:#ab6943;--north-gold:#e6bc72;--north-cream:#fff9ec;--north-muted:#566b67;color:var(--north-ink);font-family:var(--sans);padding-block:8px 20px}
 .family-north *{box-sizing:border-box}
 .family-north [hidden]{display:none!important}
@@ -11,7 +11,7 @@
 .north-heading h3{font:calc(clamp(40px,4.5vw,66px) * var(--a11y-text-scale,1))/1.1 var(--serif);font-weight:600;color:var(--north-ink);margin:10px 0}
 .north-heading h3::after{content:'↑';display:inline-block;position:relative;top:-.08em;font:700 .72em/1 var(--sans);color:var(--north-copper);margin-inline-start:.25em}
 .north-heading>p{font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.7;margin:10px auto 0;color:#51645d;max-width:640px}
-.north-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,440px) minmax(0,.92fr);gap:24px;align-items:start;direction:rtl}
+.north-layout{display:grid;grid-template-columns:minmax(220px,300px) minmax(320px,480px);gap:30px;align-items:start;justify-content:center;direction:rtl}
 .north-layout>*{direction:inherit;min-width:0}
 :root[dir=ltr] .north-layout{direction:ltr}
 .north-story,.north-guide{padding-block-start:15px}
@@ -28,13 +28,13 @@
 :root[dir=ltr] .north-rules>li{padding-inline:35px 0}
 .north-rules strong,.north-rules b{display:block;color:#264a48;font-weight:600}.north-rules>li>span{display:block;margin-block-start:3px}
 .north-cockpit{padding:12px;background:var(--north-deep);border:1px solid #2d5151;border-radius:20px;box-shadow:0 15px 35px #163b3d24,0 0 0 5px #fff9eb80;min-width:0;position:relative;color:#fff9eb}
-.north-hud{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:7px;padding:2px 3px 12px;text-align:center;align-items:center;min-width:0}
+.north-hud{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(66px * var(--a11y-text-scale,1))),1fr));gap:7px;padding:2px 3px 12px;text-align:center;align-items:center;min-width:0}
 .north-hud>div{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding-inline:3px}
 .north-hud>div+div{border-inline-start:1px solid #65817a5c}
 .north-hud small{font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.4;color:#cbd6c8}
 .north-hud strong,.north-hud b{font-size:calc(22px * var(--a11y-text-scale,1));font-weight:600;line-height:1.15;color:#fff7df;font-variant-numeric:tabular-nums}
-.north-hud [data-north-time]{font-size:calc(35px * var(--a11y-text-scale,1));color:#f4d59d;direction:ltr;letter-spacing:.02em}
-.north-hud [data-urgent=true],.north-hud [data-north-time][data-urgent=true]{color:#ffc3a2}
+.north-hud [data-north-time]{font-size:calc(32px * var(--a11y-text-scale,1));color:#f4d59d;direction:ltr;letter-spacing:.02em}
+.north-hud [data-north-speed]{font-size:calc(25px * var(--a11y-text-scale,1));direction:ltr;white-space:nowrap}.north-hud [data-urgent=true],.north-hud [data-north-time][data-urgent=true]{color:#ffc3a2}
 .north-road-shell{position:relative;border:1px solid #698178;border-radius:10px;overflow:hidden;background:#5b6960;isolation:isolate;line-height:0;margin-inline:auto;width:100%}
 .north-road-shell canvas{display:block;width:100%;height:auto;aspect-ratio:480/760;touch-action:none;user-select:none;-webkit-user-select:none;outline-offset:-5px}
 .north-road-shell canvas:focus-visible{outline:3px solid #fff3a9}
@@ -95,9 +95,6 @@
 .north-toast{position:absolute;z-index:4;inset-inline:16px;bottom:18%;margin:auto;max-width:320px;padding:12px 17px;border:1px solid #d7bb89;background:#fff6dff2;color:#544329;border-radius:12px;text-align:center;pointer-events:none;font-size:calc(14px * var(--a11y-text-scale,1));font-weight:600;line-height:1.7;box-shadow:0 4px 18px #0c242c26}
 .north-toast strong{display:block;font-size:calc(18px * var(--a11y-text-scale,1));line-height:1.4}
 .north-toast small{display:block;font-size:calc(11px * var(--a11y-text-scale,1));font-weight:400;line-height:1.7;margin-top:4px}
-.north-family-celebration{max-width:300px;margin:10px auto 13px;line-height:0}.north-family-celebration>span{display:block;width:100%;aspect-ratio:3/2;background-image:url("games/north/family-clapping.webp");background-size:200% 100%;background-position:0 0;background-repeat:no-repeat;animation:north-family-clap .56s steps(1,end) infinite;mask-image:linear-gradient(180deg,transparent,#000 3%,#000 96%,transparent)}
-@keyframes north-family-clap{0%,49.999%{background-position:0 0}50%,100%{background-position:100% 0}}
-.north-family-celebration img{width:100%;max-height:200px;object-fit:contain;display:block;border-radius:10px}
 .north-result-stats{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding-block:12px;margin-block:12px;border-block:1px solid #d9c8a6}
 .north-result-stats>span,.north-result-stats>div{display:flex;flex-direction:column;gap:5px;font-size:calc(11px * var(--a11y-text-scale,1));color:#5c6757}
 .north-result-stats strong,.north-result-stats b{font-size:calc(23px * var(--a11y-text-scale,1));color:var(--north-ink);font-variant-numeric:tabular-nums}
@@ -113,10 +110,10 @@
 .game-choice-north .game-choice-icon svg{fill:none;stroke:currentColor;stroke-width:1.8}
 @media(min-width:1050px){
  .north-cockpit{position:sticky;top:18px}
- .north-road-shell{max-width:min(100%,calc((100svh - 230px) * .63158));min-width:260px}
+ .north-road-shell{width:100%;max-width:480px;min-width:0}
 }
 @media(max-width:1049px){
- .north-layout{grid-template-columns:minmax(190px,.8fr) minmax(290px,440px);max-width:850px;margin-inline:auto;gap:22px}
+ .north-layout{grid-template-columns:minmax(200px,280px) minmax(300px,440px);max-width:850px;margin-inline:auto;gap:22px}
  .north-guide{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;padding-block-start:0}
  .north-route-card{grid-row:span 2}
  .north-heading{margin-bottom:20px}
@@ -131,7 +128,7 @@
  .north-heading h3{font-size:calc(45px * var(--a11y-text-scale,1));margin:8px 0}
  .north-eyebrow{font-size:calc(10px * var(--a11y-text-scale,1));letter-spacing:.04em}
  .north-heading>p{font-size:calc(13px * var(--a11y-text-scale,1));line-height:1.65;max-width:330px}
- .north-layout{display:flex;flex-direction:column;gap:17px;max-width:440px}
+ .north-layout{display:flex;flex-direction:column;gap:17px;max-width:480px}
  .north-layout>*{width:100%}
  .north-story{padding:0;order:0}
  .north-cockpit{order:1;padding:9px;border-radius:16px;box-shadow:0 7px 20px #163b3d21}
@@ -151,10 +148,10 @@
  :root[dir=ltr] .north-rules>li{padding-inline:26px 0}
  .north-rules>li::before{font-size:calc(10px * var(--a11y-text-scale,1));top:10px}
  .north-hud{padding:2px 2px 9px}
- .north-hud [data-north-time]{font-size:calc(31px * var(--a11y-text-scale,1))}
+ .north-hud [data-north-time]{font-size:calc(28px * var(--a11y-text-scale,1))}
  .north-hud strong,.north-hud b{font-size:calc(20px * var(--a11y-text-scale,1))}
  .north-hud small{font-size:calc(9px * var(--a11y-text-scale,1))}
- .north-road-shell{max-width:min(100%,calc((100svh - 230px) * .63158));min-width:min(100%,220px);border-radius:8px}
+ .north-road-shell{width:100%;max-width:100%;min-width:0;border-radius:8px}
  .north-overlay{padding:13px}
  .north-overlay-card{padding:19px 17px;border-radius:13px}
  .north-overlay-card h4{font-size:calc(31px * var(--a11y-text-scale,1));margin:8px 0 11px}
@@ -174,8 +171,6 @@
  .north-toast{inset-inline:10px;padding:10px;font-size:calc(12px * var(--a11y-text-scale,1));bottom:20%}
  .north-toast strong{font-size:calc(16px * var(--a11y-text-scale,1))}
  .north-toast small{font-size:calc(10px * var(--a11y-text-scale,1))}
- .north-family-celebration{max-width:210px;margin:8px auto 10px}
- .north-family-celebration img{max-height:140px}
  .north-result-stats{gap:13px;padding-block:9px;margin-block:9px}
  .north-result-stats strong,.north-result-stats b{font-size:calc(19px * var(--a11y-text-scale,1))}
  .north-result-stats>span,.north-result-stats>div{font-size:calc(10px * var(--a11y-text-scale,1))}
@@ -186,10 +181,10 @@
  .north-route-stops li::before,.north-route-stops>div::before{top:0}
  .north-route-stops small{font-size:calc(10px * var(--a11y-text-scale,1))}
  .north-tip{font-size:calc(12px * var(--a11y-text-scale,1));padding:13px 15px}
- .family-north:is([data-phase=playing],[data-phase=paused]) .north-story,.family-north:is([data-phase=playing],[data-phase=paused]) .north-guide{display:none}
- .family-north:is([data-phase=playing],[data-phase=paused]) .north-heading{margin-bottom:11px}
- .family-north:is([data-phase=playing],[data-phase=paused]) .north-heading h3{font-size:calc(32px * var(--a11y-text-scale,1));margin:3px 0}
- .family-north:is([data-phase=playing],[data-phase=paused]) .north-heading>p{display:none}
+ .family-north:is([data-phase=playing],[data-phase=paused],[data-phase=won],[data-phase=lost]) .north-story,.family-north:is([data-phase=playing],[data-phase=paused],[data-phase=won],[data-phase=lost]) .north-guide{display:none}
+ .family-north:is([data-phase=playing],[data-phase=paused],[data-phase=won],[data-phase=lost]) .north-heading{margin-bottom:11px}
+ .family-north:is([data-phase=playing],[data-phase=paused],[data-phase=won],[data-phase=lost]) .north-heading h3{font-size:calc(32px * var(--a11y-text-scale,1));margin:3px 0}
+ .family-north:is([data-phase=playing],[data-phase=paused],[data-phase=won],[data-phase=lost]) .north-heading>p{display:none}
  .family-north[data-phase=won] .north-overlay-card{padding:15px}
  .family-north[data-phase=won] .north-overlay-card h4{font-size:calc(28px * var(--a11y-text-scale,1))}
 }
@@ -204,7 +199,7 @@
  .north-controls .north-button{padding-inline:4px}
 }
 @media(max-height:570px) and (min-width:600px){
- .north-road-shell{max-width:min(100%,calc((100svh - 165px) * .63158));min-width:190px}
+ .north-road-shell{max-width:100%;min-width:0}
  .north-heading{margin-bottom:12px}
  .north-heading h3{font-size:calc(36px * var(--a11y-text-scale,1))}
  .north-overlay{padding:8px;align-items:flex-start}
@@ -212,10 +207,8 @@
  .north-overlay-card h4{font-size:calc(25px * var(--a11y-text-scale,1));margin:5px 0}
  .north-overlay-card p{font-size:calc(11px * var(--a11y-text-scale,1));margin:6px 0}
  .north-overlay-card .north-button{min-height:42px;padding:8px}
- .north-family-celebration{max-width:135px}.north-family-celebration img{max-height:90px}
 }
 @media(prefers-reduced-motion:reduce){.family-north *{transition:none!important;animation:none!important}}
-html[data-a11y-motion] .north-family-celebration>span{animation:none}
 html[data-a11y-contrast] .family-north{--north-ink:#111;--north-teal:#fff;--north-deep:#fff;--north-copper:#222;--north-muted:#222}
 html[data-a11y-contrast] .family-north :is(.north-cockpit,.north-memory,.north-route-card,.north-tip,.north-overlay-card,.north-toast,.north-driver-badge){background:#fff!important;border-color:#333!important;box-shadow:none!important}
 html[data-a11y-contrast] .family-north .north-overlay{background:#0008!important}
@@ -226,3 +219,55 @@ html[data-a11y-contrast] .family-north .north-progress progress::-webkit-progres
 html[data-a11y-contrast] .family-north .north-progress progress::-webkit-progress-value{background:#111}
 html[data-a11y-contrast] .family-north .north-progress progress::-moz-progress-bar{background:#111}
 @media(forced-colors:active){.north-cockpit,.north-overlay-card,.north-memory,.north-route-card,.north-tip,.north-toast,.north-driver-badge{border:1px solid CanvasText}.north-road-shell canvas{forced-color-adjust:none}.north-button{border:1px solid ButtonText}.north-progress progress{accent-color:Highlight}}
+
+/* The finish line is filled with familiar faces from the family albums. */
+.north-arrival{width:100%;margin:14px auto 7px;padding:10px 0 0;position:relative}
+.north-arrival::after{content:'';position:absolute;inset-inline:3%;bottom:16px;height:11px;background:#c1c6a140;border-radius:50%;z-index:0}
+.north-real-family{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px 5px;position:relative;z-index:1;padding:3px 0 0;direction:rtl}
+:root[dir=ltr] .north-real-family{direction:ltr}
+.north-relative{position:relative;display:flex;align-items:center;justify-content:flex-end;flex-direction:column;min-width:0;padding:0 1px 0;isolation:isolate}
+.north-relative>img,.north-relative>canvas{display:block;position:relative;width:44px;height:48px;max-width:100%;object-fit:contain;object-position:center bottom;z-index:2;filter:drop-shadow(0 1px 1px #243b3918);margin-bottom:24px}
+.north-relative>small{position:relative;z-index:3;width:100%;margin:1px 0 0;padding:2px 0 0;font-size:calc(9px * var(--a11y-text-scale,1));line-height:1.35;font-weight:500;color:#3c5750;text-align:center;overflow-wrap:anywhere}
+.north-relative-body{--north-shirt:#648c82;position:absolute;left:50%;top:41px;transform:translateX(-50%);z-index:1;display:block;width:28px;height:28px;border-radius:9px 9px 4px 4px;background:var(--north-shirt);box-shadow:inset 0 -3px #00000010}
+.north-relative:nth-child(2n) .north-relative-body{--north-shirt:#b57c65}
+.north-relative:nth-child(3n) .north-relative-body{--north-shirt:#809b63}
+.north-relative:nth-child(4n) .north-relative-body{--north-shirt:#a78baf}
+.north-relative:nth-child(5n) .north-relative-body{--north-shirt:#d4ac61}
+.north-relative-body::before,.north-relative-body::after{content:'';display:block;position:absolute;width:8px;height:23px;top:-1px;border-radius:7px;background:linear-gradient(to bottom,var(--north-shirt) 42%,#dfb995 42%);transform-origin:4px 5px;animation:north-real-clap-left .65s ease-in-out infinite alternate}
+.north-relative-body::before{left:-3px;transform:rotate(-43deg)}
+.north-relative-body::after{right:-3px;transform:rotate(43deg);animation-name:north-real-clap-right}
+.north-relative:nth-child(2n) .north-relative-body::before,.north-relative:nth-child(2n) .north-relative-body::after{animation-delay:-.25s}
+.north-relative:nth-child(3n) .north-relative-body::before,.north-relative:nth-child(3n) .north-relative-body::after{animation-delay:-.45s}
+@keyframes north-real-clap-left{from{transform:rotate(-43deg)}to{transform:rotate(-5deg)}}
+@keyframes north-real-clap-right{from{transform:rotate(43deg)}to{transform:rotate(5deg)}}
+.family-north[data-phase=won] .north-overlay-card{max-width:420px}
+.north-station-note{position:absolute;inset-inline:7%;top:5%;z-index:4;padding:16px 18px;border:1px solid #c3a77e;border-radius:12px;background:#fff7e9f2;color:#35534c;text-align:center;line-height:1.6;box-shadow:0 5px 20px #1a302e25;pointer-events:none}
+.north-station-note h4,.north-station-note strong{display:block;font:600 calc(22px * var(--a11y-text-scale,1))/1.3 var(--serif);color:#3c574a;margin:0 0 7px}
+.north-station-note p{font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.75;margin:6px 0;color:#5a6858}
+.north-station-note [data-north-station-time]{display:inline-block;min-width:1.4em;margin:6px 0 0;font-size:calc(31px * var(--a11y-text-scale,1));line-height:1.2;font-variant-numeric:tabular-nums;color:#93613e}
+.family-north[data-station=true] .north-driver-badge{opacity:0}
+@media(max-width:700px){
+ .north-hud [data-north-speed]{font-size:calc(22px * var(--a11y-text-scale,1))}
+ .north-hud>div{padding-inline:2px}
+ .north-hud small{font-size:calc(9px * var(--a11y-text-scale,1));line-height:1.45}
+ .north-real-family{gap:12px 3px}
+ .north-relative>img,.north-relative>canvas{width:38px;height:43px;margin-bottom:23px}
+ .north-relative-body{width:25px;height:26px;top:37px}
+ .north-relative>small{font-size:calc(8px * var(--a11y-text-scale,1))}
+ .north-station-note{inset-inline:6%;top:5%;padding:13px 12px}
+ .north-station-note h4,.north-station-note strong{font-size:calc(21px * var(--a11y-text-scale,1))}
+ .north-station-note p{font-size:calc(11px * var(--a11y-text-scale,1))}
+ .north-station-note [data-north-station-time]{font-size:calc(28px * var(--a11y-text-scale,1))}
+}
+@media(max-width:370px){
+ .north-hud [data-north-time]{font-size:calc(25px * var(--a11y-text-scale,1))}
+ .north-hud [data-north-speed]{font-size:calc(19px * var(--a11y-text-scale,1))}
+ .north-hud small{font-size:calc(8px * var(--a11y-text-scale,1))}
+ .north-real-family{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px 2px}
+ .north-relative>img,.north-relative>canvas{width:32px;height:38px;margin-bottom:23px}
+ .north-relative-body{top:33px;width:23px}
+ .north-relative>small{font-size:calc(8px * var(--a11y-text-scale,1))}
+}
+html[data-a11y-motion] .north-relative-body::before,html[data-a11y-motion] .north-relative-body::after{animation:none}
+html[data-a11y-contrast] .family-north .north-station-note{background:#fff!important;border-color:#333!important;box-shadow:none!important}
+@media(prefers-reduced-motion:reduce){.north-relative-body::before,.north-relative-body::after{animation:none}}
