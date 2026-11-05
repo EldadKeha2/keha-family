@@ -31,7 +31,7 @@ async function cpuFaces(bitmap){
     if(turn===90){ctx.translate(w,0);ctx.rotate(Math.PI/2);}else if(turn===180){ctx.translate(w,h);ctx.rotate(Math.PI);}else if(turn===270){ctx.translate(0,h);ctx.rotate(-Math.PI/2);}ctx.drawImage(canvas,0,0);
     const rgba=ctx.getImageData(0,0,w,h).data,pixels=new Uint8Array(w*h);for(let n=0;n<pixels.length;n++)pixels[n]=(2*rgba[4*n]+7*rgba[4*n+1]+rgba[4*n+2])/10;
     const detections=pico.cluster_detections(pico.run_cascade({pixels,nrows:h,ncols:w,ldim:w},cascade,{shiftfactor:.1,minsize:20,maxsize:Math.min(w,h),scalefactor:1.1}),.2);
-    for(const d of detections.filter(d=>d[3]>50)){const rect=clampRect(unrotateRect({x:(d[1]-d[2]/2)/w,y:(d[0]-d[2]/2)/h,width:d[2]/w,height:d[2]/h},turn)),previous=found.findIndex(face=>sameRegion(face.rect,rect));if(previous<0)found.push({rect,score:d[3]});else if(found[previous].score<d[3])found[previous]={rect,score:d[3]};}
+    for(const d of detections.filter(d=>d[3]>5)){const rect=clampRect(unrotateRect({x:(d[1]-d[2]/2)/w,y:(d[0]-d[2]/2)/h,width:d[2]/w,height:d[2]/h},turn)),previous=found.findIndex(face=>sameRegion(face.rect,rect));if(previous<0)found.push({rect,score:d[3]});else if(found[previous].score<d[3])found[previous]={rect,score:d[3]};}
   }
   return found.sort((a,b)=>b.score-a.score).slice(0,150);
 }
