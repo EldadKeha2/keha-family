@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import * as engine from '../public/assets/soup.mjs';
-import {ingredientIcon} from '../public/assets/soup-icons.mjs';
+import {ingredientIcon,portionIcon} from '../public/assets/soup-icons.mjs';
 
 const source=(await readFile(new URL('../public/assets/soup.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'').replace(/export function /g,'function ');
 function fixture({english=false,reducedMotion=false}={}){
   let now=1000,nextTimer=0,backs=0;const timers=new Map(),events=new Map(),nodes=new Map(),flights=[],animations=[];
-  function node(dataset={}){return {dataset,style:{},disabled:false,hidden:false,textContent:'',innerHTML:'',className:'',removed:false,getBoundingClientRect(){return {left:100,top:100,width:120,height:150};},querySelector(selector){const child=nodeFor('child:'+JSON.stringify(dataset)+selector);if(selector==='.soup-ingredient-icon'){child.innerHTML=dataset.soupAdd?ingredientIcon(dataset.soupAdd):'';child.getBoundingClientRect=()=>({left:20,top:30,width:58,height:58});}return child;},focus(){},scrollIntoView(){},setAttribute(){},remove(){this.removed=true;},animate(frames,options){animations.push({frames,options});return {};}};}
+  function node(dataset={}){return {dataset,style:{setProperty(name,value){this[name]=value;}},disabled:false,hidden:false,textContent:'',innerHTML:'',className:'',removed:false,getBoundingClientRect(){return {left:100,top:100,width:120,height:150};},querySelector(selector){const child=nodeFor('child:'+JSON.stringify(dataset)+selector);if(selector==='.soup-ingredient-icon'){child.innerHTML=dataset.soupAdd?ingredientIcon(dataset.soupAdd):'';child.getBoundingClientRect=()=>({left:20,top:30,width:58,height:58});}return child;},focus(){},scrollIntoView(){},setAttribute(){},remove(){this.removed=true;},animate(frames,options){animations.push({frames,options});return {};}};}
   function nodeFor(selector){if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);}
   const root={innerHTML:'',classList:{add(){},remove(){}},querySelector(selector){const needle=selector.startsWith('[')?selector.slice(1,-1):selector.slice(1);return root.innerHTML.includes(needle)?nodeFor(selector):null;},querySelectorAll(selector){
     if(selector==='[data-picked]')return [...nodes.values()].filter(n=>n.dataset.picked);
@@ -18,7 +18,7 @@ function fixture({english=false,reducedMotion=false}={}){
   const document={visibilityState:'visible',createElement:()=>node(),body:{appendChild(item){flights.push(item);}},addEventListener(type,fn,{signal}={}){events.set(type,fn);signal?.addEventListener('abort',()=>{if(events.get(type)===fn)events.delete(type);});}};
   const window={matchMedia:()=>({matches:reducedMotion}),FamilyI18n:{isEnglish:english}};
   const FakeDate=class extends Date{static now(){return now;}};
-  vm.runInNewContext(source+'\nwindow.soupTest={mountSoup,pauseSoup,getGame:()=>game};',{...engine,ingredientIcon,window,document,AbortController,Date:FakeDate,setTimeout(fn,delay){const id=++nextTimer;timers.set(id,{fn,due:now+delay,repeat:0});return id;},clearTimeout:id=>timers.delete(id),setInterval(fn,delay){const id=++nextTimer;timers.set(id,{fn,due:now+delay,repeat:delay});return id;},clearInterval:id=>timers.delete(id)});
+  vm.runInNewContext(source+'\nwindow.soupTest={mountSoup,pauseSoup,getGame:()=>game};',{...engine,ingredientIcon,portionIcon,window,document,AbortController,Date:FakeDate,setTimeout(fn,delay){const id=++nextTimer;timers.set(id,{fn,due:now+delay,repeat:0});return id;},clearTimeout:id=>timers.delete(id),setInterval(fn,delay){const id=++nextTimer;timers.set(id,{fn,due:now+delay,repeat:delay});return id;},clearInterval:id=>timers.delete(id)});
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const f={nodes,events,timers,flights,animations,document,window,flush,get html(){return root.innerHTML;},get game(){return window.soupTest.getGame();},get backs(){return backs;},get now(){return now;},mount(){window.soupTest.mountSoup(root,()=>backs++);},async click(selector,dataset={}){const target=node(dataset);events.get('click')({target:{closest:pattern=>pattern===selector?target:null}});await flush();},advance(ms){const target=now+ms;while(true){const due=[...timers.entries()].sort((a,b)=>a[1].due-b[1].due)[0];if(!due||due[1].due>target)break;now=due[1].due;if(due[1].repeat)due[1].due+=due[1].repeat;else timers.delete(due[0]);due[1].fn();}now=target;},jump(ms){now+=ms;},visibility(value){document.visibilityState=value;events.get('visibilitychange')();},async add(id){await f.click('[data-soup-add]',{soupAdd:id});},async remove(id){await f.click('[data-soup-remove]',{soupRemove:id});}};
   return f;
@@ -64,4 +64,25 @@ test('stirring before water, interrupted stirring, and reduced-motion stirring n
 
 test('leaving during water filling starts heating once and preserves the automatic boiling deadline',async()=>{
   const f=fixture();f.mount();await f.click('[data-soup-start]');await f.click('[data-soup-water]');f.advance(500);f.window.soupTest.pauseSoup();assert.equal(f.game.water,true);assert.equal(f.game.heat,true);const deadline=f.game.boilAt;assert.equal(f.timers.size,0);f.jump(engine.BOIL_MS+1000);f.mount();assert.equal(f.game.boilAt,deadline);assert.equal(f.game.boiled,true);assert.equal(f.nodes.get('[data-soup-kitchen]').dataset.boiled,'true');assert.equal(f.timers.size,0);
+});
+
+test('the broth shows one, two and three of each product, caps only the picture and retains all twelve product types',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english,reducedMotion:true});await prepared(f);
+  const count=id=>(f.nodes.get('[data-soup-floating]').innerHTML.match(new RegExp('data-soup-product="'+id+'"','g'))||[]).length;
+  for(const amount of [1,2,3,4]){await f.add('potato');assert.equal(count('potato'),Math.min(amount,3));assert.equal(f.game.contents.potato,amount);}
+  await f.remove('potato');assert.equal(count('potato'),3);await f.remove('potato');assert.equal(count('potato'),2);await f.remove('potato');assert.equal(count('potato'),1);await f.remove('potato');assert.equal(count('potato'),0);
+  for(const item of engine.INGREDIENTS){for(let i=0;i<4;i++)await f.add(item.id);assert.equal(count(item.id),3);assert.equal(f.game.contents[item.id],4*item.step);}
+  assert.equal((f.nodes.get('[data-soup-floating]').innerHTML.match(/class="soup-food-unit"/g)||[]).length,36);
+  const before=f.nodes.get('[data-soup-floating]').innerHTML;await f.click('[data-soup-stir]');assert.equal(f.nodes.get('[data-soup-floating]').innerHTML,before);assert.equal(f.game.attempts,0);
+  await f.click('[data-soup-reset]');assert.equal(f.nodes.get('[data-soup-floating]').innerHTML,'');assert.equal(Object.keys(f.game.contents).length,0);
+ }
+});
+test('each added hawaij portion deepens the broth, including beyond three drawn portions; removal and a fresh pot restore the colour',async()=>{
+ const f=fixture({reducedMotion:true});await prepared(f);await f.add('potato');
+ const colour=()=>f.nodes.get('[data-soup-kitchen]').style['--soup-broth'];const unspiced=colour(),shades=[];
+ for(let i=0;i<4;i++){await f.add('hawaij');shades.push(colour());}
+ assert.equal(new Set([unspiced,...shades]).size,5);assert.equal(f.game.contents.hawaij,1);assert.equal((f.nodes.get('[data-soup-floating]').innerHTML.match(/data-soup-product="hawaij"/g)||[]).length,3);
+ for(let i=0;i<4;i++)await f.remove('hawaij');assert.equal(colour(),unspiced);
+ await f.click('[data-soup-reset]');assert.equal(colour(),'#819294');assert.equal(f.game.contents.hawaij,undefined);
 });

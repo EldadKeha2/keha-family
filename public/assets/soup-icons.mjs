@@ -17,3 +17,12 @@ const paths={
  pot:'<path d="M15 25h34v24q-17 12-34 0Z" fill="#83939a" stroke="#5f727b" stroke-width="2"/><ellipse cx="32" cy="25" rx="17" ry="6" fill="#d2bd87" stroke="#5f727b" stroke-width="2"/><path d="M15 30H7v10h8m34-10h8v10h-8M24 18q-5-4 0-8m9 8q-5-4 0-8m9 8q-5-4 0-8" fill="none" stroke="#8c9d94" stroke-width="2" stroke-linecap="round"/>'
 };
 export const ingredientIcon=id=>wrap(paths[id]||paths.pot);
+
+// In the broth, grains and spices appear as portions rather than their shelf bowls.
+const inPot={
+ hawaij:'<path d="m14 40 13-23 13 3 13 22-8 8-28-1Z" fill="#c9a247" stroke="#957230" stroke-width="2"/><g fill="#efd17a"><circle cx="25" cy="31" r="3"/><circle cx="37" cy="37" r="3"/><circle cx="30" cy="43" r="2"/><circle cx="43" cy="44" r="2"/></g>',
+ paprika:'<path d="m14 40 13-23 13 3 13 22-8 8-28-1Z" fill="#b97149" stroke="#91482d" stroke-width="2"/><g fill="#d59262"><circle cx="25" cy="31" r="3"/><circle cx="37" cy="37" r="3"/><circle cx="30" cy="43" r="2"/></g>',
+ rice:'<g fill="#f3e6bd" stroke="#c6b186" stroke-width="2"><ellipse cx="22" cy="25" rx="5" ry="11" transform="rotate(-30 22 25)"/><ellipse cx="39" cy="23" rx="5" ry="11" transform="rotate(25 39 23)"/><ellipse cx="30" cy="42" rx="5" ry="11" transform="rotate(40 30 42)"/><ellipse cx="47" cy="40" rx="5" ry="10" transform="rotate(-20 47 40)"/><ellipse cx="15" cy="43" rx="4" ry="9"/></g>',
+ lentils:'<g fill="#a89858" stroke="#766f3e" stroke-width="2"><ellipse cx="21" cy="22" rx="9" ry="6"/><ellipse cx="42" cy="24" rx="9" ry="6"/><ellipse cx="31" cy="38" rx="9" ry="6"/><ellipse cx="47" cy="47" rx="8" ry="6"/><ellipse cx="16" cy="45" rx="8" ry="6"/></g>'
+};
+export const portionIcon=id=>wrap(inPot[id]||paths[id]||paths.pot);
