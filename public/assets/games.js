@@ -3,7 +3,7 @@ import {mountJachnun,pauseJachnun} from './jachnun.js?v=leaderboard-v3';
 import {mountRex,pauseRex} from './rex.js?v=4';
 import {mountSoup,pauseSoup} from './soup.js?v=clear-feedback-v10';
 import {mountNorth,pauseNorth} from './north.js?v=2';
-import {mountNetoTetris,pauseNetoTetris} from './neto-tetris.js?v=3';
+import {mountNetoTetris,pauseNetoTetris} from './neto-tetris.js?v=4';
 import {quizGrade} from './quiz.mjs';
 import {makeChickQuiz,withinChickTarget} from './chick.mjs?v=family-search-v4';
 import './differences.js?v=20261104.2';

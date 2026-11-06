@@ -97,6 +97,7 @@ test('the bilingual opening tells the Fish family story without dashes and expla
     assert.doesNotMatch(f.html,/כל הבית נופל למקום|Everything falls into place|הגבלת זמן|בלי שעון|No time limit|No clock/i);
     assert.match(f.html,english?/Clearing with ZAP adds no points/:/הניקוי עצמו לא מוסיף נקודות/);
     assert.equal((f.html.match(/data-neto-preview=/g)||[]).length,7);assert.ok(Object.keys(NETO_PRODUCTS).every(type=>f.previews.includes(type)));
+    if(!english){assert.match(f.html,/טוסטר/);assert.doesNotMatch(f.html,/מצנם/);}
     assert.match(f.html,/href="https:\/\/www\.netoneto\.co\.il\//);assert.equal(f.writes.length,0);assert.equal(f.frames.size,0);
   }
 });
@@ -108,7 +109,7 @@ test('keyboard and phone controls move, rotate and drop once, while form inputs 
   const before={...f.game.active};assert.equal(f.key('ArrowLeft','ArrowLeft',{editable:true}),false);assert.deepEqual(f.game.active,before);
   const pieces=f.game.pieces;f.key(' ','Space',{repeat:true});assert.equal(f.game.pieces,pieces);f.key(' ','Space');assert.equal(f.game.pieces,pieces+1);
   assert.doesNotMatch(f.html,/role="timer"|data-neto-time|הגבלת זמן|בלי שעון|No time limit|No clock/i);
-  assert.equal((f.html.match(/data-neto-preview=/g)||[]).length,1);assert.doesNotMatch(f.html,/data-neto-lines|data-neto-level/);
+  assert.equal((f.html.match(/data-neto-preview=/g)||[]).length,1);assert.match(f.html,/data-neto-lines/);assert.match(f.html,/data-neto-level/);
   const sideBrands=[...f.html.matchAll(/<[^>]+\bclass="[^"]*\bneto-side-brand-(?:left|right)\b[^"]*"[^>]*>/g)];
   assert.equal(sideBrands.length,2);for(const side of ['neto-side-brand-left','neto-side-brand-right'])assert.ok(sideBrands.some(match=>match[0].includes(side)));
   for(const brand of sideBrands)assert.match(brand[0],/aria-hidden="true"/);
@@ -126,7 +127,10 @@ test('Space on a focused button retains native activation instead of hard-droppi
   assert.equal(f.key(' ','Space',{button:true}),false);assert.equal(f.game.pieces,pieces);await f.click('[data-neto-pause]',0);assert.equal(f.frames.size,0);
 });
 test('pause, hidden tabs and navigation preserve the same score and lives across long absences',async()=>{
-  const f=fixture();await f.start();clearRow(f);const game=f.game,points=game.score,active={...game.active};
+  const f=fixture();await f.start();
+  for(let row=1;row<=10;row++){clearRow(f);assert.equal(f.nodes.get('[data-neto-lines]').textContent,String(row));assert.equal(f.nodes.get('[data-neto-level]').textContent,row<10?'1':'2');}
+  assert.equal(f.nodes.get('[data-neto-score]').textContent,'1,000');
+  const game=f.game,points=game.score,active={...game.active};
   await f.click('[data-neto-pause]');assert.equal(f.frames.size,0);f.advance(1000);f.key('ArrowLeft','ArrowLeft');assert.deepEqual(game.active,active);assert.equal(game.score,points);
   await f.click('[data-neto-resume]');assert.equal(f.frames.size,1);f.visibility('hidden');assert.equal(f.frames.size,0);f.jumpTime(3600000);f.visibility('visible');assert.equal(f.frames.size,0);
   assert.match(f.nodes.get('[data-neto-overlay]').innerHTML,/מוכנים\? ממשיכים מאותה נקודה\./);assert.doesNotMatch(f.nodes.get('[data-neto-overlay]').innerHTML,/הגבלת זמן|בלי שעון|No time limit|No clock/i);await f.click('[data-neto-resume]');f.advance(20);assert.equal(f.game,game);assert.equal(game.score,points);assert.equal(game.lives,4);

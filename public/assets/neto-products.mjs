@@ -85,7 +85,7 @@ export const NETO_PRODUCTS=Object.freeze({
     ]
   },
   "Z": {
-    "he": "מצנם",
+    "he": "טוסטר",
     "en": "Toaster",
     "kind": "toaster",
     "image": "assets/games/neto/toaster.webp",

@@ -15,7 +15,7 @@
 @media(max-width:600px){.neto-play-stage{padding-inline:0}.neto-side-brand{top:135px;bottom:auto;height:380px;width:30px}.neto-side-brand img{width:112px;opacity:.85}}
 
 /* A single next delivery and the four Fish brothers represent the remaining lives. */
-.neto-stats{grid-template-columns:1fr}
+.neto-stats{grid-template-columns:1fr 1fr}
 .neto-next-piece{display:flex;flex-direction:column;justify-content:center;gap:8px}
 .neto-next-piece canvas{width:144px;height:108px;grid-row:auto}
 .neto-next-piece>span,.neto-next-piece:not(:first-child)>span{align-self:center;grid-row:auto;text-align:center;font-size:calc(13px * var(--a11y-text-scale,1))}
@@ -31,8 +31,8 @@
 .neto-brother[data-lost=true]{opacity:.24;filter:grayscale(1)}
 .neto-brother[data-lost=true] .neto-brother-photo{border-color:#9aa6b4}
 @media(max-width:600px){
- .neto-stats{grid-template-columns:1fr}
- .neto-stats>.neto-score-stat{min-height:52px}
+ .neto-stats{grid-template-columns:1.4fr 1fr 1fr}
+ .neto-stats>div,.neto-stats>.neto-score-stat{min-height:52px}
  .neto-next{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 10px;border:1px solid var(--neto-line);border-radius:9px;background:#fff}
  .neto-next h4{display:block;margin:0;font-size:calc(10px * var(--a11y-text-scale,1));white-space:nowrap}
  .neto-next>div{display:block}
