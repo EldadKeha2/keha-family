@@ -88,7 +88,8 @@ test('the bilingual opening tells the Fish family story without dashes and expla
     assert.match(f.html,english?/Hashmal Neto Tetris/:/חשמל נטו טטריס/);
     const story=f.html.match(/<p class="neto-story">([^<]+)<\/p>/)?.[1];assert.ok(story);assert.doesNotMatch(story,/[-‐‑‒–—־]/);
     assert.match(story,english?/Tomer/:/תומר/);assert.match(story,english?/Tedi/:/תדי/);assert.match(story,english?/Fish brothers/:/האחים פיש/);
-    assert.match(f.html,english?/Three lives\. No clock\./:/שלוש פסילות\. בלי שעון\./);
+    assert.match(f.html,english?/Three lives\./:/שלוש פסילות\./);
+    assert.doesNotMatch(f.html,/כל הבית נופל למקום|Everything falls into place|הגבלת זמן|בלי שעון|No time limit|No clock/i);
     assert.match(f.html,english?/Clearing with ZAP adds no points/:/הניקוי עצמו לא מוסיף נקודות/);
     assert.equal((f.html.match(/data-neto-preview=/g)||[]).length,7);assert.ok(Object.keys(NETO_PRODUCTS).every(type=>f.previews.includes(type)));
     assert.match(f.html,/href="https:\/\/www\.netoneto\.co\.il\//);assert.equal(f.writes.length,0);assert.equal(f.frames.size,0);
@@ -101,7 +102,11 @@ test('keyboard and phone controls move, rotate and drop once, while form inputs 
   const y=f.game.active.y;f.pointer('down');f.release();assert.equal(f.game.active.y,y+1);
   const before={...f.game.active};assert.equal(f.key('ArrowLeft','ArrowLeft',{editable:true}),false);assert.deepEqual(f.game.active,before);
   const pieces=f.game.pieces;f.key(' ','Space',{repeat:true});assert.equal(f.game.pieces,pieces);f.key(' ','Space');assert.equal(f.game.pieces,pieces+1);
-  assert.doesNotMatch(f.html,/role="timer"|data-neto-time/);assert.match(f.html,/בלי הגבלת זמן/);
+  assert.doesNotMatch(f.html,/role="timer"|data-neto-time|הגבלת זמן|בלי שעון|No time limit|No clock/i);
+  const sideBrands=[...f.html.matchAll(/<[^>]+\bclass="[^"]*\bneto-side-brand-(?:left|right)\b[^"]*"[^>]*>/g)];
+  assert.equal(sideBrands.length,2);for(const side of ['neto-side-brand-left','neto-side-brand-right'])assert.ok(sideBrands.some(match=>match[0].includes(side)));
+  for(const brand of sideBrands)assert.match(brand[0],/aria-hidden="true"/);
+  assert.equal((f.html.match(/src="assets\/games\/neto\/logo\.webp"/g)||[]).length,2);
 });
 test('holding a phone direction repeats until release and remounting leaves one set of listeners',async()=>{
   const f=fixture();await f.start();setActive(f,'T');f.advance(20);f.pointer('left');f.advance(480);assert.equal(f.game.active.x,0);
@@ -118,7 +123,7 @@ test('pause, hidden tabs and navigation preserve the same score and lives across
   const f=fixture();await f.start();clearRow(f);const game=f.game,points=game.score,active={...game.active};
   await f.click('[data-neto-pause]');assert.equal(f.frames.size,0);f.advance(1000);f.key('ArrowLeft','ArrowLeft');assert.deepEqual(game.active,active);assert.equal(game.score,points);
   await f.click('[data-neto-resume]');assert.equal(f.frames.size,1);f.visibility('hidden');assert.equal(f.frames.size,0);f.jumpTime(3600000);f.visibility('visible');assert.equal(f.frames.size,0);
-  assert.match(f.nodes.get('[data-neto-overlay]').innerHTML,/אין הגבלת זמן/);await f.click('[data-neto-resume]');f.advance(20);assert.equal(f.game,game);assert.equal(game.score,points);assert.equal(game.lives,3);
+  assert.match(f.nodes.get('[data-neto-overlay]').innerHTML,/מוכנים\? ממשיכים מאותה נקודה\./);assert.doesNotMatch(f.nodes.get('[data-neto-overlay]').innerHTML,/הגבלת זמן|בלי שעון|No time limit|No clock/i);await f.click('[data-neto-resume]');f.advance(20);assert.equal(f.game,game);assert.equal(game.score,points);assert.equal(game.lives,3);
   await f.click('[data-neto-back]');assert.equal(f.backs,1);assert.equal(f.frames.size,0);f.jumpTime(86400000);f.mount();await f.flush();assert.equal(f.game,game);assert.equal(f.frames.size,0);
   await f.click('[data-neto-resume]');assert.equal(f.frames.size,1);assert.equal(game.phase,'playing');assert.equal(game.score,points);assert.equal(game.lives,3);
 });
