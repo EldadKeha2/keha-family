@@ -1,0 +1,40 @@
+.home-install{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:10px 13px;margin:0 0 20px;padding:15px;border:1px solid #c8cba9;border-radius:12px;background:linear-gradient(120deg,#f0f2e4,#fbf7eb);text-align:start;box-sizing:border-box;color:#5f704b}
+.home-install[hidden]{display:none!important}
+.home-install>img{display:block;width:52px;height:52px;border-radius:12px;border:1px solid #d4c4a0}
+.home-install-copy{min-width:0}
+.home-install-copy strong{display:block;font:600 calc(18px * var(--a11y-text-scale,1))/1.45 var(--serif)}
+.home-install-copy p{margin:4px 0 0;font:calc(13px * var(--a11y-text-scale,1))/1.6 var(--sans);color:#71694f;overflow-wrap:anywhere}
+.home-install-actions{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:9px}
+.home-install-actions[data-installed=true]{grid-template-columns:minmax(0,1fr)}
+.home-install-actions button{min-width:0;min-height:44px;padding:10px 12px;border:1px solid #61754e;border-radius:7px;background:#61754e;color:#fffdf4;font:600 calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans);white-space:normal;overflow-wrap:anywhere}
+.home-install [data-home-install-share]{background:#fbf8ed;border-color:#bdc4a6;color:#5a6e47}
+.home-install [data-home-install-share]:hover{background:#e9eddc}
+.home-install [data-home-install-action]:hover{background:#526541}
+.home-install-actions button:disabled{opacity:.7;cursor:wait}
+.home-install-status{grid-column:1/-1;margin:0;font:calc(13px * var(--a11y-text-scale,1))/1.65 var(--sans);color:#5d6b47;overflow-wrap:anywhere}
+.home-install-status:empty{display:none}
+.home-install-link-label,.home-install-link-input{grid-column:1/-1;font:calc(13px * var(--a11y-text-scale,1))/1.6 var(--sans);color:#635c43}
+.home-install-link-input{box-sizing:border-box;min-width:0;width:100%;min-height:44px;padding:10px;border:1px solid #c6b792;border-radius:5px;background:#fffdf7}
+.home-install [hidden]{display:none!important}
+.home-install-dialog{box-sizing:border-box;width:calc(100% - 28px);max-width:480px;max-height:calc(100dvh - 32px);margin:auto;padding:25px 23px 22px;border:1px solid #beaa7d;border-radius:15px;background:#fcf8ed;color:#635739;text-align:start;overflow:auto;overscroll-behavior:contain;box-shadow:0 14px 65px #30291840}
+.home-install-dialog::backdrop{background:#302b235e}
+.home-install-dialog h2{margin:12px 0 7px;padding-inline-end:22px;font:calc(27px * var(--a11y-text-scale,1))/1.4 var(--serif);color:#5e714b}
+.home-install-dialog h3{font:600 calc(17px * var(--a11y-text-scale,1))/1.5 var(--sans);color:#5e714b;margin:20px 0 7px}
+.home-install-dialog-icon{display:block;width:64px;height:64px;border:1px solid #d4c4a0;border-radius:14px}
+.home-install-dialog .home-install-close{position:absolute;inset-inline-end:10px;top:8px;display:grid;place-items:center;min-width:44px;min-height:44px;padding:0;border:0;border-radius:7px;background:transparent;color:#796b4f;font:30px/1 var(--sans)}
+.home-install-dialog .home-install-close:hover{background:#eee8d8}
+.home-install-dialog-intro{margin:0 0 16px;font:calc(15px * var(--a11y-text-scale,1))/1.7 var(--sans);color:#82704e}
+.home-install-dialog ol{margin:15px 0 22px;padding-inline-start:25px;font:calc(16px * var(--a11y-text-scale,1))/1.85 var(--sans)}
+.home-install-dialog li{padding-inline-start:3px;margin:10px 0;overflow-wrap:anywhere}
+.home-install-dialog li::marker{color:#70834f;font-weight:700}
+.home-install-share{display:inline-block;box-sizing:border-box;width:18px;height:21px;line-height:16px;text-align:center;border:1.5px solid currentColor;border-top-color:transparent;border-radius:2px;font-weight:700}
+.home-install-browser-note{margin:14px 0;padding:12px;border:1px solid #dccaa4;border-radius:7px;background:#f4ecda;font:calc(14px * var(--a11y-text-scale,1))/1.8 var(--sans)}
+.home-install-link-tools{border-top:1px solid #ddd0b2;padding-top:16px}
+.home-install-link-tools button{min-height:44px;width:100%;padding:10px 14px;border:1px solid #b6bfa2;border-radius:7px;background:#eaf0df;color:#536842;font:calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans);white-space:normal}
+.home-install-link-tools p{font:calc(13px * var(--a11y-text-scale,1))/1.6 var(--sans);color:#697550;margin:9px 0 0}
+.home-install-link-tools p:empty{display:none}
+.home-install-link-tools label{display:block;margin-top:12px;font:calc(13px * var(--a11y-text-scale,1))/1.6 var(--sans)}
+.home-install-link-tools input{display:block;box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin-top:6px;padding:10px;border:1px solid #c6b792;border-radius:5px;background:#fffdf7;color:#5f573e;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.home-install-dialog [hidden]{display:none!important}
+.home-install button:focus-visible,.home-install-dialog button:focus-visible,.home-install-dialog input:focus-visible{outline:3px solid #a27f45;outline-offset:3px}
+@media(max-width:350px){.home-install{padding:12px;gap:9px 10px}.home-install-dialog{padding:22px 17px}.home-install-dialog h2{font-size:calc(24px * var(--a11y-text-scale,1))}}

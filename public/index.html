@@ -7,6 +7,13 @@
   <meta name="description" content="אילן היוחסין של משפחת קהא, שישה ענפים וחמישה דורות של סיפורים וזיכרונות.">
   <title>השורשים שלנו · משפחת קהא</title>
   <link rel="icon" href="assets/medallion.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icons/apple-touch-icon.png">
+  <meta name="application-name" content="בית משפחת קהא">
+  <meta name="apple-mobile-web-app-title" content="משפחת קהא">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="assets/home-install.css?v=1">
   <link rel="stylesheet" href="assets/style.css?v=a11y1">
   <link rel="stylesheet" href="assets/maintenance.css?v=a11y1">
   <link rel="stylesheet" href="assets/readable.css?v=a11y1">
@@ -38,6 +45,7 @@
   <script src="family-data.js" defer></script>
   <script src="assets/translations.js?v=20261105.faces1" defer></script>
   <script src="assets/i18n.js" defer></script>
+  <script src="assets/home-install.js?v=1" defer></script>
   <script src="assets/accessibility.js?v=1" defer></script>
   <script src="assets/dates.js" defer></script>
   <script src="assets/tags.js?v=faces-v1" defer></script>
@@ -94,6 +102,7 @@
         <div id="directoryView" hidden><div class="directory-tabs" role="tablist" aria-label="קבוצות בני משפחה"><button role="tab" type="button" data-directory-group="main" aria-selected="true">המשפחה שלנו</button><button role="tab" type="button" data-directory-group="extended" aria-selected="false">בני משפחה נוספים</button></div><div class="directory-heading"><p id="directoryCount"></p><span>לחיצה על כרטיס פותחת את העמוד האישי</span></div><div class="directory-grid" id="directoryGrid"></div><div class="empty-search" id="emptySearch" hidden>לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.</div></div>
         <section id="homeView" class="phone-home-view" aria-label="הבית המשפחתי" hidden>
           <header class="phone-home-intro"><img src="assets/fez.svg" alt="" width="55" height="55"><div><span class="small-eyebrow">מהשורשים שלנו, אל הרגע הבא</span><h2>הבית שלנו מתחיל כאן</h2><p>כל המשפחה, הסיפורים והרגעים שלנו.</p></div></header>
+          <section id="homeInstall" class="home-install" data-i18n-skip hidden></section>
           <section class="family-slideshow" aria-label="רגעים מהאלבום המשפחתי"><button id="homeSlideOpen" class="home-slide-open" aria-label="פתיחת התמונה המשפחתית"><img id="homeSlideImage" alt="" hidden><span class="home-slide-placeholder" id="homeSlidePlaceholder"><span aria-hidden="true">❖</span><strong>הרגעים שלנו, ביחד</strong><small>תמונות מהאלבום המשפחתי יתחלפו כאן.</small></span></button><div class="home-slide-caption" id="homeSlideCaption"></div><div class="home-slide-controls"><button id="homeSlidePrevious" aria-label="התמונה המשפחתית הקודמת">→</button><span id="homeSlideCounter"></span><button id="homeSlideNext" aria-label="התמונה המשפחתית הבאה">←</button><button id="homeSlidePause" aria-label="השהיית התמונות המתחלפות">Ⅱ</button></div></section>
           <div class="phone-home-tiles" id="homeTiles"></div>
           <p class="home-family-motto">קהא · חריזי · בקר · נובל · פיש · בלום</p>
@@ -187,6 +196,7 @@
   <dialog class="portal-dialog delete-media-dialog" id="deleteMediaDialog" aria-labelledby="deleteMediaTitle" aria-describedby="deleteMediaName"><span class="small-eyebrow">מחיקת פריט מהאלבום</span><h2 id="deleteMediaTitle">האם אתה בטוח שאתה רוצה למחוק פריט זה?</h2><p id="deleteMediaName" dir="auto"></p><p class="delete-media-hint" id="deleteMediaHint">הפריט יוסר מהאתר. מיד לאחר המחיקה אפשר לבחור ״ביטול מחיקה״.</p><p id="deleteMediaError" class="form-error" role="alert"></p><div class="form-actions"><button class="secondary-button" id="cancelMediaDelete" autofocus>ביטול</button><button class="delete-confirm-button" id="confirmMediaDelete">כן, מחק</button></div></dialog>
 <dialog class="portal-dialog tag-people-dialog" id="tagPeopleDialog" aria-labelledby="tagPeopleTitle"><button class="dialog-close" id="closePeopleTags" aria-label="סגירת התיוגים">×</button><h2 id="tagPeopleTitle" class="visually-hidden">תייגו מי מופיע כאן</h2><p class="tag-media-name visually-hidden" id="tagMediaName" dir="auto"></p><div id="tagModalMount"></div><div class="form-actions"><button class="secondary-button" id="donePeopleTags" type="button">סיום</button></div></dialog>
   <dialog class="portal-dialog mobile-nav-dialog" id="mobileNavDialog" aria-labelledby="mobileNavTitle"><button class="dialog-close" id="closeMobileMenu" aria-label="סגירת תפריט">×</button><h2 id="mobileNavTitle">לאן נלך היום?</h2><div id="mobileMenuTiles" class="phone-home-tiles"></div></dialog>
+  <dialog id="homeInstallDialog" class="home-install-dialog" data-i18n-skip aria-labelledby="homeInstallTitle"></dialog>
   <dialog class="portal-dialog calendar-day-dialog" id="calendarDayDialog" aria-labelledby="calendarDayTitle"><button class="dialog-close" id="closeCalendarDay" aria-label="סגירת פרטי היום">×</button><h2 id="calendarDayTitle"></h2><p id="calendarDaySubtitle"></p><div id="calendarDayEvents"></div></dialog>
   <dialog class="portal-dialog email-preview-dialog" id="emailPreviewDialog" aria-labelledby="emailPreviewTitle"><button class="dialog-close" data-close-dialog="emailPreviewDialog" aria-label="סגירה">×</button><h2 id="emailPreviewTitle">כך ייראה המייל</h2><iframe id="emailPreviewFrame" sandbox="" title="תצוגה מקדימה של המייל"></iframe></dialog>
   <div class="toast" id="toast" role="status" hidden></div>

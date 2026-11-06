@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "בית משפחת קהא",
+  "short_name": "משפחת קהא",
+  "description": "המשפחה, התמונות, הסיפורים והמשחקים שלנו במקום אחד.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/?source=homescreen#home",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f3e9",
+  "theme_color": "#f7f3e9",
+  "prefer_related_applications": false,
+  "icons": [
+    {"src": "/assets/app-icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/app-icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/app-icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
