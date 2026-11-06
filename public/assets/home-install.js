@@ -14,6 +14,7 @@
   let english=Boolean(window.FamilyI18n?.isEnglish);const tr=(he,en)=>english?en:he;
   const ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
   const android=/Android/i.test(ua),embedded=/FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(ua);
+  const mobileDevice=ios||android||navigator.userAgentData?.mobile===true||/Mobile|Tablet/i.test(ua);
   const url=new URL('/',location.origin),language=window.FamilyI18n?.language;
   if(['he','en-US','en-GB'].includes(language))url.searchParams.set('lang',language);
   url.hash='home';
@@ -172,7 +173,7 @@
     dialog.querySelector('[data-home-install-invite-browse]').addEventListener('click',continueToSite);
     showDialog('invite',returnFocus);update();
   }
-  function offerInvitation(){if(!installationInvitation||invitationOffered)return;invitationOffered=true;openInvitation();}
+  function offerInvitation(){if(!installationInvitation||invitationOffered||!mobileDevice)return;invitationOffered=true;openInvitation();}
   async function requestInstallation(fromInvitation=false){
     if(busy||(!fromInvitation&&button.hidden))return;
     if(hasInstalledShortcut()){

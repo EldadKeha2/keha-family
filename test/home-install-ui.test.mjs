@@ -300,6 +300,34 @@ test('invitation browse dismisses the introduction permanently for this page and
   assert.equal(ordinary.dialog.open,false);assert.equal(ordinary.dialog.modalCalls,0);
 });
 
+test('shared installation links leave desktop browsers on the website at every viewport width',async()=>{
+  for(const userAgent of [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Safari/605.1.15',
+    'Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/145.0'
+  ])for(const mobile of [false,true]){
+    const entryUrl='https://family.example/?lang=he&install=1#home',f=fixture({userAgent,mobile,entryUrl,autoReady:false,recordNavigation:true}),offer=f.offer();
+    f.ready();await tick();assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,0);assert.equal(offer.calls,0);assert.equal(f.card.hidden,!mobile);
+    f.resize(!mobile);f.window.dispatchEvent(new Event('pageshow'));f.window.dispatchEvent(new Event('focus'));f.document.dispatchEvent(new Event('visibilitychange'));await tick();
+    assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,0);assert.equal(offer.calls,0);assert.deepEqual(f.assignments,[]);assert.equal(f.location.href,entryUrl);
+  }
+});
+
+test('phones and tablets receive shared installation invitations even with wide viewports',async()=>{
+  for(const options of [
+    {userAgent:'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Safari/537.36'},
+    {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1'},
+    {userAgent:'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) Safari/604.1'},
+    {userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Safari/605.1',maxTouchPoints:5},
+    {userAgent:'Mozilla/5.0 (Tablet; rv:145.0) Gecko/20100101 Firefox/145.0'},
+    {userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36',userAgentMobile:true}
+  ]){
+    const f=fixture({...options,mobile:false,entryUrl:'https://family.example/?lang=he&install=1#home',autoReady:false}),offer=f.offer();
+    assert.equal(f.dialog.open,false);f.ready();await tick();assert.equal(f.dialog.open,true);assert.equal(offer.calls,0);
+    f.click(f.dialog.querySelector('[data-home-install-invite-start]'));assert.equal(offer.calls,1);await tick();
+  }
+});
+
 test('older phones without native dialog support can open and dismiss an installation invitation',async()=>{
   const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home',nativeDialog:false});await tick();
   assert.equal(f.dialog.open,true);assert.equal(f.dialog.hasAttribute('open'),true);
@@ -313,10 +341,12 @@ test('invitation without a native prompt opens localized platform steps without 
   for(const options of [
     {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1',browser:/Safari/,otherBrowser:/Chrome/},
     {userAgent:'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',browser:/Chrome/,otherBrowser:/Safari/},
-    {userAgent:'Mozilla/5.0 (X11; Linux x86_64) Firefox/145.0',browser:/iPhone \/ iPad/}
+    {userAgent:'Mozilla/5.0 (X11; Linux x86_64) Firefox/145.0',browser:/iPhone \/ iPad/,desktop:true}
   ]){
     const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true,clipboard:'blocked'});await tick();
-    assert.equal(f.dialog.open,true);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+    if(options.desktop){assert.equal(f.dialog.open,false);f.click(f.button());}
+    else{assert.equal(f.dialog.open,true);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));}
+    await tick();assert.equal(f.dialog.open,true);
     assert.match(f.dialog.innerHTML,options.browser);assert.match(f.dialog.innerHTML,/Add to Home [Ss]creen/);assert.doesNotMatch(f.dialog.innerHTML,/[֐-׿]/);
     if(options.otherBrowser)assert.doesNotMatch(f.dialog.innerHTML,options.otherBrowser);
     assertNoInstallationCopy(f.dialog);assert.equal(f.copied.length,0);
