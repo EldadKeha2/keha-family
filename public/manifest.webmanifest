@@ -11,6 +11,9 @@
   "background_color": "#f7f3e9",
   "theme_color": "#f7f3e9",
   "prefer_related_applications": false,
+  "related_applications": [
+    {"platform": "webapp", "url": "https://keha-family.eldadkeha.workers.dev/manifest.webmanifest", "id": "https://keha-family.eldadkeha.workers.dev/"}
+  ],
   "icons": [
     {"src": "/assets/app-icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
     {"src": "/assets/app-icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},

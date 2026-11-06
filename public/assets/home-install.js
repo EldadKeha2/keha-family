@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const phoneQuery=matchMedia('(max-width: 700px)'),standaloneQuery=matchMedia('(display-mode: standalone)');
-  let installPrompt=null,installed=false,busy=false,dialogKind=null,dialogReturnFocus=null,feedbackTimer;
+  let installPrompt=null,installed=false,relatedInstalled=false,installationCheck=null,busy=false,dialogKind=null,dialogReturnFocus=null,feedbackTimer;
   // Keep the browser's one-use event until the visitor explicitly asks to install.
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;update();});
   window.addEventListener('appinstalled',()=>{installed=true;installPrompt=null;update();});
@@ -52,11 +52,24 @@
     }finally{shareButton.disabled=false;}
   });
 
+  function hasInstalledShortcut(){return installed||relatedInstalled||standaloneQuery.matches||navigator.standalone===true;}
+  function checkInstalledShortcut(){
+    if(window.top!==window||typeof navigator.getInstalledRelatedApps!=='function')return Promise.resolve();
+    if(installationCheck)return installationCheck;
+    const manifestURL=new URL('/manifest.webmanifest',location.origin).href,appID=new URL('/',location.origin).href;
+    installationCheck=Promise.resolve().then(()=>navigator.getInstalledRelatedApps()).then(apps=>{
+        relatedInstalled=apps.some(app=>app.platform==='webapp'&&(app.url===manifestURL||app.id===appID));
+        if(relatedInstalled)installPrompt=null;
+        update();
+    }).catch(()=>{}).finally(()=>{installationCheck=null;});
+    return installationCheck;
+  }
   function update(){
     if(!card)return;
-    const isInstalled=installed||standaloneQuery.matches||navigator.standalone===true;
+    const isInstalled=hasInstalledShortcut();
     card.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);
-    button.hidden=isInstalled;status.hidden=isInstalled;
+    button.hidden=false;status.hidden=false;
+    button.setAttribute('aria-haspopup',isInstalled?'false':'dialog');
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
     if(isInstalled&&dialog.open&&dialogKind==='install')dialog.close();
   }
@@ -91,7 +104,16 @@
   }
   button.addEventListener('click',async()=>{
     if(busy||button.hidden)return;
-    if(!installPrompt){openHelp();return;}
+    if(hasInstalledShortcut()){
+      announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));
+      return;
+    }
+    if(!installPrompt){
+      if(window.top===window&&typeof navigator.getInstalledRelatedApps==='function')await checkInstalledShortcut();
+      if(hasInstalledShortcut())announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));
+      else openHelp();
+      return;
+    }
     const prompt=installPrompt;installPrompt=null;busy=true;button.disabled=true;status.textContent='';shareStatus.textContent='';
     try{
       await prompt.prompt();
@@ -107,6 +129,7 @@
   });
   dialog.addEventListener('close',()=>{if(!card.hidden)(dialogReturnFocus===button&&button.hidden?shareButton:dialogReturnFocus||shareButton).focus();dialogKind=null;});
   for(const query of [phoneQuery,standaloneQuery])query.addEventListener?.('change',update);
-  window.addEventListener('pageshow',update);
-  update();
+  window.addEventListener('pageshow',()=>{update();void checkInstalledShortcut();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void checkInstalledShortcut();});
+  update();void checkInstalledShortcut();
 })();
