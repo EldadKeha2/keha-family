@@ -1,10 +1,10 @@
 (() => {
   'use strict';
   const phoneQuery=matchMedia('(max-width: 700px)'),standaloneQuery=matchMedia('(display-mode: standalone)');
-  let installPrompt=null,installed=false,busy=false;
+  let installPrompt=null,installed=false,busy=false,dialogKind=null,dialogReturnFocus=null,feedbackTimer;
   // Keep the browser's one-use event until the visitor explicitly asks to install.
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;update();});
-  window.addEventListener('appinstalled',()=>{installed=true;installPrompt=null;update();if(dialog?.open)dialog.close();});
+  window.addEventListener('appinstalled',()=>{installed=true;installPrompt=null;update();});
 
   const card=document.getElementById('homeInstall'),dialog=document.getElementById('homeInstallDialog');
   if(!card||!dialog)return;
@@ -15,28 +15,40 @@
   if(['he','en-US','en-GB'].includes(language))url.searchParams.set('lang',language);
   url.hash='home';
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  card.innerHTML='<img src="assets/app-icons/icon-192.png" width="52" height="52" alt=""><div class="home-install-copy"><strong data-home-install-heading></strong><p data-home-install-description></p></div><div class="home-install-actions" data-home-install-actions><button type="button" data-home-install-action aria-haspopup="dialog" aria-controls="homeInstallDialog">'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'</button><button type="button" data-home-install-share>'+tr('שיתוף הקיצור','Share shortcut')+'</button></div><p class="home-install-status" data-home-install-status role="status" aria-live="polite"></p><p class="home-install-status" data-home-install-share-status role="status" aria-live="polite"></p><label class="home-install-link-label" for="homeInstallShareLink" hidden>'+tr('קישור לאתר להעתקה ולשיתוף','Website link to copy and share')+'</label><input class="home-install-link-input" id="homeInstallShareLink" value="'+escape(url.href)+'" readonly dir="ltr" hidden>';
+  const shortcutIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="2" width="12" height="20" rx="2"/><path d="M8 18h4M19 5v8m-4-4h8"/></svg>';
+  const shareIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.7 10.5 6.6-4m-6.6 7 6.6 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>';
+  card.innerHTML='<div class="home-install-actions" data-home-install-actions><button type="button" data-home-install-action aria-label="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" title="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" aria-haspopup="dialog" aria-controls="homeInstallDialog">'+shortcutIcon+'<span>'+tr('קיצור דרך','Shortcut')+'</span></button><button type="button" data-home-install-share aria-label="'+tr('שיתוף האתר','Share website')+'" title="'+tr('שיתוף האתר','Share website')+'">'+shareIcon+'<span>'+tr('שיתוף','Share')+'</span></button></div><p class="home-install-status" data-home-install-status role="status" aria-live="polite"></p><p class="home-install-status" data-home-install-share-status role="status" aria-live="polite"></p>';
   const button=card.querySelector('[data-home-install-action]'),status=card.querySelector('[data-home-install-status]');
   const shareButton=card.querySelector('[data-home-install-share]'),shareStatus=card.querySelector('[data-home-install-share-status]');
+  function announce(target,message){
+    clearTimeout(feedbackTimer);status.textContent='';shareStatus.textContent='';target.textContent=message;
+    feedbackTimer=setTimeout(()=>{target.textContent='';},5000);
+  }
+  function showDialog(kind,returnFocus){
+    dialogKind=kind;dialogReturnFocus=returnFocus;
+    dialog.querySelector('[data-home-install-close]').addEventListener('click',()=>dialog.close());
+    if(!dialog.open)dialog.showModal();
+    dialog.querySelector('[data-home-install-close]').focus();
+  }
+  function openShareFallback(){
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת השיתוף','Close sharing')+'">×</button><h2 id="homeInstallTitle">'+tr('שיתוף האתר','Share website')+'</h2><p class="home-install-dialog-intro">'+tr('לחצו לחיצה ממושכת על הקישור, העתיקו אותו ושלחו לבני המשפחה.','Press and hold the link, copy it, and send it to your family.')+'</p><div class="home-install-link-tools"><label for="homeInstallShareLink">'+tr('קישור לאתר להעתקה','Website link to copy')+'</label><input id="homeInstallShareLink" value="'+escape(url.href)+'" readonly dir="ltr"></div>';
+    showDialog('share',shareButton);
+    const input=dialog.querySelector('#homeInstallShareLink');input.focus();input.select();input.setSelectionRange?.(0,input.value.length);
+  }
   shareButton.addEventListener('click',async()=>{
     if(shareButton.disabled)return;
-    shareButton.disabled=true;shareStatus.textContent='';
+    shareButton.disabled=true;shareStatus.textContent='';status.textContent='';
     try{
       if(typeof navigator.share==='function'){
         try{
-          await navigator.share({title:tr('בית משפחת קהא','Keha Family Home'),text:tr('הבית שלנו מתחיל כאן. פתחו את האתר בטלפון והתקינו קיצור דרך למסך הבית.','Our family home starts here. Open the website on your phone and install a home screen shortcut.'),url:url.href});
-          shareStatus.textContent=tr('השיתוף הושלם.','Sharing complete.');return;
+          await navigator.share({title:tr('בית משפחת קהא','Keha Family Home'),text:tr('הבית שלנו מתחיל כאן. התמונות, הסיפורים והרגעים של המשפחה.','Our family home starts here. Family photos, stories and memories.'),url:url.href});
+          announce(shareStatus,tr('הקישור הועבר לשיתוף','Link ready to share'));return;
         }catch(error){if(error?.name==='AbortError')return;}
       }
       try{
         await navigator.clipboard.writeText(url.href);
-        shareStatus.textContent=tr('הקישור הועתק. שלחו אותו לבני המשפחה כדי שיוכלו להוסיף גם אצלם קיצור דרך.','Link copied. Send it to the family so they can add their own shortcut.');
-      }catch{
-        const input=card.querySelector('#homeInstallShareLink');input.hidden=false;
-        card.querySelector('label[for="homeInstallShareLink"]').hidden=false;
-        input.focus();input.select();input.setSelectionRange?.(0,input.value.length);
-        shareStatus.textContent=tr('לחצו לחיצה ממושכת על הקישור המסומן, העתיקו אותו ושלחו לבני המשפחה.','Press and hold the selected link, copy it, and send it to the family.');
-      }
+        announce(shareStatus,tr('הקישור הועתק','Link copied'));
+      }catch{openShareFallback();}
     }finally{shareButton.disabled=false;}
   });
 
@@ -46,9 +58,7 @@
     card.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);
     button.hidden=isInstalled;status.hidden=isInstalled;
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
-    card.querySelector('[data-home-install-heading]').textContent=isInstalled?tr('הבית שלנו, במרחק נגיעה','Our family, just one tap away'):tr('הבית שלנו, גם במסך הבית','Our family, on your home screen');
-    card.querySelector('[data-home-install-description]').textContent=isInstalled?tr('שתפו את קיצור הדרך עם בני המשפחה.','Share the shortcut with your family.'):tr('קיצור דרך לאתר עם הסמל שלנו, כמו אפליקציה.','A shortcut to the family website, with our own app icon.');
-    if(isInstalled&&dialog.open)dialog.close();
+    if(isInstalled&&dialog.open&&dialogKind==='install')dialog.close();
   }
   function steps(items){return '<ol>'+items.map(item=>'<li>'+item+'</li>').join('')+'</ol>';}
   function appleHelp(){return steps([
@@ -65,7 +75,6 @@
     const embeddedNote=embedded?'<p class="home-install-browser-note">'+tr('האתר פתוח כרגע בתוך אפליקציה. העתיקו את הקישור ופתחו אותו ב Safari באייפון או ב Chrome באנדרואיד, ואז בצעו את השלבים הבאים.','This page is open inside another app. Copy the link and open it in Safari on iPhone or Chrome on Android, then follow these steps.')+'</p>':'';
     const help=ios?appleHelp():android?androidHelp():'<h3>iPhone / iPad</h3>'+appleHelp()+'<h3>Android</h3>'+androidHelp();
     dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button><img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('מוסיפים את הבית שלנו למסך הבית','Add our family to your home screen')+'</h2><p class="home-install-dialog-intro">'+tr('עוד רגע והמשפחה במרחק נגיעה.','Keep the family just one tap away.')+'</p>'+embeddedNote+help+'<div class="home-install-link-tools"><button type="button" data-home-install-copy>'+tr('העתקת קישור לאתר','Copy website link')+'</button><p data-home-install-copy-status role="status" aria-live="polite"></p><label for="homeInstallLink" hidden>'+tr('קישור לאתר להעתקה','Website link to copy')+'</label><input id="homeInstallLink" value="'+escape(url.href)+'" readonly dir="ltr" hidden></div>';
-    dialog.querySelector('[data-home-install-close]').addEventListener('click',()=>dialog.close());
     dialog.querySelector('[data-home-install-copy]').addEventListener('click',async()=>{
       const copyStatus=dialog.querySelector('[data-home-install-copy-status]');
       try{
@@ -78,17 +87,16 @@
         copyStatus.textContent=tr('לחצו לחיצה ממושכת על הקישור המסומן ובחרו ״העתק״.','Press and hold the selected link and choose “Copy”.');
       }
     });
-    if(!dialog.open)dialog.showModal();
-    dialog.querySelector('[data-home-install-close]').focus();
+    showDialog('install',button);
   }
   button.addEventListener('click',async()=>{
     if(busy||button.hidden)return;
     if(!installPrompt){openHelp();return;}
-    const prompt=installPrompt;installPrompt=null;busy=true;button.disabled=true;status.textContent='';
+    const prompt=installPrompt;installPrompt=null;busy=true;button.disabled=true;status.textContent='';shareStatus.textContent='';
     try{
       await prompt.prompt();
       const choice=await prompt.userChoice;
-      status.textContent=choice?.outcome==='accepted'?tr('השלימו את ההוספה בחלון של הטלפון.','Finish adding the website in your phone’s dialog.'):tr('אפשר להוסיף גם דרך תפריט הדפדפן. לחצו שוב להצגת ההנחיות.','You can also add it from your browser menu. Tap again for instructions.');
+      announce(status,choice?.outcome==='accepted'?tr('השלימו את ההוספה בטלפון.','Finish adding it on your phone.'):tr('לחצו שוב להנחיות ההוספה.','Tap again for installation instructions.'));
     }catch{openHelp();}
     finally{busy=false;button.disabled=false;update();}
   });
@@ -97,7 +105,7 @@
     const rect=dialog.getBoundingClientRect();
     if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)dialog.close();
   });
-  dialog.addEventListener('close',()=>{if(!card.hidden)(button.hidden?shareButton:button).focus();});
+  dialog.addEventListener('close',()=>{if(!card.hidden)(dialogReturnFocus===button&&button.hidden?shareButton:dialogReturnFocus||shareButton).focus();dialogKind=null;});
   for(const query of [phoneQuery,standaloneQuery])query.addEventListener?.('change',update);
   window.addEventListener('pageshow',update);
   update();

@@ -52,7 +52,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   if(share!=='missing')navigator.share=async payload=>{shared.push(payload);if(share!=='works'){const error=Error('Share unavailable');error.name=share;throw error;}};
   if(clipboard!=='missing')navigator.clipboard={writeText:async value=>{if(clipboard==='blocked')throw Error('Clipboard denied');copied.push(value);}};
   const location=new URL('https://family.example/?game=neto-tetris&lang='+window.FamilyI18n.language+'#games');
-  const context=vm.createContext({window,document,navigator,location,matchMedia,URL,Event,console,setTimeout,clearTimeout});
+  const context=vm.createContext({window,document,navigator,location,matchMedia,URL,Event,console,setTimeout:(fn,delay)=>{const timer=setTimeout(fn,delay);timer.unref();return timer;},clearTimeout});
   vm.runInContext(source,context);document.dispatchEvent(new Event('DOMContentLoaded'));
   const button=()=>card.querySelector('[data-home-install-action]');
   return {window,document,card,dialog,queries,nodes,copied,shared,button,
@@ -68,7 +68,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
 }
 
 test('phone shortcut responds to viewport changes while installed apps retain sharing and hide installation',()=>{
-  const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.match(f.card.innerHTML,/התקן קיצור דרך לאתר/);assert.match(f.card.innerHTML,/שיתוף הקיצור/);
+  const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.equal(f.button().getAttribute('aria-label'),'התקן קיצור דרך לאתר');assert.equal(f.card.querySelector('[data-home-install-share]').getAttribute('aria-label'),'שיתוף האתר');assert.match(f.card.innerHTML,/>קיצור דרך</);assert.match(f.card.innerHTML,/>שיתוף</);
   f.resize(false);assert.equal(f.card.hidden,true);f.resize(true);assert.equal(f.card.hidden,false);
   f.standalone(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,true);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.standalone(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
   assert.equal(fixture({mobile:false}).card.hidden,true);
@@ -117,9 +117,9 @@ test('copy keeps the home route and selected language rather than the current ga
   const fallback=blocked.nodes.get('homeInstallLink');assert.equal(fallback.hidden,false);assert.match(fallback.value,/family\.example/);
 });
 
-test('English card and platform instructions contain localized visible copy',()=>{
+test('English toolbar and platform instructions contain localized visible copy',()=>{
   const f=fixture({english:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1'});f.click(f.button());
-  assert.match(f.card.innerHTML,/Install site shortcut/i);assert.match(f.dialog.innerHTML,/Share/);assert.doesNotMatch(f.card.innerHTML+f.dialog.innerHTML,/[\u0590-\u05ff]/);
+  assert.equal(f.button().getAttribute('aria-label'),'Install site shortcut');assert.match(f.dialog.innerHTML,/Share/);assert.doesNotMatch(f.card.innerHTML+f.dialog.innerHTML,/[\u0590-\u05ff]/);
 });
 
 test('share uses the native share sheet only after a tap and sends the clean localized home link',async()=>{
@@ -128,26 +128,26 @@ test('share uses the native share sheet only after a tap and sends the clean loc
   assert.equal(f.copied.length,0);assert.equal(f.shared[0].title,'Keha Family Home');
   assert.equal(f.shared[0].url,'https://family.example/?lang=en-US#home');
   assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
-  assert.match(f.card.querySelector('[data-home-install-share-status]').textContent,/Sharing complete/);
+  assert.match(f.card.querySelector('[data-home-install-share-status]').textContent,/Link ready to share/);
 });
 
 test('cancelling the native share sheet is silent and does not copy anything',async()=>{
   const f=fixture({share:'AbortError'});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
   assert.equal(f.shared.length,1);assert.equal(f.copied.length,0);assert.equal(f.card.querySelector('[data-home-install-share-status]').textContent,'');
-  assert.equal(f.nodes.get('homeInstallShareLink').hidden,true);assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
+  assert.ok(!f.nodes.get('homeInstallShareLink')||f.nodes.get('homeInstallShareLink').hidden);assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
 });
 
 test('missing or failed Web Share copies the home link, and missing or blocked clipboard exposes a selected readable link',async()=>{
   for(const share of ['missing','NotAllowedError']){
     const f=fixture({share});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
-    assert.deepEqual(f.copied,['https://family.example/?lang=he#home']);assert.equal(f.nodes.get('homeInstallShareLink').hidden,true);
+    assert.deepEqual(f.copied,['https://family.example/?lang=he#home']);assert.ok(!f.nodes.get('homeInstallShareLink')||f.nodes.get('homeInstallShareLink').hidden);
   }
   for(const clipboard of ['missing','blocked']){
     const f=fixture({clipboard});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
-    const input=f.nodes.get('homeInstallShareLink');assert.equal(input.hidden,false);assert.equal(input.selected,true);
+    const input=f.nodes.get('homeInstallShareLink');assert.equal(f.dialog.open,true);assert.equal(input.hidden,false);assert.equal(input.selected,true);
     assert.equal(input.value,'https://family.example/?lang=he#home');assert.equal(f.document.activeElement,input);
-    assert.equal(f.card.querySelector('label[for="homeInstallShareLink"]').hidden,false);
-    assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
+    assert.equal(f.dialog.querySelector('label[for="homeInstallShareLink"]').hidden,false);
+    assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);f.dialog.close();assert.equal(f.document.activeElement,f.card.querySelector('[data-home-install-share]'));
   }
 });
 
@@ -162,4 +162,13 @@ test('manifest has a stable identity, home launch and real correctly sized phone
   }
   const applePath=html.match(/<link\s+rel="apple-touch-icon"\s+(?:sizes="180x180"\s+)?href="([^"]+)"/);assert.ok(applePath);const apple=await readFile(new URL(applePath[1].replace(/^\//,''),publicRoot));assert.equal(apple.readUInt32BE(16),180);assert.equal(apple.readUInt32BE(20),180);
   assert.doesNotMatch(source,/serviceWorker\s*\.\s*register|caches\s*\./,'Shortcut support does not cache family data');
+});
+
+
+test('phone shortcut and share toolbar has one header location rather than a duplicate home card',async()=>{
+  const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+  const header=html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1];assert.ok(header);
+  assert.equal([...html.matchAll(/id="homeInstall"/g)].length,1);assert.match(header,/id="homeInstall"/);
+  const home=html.match(/<section id="homeView"[\s\S]*?<\/section>/)?.[0];assert.ok(home);assert.doesNotMatch(home,/id="homeInstall"/);
+  const f=fixture();assert.doesNotMatch(f.card.innerHTML,/<img|data-home-install-heading|data-home-install-description/);
 });
