@@ -122,3 +122,30 @@ test('served guests thank Ruti while entering; retreating and entering cats rend
  written.length=0;departures[0].age=1.5;renderHouse(ctx,game,{actor:{x:.4,y:.5},departures},{width:1000,height:580,time:4,images:{}});
  assert.ok(!written.includes('תודה רותי!'),'a completed departure disappears');
 });
+
+test('untimed practice targets use infinity without deadline arcs, urgency or an approaching cat',()=>{
+ const written=[],strokes=[];const gradient={addColorStop(){}};
+ const ctx=new Proxy({canvas:{width:1000,height:580},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},fillText(value){written.push(value);},stroke(){strokes.push(this.strokeStyle);}},{get:(target,key)=>key in target?target[key]:(()=>{})});
+ const tasks=[{id:'p',type:'plant',slot:0},{id:'d',type:'dust',position:{x:.43,y:.60}},{id:'g',type:'guest',door:0,guest:'hila',recipeId:'tahini'},{id:'c',type:'cat',door:1,waiting:0}].map(task=>({...task,untimed:true,total:1,remaining:.01}));
+ const game={level:1,tutorial:{kind:'plant'},tasks,inventory:{},kitchen:{}};
+ renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,time:100,images:{}});
+ assert.equal(written.filter(text=>text==='∞').length,4,'every practice target communicates unlimited time');
+ assert.ok(written.includes('מחכה בחוץ…'),'the tutorial cat stays outside even with zero waiting seconds');
+ assert.ok(!written.includes('!'),'the waiting cat does not enter its alarm pose');
+ assert.ok(!strokes.some(color=>['#c94a3e','#df9f36','#67885a'].includes(color)),'practice never draws a draining or urgent deadline ring');
+ written.length=0;strokes.length=0;tasks.forEach(task=>task.untimed=false);
+ renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,time:101,images:{}});
+ assert.ok(strokes.includes('#c94a3e'),'regular timed tasks retain their deadline feedback');
+ assert.ok(!written.includes('∞'));
+});
+
+test('a missing required cooking objective highlights only its designated physical dish',()=>{
+ const highlights=[];const gradient={addColorStop(){}};
+ const ctx=new Proxy({canvas:{width:1000,height:580},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},beginPath(){this.pathArc=null;},arc(x,y,r){this.pathArc={x,y,r};},stroke(){if(this.strokeStyle==='#d9a326')highlights.push(this.pathArc);}},{get:(target,key)=>key in target?target[key]:(()=>{})});
+ for(const [level,recipeId] of [[5,'tahini'],[7,'kubaneh']]){
+  highlights.length=0;const game={level,stage:{requiredDish:recipeId},requiredDishComplete:false,tasks:[],inventory:{},kitchen:{}};
+  renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,time:5,images:{}});
+  const p=getHouseLayout(1000,580).recipes[recipeId];assert.equal(highlights.length,1);assert.equal(highlights[0].x,p.x*1000);assert.equal(highlights[0].y,p.y*580);
+  highlights.length=0;game.requiredDishComplete=true;renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,time:6,images:{}});assert.equal(highlights.length,0,'the cooking coach glow disappears after the required dish is prepared');
+ }
+});

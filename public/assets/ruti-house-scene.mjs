@@ -98,7 +98,10 @@ function imageReady(image){return image&&image.complete&&image.naturalWidth>0;}
 function icon(ctx,images,id,x,y,size){const image=images?.icons?.[id];if(imageReady(image)){ctx.drawImage(image,x-size/2,y-size/2,size,size);return true;}return false;}
 function label(ctx,text,x,y,{size=12,color='#574634',align='center',weight='600',halo=true}={}){ctx.font=`${weight} ${size}px system-ui,sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';if(halo){ctx.strokeStyle='#fff6df';ctx.lineWidth=4;ctx.strokeText(text,x,y);}ctx.fillStyle=color;ctx.fillText(text,x,y);}
 function halo(ctx,x,y,r,time,color='#dfa742',urgent=false){const pulse=.5+.5*Math.sin(time*(urgent?9:4));const gradient=ctx.createRadialGradient(x,y,r*.15,x,y,r*1.8);gradient.addColorStop(0,color+'77');gradient.addColorStop(1,color+'00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r*(1.45+pulse*.15),0,Math.PI*2);ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2+pulse;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(x,y,r*(1.05+pulse*.05),0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
-function timer(ctx,x,y,r,task){const ratio=clamp(task.remaining/task.total,0,1);ctx.beginPath();ctx.arc(x,y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*ratio);ctx.strokeStyle=ratio<.25?'#c94a3e':ratio<.5?'#df9f36':'#67885a';ctx.lineWidth=4;ctx.stroke();}
+function timer(ctx,x,y,r,task){
+ if(task.untimed){label(ctx,'∞',x+r*.72,y-r*.72,{size:clamp(r*.65,12,20),color:'#759063',weight:'800'});return;}
+ const ratio=clamp(task.remaining/task.total,0,1);ctx.beginPath();ctx.arc(x,y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*ratio);ctx.strokeStyle=ratio<.25?'#c94a3e':ratio<.5?'#df9f36':'#67885a';ctx.lineWidth=4;ctx.stroke();
+}
 
 function drawPlant(ctx,x,y,size,index,thirsty,time){
  const pots=['#c27d56','#d8a267','#76968c','#bc745e','#bc9a64'];const leaf=['#658b51','#668968','#829752','#688c5e','#759e69'][index%5];
@@ -277,7 +280,7 @@ export function renderHouse(ctx,g,visual={},options={}){
  const activePlants=new Map((g?.tasks||[]).filter(t=>t.type==='plant').map(t=>[t.slot,t]));
  for(let i=0;i<l.plants.length;i++){
   const p=l.plants[i],task=activePlants.get(i),x=p.x*width,y=p.y*height,size=M*(l.portrait?.15:.12);
-  if(task)halo(ctx,x,y-size*.18,size*.42,pulseTime,'#db9d35',task.remaining/task.total<.25);
+  if(task)halo(ctx,x,y-size*.18,size*.42,pulseTime,'#db9d35',!task.untimed&&task.remaining/task.total<.25);
   drawPlant(ctx,x,y,size,i,!!task,pulseTime);
   if(task){timer(ctx,x,y-size*.16,size*.52,task);label(ctx,english?'Water!':'מים!',x,y-size*.72,{size:clamp(M*.024,11,14),color:'#925c28'});}
  }
@@ -285,6 +288,12 @@ export function renderHouse(ctx,g,visual={},options={}){
  for(const id of FOOD_IDS){
   const p=l.recipes[id],x=p.x*width,y=p.y*height,size=M*(l.portrait?.125:.105),stock=g?.inventory?.[id]??0,kitchen=g?.kitchen?.[id];
   ellipse(ctx,x,y+size*.27,size*.46,size*.11,'#7f684527');
+  if(g?.stage?.requiredDish===id&&!g.requiredDishComplete){
+   halo(ctx,x,y,size*.65,pulseTime,'#d9a326');
+   ctx.save();ctx.strokeStyle='#efd28a';ctx.lineWidth=2.5;
+   for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+pulseTime*.1,r=size*.83;line(ctx,x+Math.cos(a)*r,y+Math.sin(a)*r,x+Math.cos(a)*(r+size*.10),y+Math.sin(a)*(r+size*.10),'#efd28a',2.5);}
+   ctx.restore();
+  }
   if(kitchen?.state==='cooking')halo(ctx,x,y,size*.43,pulseTime,'#e4ad46');
   if(!icon(ctx,images,id,x,y,size)){ellipse(ctx,x,y,size*.43,size*.18,'#eee0b6','#9f8967');ellipse(ctx,x,y-size*.06,size*.34,size*.14,['#eee0b2','#df9d55','#c18b4d','#b7a282','#daa25a'][FOOD_IDS.indexOf(id)]);}
   const short=english?{tahini:'Tahini',carrot:'Carrot',kubaneh:'Kubaneh',eggplant:'Eggplant',lasagna:'Lasagna'}:{tahini:'טחינה',carrot:'גזר וצימוקים',kubaneh:'קובנה',eggplant:'חצילים',lasagna:'לזניה'};
@@ -295,16 +304,16 @@ export function renderHouse(ctx,g,visual={},options={}){
  const actors=[];
  for(const task of g?.tasks||[]){
   const p=getTaskLocation(task,l),x=p.x*width,y=p.y*height;
-  if(task.type==='dust'){halo(ctx,x,y,M*.046,pulseTime,'#d6b76b',task.remaining/task.total<.3);drawDust(ctx,x,y,M*.095,pulseTime,task.remaining);timer(ctx,x,y,M*.05,task);}
+  if(task.type==='dust'){halo(ctx,x,y,M*.046,pulseTime,'#d6b76b',!task.untimed&&task.remaining/task.total<.3);drawDust(ctx,x,y,M*.095,pulseTime,task.untimed?1:task.remaining);timer(ctx,x,y,M*.05,task);}
   if(task.type==='guest')actors.push({y,draw:()=>{
-   const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=clamp(task.total-task.remaining,0,1),guestX=x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=y+M*.04;
-   halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',task.remaining/task.total<.25);
+   const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=task.untimed?1:clamp(task.total-task.remaining,0,1),guestX=x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=y+M*.04;
+   halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',!task.untimed&&task.remaining/task.total<.25);
    const portrait=images.family?.[task.guest]||images[task.guest];drawHuman(ctx,guestX,guestY,M*(l.portrait?.175:.17),{portrait,guest:true,index:task.guest==='hila'?1:task.guest==='rivi'?2:0,time:pulseTime,walking:arrival<1&&!reduced,facing:d.side==='left'?1:-1});
    const bubbleX=guestX+(d.side==='left'?1:-1)*M*.062,bubbleY=guestY-M*.145;ellipse(ctx,bubbleX,bubbleY,M*.035,M*.035,'#fff3d4','#c59b54');icon(ctx,images,task.recipeId,bubbleX,bubbleY,M*.06);
    const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי'};label(ctx,names[task.guest]||task.guest,guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
   }});
   if(task.type==='cat')actors.push({y:y+M*.03,draw:()=>{
-   const d=l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
+   const d=l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.untimed||task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
    const catX=x+sgn*M*(-.025+progress*.09),catY=y+M*.015;
    halo(ctx,catX,catY-M*.012,M*.058,pulseTime,'#d26b44',progress>.65);drawCat(ctx,catX,catY,M*.115,pulseTime,progress,d.side);timer(ctx,catX,catY-M*.01,M*.066,task);
    if(waiting){
