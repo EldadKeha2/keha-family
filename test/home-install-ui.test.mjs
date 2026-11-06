@@ -179,9 +179,13 @@ test('iPhone and touch iPad use Share instructions, while embedded browsers expl
     {userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit Safari/605.1',maxTouchPoints:5}
   ]){
     const f=fixture(options);f.click(f.button());await tick();assert.equal(f.dialog.open,true);assert.match(f.dialog.innerHTML,/Safari/);assert.match(f.dialog.innerHTML,/שיתוף/);assert.match(f.dialog.innerHTML,/הוספה למסך הבית/);
+    assert.equal(f.dialog.querySelector('[data-home-install-profile]')?.getAttribute('href'),'/install/iphone.html?lang=he');
+    f.click(f.dialog.querySelector('[data-home-install-language]'));
+    assert.equal(f.dialog.querySelector('[data-home-install-profile]')?.getAttribute('href'),'/install/iphone.html?lang=en-US');
   }
   const embedded=fixture({userAgent:'Mozilla/5.0 (Linux; Android 16) Instagram WhatsApp FBAN/FB4A'});embedded.click(embedded.button());await tick();
   assert.match(embedded.dialog.innerHTML,/Chrome/);assert.match(embedded.dialog.innerHTML,/בדפדפן|דפדפן/);
+  assert.equal(embedded.dialog.querySelector('[data-home-install-profile]'),null);
 });
 
 test('manual dialog closes and restores button focus',async()=>{

@@ -1,4 +1,6 @@
 .home-install[hidden],.home-install [hidden]{display:none!important}
+.home-install-profile-link{text-align:center;text-decoration:none}
+.home-install-dialog .home-install-profile-link:focus-visible{outline:3px solid #a27f45;outline-offset:3px}
 .home-install-status{position:fixed;z-index:120;inset-inline-start:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:calc(100vw - 36px);margin:0;padding:9px 14px;border:1px solid #c7b894;border-radius:7px;background:#fcf8ed;color:#536442;box-shadow:0 3px 16px #30291820;text-align:center;font:calc(13px * var(--a11y-text-scale,1))/1.6 var(--sans);overflow-wrap:anywhere;pointer-events:none}
 :root[dir=rtl] .home-install-status{transform:translateX(50%)}
 .home-install-status:empty{display:none}
