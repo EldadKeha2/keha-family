@@ -6,11 +6,23 @@
   const dictionary=window.FAMILY_TRANSLATIONS||{},own=(object,key)=>Object.prototype.hasOwnProperty.call(object,key);
   const hebrew=/[\u05d0-\u05ea][\u0590-\u05ff\s.,!?;:…()–—/\-]*/g,ending=/[\s.,!?;:…()–—/\-]+$/;
   const escapeRegExp=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const fragments=new RegExp('(?<![\\u0590-\\u05ff])(?:'+Object.keys(dictionary).sort((a,b)=>b.length-a.length).map(escapeRegExp).join('|')+')(?![\\u0590-\\u05ff])','g');
+  const keys=Object.keys(dictionary).filter(key=>key.length).sort((a,b)=>b.length-a.length);
+  const fragments=keys.length?new RegExp('(?:'+keys.map(escapeRegExp).join('|')+')(?![\\u0590-\\u05ff])','g'):null,hebrewBoundary=/[\u0590-\u05ff]/;
+  function translateFragments(part){
+    if(!fragments)return part;
+    let result='',cursor=0,match;fragments.lastIndex=0;
+    while((match=fragments.exec(part))){
+      // Check the preceding character directly: older Safari versions cannot
+      // compile lookbehind, even when Hebrew is the selected language.
+      if(match.index>0&&hebrewBoundary.test(part[match.index-1])){fragments.lastIndex=match.index+1;continue;}
+      result+=part.slice(cursor,match.index)+dictionary[match[0]];cursor=match.index+match[0].length;
+    }
+    return result+part.slice(cursor);
+  }
   function t(value){
     if(!isEnglish||typeof value!=='string'||!/[\u05d0-\u05ea]/.test(value))return value;
     if(own(dictionary,value))return dictionary[value];
-    return value.replace(hebrew,part=>{const key=part.trim().replace(ending,'');if(own(dictionary,key))return dictionary[key]+part.slice(key.length);return part.replace(fragments,key=>dictionary[key]);});
+    return value.replace(hebrew,part=>{const key=part.trim().replace(ending,'');if(own(dictionary,key))return dictionary[key]+part.slice(key.length);return translateFragments(part);});
   }
   function html(strings,...values){return strings.reduce((result,part,index)=>result+t(part)+(index<values.length?String(values[index]):''),'');}
   function personName(person){if(!person)return '';const canonical=window.FAMILY_DATA?.people[person.id];return isEnglish?(person.nameEn||canonical?.nameEn||person.name||''):(person.name||canonical?.name||'');}

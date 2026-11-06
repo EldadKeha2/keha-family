@@ -8,11 +8,15 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
 // Only controller-facing DOM APIs are modeled. Native dialog focus containment,
 // operating-system install prompts and phone layout are checked in the browser.
-function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false}={}){
+function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true}={}){
   const nodes=new Map(),copied=[],shared=[],relatedCalls=[];
-  const document=new EventTarget();document.activeElement=null;document.readyState='complete';document.visibilityState='visible';
+  const document=new EventTarget();document.activeElement=null;document.readyState='loading';document.visibilityState='visible';
   class Element extends EventTarget{
-    constructor(tag='div'){super();this.tagName=tag;this.hidden=false;this.open=false;this.disabled=false;this.dataset={};this.attrs=new Map();this.children=new Map();this.textContent='';this.value='';this.modalCalls=0;}
+    constructor(tag='div'){
+      super();this.tagName=tag;this.hidden=false;this.open=false;this.disabled=false;this.dataset={};this.attrs=new Map();this.children=new Map();this.textContent='';this.value='';this.modalCalls=0;
+      const classes=new Set();this.classList={add:(...names)=>names.forEach(name=>classes.add(name)),remove:(...names)=>names.forEach(name=>classes.delete(name)),contains:name=>classes.has(name)};
+      if(tag==='dialog'&&!nativeDialog){this.showModal=undefined;this.close=undefined;}
+    }
     setAttribute(name,value){this.attrs.set(name,String(value));}
     getAttribute(name){return this.attrs.get(name)??null;}
     removeAttribute(name){this.attrs.delete(name);}
@@ -31,12 +35,13 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
       for(const match of html.matchAll(/<([a-z][\w-]*)\b([^>]*)>/gi)){
         const child=new Element(match[1]);
         for(const attr of match[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)){
-          child.setAttribute(attr[1],attr[2]??'');if(attr[1]==='hidden')child.hidden=true;
-          if(attr[1]==='id'){child.id=attr[2];nodes.set(attr[2],child);this.children.set('#'+attr[2],child);}
-          if(attr[1].startsWith('data-')){this.children.set('['+attr[1]+']',child);child.dataset[attr[1].slice(5).replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase())]=attr[2]??'';}
-          if(attr[1]==='class')for(const name of attr[2].split(/\s+/))this.children.set('.'+name,child);
-          if(attr[1]==='value')child.value=attr[2];
-          if(attr[1]==='for')this.children.set(match[1]+'[for="'+attr[2]+'"]',child);
+          const value=(attr[2]??'').replace(/&(amp|lt|gt|quot|#39);/g,(_,entity)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[entity]));
+          child.setAttribute(attr[1],value);if(attr[1]==='hidden')child.hidden=true;
+          if(attr[1]==='id'){child.id=value;nodes.set(value,child);this.children.set('#'+value,child);}
+          if(attr[1].startsWith('data-')){this.children.set('['+attr[1]+']',child);child.dataset[attr[1].slice(5).replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase())]=value;}
+          if(attr[1]==='class')for(const name of value.split(/\s+/)){this.children.set('.'+name,child);child.classList.add(name);}
+          if(attr[1]==='value')child.value=value;
+          if(attr[1]==='for')this.children.set(match[1]+'[for="'+value+'"]',child);
         }
       }
     }
@@ -52,11 +57,12 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   if(installedRelated!=='missing')navigator.getInstalledRelatedApps=async()=>{relatedCalls.push(true);if(installedRelated==='throw')throw Error('Detection unavailable');return typeof installedRelated==='function'?installedRelated():installedRelated;};
   if(share!=='missing')navigator.share=async payload=>{shared.push(payload);if(share!=='works'){const error=Error('Share unavailable');error.name=share;throw error;}};
   if(clipboard!=='missing')navigator.clipboard={writeText:async value=>{if(clipboard==='blocked')throw Error('Clipboard denied');copied.push(value);}};
-  const location=new URL('https://family.example/?game=neto-tetris&lang='+window.FamilyI18n.language+'#games');
-  const context=vm.createContext({window,document,navigator,location,matchMedia,URL,Event,console,setTimeout:(fn,delay)=>{const timer=setTimeout(fn,delay);timer.unref();return timer;},clearTimeout});
-  vm.runInContext(source,context);document.dispatchEvent(new Event('DOMContentLoaded'));
+  const location=new URL(entryUrl||'https://family.example/?game=neto-tetris&lang='+window.FamilyI18n.language+'#games');window.location=location;
+  const context=vm.createContext({window,document,navigator,location,matchMedia,URL,URLSearchParams,Event,console,setTimeout:(fn,delay)=>{const timer=setTimeout(fn,delay);timer.unref();return timer;},clearTimeout});
+  const ready=()=>{document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';};
+  vm.runInContext(source,context);if(autoReady)ready();
   const button=()=>card.querySelector('[data-home-install-action]');
-  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,
+  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,
     click(element){element.dispatchEvent(new Event('click',{cancelable:true}));},
     resize(value){const media=matchMedia('(max-width: 700px)');media.matches=value;media.dispatchEvent(new Event('change'));},
     standalone(value){const media=matchMedia('(display-mode: standalone)');media.matches=value;media.dispatchEvent(new Event('change'));},
@@ -144,11 +150,11 @@ test('manual dialog closes and restores button focus',async()=>{
   f.click(f.dialog.querySelector('[data-home-install-close]'));assert.equal(f.dialog.open,false);assert.equal(f.document.activeElement,f.button());
 });
 
-test('copy keeps the home route and selected language rather than the current game, with a usable clipboard fallback',async()=>{
+test('manual installation copy sends a localized installation invitation with a usable clipboard fallback',async()=>{
   const f=fixture({english:true});f.click(f.button());await tick();f.click(f.dialog.querySelector('[data-home-install-copy]'));await tick();
-  assert.equal(f.copied.length,1);const url=new URL(f.copied[0]);assert.equal(url.origin,'https://family.example');assert.equal(url.hash,'#home');assert.equal(url.searchParams.get('lang'),'en-US');assert.equal(url.searchParams.has('game'),false);
+  assert.equal(f.copied.length,1);const url=new URL(f.copied[0]);assert.equal(url.origin,'https://family.example');assert.equal(url.hash,'#home');assert.equal(url.searchParams.get('lang'),'en-US');assert.equal(url.searchParams.get('install'),'1');assert.equal(url.searchParams.has('game'),false);
   const blocked=fixture({clipboard:'blocked'});blocked.click(blocked.button());await tick();blocked.click(blocked.dialog.querySelector('[data-home-install-copy]'));await tick();
-  const fallback=blocked.nodes.get('homeInstallLink');assert.equal(fallback.hidden,false);assert.match(fallback.value,/family\.example/);
+  const fallback=blocked.nodes.get('homeInstallLink');assert.equal(fallback.hidden,false);assert.equal(new URL(fallback.value).searchParams.get('install'),'1');assert.equal(fallback.selected,true);
 });
 
 test('English toolbar and platform instructions contain localized visible copy',async()=>{
@@ -156,11 +162,11 @@ test('English toolbar and platform instructions contain localized visible copy',
   assert.equal(f.button().getAttribute('aria-label'),'Install site shortcut');assert.match(f.dialog.innerHTML,/Share/);assert.doesNotMatch(f.card.innerHTML+f.dialog.innerHTML,/[\u0590-\u05ff]/);
 });
 
-test('share uses the native share sheet only after a tap and sends the clean localized home link',async()=>{
+test('share uses the native share sheet only after a tap and sends a localized installation invitation',async()=>{
   const f=fixture({share:'works',english:true});assert.equal(f.shared.length,0);
   f.click(f.card.querySelector('[data-home-install-share]'));assert.equal(f.shared.length,1);await tick();
   assert.equal(f.copied.length,0);assert.equal(f.shared[0].title,'Keha Family Home');
-  assert.equal(f.shared[0].url,'https://family.example/?lang=en-US#home');
+  assert.equal(f.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
   assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
   assert.match(f.card.querySelector('[data-home-install-share-status]').textContent,/Link ready to share/);
 });
@@ -171,17 +177,116 @@ test('cancelling the native share sheet is silent and does not copy anything',as
   assert.ok(!f.nodes.get('homeInstallShareLink')||f.nodes.get('homeInstallShareLink').hidden);assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
 });
 
-test('missing or failed Web Share copies the home link, and missing or blocked clipboard exposes a selected readable link',async()=>{
+test('missing or failed Web Share copies the invitation, and unavailable clipboard exposes a selected readable invitation',async()=>{
   for(const share of ['missing','NotAllowedError']){
     const f=fixture({share});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
-    assert.deepEqual(f.copied,['https://family.example/?lang=he#home']);assert.ok(!f.nodes.get('homeInstallShareLink')||f.nodes.get('homeInstallShareLink').hidden);
+    assert.deepEqual(f.copied,['https://family.example/?lang=he&install=1#home']);assert.ok(!f.nodes.get('homeInstallShareLink')||f.nodes.get('homeInstallShareLink').hidden);
   }
   for(const clipboard of ['missing','blocked']){
     const f=fixture({clipboard});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
     const input=f.nodes.get('homeInstallShareLink');assert.equal(f.dialog.open,true);assert.equal(input.hidden,false);assert.equal(input.selected,true);
-    assert.equal(input.value,'https://family.example/?lang=he#home');assert.equal(f.document.activeElement,input);
+    assert.equal(input.value,'https://family.example/?lang=he&install=1#home');assert.equal(f.document.activeElement,input);
     assert.equal(f.dialog.querySelector('label[for="homeInstallShareLink"]').hidden,false);
     assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);f.dialog.close();assert.equal(f.document.activeElement,f.card.querySelector('[data-home-install-share]'));
+  }
+});
+
+test('an installed sender shares an installation invitation that an independent recipient can install',async()=>{
+  const sender=fixture({standalone:true,share:'works',english:true}),senderOffer=sender.offer();
+  sender.click(sender.card.querySelector('[data-home-install-share]'));await tick();
+  assert.equal(senderOffer.calls,0);assert.equal(sender.shared.length,1);
+  assert.equal(sender.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
+  const recipient=fixture({entryUrl:sender.shared[0].url,english:true});await tick();
+  assert.equal(recipient.dialog.open,true);assert.ok(recipient.dialog.querySelector('[data-home-install-invite-start]'));
+  assert.equal(recipient.dialog.querySelector('[data-home-install-invite-installed]'),null);
+  assert.doesNotMatch(recipient.dialog.innerHTML,/[֐-׿]/);
+  const recipientOffer=recipient.offer({outcome:'accepted'});assert.equal(recipientOffer.calls,0);
+  recipient.click(recipient.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+  assert.equal(recipientOffer.calls,1);assert.equal(senderOffer.calls,0);
+});
+
+test('incoming invitation waits for DOM readiness and a user tap before prompting',async()=>{
+  const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home',autoReady:false}),offer=f.offer();
+  assert.equal(f.dialog.open,false);assert.equal(offer.calls,0);
+  f.ready();await tick();assert.equal(f.dialog.open,true);assert.equal(offer.calls,0);
+  assert.ok(f.dialog.querySelector('[data-home-install-invite-browse]'));
+  f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+  assert.equal(offer.calls,1);
+  f.click(f.button());await tick();assert.equal(offer.calls,1,'The retained native event cannot be prompted twice');
+});
+
+test('a native offer arriving after the invitation opens is available from its install action',async()=>{
+  const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
+  assert.equal(f.dialog.open,true);assert.ok(f.dialog.querySelector('[data-home-install-invite-start]'));
+  const offer=f.offer();assert.equal(offer.calls,0);assert.equal(f.dialog.open,true);
+  assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,'התקנת קיצור דרך');
+  f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+  assert.equal(offer.calls,1);assert.equal(f.button().disabled,false);
+  assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,'הוספה למסך הבית');
+  assert.equal(f.dialog.querySelector('[data-home-install-invite-status]').textContent,'לחצו שוב להנחיות ההוספה.');
+});
+
+test('accepting an invitation prompt does not claim installation until appinstalled',async()=>{
+  const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
+  const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+  assert.equal(offer.calls,1);assert.equal(f.dialog.querySelector('[data-home-install-invite-installed]'),null);
+  assert.equal(f.dialog.open,true);assert.equal(f.dialog.querySelector('[data-home-install-invite-status]').textContent,'השלימו את ההוספה בטלפון.');
+  assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+  f.window.dispatchEvent(new Event('appinstalled'));await tick();
+  assert.ok(f.dialog.querySelector('[data-home-install-invite-installed]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);
+  f.click(f.button());assert.equal(offer.calls,1);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+});
+
+test('installed invitation recipients see their local installed state and browse without prompting',async()=>{
+  for(const options of [{standalone:true},{iosStandalone:true},{installedRelated:[{platform:'webapp',id:'https://family.example/'}]}]){
+    const f=fixture({...options,entryUrl:'https://family.example/?lang=he&install=1#home'}),offer=f.offer();await tick();
+    assert.equal(f.dialog.open,true);assert.ok(f.dialog.querySelector('[data-home-install-invite-installed]'));
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.equal(offer.calls,0);
+    f.click(f.dialog.querySelector('[data-home-install-invite-browse]'));assert.equal(f.dialog.open,false);assert.equal(offer.calls,0);
+  }
+});
+
+test('invitation browse dismisses the introduction permanently for this page and install=0 never opens it',async()=>{
+  const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
+  assert.equal(f.dialog.open,true);f.click(f.dialog.querySelector('[data-home-install-invite-browse]'));assert.equal(f.dialog.open,false);
+  const shown=f.dialog.modalCalls;f.window.dispatchEvent(new Event('pageshow'));f.document.dispatchEvent(new Event('visibilitychange'));await tick();
+  assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,shown);
+  const ordinary=fixture({entryUrl:'https://family.example/?lang=he&install=0#home'});await tick();
+  assert.equal(ordinary.dialog.open,false);assert.equal(ordinary.dialog.modalCalls,0);
+});
+
+test('older phones without native dialog support can open and dismiss an installation invitation',async()=>{
+  const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home',nativeDialog:false});await tick();
+  assert.equal(f.dialog.open,true);assert.equal(f.dialog.hasAttribute('open'),true);
+  assert.equal(f.dialog.getAttribute('role'),'dialog');assert.equal(f.dialog.getAttribute('aria-modal'),'true');
+  assert.equal(f.dialog.classList.contains('home-install-dialog-fallback'),true);
+  f.click(f.dialog.querySelector('[data-home-install-invite-browse]'));assert.equal(f.dialog.open,false);
+  assert.equal(f.dialog.hasAttribute('open'),false);assert.equal(f.document.activeElement,f.card.querySelector('[data-home-install-share]'));
+});
+
+test('invitation without a native prompt provides localized platform installation steps and a readable copy fallback',async()=>{
+  for(const options of [
+    {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1',browser:/Safari/},
+    {userAgent:'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',browser:/Chrome/},
+    {userAgent:'Mozilla/5.0 (X11; Linux x86_64) Firefox/145.0',browser:/iPhone \/ iPad/}
+  ]){
+    const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true,clipboard:'blocked'});await tick();
+    assert.equal(f.dialog.open,true);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+    assert.match(f.dialog.innerHTML,options.browser);assert.match(f.dialog.innerHTML,/Add to Home [Ss]creen/);assert.doesNotMatch(f.dialog.innerHTML,/[֐-׿]/);
+    f.click(f.dialog.querySelector('[data-home-install-copy]'));await tick();
+    const input=f.nodes.get('homeInstallLink');assert.equal(input.hidden,false);assert.equal(input.selected,true);
+    assert.equal(input.value,'https://family.example/?lang=en-US&install=1#home');assert.equal(f.document.activeElement,input);
+  }
+});
+
+test('WhatsApp invitation installation explains opening Chrome or Safari outside the embedded browser',async()=>{
+  for(const options of [
+    {userAgent:'Mozilla/5.0 (Linux; Android 16) WhatsApp/2.26.1',browser:/Chrome/},
+    {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) WhatsApp/2.26.1',browser:/Safari/}
+  ]){
+    const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true});await tick();
+    assert.match(f.dialog.innerHTML,/Open in browser/);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+    assert.match(f.dialog.innerHTML,/inside another app/);assert.match(f.dialog.innerHTML,options.browser);assert.match(f.dialog.innerHTML,/open.*(?:Safari|Chrome)/i);
   }
 });
 
