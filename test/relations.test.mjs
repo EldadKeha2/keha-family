@@ -46,9 +46,23 @@ test('every known parent also lists the viewed person as a child',()=>{
 });
 test('additional relatives appear only as the explicitly linked person’s sibling',()=>{
   assert.deepEqual(relatives('itzhak-katan'),{partners:[],parents:[],children:[],siblings:['rachel-katan']});
-  assert.deepEqual(relatives('natan-fish'),{partners:[],parents:[],children:[],siblings:['eddie']});
+  assert.deepEqual(relatives('natan-fish'),{partners:[],parents:[],children:['keren-fish','sivan-fish','sharon-fish'],siblings:['eddie']});
   assert.deepEqual(relatives('eddie').siblings,['natan-fish']);
   for(const id of ['eldad','yehiel','ora','yona'])assert.ok(!relatives(id).siblings.some(id=>['itzhak-katan','natan-fish'].includes(id)));
+});
+test('Natan Fish’s three daughters are distinct additional relatives with one known father',()=>{
+ const daughters=['keren-fish','sivan-fish','sharon-fish'];
+ const names=[['קרן פיש','Keren Fish'],['סיוון פיש','Sivan Fish'],['שרון פיש','Sharon Fish']];
+ for(const [index,id] of daughters.entries()){
+  assert.deepEqual(relatives(id),{partners:[],parents:['natan-fish'],children:[],siblings:daughters.filter(other=>other!==id)});
+  const person=family.people[id];assert.equal(person.name,names[index][0]);assert.equal(person.nameEn,names[index][1]);
+  assert.equal(person.extended,true);assert.equal(person.gender,'f');assert.equal(person.unit,undefined);
+  assert.equal(person.birthday,'1.1.1111','Unknown birthdays retain the existing unknown-date marker');
+  assert.ok(!Object.values(family.units).some(unit=>unit.people.includes(id)),'Additional relatives do not alter the main tree');
+ }
+ assert.equal(family.people.sharon.name,'שרון דיין','Sharon Fish does not overwrite Sharon Dayan');
+ assert.equal(family.people.sharon.gender,'m');assert.equal(family.people['sharon-fish'].gender,'f');
+ assert.deepEqual(relatives('eddie').children,['tidhar','moran','tomer','amir'],'Natan’s daughters are not children of his brother');
 });
 test('Robin and her children are additional relatives with only the explicitly supplied parents',()=>{
  assert.deepEqual(relatives('robin'),{partners:[],parents:['mark'],children:['matthew-robin','lily'],siblings:['ilan','raya','orit']});

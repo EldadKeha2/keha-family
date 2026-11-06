@@ -89,6 +89,7 @@ export function createHouseSound(){
     lastPlayed.set(kind,now);const at=now+.008;
     try{
       switch(kind){
+        case 'step':tone(135,at,.045,{wave:'triangle',volume:.025,to:85});hush(at,.025,{hz:500,to:180,volume:.018});break;
         case 'select':tone(680,at,.07,{wave:'triangle',volume:.18,to:420});break;
         case 'wrong':notes([53,51],at,{gap:.095,duration:.13,volume:.1,wave:'triangle'});break;
         case 'meal':notes([72,76,79,84,88,91],at,{gap:.065,duration:.34,volume:.18});

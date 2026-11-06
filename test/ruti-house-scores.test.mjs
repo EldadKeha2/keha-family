@@ -66,3 +66,42 @@ test('Ruti’s House score writes preserve existing origin, marker, method and s
     assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_scores').get().n,0);
   }finally{f.close();}
 });
+
+const staged=(n,{level=3,completedLevels=2,stageScores=[300,300,300,0,0,0,0,0,0,0],elapsed=400}={})=>({...entry(n,stageScores.reduce((a,b)=>a+b,0)/300),version:2,score:stageScores.reduce((a,b)=>a+b,0),level,elapsed,completedLevels,stageScores});
+
+test('Ruti’s House v2 saves explicit stages independently of elapsed time and preserves legacy entries',async()=>{
+  const f=fixture();try{
+    const old=entry(1);assert.equal((await f.call(old)).status,200);
+    // Simulate an existing deployment whose score table predates the details table.
+    f.db.exec('DROP TABLE ruti_house_score_details');f.restart();
+    let oldRow=(await (await f.call()).json()).scores[0];assert.equal(oldRow.version,null);assert.equal(oldRow.completedLevels,null);assert.equal(oldRow.stageScores,null);
+    assert.equal((await f.call(old)).status,200);
+    const partial=staged(2),won=staged(3,{level:10,completedLevels:10,stageScores:Array(10).fill(300),elapsed:123});
+    for(const body of [partial,won])assert.equal((await f.call(body)).status,200);
+    f.restart();const rows=(await (await f.call()).json()).scores;assert.deepEqual(rows.map(row=>row.score),[3000,900,300]);
+    for(const body of [partial,won]){
+      const saved=rows.find(row=>row.id===body.requestId);assert.equal(saved.version,2);assert.equal(saved.level,body.level);assert.equal(saved.completedLevels,body.completedLevels);assert.deepEqual(saved.stageScores,body.stageScores);assert.equal(saved.elapsed,body.elapsed);
+      assert.equal((await f.call(body)).status,200);
+    }
+  }finally{f.close();}
+});
+
+test('Ruti’s House v2 rejects malformed stages and mismatched totals without writing either table',async()=>{
+  const f=fixture();try{
+    const good=staged(1),invalid=[{version:1},{version:'2'},{level:11},{completedLevels:-1},{completedLevels:11},{completedLevels:4},{completedLevels:1.5},{completedLevels:null},{stageScores:null},{stageScores:[]},{stageScores:Array(9).fill(100)},{stageScores:[300,300,299,0,0,0,0,0,0,0]},{stageScores:[300,300,200,100,0,0,0,0,0,0]},{stageScores:[300,300,300,-1,0,0,0,0,0,0]},{stageScores:[300,300,300,0,0,0,0,0,0,'0']},{stageScores:[Number.MAX_SAFE_INTEGER+1,0,0,0,0,0,0,0,0,0]},{stageScores:[300.5,299.5,300,0,0,0,0,0,0,0]}];
+    for(const bad of invalid)assert.equal((await f.call({...good,...bad})).status,400,JSON.stringify(bad));
+    assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_scores').get().n,0);assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_score_details').get().n,0);
+    const zero=staged(2,{level:1,completedLevels:0,stageScores:Array(10).fill(0),elapsed:0});assert.equal((await f.call(zero)).status,200);
+  }finally{f.close();}
+});
+
+test('Ruti’s House v2 retries compare stage details and cannot replace legacy metadata',async()=>{
+  const f=fixture();try{
+    const body=staged(1);assert.equal((await f.call(body)).status,200);
+    for(const change of [{completedLevels:1},{stageScores:[600,0,300,0,0,0,0,0,0,0]}])assert.equal((await f.call({...body,...change})).status,409);
+    const legacy={...body};delete legacy.version;delete legacy.completedLevels;delete legacy.stageScores;legacy.elapsed=48;assert.equal((await f.call(legacy)).status,409);
+    const old=entry(2);assert.equal((await f.call(old)).status,200);
+    assert.equal((await f.call({...old,version:2,completedLevels:1,stageScores:[old.score,0,0,0,0,0,0,0,0,0]})).status,409);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_scores').get().n,2);assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_score_details').get().n,1);
+  }finally{f.close();}
+});
