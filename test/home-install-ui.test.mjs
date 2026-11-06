@@ -5,6 +5,12 @@ import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../public/assets/home-install.js',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const decodeHTML=value=>value.replace(/&(amp|lt|gt|quot|#39);/g,(_,entity)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[entity]));
+const assertNoInstallationCopy=dialog=>{
+  assert.equal(dialog.querySelector('[data-home-install-copy]'),null);
+  assert.equal(dialog.querySelector('#homeInstallLink'),null);
+  assert.doesNotMatch(dialog.innerHTML,/<(?:input|textarea)\b|copy|paste|העתק|להדביק|הדבקה/i);
+};
 
 // Only controller-facing DOM APIs are modeled. Native dialog focus containment,
 // operating-system install prompts and phone layout are checked in the browser.
@@ -34,8 +40,10 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
       this.html=html;this.children=new Map();
       for(const match of html.matchAll(/<([a-z][\w-]*)\b([^>]*)>/gi)){
         const child=new Element(match[1]);
+        const contentStart=match.index+match[0].length,contentEnd=html.indexOf('</'+match[1]+'>',contentStart);
+        if(contentEnd>=0)child.textContent=decodeHTML(html.slice(contentStart,contentEnd).replace(/<[^>]*>/g,''));
         for(const attr of match[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)){
-          const value=(attr[2]??'').replace(/&(amp|lt|gt|quot|#39);/g,(_,entity)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[entity]));
+          const value=decodeHTML(attr[2]??'');
           child.setAttribute(attr[1],value);if(attr[1]==='hidden')child.hidden=true;
           if(attr[1]==='id'){child.id=value;nodes.set(value,child);this.children.set('#'+value,child);}
           if(attr[1].startsWith('data-')){this.children.set('['+attr[1]+']',child);child.dataset[attr[1].slice(5).replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase())]=value;}
@@ -75,7 +83,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
 }
 
 test('phone toolbar responds to viewport changes and keeps both controls in installed apps',()=>{
-  const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.equal(f.button().getAttribute('aria-label'),'התקן קיצור דרך לאתר');assert.equal(f.card.querySelector('[data-home-install-share]').getAttribute('aria-label'),'שיתוף האתר');assert.match(f.card.innerHTML,/>התקנת קיצור דרך</);assert.match(f.card.innerHTML,/>שיתוף</);
+  const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.equal(f.button().getAttribute('aria-label'),'התקן קיצור דרך לאתר');assert.equal(f.card.querySelector('[data-home-install-share]').getAttribute('aria-label'),'שיתוף האתר');assert.equal(f.button().textContent,'התקן');assert.match(f.card.innerHTML,/>שיתוף</);
   f.resize(false);assert.equal(f.card.hidden,true);f.resize(true);assert.equal(f.card.hidden,false);
   f.standalone(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.standalone(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
   assert.equal(fixture({mobile:false}).card.hidden,true);
@@ -150,16 +158,16 @@ test('manual dialog closes and restores button focus',async()=>{
   f.click(f.dialog.querySelector('[data-home-install-close]'));assert.equal(f.dialog.open,false);assert.equal(f.document.activeElement,f.button());
 });
 
-test('manual installation copy sends a localized installation invitation with a usable clipboard fallback',async()=>{
-  const f=fixture({english:true});f.click(f.button());await tick();f.click(f.dialog.querySelector('[data-home-install-copy]'));await tick();
-  assert.equal(f.copied.length,1);const url=new URL(f.copied[0]);assert.equal(url.origin,'https://family.example');assert.equal(url.hash,'#home');assert.equal(url.searchParams.get('lang'),'en-US');assert.equal(url.searchParams.get('install'),'1');assert.equal(url.searchParams.has('game'),false);
-  const blocked=fixture({clipboard:'blocked'});blocked.click(blocked.button());await tick();blocked.click(blocked.dialog.querySelector('[data-home-install-copy]'));await tick();
-  const fallback=blocked.nodes.get('homeInstallLink');assert.equal(fallback.hidden,false);assert.equal(new URL(fallback.value).searchParams.get('install'),'1');assert.equal(fallback.selected,true);
+test('manual installation help has direct instructions without clipboard controls',async()=>{
+  for(const options of [{},{english:true},{clipboard:'missing'},{clipboard:'blocked'}]){
+    const f=fixture(options);f.click(f.button());await tick();
+    assert.equal(f.dialog.open,true);assertNoInstallationCopy(f.dialog);assert.equal(f.copied.length,0);
+  }
 });
 
 test('English toolbar and platform instructions contain localized visible copy',async()=>{
   const f=fixture({english:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1'});f.click(f.button());await tick();
-  assert.equal(f.button().getAttribute('aria-label'),'Install site shortcut');assert.match(f.dialog.innerHTML,/Share/);assert.doesNotMatch(f.card.innerHTML+f.dialog.innerHTML,/[\u0590-\u05ff]/);
+  assert.equal(f.button().getAttribute('aria-label'),'Install site shortcut');assert.equal(f.button().textContent,'Install');assert.match(f.dialog.innerHTML,/Share/);assert.doesNotMatch(f.card.innerHTML+f.dialog.innerHTML,/[\u0590-\u05ff]/);
 });
 
 test('share uses the native share sheet only after a tap and sends a localized installation invitation',async()=>{
@@ -216,14 +224,16 @@ test('incoming invitation waits for DOM readiness and a user tap before promptin
 });
 
 test('a native offer arriving after the invitation opens is available from its install action',async()=>{
-  const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
-  assert.equal(f.dialog.open,true);assert.ok(f.dialog.querySelector('[data-home-install-invite-start]'));
-  const offer=f.offer();assert.equal(offer.calls,0);assert.equal(f.dialog.open,true);
-  assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,'התקנת קיצור דרך');
-  f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
-  assert.equal(offer.calls,1);assert.equal(f.button().disabled,false);
-  assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,'הוספה למסך הבית');
-  assert.equal(f.dialog.querySelector('[data-home-install-invite-status]').textContent,'לחצו שוב להנחיות ההוספה.');
+  for(const english of [false,true]){
+    const label=english?'Install':'התקן',f=fixture({english,entryUrl:'https://family.example/?lang='+(english?'en-US':'he')+'&install=1#home'});await tick();
+    assert.equal(f.dialog.open,true);assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,label);assertNoInstallationCopy(f.dialog);
+    const offer=f.offer();assert.equal(offer.calls,0);assert.equal(f.dialog.open,true);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,label);
+    f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+    assert.equal(offer.calls,1);assert.equal(f.button().disabled,false);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,label);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-status]').textContent,english?'Tap again for installation instructions.':'לחצו שוב להנחיות ההוספה.');
+  }
 });
 
 test('accepting an invitation prompt does not claim installation until appinstalled',async()=>{
@@ -264,29 +274,45 @@ test('older phones without native dialog support can open and dismiss an install
   assert.equal(f.dialog.hasAttribute('open'),false);assert.equal(f.document.activeElement,f.card.querySelector('[data-home-install-share]'));
 });
 
-test('invitation without a native prompt provides localized platform installation steps and a readable copy fallback',async()=>{
+test('invitation without a native prompt opens localized platform steps without copying or pasting',async()=>{
   for(const options of [
-    {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1',browser:/Safari/},
-    {userAgent:'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',browser:/Chrome/},
+    {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1',browser:/Safari/,otherBrowser:/Chrome/},
+    {userAgent:'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',browser:/Chrome/,otherBrowser:/Safari/},
     {userAgent:'Mozilla/5.0 (X11; Linux x86_64) Firefox/145.0',browser:/iPhone \/ iPad/}
   ]){
     const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true,clipboard:'blocked'});await tick();
     assert.equal(f.dialog.open,true);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
     assert.match(f.dialog.innerHTML,options.browser);assert.match(f.dialog.innerHTML,/Add to Home [Ss]creen/);assert.doesNotMatch(f.dialog.innerHTML,/[֐-׿]/);
-    f.click(f.dialog.querySelector('[data-home-install-copy]'));await tick();
-    const input=f.nodes.get('homeInstallLink');assert.equal(input.hidden,false);assert.equal(input.selected,true);
-    assert.equal(input.value,'https://family.example/?lang=en-US&install=1#home');assert.equal(f.document.activeElement,input);
+    if(options.otherBrowser)assert.doesNotMatch(f.dialog.innerHTML,options.otherBrowser);
+    assertNoInstallationCopy(f.dialog);assert.equal(f.copied.length,0);
   }
 });
 
-test('WhatsApp invitation installation explains opening Chrome or Safari outside the embedded browser',async()=>{
+test('WhatsApp installation uses the app menu to open a full browser without copy instructions',async()=>{
   for(const options of [
     {userAgent:'Mozilla/5.0 (Linux; Android 16) WhatsApp/2.26.1',browser:/Chrome/},
     {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) WhatsApp/2.26.1',browser:/Safari/}
   ]){
     const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true});await tick();
-    assert.match(f.dialog.innerHTML,/Open in browser/);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
-    assert.match(f.dialog.innerHTML,/inside another app/);assert.match(f.dialog.innerHTML,options.browser);assert.match(f.dialog.innerHTML,/open.*(?:Safari|Chrome)/i);
+    assertNoInstallationCopy(f.dialog);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+    assert.match(f.dialog.innerHTML,/menu/i);assert.match(f.dialog.innerHTML,/Open in browser/);assert.match(f.dialog.innerHTML,options.browser);assertNoInstallationCopy(f.dialog);
+  }
+});
+
+test('a native prompt arriving during manual help offers a direct one-use Install action in that dialog',async()=>{
+  for(const options of [{},{english:true},{nativeDialog:false}]){
+    const f=fixture(options);f.click(f.button());await tick();assert.equal(f.dialog.open,true);
+    assert.equal(f.dialog.querySelector('[data-home-install-native-start]').hidden,true);assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,false);
+    const opened=f.dialog.modalCalls,offer=f.offer({outcome:'accepted'}),action=f.dialog.querySelector('[data-home-install-native-start]');
+    assert.equal(offer.calls,0);assert.equal(f.dialog.open,true);assert.equal(f.dialog.modalCalls,opened);
+    assert.ok(action);assert.equal(action.hidden,false);assert.equal(action.disabled,false);assert.equal(action.textContent,options.english?'Install':'התקן');assertNoInstallationCopy(f.dialog);
+    assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,true);
+    f.click(action);f.click(action);assert.equal(offer.calls,1);assert.equal(action.disabled,true);await tick();
+    const accepted=options.english?'Finish adding it on your phone.':'השלימו את ההוספה בטלפון.';
+    assert.equal(f.button().disabled,false);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,accepted);assert.equal(f.dialog.querySelector('[data-home-install-help-status]').textContent,accepted);
+    const consumed=f.dialog.querySelector('[data-home-install-native-start]');assert.ok(!consumed||consumed.hidden||consumed.disabled);
+    assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,false);
+    f.window.dispatchEvent(new Event('appinstalled'));assert.equal(f.dialog.open,false);assert.equal(f.document.activeElement,f.button());
   }
 });
 
