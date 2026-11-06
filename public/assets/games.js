@@ -3,6 +3,7 @@ import {mountJachnun,pauseJachnun} from './jachnun.js?v=leaderboard-v3';
 import {mountRex,pauseRex} from './rex.js?v=4';
 import {mountSoup,pauseSoup} from './soup.js?v=clear-feedback-v10';
 import {mountNorth,pauseNorth} from './north.js?v=2';
+import {mountNetoTetris,pauseNetoTetris} from './neto-tetris.js?v=1';
 import {quizGrade} from './quiz.mjs';
 import {makeChickQuiz,withinChickTarget} from './chick.mjs?v=family-search-v4';
 import './differences.js?v=20261104.2';
@@ -14,6 +15,7 @@ const state={view:'tree',phase:'welcome',game:null,questions:[],index:0,answers:
 let clock=null,advanceClock=null,nextPhoto=null,preloaded='';
 let initialSoupLink=new URL(window.location.href).searchParams.get('game')==='soup';
 let initialNorthLink=new URL(window.location.href).searchParams.get('game')==='north';
+let initialNetoLink=new URL(window.location.href).searchParams.get('game')==='neto-tetris';
 const editor={language:I.isEnglish?'en':'he',languageChosen:false,question:'',options:['','','',''],correctIndex:null,requestId:null,saving:false,status:'',error:''};
 const name=person=>I.personName(person);
 function stopClock(){if(clock!==null)clearInterval(clock);if(advanceClock!==null)clearInterval(advanceClock);clock=null;advanceClock=null;}
@@ -31,8 +33,9 @@ function sideDancer(side){
 }
 function welcome(){
   const games=[['jachnun','games',tr('תפוס תג׳חנון','Catch the Jachnun'),tr('אספו ג׳חנונים והאריכו את שרשרת הראשים.','Collect jachnun and grow a chain of heads.')],['photos','photos',tr('מי זה?','Who is it?'),tr('זהו מי מופיע בתמונות המשפחתיות.','Recognize faces in family photos.')],['kinship','tree',tr('מה הקשר?','What’s the relation?'),tr('גלו את הקשרים בין בני המשפחה.','Discover how family members are related.')],['missing','directory',tr('מי חסר?','Who’s missing?'),tr('תמונה וארבעה שמות — מי לא מופיע בה?','Four names. Who is missing from the photo?')],['trivia','calendar',tr('טריוויה משפחתית','Family Trivia'),tr('בחנו את הידע שלכם על המשפחה.','Test your knowledge of our family.')],['puzzle','photos',tr('פאזל משפחתי','Family Puzzle'),tr('הרכיבו תמונה משפחתית, חלק אחר חלק.','Piece together a family photograph.')],['chick','games',tr('איפה הגוזל?','Where’s the little bird?'),tr('מצאו את הדמות המשפחתית בתוך הקהל.','Find a familiar face in the busy crowd.')],['differences','photos',tr('מצא את ההבדלים','Spot the differences'),tr('גלו מה השתנה בין שתי התמונות.','Spot what changed between two photos.')],['rex','games',tr('תימנירקס','Yemeanite Rex'),tr('קפצו מעל גת ואספו מטעמים תימניים.','Jump over khat and collect Yemeni treats.')],['soup','games',tr('המתכון הסודי','The Secret Recipe'),tr('פצחו את סוד המרק התימני של סבתא יונה','Crack the secret of Grandma Yona’s Yemeni soup.')]];
+  games.unshift(['neto-tetris','games',tr('חשמל נטו טטריס','Hashmal Neto Tetris'),tr('מוצרי החשמל של משפחת פיש נופלים למקום.','The Fish family appliances fall into place.')]);
   games.unshift(['north','games',tr('נוסעים לצפון','Heading North'),tr('נוסעים בקרוז למפגש המשפחתי — לזכרו של רועי חריזי ז״ל.','Drive the Cruze to our family gathering — in loving memory of Roei Harizi.')]);
-  return `<header class="family-game-intro"><span class="game-medallion" aria-hidden="true">❖</span><span class="small-eyebrow">${tr('המשפחה שלנו, מזווית קצת אחרת','Our family, from a different angle')}</span><h3>${tr('במה משחקים היום?','What shall we play?')}</h3><p>${tr('מזהים פנים או מפענחים קשרים? בחרו את האתגר שלכם.','Recognize faces or untangle family ties? Choose your challenge.')}</p></header><div class="game-lobby-desktop-stage">${sideDancer('left')}${sideDancer('right')}<div class="family-game-choices">${games.map(([id,icon,title,description])=>`<button type="button" class="family-game-choice game-choice-${id}" data-game-start="${id}" ${id==='trivia'?'data-game-home="trivia"':''} ${state.phase==='loading'?'disabled':''}><span class="game-choice-icon" aria-hidden="true"><svg viewBox="0 0 48 48">${id==='north'?'<path d="M11 35V16l4-9h18l4 9v19M11 21h26M16 29h4m8 0h4M15 35v5m18-5v5M17 12h14"/><path d="m24 18 4 5h-8Z"/>':id==='soup'?'<path d="M10 21h28v17q-14 9-28 0Z"/><ellipse cx="24" cy="21" rx="14" ry="5"/><path d="M10 25H4v9h6m28-9h6v9h-6M16 14q-5-5 0-9m8 9q-5-5 0-9m8 9q-5-5 0-9" fill="none"/>':id==='rex'?'<path d="M7 36h9l5-9 7 6h8M20 27V17m-1 7-8 4m9-5 9-4" fill="none" stroke-linecap="round" stroke-width="4"/><circle cx="21" cy="10" r="7"/><path d="M38 39V22m0 9-7-6m7 2 6-8m-6 2-5-6" fill="none" stroke-linecap="round"/>':id==='jachnun'?'<path d="M7 33c-7-12 7-18 16-12l12-10c9-7 16 5 10 11L25 39c-7 6-14 2-18-6Z"/><path d="M12 30c-2-5 5-8 9-4s1 9-3 9-5-4-2-5" fill="none"/>':id==='puzzle'?'<path d="M5 6h13v4a5 5 0 1 0 10 0V6h14v13h-4a5 5 0 1 0 0 10h4v13H28v-4a5 5 0 1 0-10 0v4H5V29h4a5 5 0 1 0 0-10H5Z"/>':`<use href="assets/home-icons.svg#${icon}"></use>`}</svg></span><span><strong>${title}</strong><span class="game-choice-description">${description}</span><b>${state.phase==='loading'&&state.game===id?tr('מכין את האתגר…','Preparing your challenge…'):tr('בואו נשחק','Let’s play')} ${I.isEnglish?'→':'←'}</b></span></button>`).join('')}</div></div><figure class="game-lobby-welcome" data-dancing="true"><img src="assets/games/yemeni-courtyard.webp" width="1536" height="1024" loading="eager" decoding="async" alt="${tr('בניינים תימניים מסורתיים וחצר מוארת','Traditional Yemeni buildings and a sunlit courtyard')}"><div class="game-lobby-dancer" role="img" aria-label="${tr('סבא שלמה עם תרבוש אדום רוקד צעד תימני','Grandpa Shlomo in a red fez dances a Yemeni step')}"><span class="shlomo-dance-frames" aria-hidden="true"></span></div><figcaption class="game-lobby-speech">${tr('בואו נשחק!','Let’s play!')}</figcaption><button type="button" class="game-dance-toggle" data-shlomo-dance aria-pressed="true">${tr('עצירת הריקוד','Pause dance')}</button></figure>${state.error?`<p class="game-error" role="alert">${safe(state.error)}</p>`:''}`;
+  return `<header class="family-game-intro"><span class="game-medallion" aria-hidden="true">❖</span><span class="small-eyebrow">${tr('המשפחה שלנו, מזווית קצת אחרת','Our family, from a different angle')}</span><h3>${tr('במה משחקים היום?','What shall we play?')}</h3><p>${tr('מזהים פנים או מפענחים קשרים? בחרו את האתגר שלכם.','Recognize faces or untangle family ties? Choose your challenge.')}</p></header><div class="game-lobby-desktop-stage">${sideDancer('left')}${sideDancer('right')}<div class="family-game-choices">${games.map(([id,icon,title,description])=>`<button type="button" class="family-game-choice game-choice-${id}" data-game-start="${id}" ${id==='trivia'?'data-game-home="trivia"':''} ${state.phase==='loading'?'disabled':''}><span class="game-choice-icon" aria-hidden="true"><svg viewBox="0 0 48 48">${id==='neto-tetris'?'<path d="M8 8h10v10H8zm10 0h10v10H18zm0 10h10v10H18zm10 0h10v10H28z"/><path d="m8 37 5-8h-5l5-8" fill="none"/>':id==='north'?'<path d="M11 35V16l4-9h18l4 9v19M11 21h26M16 29h4m8 0h4M15 35v5m18-5v5M17 12h14"/><path d="m24 18 4 5h-8Z"/>':id==='soup'?'<path d="M10 21h28v17q-14 9-28 0Z"/><ellipse cx="24" cy="21" rx="14" ry="5"/><path d="M10 25H4v9h6m28-9h6v9h-6M16 14q-5-5 0-9m8 9q-5-5 0-9m8 9q-5-5 0-9" fill="none"/>':id==='rex'?'<path d="M7 36h9l5-9 7 6h8M20 27V17m-1 7-8 4m9-5 9-4" fill="none" stroke-linecap="round" stroke-width="4"/><circle cx="21" cy="10" r="7"/><path d="M38 39V22m0 9-7-6m7 2 6-8m-6 2-5-6" fill="none" stroke-linecap="round"/>':id==='jachnun'?'<path d="M7 33c-7-12 7-18 16-12l12-10c9-7 16 5 10 11L25 39c-7 6-14 2-18-6Z"/><path d="M12 30c-2-5 5-8 9-4s1 9-3 9-5-4-2-5" fill="none"/>':id==='puzzle'?'<path d="M5 6h13v4a5 5 0 1 0 10 0V6h14v13h-4a5 5 0 1 0 0 10h4v13H28v-4a5 5 0 1 0-10 0v4H5V29h4a5 5 0 1 0 0-10H5Z"/>':`<use href="assets/home-icons.svg#${icon}"></use>`}</svg></span><span><strong>${title}</strong><span class="game-choice-description">${description}</span><b>${state.phase==='loading'&&state.game===id?tr('מכין את האתגר…','Preparing your challenge…'):tr('בואו נשחק','Let’s play')} ${I.isEnglish?'→':'←'}</b></span></button>`).join('')}</div></div><figure class="game-lobby-welcome" data-dancing="true"><img src="assets/games/yemeni-courtyard.webp" width="1536" height="1024" loading="eager" decoding="async" alt="${tr('בניינים תימניים מסורתיים וחצר מוארת','Traditional Yemeni buildings and a sunlit courtyard')}"><div class="game-lobby-dancer" role="img" aria-label="${tr('סבא שלמה עם תרבוש אדום רוקד צעד תימני','Grandpa Shlomo in a red fez dances a Yemeni step')}"><span class="shlomo-dance-frames" aria-hidden="true"></span></div><figcaption class="game-lobby-speech">${tr('בואו נשחק!','Let’s play!')}</figcaption><button type="button" class="game-dance-toggle" data-shlomo-dance aria-pressed="true">${tr('עצירת הריקוד','Pause dance')}</button></figure>${state.error?`<p class="game-error" role="alert">${safe(state.error)}</p>`:''}`;
 }
 function openTrivia(){stopClock();state.serial++;Object.assign(state,{game:'trivia',phase:'trivia-home',questions:[],answers:[],deadline:null,error:''});render();}
 function triviaHome(){
@@ -178,6 +181,8 @@ function imageReady(index,token){
 }
 function render(){
   stopClock();if(state.view!=='games')return;
+  if(state.phase==='neto-tetris'){pauseNorth();pauseSoup();pauseRex();pauseJachnun();pausePuzzle();mountNetoTetris($('familyGamesContent'),()=>{state.phase='welcome';state.game=null;render();});return;}
+  pauseNetoTetris();
   if(state.phase==='north'){pausePuzzle();pauseJachnun();pauseRex();pauseSoup();mountNorth($('familyGamesContent'),()=>{state.phase='welcome';state.game=null;render();});return;}
   pauseNorth();
   if(state.phase==='soup'){pausePuzzle();pauseJachnun();pauseRex();mountSoup($('familyGamesContent'),()=>{state.phase='welcome';state.game=null;render();});return;}
@@ -204,6 +209,7 @@ function render(){
   }
 }
 async function start(game='photos'){
+  if(game==='neto-tetris'){stopClock();state.serial++;state.game='neto-tetris';state.phase='neto-tetris';render();return;}
   if(game==='north'){stopClock();state.serial++;state.game='north';state.phase='north';render();return;}
   if(game==='soup'){stopClock();pausePuzzle();pauseJachnun();pauseRex();state.serial++;state.game='soup';state.phase='soup';render();return;}
   if(game==='rex'){stopClock();pausePuzzle();pauseJachnun();state.serial++;state.game='rex';state.phase='rex';render();return;}
@@ -220,11 +226,13 @@ async function start(game='photos'){
   }catch(error){if(serial===state.serial){state.phase=isTrivia()?'trivia-home':'welcome';state.error=error.message;render();}}
 }
 function activate(view){
+  if(view!=='games')pauseNetoTetris();
   if(view!=='games')pauseNorth();
   if(view!=='games')pauseSoup();
   if(view!=='games')pauseRex();
   if(view!=='games')pauseJachnun();
   stopClock();state.view=view;$('gamesView').hidden=view!=='games';if(view!=='games')pausePuzzle();if(window.FamilyDifferences?.activate(view))return;if(view!=='games')return;
+  if(initialNetoLink){initialNetoLink=false;start('neto-tetris');return;}
   if(initialSoupLink){initialSoupLink=false;start('soup');return;}
   if(initialNorthLink){initialNorthLink=false;start('north');return;}
   if(state.phase==='playing'&&state.deadline&&Date.now()>=state.deadline){if(isChick())finishChick(false);else finishRound(null);return;}render();

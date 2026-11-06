@@ -11,6 +11,7 @@ import {makeTriviaQuiz,triviaPool} from '../public/assets/trivia.mjs';
 import {triviaLanguage,validateTriviaQuestion,mixTriviaQuestions} from './trivia-questions.mjs';
 import {jachnunScore,JACHNUN_SCORE_LIMIT} from './jachnun-scores.mjs';
 import {rexScore,REX_SCORE_LIMIT} from './rex-scores.mjs';
+import {netoTetrisScore,NETO_TETRIS_SCORE_LIMIT} from './neto-tetris-scores.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {faceRect,overlap,FACE_LIMIT} from './faces.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
@@ -39,6 +40,8 @@ export class FamilyState {
     this.sql.exec('CREATE INDEX IF NOT EXISTS jachnun_scores_ranking ON jachnun_scores(score DESC,created_at,id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS rex_scores(id TEXT PRIMARY KEY,name TEXT NOT NULL,score INTEGER NOT NULL,head_id TEXT NOT NULL,basket TEXT NOT NULL,created_at TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS rex_scores_ranking ON rex_scores(score DESC,created_at,id)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS neto_tetris_scores(id TEXT PRIMARY KEY,name TEXT NOT NULL,score INTEGER NOT NULL,lines INTEGER NOT NULL,level INTEGER NOT NULL,pieces INTEGER NOT NULL,zaps INTEGER NOT NULL,created_at TEXT NOT NULL)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS neto_tetris_scores_ranking ON neto_tetris_scores(score DESC,created_at,id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
@@ -285,6 +288,14 @@ export class FamilyState {
         if(!previous)this.sql.exec('INSERT INTO rex_scores(id,name,score,head_id,basket,created_at) VALUES(?,?,?,?,?,?)',entry.id,entry.name,entry.score,entry.headId,basket,new Date().toISOString());
         const rank=this.rows('SELECT count(*) AS n FROM rex_scores s JOIN rex_scores own ON own.id=? WHERE s.score>own.score OR (s.score=own.score AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id)))',entry.id)[0].n+1;
         return {saved:true,id:entry.id,rank,...this.run('game.rex.scores')};
+      }
+      case 'game.neto-tetris.scores':return {scores:this.rows('SELECT id,name,score,lines,level,pieces,zaps,created_at AS createdAt FROM neto_tetris_scores ORDER BY score DESC,created_at,id LIMIT ?',NETO_TETRIS_SCORE_LIMIT),limit:NETO_TETRIS_SCORE_LIMIT};
+      case 'game.neto-tetris.score.add':{
+        const entry=netoTetrisScore(p),previous=this.rows('SELECT name,score,lines,level,pieces,zaps FROM neto_tetris_scores WHERE id=?',entry.id)[0];
+        if(previous&&['name','score','lines','level','pieces','zaps'].some(key=>previous[key]!==entry[key]))throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
+        if(!previous)this.sql.exec('INSERT INTO neto_tetris_scores(id,name,score,lines,level,pieces,zaps,created_at) VALUES(?,?,?,?,?,?,?,?)',entry.id,entry.name,entry.score,entry.lines,entry.level,entry.pieces,entry.zaps,new Date().toISOString());
+        const rank=this.rows('SELECT count(*) AS n FROM neto_tetris_scores s JOIN neto_tetris_scores own ON own.id=? WHERE s.score>own.score OR (s.score=own.score AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id)))',entry.id)[0].n+1;
+        return {saved:true,id:entry.id,rank,...this.run('game.neto-tetris.scores')};
       }
       case 'game.kinship':return {questions:makeKinshipQuiz(family,this.run('people').people),available:kinshipPool(family).length,required:10};
       case 'game.trivia':{

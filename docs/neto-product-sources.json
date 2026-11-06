@@ -1,0 +1,162 @@
+{
+  "retrievedAt": "2026-11-06",
+  "officialSite": "https://www.netoneto.co.il/",
+  "purpose": "Local branded game assets from the official Hashmal Neto catalogue. No real prices are represented by game effects.",
+  "products": {
+    "washer": {
+      "href": "https://www.netoneto.co.il/product/%D7%9E%D7%9B%D7%95%D7%A0%D7%AA-%D7%9B%D7%91%D7%99%D7%A1%D7%94-9-%D7%A7%D7%92-siemens-%D7%A1%D7%99%D7%9E%D7%A0%D7%A1-%D7%93%D7%92%D7%9D-wm14n221il",
+      "src": "https://www.netoneto.co.il/media/catalog/product/cache/e0547e52f31a6e17c411dc2cfa68375c/w/m/wm14n221il-1.jpg",
+      "alt": "מכונת כביסה 9 ק\"ג SIEMENS סימנס דגם WM14N221IL",
+      "file": "assets/games/neto/washer.webp",
+      "width": 450,
+      "height": 450,
+      "contentBounds": [
+        68,
+        9,
+        388,
+        450
+      ],
+      "bytes": 9760,
+      "model": "SIEMENS WM14N221IL",
+      "nameEn": "Siemens WM14N221IL washing machine",
+      "shape": "O",
+      "rendering": "single appliance"
+    },
+    "hood": {
+      "href": "https://www.netoneto.co.il/product/%D7%A7%D7%95%D7%9C%D7%98-%D7%90%D7%93%D7%99%D7%9D-%D7%A6%D7%9E%D7%95%D7%93-%D7%A7%D7%99%D7%A8-90-%D7%A1%D7%9E-airforce-%D7%90%D7%99%D7%99%D7%A8%D7%A4%D7%95%D7%A8%D7%A1-%D7%93%D7%92%D7%9D-b-ox-90",
+      "src": "https://www.netoneto.co.il/media/catalog/product/cache/e0547e52f31a6e17c411dc2cfa68375c/b/o/box90ix.jpg",
+      "alt": "קולט אדים צמוד קיר 90 ס\"מ AIRFORCE איירפורס דגם B-OX-90",
+      "file": "assets/games/neto/hood.webp",
+      "width": 450,
+      "height": 450,
+      "contentBounds": [
+        40,
+        34,
+        384,
+        392
+      ],
+      "bytes": 4858,
+      "model": "AIRFORCE B-OX-90",
+      "nameEn": "Airforce B-OX-90 wall range hood",
+      "shape": "T",
+      "rendering": "single appliance"
+    },
+    "kettle": {
+      "href": "https://www.netoneto.co.il/product/%D7%A7%D7%95%D7%9E%D7%A7%D7%95%D7%9D-%D7%A0%D7%99%D7%A8%D7%95%D7%A1%D7%98%D7%94-1-7-%D7%9C%D7%99%D7%98%D7%A8-bosch-%D7%91%D7%95%D7%A9-%D7%93%D7%92%D7%9D-twk7l464",
+      "src": "https://www.netoneto.co.il/media/catalog/product/cache/e0547e52f31a6e17c411dc2cfa68375c/t/w/twk7l464-1.jpg",
+      "alt": "קומקום מנירוסטה 1.7 ליטר  BOSCH בוש דגם TWK7L464- אדום",
+      "file": "assets/games/neto/kettle.webp",
+      "width": 450,
+      "height": 450,
+      "contentBounds": [
+        70,
+        16,
+        414,
+        436
+      ],
+      "bytes": 10094,
+      "model": "BOSCH TWK7L464",
+      "nameEn": "Bosch TWK7L464 kettle",
+      "shape": "S",
+      "rendering": "four copies of this same model"
+    },
+    "toaster": {
+      "href": "https://www.netoneto.co.il/product/%D7%9E%D7%A6%D7%A0%D7%9D-%D7%A0%D7%99%D7%A8%D7%95%D7%A1%D7%98%D7%94-2-%D7%A4%D7%A8%D7%95%D7%A1%D7%95%D7%AA-morphy-richards-%D7%9E%D7%95%D7%A8%D7%A4%D7%99-%D7%A8%D7%99%D7%A6%D7%90%D7%A8%D7%93%D7%A1-%D7%93%D7%92%D7%9D-222009",
+      "src": "https://www.netoneto.co.il/media/catalog/product/cache/e0547e52f31a6e17c411dc2cfa68375c/2/2/222009.jpg",
+      "alt": "מצנם נירוסטה 2 פרוסות MORPHY RICHARDS מורפי ריצ`ארדס דגם 222009",
+      "file": "assets/games/neto/toaster.webp",
+      "width": 450,
+      "height": 450,
+      "contentBounds": [
+        0,
+        10,
+        450,
+        429
+      ],
+      "bytes": 20020,
+      "model": "MORPHY RICHARDS 222009",
+      "nameEn": "Morphy Richards 222009 toaster",
+      "shape": "Z",
+      "rendering": "four copies of this same model"
+    },
+    "coffee": {
+      "href": "https://www.netoneto.co.il/product/%D7%9E%D7%9B%D7%95%D7%A0%D7%AA-%D7%A7%D7%A4%D7%94-nespresso-essenza-mini-%D7%A0%D7%A1%D7%A4%D7%A8%D7%A1%D7%95-%D7%93%D7%92%D7%9D-c30",
+      "src": "https://www.netoneto.co.il/media/catalog/product/cache/e0547e52f31a6e17c411dc2cfa68375c/c/3/c30-1.jpg",
+      "alt": "מכונת קפה NESPRESSO ESSENZA MINI נספרסו דגם C30 ",
+      "file": "assets/games/neto/coffee.webp",
+      "width": 450,
+      "height": 450,
+      "contentBounds": [
+        100,
+        11,
+        360,
+        450
+      ],
+      "bytes": 9666,
+      "model": "NESPRESSO C30 ESSENZA MINI",
+      "nameEn": "Nespresso C30 Essenza Mini coffee machine",
+      "shape": "J",
+      "rendering": "four copies of this same model"
+    },
+    "blender": {
+      "href": "https://www.netoneto.co.il/product/%D7%91%D7%9C%D7%A0%D7%93%D7%A8-%D7%9E%D7%A7%D7%A6%D7%95%D7%A2%D7%99-smeg-%D7%A1%D7%9E%D7%90%D7%92-%D7%93%D7%92%D7%9D-blf03",
+      "src": "https://www.netoneto.co.il/media/catalog/product/cache/e0547e52f31a6e17c411dc2cfa68375c/b/l/blf03-1.jpg",
+      "alt": "בלנדר מקצועי SMEG סמאג דגם BLF03",
+      "file": "assets/games/neto/blender.webp",
+      "width": 450,
+      "height": 450,
+      "contentBounds": [
+        128,
+        10,
+        319,
+        448
+      ],
+      "bytes": 7956,
+      "model": "SMEG BLF03",
+      "nameEn": "Smeg BLF03 blender",
+      "shape": "L",
+      "rendering": "four copies of this same model"
+    },
+    "soundbar": {
+      "href": "https://www.netoneto.co.il/product/מקרן-קול-מבית-sonos-סונוס-דגם-sonos-beam2",
+      "alt": "מקרן קול מבית SONOS סונוס דגם SONOS BEAM2",
+      "src": "https://www.netoneto.co.il/media/catalog/product/cache/e0547e52f31a6e17c411dc2cfa68375c/b/e/beam2_13102021113446.jpg",
+      "file": "assets/games/neto/soundbar.webp",
+      "width": 450,
+      "height": 450,
+      "contentBounds": [
+        21,
+        187,
+        435,
+        245
+      ],
+      "bytes": 1530,
+      "model": "SONOS BEAM2",
+      "nameEn": "Sonos Beam Gen 2 soundbar",
+      "shape": "I",
+      "rendering": "single appliance",
+      "view": "front, horizontal"
+    },
+    "logo": {
+      "href": "https://www.netoneto.co.il/",
+      "alt": "חשמל נטו",
+      "src": "https://www.netoneto.co.il/media/logo/stores/1/629_x_213_logo.png",
+      "file": "assets/games/neto/logo.webp",
+      "width": 629,
+      "height": 213,
+      "contentBounds": [
+        0,
+        0,
+        629,
+        213
+      ],
+      "bytes": 19092
+    }
+  },
+  "brand": {
+    "blue": "#164b8d",
+    "grey": "#4c4c4c",
+    "orange": "#f26722",
+    "logoTransparency": true
+  }
+}

@@ -160,6 +160,11 @@ export default {
         if(request.method==='POST')return json(await db('game.rex.score.add',await readJSON(request,4096)));
         throw new HttpError(405,'הפעולה אינה נתמכת.');
       }
+      if(path==='/api/games/neto-tetris/scores'){
+        if(request.method==='GET')return json(await db('game.neto-tetris.scores'));
+        if(request.method==='POST')return json(await db('game.neto-tetris.score.add',await readJSON(request,4096)));
+        throw new HttpError(405,'הפעולה אינה נתמכת.');
+      }
       if(path==='/family-data.js'&&request.method==='GET'){
         let people={},dataAvailable=true;
         try{people=Object.fromEntries((await db('dates')).people.map(p=>[p.id,p]));}catch{dataAvailable=false;}
