@@ -11,7 +11,7 @@ const questions=Array.from({length:10},(_,i)=>({id:'photo-'+i,src:'/media/photo-
 const kinshipQuestions=questions.map(q=>({...q,kind:'kinship',subject:{id:'rivi',name:'ריוי גנדלמן',nameEn:'Revital Gandelman',gender:'f',profile:'/media/rivi'},reference:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha',gender:'m',profile:'/media/eldad'},options:[{id:'p0',name:'בת דודה',nameEn:'First cousin'},{id:'p1',name:'אחות',nameEn:'Sister'},{id:'p2',name:'אחיינית',nameEn:'Niece'},{id:'p3',name:'נכדה',nameEn:'Granddaughter'}]}));
 const triviaQuestions=questions.map(q=>({...q,kind:'trivia',subject:kinshipQuestions[0].subject,prompt:'באיזו שנה נולדה ריוי גנדלמן?',promptEn:'In which year was Revital Gandelman born?',options:q.options.map((o,i)=>({...o,name:String(1970+i),nameEn:String(1970+i)}))}));
 function fixture({entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false}={}){
-  let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null,northMounts=0,northPauses=0,northBack=null,netoMounts=0,netoPauses=0,netoBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
+  let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null,northMounts=0,northPauses=0,northBack=null,netoMounts=0,netoPauses=0,netoBack=null,rutiMounts=0,rutiPauses=0,rutiBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
   const chickQuestions=makeChickQuiz(()=>.5);
   class Node{
     constructor(){this.handlers=new Map();this.dataset={};this.style={setProperty(){}};this.attributes={};this.disabled=false;this.hidden=false;this.complete=autoImages;this.naturalWidth=autoImages?100:0;this.textContent='';}
@@ -39,11 +39,11 @@ function fixture({entryUrl=null,english=false,autoImages=true,count=10,nativeSha
   const navigator={clipboard:{async writeText(value){if(clipboardError)throw Error('Clipboard unavailable');copied.push(value);}}};
   if(nativeShare)navigator.share=async data=>{shared.push(data);if(shareError)throw Object.assign(Error('Share unavailable'),{name:shareError});};
   const FakeDate=class extends Date{static now(){return now;}};
-  vm.runInNewContext(source,{window,document,navigator,URL,crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},quizGrade,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
+  vm.runInNewContext(source,{window,document,navigator,URL,crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},mountRutiHouse(_root,onBack){rutiMounts++;rutiBack=onBack;},pauseRutiHouse(){rutiPauses++;},quizGrade,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
   documentEvents.get('DOMContentLoaded')();
   const root=nodes.get('familyGamesContent'),flush=()=>new Promise(resolve=>setImmediate(resolve));
   async function click(selector,node={},detail=1,position={}){prevented=false;root.handlers.get('click')({...position,detail,preventDefault(){prevented=true;},target:{closest:s=>s===selector?node:null}});await flush();}
-  return {window,nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get netoMounts(){return netoMounts;},get netoPauses(){return netoPauses;},backFromNeto(){netoBack();},get northMounts(){return northMounts;},get northPauses(){return northPauses;},backFromNorth(){northBack();},get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
+  return {window,nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get rutiMounts(){return rutiMounts;},get rutiPauses(){return rutiPauses;},backFromRuti(){rutiBack();},get netoMounts(){return netoMounts;},get netoPauses(){return netoPauses;},backFromNeto(){netoBack();},get northMounts(){return northMounts;},get northPauses(){return northPauses;},backFromNorth(){northBack();},get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
     messenger:()=>click('[data-game-share-messenger]'),
     openTrivia:()=>click('[data-game-start]',{dataset:{gameStart:'trivia',gameHome:'trivia'}}),
     click,input(id,value){nodes.get(id).value=value;root.handlers.get('input')({target:{id,value}});},
@@ -254,4 +254,23 @@ test('switching to Neto Tetris clears quiz clocks and switching away detaches it
   const pauses=f.netoPauses;await f.start('trivia');assert.ok(f.netoPauses>pauses);assert.equal(f.intervals.size,1);
   await f.start('neto-tetris');assert.equal(f.netoMounts,2);assert.equal(f.intervals.size,0);
   const detached=f.netoPauses;await f.start('north');assert.ok(f.netoPauses>detached);assert.equal(f.northMounts,1);assert.equal(f.intervals.size,0);
+});
+
+
+test('Ruti’s House opens from the bilingual lobby, stops quiz clocks and pauses when leaving',async()=>{
+  for(const english of [false,true]){
+    const f=fixture({english});assert.match(f.html,english?/Ruti’s House/:/הבית של רותי/);assert.match(f.html,/data-game-start="ruti-house"/);
+    await f.start('photos');assert.equal(f.intervals.size,1);const requests=f.requests.length;
+    await f.start('ruti-house');assert.equal(f.rutiMounts,1);assert.equal(f.intervals.size,0);assert.equal(f.requests.length,requests);
+    const pauses=f.rutiPauses;f.window.FamilyGames.activate('tree');assert.ok(f.rutiPauses>pauses);f.window.FamilyGames.activate('games');assert.equal(f.rutiMounts,2);
+    f.backFromRuti();assert.match(f.html,/family-game-choices/);assert.equal(f.intervals.size,0);
+  }
+});
+
+test('a direct Ruti’s House link opens only once and allows returning to game selection',()=>{
+  for(const english of [false,true]){
+    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=ruti-house#games'});
+    assert.equal(f.rutiMounts,1);assert.equal(f.netoMounts,0);assert.equal(f.requests.length,0);
+    f.backFromRuti();assert.match(f.html,/family-game-choices/);f.window.FamilyGames.activate('games');assert.equal(f.rutiMounts,1);
+  }
 });
