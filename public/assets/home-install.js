@@ -124,8 +124,9 @@
     if(!card)return;
     const isInstalled=hasInstalledShortcut();
     if(isInstalled&&attemptActive){completeInstallation();return;}
-    card.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);
-    button.hidden=false;status.hidden=false;
+    // Share the same invitation from computers and phones; installation stays on phones.
+    card.hidden=false;
+    button.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);status.hidden=false;
     button.setAttribute('aria-haspopup',isInstalled?'false':'dialog');
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
     button.disabled=busy;

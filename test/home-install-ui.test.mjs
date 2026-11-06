@@ -110,9 +110,9 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
 
 test('phone toolbar responds to viewport changes and keeps both controls in installed apps',()=>{
   const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.equal(f.button().getAttribute('aria-label'),'התקן קיצור דרך לאתר');assert.equal(f.card.querySelector('[data-home-install-share]').getAttribute('aria-label'),'שיתוף האתר');assert.equal(f.button().textContent,'התקן');assert.match(f.card.innerHTML,/>שיתוף</);
-  f.resize(false);assert.equal(f.card.hidden,true);f.resize(true);assert.equal(f.card.hidden,false);
+  f.resize(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,true);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.resize(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
   f.standalone(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.standalone(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
-  assert.equal(fixture({mobile:false}).card.hidden,true);
+  assert.equal(fixture({mobile:false}).card.hidden,false);assert.equal(fixture({mobile:false}).button().hidden,true);
   assert.equal(fixture({mobile:false,userAgentMobile:true}).card.hidden,false);
   for(const options of [{standalone:true},{iosStandalone:true}]){const installed=fixture(options);assert.equal(installed.card.hidden,false);assert.equal(installed.button().hidden,false);assert.equal(installed.card.querySelector('[data-home-install-share]').hidden,false);}
 });
@@ -201,13 +201,15 @@ test('English toolbar and platform instructions contain localized visible copy',
   assert.equal(f.button().getAttribute('aria-label'),'Install site shortcut');assert.equal(f.button().textContent,'Install');assert.match(f.dialog.innerHTML,/Share/);assert.doesNotMatch(f.card.innerHTML+f.dialog.innerHTML,/[\u0590-\u05ff]/);
 });
 
-test('share uses the native share sheet only after a tap and sends a localized installation invitation',async()=>{
-  const f=fixture({share:'works',english:true});assert.equal(f.shared.length,0);
-  f.click(f.card.querySelector('[data-home-install-share]'));assert.equal(f.shared.length,1);await tick();
-  assert.equal(f.copied.length,0);assert.equal(f.shared[0].title,'Keha Family Home');
-  assert.equal(f.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
-  assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
-  assert.match(f.card.querySelector('[data-home-install-share-status]').textContent,/Link ready to share/);
+test('share on phones and computers sends the same localized installation invitation only after a tap',async()=>{
+  for(const mobile of [true,false]){
+    const f=fixture({mobile,share:'works',english:true,userAgent:mobile?'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36'});assert.equal(f.shared.length,0);assert.equal(f.card.hidden,false);
+    f.click(f.card.querySelector('[data-home-install-share]'));assert.equal(f.shared.length,1);await tick();
+    assert.equal(f.copied.length,0);assert.equal(f.shared[0].title,'Keha Family Home');
+    assert.equal(f.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
+    assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
+    assert.match(f.card.querySelector('[data-home-install-share-status]').textContent,/Link ready to share/);
+  }
 });
 
 test('cancelling the native share sheet is silent and does not copy anything',async()=>{
@@ -307,7 +309,7 @@ test('shared installation links leave desktop browsers on the website at every v
     'Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/145.0'
   ])for(const mobile of [false,true]){
     const entryUrl='https://family.example/?lang=he&install=1#home',f=fixture({userAgent,mobile,entryUrl,autoReady:false,recordNavigation:true}),offer=f.offer();
-    f.ready();await tick();assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,0);assert.equal(offer.calls,0);assert.equal(f.card.hidden,!mobile);
+    f.ready();await tick();assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,0);assert.equal(offer.calls,0);assert.equal(f.card.hidden,false);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);
     f.resize(!mobile);f.window.dispatchEvent(new Event('pageshow'));f.window.dispatchEvent(new Event('focus'));f.document.dispatchEvent(new Event('visibilitychange'));await tick();
     assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,0);assert.equal(offer.calls,0);assert.deepEqual(f.assignments,[]);assert.equal(f.location.href,entryUrl);
   }
