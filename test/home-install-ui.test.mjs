@@ -179,9 +179,9 @@ test('iPhone and touch iPad use Share instructions, while embedded browsers expl
     {userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit Safari/605.1',maxTouchPoints:5}
   ]){
     const f=fixture(options);f.click(f.button());await tick();assert.equal(f.dialog.open,true);assert.match(f.dialog.innerHTML,/Safari/);assert.match(f.dialog.innerHTML,/שיתוף/);assert.match(f.dialog.innerHTML,/הוספה למסך הבית/);
-    assert.equal(f.dialog.querySelector('[data-home-install-profile]')?.getAttribute('href'),'/install/iphone.html?lang=he');
+    assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.equal(f.dialog.querySelector('[data-home-install-profile]'),null);
     f.click(f.dialog.querySelector('[data-home-install-language]'));
-    assert.equal(f.dialog.querySelector('[data-home-install-profile]')?.getAttribute('href'),'/install/iphone.html?lang=en-US');
+    assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
   }
   const embedded=fixture({userAgent:'Mozilla/5.0 (Linux; Android 16) Instagram WhatsApp FBAN/FB4A'});embedded.click(embedded.button());await tick();
   assert.match(embedded.dialog.innerHTML,/Chrome/);assert.match(embedded.dialog.innerHTML,/בדפדפן|דפדפן/);
@@ -330,7 +330,8 @@ test('phones and tablets receive shared installation invitations even with wide 
   ]){
     const f=fixture({...options,mobile:false,entryUrl:'https://family.example/?lang=he&install=1#home',autoReady:false}),offer=f.offer();
     assert.equal(f.dialog.open,false);f.ready();await tick();assert.equal(f.dialog.open,true);assert.equal(offer.calls,0);
-    f.click(f.dialog.querySelector('[data-home-install-invite-start]'));assert.equal(offer.calls,1);await tick();
+    if(f.dialog.querySelector('[data-home-install-apple-steps]')){assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.equal(offer.calls,0);}
+    else{f.click(f.dialog.querySelector('[data-home-install-invite-start]'));assert.equal(offer.calls,1);await tick();}
   }
 });
 
@@ -351,7 +352,7 @@ test('invitation without a native prompt opens localized platform steps without 
   ]){
     const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true,clipboard:'blocked'});await tick();
     if(options.desktop){assert.equal(f.dialog.open,false);f.click(f.button());}
-    else{assert.equal(f.dialog.open,true);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));}
+    else{assert.equal(f.dialog.open,true);const start=f.dialog.querySelector('[data-home-install-invite-start]');if(start)f.click(start);else assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));}
     await tick();assert.equal(f.dialog.open,true);
     assert.match(f.dialog.innerHTML,options.browser);assert.match(f.dialog.innerHTML,/Add to Home [Ss]creen/);assert.doesNotMatch(f.dialog.innerHTML,/[֐-׿]/);
     if(options.otherBrowser)assert.doesNotMatch(f.dialog.innerHTML,options.otherBrowser);
@@ -365,7 +366,7 @@ test('WhatsApp installation uses the app menu to open a full browser without cop
     {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) WhatsApp/2.26.1',browser:/Safari/}
   ]){
     const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true});await tick();
-    assertNoInstallationCopy(f.dialog);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
+    assertNoInstallationCopy(f.dialog);const start=f.dialog.querySelector('[data-home-install-invite-start]');if(start)f.click(start);else assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));await tick();
     assert.match(f.dialog.innerHTML,/menu/i);assert.match(f.dialog.innerHTML,/Open in browser/);assert.match(f.dialog.innerHTML,options.browser);assertNoInstallationCopy(f.dialog);
   }
 });

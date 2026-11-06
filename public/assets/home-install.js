@@ -46,6 +46,7 @@
   function showDialog(kind,returnFocus){
     dialogKind=kind;dialogReturnFocus=returnFocus;
     dialog.setAttribute('dir',english?'ltr':'rtl');
+    dialog.setAttribute('data-ios-guide',String(ios&&kind==='invite'&&!hasInstalledShortcut()));
     dialog.querySelector('[data-home-install-close]').addEventListener('click',()=>closeDialog());
     dialog.querySelector('[data-home-install-language]')?.addEventListener('click',()=>{
       const currentKind=dialogKind,currentFocus=dialogReturnFocus;english=!english;
@@ -151,15 +152,11 @@
     if(message)status.textContent=message;
   }
   function steps(items){return '<ol>'+items.map(item=>'<li>'+item+'</li>').join('')+'</ol>';}
-  function appleProfileLink(){
-    if(!ios)return '';
-    const profileLanguage=english?(language==='en-GB'?'en-GB':'en-US'):'he';
-    return '<a class="home-install-invite-browse home-install-profile-link" data-home-install-profile href="/install/iphone.html?lang='+profileLanguage+'">'+tr('ניסוי לאייפון: הוספה דרך פרופיל','iPhone trial: add using a profile')+'</a>';
-  }
-  function appleHelp(){return steps([
-    tr('ב־Safari לחצו על שיתוף <span class="home-install-share" aria-hidden="true">↑</span> ובחרו ״הוספה למסך הבית״.','In Safari, tap Share <span class="home-install-share" aria-hidden="true">↑</span> and choose “Add to Home Screen”.'),
-    tr('לחצו ״הוסף״. אייקון האתר יופיע במסך הבית.','Tap “Add”. The website icon will appear on your home screen.')
-  ]);}
+  function appleHelp(){return '<div class="home-install-apple-steps" data-home-install-apple-steps>'+steps([
+    '<strong><span class="home-install-share" aria-hidden="true">↑</span> '+tr('שיתוף','Share')+'</strong><span>'+tr('בסרגל של Safari. אם הסמל מוסתר, פתחו את תפריט ⋯ ואז ״שיתוף״.','Use Safari’s toolbar. If the icon is hidden, open the ⋯ page menu, then “Share”.')+'</span>',
+    '<strong>'+tr('הוספה למסך הבית','Add to Home Screen')+'</strong><span>'+tr('בוחרים ברשימת הפעולות של Safari. ייתכן שצריך לגלול ברשימה.','Choose it in Safari’s actions. You may need to scroll down the list.')+'</span>',
+    '<strong>'+tr('הוסף','Add')+'</strong><span>'+tr('משאירים את השם ולוחצים ״הוסף״. האייקון יופיע במסך הבית.','Keep the name and tap “Add”. The icon will appear on your Home Screen.')+'</span>'
+  ])+'</div>';}
   function androidHelp(){return steps([
     tr('ב־Chrome פתחו את התפריט ⋮ ובחרו ״התקנת אפליקציה״ או ״הוספה למסך הבית״.','In Chrome, open the ⋮ menu and choose “Install app” or “Add to Home screen”.'),
     tr('אשרו ״התקן״ או ״הוסף״. אייקון האתר יופיע במסך הבית.','Confirm “Install” or “Add”. The website icon will appear on your home screen.')
@@ -167,14 +164,24 @@
   function openHelp(returnFocus=button){
     const embeddedNote=embedded?'<p class="home-install-browser-note">'+tr('בתפריט ⋮ או השיתוף של האפליקציה בחרו ״פתיחה בדפדפן״. אחרי הפתיחה לחצו שוב ״התקן״.','In this app’s ⋮ or Share menu, choose “Open in browser”. Then tap “Install” again.')+'</p>':'';
     const help=ios?appleHelp():android?androidHelp():'<h3>iPhone / iPad</h3>'+appleHelp()+'<h3>Android</h3>'+androidHelp();
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('התקנת בית משפחת קהא','Install Keha Family Home')+'</h2><button type="button" class="home-install-invite-primary" data-home-install-native-start hidden>'+tr('התקן','Install')+'</button>'+progressControl()+'<div data-home-install-instructions>'+embeddedNote+help+appleProfileLink()+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>'+iconConfirmation();
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('התקנת בית משפחת קהא','Install Keha Family Home')+'</h2><button type="button" class="home-install-invite-primary" data-home-install-native-start hidden>'+tr('התקן','Install')+'</button>'+progressControl()+'<div data-home-install-instructions>'+embeddedNote+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>'+iconConfirmation();
     dialog.querySelector('[data-home-install-native-start]').addEventListener('click',()=>requestInstallation(true));
     showDialog('install',returnFocus);
     update();
   }
   function openInvitation(returnFocus=shareButton){
     const alreadyInstalled=hasInstalledShortcut();
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההזמנה','Close invitation')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+(alreadyInstalled?tr('הבית שלנו כבר אצלכם','Our home is already with you'):tr('התקנת בית משפחת קהא','Install Keha Family Home'))+'</h2>'+(alreadyInstalled?'<p class="home-install-dialog-intro" data-home-install-invite-installed>'+tr('קיצור הדרך כבר מותקן בטלפון הזה. אפשר להמשיך ישר לאתר.','The shortcut is already installed on this device. You can continue to the website.')+'</p>':'<p class="home-install-dialog-intro">'+tr('אייקון האתר במסך הבית של הטלפון — המשפחה במרחק נגיעה.','The website icon on your phone’s home screen — your family just a tap away.')+'</p>'+welcomeArt()+'<button type="button" class="home-install-invite-primary" data-home-install-invite-start>'+tr('התקן','Install')+'</button>'+platformLogos()+appleProfileLink()+progressControl()+'<p class="home-install-invite-status" data-home-install-invite-status role="status" aria-live="polite"></p>'+iconConfirmation(true))+'<button type="button" class="home-install-invite-browse" data-home-install-invite-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
+    let content;
+    if(alreadyInstalled){
+      content='<p class="home-install-dialog-intro" data-home-install-invite-installed>'+tr('קיצור הדרך כבר מותקן בטלפון הזה. אפשר להמשיך ישר לאתר.','The shortcut is already installed on this device. You can continue to the website.')+'</p>';
+    }else if(ios){
+      const browserNote=embedded?'<p class="home-install-browser-note">'+tr('אם ״הוספה למסך הבית״ אינה זמינה כאן, בתפריט האפליקציה בחרו ״פתיחה בדפדפן״.','If “Add to Home Screen” is missing here, use this app’s menu and choose “Open in browser”.')+'</p>':'';
+      content='<p class="home-install-dialog-intro">'+tr('הוספה חד־פעמית דרך Safari. אפשר להשאיר חלון זה פתוח בזמן ההוספה.','Add once through Safari. You can leave this guide open while adding the icon.')+'</p>'+welcomeArt()+browserNote+appleHelp();
+    }else{
+      content='<p class="home-install-dialog-intro">'+tr('אייקון האתר במסך הבית של הטלפון — המשפחה במרחק נגיעה.','The website icon on your phone’s home screen — your family just a tap away.')+'</p>'+welcomeArt()+'<button type="button" class="home-install-invite-primary" data-home-install-invite-start>'+tr('התקן','Install')+'</button>'+platformLogos()+progressControl()+'<p class="home-install-invite-status" data-home-install-invite-status role="status" aria-live="polite"></p>'+iconConfirmation(true);
+    }
+    const heading=alreadyInstalled?tr('הבית שלנו כבר אצלכם','Our home is already with you'):ios?tr('מוסיפים למסך הבית','Add to your Home Screen'):tr('התקנת בית משפחת קהא','Install Keha Family Home');
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההזמנה','Close invitation')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+heading+'</h2>'+content+'<button type="button" class="home-install-invite-browse" data-home-install-invite-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
     dialog.querySelector('[data-home-install-invite-start]')?.addEventListener('click',()=>requestInstallation(true));
     dialog.querySelector('[data-home-install-invite-browse]').addEventListener('click',continueToSite);
     showDialog('invite',returnFocus);update();
@@ -186,6 +193,7 @@
       announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));
       return;
     }
+    if(ios){openInvitation(button);return;}
     if(attemptActive&&(installState==='pending'||installState==='requesting')){if(!dialog.open)openInvitation(button);return;}
     if(!installPrompt){
       if(window.top===window&&typeof navigator.getInstalledRelatedApps==='function')await checkInstalledShortcut();
