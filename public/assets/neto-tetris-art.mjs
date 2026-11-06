@@ -1,4 +1,4 @@
-import {TETROMINOES,pieceCells,ghostY,COLS,ROWS} from './neto-tetris.mjs?v=1';
+import {TETROMINOES,pieceCells,ghostY,COLS,ROWS} from './neto-tetris.mjs?v=2';
 import {NETO_PRODUCTS} from './neto-products.mjs?v=1';
 
 const images=new Map(),loads=new Map();

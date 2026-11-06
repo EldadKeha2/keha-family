@@ -11,7 +11,7 @@ function forceTopOut(game){
 }
 test('the seven-bag stream has one of each connected tetromino and five previews',()=>{
   const game=createTetris({random:random()}),sequence=[];
-  assert.equal(game.board.length,ROWS);assert.ok(game.board.every(row=>row.length===COLS));assert.equal(game.lives,TETRIS_LIVES);
+  assert.equal(game.board.length,ROWS);assert.ok(game.board.every(row=>row.length===COLS));assert.equal(game.lives,TETRIS_LIVES);assert.equal(TETRIS_LIVES,4);
   for(let i=0;i<56;i++){
     sequence.push(game.active.type);assert.equal(game.next.length,5);assert.equal(TETROMINOES[game.active.type].cells.length,4);
     beginZap(game);finishZap(game);
@@ -55,9 +55,9 @@ test('gravity and a lock delay permit a grounded adjustment, with a bounded fall
   advanceTetris(game,.2);assert.notEqual(game.active.group,group);assert.equal(game.pieces,1);
   assert.ok(dropInterval({level:10})<dropInterval({level:1}));assert.equal(dropInterval({level:1000000}),.075);
 });
-test('each full stockroom loses one life and preserves cumulative score; the third ends the game',()=>{
+test('each full stockroom loses one life and preserves cumulative score; only the fourth ends the game',()=>{
   const game=createTetris();game.score=2300;game.lines=23;game.level=3;
-  for(let life=2;life>=0;life--){
+  for(let life=3;life>=0;life--){
     forceTopOut(game);assert.equal(game.lives,life);assert.equal(game.phase,life?'crashed':'finished');assert.equal(game.score,2300);assert.equal(game.lines,23);
     const count=game.pieces;advanceTetris(game,1);hardDropTetris(game);moveTetris(game,1);rotateTetris(game);softDropTetris(game);assert.equal(game.pieces,count);assert.equal(beginZap(game),null);
     if(life){assert.equal(resumeTetris(game),true);assert.equal(game.phase,'playing');assert.equal(game.board.flat().filter(Boolean).length,0);}
@@ -66,14 +66,14 @@ test('each full stockroom loses one life and preserves cumulative score; the thi
 });
 test('locking above the display also costs exactly one life',()=>{
   const game=createTetris();active(game,'O',3,-1);game.board[1][4]=tile();game.board[1][5]=tile();
-  softDropTetris(game);assert.equal(game.phase,'crashed');assert.equal(game.lives,2);assert.equal(game.pieces,1);
+  softDropTetris(game);assert.equal(game.phase,'crashed');assert.equal(game.lives,3);assert.equal(game.pieces,1);
 });
 test('ZAP snapshots every visible product, freezes actions, clears once and awards no lines or points',()=>{
   const game=createTetris();game.score=500;game.lines=5;active(game,'T',3,4,1);game.board[19][0]=tile('J',8);game.board[18][0]=tile('J',8);
   const before=pieceCells(game.active),snapshot=beginZap(game);assert.equal(snapshot.length,6);assert.equal(game.phase,'zapping');assert.equal(game.zaps,1);
   assert.deepEqual(snapshot.filter(cell=>cell.group===game.active.group).map(({x,y,localX,localY})=>({x,y,localX,localY})),before);
   const group=game.active.group;assert.equal(moveTetris(game,1),false);assert.equal(rotateTetris(game),false);assert.equal(hardDropTetris(game),false);assert.equal(beginZap(game),null);advanceTetris(game,1);assert.equal(game.active.group,group);
-  assert.equal(finishZap(game),true);assert.equal(finishZap(game),false);assert.equal(game.board.flat().filter(Boolean).length,0);assert.equal(game.score,500);assert.equal(game.lines,5);assert.equal(game.lives,3);assert.equal(game.pieces,0);assert.notEqual(game.active.group,group);
+  assert.equal(finishZap(game),true);assert.equal(finishZap(game),false);assert.equal(game.board.flat().filter(Boolean).length,0);assert.equal(game.score,500);assert.equal(game.lines,5);assert.equal(game.lives,4);assert.equal(game.pieces,0);assert.notEqual(game.active.group,group);
   assert.ok(beginZap(game));finishZap(game);assert.equal(game.zaps,2);
 });
 test('many hours of continued play have no deadline and no points from dropping or ZAP alone',()=>{
@@ -82,5 +82,5 @@ test('many hours of continued play have no deadline and no points from dropping 
     advanceTetris(game,.4);if(step%12===0){hardDropTetris(game);beginZap(game);finishZap(game);}
     assert.equal(game.phase,'playing');
   }
-  assert.equal('deadline' in game,false);assert.equal(game.lives,3);assert.equal(game.score,0);assert.equal(game.lines,0);assert.ok(game.pieces>1000);
+  assert.equal('deadline' in game,false);assert.equal(game.lives,4);assert.equal(game.score,0);assert.equal(game.lines,0);assert.ok(game.pieces>1000);
 });

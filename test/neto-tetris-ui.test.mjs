@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {webcrypto} from 'node:crypto';
 import * as engine from '../public/assets/neto-tetris.mjs';
 import {NETO_PRODUCTS,NETO_STORE_URL} from '../public/assets/neto-products.mjs';
+import {NETO_BROTHERS} from '../public/assets/neto-brothers.mjs';
 
 const source=(await readFile(new URL('../public/assets/neto-tetris.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'').replace(/export function /g,'function ');
 function fixture({english=false,failSave=false,initialScores=[],reducedMotion=false,legacyCrypto=false,failArt=false}={}){
@@ -38,7 +39,7 @@ function fixture({english=false,failSave=false,initialScores=[],reducedMotion=fa
     return Response.json({scores:initialScores});
   }}};
   vm.runInNewContext(source+'\nwindow.test={mountNetoTetris,pauseNetoTetris};',{
-    ...engine,NETO_PRODUCTS,NETO_STORE_URL,window,document,Response,AbortController,Uint8Array,
+    ...engine,NETO_PRODUCTS,NETO_STORE_URL,NETO_BROTHERS,window,document,Response,AbortController,Uint8Array,
     performance:{now:()=>now},crypto:legacyCrypto?{getRandomValues:n=>webcrypto.getRandomValues(n)}:webcrypto,
     createTetris(options){game=engine.createTetris({random:()=>.2,...options});return game;},
     loadNetoImages(callback){if(failArt)return Promise.reject(Error('art unavailable'));queueMicrotask(callback);return Promise.resolve();},
@@ -74,10 +75,14 @@ function topOut(f){
   for(const y of [0,1])f.game.board[y]=Array.from({length:engine.COLS},(_,x)=>x>=2&&x<=7?tile():null);
   setActive(f,'O',3,engine.ROWS-2);f.key(' ','Space');
 }
+function displayedBrothers(f){
+  const portraits=f.nodes.get('[data-neto-life-icons]')?.innerHTML||f.html;
+  return [...portraits.matchAll(/<[^>]+\bdata-neto-brother="([^"]+)"[^>]*>/g)].map(match=>({id:match[1],lost:/\bdata-lost="true"/.test(match[0])}));
+}
 async function finish(f,{withPoints=true}={}){
-  for(let life=0;life<3;life++){
+  for(let life=0;life<4;life++){
     if(withPoints)clearRow(f);topOut(f);
-    if(life<2)await f.click('[data-neto-continue]');
+    if(life<3)await f.click('[data-neto-continue]');
   }
   await f.flush();
 }
@@ -88,7 +93,7 @@ test('the bilingual opening tells the Fish family story without dashes and expla
     assert.match(f.html,english?/Hashmal Neto Tetris/:/חשמל נטו טטריס/);
     const story=f.html.match(/<p class="neto-story">([^<]+)<\/p>/)?.[1];assert.ok(story);assert.doesNotMatch(story,/[-‐‑‒–—־]/);
     assert.match(story,english?/Tomer/:/תומר/);assert.match(story,english?/Tedi/:/תדי/);assert.match(story,english?/Fish brothers/:/האחים פיש/);
-    assert.match(f.html,english?/Three lives\./:/שלוש פסילות\./);
+    assert.match(f.html,english?/Four lives/:/ארבע פסילות/);
     assert.doesNotMatch(f.html,/כל הבית נופל למקום|Everything falls into place|הגבלת זמן|בלי שעון|No time limit|No clock/i);
     assert.match(f.html,english?/Clearing with ZAP adds no points/:/הניקוי עצמו לא מוסיף נקודות/);
     assert.equal((f.html.match(/data-neto-preview=/g)||[]).length,7);assert.ok(Object.keys(NETO_PRODUCTS).every(type=>f.previews.includes(type)));
@@ -103,6 +108,7 @@ test('keyboard and phone controls move, rotate and drop once, while form inputs 
   const before={...f.game.active};assert.equal(f.key('ArrowLeft','ArrowLeft',{editable:true}),false);assert.deepEqual(f.game.active,before);
   const pieces=f.game.pieces;f.key(' ','Space',{repeat:true});assert.equal(f.game.pieces,pieces);f.key(' ','Space');assert.equal(f.game.pieces,pieces+1);
   assert.doesNotMatch(f.html,/role="timer"|data-neto-time|הגבלת זמן|בלי שעון|No time limit|No clock/i);
+  assert.equal((f.html.match(/data-neto-preview=/g)||[]).length,1);assert.doesNotMatch(f.html,/data-neto-lines|data-neto-level/);
   const sideBrands=[...f.html.matchAll(/<[^>]+\bclass="[^"]*\bneto-side-brand-(?:left|right)\b[^"]*"[^>]*>/g)];
   assert.equal(sideBrands.length,2);for(const side of ['neto-side-brand-left','neto-side-brand-right'])assert.ok(sideBrands.some(match=>match[0].includes(side)));
   for(const brand of sideBrands)assert.match(brand[0],/aria-hidden="true"/);
@@ -123,16 +129,16 @@ test('pause, hidden tabs and navigation preserve the same score and lives across
   const f=fixture();await f.start();clearRow(f);const game=f.game,points=game.score,active={...game.active};
   await f.click('[data-neto-pause]');assert.equal(f.frames.size,0);f.advance(1000);f.key('ArrowLeft','ArrowLeft');assert.deepEqual(game.active,active);assert.equal(game.score,points);
   await f.click('[data-neto-resume]');assert.equal(f.frames.size,1);f.visibility('hidden');assert.equal(f.frames.size,0);f.jumpTime(3600000);f.visibility('visible');assert.equal(f.frames.size,0);
-  assert.match(f.nodes.get('[data-neto-overlay]').innerHTML,/מוכנים\? ממשיכים מאותה נקודה\./);assert.doesNotMatch(f.nodes.get('[data-neto-overlay]').innerHTML,/הגבלת זמן|בלי שעון|No time limit|No clock/i);await f.click('[data-neto-resume]');f.advance(20);assert.equal(f.game,game);assert.equal(game.score,points);assert.equal(game.lives,3);
+  assert.match(f.nodes.get('[data-neto-overlay]').innerHTML,/מוכנים\? ממשיכים מאותה נקודה\./);assert.doesNotMatch(f.nodes.get('[data-neto-overlay]').innerHTML,/הגבלת זמן|בלי שעון|No time limit|No clock/i);await f.click('[data-neto-resume]');f.advance(20);assert.equal(f.game,game);assert.equal(game.score,points);assert.equal(game.lives,4);
   await f.click('[data-neto-back]');assert.equal(f.backs,1);assert.equal(f.frames.size,0);f.jumpTime(86400000);f.mount();await f.flush();assert.equal(f.game,game);assert.equal(f.frames.size,0);
-  await f.click('[data-neto-resume]');assert.equal(f.frames.size,1);assert.equal(game.phase,'playing');assert.equal(game.score,points);assert.equal(game.lives,3);
+  await f.click('[data-neto-resume]');assert.equal(f.frames.size,1);assert.equal(game.phase,'playing');assert.equal(game.score,points);assert.equal(game.lives,4);
 });
 test('ZAP freezes the same products for its full animation, ignores repeated activation and clears without scoring',async()=>{
   const f=fixture();await f.start();clearRow(f);setActive(f,'S');f.game.board[19][0]=tile();const score=f.game.score,lines=f.game.lines,next=f.game.next[0],group=f.game.active.group;
   f.advance(20);f.pointer('zap');assert.equal(f.game.phase,'zapping');assert.equal(f.game.zaps,1);assert.equal(f.nodes.get('[data-neto-price]').hidden,false);
   assert.equal(f.zapDraws.at(-1).snapshot.length,5);f.pointer('zap');f.key('b','KeyB');f.key(' ','Space');assert.equal(f.game.zaps,1);assert.equal(f.game.active.group,group);
-  f.advance(2500);assert.equal(f.game.phase,'zapping');assert.ok(f.game.board[19][0]);assert.equal(f.game.score,score);assert.equal(f.game.lines,lines);assert.equal(f.game.lives,3);
-  f.advance(150);assert.equal(f.game.phase,'playing');assert.equal(f.game.board.flat().filter(Boolean).length,0);assert.equal(f.game.active.type,next);assert.notEqual(f.game.active.group,group);assert.equal(f.game.score,score);assert.equal(f.game.lines,lines);assert.equal(f.game.lives,3);assert.equal(f.nodes.get('[data-neto-price]').hidden,true);
+  f.advance(2500);assert.equal(f.game.phase,'zapping');assert.ok(f.game.board[19][0]);assert.equal(f.game.score,score);assert.equal(f.game.lines,lines);assert.equal(f.game.lives,4);
+  f.advance(150);assert.equal(f.game.phase,'playing');assert.equal(f.game.board.flat().filter(Boolean).length,0);assert.equal(f.game.active.type,next);assert.notEqual(f.game.active.group,group);assert.equal(f.game.score,score);assert.equal(f.game.lines,lines);assert.equal(f.game.lives,4);assert.equal(f.nodes.get('[data-neto-price]').hidden,true);
   assert.equal(f.nodes.get('[data-neto-action="zap"]').disabled,false);assert.ok(f.zapDraws.some(draw=>draw.progress>.9));
 });
 test('a paused ZAP resumes its remaining animation and reduced motion uses a shorter clear',async()=>{
@@ -141,22 +147,23 @@ test('a paused ZAP resumes its remaining animation and reduced motion uses a sho
   f.key('p','KeyP');assert.equal(f.frames.size,1);f.advance(20);assert.ok(f.zapDraws.at(-1).progress>=progress);f.advance(1700);assert.equal(f.game.phase,'playing');assert.equal(f.game.zaps,1);
   const reduced=fixture({reducedMotion:true});await reduced.start();reduced.advance(20);reduced.pointer('zap');reduced.advance(750);assert.equal(reduced.game.phase,'zapping');reduced.advance(100);assert.equal(reduced.game.phase,'playing');assert.ok(reduced.zapDraws.every(draw=>draw.reduced));
 });
-test('three full warehouses preserve points across lives and end with the cumulative score form in both languages',async()=>{
+test('four full warehouses consume the brothers in order and end with the cumulative score form in both languages',async()=>{
   for(const english of [false,true]){
     const f=fixture({english});await f.start();
-    for(let n=0;n<3;n++){
-      clearRow(f);assert.equal(f.game.score,(n+1)*100);topOut(f);assert.equal(f.game.lives,2-n);
-      if(n<2){assert.equal(f.game.phase,'crashed');assert.equal(f.frames.size,0);assert.match(f.nodes.get('[data-neto-overlay]').innerHTML,english?/Your score is kept/:/הניקוד שלכם נשמר/);assert.doesNotMatch(f.html,/data-neto-score-form/);await f.click('[data-neto-continue]');assert.equal(f.game.board.flat().filter(Boolean).length,0);assert.equal(f.frames.size,1);}
+    const order=['tidhar','moran','tomer','amir'];assert.deepEqual(displayedBrothers(f),order.map(id=>({id,lost:false})));
+    for(let n=0;n<4;n++){
+      clearRow(f);assert.equal(f.game.score,(n+1)*100);topOut(f);assert.equal(f.game.lives,3-n);
+      if(n<3){assert.deepEqual(displayedBrothers(f),order.map((id,index)=>({id,lost:index<=n})));assert.equal(f.game.phase,'crashed');assert.equal(f.frames.size,0);assert.match(f.nodes.get('[data-neto-overlay]').innerHTML,english?/Your score is kept/:/הניקוד שלכם נשמר/);assert.doesNotMatch(f.html,/data-neto-score-form/);await f.click('[data-neto-continue]');assert.equal(f.game.board.flat().filter(Boolean).length,0);assert.equal(f.frames.size,1);}
     }
-    await f.flush();assert.equal(f.game.phase,'finished');assert.equal(f.game.score,300);assert.equal(f.game.lines,3);assert.match(f.html,/data-neto-score-form/);assert.match(f.html,english?/Every point from all three lives/:/כל הנקודות משלוש הפסילות/);assert.equal(f.frames.size,0);assert.equal(f.writes.length,0);
+    await f.flush();assert.equal(f.game.phase,'finished');assert.equal(f.game.score,400);assert.equal(f.game.lines,4);assert.match(f.html,/data-neto-score-form/);assert.match(f.html,english?/Every point from all four lives/:/כל הנקודות מארבע הפסילות/);assert.equal(f.frames.size,0);assert.equal(f.writes.length,0);
   }
 });
 test('score save failures preserve the same request and final stats, and successful retries cannot submit twice',async()=>{
   const f=fixture({english:true,failSave:true});await f.start();await finish(f);f.input('  Warehouse   Champion  ');await f.submit();assert.equal(f.writes.length,1);
   assert.match(f.nodes.get('[data-neto-entry]').innerHTML,/could not be saved/);assert.match(f.nodes.get('[data-neto-entry]').innerHTML,/Warehouse   Champion/);f.allowSave();await f.submit();assert.equal(f.writes.length,2);assert.deepEqual(f.writes[0],f.writes[1]);
-  const saved=f.writes[1];assert.match(saved.requestId,/^[a-f0-9]{32}$/);assert.equal(saved.name,'Warehouse Champion');assert.equal(saved.score,300);assert.equal(saved.lines,3);assert.equal(saved.level,1);assert.equal(saved.pieces,6);assert.equal(saved.zaps,0);
+  const saved=f.writes[1];assert.match(saved.requestId,/^[a-f0-9]{32}$/);assert.equal(saved.name,'Warehouse Champion');assert.equal(saved.score,400);assert.equal(saved.lines,4);assert.equal(saved.level,1);assert.equal(saved.pieces,8);assert.equal(saved.zaps,0);
   assert.match(f.nodes.get('[data-neto-entry]').innerHTML,/is saved/);assert.match(f.nodes.get('[data-neto-leaderboard]').innerHTML,/Warehouse Champion/);await f.submit();assert.equal(f.writes.length,2);
-  await f.click('[data-neto-start]');assert.equal(f.game.score,0);assert.equal(f.game.lives,3);assert.equal(f.frames.size,1);assert.doesNotMatch(f.html,/data-neto-score-form/);
+  await f.click('[data-neto-start]');assert.equal(f.game.score,0);assert.equal(f.game.lives,4);assert.equal(f.frames.size,1);assert.doesNotMatch(f.html,/data-neto-score-form/);
 });
 test('leaderboard names are escaped, art failures leave gameplay available and no score writes occur before submission',async()=>{
   const f=fixture({failArt:true,initialScores:[{id:'x',name:'<img src=x onerror=alert(1)>',score:100,lines:1,level:1}]});f.mount();await f.flush();

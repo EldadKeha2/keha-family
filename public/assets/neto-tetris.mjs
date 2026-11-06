@@ -1,7 +1,7 @@
 // The display has no timer. Only a full stockroom costs a life.
 export const COLS=10;
 export const ROWS=20;
-export const TETRIS_LIVES=3;
+export const TETRIS_LIVES=4;
 const definitions={
   I:{cells:[[0,1],[1,1],[2,1],[3,1]],size:4,color:'#70cde3'},
   O:{cells:[[1,0],[2,0],[1,1],[2,1]],size:4,color:'#f4ce68'},

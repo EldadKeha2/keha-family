@@ -1,0 +1,80 @@
+{
+  "retrievedAt": "2026-11-06",
+  "order": "oldest to youngest, first life lost to last",
+  "sourceApi": "https://keha-family.eldadkeha.workers.dev/api/people/{id}/page",
+  "portraits": [
+    {
+      "id": "tidhar",
+      "nameHe": "תדי",
+      "nameEn": "Tedi",
+      "src": "assets/games/neto/face-tidhar.webp",
+      "source": "https://keha-family.eldadkeha.workers.dev/media/82642a561ff8412185832f837f42b47f",
+      "sourceProfileName": "תדהר פיש",
+      "width": 700,
+      "height": 476,
+      "crop": {
+        "zoom": 3.11115991,
+        "x": 0.529554,
+        "y": 0.3032275
+      },
+      "cropStatus": "user-labelled-face",
+      "note": "Crop derived from the face rectangle labelled tidhar by the user on the website on 2026-11-06.",
+      "faceId": "4bd27c124be24287924bb78607c093bd",
+      "faceRevision": "77d50e7743824894b397e9fb8e0b10b7",
+      "faceRect": {
+        "x": 0.438484,
+        "y": 0.169398,
+        "width": 0.18214,
+        "height": 0.267659
+      }
+    },
+    {
+      "id": "moran",
+      "nameHe": "מורן",
+      "nameEn": "Moran",
+      "src": "assets/games/neto/face-moran.webp",
+      "source": "https://keha-family.eldadkeha.workers.dev/media/91ab3a3665074a07ab988b5a35ac0b7e",
+      "sourceProfileName": "מורן פיש",
+      "width": 217,
+      "height": 322,
+      "crop": {
+        "zoom": 1.65,
+        "x": 0.25,
+        "y": 0.3
+      },
+      "cropStatus": "single-adult-profile-photo"
+    },
+    {
+      "id": "tomer",
+      "nameHe": "תומר",
+      "nameEn": "Tomer",
+      "src": "assets/games/heads/tomer.png",
+      "source": "https://keha-family.eldadkeha.workers.dev/media/3ff8f11c0ee64f4baa609ffb7281a272",
+      "sourceProfileName": "תומר פיש",
+      "width": 245,
+      "height": 350,
+      "crop": {
+        "zoom": 1.45,
+        "x": 0.59,
+        "y": 0.37
+      },
+      "cropStatus": "existing-reviewed-prepared-head"
+    },
+    {
+      "id": "amir",
+      "nameHe": "אמיר",
+      "nameEn": "Amir",
+      "src": "assets/games/heads/amir.png",
+      "source": "https://keha-family.eldadkeha.workers.dev/media/37c6fa1e2d4b4749acd64752a3ed8c84",
+      "sourceProfileName": "אמיר פיש",
+      "width": 611,
+      "height": 714,
+      "crop": {
+        "zoom": 1.8,
+        "x": 0.29,
+        "y": 0.34
+      },
+      "cropStatus": "existing-reviewed-prepared-head"
+    }
+  ]
+}
