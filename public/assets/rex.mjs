@@ -1,9 +1,7 @@
-// Three lives, cumulative food points, and a wall-clock deadline.
-export const ROUND_MS=5*60*1000;
+// Endless running with three lives and cumulative food points.
 export const RUNNER_LIVES=3;
 export const MIN_ENCOUNTER_GAP=1.2;
 export const MAX_ENCOUNTER_FOODS=5;
-export const MAX_COLLECTIBLES=Math.ceil(ROUND_MS/1000/MIN_ENCOUNTER_GAP)*MAX_ENCOUNTER_FOODS;
 export const GROUND=338;
 export const WORLD_HEIGHT=410;
 export const PLAYER={x:96,width:42,height:84};
@@ -16,12 +14,11 @@ export const FOODS=Object.freeze([
 export const emptyBasket=()=>Object.fromEntries(FOODS.map(food=>[food.id,0]));
 export const basketPoints=basket=>FOODS.reduce((sum,food)=>sum+(basket[food.id]||0)*food.points,0);
 export const runnerSpeed=game=>Math.min(330,230+game.distance*.008);
-export const remainingMs=(game,now)=>Math.max(0,game.deadline-now);
 export function createRunner({now=Date.now(),width=960}={}){
-  return {phase:'playing',reason:null,deadline:now+ROUND_MS,width:Math.max(620,width),player:{...PLAYER,y:GROUND-PLAYER.height,vy:0},score:0,basket:emptyBasket(),lives:RUNNER_LIVES,crashes:0,distance:0,plants:[],foods:[],nextSpawn:.75,recoverUntil:0,events:[],sequence:0,encounters:0};
+  return {phase:'playing',reason:null,width:Math.max(620,width),player:{...PLAYER,y:GROUND-PLAYER.height,vy:0},score:0,basket:emptyBasket(),lives:RUNNER_LIVES,crashes:0,distance:0,plants:[],foods:[],nextSpawn:.75,recoverUntil:0,events:[],sequence:0,encounters:0};
 }
 export function jumpRunner(game,now=Date.now()){
-  if(game.phase!=='playing'||now>=game.deadline||now<game.recoverUntil||game.player.vy!==0||game.player.y<GROUND-PLAYER.height-.1)return false;
+  if(game.phase!=='playing'||now<game.recoverUntil||game.player.vy!==0||game.player.y<GROUND-PLAYER.height-.1)return false;
   game.player.vy=-640;return true;
 }
 export function crashRunner(game,now){
@@ -97,7 +94,6 @@ const intersects=(a,b)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+
 export function advanceRunner(game,seconds,now=Date.now(),random=Math.random){
   game.events=[];
   if(game.phase!=='playing')return game;
-  if(now>=game.deadline){game.phase='finished';game.reason='time';game.events.push({type:'finish',reason:'time'});return game;}
   if(now<game.recoverUntil)return game;
   // Small physics steps prevent missed food or tunnelling through narrow plants.
   let left=Math.max(0,Math.min(.1,seconds));

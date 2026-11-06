@@ -54,7 +54,7 @@ test('objects enter from offscreen and encounter timing varies without a forced 
     const game=createRunner({width,now:0}),random=seeded(91373+width),timings=new Set(),patterns=[];
     for(let n=0;n<96;n++){
       // Isolate successive generator choices without making fake collisions or
-      // waiting for the complete five-minute round covered in rex.test.mjs.
+      // waiting for the long simulated runs covered in rex.test.mjs.
       game.plants=[];game.foods=[];game.nextSpawn=0;
       advanceRunner(game,.001,n+1,random);
       assert.equal(game.encounters,n+1);

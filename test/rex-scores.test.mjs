@@ -1,7 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
-import {MAX_COLLECTIBLES} from '../public/assets/rex.mjs';
 import worker,{FamilyState,PUBLIC_WRITE_TOKEN} from '../src/worker.mjs';
 
 function fixture(){
@@ -31,13 +30,13 @@ test('retries are idempotent and cannot replace a saved player, head or basket; 
 test('invalid and unweighted baskets, impossible totals and bad write credentials are rejected',async()=>{
   const f=fixture();try{
     const good=entry(1);
-    for(const bad of [{score:1},{score:'4'},{score:-1},{basket:null},{basket:[]},{basket:{jachnun:1}},{basket:{...good.basket,jachnun:1.1}},{basket:{...good.basket,jachnun:-1}},{score:4*(MAX_COLLECTIBLES+1),basket:{...good.basket,jachnun:MAX_COLLECTIBLES+1}},{name:''},{name:'x'.repeat(61)},{headId:'unknown'},{requestId:'bad'}])assert.equal((await f.call({...good,...bad})).status,400,JSON.stringify(bad));
+    for(const bad of [{score:1},{score:'4'},{score:-1},{basket:null},{basket:[]},{basket:{jachnun:1}},{basket:{...good.basket,jachnun:1.1}},{basket:{...good.basket,jachnun:-1}},{score:Number.MAX_SAFE_INTEGER+1},{score:Infinity},{basket:{...good.basket,jachnun:Number.MAX_SAFE_INTEGER+1}},{basket:{...good.basket,jachnun:Number.MAX_SAFE_INTEGER},score:Number.MAX_SAFE_INTEGER*4},{basket:{jachnun:0,lahoh:0,kubaneh:0,malawach:Number.MAX_SAFE_INTEGER+1},score:Number.MAX_SAFE_INTEGER+1},{basket:{jachnun:0,lahoh:0,kubaneh:1,malawach:Number.MAX_SAFE_INTEGER},score:Number.MAX_SAFE_INTEGER+2},{name:''},{name:'x'.repeat(61)},{headId:'unknown'},{requestId:'bad'}])assert.equal((await f.call({...good,...bad})).status,400,JSON.stringify(bad));
     assert.equal((await f.call(good,{Origin:'https://other.example'})).status,403);assert.equal((await f.call(good,{'X-Family-Token':'wrong'})).status,403);
     assert.equal(f.db.prepare('SELECT count(*) n FROM rex_scores').get().n,0);
     assert.equal((await f.call({...good,score:0,basket:{jachnun:0,lahoh:0,kubaneh:0,malawach:0}})).status,200);
   }finally{f.close();}
 });
 
-test('new food trails and retained lives allow higher cumulative scores than the old one-food-per-bush limit',async()=>{
-  const f=fixture();try{const body=entry(100,300);const response=await f.call(body);assert.equal(response.status,200);const data=await response.json();assert.equal(data.scores[0].score,1200);assert.equal(data.scores[0].basket.jachnun,300);const invalid={...entry(101),basket:{jachnun:MAX_COLLECTIBLES,lahoh:1,kubaneh:0,malawach:0},score:MAX_COLLECTIBLES*4+3};assert.equal((await f.call(invalid)).status,400);}finally{f.close();}
+test('endless runs save totals beyond the former five-minute food cap and preserve mixed food values',async()=>{
+  const f=fixture();try{const body={...entry(100,1500),basket:{jachnun:1500,lahoh:750,kubaneh:500,malawach:250},score:9500};const response=await f.call(body);assert.equal(response.status,200);const data=await response.json();assert.equal(data.scores[0].score,9500);assert.deepEqual(data.scores[0].basket,body.basket);f.restart();assert.equal((await (await f.call()).json()).scores[0].score,9500);assert.equal((await f.call({...entry(101),basket:body.basket,score:9501})).status,400);}finally{f.close();}
 });

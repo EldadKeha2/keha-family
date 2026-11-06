@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {ROUND_MS,RUNNER_LIVES,GROUND,PLAYER,FOODS,basketPoints,createRunner,jumpRunner,advanceRunner,crashRunner,runnerSpeed,remainingMs,ENCOUNTER_PATTERNS,makeEncounter,MAX_ENCOUNTER_FOODS} from '../public/assets/rex.mjs';
+import {RUNNER_LIVES,GROUND,PLAYER,FOODS,basketPoints,createRunner,jumpRunner,advanceRunner,crashRunner,runnerSpeed,ENCOUNTER_PATTERNS,makeEncounter,MAX_ENCOUNTER_FOODS} from '../public/assets/rex.mjs';
 function avoidPlants(game,now){
   const plants=game.plants.filter(p=>p.x+p.width>PLAYER.x+8).sort((a,b)=>a.x-b.x),first=plants[0];if(!first)return;
   let last=first;for(const next of plants.slice(1)){if(next.x-last.x>100)break;last=next;}
@@ -9,31 +9,31 @@ function avoidPlants(game,now){
 function setEncounter(game,encounter,offset=320){
   game.nextSpawn=1000;game.plants=encounter.plants.map((p,id)=>({...p,x:offset+p.x,id}));game.foods=encounter.foods.map((f,id)=>({...f,x:offset+f.x,id}));
 }
-test('three lives, five-minute deadline and the original menu values and sizes',()=>{
-  const game=createRunner({now:1000,width:620});assert.equal(game.deadline,301000);assert.equal(ROUND_MS,300000);assert.equal(game.lives,RUNNER_LIVES);assert.equal(game.lives,3);
+test('three lives without a deadline and the original menu values and sizes',()=>{
+  const game=createRunner({now:1000,width:620});assert.equal('deadline' in game,false);assert.equal(game.lives,RUNNER_LIVES);assert.equal(game.lives,3);
   assert.deepEqual(FOODS.map(food=>[food.id,food.points]),[['jachnun',4],['lahoh',3],['kubaneh',2],['malawach',1]]);assert.equal(FOODS[0].radius,Math.min(...FOODS.map(food=>food.radius)));
-  advanceRunner(game,.02,300999);assert.equal(game.phase,'playing');advanceRunner(game,.02,301000);assert.equal(game.phase,'finished');assert.equal(game.reason,'time');assert.equal(remainingMs(game,301001),0);assert.equal(jumpRunner(game,301001),false);
+  for(const now of [300999,301000,3600000,86400000]){advanceRunner(game,.02,now);assert.equal(game.phase,'playing');assert.equal(game.reason,null);assert.equal(game.lives,3);}assert.equal(jumpRunner(game,86400001),true);
 });
 test('each food contributes its weighted value once, including low food while running',()=>{
   const game=createRunner({now:0});game.nextSpawn=100;
   for(const food of FOODS){game.foods=[{kind:food.id,x:120,y:GROUND-30,radius:food.radius}];advanceRunner(game,1/120,1);assert.equal(game.basket[food.id],1);assert.equal(game.events[0].points,food.points);advanceRunner(game,1/120,2);assert.equal(game.basket[food.id],1);}
   assert.equal(game.score,10);assert.equal(game.score,basketPoints(game.basket));
 });
-test('a crash preserves every food, point, distance and deadline; the third crash ends the round',()=>{
+test('a crash preserves every food, point and distance; only the third crash ends the round',()=>{
   const game=createRunner({now:1000});game.basket={jachnun:3,lahoh:2,kubaneh:1,malawach:4};game.score=basketPoints(game.basket);game.distance=20000;
-  const deadline=game.deadline,score=game.score,basket={...game.basket};
+  const score=game.score,basket={...game.basket};
   for(let crash=1;crash<=3;crash++){
     const now=5000+crash*2000;game.plants=[{x:105,width:40,height:70}];advanceRunner(game,.01,now);
-    assert.equal(game.crashes,crash);assert.equal(game.lives,3-crash);assert.equal(game.score,score);assert.deepEqual(game.basket,basket);assert.equal(game.deadline,deadline);assert.ok(game.distance>=20000);assert.deepEqual(game.plants,[]);
-    if(crash<3){assert.equal(game.phase,'playing');assert.equal(jumpRunner(game,now+200),false);advanceRunner(game,.02,now+400);assert.equal(remainingMs(game,now+400),deadline-now-400);}
+    assert.equal(game.crashes,crash);assert.equal(game.lives,3-crash);assert.equal(game.score,score);assert.deepEqual(game.basket,basket);assert.equal('deadline' in game,false);assert.ok(game.distance>=20000);assert.deepEqual(game.plants,[]);
+    if(crash<3){assert.equal(game.phase,'playing');assert.equal(jumpRunner(game,now+200),false);advanceRunner(game,.02,now+400);assert.equal(game.phase,'playing');}
   }
   assert.equal(game.phase,'finished');assert.equal(game.reason,'lives');crashRunner(game,12000);assert.equal(game.crashes,3);
 });
-test('one grounded jump at a time; time expires even during recovery or a hidden-tab gap',()=>{
+test('one grounded jump at a time; recovery and long hidden-tab gaps never expire the run',()=>{
   const game=createRunner({now:0});game.nextSpawn=100;assert.equal(jumpRunner(game,0),true);assert.equal(jumpRunner(game,0),false);advanceRunner(game,.1,100);assert.equal(jumpRunner(game,100),false);
   for(let i=2;i<=10;i++)advanceRunner(game,.1,i*100);assert.equal(game.player.y,GROUND-PLAYER.height);assert.equal(game.player.vy,0);
-  game.score=4;game.basket.jachnun=1;crashRunner(game,299900);advanceRunner(game,0,300001);assert.equal(game.phase,'finished');assert.equal(game.reason,'time');assert.equal(game.score,4);assert.equal(game.lives,2);
-  const hidden=createRunner({now:0});hidden.score=7;advanceRunner(hidden,0,ROUND_MS+90000);assert.equal(hidden.phase,'finished');assert.equal(hidden.score,7);
+  game.score=4;game.basket.jachnun=1;crashRunner(game,299900);advanceRunner(game,0,300001);assert.equal(game.phase,'playing');assert.equal(game.reason,null);assert.equal(game.score,4);assert.equal(game.lives,2);assert.equal(jumpRunner(game,300001),false);advanceRunner(game,0,3600000);assert.equal(jumpRunner(game,3600000),true);
+  const hidden=createRunner({now:0});hidden.score=7;advanceRunner(hidden,0,86400000);assert.equal(hidden.phase,'playing');assert.equal(hidden.lives,3);assert.equal(hidden.score,7);assert.equal(jumpRunner(hidden,86400000),true);
 });
 test('encounters include empty bushes, a close pair, spaced jumps, a rhythm sequence, ground food and airborne food',()=>{
   const encounter=pattern=>makeEncounter({pattern,random:()=>.9});
@@ -62,13 +62,13 @@ test('tempting low food requires trading a life for points; skipping it allows s
     assert.equal(hungry.crashes,1);assert.equal(hungry.basket.jachnun,1);assert.equal(hungry.score,4,'the risked bite is retained after the crash');
   }
 });
-test('a five-minute desktop or phone run has shuffled variety, safe transitions and all four types of food',()=>{
+test('a ten-minute desktop or phone run keeps playing with shuffled variety, safe transitions and all four foods',()=>{
   for(const width of [620,960])for(const initial of [33,91,750]){
     let seed=initial;const random=()=>((seed=(1664525*seed+1013904223)>>>0)/2**32),game=createRunner({now:0,width}),patterns=[];
-    for(let frame=1;frame<=18000;frame++){
+    for(let frame=1;frame<=36000;frame++){
       const now=frame*1000/60,before=game.encounters;avoidPlants(game,now);advanceRunner(game,1/60,now,random);if(game.encounters!==before)patterns.push(game.lastPattern);
     }
-    assert.equal(game.phase,'finished');assert.equal(game.reason,'time');assert.equal(game.crashes,0,`safe transitions at width ${width}, seed ${initial}`);
+    assert.equal(game.phase,'playing');assert.equal(game.reason,null);assert.equal(game.crashes,0,`safe transitions at width ${width}, seed ${initial}`);
     assert.equal(new Set(patterns).size,ENCOUNTER_PATTERNS.length,'all encounter types remain available without fixed cycles');
     for(let i=1;i<patterns.length;i++)assert.notEqual(patterns[i],patterns[i-1],'avoid immediate repeats while keeping independent choices');
     for(const food of FOODS)assert.ok(game.basket[food.id]>0,food.id+' must be collectible');assert.ok(game.score>100);assert.equal(game.score,basketPoints(game.basket));
