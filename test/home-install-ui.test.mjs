@@ -69,7 +69,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
 }
 
 test('phone toolbar responds to viewport changes and keeps both controls in installed apps',()=>{
-  const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.equal(f.button().getAttribute('aria-label'),'התקן קיצור דרך לאתר');assert.equal(f.card.querySelector('[data-home-install-share]').getAttribute('aria-label'),'שיתוף האתר');assert.match(f.card.innerHTML,/>קיצור דרך</);assert.match(f.card.innerHTML,/>שיתוף</);
+  const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.equal(f.button().getAttribute('aria-label'),'התקן קיצור דרך לאתר');assert.equal(f.card.querySelector('[data-home-install-share]').getAttribute('aria-label'),'שיתוף האתר');assert.match(f.card.innerHTML,/>התקנת קיצור דרך</);assert.match(f.card.innerHTML,/>שיתוף</);
   f.resize(false);assert.equal(f.card.hidden,true);f.resize(true);assert.equal(f.card.hidden,false);
   f.standalone(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.standalone(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
   assert.equal(fixture({mobile:false}).card.hidden,true);

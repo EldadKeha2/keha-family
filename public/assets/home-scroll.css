@@ -1,0 +1,11 @@
+.home-more-hint{display:none}
+.home-more-hint[hidden]{display:none!important}
+#homeScrollEnd{display:block;width:1px;height:1px;pointer-events:none}
+@media(max-width:700px){
+  .phone-home-view{padding-bottom:calc(52px + env(safe-area-inset-bottom,0px))}
+  body[data-active-view=home] .home-more-hint:not([hidden]){display:inline-flex}
+  .home-more-hint{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:35;align-items:center;justify-content:center;gap:7px;box-sizing:border-box;width:max-content;max-width:calc(100vw - 32px);min-height:36px;margin:0;padding:7px 14px;border:1px solid #c5b48e;border-radius:22px;background:#fbf7ed;color:#586d43;box-shadow:0 3px 14px #67522b20;font:calc(13px * var(--a11y-text-scale,1))/1.45 var(--sans);text-align:center;white-space:normal}
+  .home-more-hint svg{display:block;width:17px;height:17px;flex:0 0 17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .home-more-hint:hover{background:#f1f0df;border-color:#aeb992}
+  .home-more-hint:focus-visible{outline:3px solid #a27f45;outline-offset:3px}
+}

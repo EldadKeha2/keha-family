@@ -41,12 +41,13 @@
   <link rel="stylesheet" href="assets/navigation.css?v=a11y1">
   <link rel="stylesheet" href="assets/accessibility.css?v=a11y1">
   <link rel="stylesheet" href="assets/mobile-header.css?v=1">
+  <link rel="stylesheet" href="assets/home-scroll.css?v=1">
   <script src="assets/maintenance.js" defer></script>
   <script src="assets/family-fallback.js" defer></script>
   <script src="family-data.js" defer></script>
   <script src="assets/translations.js?v=20261105.faces1" defer></script>
   <script src="assets/i18n.js" defer></script>
-  <script src="assets/home-install.js?v=3" defer></script>
+  <script src="assets/home-install.js?v=4" defer></script>
   <script src="assets/accessibility.js?v=1" defer></script>
   <script src="assets/dates.js" defer></script>
   <script src="assets/tags.js?v=faces-v1" defer></script>
@@ -60,6 +61,7 @@
   <script src="assets/archive.js?v=20261104.2" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/home.js?v=a11y1" defer></script>
+  <script src="assets/home-scroll.js?v=1" defer></script>
   <script src="assets/memorial.js?v=20261105.1" defer></script>
   <script src="assets/nursery.js?v=1" defer></script>
   <script src="assets/tree-guide.js" defer></script>
@@ -108,6 +110,8 @@
           <header class="phone-home-intro"><img src="assets/fez.svg" alt="" width="55" height="55"><div><span class="small-eyebrow">מהשורשים שלנו, אל הרגע הבא</span><h2>הבית שלנו מתחיל כאן</h2><p>כל המשפחה, הסיפורים והרגעים שלנו.</p></div></header>
           <section class="family-slideshow" aria-label="רגעים מהאלבום המשפחתי"><button id="homeSlideOpen" class="home-slide-open" aria-label="פתיחת התמונה המשפחתית"><img id="homeSlideImage" alt="" hidden><span class="home-slide-placeholder" id="homeSlidePlaceholder"><span aria-hidden="true">❖</span><strong>הרגעים שלנו, ביחד</strong><small>תמונות מהאלבום המשפחתי יתחלפו כאן.</small></span></button><div class="home-slide-caption" id="homeSlideCaption"></div><div class="home-slide-controls"><button id="homeSlidePrevious" aria-label="התמונה המשפחתית הקודמת">→</button><span id="homeSlideCounter"></span><button id="homeSlideNext" aria-label="התמונה המשפחתית הבאה">←</button><button id="homeSlidePause" aria-label="השהיית התמונות המתחלפות">Ⅱ</button></div></section>
           <div class="phone-home-tiles" id="homeTiles"></div>
+          <span id="homeScrollEnd" aria-hidden="true"></span>
+          <button id="homeMoreHint" class="home-more-hint" type="button" data-i18n-skip hidden></button>
           <p class="home-family-motto">קהא · חריזי · בקר · נובל · פיש · בלום</p>
         </section>
         <section id="personView" class="portal-view person-page-view" aria-label="עמוד אישי" hidden><div id="personPageContent"></div></section>
