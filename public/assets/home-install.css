@@ -6,7 +6,7 @@
 .home-install-dialog::backdrop{background:#302b235e}
 .home-install-dialog h2{margin:12px 0 7px;padding-inline-end:22px;font:calc(27px * var(--a11y-text-scale,1))/1.4 var(--serif);color:#5e714b}
 .home-install-dialog h3{font:600 calc(17px * var(--a11y-text-scale,1))/1.5 var(--sans);color:#5e714b;margin:20px 0 7px}
-.home-install-dialog-icon{display:block;width:64px;height:64px;border:1px solid #d4c4a0;border-radius:14px}
+.home-install-dialog-icon{display:block;width:48px;height:48px;margin-block-start:34px;margin-inline:auto;border:1px solid #d4c4a0;border-radius:12px}
 .home-install-dialog .home-install-close{position:absolute;inset-inline-end:10px;top:8px;display:grid;place-items:center;min-width:44px;min-height:44px;padding:0;border:0;border-radius:7px;background:transparent;color:#796b4f;font:30px/1 var(--sans)}
 .home-install-dialog .home-install-close:hover{background:#eee8d8}
 .home-install-dialog-intro{margin:0 0 16px;font:calc(15px * var(--a11y-text-scale,1))/1.7 var(--sans);color:#82704e}
@@ -26,3 +26,170 @@
 @media(max-width:350px){.home-install-dialog{padding:22px 17px}.home-install-dialog h2{font-size:calc(24px * var(--a11y-text-scale,1))}}
 
 .home-install-invite-primary,.home-install-invite-browse{display:block;box-sizing:border-box;width:100%;min-height:46px;padding:11px 15px;border-radius:9px;font:600 calc(16px * var(--a11y-text-scale,1))/1.5 var(--sans);cursor:pointer}.home-install-invite-primary{margin:15px 0 8px;background:#5a7047;border:1px solid #4a623b;color:#fffbea;box-shadow:0 3px 0 #3e542f}.home-install-invite-primary:hover{background:#4e663e}.home-install-invite-primary:disabled{opacity:.6}.home-install-invite-browse{margin-top:15px;background:#fffaf0;border:1px solid #d5c8a8;color:#6d684d;font-size:calc(14px * var(--a11y-text-scale,1))}.home-install-invite-note{font:calc(13px * var(--a11y-text-scale,1))/1.7 var(--sans);color:#867653;margin:8px 0 0}.home-install-invite-status{color:#526d42;font:600 calc(14px * var(--a11y-text-scale,1))/1.6 var(--sans);margin:10px 0}.home-install-invite-status:empty{display:none}.home-install-dialog:not([open]){display:none}.home-install-dialog-fallback[open]{display:block;position:fixed;inset:16px;z-index:10000;max-height:calc(100vh - 32px);box-shadow:0 0 0 100vmax #302b235e,0 14px 65px #30291840}
+
+/* Installation waits are indeterminate: the browser supplies no percentage. */
+.home-install-progress{
+  position:relative;
+  box-sizing:border-box;
+  height:9px;
+  margin:14px 0 12px;
+  overflow:hidden;
+  border:1px solid #d3c49e;
+  border-radius:999px;
+  background:#eee6d2;
+}
+.home-install-progress[hidden]{display:none!important}
+.home-install-progress>span{
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:-35%;
+  width:35%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#b6a16d,#6c8554);
+  animation:home-install-waiting 1.7s ease-in-out infinite;
+}
+@keyframes home-install-waiting{
+  from{transform:translateX(0)}
+  to{transform:translateX(400%)}
+}
+
+/* The close button keeps its own 44px hit area at the outer edge. */
+.home-install-dialog .home-install-language{
+  position:absolute;
+  top:8px;
+  inset-inline-end:auto;
+  left:50%;
+  right:auto;
+  transform:translateX(-50%);
+  box-sizing:border-box;
+  min-height:44px;
+  max-width:calc(100% - 154px);
+  padding:7px 10px;
+  border:1px solid #d1c5a7;
+  border-radius:7px;
+  background:#f7f2e6;
+  color:#5a7047;
+  font:600 calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans);
+  text-align:center;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  cursor:pointer;
+}
+.home-install-dialog .home-install-language:hover{background:#eee8d8}
+.home-install-dialog .home-install-language:focus-visible,
+.home-install-dialog .home-install-check-icon:focus-visible{
+  outline:3px solid #a27f45;
+  outline-offset:3px;
+}
+.home-install-success-mark{
+  display:grid;
+  place-items:center;
+  box-sizing:border-box;
+  width:64px;
+  height:64px;
+  margin-block-start:34px;
+  margin-inline:auto;
+  border:1px solid #b2c29e;
+  border-radius:50%;
+  background:#e8efde;
+  color:#54733e;
+  font:700 36px/1 var(--sans);
+}
+.home-install-success-mark svg{
+  width:32px;
+  height:32px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.5;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.home-install-dialog .home-install-check-icon{
+  display:block;
+  box-sizing:border-box;
+  width:100%;
+  min-height:46px;
+  margin-top:12px;
+  padding:10px 14px;
+  border:1px solid #bcc6aa;
+  border-radius:9px;
+  background:#f1f4e9;
+  color:#536a41;
+  font:600 calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans);
+  white-space:normal;
+  cursor:pointer;
+}
+.home-install-dialog .home-install-check-icon:hover{background:#e7eddb}
+@media(prefers-reduced-motion:reduce){
+  .home-install-progress>span{
+    left:15%;
+    width:70%;
+    animation:none;
+    transform:none;
+  }
+}
+:root[data-a11y-motion] .home-install-progress>span{
+  left:15%;
+  width:70%;
+  animation:none;
+  transform:none;
+}
+
+/* A static welcome illustration points toward the installation action. */
+.home-install-welcome{
+  display:flex;
+  justify-content:center;
+  width:100%;
+  margin:5px 0 0;
+}
+.home-install-yona{
+  display:block;
+  width:100%;
+  max-width:100%;
+  height:180px;
+  height:clamp(120px,23dvh,180px);
+  object-fit:contain;
+  object-position:center bottom;
+}
+.home-install-welcome+.home-install-invite-primary{margin-top:5px}
+.home-install-dialog:has(.home-install-welcome) .home-install-dialog-intro{margin-bottom:8px}
+.home-install-platforms{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:8px 18px;
+  margin:12px 0 6px;
+}
+.home-install-platform{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+  color:#6d684d;
+  font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans);
+  white-space:nowrap;
+}
+.home-install-platform svg{
+  display:block;
+  flex:0 0 24px;
+  width:24px;
+  height:24px;
+}
+@media(max-width:480px){
+  .home-install-dialog:has(.home-install-welcome) h2{
+    margin-top:10px;
+    margin-bottom:6px;
+    font-size:calc(24px * var(--a11y-text-scale,1));
+    line-height:1.35;
+  }
+}
+@media(max-height:640px){
+  .home-install-dialog:has(.home-install-welcome){padding-block:20px 16px}
+  .home-install-dialog:has(.home-install-welcome) .home-install-dialog-intro{
+    font-size:calc(14px * var(--a11y-text-scale,1));
+    line-height:1.6;
+  }
+  .home-install-platforms{margin-top:9px;margin-bottom:3px}
+}
