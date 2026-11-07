@@ -11,7 +11,7 @@ import * as character from '../public/assets/ruti-house-character.mjs';
 import {HOUSE_LESSONS} from '../public/assets/ruti-house-lessons.mjs';
 
 const source=(await readFile(new URL('../public/assets/ruti-house.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'').replace(/export function /g,'function ');
-const required=t=>({plant:'water',dust:'broom',cat:'hand',guest:'serve'}[t.type]);
+const required=t=>t.type==='guest'?(t.food||'serve'):({plant:'water',dust:'broom',cat:'hand'}[t.type]);
 function completeEngineTask(g){
   if(g.tasks.length){
     const t=g.tasks.find(t=>g.stage.requiredMeal&&!g.requiredMealComplete&&t.type==='guest')||g.tasks[0];
@@ -88,7 +88,7 @@ test('the original bilingual opening remains about Ruti’s home without stage p
   for(const english of [false,true]){
     const f=fixture({english,initialScores:[{id:'a'.repeat(32),name:'Champion',score:1000,meals:2,snacks:1,level:10,completedLevels:10}]});f.mount();await f.flush();
     const opening=introCopy(f.html);assert.match(opening,english?/A warm home\. A big heart\. A moment to rest\?/:/בית קטן\. לב ענק\. רגע של מנוחה\?/);
-    assert.match(opening,english?/The tahini is on its way/:/הטחינה בדרך/);assert.match(opening,english?/Open the house/:/פותחים את הבית/);assert.doesNotMatch(opening,english?/\b(?:level|stage|chapter)s?\b/i:/שלב/);
+    assert.match(opening,english?/The plants are thirsty/:/העציצים צמאים/);assert.match(opening,english?/Open the house/:/פותחים את הבית/);assert.doesNotMatch(opening,english?/\b(?:level|stage|chapter)s?\b/i:/שלב/);
     assert.match(f.nodes.get('[data-rh-leaderboard]').innerHTML,/Champion/);assert.equal(f.requests.filter(r=>r.path.endsWith('/scores')).length,1);
   }
 });
@@ -193,16 +193,16 @@ test('pause, hidden tabs, blur and navigation freeze both walking and the singin
 
 test('the single Food tool serves a homemade dish directly to the guest without kitchen selection or preparation',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,startLevel:6});await f.start();f.until(()=>f.game.tasks.some(t=>t.type==='guest'));const guest=f.game.tasks.find(t=>t.type==='guest'),before=f.game.score,stock=f.game.inventory[guest.recipeId];await f.choose('serve');f.until(()=>!f.state.motion.busy);assert.equal(f.actor.tool,'serve');
+    const f=fixture({english,startLevel:6});await f.start();f.until(()=>f.game.tasks.some(t=>t.type==='guest'),30000);const guest=f.game.tasks.find(t=>t.type==='guest'),before=f.game.score,stock=f.game.inventory[guest.recipeId];await f.choose('serve');f.until(()=>!f.state.motion.busy);assert.equal(f.actor.tool,'serve');
     assert.deepEqual(f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool),['water','broom','hand','argue','serve']);assert.ok(f.root.querySelectorAll('[data-rh-target]').every(b=>!b.dataset.rhTarget.startsWith('cook-')));
-    const initialMeals=f.game.stats.meals;await f.act(guest.id);assert.equal(f.state.motion.busy,true);assert.equal(f.actor.carryDish,guest.recipeId);assert.equal(f.game.stats.meals,initialMeals);f.advance(100);f.until(()=>f.game.stats.meals===initialMeals+1);assert.equal(f.game.inventory[guest.recipeId],stock);assert.equal(f.actor.carryDish,null);assert.equal(f.game.score-before,600);assert.equal(f.game.requiredMealComplete,true);assert.equal(f.game.stats.snacks,0);assert.equal(f.game.stats.dishes,0);assert.ok(f.draws.some(d=>d.actor.carryDish===guest.recipeId&&d.actor.walking));
+    const initialMeals=f.game.stats.meals;await f.act(guest.id);assert.equal(f.state.motion.busy,true);assert.equal(f.actor.carryDish,guest.recipeId);assert.equal(f.game.stats.meals,initialMeals);f.advance(100);f.until(()=>f.game.stats.meals===initialMeals+1);assert.equal(f.game.inventory[guest.recipeId],stock);assert.equal(f.actor.carryDish,null);assert.ok(f.game.score-before>300&&f.game.score-before<=600);assert.equal(f.game.requiredMealComplete,true);assert.equal(f.game.stats.snacks,0);assert.equal(f.game.stats.dishes,0);assert.ok(f.draws.some(d=>d.actor.carryDish===guest.recipeId&&d.actor.walking));
   }
 });
 
-test('the third cat ends the run and v4 saves preserve stage scores, statistics and retry identifiers',async()=>{
+test('the third cat ends the run and v5 saves preserve stage scores, statistics and retry identifiers',async()=>{
   for(const english of [false,true]){
     const f=fixture({english,startLevel:3,failSave:true});await f.start();assert.equal(f.key('Digit3'),true);assert.equal(f.game.selected,'hand');for(const digit of [5,6,7,8])assert.equal(f.key(`Digit${digit}`),false);assert.equal(f.key('Digit1',{editable:true}),false);assert.equal(f.game.selected,'hand');f.game.tasks=[];f.game.events=[];for(let i=0;i<3;i++)f.game.tasks.push({id:`test-cat-${i}`,type:'cat',slot:i%2,door:i%2,state:'approaching',waiting:0,total:.1,remaining:.1});f.advance(300);await f.flush();assert.equal(f.game.phase,'finished');assert.equal(f.game.strikes,3);assert.equal(f.frames.size,0);assert.match(f.html,/data-rh-score-form/);
-    await f.submit();assert.equal(f.writes.length,0);f.input('  Player One  ');await f.submit();assert.equal(f.writes.length,1);assert.match(f.html,english?/Could not save your score/:/שמירה נכשלה/);f.allowSave();await f.submit();assert.equal(f.writes.length,2);const payload=f.writes[1];assert.equal(payload.requestId,f.writes[0].requestId);assert.equal(payload.name,'Player One');assert.equal(payload.version,4);assert.equal(payload.completedLevels,2);assert.deepEqual(payload.stageScores,[...f.game.stageScores]);assert.equal(payload.stageScores.reduce((a,b)=>a+b,0),payload.score);assert.ok(payload.stageScores[0]>0);assert.equal(payload.level,3);assert.equal(payload.plants,f.game.stats.plants);assert.equal(payload.elapsed,Math.floor(f.game.elapsed));assert.equal(f.requests.find(r=>r.options?.method==='POST').options.headers['X-Family-Token'],'test-token');assert.match(f.html,english?/Score saved! Your rank/:/השיא נשמר! המקום שלכם/);await f.submit();assert.equal(f.writes.length,2);
+    await f.submit();assert.equal(f.writes.length,0);f.input('  Player One  ');await f.submit();assert.equal(f.writes.length,1);assert.match(f.html,english?/Could not save your score/:/שמירה נכשלה/);f.allowSave();await f.submit();assert.equal(f.writes.length,2);const payload=f.writes[1];assert.equal(payload.requestId,f.writes[0].requestId);assert.equal(payload.name,'Player One');assert.equal(payload.version,5);assert.equal(payload.completedLevels,2);assert.deepEqual(payload.stageScores,[...f.game.stageScores]);assert.equal(payload.stageScores.reduce((a,b)=>a+b,0),payload.score);assert.ok(payload.stageScores[0]>0);assert.equal(payload.level,3);assert.equal(payload.plants,f.game.stats.plants);assert.equal(payload.elapsed,Math.floor(f.game.elapsed));assert.equal(f.requests.find(r=>r.options?.method==='POST').options.headers['X-Family-Token'],'test-token');assert.match(f.html,english?/Score saved! Your rank/:/השיא נשמר! המקום שלכם/);await f.submit();assert.equal(f.writes.length,2);
   }
 });
 
@@ -210,14 +210,14 @@ test('leaderboards escape visitor names without adding stage explanations to the
   const f=fixture({initialScores:[{id:'a'.repeat(32),name:'<img src=x onerror=alert(1)>',score:300,meals:1,snacks:0,level:10,completedLevels:10}]});f.mount();await f.flush();const table=f.nodes.get('[data-rh-leaderboard]').innerHTML;assert.match(table,/&lt;img src=x onerror=alert\(1\)&gt;/);assert.doesNotMatch(table,/<img src=x/);assert.doesNotMatch(introCopy(f.html),/שלב/);
 });
 
-test('all ten simplified stages remain winnable with physical movement and direct food serving, and the resulting score validates',async t=>{
+test('all twelve stages remain winnable with physical movement and direct food serving, and the resulting score validates',async t=>{
   const f=fixture();await f.start();const layout=getHouseLayout(960,600),completed=new Set();
   const prioritize=tasks=>{const cats=tasks.filter(t=>t.type==='cat');if(cats.length)return cats.sort((a,b)=>(a.waiting+a.remaining)-(b.waiting+b.remaining))[0];const cost=t=>{const p=getTaskLocation(t,layout).anchor||getTaskLocation(t,layout),change=f.actor.tool===required(t)?0:1.4;return Math.hypot((p.x-f.actor.x)*1.6,p.y-f.actor.y)+change;};return [...tasks].sort((a,b)=>cost(a)-cost(b))[0];};
   let targetId=null,steps=0;
   while(f.game.phase!=='finished'&&steps++<35000){
     if(f.state.briefing){await f.acknowledge();continue;}
     if(f.game.phase==='stage-complete'){completed.add(f.game.level);await f.click('[data-rh-next]');targetId=null;continue;}
-    const shown=f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool);assert.ok(shown.length<=5);assert.ok(!shown.includes('peanuts'));if(f.game.level===1)assert.deepEqual(shown,['water','broom']);if(f.game.level>=5)assert.deepEqual(shown,['water','broom','hand','argue','serve']);
+    const shown=f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool);assert.ok(shown.length<=6);assert.equal(shown.includes('peanuts'),f.game.level>=11);if(f.game.level===1)assert.deepEqual(shown,['water','broom']);if(f.game.level>=6)assert.deepEqual(shown,['water','broom','hand','argue','serve',...(f.game.level>=11?['peanuts']:[])]);
     const target=f.game.tasks.find(t=>t.id===targetId),cat=prioritize(f.game.tasks.filter(t=>t.type==='cat'));
     if(!f.state.motion.busy||cat&&target?.type!=='cat'){
       const neededGuest=f.game.stage.requiredMeal&&!f.game.requiredMealComplete?f.game.tasks.find(t=>t.type==='guest'):null,next=cat||neededGuest||prioritize(f.game.tasks);
@@ -225,9 +225,9 @@ test('all ten simplified stages remain winnable with physical movement and direc
     }
     f.advance(100);
   }
-  assert.equal(f.state.celebrating,true);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/השלמת את כל עשרת השלבים!/);assert.doesNotMatch(f.html,/data-rh-score-form/);f.advance(30000);assert.equal(f.state.celebrating,true);assert.doesNotMatch(f.html,/data-rh-score-form/);f.input('Too early');await f.submit();assert.equal(f.writes.length,0,'the final score cannot be saved until the player ends the celebration');await f.click('[data-rh-next]');assert.equal(f.state.celebrating,false);assert.equal(f.game.won,true,JSON.stringify({level:f.game.level,strikes:f.game.strikes,elapsed:f.game.elapsed,completed:[...completed],requiredMealComplete:f.game.requiredMealComplete,tasks:f.game.tasks.map(t=>({type:t.type,remaining:t.remaining,waiting:t.waiting}))}));assert.equal(f.game.completedLevels,10);assert.equal(completed.size,9);assert.ok(f.game.strikes<3);assert.equal(f.game.stageScores.reduce((a,b)=>a+b,0),f.game.score);assert.ok(f.game.stageScores.every(points=>points>0));assert.ok(f.game.stats.plants>=60);assert.equal(f.game.stats.dishes,0);assert.equal(f.game.stats.snacks,0);assert.ok(f.game.stats.meals>=1);assert.match(f.html,/כל עשרת השלבים/);assert.equal(f.frames.size,0);
-  f.input('אלופת הבית');await f.submit();assert.equal(f.writes.length,1);const entry=rutiHouseScore(f.writes[0]);assert.equal(entry.version,4);assert.equal(entry.completedLevels,10);assert.equal(entry.level,10);assert.equal(entry.score,f.game.score);assert.equal(entry.name,'אלופת הבית');assert.equal(entry.stageScores.reduce((a,b)=>a+b,0),entry.score);
-  t.diagnostic(`Ten levels won in ${Math.floor(f.game.elapsed)} game seconds with ${f.game.strikes} strikes; thirty-water opening and direct guest meals completed; ${entry.score} points pass the production v4 validator.`);
+  assert.equal(f.state.celebrating,true);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/הבית כולו בידיים טובות!/);assert.doesNotMatch(f.html,/data-rh-score-form/);f.advance(30000);assert.equal(f.state.celebrating,true);assert.doesNotMatch(f.html,/data-rh-score-form/);f.input('Too early');await f.submit();assert.equal(f.writes.length,0,'the final score cannot be saved until the player ends the celebration');await f.click('[data-rh-next]');assert.equal(f.state.celebrating,false);assert.equal(f.game.won,true,JSON.stringify({level:f.game.level,strikes:f.game.strikes,elapsed:f.game.elapsed,completed:[...completed],requiredMealComplete:f.game.requiredMealComplete,tasks:f.game.tasks.map(t=>({type:t.type,remaining:t.remaining,waiting:t.waiting}))}));assert.equal(f.game.completedLevels,12);assert.equal(completed.size,11);assert.ok(f.game.strikes<3);assert.equal(f.game.stageScores.reduce((a,b)=>a+b,0),f.game.score);assert.ok(f.game.stageScores.every(points=>points>0));assert.ok(f.game.stats.plants>=60);assert.equal(f.game.stats.dishes,0);assert.ok(f.game.stats.snacks>=0);assert.ok(f.game.stats.meals>=1);assert.match(f.html,/כל הבית/);assert.equal(f.frames.size,0);
+  f.input('אלופת הבית');await f.submit();assert.equal(f.writes.length,1);const entry=rutiHouseScore(f.writes[0]);assert.equal(entry.version,5);assert.equal(entry.completedLevels,12);assert.equal(entry.level,12);assert.equal(entry.score,f.game.score);assert.equal(entry.name,'אלופת הבית');assert.equal(entry.stageScores.reduce((a,b)=>a+b,0),entry.score);
+  t.diagnostic(`Twelve levels won in ${Math.floor(f.game.elapsed)} game seconds with ${f.game.strikes} strikes; thirty-water opening and direct guest meals completed; ${entry.score} points pass the production v5 validator.`);
 });
 
 
@@ -356,6 +356,24 @@ test('the upper task summary shows only successful per-type counts, conceals the
  await performTask(f,f.game.tasks[0]);f.until(()=>f.game.stageCompleted===1);f.advance(150);
  assert.equal(f.nodes.get('[data-rh-progress]').textContent,'1');assert.deepEqual(tally(),[['plants',1],['dust',0]]);
  f.until(()=>f.game.tasks.length>0);const task=f.game.tasks[0];task.untimed=false;task.remaining=.01;f.advance(200);assert.ok(f.game.stats.missed>0);assert.deepEqual(tally(),[['plants',1],['dust',0]]);
- let guard=0;while(f.game.phase==='playing'&&guard++<12000)completeEngineTask(f.game);f.advance(150);assert.equal(f.game.stageCompleted,30);assert.equal(tally().reduce((a,[,b])=>a+b,0),30);
+ let guard=0;while(f.game.phase==='playing'&&guard++<12000)completeEngineTask(f.game);f.advance(150);assert.equal(f.game.stageResolved,30);assert.equal(f.game.stageCompleted,29);assert.equal(tally().reduce((a,[,b])=>a+b,0),29);
  await f.click('[data-rh-next]');assert.equal(f.game.level,2);assert.equal(f.nodes.get('[data-rh-progress]').textContent,'0');assert.deepEqual(tally(),[['plants',0],['dust',0]]);
+});
+
+test('tool slots and success tally slots stay fixed while only newly relevant icons appear',async()=>{
+ for(const level of [1,3,4,5,6,10,11,12]){
+  const f=fixture({startLevel:level});await f.start();
+  const shelf=f.html.match(/<div class="rh-tools"[\s\S]*?<\/div><\/div>/)[0];
+  const slots=[...shelf.matchAll(/data-rh-tool="([^"]+)"|class="rh-tool-slot"/g)].map(m=>m[1]||null);
+  assert.equal(slots.length,6);assert.deepEqual(slots,engine.TOOLS.map(t=>f.game.unlockedTools.includes(t.id)?t.id:null));
+  const tally=f.nodes.get('[data-rh-task-tallies]').innerHTML;assert.equal((tally.match(/class="rh-task-tally"|class="rh-tally-slot"/g)||[]).length,6);
+  assert.doesNotMatch(f.html,/rh-stage-road|\/ 10|\/ 12|עשרת|twelve levels|ten levels|30 מטלות|\/ 30/);
+  if(level===5)assert.equal(f.key('Digit5'),false);if(level>=6)assert.equal(f.key('Digit5'),true);if(level>=11){assert.equal(f.key('Digit6'),true);assert.equal(f.game.selected,'peanuts');}
+ }
+});
+
+test('advanced visitors require the correct refreshment through the ordinary tool and target controls',async()=>{
+ const f=fixture({startLevel:11});await f.start();const visitor={id:'visitor-qa',type:'guest',guest:'visitor-hila',food:'peanuts',door:1,slot:1,total:28,remaining:28,createdAt:f.game.elapsed};
+ f.game.tasks=[visitor];f.game.stageIssued++;f.window.test.render();await f.choose('serve');await f.act(visitor.id);assert.equal(f.state.motion.busy,false);assert.ok(f.game.tasks.includes(visitor));assert.ok(f.sounds.includes('wrong'));assert.equal(toast(f),'','late levels do not reveal the correct food in text');
+ const before=f.game.stats.snacks;await f.choose('peanuts');await f.act(visitor.id);assert.equal(f.state.motion.busy,true);f.until(()=>f.game.stats.snacks===before+1);assert.equal(f.actor.carryDish,null);assert.ok(!f.game.tasks.includes(visitor));
 });

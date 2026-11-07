@@ -27,7 +27,7 @@ export const HOUSE_LESSONS = Object.freeze({
     en: 'Who is waiting by the door?',
     icons: ['hand', 'cat', 'water'],
     steps: [
-      { he: 'ממשיכים להשקות ולטאטא, ושומרים על הכניסה הראשית ועל הדלת האחורית הקטנה.', en: 'Keep watering and sweeping, and watch the main entrance and the small back door.' },
+      { he: 'חתול שנכנס נשאר בבית ומסתובב בו. ממשיכים להשקות ולטאטא, ושומרים על הכניסה הראשית ועל הדלת האחורית הקטנה.', en: 'A cat that gets inside stays and roams around. Keep watering and sweeping, and watch the main entrance and the small back door.' },
       { he: 'כשרואים חתול, בוחרים את היד עם הכיתוב ״לכו מפה״.', en: 'When a cat appears, choose the hand marked “Shoo!”.' },
       { he: 'החתולים מתגנבים לאט. לוחצים על החתול עם היד כדי להבריח אותו. שלושה חתולים שנכנסו מסיימים את המשחק.', en: 'The cats sneak in slowly. Choose the hand and tap a cat to shoo it away. Three cats inside end the game.' }
     ],
@@ -45,7 +45,7 @@ export const HOUSE_LESSONS = Object.freeze({
   4: {
     he:'אורה נכנסת לוויכוח',en:'Ora joins the argument',icons:['argue'],
     steps:[
-      {he:'כל מטלה שהושלמה מקדמת את השלב. הסמלים למעלה מסכמים השקיות, ניקוי, חתולים, אירוח והצלחות מול אורה.',en:'Every completed task advances the level. The icons above summarize watering, sweeping, cats, guests and wins against Ora.'},
+      {he:'כל מטלה שהסתיימה מקדמת את השלב, גם אם פספסנו אותה. הסמלים למעלה מסכמים השקיות, ניקוי, חתולים, אירוח והצלחות מול אורה.',en:'Every resolved task advances the level, including missed tasks. The icons above summarize watering, sweeping, cats, guests and wins against Ora.'},
       {he:'אחרי המטלה העשירית הראש של אורה יופיע בזמן אקראי, פעם אחת בכל שלב.',en:'After the tenth task, Ora’s head appears at a random point, once per level.'},
       {he:'מהר! לוחצים על סמל האיש שמתווכח ואז על הראש של אורה לפני שהיא נעלמת. הסמל נדלק רק כשהיא מופיעה.',en:'Quick! Tap the arguing-person icon, then Ora’s head before she disappears. The icon lights up only while she is here.'},
       {he:'ניצחון מזכה ב־5,000 נקודות ועוצר את המשחק להודעה של 5 שניות. בשלב הזה יש יותר זמן לתפוס אותה; בהמשך החלון מתקצר.',en:'Win 5,000 points and pause for a five-second message. This level gives you more time to catch her; later windows get shorter.'}
@@ -55,12 +55,12 @@ export const HOUSE_LESSONS = Object.freeze({
     successHe:'בדיוק! הסמל ואז אורה, לפני שהיא נעלמת.',successEn:'Exactly! The icon, then Ora, before she disappears.',
     retryHe:'חפשו את סמל האיש שמתווכח. קודם הסמל, ואז אורה.',retryEn:'Look for the arguing-person icon. First the icon, then Ora.'
   },
-  5: {
+  6: {
     he: 'מישהו הגיע לאכול',
     en: 'Someone has come for a meal',
     icons: ['serve', 'water', 'broom'],
     steps: [
-      { he: 'כשמגיע אורח, בוחרים בסמל האוכל במדף.', en: 'When a guest arrives, choose the Food icon on the shelf.' },
+      { he: 'רועי, הילה, ריוי וליהי מגיעים מדי פעם, רק אחרי שעוברות לפחות 15 שניות מתחילת השלב. בוחרים בסמל האוכל במדף.', en: 'Roei, Hila, Rivi and Lihi visit occasionally, only after at least 15 seconds of the level. Choose the Food icon on the shelf.' },
       { he: 'לוחצים על האורח. רותי ניגשת ומגישה לו אחד ממטעמי הבית.', en: 'Tap the guest. Ruti walks over and serves one of her homemade treats.' },
       { he: 'אין צורך לבחור מנה או להכין מתכון. ממשיכים לדאוג גם לבית.', en: 'There is no dish selection or recipe to prepare. Keep caring for the house too.' }
     ],
@@ -74,26 +74,6 @@ export const HOUSE_LESSONS = Object.freeze({
     successEn: 'Exactly! One Food button, one tap on the guest, and plenty of love.',
     retryHe: 'המטאטא לאבק. לאורח בוחרים את סמל האוכל.',
     retryEn: 'The broom is for dust. Choose the Food icon for a guest.'
-  },
-  6: {
-    he: 'אף אחד לא יוצא מכאן רעב',
-    en: 'Nobody leaves hungry',
-    icons: ['serve', 'hand'],
-    steps: [
-      { he: 'ממשיכים להשקות, לנקות ולשמור על הדלתות.', en: 'Keep watering, cleaning and watching the doors.' },
-      { he: 'כדי להגיש ארוחה, בוחרים אוכל ולוחצים ישירות על האורח.', en: 'To serve a meal, choose Food and tap the guest directly.' },
-      { he: 'רותי בוחרת בעצמה אחד מהמטעמים. אירוח נותן נקודות נוספות.', en: 'Ruti chooses a homemade treat herself. Feeding guests earns extra points.' }
-    ],
-    question: { he: 'צריך לבחור מנה במטבח לפני ההגשה?', en: 'Do you need to choose a kitchen dish before serving?' },
-    answers: [
-      { he: 'לא — אוכל, ואז לחיצה על האורח', en: 'No — choose Food, then tap the guest' },
-      { he: 'כן — צריך לבחור מנה ולבשל אותה', en: 'Yes — choose a dish and cook it' }
-    ],
-    correctIndex: 0,
-    successHe: 'נכון! רותי כבר דואגת למטעמים.',
-    successEn: 'Right! Ruti takes care of the homemade treats.',
-    retryHe: 'הפעם ההגשה פשוטה: אוכל, ואז האורח.',
-    retryEn: 'Serving is simple: Food, then the guest.'
   },
   7: {
     he: 'בית מלא משפחה',
@@ -114,5 +94,17 @@ export const HOUSE_LESSONS = Object.freeze({
     successEn: 'Right! A full house, with the same simple tools.',
     retryHe: 'המשפך לעציצים. לאורח מגישים אוכל.',
     retryEn: 'The watering can is for plants. Serve Food to a guest.'
+  },
+  11: {
+    he:'מכירים את האורחים?',en:'Do you recognize the guests?',icons:['serve','peanuts'],
+    steps:[
+      {he:'עכשיו מגיעים גם אורחים אחרים. הם דומים לבני המשפחה, אז מסתכלים היטב על הפנים.',en:'Other visitors now arrive too. They resemble the family, so look carefully at their faces.'},
+      {he:'לרועי, הילה, ריוי וליהי מגישים אוכל עם סמל המגש. לכל אורח אחר מגישים בוטנים עם סמל הקערה.',en:'Serve Roei, Hila, Rivi and Lihi Food with the tray icon. Give every other visitor Peanuts with the bowl icon.'},
+      {he:'הסמלים נשארים במקום הקבוע שלהם. בוחרים בכיבוד המתאים ואז לוחצים על האורח.',en:'The icons keep their fixed positions. Choose the matching refreshment, then tap the visitor.'}
+    ],
+    question:{he:'מה מגישים לאורח שאינו מהמשפחה?',en:'What do you serve a visitor who is not family?'},
+    answers:[{he:'בוטנים',en:'Peanuts'},{he:'ארוחה מהמטבח',en:'A homemade meal'}],correctIndex:0,
+    successHe:'נכון! אוכל למשפחה, בוטנים לאורחים האחרים.',successEn:'Right! Food for family, peanuts for other visitors.',
+    retryHe:'את הארוחות שומרים למשפחה. אורחים אחרים מקבלים בוטנים.',retryEn:'Homemade meals are for family. Other visitors get peanuts.'
   }
 });

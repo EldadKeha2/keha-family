@@ -1,7 +1,7 @@
 import {iconArtwork} from './ruti-house-art.mjs?v=4';
-import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=3';
+import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=4';
 import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
-import {CAT_COATS} from './ruti-house-engine.mjs?v=8';
+import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=9';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -10,7 +10,7 @@ export const PLANT_VARIETIES=Object.freeze([
  {id:'fern',he:'שרך',en:'Fern'},
  {id:'pothos',he:'פוטוס',en:'Pothos'}
 ].map(Object.freeze));
-const ICON_IDS=[...FOOD_IDS,'water','broom','hand','argue','serve','plant','dust','cat'];
+const ICON_IDS=[...FOOD_IDS,'water','broom','hand','argue','serve','peanuts','plant','dust','cat'];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const length=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const departureRoutes=new WeakMap();
@@ -25,6 +25,8 @@ export function createSceneAssets({family={}}={}){
  function load(url,put){if(typeof Image==='undefined')return;const image=new Image();put(image);jobs.push(new Promise(resolve=>{image.onload=resolve;image.onerror=resolve;}));image.src=url;}
  load('assets/games/ruti-house/ruti-head-cutout-v1.png',image=>images.ruti=image);
  load('assets/games/ruti-house/ruti-character-atlas-v1.webp',image=>images.rutiAtlas=image);
+ load('assets/games/ruti-house/family-guests-v1.png',image=>images.familyAtlas=image);
+ load('assets/games/ruti-house/strangers-v1.png',image=>images.visitorAtlas=image);
  load('assets/games/portraits/ora.webp',image=>images.ora=image);
  for(const id of ICON_IDS)load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(iconArtwork(id)),image=>images.icons[id]=image);
  for(const [id,value] of Object.entries(family)){if(typeof value==='string')load(value,image=>images.family[id]=image);else if(value)images.family[id]=value;}
@@ -73,7 +75,7 @@ function nearestFloor(layout,point){
 
 export function getTaskLocation(task,layout){
  if(task.type==='plant')return layout.plants[Math.abs(task.slot||0)%layout.plants.length];
- if(task.type==='ora'){const p=nearestFloor(layout,task.position);return {...p,hitRadius:.09,anchor:{...p}};}
+ if(task.type==='ora'){const p={x:clamp(task.position.x,.08,.92),y:clamp(task.position.y,.28,.90)};return {...p,hitRadius:.09,anchor:{...p}};}
  if(task.type==='dust'){
   const raw=task.position||{x:.15+((task.slot||0)*.137)% .70,y:.40+((task.slot||0)*.113)% .45};
   const p=nearestFloor(layout,raw);return {...p,hitRadius:layout.portrait?.070:.052,anchor:{...p}};
@@ -313,20 +315,20 @@ function drawRutiFrame(ctx,atlas,frame,height,pose){
  if(speechHead){
   // Keep the leaning shoulders and arms, but exclude the original broom
   // head silhouette so the animated head can never produce a double face.
-  ctx.save();ctx.beginPath();ctx.rect(-pivot*scale,-355*scale,362*scale,(neck+1)*scale);
+  ctx.save();ctx.beginPath();ctx.rect(-pivot*scale,-355*scale,362*scale,(neck+13)*scale);
   for(const [i,[hx,hy]] of [[155,0],[280,0],[280,109],[210,109],[180,102],[164,87],[155,70]].entries()){
    const px=(hx-pivot)*scale,py=(hy-355)*scale;i?ctx.lineTo(px,py):ctx.moveTo(px,py);
   }
-  ctx.closePath();ctx.clip('evenodd');strip(0,neck,1);ctx.restore();
+  ctx.closePath();ctx.clip('evenodd');strip(0,neck+12,1);ctx.restore();
   ctx.save();ctx.translate((198-pivot)*scale,(105-355)*scale);ctx.scale(-1,1);
   const headX=(pose.headFrame%4)*cw+.5+speechHead.x/362*(cw-1),headY=Math.floor(pose.headFrame/4)*ch+.5;
   ctx.beginPath();
-  for(const [i,[hx,hy]] of [[speechHead.x,0],[speechHead.x+speechHead.w,0],[speechHead.x+speechHead.w,90],[speechHead.neckX+27,98],[speechHead.neckX+17,104],[speechHead.neckX-17,104],[speechHead.neckX-25,96],[speechHead.x,90]].entries()){
+  for(const [i,[hx,hy]] of [[speechHead.x,0],[speechHead.x+speechHead.w,0],[speechHead.x+speechHead.w,90],[speechHead.neckX+27,98],[speechHead.neckX+18,109],[speechHead.neckX+13,123],[speechHead.neckX-13,123],[speechHead.neckX-18,109],[speechHead.neckX-25,96],[speechHead.x,90]].entries()){
    const px=(hx-speechHead.neckX)*scale,py=(hy-speechHead.neckY)*scale;i?ctx.lineTo(px,py):ctx.moveTo(px,py);
   }
   ctx.closePath();ctx.clip();
-  ctx.drawImage(atlas,headX,headY,speechHead.w/362*(cw-1),104/362*(ch-1),
-   (speechHead.x-speechHead.neckX)*scale,-speechHead.neckY*scale,speechHead.w*scale,104*scale);
+  ctx.drawImage(atlas,headX,headY,speechHead.w/362*(cw-1),124/362*(ch-1),
+   (speechHead.x-speechHead.neckX)*scale,-speechHead.neckY*scale,speechHead.w*scale,124*scale);
   ctx.restore();
  }else strip(0,neck,1);
  ctx.restore();
@@ -373,6 +375,7 @@ function drawRuti(ctx,x,y,height,actor,images,time,reduced,waterTarget=null){
  ellipse(ctx,0,-1,height*.21,height*.045,'#4c382c35');
  ctx.translate(0,-pose.lift);ctx.rotate(pose.lean);ctx.scale(direction,pose.breath);
  drawRutiFrame(ctx,atlas,pose.frame,height,pose);
+ if(pose.frame===6&&actor.tool==='peanuts')icon(ctx,images,'peanuts',-height*.31,-height*.72,height*.33);
  // Action frames already hold their real object. While idle or walking the
  // selected object stays in hand, including immediately after a tool switch.
  if(![3,4,5,6,9,10].includes(pose.frame)&&actor.tool){
@@ -427,7 +430,53 @@ function drawRutiSpeech(ctx,x,y,height,actor,time,width){
  ctx.restore();
 }
 
-function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null,quiet=false}={}){
+// Two full-body poses retain the actual family likeness, neck and clothing.
+// Both atlases share the same cell geometry and scale, so silhouettes do not
+// disclose whether a guest should receive a meal or peanuts.
+export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,facing=1,reduced=false}={}){
+ const familyIndex=HOUSE_GUESTS.indexOf(id),column=familyIndex>=0?familyIndex:HOUSE_VISITORS.indexOf(id);
+ const atlas=familyIndex>=0?images?.familyAtlas:images?.visitorAtlas;
+ if(column<0||!imageReady(atlas))return false;
+ const cw=atlas.naturalWidth/4,ch=atlas.naturalHeight/2,row=walking&&!reduced?Math.floor(time*4)%2:0;
+ const scale=height/(ch*.91),w=cw*scale,h=ch*scale;
+ const center=familyIndex>=0?[[203,186,175,158],[214,193,184,169]][row][column]/384:.5;
+ const foot=familyIndex>=0?(row===0?482:490)/512:.98;
+ const bob=walking&&!reduced?Math.abs(Math.sin(time*8))*height*.012:reduced?0:Math.sin(time*1.7+column)*height*.002;
+ ctx.save();ctx.translate(x,y-bob);ellipse(ctx,0,1,height*.15,height*.025,'#4c382c25');
+ if(facing<0)ctx.scale(-1,1);
+ ctx.drawImage(atlas,column*cw+.5,row*ch+.5,cw-1,ch-1,-w*center,-h*foot,w,h);ctx.restore();return true;
+}
+const residentRoutes=new WeakMap();
+/** A persistent indoor cat walks around furniture and jumps onto real surfaces. */
+export function residentCatPose(cat,layout,elapsed){
+ const key=`${layout.width}:${layout.height}`;let route=residentRoutes.get(cat);
+ if(!route||route.key!==key){
+  const seed=cat.pathSeed??.5,c=layout.counter,s=layout.sofa,t=layout.table,door=layout.doors[Math.abs(cat.door??0)%2];
+  const counterFloor=nearestFloor(layout,{x:c.x+c.w*(.2+seed*.2),y:c.y+c.h+.06});
+  const counterTop={x:counterFloor.x,y:c.y+c.h*.31};
+  const sofaFloor=nearestFloor(layout,{x:s.x-.055,y:s.y+s.h+.04}),sofaTop={x:s.x+s.w*.28,y:s.y+s.h*.48};
+  const tableFloor=nearestFloor(layout,{x:t.x-.06,y:t.y+t.h+.025}),tableTop={x:t.x+t.w*.28,y:t.y+t.h*.28};
+  const roam=nearestFloor(layout,{x:.19+seed*.08,y:.81});let last={...door.anchor};const segments=[];
+  const walk=target=>{const points=[last,...findHousePath(layout,last,target)],distance=points.slice(1).reduce((sum,p,i)=>sum+Math.hypot((p.x-points[i].x)*layout.width,(p.y-points[i].y)*layout.height),0);segments.push({points,duration:Math.max(.4,distance/(Math.min(layout.width,layout.height)*.17)),surface:'floor'});last=target;};
+  const jump=(target,surface)=>{segments.push({points:[last,target],duration:1.05,jump:true,surface});last=target;};
+  const rest=(duration,surface)=>segments.push({points:[last,last],duration,surface,rest:true});
+  walk(counterFloor);jump(counterTop,'counter');rest(3+seed*2,'counter');jump(counterFloor,'floor');
+  walk(sofaFloor);jump(sofaTop,'sofa');rest(3,'sofa');jump(sofaFloor,'floor');
+  walk(tableFloor);jump(tableTop,'table');rest(2.5,'table');jump(tableFloor,'floor');walk(roam);rest(2,'floor');walk(door.anchor);
+  route={key,segments,duration:segments.reduce((sum,p)=>sum+p.duration,0)};residentRoutes.set(cat,route);
+ }
+ let age=Math.max(0,elapsed-(cat.enteredAt||0))%route.duration;
+ for(const segment of route.segments){
+  if(age>segment.duration){age-=segment.duration;continue;}
+  const progress=clamp(age/segment.duration,0,1),position=routePosition(segment.points,progress,layout.width,layout.height);
+  if(segment.jump)position.y-=Math.sin(progress*Math.PI)*Math.min(layout.width,layout.height)*.11/layout.height;
+  return {...position,jumping:!!segment.jump,walking:!segment.rest,surface:segment.surface};
+ }
+ return {...route.segments[0].points[0],facing:1,surface:'floor',walking:false,jumping:false};
+}
+
+function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null,quiet=false}={}){
+ if(guest&&drawHouseGuest(ctx,x,y,height,guestId,images,time,{walking,facing,reduced}))return;
  if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced,waterTarget);return;}
  ctx.save();ctx.translate(x,y);const s=height/100;ctx.scale(s,s);ctx.lineCap='round';ctx.lineJoin='round';
  const cycle=walking?Math.sin(time*13):0,bob=walking?Math.abs(cycle)*2:Math.sin(time*1.8)*.4;
@@ -556,7 +605,7 @@ export function renderHouse(ctx,g,visual={},options={}){
  const l=getHouseLayout(width,height),M=Math.min(width,height),pulseTime=reduced?0:time,showTaskLabels={plant:true,dust:true,cat:true,...visual.showTaskLabels};
  // Learned plant and dust cues stay quiet even when a stale caller omits or
  // explicitly enables labels. Their physical signals and time bars remain.
- const learnedBasicTasks=(g?.level??1)>1||(Number.isFinite(g?.stage?.goal)&&g.stageCompleted>=g.stage.goal/2);
+ const learnedBasicTasks=(g?.level??1)>1||(Number.isFinite(g?.stage?.goal)&&(g.stageResolved??g.stageCompleted)>=g.stage.goal/2);
  const quiet=!!visual.quiet||learnedBasicTasks;
  if(quiet){showTaskLabels.plant=false;showTaskLabels.dust=false;showTaskLabels.cat=false;}
  ctx.save();ctx.clearRect(0,0,width,height);ctx.lineCap='round';drawRoom(ctx,l,{time:pulseTime,english,reduced,quiet});
@@ -577,7 +626,7 @@ export function renderHouse(ctx,g,visual={},options={}){
  }
  // Food is one simple hospitality action. The counter stays uncluttered
  // during the early plant/cleaning lessons, then holds one decorative platter.
- const canServe=g?.unlockedTools?g.unlockedTools.includes('serve'):g?.level>=5;
+ const canServe=g?.unlockedTools?g.unlockedTools.includes('serve'):g?.level>=6;
  if(canServe){
   const x=width*.41,y=height*.175,size=M*(l.portrait?.15:.12);
   ellipse(ctx,x,y+size*.26,size*.76,size*.19,'#73502e22');
@@ -592,6 +641,7 @@ export function renderHouse(ctx,g,visual={},options={}){
   if(!quiet)label(ctx,english?'Homemade treats':'מטעמי הבית',x,y+size*.65,{size:clamp(M*.023,10,14),color:'#63513b'});
  }
 
+ if(g?.unlockedTools?.includes('peanuts'))icon(ctx,images,'peanuts',width*.2,height*.175,M*.12);
  const actors=[];
  for(const task of g?.tasks||[]){
   const p=getTaskLocation(task,l),x=p.x*width,y=p.y*height;
@@ -599,9 +649,9 @@ export function renderHouse(ctx,g,visual={},options={}){
   if(task.type==='guest')actors.push({y,draw:()=>{
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=task.untimed?1:clamp(task.total-task.remaining,0,1),guestX=x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=y+M*.04;
    halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',!task.untimed&&task.remaining/task.total<.25);
-   const portrait=images.family?.[task.guest]||images[task.guest];drawHuman(ctx,guestX,guestY,M*(l.portrait?.175:.17),{portrait,guest:true,index:task.guest==='hila'?1:task.guest==='rivi'?2:0,time:pulseTime,walking:arrival<1&&!reduced,facing:d.side==='left'?1:-1});
-   const bubbleX=guestX+(d.side==='left'?1:-1)*M*.062,bubbleY=guestY-M*.145;ellipse(ctx,bubbleX,bubbleY,M*.035,M*.035,'#fff3d4','#c59b54');icon(ctx,images,'serve',bubbleX,bubbleY,M*.06);
-   const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי'};if(!quiet)label(ctx,names[task.guest]||task.guest,guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
+   const portrait=images.family?.[task.guest]||images[task.guest];drawHuman(ctx,guestX,guestY,M*(l.portrait?.26:.235),{portrait,guest:true,guestId:task.guest,images,reduced,index:task.guest==='hila'?1:task.guest==='rivi'?2:0,time:pulseTime,walking:arrival<1&&!reduced,facing:d.side==='left'?1:-1});
+   const bubbleX=guestX+(d.side==='left'?1:-1)*M*.062,bubbleY=guestY-M*.225;ellipse(ctx,bubbleX,bubbleY,M*.035,M*.035,'#fff3d4','#c59b54');if(g.level<11)icon(ctx,images,'serve',bubbleX,bubbleY,M*.06);else{line(ctx,bubbleX-M*.012,bubbleY,bubbleX+M*.012,bubbleY,'#776543',2);ellipse(ctx,bubbleX-M*.012,bubbleY-M*.01,M*.003,M*.003,'#776543');ellipse(ctx,bubbleX+M*.012,bubbleY-M*.01,M*.003,M*.003,'#776543');}
+   const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi',lihi:'Lihi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי',lihi:'ליהי'};if(!quiet)label(ctx,names[task.guest]||(english?'Visitor':'אורח'),guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
   }});
   if(task.type==='cat')actors.push({y:y+M*.03,draw:()=>{
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.untimed||task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
@@ -624,13 +674,17 @@ export function renderHouse(ctx,g,visual={},options={}){
   const fade=1-clamp((progress-.62)/.38,0,1);
   if(departure.type==='guest'){
    const p=guestDeparturePosition(departure,l,reduced?1:progress),px=p.x*width,py=p.y*height;
-   actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawHuman(ctx,px,py,M*(l.portrait?.175:.17),{portrait:images.family?.[departure.guest]||images[departure.guest],guest:true,index:departure.guest==='hila'?1:departure.guest==='rivi'?2:0,time:pulseTime,walking:!reduced,facing:p.facing});
+   actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawHuman(ctx,px,py,M*(l.portrait?.26:.235),{portrait:images.family?.[departure.guest]||images[departure.guest],guest:true,guestId:departure.guest,images,reduced,index:departure.guest==='hila'?1:departure.guest==='rivi'?2:0,time:pulseTime,walking:!reduced,facing:p.facing});
     if(!quiet)label(ctx,english?'Thank you!':'תודה רותי!',px,py-M*.20,{size:clamp(M*.025,11,15),color:'#6b8254'});ctx.restore();}});
   }else if(departure.type==='cat'||departure.type==='cat-enter'){
    const entering=departure.type==='cat-enter',p=reduced?1:progress;
    const px=door.x*width+sgn*M*(entering?.025+p*.18:.035-p*.19),py=door.y*height+M*(.015+(entering?p*.085:0));
    actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawCat(ctx,px,py,M*.115*(departure.size||1),pulseTime*2,1,entering?door.side:(door.side==='left'?'right':'left'),showTaskLabels.cat,departure);ctx.restore();}});
   }
+ }
+ for(const cat of g?.catsInside||[]){
+  const p=residentCatPose(cat,l,reduced?(cat.enteredAt||0)+3:g.elapsed||0),size=M*.115*(cat.size||1),py=p.y*height-size*26/64;
+  actors.push({y:p.y*height,draw:()=>drawCat(ctx,p.x*width,py,size,reduced?0:g.elapsed||0,p.walking?1:0,p.facing>0?'left':'right',false,cat)});
  }
  const actor=visual.actor||{...l.spawn};const actorX=(actor.x??l.spawn.x)*width,actorY=(actor.y??l.spawn.y)*height;
  const actorHeight=clamp(M*(l.portrait?.28:.245),l.portrait?94:102,l.portrait?116:140);

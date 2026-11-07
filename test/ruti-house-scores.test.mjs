@@ -133,3 +133,18 @@ test('v4 persists exact Ora bonuses and thirty-task level totals, without changi
   assert.equal((await f.call(won)).status,200);assert.equal((await f.call({...entry(202),version:3,completedLevels:1,stageScores:[60600,0,0,0,0,0,0,0,0,0]})).status,200);
  }finally{f.close();}
 });
+
+test('v5 stores twelve-stage runs with missed tasks, exact Ora bonuses, safe retries and legacy records',async()=>{
+ const f=fixture();try{
+  const partial={...entry(501,0),version:5,score:7800,level:4,completedLevels:3,plants:70,missed:30,oraWins:1,bestCombo:6,elapsed:400,stageScores:[1000,1000,800,5000,0,0,0,0,0,0,0,0]};
+  assert.equal((await f.call(partial)).status,200);assert.equal((await f.call(partial)).status,200);
+  assert.equal((await f.call({...partial,missed:31})).status,409,'an otherwise valid retry cannot replace its missed count');
+  const won={...entry(502,8),version:5,score:72640,level:12,completedLevels:12,plants:200,dust:40,cats:27,snacks:5,missed:71,oraWins:9,bestCombo:20,elapsed:1100,stageScores:[...Array(11).fill(6000),6640]};
+  assert.equal((await f.call(won)).status,200);assert.equal((await f.call(entry(503))).status,200);f.restart();
+  const rows=(await (await f.call()).json()).scores;
+  for(const input of [partial,won]){const row=rows.find(r=>r.id===input.requestId);assert.equal(row.version,5);assert.equal(row.missed,input.missed);assert.equal(row.oraWins,input.oraWins);assert.deepEqual(row.stageScores,input.stageScores);}
+  assert.equal(rows.find(r=>r.id===entry(503).requestId).missed,0);
+  for(const changes of [{missed:70},{missed:72},{missed:-1},{missed:1.5},{missed:undefined},{oraWins:10},{stageScores:Array(10).fill(7264)},{level:13},{version:4}])assert.equal((await f.call({...won,requestId:'e'.repeat(32),...changes})).status,400,JSON.stringify(changes));
+  assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_run_metrics').get().n,2);
+ }finally{f.close();}
+});

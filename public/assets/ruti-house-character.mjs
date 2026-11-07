@@ -52,8 +52,8 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
   lift:reduced?0:celebrating?pulse*1.5:walking?Math.abs(cycle)*1.8:accent*.45,
   lean:reduced?0:celebrating?blend(weight)*1.1:action==='broom'?Math.sin(time*10)*.028:action==='hand'?Math.sin(time*14)*.025:cycle*.008+(talking?Math.sin(speechAge*3.1)*.009+accent*.006:0),
   breath:reduced?1:1+Math.sin(time*1.9)*.006+(celebrating?pulse*.002:0),talking,
-  headTilt:reduced?0:(celebrating?Math.sin(songPosition*Math.PI*.5)*.02:talking?Math.sin(speechAge*3.1)*.008+accent*.004:Math.sin(time*.83)*.004),
-  headLift:reduced?0:(celebrating?pulse*.003:talking?accent*.0025:Math.sin(time*1.9)*.0008)};
+  headTilt:reduced?0:(celebrating?Math.sin(songPosition*Math.PI*.5)*.008:talking?Math.sin(speechAge*3.1)*.008+accent*.004:Math.sin(time*.83)*.004),
+  headLift:reduced?0:(celebrating?0:talking?accent*.0025:Math.sin(time*1.9)*.0008)};
 }
 
 const LINES=Object.freeze({

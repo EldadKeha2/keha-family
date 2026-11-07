@@ -295,7 +295,7 @@ test('singing composites alternate original heads while retaining the same narro
  const heads=new Set(),bodies=[];
  for(const time of [.02,.11,.20,3.43]){
   calls.length=0;drawRutiCelebration(ctx,{width:390,height:570,time,images:{rutiAtlas:atlas},actor:{celebrationStartedAt:0}});
-  const head=calls.find(call=>call[3]<150&&call[4]<120);assert.ok(head,'the face is a separate original atlas crop');
+  const head=calls.find(call=>call[3]<150&&call[4]<130);assert.ok(head,'the face is a separate original atlas crop');
   heads.add(`${head[1]}:${head[2]}`);bodies.push(calls.at(-1).slice(1,5));
  }
  assert.ok(heads.size>=3,'open, closed, rounded mouths or blinks vary during the song');
@@ -357,5 +357,27 @@ test('the petunia pot rests on the kitchen stone with a reachable anchor in fron
   assert.ok(plant.anchor.y>=counter.y+counter.h,'Ruti stands on the floor in front of the counter');
   assert.ok(distance(plant,layout.doors[0])>.5,'the main doorway stays clear');
   checkWalk(layout,layout.spawn,plant.anchor);
+ }
+});
+
+test('resident cats keep continuous paths around furniture and jump onto counter, sofa and table',async()=>{
+ const {residentCatPose}=await import('../public/assets/ruti-house-scene.mjs');
+ for(const [width,height] of sizes){
+  const layout=getHouseLayout(width,height),cat={door:0,enteredAt:10,pathSeed:.4},surfaces=new Set();let previous;
+  for(let t=10;t<=190;t+=.05){const p=residentCatPose(cat,layout,t);surfaces.add(p.surface);assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y));assert.ok(p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1);
+   if(!p.jumping&&p.surface==='floor')assert.ok(!layout.obstacles.some(o=>inside(p,o,.004)),'floor walking avoids furniture');
+   if(previous)assert.ok(Math.hypot((p.x-previous.x)*width,(p.y-previous.y)*height)<Math.min(width,height)*.04,'no teleports between walking, jumping and resting');previous=p;
+  }
+  assert.deepEqual(surfaces,new Set(['floor','counter','sofa','table']));assert.deepEqual(residentCatPose(cat,layout,35),residentCatPose(cat,layout,35),'paused elapsed time preserves the cat pose');
+ }
+});
+
+test('all eight guest identities use connected full-body atlas cells with consistent standing and walking scales',async()=>{
+ const {drawHouseGuest}=await import('../public/assets/ruti-house-scene.mjs');const family={complete:true,naturalWidth:1536,naturalHeight:1024},strangers={...family},calls=[];
+ const ctx=new Proxy({drawImage(...args){calls.push(args);}},{get:(target,key)=>key in target?target[key]:()=>{}});
+ const ids=['roi','hila','rivi','lihi','visitor-man','visitor-hila','visitor-rivi','visitor-lihi'];
+ for(const [index,id] of ids.entries())for(const walking of [false,true]){
+  calls.length=0;assert.equal(drawHouseGuest(ctx,100,200,110,id,{familyAtlas:family,visitorAtlas:strangers},.3,{walking}),true);assert.equal(calls.length,1);
+  const [image,sx,sy,sw,sh,,,dw,dh]=calls[0];assert.equal(image,index<4?family:strangers);assert.equal(sx,(index%4)*384+.5);assert.equal(sy,walking?512.5:.5);assert.equal(sw,383);assert.equal(sh,511);assert.ok(dw>85&&dw<95);assert.ok(dh>120&&dh<123);
  }
 });

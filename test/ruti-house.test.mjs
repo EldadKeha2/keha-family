@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import {RECIPES,TOOLS,POINTS,HOUSE_SLOTS,STAGES,firstStagePace,secondStagePace,createHouse,advanceHouse,advanceStage,selectTool,actHouse} from '../public/assets/ruti-house-engine.mjs';
 
 const game=()=>createHouse({random:()=>.5});
-const needed=t=>({plant:'water',dust:'broom',cat:'hand',guest:'serve'}[t.type]);
+const needed=t=>t.type==='guest'?(t.food||'serve'):({plant:'water',dust:'broom',cat:'hand'}[t.type]);
 function clearTask(g,task=g.tasks[0],tool=needed(task)){assert.equal(selectTool(g,tool),true);return actHouse(g,task.id);}
 function waterUntil(g,count){let attempts=0;while(g.stageCompleted<count&&g.phase==='playing'&&attempts++<12000){if(g.tasks.length)clearTask(g);else advanceHouse(g,.1);}assert.ok(attempts<12000);}
-function finishStage(g){let attempts=0;while(g.phase==='playing'&&attempts++<12000){if(g.tasks.length)clearTask(g);else advanceHouse(g,.1);}assert.ok(attempts<12000);}
+function finishStage(g){let attempts=0;while(['playing','ora-bonus'].includes(g.phase)&&attempts++<12000){if(g.phase==='ora-bonus')advanceHouse(g,5);else if(g.ora){selectTool(g,'argue');actHouse(g,g.ora.id);}else if(g.tasks.length)clearTask(g);else advanceHouse(g,.1);}assert.ok(attempts<12000);}
 function atStage(level){const g=game();while(g.level<level){finishStage(g);assert.equal(advanceStage(g),true);}return g;}
 
 test('the opening has four pots, thirty waterings and only the tools for its two tasks',()=>{
   assert.equal(HOUSE_SLOTS.plant,4);assert.equal(STAGES[0].goal,30);assert.deepEqual(STAGES[0].types,['plant','dust']);
-  assert.deepEqual(TOOLS.map(t=>t.id),['water','broom','hand','argue','serve']);assert.deepEqual(game().unlockedTools,['water','broom']);
-  for(const s of STAGES){assert.ok(s.unlockedTools.length<=5);assert.ok(s.unlockedTools.every(id=>TOOLS.some(t=>t.id===id)));assert.deepEqual(s.unlockedRecipes,[]);assert.equal(s.requiredDish,null);}
-  assert.equal(STAGES.find(s=>s.types.includes('guest')).level,5);assert.equal(STAGES[5].requiredMeal,true);
+  assert.deepEqual(TOOLS.map(t=>t.id),['water','broom','hand','argue','serve','peanuts']);assert.deepEqual(game().unlockedTools,['water','broom']);
+  for(const s of STAGES){assert.ok(s.unlockedTools.length<=6);assert.ok(s.unlockedTools.every(id=>TOOLS.some(t=>t.id===id)));assert.deepEqual(s.unlockedRecipes,[]);assert.equal(s.requiredDish,null);}
+  assert.equal(STAGES.find(s=>s.types.includes('guest')).level,6);assert.equal(STAGES[5].requiredMeal,true);
 });
 
 test('the first six waterings are relaxed, cover all four pots and do not end the lesson',()=>{
@@ -55,7 +55,7 @@ test('a missed flashing plant breaks the streak, then another chance can still c
   const g=game();waterUntil(g,6);advanceHouse(g,2.3);const missed=g.tasks[0];assert.equal(missed.type,'plant');assert.ok(!missed.untimed);
   advanceHouse(g,missed.total);assert.ok(!g.tasks.includes(missed));assert.ok(g.stats.missed>0);assert.equal(g.stageCompleted,6);assert.equal(g.strikes,0);assert.equal(g.combo,0);
   assert.ok(g.events.some(e=>e.type==='missed'&&e.targetId===missed.id));finishStage(g);
-  assert.equal(g.stats.plants+g.stats.dust,30);assert.equal(g.phase,'stage-complete');
+  assert.equal(g.stats.plants+g.stats.dust+g.stats.missed,30);assert.equal(g.stageResolved,30);assert.equal(g.phase,'stage-complete');
 });
 
 test('random plant decks vary while avoiding duplicate active slots',()=>{
@@ -71,7 +71,7 @@ test('wrong and unavailable tools, recipe targets and duplicate clicks cannot sk
 });
 
 test('one Food tool directly serves a random valid delicacy without picking up dishes or maintaining stock',()=>{
-  const g=atStage(5),guest=g.tasks[0];assert.equal(guest.type,'guest');assert.ok(RECIPES.some(r=>r.id===guest.recipeId));
+  const g=atStage(6);while(!g.tasks.some(t=>t.type==='guest'))advanceHouse(g,.1);const guest=g.tasks.find(t=>t.type==='guest');assert.equal(guest.type,'guest');assert.ok(RECIPES.some(r=>r.id===guest.recipeId));
   assert.ok(Object.values(g.inventory).every(n=>n===0));assert.equal(g.requiredMealComplete,false);const before=g.score;
   selectTool(g,'water');assert.equal(actHouse(g,guest.id).type,'wrong');const event=clearTask(g,guest,'serve');
   assert.equal(event.kind,'meal');assert.equal(event.recipeId,guest.recipeId);assert.equal(g.score-before,POINTS.meal*2);assert.equal(g.stats.meals,1);
@@ -80,7 +80,7 @@ test('one Food tool directly serves a random valid delicacy without picking up d
 });
 
 test('all serving stages stay completable without cooking tools or inventory',()=>{
-  for(const n of [5,6,7,8,9,10]){const g=atStage(n);assert.equal(selectTool(g,'serve'),true);assert.ok(!g.unlockedTools.includes('bowl'));assert.deepEqual(g.unlockedRecipes,[]);finishStage(g);assert.equal(g.completedLevels,n);}
+  for(const n of [6,7,8,9,10,11,12]){const g=atStage(n);assert.equal(selectTool(g,'serve'),true);assert.ok(!g.unlockedTools.includes('bowl'));assert.deepEqual(g.unlockedRecipes,[]);finishStage(g);assert.equal(g.completedLevels,n);}
 });
 
 test('the first cats wait briefly and then visibly sneak toward a doorway over a generous response window',()=>{
@@ -104,9 +104,9 @@ test('three cat entries end the run and prior strikes survive a completed stage'
   finishStage(g);advanceStage(g);assert.equal(g.level,4);assert.equal(g.strikes,2);g.tasks=[{id:'last-cat',type:'cat',slot:0,door:0,waiting:0,state:'approaching',total:.1,remaining:.1}];advanceHouse(g,.1);assert.equal(g.phase,'finished');assert.equal(g.strikes,3);assert.equal(g.won,false);assert.equal(g.completedLevels,3);const frozen=JSON.stringify(g);advanceHouse(g,60);advanceStage(g);actHouse(g,'cook-tahini');assert.equal(JSON.stringify(g),frozen);
 });
 
-test('all ten stages retain exact score accounting, paused transition clocks and one win event',()=>{
-  const g=game();for(let n=1;n<=10;n++){finishStage(g);assert.equal(g.completedLevels,n);assert.equal(g.stageCompleted,STAGES[n-1].goal);assert.ok(g.stageScores[n-1]>0);assert.equal(g.requiredDishComplete,true);assert.equal(g.requiredMealComplete,true);if(n<10){assert.equal(g.phase,'stage-complete');const frozen=JSON.stringify(g);advanceHouse(g,60);assert.equal(JSON.stringify(g),frozen);assert.equal(advanceStage(g),true);}}
-  assert.equal(g.phase,'finished');assert.equal(g.won,true);assert.equal(g.level,10);assert.equal(g.stageScores.reduce((a,b)=>a+b,0),g.score);assert.equal(g.events.filter(e=>e.type==='finished').length,1);assert.equal(advanceStage(g),false);
+test('all twelve stages retain exact score accounting, paused transition clocks and one win event',()=>{
+  const g=game();for(let n=1;n<=12;n++){finishStage(g);assert.equal(g.completedLevels,n);assert.equal(g.stageCompleted,STAGES[n-1].goal);assert.ok(g.stageScores[n-1]>0);assert.equal(g.requiredDishComplete,true);if(n<12){assert.equal(g.phase,'stage-complete');const frozen=JSON.stringify(g);advanceHouse(g,60);assert.equal(JSON.stringify(g),frozen);assert.equal(advanceStage(g),true);}}
+  assert.equal(g.phase,'finished');assert.equal(g.won,true);assert.equal(g.level,12);assert.equal(g.stageScores.reduce((a,b)=>a+b,0),g.score);assert.equal(g.events.filter(e=>e.type==='finished').length,1);assert.equal(advanceStage(g),false);
 });
 
 test('invalid deltas preserve clocks and split frames produce the same tutorial task',()=>{
@@ -172,9 +172,9 @@ test('reaction bonus uses the correct click time rather than walking time and pa
 });
 
 test('dust, cats and guests all receive speed bonuses, including the cat waiting window',()=>{
-  for(const [level,type,kind] of [[2,'dust','dust'],[3,'cat','cat'],[5,'guest','meal']]){
+  for(const [level,type,kind] of [[2,'dust','dust'],[3,'cat','cat'],[6,'guest','meal']]){
     const g=atStage(level);let attempts=0;
-    while(!g.tasks.some(t=>t.type===type)&&attempts++<1000){if(g.tasks.length)clearTask(g);else advanceHouse(g,.1);}
+    while(!g.tasks.some(t=>t.type===type)&&attempts++<1000){if(type!=='guest'&&g.tasks.length)clearTask(g);else advanceHouse(g,.1);}
     const task=g.tasks.find(t=>t.type===type);assert.ok(task);
     g.combo=0;g.comboRemaining=0;
     const delay=2;advanceHouse(g,delay);const result=clearTask(g,task);
@@ -184,18 +184,19 @@ test('dust, cats and guests all receive speed bonuses, including the cat waiting
   }
 });
 
-test('every level requires exactly thirty successful mixed tasks and resets its per-type success counts',()=>{
+test('every level caps issued tasks at thirty and resets its per-type success counts',()=>{
  const g=game();
- for(let level=1;level<=10;level++){
+ for(let level=1;level<=12;level++){
   const total=()=>['plants','dust','cats','meals','snacks','oraWins'].reduce((n,k)=>n+g.stats[k],0),initial=total();assert.equal(g.stage.goal,30);assert.ok(Object.values(g.stageStats).every(n=>n===0));let guard=0;
-  while(g.phase==='playing'&&guard++<15000){
+  while(['playing','ora-bonus'].includes(g.phase)&&guard++<15000){
+   if(g.phase==='ora-bonus'){advanceHouse(g,5);continue;}if(g.ora){selectTool(g,'argue');actHouse(g,g.ora.id);continue;}
    if(g.tasks.length){const task=g.tasks[0],before=g.stageCompleted;clearTask(g,task);assert.equal(g.stageCompleted,before+1);}
    else advanceHouse(g,.2);
   }
   assert.ok(guard<15000);assert.equal(g.stageCompleted,30);assert.equal(total()-initial,30);assert.equal(Object.values(g.stageStats).reduce((a,b)=>a+b,0),30);
-  if(level<10)assert.equal(advanceStage(g),true);
+  if(level<12)assert.equal(advanceStage(g),true);
  }
- assert.equal(['plants','dust','cats','meals','snacks','oraWins'].reduce((n,k)=>n+g.stats[k],0),300);assert.ok(g.stats.plants<300);assert.equal(g.won,true);
+ assert.equal(['plants','dust','cats','meals','snacks','oraWins'].reduce((n,k)=>n+g.stats[k],0),360);assert.ok(g.stats.plants<360);assert.equal(g.won,true);
 });
 
 function findOra(g){let guard=0;while(!g.ora&&g.phase==='playing'&&guard++<15000){if(g.tasks.length)clearTask(g);else advanceHouse(g,.1);}assert.ok(g.ora,'Ora appears before level completion');return g.ora;}
@@ -240,4 +241,65 @@ test('Ora can complete the thirtieth task, with level completion delayed until t
  const g=atStage(4),ora=findOra(g);ora.remaining=100;waterUntil(g,29);
  selectTool(g,'argue');actHouse(g,ora.id);assert.equal(g.stageCompleted,30);assert.equal(g.phase,'ora-bonus');assert.equal(g.completedLevels,3);
  advanceHouse(g,5);assert.equal(g.phase,'stage-complete');assert.equal(g.completedLevels,4);assert.equal(Object.values(g.stageStats).reduce((a,b)=>a+b,0),30);
+});
+
+test('thirty resolved tasks include misses, never issue a thirty-first task and display only successes',()=>{
+ const g=game();waterUntil(g,6);const initialMissed=g.stats.missed;
+ for(let guard=0;g.phase==='playing'&&guard<10000;guard++)advanceHouse(g,1);
+ assert.equal(g.phase,'stage-complete');assert.equal(g.stageIssued,30);assert.equal(g.stageResolved,30);assert.equal(g.stageCompleted,6);assert.equal(g.stats.missed-initialMissed,24);assert.equal(g.tasks.length,0);
+ assert.equal(Object.values(g.stageStats).reduce((a,b)=>a+b,0),6);
+ advanceStage(g);assert.equal(g.stageCompleted,0);assert.equal(g.stageResolved,0);
+ for(let guard=0;g.phase==='playing'&&guard<10000;guard++)advanceHouse(g,1);
+ assert.equal(g.stageIssued,30);assert.equal(g.stageResolved,30);assert.equal(g.stageCompleted,0);assert.equal(g.completedLevels,2);
+});
+
+test('stage five repeats stage four faster, without meals, and Ora favors the visible periphery',()=>{
+ assert.equal(STAGES.length,12);const [four,five]=STAGES.slice(3,5);
+ assert.deepEqual(five.unlockedTools,four.unlockedTools);assert.ok(!five.types.includes('guest'));assert.equal(five.guestMode,null);
+ assert.ok(five.spawnDelay<four.spawnDelay);for(const type of ['plant','dust','cat'])assert.ok(five.deadlines[type]<four.deadlines[type]);
+ const fourth=findOra(atStage(4)),fifth=findOra(atStage(5));assert.ok(fifth.total<fourth.total);
+ let peripheral=0;
+ for(let seed=1;seed<=100;seed++){
+  let state=seed;const g=createHouse({random:()=>((state=(state*1664525+1013904223)>>>0)/2**32)});
+  while(g.level<4){finishStage(g);advanceStage(g);}const {x,y}=findOra(g).position;
+  if(x<.17||x>.83||y<.36||y>.84)peripheral++;
+ }
+ assert.ok(peripheral>=72&&peripheral<=96,`${peripheral}/100 peripheral appearances`);
+});
+
+test('cats that get inside persist with their own coat and size into the following stage',()=>{
+ const g=atStage(3),cat=g.tasks[0];cat.waiting=0;cat.remaining=.01;const appearance={coat:cat.coat,size:cat.size};advanceHouse(g,.1);
+ assert.equal(g.catsInside.length,1);const resident=g.catsInside[0];assert.equal(resident.id,cat.id);assert.deepEqual({coat:resident.coat,size:resident.size},appearance);assert.equal(resident.enteredAt,g.elapsed);
+ finishStage(g);advanceStage(g);assert.equal(g.catsInside[0],resident);assert.equal(g.strikes,1);
+});
+
+test('feeding is rare, randomly scheduled after fifteen seconds and distinguishes family from other visitors',()=>{
+ const arrivals=[],foods=new Set(),identities=new Set();
+ for(let seed=20;seed<84;seed++){
+  let state=seed;const g=createHouse({random:()=>((state=(state*1664525+1013904223)>>>0)/2**32)});
+  while(g.level<11){finishStage(g);advanceStage(g);}const stageStart=g.elapsed,seen=new Set();
+  while(['playing','ora-bonus'].includes(g.phase)){
+   if(g.phase==='ora-bonus'){advanceHouse(g,5);continue;}
+   if(g.ora){selectTool(g,'argue');actHouse(g,g.ora.id);continue;}
+   for(const task of [...g.tasks]){
+    if(task.type==='guest'){
+     if(!seen.has(task.id)){arrivals.push(task.createdAt-stageStart);seen.add(task.id);}
+     foods.add(task.food);identities.add(task.guest);assert.ok(task.createdAt-stageStart>=15);
+     selectTool(g,task.food==='peanuts'?'serve':'peanuts');assert.equal(actHouse(g,task.id).type,'wrong');assert.ok(g.tasks.includes(task));
+     const event=clearTask(g,task);assert.equal(event.kind,task.food==='peanuts'?'snack':'meal');
+    }else clearTask(g,task);
+   }
+   advanceHouse(g,.1);
+  }
+  assert.ok(seen.size>=1&&seen.size<=3,'guests are occasional, not part of the regular task sequence');assert.equal(g.stageResolved,30);
+ }
+ assert.ok(new Set(arrivals.map(n=>n.toFixed(1))).size>10,'arrival times vary between runs');assert.deepEqual(foods,new Set(['serve','peanuts']));assert.ok(identities.has('lihi'));assert.equal(identities.size,8);
+});
+
+test('Ora expiry resolves one of the thirty tasks without adding a household success or cat strike',()=>{
+ const g=atStage(4),ora=findOra(g),resolved=g.stageResolved,completed=g.stageCompleted,missed=g.stats.missed;
+ // Preserve other issued tasks while this deliberately missed bonus expires.
+ for(const task of g.tasks)task.untimed=true;
+ advanceHouse(g,ora.total);assert.equal(g.stageResolved,resolved+1);assert.equal(g.stageCompleted,completed);assert.equal(g.stats.missed,missed+1);assert.equal(g.strikes,0);
+ finishStage(g);assert.equal(g.stageResolved,30);assert.equal(g.stageCompleted,29);assert.equal(g.stageIssued,30);
 });
