@@ -5,7 +5,7 @@ import {HOUSE_LESSONS} from './ruti-house-lessons.mjs?v=6';
 import {createHouseActor,createHouseMotion} from './ruti-house-motion.mjs?v=2';
 import {createRutiPerformance} from './ruti-house-character.mjs?v=3';
 import {createHouseSound} from './ruti-house-sound.mjs?v=5';
-import {createRutiSong} from './ruti-house-music.mjs?v=2';
+import {createRutiSong} from './ruti-house-music.mjs?v=3';
 
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

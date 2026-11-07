@@ -1,6 +1,6 @@
 // Set this to an audio file supplied for the game. An absent source stays silent
 // and makes no media request; celebration animation does not depend on audio.
-export const RUTI_SONG_SOURCE=null;
+export const RUTI_SONG_SOURCE='assets/games/ruti-house/abba-shimon.mp3';
 
 export function createRutiSong({source,src=source??RUTI_SONG_SOURCE,random=Math.random,
  Audio:AudioClass=globalThis.Audio,document:doc=globalThis.document}={}){

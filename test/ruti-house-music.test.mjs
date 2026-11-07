@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createRutiSong,RUTI_SONG_SOURCE} from '../public/assets/ruti-house-music.mjs';
 
-function fixture({src='/test-song.mp3',random=()=>.5,blocked=false,deferred=false}={}){
+function fixture({src='/test-song.mp3',useDefaultSource=false,random=()=>.5,blocked=false,deferred=false}={}){
  const audios=[],pending=[];
  class Audio{
   constructor(){this.listeners=new Map();this.duration=NaN;this.currentTime=0;this.paused=true;this.readyState=0;this.loads=0;this.plays=0;this.pauses=0;audios.push(this);}
@@ -15,14 +15,21 @@ function fixture({src='/test-song.mp3',random=()=>.5,blocked=false,deferred=fals
   metadata(duration){this.duration=duration;this.readyState=1;this.listeners.get('loadedmetadata')?.();}
   error(){this.listeners.get('error')?.();}
  }
- const song=createRutiSong({src,random,Audio,document:null});
- return {song,audios,pending,flush:()=>new Promise(resolve=>setImmediate(resolve))};
+ const song=createRutiSong({...useDefaultSource?{}:{src},random,Audio,document:null});
+ return {song,audios,pending,Audio,flush:()=>new Promise(resolve=>setImmediate(resolve))};
 }
 
 test('no configured song makes no request, creates no player UI and stays silent',()=>{
- assert.equal(RUTI_SONG_SOURCE,null);const f=fixture({src:null});assert.equal(f.song.mount(null),false);
+ const f=fixture({src:null});assert.equal(f.song.mount(null),false);
  f.song.setEnabled(true);f.song.update(1);assert.equal(f.audios.length,0);assert.equal(f.song.time(),null);
  f.song.pause();f.song.stop();
+});
+
+test('the supplied MP3 is the configured default and starts without creating a visible player',async()=>{
+ assert.equal(RUTI_SONG_SOURCE,'assets/games/ruti-house/abba-shimon.mp3');
+ const f=fixture({useDefaultSource:true});assert.equal(f.song.mount(null),true);
+ const audio=f.audios[0];assert.equal(audio.src,RUTI_SONG_SOURCE);assert.equal(audio.controls,false);
+ audio.metadata(180);await f.flush();assert.equal(audio.paused,false);assert.equal(audio.currentTime,84);
 });
 
 test('the audio-only song starts at a random position after metadata and loops without controls',async()=>{
@@ -74,6 +81,14 @@ test('blocked playback and invalid or short durations fail gracefully without re
  for(const duration of [NaN,Infinity,-1]){const x=fixture();x.song.mount(null);x.audios[0].metadata(duration);await x.flush();assert.equal(x.audios[0].currentTime,0);}
 });
 
-test('source alias works and a missing audio environment leaves the game usable',()=>{
- const f=fixture();const song=createRutiSong({source:'/approved.mp3',Audio:null,document:null});assert.equal(song.mount(null),true);assert.equal(song.time(),null);song.pause();song.setEnabled(false);song.stop();assert.equal(f.audios.length,0);
+test('source alias selects the supplied file and a missing audio environment leaves the game usable',()=>{
+ const f=fixture();const configured=createRutiSong({source:'/approved.mp3',Audio:f.Audio,document:null});configured.mount(null);assert.equal(f.audios[0].src,'/approved.mp3');configured.stop();
+ const song=createRutiSong({source:'/approved.mp3',Audio:null,document:null});assert.equal(song.mount(null),true);assert.equal(song.time(),null);song.pause();song.setEnabled(false);song.stop();
+});
+
+test('random starting positions stay within the recording and leave at least twelve seconds',async()=>{
+ for(const fraction of [0,.25,.9,1,Infinity,NaN,-1]){
+  const f=fixture({random:()=>fraction});f.song.mount(null);const audio=f.audios[0];audio.metadata(180);await f.flush();
+  assert.ok(audio.currentTime>=0);assert.ok(audio.currentTime<=168);assert.ok(180-audio.currentTime>=12);
+ }
 });
