@@ -94,7 +94,7 @@ test('all physical interaction areas provide finite radii suitable for a 44 CSS 
 test('interaction reach remains close to physical pots and doors when the canvas becomes wide',()=>{
  for(const [width,height] of [[1130,580],[390,570],[320,500]]){
   const layout=getHouseLayout(width,height);
-  for(const target of [...layout.plants,...layout.doors]){
+  for(const target of [...layout.plants.filter(p=>p.slot!==1),...layout.doors]){
    const reach=Math.hypot((target.x-target.anchor.x)*width,(target.y-target.anchor.y)*height);
    assert.ok(reach<=65&&reach>=30,`physical interaction reach is ${reach} CSS pixels`);
   }
@@ -236,7 +236,7 @@ test('watering faces and lands on every physical pot even if the last walking st
    assert.equal(geometry.facing,-actor.facing,'the arrival direction cannot point the can away from the pot');
    assert.deepEqual(geometry.end,target,'the stream lands inside the selected pot rim');
    assert.ok((geometry.start.x-actor.x)*geometry.facing>0,'the can nozzle is on the target side');
-   assert.ok(geometry.start.y<geometry.end.y,'the stream falls down into the pot');
+   assert.ok(geometry.control.y<geometry.end.y,'the final stream segment falls down into the pot, including on the counter');
    assert.ok(Object.values(geometry.start).concat(Object.values(geometry.control)).every(Number.isFinite));
   }
  }
@@ -345,4 +345,17 @@ test('quiet mode removes every canvas word, bubble and missed badge while preser
  }
  const forced=renderRecord({level:1,stage:{goal:30},stageCompleted:0,tasks},{time:2},{...visual,quiet:true});
  assert.equal(forced.written.length,0,'an explicit quiet scene is honored before the automatic cutoff too');
+});
+
+test('the petunia pot rests on the kitchen stone with a reachable anchor in front, clear of the door',()=>{
+ for(const [width,height] of sizes){
+  const layout=getHouseLayout(width,height),plant=layout.plants[1],counter=layout.counter;
+  assert.equal(plant.variety,'petunia');
+  assert.ok(plant.x>counter.x&&plant.x<counter.x+counter.w);
+  const potBottom=plant.y+Math.min(width,height)*(layout.portrait?.15:.12)*31/64/height;
+  assert.ok(potBottom>counter.y&&potBottom<counter.y+counter.h*.43,'the pot base touches the stone surface');
+  assert.ok(plant.anchor.y>=counter.y+counter.h,'Ruti stands on the floor in front of the counter');
+  assert.ok(distance(plant,layout.doors[0])>.5,'the main doorway stays clear');
+  checkWalk(layout,layout.spawn,plant.anchor);
+ }
 });

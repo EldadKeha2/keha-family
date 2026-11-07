@@ -41,7 +41,7 @@ export function drawDustSignal(ctx,x,y,size,task,time,{reduced=false,english=fal
  ctx.restore();
 
  const labelY=Math.max(12,y-size*1.25),labelX=clamp(x,30,width-30);
- ctx.save();ctx.lineWidth=2;
+ ctx.save();ctx.lineWidth=2;ctx.shadowBlur=0;ctx.shadowColor='transparent';ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;ctx.filter='none';
  // Plain ink introduces the dust without putting another framed card or
  // glow behind the word. The physical cloud above stays strongly outlined.
  if(showLabel){ctx.fillStyle=edge;text(ctx,english?'Dust!':'אבק!',labelX,labelY,13);}

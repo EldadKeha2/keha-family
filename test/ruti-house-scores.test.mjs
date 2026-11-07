@@ -105,3 +105,17 @@ test('Ruti’s House v2 retries compare stage details and cannot replace legacy 
     assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_scores').get().n,2);assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_score_details').get().n,1);
   }finally{f.close();}
 });
+
+test('v3 speed and combo rewards save, retry and survive restart without relaxing the v2 limit',async()=>{
+  const f=fixture();try{
+    const body={...staged(51,{level:1,completedLevels:0,stageScores:[1200,0,0,0,0,0,0,0,0,0]}),version:3,meals:1,bestCombo:1};
+    assert.equal((await f.call(body)).status,200);
+    assert.equal((await f.call(body)).status,200);
+    f.restart();const saved=(await (await f.call()).json()).scores[0];
+    assert.equal(saved.score,1200);assert.equal(saved.version,3);assert.deepEqual(saved.stageScores,body.stageScores);
+    assert.equal((await f.call({...body,requestId:'a'.repeat(32),version:2})).status,400);
+    assert.equal((await f.call({...body,requestId:'b'.repeat(32),score:1201,stageScores:[1201,0,0,0,0,0,0,0,0,0]})).status,400);
+    assert.equal((await f.call({...body,version:2,score:600,stageScores:[600,0,0,0,0,0,0,0,0,0]})).status,409);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_scores').get().n,1);
+  }finally{f.close();}
+});

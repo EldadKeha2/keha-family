@@ -308,7 +308,7 @@ export class FamilyState {
         const details=this.rows('SELECT version,completed_levels AS completedLevels,stage_scores AS stageScores FROM ruti_house_score_details WHERE id=?',entry.id)[0];
         if(previous&&((details?.version??null)!==entry.version||(details?.completedLevels??null)!==entry.completedLevels||(details?.stageScores??null)!==(entry.stageScores===null?null:JSON.stringify(entry.stageScores))))throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
         if(!previous)this.sql.exec('INSERT INTO ruti_house_scores(id,name,score,level,meals,snacks,plants,dust,cats,dishes,bestCombo,elapsed,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',entry.id,entry.name,...RUTI_HOUSE_SCORE_FIELDS.map(key=>entry[key]),new Date().toISOString());
-        if(!previous&&entry.version===2)this.sql.exec('INSERT INTO ruti_house_score_details(id,version,completed_levels,stage_scores) VALUES(?,?,?,?)',entry.id,entry.version,entry.completedLevels,JSON.stringify(entry.stageScores));
+        if(!previous&&entry.version!==null)this.sql.exec('INSERT INTO ruti_house_score_details(id,version,completed_levels,stage_scores) VALUES(?,?,?,?)',entry.id,entry.version,entry.completedLevels,JSON.stringify(entry.stageScores));
         const rank=this.rows('SELECT count(*) AS n FROM ruti_house_scores s JOIN ruti_house_scores own ON own.id=? WHERE s.score>own.score OR (s.score=own.score AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id)))',entry.id)[0].n+1;
         return {saved:true,id:entry.id,rank,...this.run('game.ruti-house.scores')};
       }
