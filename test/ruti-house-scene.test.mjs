@@ -147,11 +147,11 @@ function renderRecord(game,options={},visual={}){
  return {written,strokes,fills};
 }
 
-test('all four plants remain identifiable by species, flowers, leaves and pot colors before any request',()=>{
+test('four plants retain distinct flower, leaf and pot artwork without species labels',()=>{
  const expected=['geranium','petunia','fern','pothos'];assert.deepEqual(PLANT_VARIETIES.map(p=>p.id),expected);
  for(const english of [false,true]){
   const r=renderRecord({level:1,tasks:[],inventory:{},kitchen:{}},{english});
-  for(const plant of PLANT_VARIETIES)assert.ok(r.written.some(t=>t.text===(english?plant.en:plant.he)),'every permanent pot has a readable species name');
+  for(const plant of PLANT_VARIETIES)assert.ok(!r.written.some(t=>t.text===plant.he||t.text===plant.en),'plant species names are not drawn on the game scene');
   for(const color of ['#d91f3b','#8f32d2','#55a641','#238f4c','#bd573f','#315cb2','#e7d3a4','#238c83'])assert.ok(r.fills.includes(color)||r.strokes.some(s=>s.color===color),`the distinct plant artwork includes ${color}`);
  }
 });
@@ -201,4 +201,26 @@ test('missed watering briefly wilts the correct pot and shows an explicit failur
  assert.ok(!expired.written.some(t=>t.text==='פספסתם'));
  const reduced=renderRecord(game,{reduced:true,english:true},{departures:[{type:'plant-missed',slot:2,age:.3,duration:1.8}]});
  assert.ok(reduced.written.some(t=>t.text==='Missed'),'failure remains explicit without animation');
+});
+
+
+test('Ruti’s transparent head keeps its natural outline, aspect ratio and neck connection while guest portraits retain their crop',()=>{
+ const ruti={complete:true,naturalWidth:300,naturalHeight:400},guest={complete:true,naturalWidth:600,naturalHeight:600};
+ const calls=[],clips=[],ellipses=[],gradient={addColorStop(){}};
+ let path=null;
+ const ctx=new Proxy({canvas:{width:1000,height:580},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},beginPath(){path=null;},ellipse(...args){path={kind:'ellipse',args};ellipses.push(args);},rect(...args){path={kind:'rect',args};},clip(){clips.push(path);},drawImage(...args){calls.push(args);}},{get:(target,key)=>key in target?target[key]:(()=>{})});
+ const game={level:1,tasks:[]};
+ renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,images:{ruti},reduced:true});
+ const head=calls.find(call=>call[0]===ruti);assert.ok(head,'the actual transparent sprite is rendered');
+ assert.equal(head.length,5,'the complete alpha image is drawn, without a round portrait crop');
+ const [,x,y,w,h]=head;
+ assert.ok(Math.abs(w/h-300/400)<1e-10,'the head is not stretched');
+ assert.ok(w<=56&&h<=62);assert.equal(x,-w/2);assert.equal(y+h,-62,'the neck meets the body shoulders instead of floating above them');
+ assert.ok(!clips.some(p=>p?.kind==='ellipse'),'Ruti is not put inside any circular mask');
+ assert.ok(!ellipses.some(a=>a[0]===0&&a[1]===-80&&a[2]===18&&a[3]===20),'no opaque oval sits behind the transparent head');
+ calls.length=0;clips.length=0;
+ const task={id:'guest',type:'guest',guest:'hila',door:0,total:50,remaining:45};
+ renderHouse(ctx,{level:5,tasks:[task]},{actor:{x:.4,y:.5}},{width:1000,height:580,images:{ruti,family:{hila:guest}},reduced:true});
+ assert.equal(calls.find(call=>call[0]===guest)?.length,9,'guest portrait source cropping is unchanged');
+ assert.ok(clips.some(p=>p?.kind==='ellipse'),'guest portraits retain their existing mask');
 });

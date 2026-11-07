@@ -1,4 +1,6 @@
 import {iconArtwork} from './ruti-house-art.mjs';
+import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=1';
+import {drawDustSignal} from './ruti-house-dust.mjs?v=1';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -18,9 +20,10 @@ function plantSignalGeometry(x,y,size,width){
 
 /** Images are immediately usable when loaded; ready never rejects for optional art. */
 export function createSceneAssets({family={}}={}){
- const images={ruti:null,icons:{},family:{}};const jobs=[];
+ const images={ruti:null,rutiAtlas:null,icons:{},family:{}};const jobs=[];
  function load(url,put){if(typeof Image==='undefined')return;const image=new Image();put(image);jobs.push(new Promise(resolve=>{image.onload=resolve;image.onerror=resolve;}));image.src=url;}
- load('assets/games/portraits/ruti.webp',image=>images.ruti=image);
+ load('assets/games/ruti-house/ruti-head-cutout-v1.png',image=>images.ruti=image);
+ load('assets/games/ruti-house/ruti-character-atlas-v1.webp',image=>images.rutiAtlas=image);
  for(const id of ICON_IDS)load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(iconArtwork(id)),image=>images.icons[id]=image);
  for(const [id,value] of Object.entries(family)){if(typeof value==='string')load(value,image=>images.family[id]=image);else if(value)images.family[id]=value;}
  images.ready=Promise.all(jobs).then(()=>images);return images;
@@ -252,7 +255,53 @@ function guestDeparturePosition(departure,layout,progress){
  return routePosition(cached.points,progress,layout.width,layout.height);
 }
 
-function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false}={}){
+function drawRuti(ctx,x,y,height,actor,images,time,reduced){
+ const pose=rutiPose(actor,time,{reduced}),atlas=images.rutiAtlas;
+ const cw=atlas.naturalWidth/RUTI_ATLAS.columns,ch=atlas.naturalHeight/RUTI_ATLAS.rows;
+ // Register each painted pose at the hips and soles; different arm positions
+ // never make the actor slide sideways or float above the floor.
+ const pivots=[197.5,165,162.5,105,165,154.5,183.5,167,197.5,179,172,168];
+ const orientations=[-1,1,1,1,1,1,-1,-1,-1,-1,-1,-1];
+ const size=height*362/345,scale=height/345,direction=(actor.facing<0?-1:1)*orientations[pose.frame];
+ ctx.save();ctx.translate(x,y);
+ ellipse(ctx,0,-1,height*.21,height*.045,'#4c382c35');
+ ctx.translate(0,-pose.lift);ctx.rotate(pose.lean);ctx.scale(direction,pose.breath);
+ ctx.drawImage(atlas,(pose.frame%4)*cw+.5,Math.floor(pose.frame/4)*ch+.5,cw-1,ch-1,-pivots[pose.frame]*scale,-355*scale,size,size);
+ // Action frames already hold their real object. While idle or walking the
+ // selected object stays in hand, including immediately after a tool switch.
+ if(![3,4,5,6,9,10].includes(pose.frame)&&actor.tool){
+  const walking=pose.frame===1||pose.frame===2,hx=height*(walking?.20:-.16),hy=-height*.57;
+  if(actor.tool==='broom'){
+   line(ctx,hx,hy-height*.13,hx,hy+height*.43,'#9e6d41',height*.026);
+   polygon(ctx,[[hx-height*.04,hy+height*.32],[hx+height*.04,hy+height*.32],[hx+height*.09,hy+height*.46],[hx-height*.09,hy+height*.46]],'#d3ae62','#8b6943');
+  }else if(actor.tool==='serve')icon(ctx,images,actor.carryDish||'serve',hx,hy,height*.27);
+  else icon(ctx,images,actor.tool,hx,hy,height*.25);
+ }
+ if(actor.action==='water'&&!reduced){
+  for(let i=0;i<7;i++){const t=(time*2.5+i/7)%1;ellipse(ctx,height*(.43+t*.13),height*(-.46+t*t*.35),height*.008,height*.017,'#6ccde3');}
+ }
+ ctx.restore();
+}
+
+function drawRutiSpeech(ctx,x,y,height,actor,time,width){
+ if(!actor.speechText||time>=(actor.speechUntil||0))return;
+ const fontSize=clamp(width*.025,11,14),padding=11,maxWidth=Math.min(210,width-18);
+ ctx.save();ctx.font=`700 ${fontSize}px system-ui,sans-serif`;
+ const words=actor.speechText.split(' '),lines=[];let current='';
+ for(const word of words){const next=current?`${current} ${word}`:word;if(current&&ctx.measureText(next).width>maxWidth-padding*2){lines.push(current);current=word;}else current=next;}
+ if(current)lines.push(current);
+ const w=Math.min(maxWidth,Math.max(90,...lines.map(text=>ctx.measureText(text).width))+padding*2),h=lines.length*(fontSize+4)+16;
+ const bx=clamp(x-w/2,7,width-w-7),by=Math.max(6,y-height-18-h);
+ ctx.shadowColor='#3b40372c';ctx.shadowBlur=8;
+ box(ctx,bx,by,w,h,'#fffdf3','#738568',10);ctx.shadowBlur=0;
+ const tailX=clamp(x,bx+15,bx+w-15);
+ polygon(ctx,[[tailX-6,by+h],[tailX+6,by+h],[x,Math.min(y-height+2,by+h+12)]],'#fffdf3','#738568');
+ lines.forEach((text,i)=>label(ctx,text,bx+w/2,by+13+i*(fontSize+4),{size:fontSize,color:'#36543e',halo:false,weight:'700'}));
+ ctx.restore();
+}
+
+function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false}={}){
+ if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced);return;}
  ctx.save();ctx.translate(x,y);const s=height/100;ctx.scale(s,s);ctx.lineCap='round';ctx.lineJoin='round';
  const cycle=walking?Math.sin(time*13):0,bob=walking?Math.abs(cycle)*2:Math.sin(time*1.8)*.4;
  ellipse(ctx,0,0,22,5,'#4c382c35');ctx.translate(0,-bob);
@@ -271,18 +320,29 @@ function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,faci
  else if(action){handX=direction*27;handY=-48+Math.sin(time*17)*4;}
  const armSwing=walking?cycle*7:0;
  line(ctx,-13,-60,-23-armSwing,-39,'#bc8a69',7);line(ctx,13*direction,-60,handX,handY,'#bc8a69',7);ellipse(ctx,handX,handY,4.5,4.5,'#d8a983');
- // Curly hair silhouette surrounds a recognizable round photograph.
- for(let i=0;i<11;i++){const a=Math.PI+i*Math.PI/10;ellipse(ctx,Math.cos(a)*17,-81+Math.sin(a)*18,7,7,guest?'#614b3d':'#60422f');}
- ellipse(ctx,0,-80,18,20,'#dab08b','#71513b');
- if(imageReady(portrait)){
-  ctx.save();ctx.beginPath();ctx.ellipse(0,-80,17,19,0,0,Math.PI*2);ctx.clip();
-  const iw=portrait.naturalWidth,ih=portrait.naturalHeight;ctx.drawImage(portrait,iw*.14,ih*.07,iw*.72,ih*.76,-20,-103,40,45);ctx.restore();
+ // Ruti uses a transparent head sprite, with her natural hair contour instead
+ // of a circular portrait frame. The neck joins the apron body's shoulders.
+ if(!guest&&imageReady(portrait)){
+  polygon(ctx,[[-7,-77],[7,-77],[7,-62],[-7,-62]],'#d5a27c');
+  polygon(ctx,[[-13,-66],[-5,-59],[0,-62],[5,-59],[13,-66]],'#f1dfb7','#c4aa85');
+  const iw=portrait.naturalWidth,ih=portrait.naturalHeight,headScale=Math.min(56/iw,62/ih);
+  const headW=iw*headScale,headH=ih*headScale;
+  ctx.drawImage(portrait,-headW/2,-62-headH,headW,headH);
  }else{
-  ellipse(ctx,-7,-82,2,2,'#574b3c');ellipse(ctx,7,-82,2,2,'#574b3c');
-  ctx.beginPath();ctx.arc(0,-75,7,.2,Math.PI-.2);ctx.strokeStyle='#a46858';ctx.lineWidth=1.7;ctx.stroke();
-  if(!guest){box(ctx,-15,-87,13,10,'#ffffff11','#665b4a',3);box(ctx,2,-87,13,10,'#ffffff11','#665b4a',3);line(ctx,-2,-83,2,-83,'#665b4a',1.5);}
+  // Guests retain their compact portrait treatment. A drawn head is also a
+  // graceful fallback if Ruti's optional sprite has not loaded yet.
+  for(let i=0;i<11;i++){const a=Math.PI+i*Math.PI/10;ellipse(ctx,Math.cos(a)*17,-81+Math.sin(a)*18,7,7,guest?'#614b3d':'#60422f');}
+  ellipse(ctx,0,-80,18,20,'#dab08b','#71513b');
+  if(imageReady(portrait)){
+   ctx.save();ctx.beginPath();ctx.ellipse(0,-80,17,19,0,0,Math.PI*2);ctx.clip();
+   const iw=portrait.naturalWidth,ih=portrait.naturalHeight;ctx.drawImage(portrait,iw*.14,ih*.07,iw*.72,ih*.76,-20,-103,40,45);ctx.restore();
+  }else{
+   ellipse(ctx,-7,-82,2,2,'#574b3c');ellipse(ctx,7,-82,2,2,'#574b3c');
+   ctx.beginPath();ctx.arc(0,-75,7,.2,Math.PI-.2);ctx.strokeStyle='#a46858';ctx.lineWidth=1.7;ctx.stroke();
+   if(!guest){box(ctx,-15,-87,13,10,'#ffffff11','#665b4a',3);box(ctx,2,-87,13,10,'#ffffff11','#665b4a',3);line(ctx,-2,-83,2,-83,'#665b4a',1.5);}
+  }
+  if(!guest){ellipse(ctx,-18,-77,1.8,2.2,'#dac184');ellipse(ctx,18,-77,1.8,2.2,'#dac184');}
  }
- if(!guest){ellipse(ctx,-18,-77,1.8,2.2,'#dac184');ellipse(ctx,18,-77,1.8,2.2,'#dac184');}
  if(tool||action){
   const active=action||tool;let px=handX+direction*8,py=handY+1;
   if(active==='broom'){
@@ -374,8 +434,6 @@ export function renderHouse(ctx,g,visual={},options={}){
   const p=l.plants[i],task=activePlants.get(i),missed=missedPlants.get(i),x=p.x*width,y=p.y*height,size=M*(l.portrait?.15:.12);
   if(task)drawPlantHalo(ctx,x,y,size,task,pulseTime,reduced);
   drawPlant(ctx,x,y,size,i,task?true:missed?'missed':false,pulseTime);
-  const plantName=english?PLANT_VARIETIES[i].en:PLANT_VARIETIES[i].he;
-  label(ctx,plantName,x,y+size*.66,{size:clamp(M*.022,9,12),color:'#254c36',weight:'800'});
   if(task)drawPlantSignal(ctx,x,y,size,task,{english,width});
   if(missed&&!task){
    const w=clamp(size*1.15,67,88),cx=clamp(x,w/2+4,width-w/2-4),by=y-size*.68;
@@ -405,7 +463,7 @@ export function renderHouse(ctx,g,visual={},options={}){
  const actors=[];
  for(const task of g?.tasks||[]){
   const p=getTaskLocation(task,l),x=p.x*width,y=p.y*height;
-  if(task.type==='dust'){halo(ctx,x,y,M*.046,pulseTime,'#d6b76b',!task.untimed&&task.remaining/task.total<.3);drawDust(ctx,x,y,M*.095,pulseTime,task.untimed?1:task.remaining);timer(ctx,x,y,M*.05,task);}
+  if(task.type==='dust')drawDustSignal(ctx,x,y,M*.095,task,pulseTime,{reduced,english,width});
   if(task.type==='guest')actors.push({y,draw:()=>{
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=task.untimed?1:clamp(task.total-task.remaining,0,1),guestX=x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=y+M*.04;
    halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',!task.untimed&&task.remaining/task.total<.25);
@@ -443,9 +501,11 @@ export function renderHouse(ctx,g,visual={},options={}){
   }
  }
  const actor=visual.actor||{...l.spawn};const actorX=(actor.x??l.spawn.x)*width,actorY=(actor.y??l.spawn.y)*height;
- actors.push({y:actorY,draw:()=>drawHuman(ctx,actorX,actorY,clamp(M*(l.portrait?.205:.19),l.portrait?66:76,l.portrait?84:102),{
-  portrait:images.ruti,time:pulseTime,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english})});
+ const actorHeight=clamp(M*(l.portrait?.28:.245),l.portrait?94:102,l.portrait?116:140);
+ actors.push({y:actorY,draw:()=>drawHuman(ctx,actorX,actorY,actorHeight,{
+  portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced})});
  actors.sort((a,b)=>a.y-b.y);for(const actor of actors)actor.draw();
+ drawRutiSpeech(ctx,actorX,actorY,actorHeight,actor,time,width);
  // Navigation destination marker remains part of the floor rather than a card.
  const destination=visual.destination||visual.targetPosition;
  if(destination&&actor.walking){const x=destination.x*width,y=destination.y*height;ctx.strokeStyle='#58785d';ctx.lineWidth=2;ctx.setLineDash([3,4]);ctx.beginPath();ctx.ellipse(x,y,M*.025,M*.012,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}

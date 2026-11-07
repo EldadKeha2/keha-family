@@ -6,7 +6,7 @@ export const HOUSE_LESSONS = Object.freeze({
     en: 'First, a little water for the plants',
     icons: ['water', 'broom'],
     steps: [
-      { he: 'בוחרים את המשפך במדף. רותי הולכת לקחת אותו.', en: 'Choose the watering can on the shelf. Ruti walks over to collect it.' },
+      { he: 'לוחצים על המשפך למטה והוא מופיע מיד ביד של רותי.', en: 'Tap the watering can below and it appears in Ruti’s hand instantly.' },
       { he: 'לוחצים על העציץ הזוהר, ורותי ניגשת להשקות.', en: 'Tap the glowing plant and Ruti walks over to water it.' },
       { he: 'בבית ארבעה עציצים שונים. משלימים 30 השקיות בסך הכול: מתחילים בנחת, ובהמשך מופיעים שעונים ובקשות חופפות. כשמופיע אבק, עוברים למטאטא.', en: 'There are four different plants. Complete 30 waterings in total: begin gently, then timers and overlapping requests appear. Switch to the broom when dust appears.' }
     ],
@@ -16,8 +16,8 @@ export const HOUSE_LESSONS = Object.freeze({
       { he: 'מטאטא', en: 'Broom' }
     ],
     correctIndex: 0,
-    successHe: 'בדיוק! לוקחים את המשפך וניגשים לעציץ.',
-    successEn: 'Exactly! Collect the watering can, then visit the plant.',
+    successHe: 'בדיוק! בוחרים במשפך ולוחצים על העציץ.',
+    successEn: 'Exactly! Select the watering can, then tap the plant.',
     retryHe: 'העציץ צריך מים. חפשו את המשפך ונסו שוב.',
     retryEn: 'The plant needs water. Look for the watering can and try again.'
   },
@@ -27,7 +27,7 @@ export const HOUSE_LESSONS = Object.freeze({
     icons: ['broom', 'dust', 'water'],
     steps: [
       { he: 'ממשיכים להשקות את העציצים כשהם זוהרים.', en: 'Keep watering the plants when they glow.' },
-      { he: 'כשמופיע אבק, לוקחים את המטאטא ולוחצים על ענן האבק.', en: 'When dust appears, collect the broom and tap the dust cloud.' },
+      { he: 'כשמופיע אבק, בוחרים מטאטא ולוחצים על ענן האבק. הכלי מתחלף מיד ביד.', en: 'When dust appears, select the broom and tap the dust cloud. The tool switches in hand instantly.' },
       { he: 'האבק לא מחכה לנצח. מחליפים כלי לפי המשימה ומגיעים בזמן.', en: 'Dust will not wait forever. Switch tools to match the task and arrive in time.' }
     ],
     question: { he: 'באיזה כלי מנקים אבק?', en: 'Which tool cleans the dust?' },
@@ -38,7 +38,7 @@ export const HOUSE_LESSONS = Object.freeze({
     correctIndex: 0,
     successHe: 'נכון! המטאטא מחזיר את הבית להיות מבריק.',
     successEn: 'Right! The broom makes the house sparkle again.',
-    retryHe: 'המשפך מיועד לעציצים. בשביל האבק לוקחים מטאטא.',
+    retryHe: 'המשפך מיועד לעציצים. בשביל האבק בוחרים מטאטא.',
     retryEn: 'The watering can is for plants. Dust needs the broom.'
   },
   3: {
@@ -50,7 +50,7 @@ export const HOUSE_LESSONS = Object.freeze({
       { he: 'כשרואים חתול, בוחרים את היד עם הכיתוב ״לכו מפה!״.', en: 'When a cat appears, choose the hand marked “Shoo!”.' },
       { he: 'לוחצים על החתול. רותי ניגשת ומבריחה אותו לפני שייכנס.', en: 'Tap the cat. Ruti walks over and shoos it away before it gets inside.' }
     ],
-    question: { he: 'מה לוקחים כדי להבריח חתול?', en: 'What do you collect to shoo a cat away?' },
+    question: { he: 'מה בוחרים כדי להבריח חתול?', en: 'What do you select to shoo a cat away?' },
     answers: [
       { he: 'היד של ״לכו מפה!״', en: 'The “Shoo!” hand' },
       { he: 'מגש אוכל', en: 'Serving tray' }
