@@ -332,8 +332,8 @@ test('level four explains Ora with the argument icon, requires both clicks, and 
   await f.acknowledge();assert.equal(f.nodes.get('[data-rh-tool="argue"]').disabled,true);
   let guard=0;while(!f.game.ora&&guard++<12000)completeEngineTask(f.game);assert.ok(f.game.ora);f.advance(100);
   const ora=f.game.ora,before=f.game.score;assert.equal(f.nodes.get('[data-rh-tool="argue"]').disabled,false);assert.equal(f.nodes.get('[data-rh-tool="argue"]').classList.contains('rh-ora-ready'),true);
-  await f.act(ora.id);assert.equal(f.game.stats.oraWins,0);await f.choose('argue');await f.act(ora.id);
-  assert.equal(f.game.phase,'ora-bonus');assert.equal(f.game.score-before,5000);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/won the argument with Ora/:/ניצחת את אורה בוויכוח/);
+  await f.act(ora.id);assert.equal(f.game.stats.oraWins,0);await f.choose('argue');assert.equal(f.game.score,before);assert.equal(f.game.ora,ora);await f.act(ora.id);
+  assert.equal(f.game.phase,'ora-bonus');assert.equal(f.game.score-before,5000);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/Well done!/:/כל הכבוד!/);
   const elapsed=f.game.elapsed,deadlines=JSON.stringify(f.game.tasks);f.advance(2000);assert.equal(f.game.elapsed,elapsed);assert.equal(JSON.stringify(f.game.tasks),deadlines);
   await f.click('[data-rh-pause]');const remaining=f.game.oraBonusRemaining;f.advance(60000);assert.equal(f.game.oraBonusRemaining,remaining);await f.click('[data-rh-pause]');
   f.until(()=>f.game.phase==='playing',5000);assert.equal(f.game.stats.oraWins,1);assert.equal(f.nodes.get('[data-rh-overlay]').hidden,true);
@@ -349,15 +349,15 @@ test('remaining lives use Ruti heads first and cat symbols from level three, wit
  }
 });
 
-test('the upper task summary shows only successful per-type counts, conceals the target and resets each level',async()=>{
- const f=fixture();await f.start();assert.match(f.html,/מטלות שבוצעו/);assert.doesNotMatch(f.html,/\/ 30|30 מטלות|30 השקיות/);
+test('the upper summary pairs completed and missed totals, details successes only and resets each level',async()=>{
+ const f=fixture();await f.start();assert.match(f.html,/מטלות שבוצעו/);assert.match(f.html,/לא בוצעו/);assert.equal(f.nodes.get('[data-rh-missed]').textContent,'0');assert.doesNotMatch(f.html,/\/ 30|30 מטלות|30 השקיות/);
  const tally=()=>[...f.nodes.get('[data-rh-task-tallies]').innerHTML.matchAll(/data-rh-task-count="([^"]+)">(\d+)</g)].map(m=>[m[1],Number(m[2])]);
  assert.deepEqual(tally(),[['plants',0],['dust',0]]);
  await performTask(f,f.game.tasks[0]);f.until(()=>f.game.stageCompleted===1);f.advance(150);
  assert.equal(f.nodes.get('[data-rh-progress]').textContent,'1');assert.deepEqual(tally(),[['plants',1],['dust',0]]);
- f.until(()=>f.game.tasks.length>0);const task=f.game.tasks[0];task.untimed=false;task.remaining=.01;f.advance(200);assert.ok(f.game.stats.missed>0);assert.deepEqual(tally(),[['plants',1],['dust',0]]);
- let guard=0;while(f.game.phase==='playing'&&guard++<12000)completeEngineTask(f.game);f.advance(150);assert.equal(f.game.stageResolved,30);assert.equal(f.game.stageCompleted,29);assert.equal(tally().reduce((a,[,b])=>a+b,0),29);
- await f.click('[data-rh-next]');assert.equal(f.game.level,2);assert.equal(f.nodes.get('[data-rh-progress]').textContent,'0');assert.deepEqual(tally(),[['plants',0],['dust',0]]);
+ f.until(()=>f.game.tasks.length>0);const task=f.game.tasks[0];task.untimed=false;task.remaining=.01;f.advance(200);assert.ok(f.game.stats.missed>0);assert.equal(f.nodes.get('[data-rh-missed]').textContent,'1');assert.deepEqual(tally(),[['plants',1],['dust',0]]);
+ let guard=0;while(f.game.phase==='playing'&&guard++<12000)completeEngineTask(f.game);f.advance(150);assert.equal(f.game.stageResolved,30);assert.equal(f.game.stageCompleted,29);assert.equal(f.nodes.get('[data-rh-missed]').textContent,'1');assert.equal(tally().reduce((a,[,b])=>a+b,0),29);
+ await f.click('[data-rh-next]');assert.equal(f.game.level,2);assert.equal(f.nodes.get('[data-rh-progress]').textContent,'0');assert.equal(f.nodes.get('[data-rh-missed]').textContent,'0');assert.deepEqual(tally(),[['plants',0],['dust',0]]);
 });
 
 test('tool slots and success tally slots stay fixed while only newly relevant icons appear',async()=>{
@@ -376,4 +376,17 @@ test('advanced visitors require the correct refreshment through the ordinary too
  const f=fixture({startLevel:11});await f.start();const visitor={id:'visitor-qa',type:'guest',guest:'visitor-hila',food:'peanuts',door:1,slot:1,total:28,remaining:28,createdAt:f.game.elapsed};
  f.game.tasks=[visitor];f.game.stageIssued++;f.window.test.render();await f.choose('serve');await f.act(visitor.id);assert.equal(f.state.motion.busy,false);assert.ok(f.game.tasks.includes(visitor));assert.ok(f.sounds.includes('wrong'));assert.equal(toast(f),'','late levels do not reveal the correct food in text');
  const before=f.game.stats.snacks;await f.choose('peanuts');await f.act(visitor.id);assert.equal(f.state.motion.busy,true);f.until(()=>f.game.stats.snacks===before+1);assert.equal(f.actor.carryDish,null);assert.ok(!f.game.tasks.includes(visitor));
+});
+
+
+test('briefings introduce Ora only at level four and describe guest serving without arrival rules',()=>{
+ const lesson=HOUSE_LESSONS[4];assert.equal(lesson.steps.length,3);
+ for(const language of ['he','en']){
+  const words=lesson.steps.map(s=>s[language]).join(' ');
+  assert.match(words,language==='he'?/5,000 נקודות/:/5,000 points/);
+  assert.match(words,language==='he'?/קודם.*סמל.*ואז.*אורה עצמה/:/first.*icon.*then tap Ora herself/);
+  assert.doesNotMatch(words,/5 שניות|five.second|בהמשך|later|tenth|עשירית|פעם אחת/);
+  for(const [level,later] of Object.entries(HOUSE_LESSONS))if(Number(level)>4)assert.doesNotMatch(JSON.stringify(later),/אורה|Ora/);
+  assert.doesNotMatch(HOUSE_LESSONS[6].steps.map(s=>s[language]).join(' '),/15|seconds|שניות|after|אחרי/);
+ }
 });

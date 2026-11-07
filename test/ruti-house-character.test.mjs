@@ -143,10 +143,11 @@ test('repeated-action captions can disappear without suppressing the voice or ex
  f.utterances[1].onstart();assert.equal(f.actor.speaking,true);
 });
 
-test('celebration sings through changing head poses while the real broom body remains fixed',()=>{
+test('celebration articulates the mouth while the original broom head and body remain connected',()=>{
  const actor={celebrating:true,celebrationStartedAt:10};
  const poses=[10.01,10.09,10.2,10.27].map(time=>rutiPose(actor,time));
- assert.ok(poses.every(pose=>pose.frame===4));
+ assert.ok(poses.every(pose=>pose.frame===4&&pose.headTilt===0&&pose.headLift===0));
+ assert.ok(poses.some(pose=>pose.mouthOpen>.5));assert.equal(rutiPose(actor,10.2,{reduced:true}).mouthOpen,0);
  assert.deepEqual(new Set(poses.map(pose=>pose.headFrame)),new Set([0,7,8]));
  assert.equal(rutiPose(actor,12.3).singing,false,'the phrase has a visible breathing rest');
  assert.equal(rutiPose(actor,14.49).singing,true,'a fresh phrase continues after the rest');

@@ -12,7 +12,7 @@ export const TOOLS=Object.freeze([
   {id:'water',he:'משפך',en:'Watering can',emoji:'🚿'},
   {id:'broom',he:'מטאטא',en:'Broom',emoji:'🧹'},
   {id:'hand',he:'לכו מפה',en:'Shoo!',emoji:'✋'},
-  {id:'argue',he:'ויכוח עם אורה',en:'Argue with Ora',emoji:'🗣️'},
+  {id:'argue',he:'ויכוח',en:'Argument',emoji:'🗣️'},
   {id:'serve',he:'אוכל',en:'Food',emoji:'🍽️'},
   {id:'peanuts',he:'בוטנים',en:'Peanuts',emoji:'🥜'}
 ].map(Object.freeze));

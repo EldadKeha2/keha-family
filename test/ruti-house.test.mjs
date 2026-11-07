@@ -216,7 +216,7 @@ test('Ora starts after ten or more tasks in level four, appears once per level a
 test('Ora requires icon then head, pays exactly 5000 once, and freezes all household clocks during the five-second countdown',()=>{
  const g=atStage(4),ora=findOra(g),before=g.score,stageScore=g.stageScores[3],progress=g.stageCompleted;
  selectTool(g,'water');assert.equal(actHouse(g,ora.id).ok,false);assert.equal(g.score,before);
- selectTool(g,'argue');const result=actHouse(g,ora.id);assert.equal(result.points,5000);assert.equal(g.score-before,5000);assert.equal(g.stageScores[3]-stageScore,5000);assert.equal(g.stats.oraWins,1);assert.equal(g.stageCompleted,progress+1);assert.equal(g.stageStats.oraWins,1);assert.equal(g.phase,'ora-bonus');
+ selectTool(g,'argue');assert.equal(g.score,before,'choosing the icon alone earns no points');assert.equal(g.ora,ora);const result=actHouse(g,ora.id);assert.equal(result.points,5000);assert.equal(g.score-before,5000);assert.equal(g.stageScores[3]-stageScore,5000);assert.equal(g.stats.oraWins,1);assert.equal(g.stageCompleted,progress+1);assert.equal(g.stageStats.oraWins,1);assert.equal(g.phase,'ora-bonus');
  const clocks=JSON.stringify({elapsed:g.elapsed,stageElapsed:g.stageElapsed,tasks:g.tasks,combo:g.comboRemaining});
  advanceHouse(g,2);assert.equal(g.oraBonusRemaining,3);assert.equal(actHouse(g,ora.id),null);
  advanceHouse(g,2.99);assert.equal(g.phase,'ora-bonus');assert.equal(g.oraBonusRemaining,.01);

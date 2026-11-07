@@ -29,7 +29,7 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
  else if(time<(actor.expressionUntil??0))frame=actor.expression==='cheer'?9:actor.expression==='concern'?10:0;
  else if(blinking)frame=11;
  const cycle=reduced?0:Math.sin(time*(walking?12:1.9));
- // Music can supply its beat duration. Head articulation and the right/left
+ // Music can supply its beat duration. Mouth articulation and the right/left
  // Yemenite step share that beat while the real broom stays in her hands.
  const beatSeconds=Number.isFinite(actor.celebrationBeatSeconds)&&actor.celebrationBeatSeconds>0?Math.max(.18,Math.min(1.2,actor.celebrationBeatSeconds)):.3;
  const songAge=Math.max(0,time-(actor.celebrationStartedAt??0)),songPosition=songAge/beatSeconds,songBeat=Math.floor(songPosition),songPart=songPosition%1;
@@ -46,13 +46,14 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
  const singing=celebrating&&(songBeat%8!==7||heldNote);
  const headFrame=!celebrating?frame:reduced?0:blinking?11:!singing?0:heldNote?8:songPart<.09||songPart>.82?0:songPart<.53?7:8;
  return {frame,headFrame,singing,danceStep,danceSide,
+  mouthOpen:dancing&&singing&&headFrame!==11?Math.sin(Math.PI*Math.min(1,songPart/.86)):0,
   danceX:dancing?blend(weight):0,danceDepth:dancing?blend(depth):0,
   footLeftX:dancing&&!activeRight?footShift:0,footRightX:dancing&&activeRight?footShift:0,
   footLeftLift:dancing&&!activeRight?pulse*.015:0,footRightLift:dancing&&activeRight?pulse*.015:0,
   lift:reduced?0:celebrating?pulse*1.5:walking?Math.abs(cycle)*1.8:accent*.45,
   lean:reduced?0:celebrating?blend(weight)*1.1:action==='broom'?Math.sin(time*10)*.028:action==='hand'?Math.sin(time*14)*.025:cycle*.008+(talking?Math.sin(speechAge*3.1)*.009+accent*.006:0),
   breath:reduced?1:1+Math.sin(time*1.9)*.006+(celebrating?pulse*.002:0),talking,
-  headTilt:reduced?0:(celebrating?Math.sin(songPosition*Math.PI*.5)*.008:talking?Math.sin(speechAge*3.1)*.008+accent*.004:Math.sin(time*.83)*.004),
+  headTilt:reduced||celebrating?0:(talking?Math.sin(speechAge*3.1)*.008+accent*.004:Math.sin(time*.83)*.004),
   headLift:reduced?0:(celebrating?0:talking?accent*.0025:Math.sin(time*1.9)*.0008)};
 }
 

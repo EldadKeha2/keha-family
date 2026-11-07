@@ -61,17 +61,17 @@
 @media(max-width:700px){.rh-life-symbol{width:21px;height:27px}.rh-lives [data-rh-strikes]{gap:3px;min-height:28px}.rh-ora-bonus p{font-size:22px}}
 @media(prefers-reduced-motion:reduce){.rh-ora-ready .rh-tool-art{animation:none}}
 
-/* Success-only summary: the target stays out of the player interface. */
+/* Stage totals share one row; the icons detail successes only. */
 .rh-task-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none;padding:7px 14px;background:#f9f3df;color:#365c47;border-inline:1px solid #b6a27d;border-bottom:1px solid #d8c9a6;direction:rtl}
-.ruti-house[dir=ltr] .rh-task-summary{direction:ltr}.rh-task-summary>strong{display:flex;align-items:center;gap:10px;font-size:12px;line-height:1.35}.rh-task-summary>strong>b{font-size:25px;font-variant-numeric:tabular-nums}
+.ruti-house[dir=ltr] .rh-task-summary{direction:ltr}.rh-task-counts{display:flex;align-items:center;gap:20px;min-width:0}.rh-task-counts>strong{display:flex;align-items:center;gap:10px;font-size:12px;line-height:1.35;white-space:nowrap}.rh-task-counts>strong>b{font-size:25px;font-variant-numeric:tabular-nums}.rh-task-missed{color:#815b42}
 .rh-task-tallies{display:flex;align-items:center;justify-content:flex-end;gap:12px}.rh-task-tally{display:flex;align-items:center;gap:4px}.rh-task-tally>span{display:block;width:29px;height:29px}.rh-task-tally svg{display:block;width:100%;height:100%}.rh-task-tally>b{font-size:17px;font-variant-numeric:tabular-nums;min-width:16px;text-align:center}
 .rh-objective-quiet{display:none!important}
-@media(max-width:700px){.rh-task-summary{padding:5px 8px;gap:6px}.rh-task-summary>strong{font-size:10px;gap:6px;max-width:95px}.rh-task-summary>strong>b{font-size:22px}.rh-task-tallies{gap:7px}.rh-task-tally{flex-direction:column;gap:0}.rh-task-tally>span{width:23px;height:23px}.rh-task-tally>b{font-size:12px;line-height:1.1}}
+@media(max-width:700px){.rh-task-summary{padding:5px 8px;gap:6px;flex-wrap:wrap}.rh-task-counts{flex:1 1 100%;justify-content:space-between;gap:12px}.rh-task-counts>strong{font-size:11px;gap:6px}.rh-task-counts>strong>b{font-size:22px}.rh-task-tallies{gap:7px;margin-inline-start:auto}.rh-task-tally{flex-direction:column;gap:0}.rh-task-tally>span{width:23px;height:23px}.rh-task-tally>b{font-size:12px;line-height:1.1}}
 
 /* Fixed positions reserve room for each tool without revealing future icons. */
 .rh-tool-slot{display:block;pointer-events:none}.rh-task-tallies{display:grid;grid-template-columns:repeat(6,45px);gap:6px}.rh-tally-slot{display:block}.rh-task-tally{justify-content:center}
 .rh-quiet .rh-level>span{font-size:12px}.rh-quiet .rh-level>span:before{content:none}
 @media(max-width:700px){.rh-active .rh-tools{gap:2px}.rh-active .rh-tool-art{width:39px;height:39px}.rh-active .rh-tool strong{font-size:9px}.rh-task-tallies{grid-template-columns:repeat(6,25px);gap:3px}.rh-quiet .rh-level>span{font-size:10px}}
-@media(max-width:359px){.rh-active .rh-tools{gap:1px}.rh-active .rh-tool-art{width:34px;height:34px}.rh-task-summary>strong{max-width:80px}.rh-task-tallies{gap:2px}}
+@media(max-width:359px){.rh-active .rh-tools{gap:1px}.rh-active .rh-tool-art{width:34px;height:34px}.rh-task-tallies{gap:2px}}
 
 .ruti-house,.ruti-house *{box-sizing:border-box}

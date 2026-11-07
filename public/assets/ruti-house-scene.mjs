@@ -1,5 +1,5 @@
 import {iconArtwork} from './ruti-house-art.mjs?v=4';
-import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=4';
+import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=5';
 import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
 import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=9';
 
@@ -290,12 +290,6 @@ const RUTI_PIVOTS=[197.5,165,162.5,105,165,154.5,183.5,167,197.5,179,172,168];
 const RUTI_NECKLINES=[106,106,106,110,108,108,110,108,108,110,108,110];
 const RUTI_ORIENTATIONS=[-1,1,1,1,1,1,-1,-1,-1,-1,-1,-1];
 const RUTI_BODY_WIDTH=.91;
-// Speech poses share Ruti's face but use different registration and direction.
-// Neck anchors align their original, unstretched head pixels to the broom body.
-const RUTI_SPEECH_HEADS={
- 0:{x:169,w:111,neckX:214,neckY:101},7:{x:137,w:114,neckX:180,neckY:101},
- 8:{x:166,w:115,neckX:211,neckY:101},11:{x:143,w:109,neckX:181,neckY:101}
-};
 function drawRutiFrame(ctx,atlas,frame,height,pose){
  const cw=atlas.naturalWidth/RUTI_ATLAS.columns,ch=atlas.naturalHeight/RUTI_ATLAS.rows;
  const sx=(frame%4)*cw+.5,sy=Math.floor(frame/4)*ch+.5,scale=height/345;
@@ -309,42 +303,36 @@ function drawRutiFrame(ctx,atlas,frame,height,pose){
   ctx.drawImage(atlas,sx+left/362*(cw-1),sy+from/362*(ch-1),(right-left)/362*(cw-1),(to-from)/362*(ch-1),
    (left-pivot)*scale*narrow,(from-355)*scale,(right-left)*scale*narrow,(to-from)*scale);
  }
+ if(frame===4){
+  // One original image contains the head, neck, collar, shoulders and hands.
+  // They share both scale and motion: singing never swaps in another head or
+  // places a seam through the neck. Only the grounded feet take separate steps.
+  strip(0,310,1);
+  if(pose.mouthOpen>.12){
+   // Animate only the mouth inside the original face; hair, jaw and neckline
+   // remain the same unbroken artwork throughout the song.
+   const openness=pose.mouthOpen,round=pose.headFrame===8;
+   ctx.save();ctx.translate((223-pivot)*scale,(82-355)*scale);ctx.rotate(.48);ctx.scale(scale,scale);
+   ctx.beginPath();ctx.ellipse(0,0,round?4.5:7,1+openness*3,0,0,Math.PI*2);ctx.fillStyle='#69392e';ctx.fill();
+   ctx.strokeStyle='#a86648';ctx.lineWidth=.7;ctx.stroke();ctx.clip();
+   ctx.fillStyle='#f4e7cb';ctx.fillRect(-7,-4,14,3.3);
+   ctx.beginPath();ctx.ellipse(0,3.2,4.5,1.7,0,0,Math.PI*2);ctx.fillStyle='#b97061';ctx.fill();ctx.restore();
+  }
+  ctx.save();ctx.translate((pose.footLeftX||0)*height,-(pose.footLeftLift||0)*height);
+  strip(309.25,362,1,{left:0,right:130});ctx.restore();
+  ctx.save();ctx.translate((pose.footRightX||0)*height,-(pose.footRightLift||0)*height);
+  strip(309.25,362,1,{left:130,right:205});ctx.restore();
+  strip(309.25,362,1,{left:205,right:362});
+  return;
+ }
  ctx.save();const neckY=(neck-355)*scale;
  ctx.translate(0,neckY);ctx.rotate(pose.headTilt||0);ctx.translate(0,-neckY+(pose.headLift||0)*height);
- const speechHead=frame===4?RUTI_SPEECH_HEADS[pose.headFrame]:null;
- if(speechHead){
-  // Keep the leaning shoulders and arms, but exclude the original broom
-  // head silhouette so the animated head can never produce a double face.
-  ctx.save();ctx.beginPath();ctx.rect(-pivot*scale,-355*scale,362*scale,(neck+13)*scale);
-  for(const [i,[hx,hy]] of [[155,0],[280,0],[280,109],[210,109],[180,102],[164,87],[155,70]].entries()){
-   const px=(hx-pivot)*scale,py=(hy-355)*scale;i?ctx.lineTo(px,py):ctx.moveTo(px,py);
-  }
-  ctx.closePath();ctx.clip('evenodd');strip(0,neck+12,1);ctx.restore();
-  ctx.save();ctx.translate((198-pivot)*scale,(105-355)*scale);ctx.scale(-1,1);
-  const headX=(pose.headFrame%4)*cw+.5+speechHead.x/362*(cw-1),headY=Math.floor(pose.headFrame/4)*ch+.5;
-  ctx.beginPath();
-  for(const [i,[hx,hy]] of [[speechHead.x,0],[speechHead.x+speechHead.w,0],[speechHead.x+speechHead.w,90],[speechHead.neckX+27,98],[speechHead.neckX+18,109],[speechHead.neckX+13,123],[speechHead.neckX-13,123],[speechHead.neckX-18,109],[speechHead.neckX-25,96],[speechHead.x,90]].entries()){
-   const px=(hx-speechHead.neckX)*scale,py=(hy-speechHead.neckY)*scale;i?ctx.lineTo(px,py):ctx.moveTo(px,py);
-  }
-  ctx.closePath();ctx.clip();
-  ctx.drawImage(atlas,headX,headY,speechHead.w/362*(cw-1),124/362*(ch-1),
-   (speechHead.x-speechHead.neckX)*scale,-speechHead.neckY*scale,speechHead.w*scale,124*scale);
-  ctx.restore();
- }else strip(0,neck,1);
+ strip(0,neck,1);
  ctx.restore();
  for(let i=0;i<6;i++){const top=neck+i*6;strip(top,top+6,1-(1-RUTI_BODY_WIDTH)*(i+.5)/6);}
  const bodyTop=neck+36;
  if(frame===3){strip(bodyTop,190,RUTI_BODY_WIDTH);strip(190,362,RUTI_BODY_WIDTH);}
- else if(frame===4&&speechHead){
-  // Three weight transfers and a held beat alternate the grounded feet. The
-  // broom bristles stay attached to their shaft while each foot takes its step.
-  strip(bodyTop,310,RUTI_BODY_WIDTH);
-  ctx.save();ctx.translate((pose.footLeftX||0)*height,-(pose.footLeftLift||0)*height);
-  strip(309.25,362,RUTI_BODY_WIDTH,{left:0,right:130});ctx.restore();
-  ctx.save();ctx.translate((pose.footRightX||0)*height,-(pose.footRightLift||0)*height);
-  strip(309.25,362,RUTI_BODY_WIDTH,{left:130,right:205});ctx.restore();
-  strip(309.25,362,RUTI_BODY_WIDTH,{left:205,right:362});
- }else strip(bodyTop,362,RUTI_BODY_WIDTH);
+ else strip(bodyTop,362,RUTI_BODY_WIDTH);
 }
 
 /** World-pixel geometry keeps the nozzle and stream aimed at the actual pot. */

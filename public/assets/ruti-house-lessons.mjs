@@ -45,10 +45,9 @@ export const HOUSE_LESSONS = Object.freeze({
   4: {
     he:'אורה נכנסת לוויכוח',en:'Ora joins the argument',icons:['argue'],
     steps:[
-      {he:'כל מטלה שהסתיימה מקדמת את השלב, גם אם פספסנו אותה. הסמלים למעלה מסכמים השקיות, ניקוי, חתולים, אירוח והצלחות מול אורה.',en:'Every resolved task advances the level, including missed tasks. The icons above summarize watering, sweeping, cats, guests and wins against Ora.'},
-      {he:'אחרי המטלה העשירית הראש של אורה יופיע בזמן אקראי, פעם אחת בכל שלב.',en:'After the tenth task, Ora’s head appears at a random point, once per level.'},
-      {he:'מהר! לוחצים על סמל האיש שמתווכח ואז על הראש של אורה לפני שהיא נעלמת. הסמל נדלק רק כשהיא מופיעה.',en:'Quick! Tap the arguing-person icon, then Ora’s head before she disappears. The icon lights up only while she is here.'},
-      {he:'ניצחון מזכה ב־5,000 נקודות ועוצר את המשחק להודעה של 5 שניות. בשלב הזה יש יותר זמן לתפוס אותה; בהמשך החלון מתקצר.',en:'Win 5,000 points and pause for a five-second message. This level gives you more time to catch her; later windows get shorter.'}
+      {he:'כל מטלה שהסתיימה מקדמת את השלב, גם אם פספסנו אותה. למעלה רואים כמה מטלות בוצעו וכמה לא בוצעו, ולצדן סמלים של המטלות שבוצעו.',en:'Every resolved task advances the level, including missed tasks. The top row shows how many tasks were completed and how many were missed, alongside icons for completed tasks.'},
+      {he:'מעכשיו אורה עשויה להופיע בבית. סמל האיש שמתווכח נדלק כשהיא מופיעה.',en:'From now on, Ora may appear in the house. The arguing-person icon lights up when she appears.'},
+      {he:'כדי לזכות ב־5,000 נקודות, לוחצים קודם על סמל האיש שמתווכח, ואז על אורה עצמה לפני שהיא נעלמת.',en:'To earn 5,000 points, first tap the arguing-person icon, then tap Ora herself before she disappears.'}
     ],
     question:{he:'איך מנצחים את אורה בוויכוח?',en:'How do you win the argument with Ora?'},
     answers:[{he:'סמל האיש שמתווכח, ואז הראש של אורה',en:'Arguing-person icon, then Ora’s head'},{he:'משפך, ואז אורה',en:'Watering can, then Ora'}],correctIndex:0,
@@ -60,7 +59,7 @@ export const HOUSE_LESSONS = Object.freeze({
     en: 'Someone has come for a meal',
     icons: ['serve', 'water', 'broom'],
     steps: [
-      { he: 'רועי, הילה, ריוי וליהי מגיעים מדי פעם, רק אחרי שעוברות לפחות 15 שניות מתחילת השלב. בוחרים בסמל האוכל במדף.', en: 'Roei, Hila, Rivi and Lihi visit occasionally, only after at least 15 seconds of the level. Choose the Food icon on the shelf.' },
+      { he: 'רועי, הילה, ריוי וליהי באים להתארח. בוחרים בסמל האוכל במדף.', en: 'Roei, Hila, Rivi and Lihi come to visit. Choose the Food icon on the shelf.' },
       { he: 'לוחצים על האורח. רותי ניגשת ומגישה לו אחד ממטעמי הבית.', en: 'Tap the guest. Ruti walks over and serves one of her homemade treats.' },
       { he: 'אין צורך לבחור מנה או להכין מתכון. ממשיכים לדאוג גם לבית.', en: 'There is no dish selection or recipe to prepare. Keep caring for the house too.' }
     ],
@@ -80,7 +79,7 @@ export const HOUSE_LESSONS = Object.freeze({
     en: 'A house full of family',
     icons: ['serve', 'water', 'broom', 'hand'],
     steps: [
-      { he: 'ממשיכים עם משפך, מטאטא, יד ואוכל. כשאורה מופיעה, עוברים לסמל הוויכוח.', en: 'Keep using the watering can, broom, hand and Food. Switch to the argument icon when Ora appears.' },
+      { he: 'ממשיכים עם משפך, מטאטא, יד ואוכל.', en: 'Keep using the watering can, broom, hand and Food.' },
       { he: 'הבית נעשה עמוס יותר. שמים לב לטיפות, לשעונים ולדלתות.', en: 'The house gets busier. Watch the water drops, timers and doors.' },
       { he: 'אורח מקבל אוכל בלחיצה אחת אחרי שבוחרים בסמל האוכל.', en: 'A guest receives a meal with one tap after you choose the Food icon.' }
     ],

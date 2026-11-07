@@ -242,21 +242,18 @@ test('watering faces and lands on every physical pot even if the last walking st
  }
 });
 
-test('the enlarged broom dancer preserves full-width head art and narrows only the connected body',()=>{
+test('the dancer draws her head, neck and shoulders in one continuous original pose at every size',()=>{
  const atlas={complete:true,naturalWidth:1448,naturalHeight:1086},calls=[],numbers=[],gradient={addColorStop(){}};
  const ctx=new Proxy({createRadialGradient(){return gradient;},drawImage(...args){calls.push(args);}}, {get:(target,key)=>key in target?target[key]:(...args)=>numbers.push(...args.filter(x=>typeof x==='number'))});
- for(const [width,height] of sizes){
-  calls.length=0;drawRutiCelebration(ctx,{width,height,time:2,progress:.6,reduced:true,images:{rutiAtlas:atlas},actor:{}});
-  assert.ok(calls.length>=8,'the head, neck and connected body are drawn from the same atlas pose');
-  const head=calls[0],body=calls.at(-1);
-  assert.equal(head[1],.5,'the dancer uses the original broom pose in column one');
-  assert.equal(head[2],362.5,'the dancer uses the original broom pose in row two');
-  const headScale=head[7]/head[3],bodyScale=body[7]/body[3];
-  assert.ok(Math.abs(bodyScale/headScale-.91)<1e-10,'only the body becomes slightly narrower');
-  assert.ok(head[8]>0&&body[8]>0);assert.ok(numbers.every(Number.isFinite));
+ for(const [width,height] of sizes)for(const reduced of [false,true])for(const time of [.02,.11,.20,3.43]){
+  calls.length=0;drawRutiCelebration(ctx,{width,height,time,progress:.6,reduced,images:{rutiAtlas:atlas},actor:{}});
+  assert.equal(calls.length,4,'one continuous upper body and three strips for stepping feet and grounded broom');
+  const body=calls[0];assert.equal(body[1],.5);assert.equal(body[2],362.5);
+  assert.ok(body[3]>360&&body[4]>309,'the entire head, neck, collar, shoulders, hands and upper body come from the same image');
+  for(const call of calls){assert.equal(call[0],atlas);assert.ok(Math.abs(call[7]/call[3]-call[8]/call[4])<1e-10,'head and body share their natural scale');}
+  assert.ok(numbers.every(Number.isFinite));
  }
 });
-
 
 test('the large main entrance and smaller back door are visually distinct before any tasks begin',()=>{
  for(const [width,height] of sizes){
@@ -289,19 +286,17 @@ test('Hebrew labels and speech use RTL punctuation while English remains LTR',()
  }
 });
 
-test('singing composites alternate original heads while retaining the same narrowed broom body',()=>{
+test('singing never substitutes a detached speech head or changes the neck and shoulders',()=>{
  const atlas={complete:true,naturalWidth:1448,naturalHeight:1086},calls=[],gradient={addColorStop(){}};
  const ctx=new Proxy({createRadialGradient(){return gradient;},drawImage(...args){calls.push(args);}}, {get:(target,key)=>key in target?target[key]:(()=>{})});
- const heads=new Set(),bodies=[];
+ const upperBodies=[];
  for(const time of [.02,.11,.20,3.43]){
   calls.length=0;drawRutiCelebration(ctx,{width:390,height:570,time,images:{rutiAtlas:atlas},actor:{celebrationStartedAt:0}});
-  const head=calls.find(call=>call[3]<150&&call[4]<130);assert.ok(head,'the face is a separate original atlas crop');
-  heads.add(`${head[1]}:${head[2]}`);bodies.push(calls.at(-1).slice(1,5));
+  upperBodies.push(calls[0].slice(1));
+  assert.ok(calls.every(call=>call[2]>=362&&call[2]+call[4]<=725),'every body pixel stays in the original broom pose');
  }
- assert.ok(heads.size>=3,'open, closed, rounded mouths or blinks vary during the song');
- assert.ok(bodies.every(body=>JSON.stringify(body)===JSON.stringify(bodies[0])),'the same broom and body remain connected throughout singing');
+ assert.ok(upperBodies.every(body=>JSON.stringify(body)===JSON.stringify(upperBodies[0])));
 });
-
 
 test('learned plant and dust words stop at half of stage one without relying on caller flags',()=>{
  const tasks=[{id:'plant',type:'plant',slot:0},{id:'dust',type:'dust',position:{x:.25,y:.6}},{id:'cat',type:'cat',door:1,waiting:2}].map(task=>({...task,total:20,remaining:16}));
