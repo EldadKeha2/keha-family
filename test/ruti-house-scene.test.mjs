@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {RECIPES} from '../public/assets/ruti-house-engine.mjs';
-import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse} from '../public/assets/ruti-house-scene.mjs';
+import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse,getRutiWateringGeometry,drawRutiCelebration} from '../public/assets/ruti-house-scene.mjs';
 
 const sizes=[[1000,580],[390,570],[320,500]];
 const inside=(point,obstacle,margin=0)=>point.x>obstacle.x-margin&&point.x<obstacle.x+obstacle.w+margin&&point.y>obstacle.y-margin&&point.y<obstacle.y+obstacle.h+margin;
@@ -123,13 +123,13 @@ test('served guests thank Ruti while entering; retreating and entering cats rend
  assert.ok(!written.includes('תודה רותי!'),'a completed departure disappears');
 });
 
-test('untimed practice targets use infinity without deadline arcs, urgency or an approaching cat',()=>{
+test('untimed practice targets omit timer labels and deadline arcs without an approaching cat',()=>{
  const written=[],strokes=[];const gradient={addColorStop(){}};
  const ctx=new Proxy({canvas:{width:1000,height:580},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},fillText(value){written.push(value);},stroke(){strokes.push(this.strokeStyle);}},{get:(target,key)=>key in target?target[key]:(()=>{})});
  const tasks=[{id:'p',type:'plant',slot:0},{id:'d',type:'dust',position:{x:.43,y:.60}},{id:'g',type:'guest',door:0,guest:'hila',recipeId:'tahini'},{id:'c',type:'cat',door:1,waiting:0}].map(task=>({...task,untimed:true,total:1,remaining:.01}));
  const game={level:1,tutorial:{kind:'plant'},tasks,inventory:{},kitchen:{}};
  renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,time:100,images:{}});
- assert.equal(written.filter(text=>text==='∞').length,4,'every practice target communicates unlimited time');
+ assert.ok(!written.includes('∞'),'task badges remain uncluttered during practice');
  assert.ok(written.includes('מחכה בחוץ…'),'the tutorial cat stays outside even with zero waiting seconds');
  assert.ok(!written.includes('!'),'the waiting cat does not enter its alarm pose');
  assert.ok(!strokes.some(color=>['#c94a3e','#df9f36','#67885a'].includes(color)),'practice never draws a draining or urgent deadline ring');
@@ -163,7 +163,7 @@ test('watering requests stay strongly outlined in every pulse phase and become s
   const r=renderRecord(game,{time});
   for(const color of ['#123e4b','#ffffff','#00aee5'])assert.ok(r.strokes.some(s=>s.color===color),'high contrast rings never blink off');
   assert.ok(r.fills.some(color=>['#fff18fea','#fffbd9f2'].includes(color)),'persistent bright spotlight separates the pot from the room');
-  assert.ok(r.written.some(t=>t.text==='מים!'));assert.ok(r.written.some(t=>t.text==='∞'));
+  assert.ok(r.written.some(t=>t.text==='מים!'));assert.ok(!r.written.some(t=>t.text==='∞'));
   outlineRadius.push(r.strokes.find(s=>s.color==='#00aee5').arc.r);
  }
  assert.ok(new Set(outlineRadius).size>1,'normal motion gently pulses the watering outline');
@@ -171,14 +171,13 @@ test('watering requests stay strongly outlined in every pulse phase and become s
  assert.equal(first.strokes.find(s=>s.color==='#00aee5').arc.r,later.strokes.find(s=>s.color==='#00aee5').arc.r,'reduced motion uses an equally clear static outline');
 });
 
-test('urgent plant requests show words and numeric time in addition to color, with edge badges inside the canvas',()=>{
+test('urgent plant requests keep clear words and deadline bars without numeric countdowns',()=>{
  for(const [width,height] of [...sizes,[280,500]]){
   const layout=getHouseLayout(width,height),tasks=layout.plants.map(p=>({id:`p-${p.slot}`,type:'plant',slot:p.slot,total:12,remaining:2.2}));
   const r=renderRecord({level:1,tasks,inventory:{},kitchen:{}},{width,height,english:true});
-  const badges=r.written.filter(t=>t.text==='Hurry!'),timers=r.written.filter(t=>t.text==='3s');
-  assert.equal(badges.length,4);assert.equal(timers.length,4);
+  const badges=r.written.filter(t=>t.text==='Hurry!');
+  assert.equal(badges.length,4);assert.ok(!r.written.some(t=>/^[0-9]+s?$/.test(t.text)||t.text==='∞'));assert.ok(r.fills.includes('#f65c62'),'the draining deadline bar remains visible');
   assert.ok(badges.every(t=>t.x>=28&&t.x<=width-28),'urgent words stay within the screen even for edge pots');
-  assert.ok(timers.every(t=>t.x>=10&&t.x<=width-10),'countdown stays within the screen');
   assert.ok(r.fills.includes('#f65c62'),'the countdown bar also marks the short remaining window');
  }
 });
@@ -223,4 +222,37 @@ test('Ruti’s transparent head keeps its natural outline, aspect ratio and neck
  renderHouse(ctx,{level:5,tasks:[task]},{actor:{x:.4,y:.5}},{width:1000,height:580,images:{ruti,family:{hila:guest}},reduced:true});
  assert.equal(calls.find(call=>call[0]===guest)?.length,9,'guest portrait source cropping is unchanged');
  assert.ok(clips.some(p=>p?.kind==='ellipse'),'guest portraits retain their existing mask');
+});
+
+
+test('watering faces and lands on every physical pot even if the last walking step faced away',()=>{
+ for(const [width,height] of sizes){
+  const layout=getHouseLayout(width,height),M=Math.min(width,height),actorHeight=Math.max(layout.portrait?94:102,Math.min(layout.portrait?116:140,M*(layout.portrait?.28:.245)));
+  for(const plant of layout.plants){
+   const actor={x:plant.anchor.x*width,y:plant.anchor.y*height,facing:plant.x<plant.anchor.x?1:-1};
+   const target={x:plant.x*width,y:plant.y*height+M*(layout.portrait?.15:.12)*.125};
+   const geometry=getRutiWateringGeometry(actor,target,actorHeight,{lean:.008,breath:1.006});
+   assert.equal(geometry.facing,target.x<actor.x?-1:1);
+   assert.equal(geometry.facing,-actor.facing,'the arrival direction cannot point the can away from the pot');
+   assert.deepEqual(geometry.end,target,'the stream lands inside the selected pot rim');
+   assert.ok((geometry.start.x-actor.x)*geometry.facing>0,'the can nozzle is on the target side');
+   assert.ok(geometry.start.y<geometry.end.y,'the stream falls down into the pot');
+   assert.ok(Object.values(geometry.start).concat(Object.values(geometry.control)).every(Number.isFinite));
+  }
+ }
+});
+
+test('the enlarged broom dancer preserves full-width head art and narrows only the connected body',()=>{
+ const atlas={complete:true,naturalWidth:1448,naturalHeight:1086},calls=[],numbers=[],gradient={addColorStop(){}};
+ const ctx=new Proxy({createRadialGradient(){return gradient;},drawImage(...args){calls.push(args);}}, {get:(target,key)=>key in target?target[key]:(...args)=>numbers.push(...args.filter(x=>typeof x==='number'))});
+ for(const [width,height] of sizes){
+  calls.length=0;drawRutiCelebration(ctx,{width,height,time:2,progress:.6,reduced:true,images:{rutiAtlas:atlas},actor:{}});
+  assert.ok(calls.length>=8,'the head, neck and connected body are drawn from the same atlas pose');
+  const head=calls[0],body=calls.at(-1);
+  assert.equal(head[1],.5,'the dancer uses the original broom pose in column one');
+  assert.equal(head[2],362.5,'the dancer uses the original broom pose in row two');
+  const headScale=head[7]/head[3],bodyScale=body[7]/body[3];
+  assert.ok(Math.abs(bodyScale/headScale-.91)<1e-10,'only the body becomes slightly narrower');
+  assert.ok(head[8]>0&&body[8]>0);assert.ok(numbers.every(Number.isFinite));
+ }
 });

@@ -49,7 +49,6 @@ export function drawDustSignal(ctx,x,y,size,task,time,{reduced=false,english=fal
  ctx.beginPath();ctx.moveTo(ix+3,iy-7);ctx.lineTo(ix-3,iy+6);ctx.strokeStyle='#ffffff';ctx.lineWidth=2.5;ctx.stroke();
  ctx.beginPath();ctx.moveTo(ix-5,iy+3);ctx.lineTo(ix,iy+6);ctx.lineTo(ix-2,iy+12);ctx.lineTo(ix-10,iy+8);ctx.closePath();ctx.fillStyle='#f6d991';ctx.fill();
  ctx.fillStyle='#ffffff';text(ctx,english?'Dust!':'אבק!',cx+1,by+h/2,13);
- text(ctx,task.untimed?'∞':String(Math.max(0,Math.ceil(task.remaining))),bx+w-12,by+h/2,12);
  if(!task.untimed){
   const barWidth=size*1.34,barY=y+size*.63;
   ctx.beginPath();ctx.roundRect(x-barWidth/2,barY,barWidth,7,3);ctx.fillStyle=edge;ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.stroke();

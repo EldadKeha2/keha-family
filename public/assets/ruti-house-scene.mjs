@@ -1,6 +1,6 @@
 import {iconArtwork} from './ruti-house-art.mjs';
 import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=1';
-import {drawDustSignal} from './ruti-house-dust.mjs?v=1';
+import {drawDustSignal} from './ruti-house-dust.mjs?v=2';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -116,7 +116,7 @@ function icon(ctx,images,id,x,y,size){const image=images?.icons?.[id];if(imageRe
 function label(ctx,text,x,y,{size=12,color='#574634',align='center',weight='600',halo=true}={}){ctx.font=`${weight} ${size}px system-ui,sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';if(halo){ctx.strokeStyle='#fff6df';ctx.lineWidth=4;ctx.strokeText(text,x,y);}ctx.fillStyle=color;ctx.fillText(text,x,y);}
 function halo(ctx,x,y,r,time,color='#dfa742',urgent=false){const pulse=.5+.5*Math.sin(time*(urgent?9:4));const gradient=ctx.createRadialGradient(x,y,r*.15,x,y,r*1.8);gradient.addColorStop(0,color+'77');gradient.addColorStop(1,color+'00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r*(1.45+pulse*.15),0,Math.PI*2);ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2+pulse;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(x,y,r*(1.05+pulse*.05),0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
 function timer(ctx,x,y,r,task){
- if(task.untimed){label(ctx,'∞',x+r*.72,y-r*.72,{size:clamp(r*.65,12,20),color:'#759063',weight:'800'});return;}
+ if(task.untimed)return;
  const ratio=clamp(task.remaining/task.total,0,1);ctx.beginPath();ctx.arc(x,y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*ratio);ctx.strokeStyle=ratio<.25?'#c94a3e':ratio<.5?'#df9f36':'#67885a';ctx.lineWidth=4;ctx.stroke();
 }
 
@@ -205,7 +205,6 @@ function drawPlantSignal(ctx,x,y,size,task,{english,width}){
  // A large water drop supplements the text and urgent color change.
  const dx=bx+12,dy=by+10;ctx.beginPath();ctx.moveTo(dx,dy-7);ctx.bezierCurveTo(dx-1,dy-4,dx-6,dy,dx-6,dy+3);ctx.bezierCurveTo(dx-6,dy+10,dx+6,dy+10,dx+6,dy+3);ctx.bezierCurveTo(dx+6,dy,dx+1,dy-4,dx,dy-7);ctx.fillStyle='#bff5ff';ctx.fill();
  label(ctx,urgent?(english?'Hurry!':'מהר!'):(english?'Water!':'מים!'),cx-1,by+h/2,{size:10,color:'#ffffff',halo:false,weight:'900'});
- label(ctx,task.untimed?'∞':`${Math.ceil(task.remaining)}s`,bx+w-12,by+h/2,{size:10,color:'#ffffff',halo:false,weight:'800'});
  if(!task.untimed){
   const barY=y+size*.84;box(ctx,x-size*.49,barY,size*.98,7,'#123e4b','#ffffff',3);
   if(ratio>0)box(ctx,x-size*.49+1,barY+1,(size*.98-2)*ratio,5,urgent?'#f65c62':'#00d5f1',null,2);
@@ -255,18 +254,61 @@ function guestDeparturePosition(departure,layout,progress){
  return routePosition(cached.points,progress,layout.width,layout.height);
 }
 
-function drawRuti(ctx,x,y,height,actor,images,time,reduced){
- const pose=rutiPose(actor,time,{reduced}),atlas=images.rutiAtlas;
+// Only the body is narrowed. Full-width head pixels above each neckline keep
+// Ruti's likeness; a short graduated neck transition avoids a visible seam.
+const RUTI_PIVOTS=[197.5,165,162.5,105,165,154.5,183.5,167,197.5,179,172,168];
+const RUTI_NECKLINES=[106,106,106,110,108,108,110,108,108,110,108,110];
+const RUTI_ORIENTATIONS=[-1,1,1,1,1,1,-1,-1,-1,-1,-1,-1];
+const RUTI_BODY_WIDTH=.91;
+function drawRutiFrame(ctx,atlas,frame,height,pose){
  const cw=atlas.naturalWidth/RUTI_ATLAS.columns,ch=atlas.naturalHeight/RUTI_ATLAS.rows;
- // Register each painted pose at the hips and soles; different arm positions
- // never make the actor slide sideways or float above the floor.
- const pivots=[197.5,165,162.5,105,165,154.5,183.5,167,197.5,179,172,168];
- const orientations=[-1,1,1,1,1,1,-1,-1,-1,-1,-1,-1];
- const size=height*362/345,scale=height/345,direction=(actor.facing<0?-1:1)*orientations[pose.frame];
+ const sx=(frame%4)*cw+.5,sy=Math.floor(frame/4)*ch+.5,scale=height/345;
+ const neck=RUTI_NECKLINES[frame],pivot=RUTI_PIVOTS[frame];
+ function strip(top,bottom,narrow){
+  // The watering image includes a static spray beyond the real nozzle. Trim
+  // only that spray and replace it with droplets that land on the chosen pot.
+  const right=frame===3&&top>=190?244:362;
+  // Adjacent transformed strips overlap slightly so subpixel rasterization
+  // cannot expose hairline gaps across the blouse during the larger dance.
+  const from=Math.max(0,top-.75),to=Math.min(362,bottom+.75);
+  ctx.drawImage(atlas,sx,sy+from/362*(ch-1),right/362*(cw-1),(to-from)/362*(ch-1),
+   -pivot*scale*narrow,(from-355)*scale,right*scale*narrow,(to-from)*scale);
+ }
+ ctx.save();const neckY=(neck-355)*scale;
+ ctx.translate(0,neckY);ctx.rotate(pose.headTilt||0);ctx.translate(0,-neckY+(pose.headLift||0)*height);
+ strip(0,neck,1);ctx.restore();
+ for(let i=0;i<6;i++){const top=neck+i*6;strip(top,top+6,1-(1-RUTI_BODY_WIDTH)*(i+.5)/6);}
+ const bodyTop=neck+36;
+ if(frame===3){strip(bodyTop,190,RUTI_BODY_WIDTH);strip(190,362,RUTI_BODY_WIDTH);}
+ else strip(bodyTop,362,RUTI_BODY_WIDTH);
+}
+
+/** World-pixel geometry keeps the nozzle and stream aimed at the actual pot. */
+export function getRutiWateringGeometry(actor,target,height,pose={}){
+ const facing=target.x<actor.x?-1:1,lean=pose.lean||0,breath=pose.breath||1;
+ const nozzleX=(244-RUTI_PIVOTS[3])*height/345*RUTI_BODY_WIDTH*facing,nozzleY=-165*height/345*breath;
+ const start={x:actor.x+Math.cos(lean)*nozzleX-Math.sin(lean)*nozzleY,
+  y:actor.y-(pose.lift||0)+Math.sin(lean)*nozzleX+Math.cos(lean)*nozzleY};
+ return {facing,start,end:{x:target.x,y:target.y},control:{x:start.x+(target.x-start.x)*.62,y:start.y+Math.max(4,(target.y-start.y)*.12)}};
+}
+function drawWaterStream(ctx,geometry,height,time,reduced){
+ const {start,end,control}=geometry;
+ ctx.save();ctx.lineCap='round';ctx.strokeStyle='#72cfe4aa';ctx.lineWidth=Math.max(1.5,height*.013);
+ ctx.beginPath();ctx.moveTo(start.x,start.y);ctx.quadraticCurveTo(control.x,control.y,end.x,end.y);ctx.stroke();
+ if(!reduced)for(let i=0;i<8;i++){
+  const t=(time*1.65+i/8)%1,u=1-t;
+  ellipse(ctx,u*u*start.x+2*u*t*control.x+t*t*end.x,u*u*start.y+2*u*t*control.y+t*t*end.y,height*.008,height*.014,'#c0f4ff');
+ }
+ ellipse(ctx,end.x,end.y,height*.035,height*.011,'#a4edff99');ctx.restore();
+}
+function drawRuti(ctx,x,y,height,actor,images,time,reduced,waterTarget=null){
+ const pose=rutiPose(actor,time,{reduced}),atlas=images.rutiAtlas;
+ const watering=actor.action==='water'&&waterTarget?getRutiWateringGeometry({x,y},waterTarget,height,pose):null;
+ const direction=(watering?.facing??(actor.facing<0?-1:1))*RUTI_ORIENTATIONS[pose.frame];
  ctx.save();ctx.translate(x,y);
  ellipse(ctx,0,-1,height*.21,height*.045,'#4c382c35');
  ctx.translate(0,-pose.lift);ctx.rotate(pose.lean);ctx.scale(direction,pose.breath);
- ctx.drawImage(atlas,(pose.frame%4)*cw+.5,Math.floor(pose.frame/4)*ch+.5,cw-1,ch-1,-pivots[pose.frame]*scale,-355*scale,size,size);
+ drawRutiFrame(ctx,atlas,pose.frame,height,pose);
  // Action frames already hold their real object. While idle or walking the
  // selected object stays in hand, including immediately after a tool switch.
  if(![3,4,5,6,9,10].includes(pose.frame)&&actor.tool){
@@ -277,9 +319,26 @@ function drawRuti(ctx,x,y,height,actor,images,time,reduced){
   }else if(actor.tool==='serve')icon(ctx,images,actor.carryDish||'serve',hx,hy,height*.27);
   else icon(ctx,images,actor.tool,hx,hy,height*.25);
  }
- if(actor.action==='water'&&!reduced){
-  for(let i=0;i<7;i++){const t=(time*2.5+i/7)%1;ellipse(ctx,height*(.43+t*.13),height*(-.46+t*t*.35),height*.008,height*.017,'#6ccde3');}
+ ctx.restore();
+ if(watering)drawWaterStream(ctx,watering,height,time,reduced);
+}
+
+/** Large broom dance on the existing scene canvas; all motion uses game time. */
+export function drawRutiCelebration(ctx,{width,height,time=0,reduced=false,images={},actor={},progress=1}={}){
+ const entrance=reduced?1:1-Math.pow(1-clamp(progress/.12,0,1),3);
+ const dancerHeight=Math.min(height*.56,width*.73,350),cx=width*.5,feet=height*.83;
+ ctx.save();ctx.fillStyle='#fff8e6e8';ctx.fillRect(0,0,width,height);
+ const glow=ctx.createRadialGradient(cx,feet-dancerHeight*.48,10,cx,feet-dancerHeight*.48,dancerHeight*.73);
+ glow.addColorStop(0,'#fffdf5');glow.addColorStop(1,'#fff8d600');ctx.fillStyle=glow;ctx.fillRect(0,height*.2,width,height*.68);
+ for(let i=0;i<14;i++){
+  const phase=reduced?i*.41:time*1.4+i*.67;
+  const px=cx+Math.sin(i*2.4)*Math.min(width*.39,dancerHeight*.9),py=height*.30+(i%6)*height*.075+(reduced?0:Math.sin(phase)*4);
+  ctx.save();ctx.translate(px,py);ctx.rotate(reduced?i:phase*.2);ctx.fillStyle=['#d2a344','#96b57a','#d48b70'][i%3];ctx.fillRect(-2,-5,4,10);ctx.restore();
  }
+ ctx.translate(cx,feet);ctx.scale(.72+entrance*.28,.72+entrance*.28);ctx.translate(-cx,-feet);
+ const dancer={...actor,celebrating:true,walking:false,action:'broom',tool:'broom',facing:1};
+ if(imageReady(images.rutiAtlas))drawRuti(ctx,cx,feet,dancerHeight,dancer,images,time,reduced);
+ else drawHuman(ctx,cx,feet,dancerHeight,{portrait:images.ruti,action:'broom',tool:'broom',images,time:reduced?0:time,reduced});
  ctx.restore();
 }
 
@@ -300,8 +359,8 @@ function drawRutiSpeech(ctx,x,y,height,actor,time,width){
  ctx.restore();
 }
 
-function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false}={}){
- if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced);return;}
+function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null}={}){
+ if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced,waterTarget);return;}
  ctx.save();ctx.translate(x,y);const s=height/100;ctx.scale(s,s);ctx.lineCap='round';ctx.lineJoin='round';
  const cycle=walking?Math.sin(time*13):0,bob=walking?Math.abs(cycle)*2:Math.sin(time*1.8)*.4;
  ellipse(ctx,0,0,22,5,'#4c382c35');ctx.translate(0,-bob);
@@ -502,8 +561,11 @@ export function renderHouse(ctx,g,visual={},options={}){
  }
  const actor=visual.actor||{...l.spawn};const actorX=(actor.x??l.spawn.x)*width,actorY=(actor.y??l.spawn.y)*height;
  const actorHeight=clamp(M*(l.portrait?.28:.245),l.portrait?94:102,l.portrait?116:140);
+ const wateringTask=actor.action==='water'?(g?.tasks||[]).find(task=>task.id===(actor.targetId||visual.focusTarget)&&task.type==='plant'):null;
+ const plant=wateringTask?getTaskLocation(wateringTask,l):actor.action==='water'?l.plants.reduce((nearest,p)=>length(p.anchor,actor)<length(nearest.anchor,actor)?p:nearest):null;
+ const waterTarget=plant?{x:plant.x*width,y:plant.y*height+M*(l.portrait?.15:.12)*.125}:null;
  actors.push({y:actorY,draw:()=>drawHuman(ctx,actorX,actorY,actorHeight,{
-  portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced})});
+  portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced,waterTarget})});
  actors.sort((a,b)=>a.y-b.y);for(const actor of actors)actor.draw();
  drawRutiSpeech(ctx,actorX,actorY,actorHeight,actor,time,width);
  // Navigation destination marker remains part of the floor rather than a card.

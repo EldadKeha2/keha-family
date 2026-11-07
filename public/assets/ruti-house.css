@@ -24,3 +24,10 @@
 
 /* Only tools used in this stage occupy the shelf. */
 .rh-active .rh-tools{grid-template-columns:repeat(var(--rh-tool-count,4),minmax(0,1fr));max-width:560px;margin-inline:auto;gap:12px}.rh-active .rh-tool strong{font-size:12px}.rh-active .rh-tool-art{width:54px;height:54px}@media(max-width:700px){.rh-active .rh-tools{gap:8px}.rh-active .rh-tool strong{font-size:11px}.rh-active .rh-tool-art{width:45px;height:45px}.rh-active .rh-tool{min-height:74px}}
+
+/* Leave the centre of the house open for Ruti's enlarged broom dance. */
+.rh-active .rh-overlay.rh-celebration-overlay{background:transparent;backdrop-filter:none;overflow:hidden;pointer-events:none;padding:18px 12px}
+.rh-dance-cheer{position:absolute;inset:0;max-width:none;padding:20px 14px 12px;justify-content:space-between;gap:0}
+.rh-dance-cheer h4{font-size:clamp(26px,4vw,44px);line-height:1.2;max-width:95%;color:#355b43;text-shadow:0 2px 0 #fff9e9;margin:0}
+.rh-dance-cheer .rh-break-points{font-size:clamp(26px,3vw,36px);line-height:1.05;background:#fff9e9dc;border-radius:18px;padding:6px 20px}
+.rh-dance-cheer .rh-break-points small{font-size:11px;margin-top:3px}

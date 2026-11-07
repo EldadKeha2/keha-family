@@ -15,7 +15,7 @@ test('dust keeps its white outline, dark border, label and deadline through ever
  for(const size of [30,37,55])for(const time of [0,.28,.56,.83])for(const english of [false,true]){
   const c=canvas(),task={remaining:8.2,total:24};
   drawDustSignal(c.ctx,48,330,size,task,time,{english,width:320});
-  assert.ok(c.texts.includes(english?'Dust!':'אבק!'));assert.ok(c.texts.includes('9'));
+  assert.ok(c.texts.includes(english?'Dust!':'אבק!'));assert.ok(!c.texts.some(text=>/^[0-9]+$/.test(text)||text==='∞'));
   assert.ok(c.strokes.some(s=>s.color==='#ffffff'&&s.width===7));
   assert.ok(c.strokes.some(s=>s.color==='#274b51'&&s.width===3));
   assert.ok(c.numbers.length>0&&c.numbers.every(Number.isFinite));
@@ -29,11 +29,11 @@ test('reduced motion holds the complete dust signal steady while deadlines remai
  drawDustSignal(b.ctx,280,200,37,task,12.6,{reduced:true,width:320});
  assert.deepEqual(a.numbers,b.numbers);assert.deepEqual(a.shadows,b.shadows);
  assert.ok(a.strokes.some(s=>s.color==='#8b234c'));
- assert.ok(a.texts.includes('2'));
+ assert.ok(!a.texts.includes('2'),'only the time bar shows the deadline');
 });
 
-test('untimed dust shows infinity and stays visible without a countdown bar',()=>{
+test('untimed dust stays visible without numbers or a countdown bar',()=>{
  const c=canvas();drawDustSignal(c.ctx,160,200,37,{untimed:true,remaining:1,total:1},1,{width:320});
- assert.ok(c.texts.includes('∞'));assert.ok(c.texts.includes('אבק!'));
+ assert.ok(!c.texts.includes('∞'));assert.ok(c.texts.includes('אבק!'));
  assert.ok(!c.strokes.some(s=>s.width===2&&s.color==='#ffffff'));
 });

@@ -108,3 +108,37 @@ test('the watchdog cancels engines that never start or never finish without leav
  const hanging=fixture();hanging.performance.unlock();hanging.performance.react('welcome');hanging.utterances[0].onstart();
  hanging.at(hanging.actor.speechUntil+.1);hanging.performance.update();assert.equal(hanging.cancels,1);assert.equal(hanging.actor.speaking,false);assert.equal(hanging.actor.speechText,'');
 });
+
+test('celebration keeps the broom in hand and dances on game time while reduced motion holds a still pose',()=>{
+ const actor={celebrating:true,action:'water',speaking:true,speechUntil:20};
+ const poses=[0,.1,.2,.3].map(time=>rutiPose(actor,time));
+ assert.ok(poses.every(pose=>pose.frame===4),'the celebration must visibly hold the real broom');
+ assert.ok(new Set(poses.map(pose=>pose.lean)).size>1);
+ assert.ok(poses.some(pose=>pose.lift>0));
+ assert.deepEqual(rutiPose(actor,.2),rutiPose(actor,.2),'a paused game time freezes every movement');
+ for(const time of [.1,1,4]){
+  const pose=rutiPose(actor,time,{reduced:true});
+  assert.equal(pose.frame,4);assert.equal(pose.lift,0);assert.equal(pose.lean,0);assert.equal(pose.headTilt,0);assert.equal(pose.headLift,0);
+ }
+});
+
+test('spoken word boundaries refresh a brief connected head accent and speech end stops articulation',()=>{
+ const f=fixture();f.performance.unlock();f.performance.react('water');
+ f.at(.5);const spoken=f.utterances[0];spoken.onstart();
+ f.at(.8);spoken.onboundary();
+ assert.equal(f.actor.speechStartedAt,.5);assert.equal(f.actor.speechBoundaryAt,.8);
+ const emphasized=rutiPose(f.actor,.8),later=rutiPose(f.actor,1.2);
+ assert.ok(emphasized.headLift>later.headLift);assert.ok(Number.isFinite(emphasized.headTilt));
+ spoken.onend();assert.equal(rutiPose(f.actor,1.2).talking,false);
+});
+
+test('repeated-action captions can disappear without suppressing the voice or expression',()=>{
+ const f=fixture();f.performance.unlock();f.performance.react('water');f.utterances[0].onstart();
+ f.at(.5);assert.equal(f.performance.react('water',{caption:false}),false);
+ assert.equal(f.actor.speechText,'','a throttled reaction must still remove the previous bubble');
+ assert.equal(f.actor.speaking,true);assert.equal(f.actor.expression,'smile');
+ f.utterances[0].onend();f.at(6);
+ assert.equal(f.performance.react('broom',{caption:false}),true);
+ assert.equal(f.actor.speechText,'');assert.match(f.utterances[1].text,/[\u0590-\u05ff]/);
+ f.utterances[1].onstart();assert.equal(f.actor.speaking,true);
+});
