@@ -1,13 +1,13 @@
 // Small, self-contained instruments for Ruti's house. Audio is only created
 // after unlock() is called from a player gesture; there are no background timers.
-export function createHouseSound(){
+export function createHouseSound({Audio=globalThis.AudioContext||globalThis.webkitAudioContext,
+ visible=()=>globalThis.document?.visibilityState!=='hidden'}={}){
   let context=null,master=null,noise=null,enabled=true,awake=false,disposed=false;
-  const sources=new Set(),lastPlayed=new Map();
+  const sources=new Map(),lastPlayed=new Map();
   const frequency=note=>440*Math.pow(2,(note-69)/12);
 
   function makeContext(){
     if(context)return true;
-    const Audio=globalThis.AudioContext||globalThis.webkitAudioContext;
     if(!Audio||disposed)return false;
     try{
       context=new Audio({latencyHint:'interactive'});
@@ -25,9 +25,18 @@ export function createHouseSound(){
 
   function track(source,connections){
     // Keep rapid multi-task bursts bounded, even on a device that suspends audio.
-    if(sources.size>=64){const oldest=sources.values().next().value;try{oldest.stop();}catch{}sources.delete(oldest);}
-    sources.add(source);
-    source.onended=()=>{sources.delete(source);for(const node of [source,...connections]){try{node.disconnect();}catch{}}};
+    if(sources.size>=64)halt(sources.keys().next().value);
+    sources.set(source,connections);
+    source.onended=()=>disconnect(source);
+  }
+
+  function disconnect(source){
+    const connections=sources.get(source)||[];sources.delete(source);
+    for(const node of [source,...connections]){try{node.disconnect();}catch{}}
+  }
+
+  function halt(source){
+    try{source.stop();}catch{}disconnect(source);
   }
 
   function tone(hz,at,duration=.17,{wave='sine',volume=.3,to=null,attack=.007,filter=null}={}){
@@ -75,7 +84,7 @@ export function createHouseSound(){
 
   function stop(){
     awake=false;lastPlayed.clear();
-    for(const source of sources){try{source.stop();}catch{}try{source.disconnect();}catch{}}
+    for(const source of [...sources.keys()])halt(source);
     sources.clear();
   }
 
@@ -83,7 +92,7 @@ export function createHouseSound(){
 
   function play(kind){
     if(!enabled||!awake||!context||disposed)return;
-    if(globalThis.document?.visibilityState==='hidden')return;
+    if(!visible())return;
     const now=context.currentTime,previous=lastPlayed.get(kind);
     if(previous!==undefined&&now-previous<(kind==='select'?.04:.075))return;
     lastPlayed.set(kind,now);const at=now+.008;
@@ -95,11 +104,21 @@ export function createHouseSound(){
         case 'meal':notes([72,76,79,84,88,91],at,{gap:.065,duration:.34,volume:.18});
           [60,64,67].forEach(note=>tone(frequency(note),at+.27,.48,{volume:.085,wave:'triangle'}));break;
         case 'snack':notes([72,76,79,84],at,{gap:.07,duration:.23,volume:.17});break;
-        case 'water':hush(at,.42,{hz:1700,to:450,volume:.15});
-          [0,.09,.21].forEach((offset,i)=>tone(1280-i*180,at+offset,.085,{volume:.075,to:700-i*70}));break;
-        case 'dust':hush(at,.18,{type:'highpass',hz:1600,to:5000,volume:.11});
-          hush(at+.13,.2,{type:'highpass',hz:2800,to:6000,volume:.085});
-          notes([88,93],at+.2,{gap:.07,duration:.15,volume:.07});break;
+        // Physical action begins with the animated tool. These aliases contain
+        // no success chime, so a cancelled or missed action cannot sound won.
+        case 'water':case 'water-action':
+          hush(at,.78,{hz:1200,to:650,volume:.12});
+          hush(at+.16,.5,{type:'bandpass',hz:2200,to:1100,volume:.035});
+          [0,.14,.30,.49,.66].forEach((offset,i)=>tone([1100,890,1210,970,780][i],at+offset,.065,{volume:.035,to:[700,570,760,610,490][i]}));break;
+        case 'dust':case 'dust-action':
+          hush(at,.27,{type:'bandpass',hz:1800,to:900,volume:.095});
+          hush(at+.33,.29,{type:'bandpass',hz:1500,to:700,volume:.08});break;
+        // Success rewards are short, separate gestures: a clear rising water
+        // sparkle and a warmer two-note sweep pluck, with no noise or speech.
+        case 'water-reward':notes([79,84,88],at,{gap:.065,duration:.145,volume:.105});break;
+        case 'dust-reward':
+          tone(frequency(67),at,.13,{wave:'triangle',volume:.13,filter:1700});
+          tone(frequency(72),at+.09,.145,{wave:'triangle',volume:.105,filter:1900});break;
         case 'cat':meow(at);hush(at+.1,.15,{hz:900,to:350,volume:.055});break;
         case 'ready':notes([79,84,79,84],at,{gap:.105,duration:.19,volume:.13});break;
         case 'guest':notes([79,72],at,{gap:.2,duration:.38,volume:.17});break;

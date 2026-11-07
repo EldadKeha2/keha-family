@@ -269,7 +269,7 @@ test('the large main entrance and smaller back door are visually distinct before
 
 test('quiet task signals retain art and deadline bars while suppressing learned labels',()=>{
  const tasks=[{id:'p',type:'plant',slot:0},{id:'d',type:'dust',position:{x:.25,y:.6}},{id:'c',type:'cat',door:1,waiting:2}].map(t=>({...t,total:10,remaining:2}));
- const game={level:3,tasks},normal=renderRecord(game),quiet=renderRecord(game,{}, {showTaskLabels:{plant:false,dust:false,cat:false}});
+ const game={level:1,tasks},normal=renderRecord(game),quiet=renderRecord(game,{}, {showTaskLabels:{plant:false,dust:false,cat:false}});
  assert.ok(normal.written.some(t=>t.text==='מהר!'));assert.ok(normal.written.some(t=>t.text==='אבק!'));assert.ok(normal.written.some(t=>t.text==='מחכה בחוץ…'));
  for(const text of ['מים!','מהר!','אבק!','מחכה בחוץ…','!'])assert.ok(!quiet.written.some(t=>t.text===text),`${text} is no longer repeated after learning`);
  for(const color of ['#00aee5','#ffffff','#8b234c'])assert.ok(quiet.strokes.some(s=>s.color===color),'physical task signals remain visible');
@@ -300,4 +300,22 @@ test('singing composites alternate original heads while retaining the same narro
  }
  assert.ok(heads.size>=3,'open, closed, rounded mouths or blinks vary during the song');
  assert.ok(bodies.every(body=>JSON.stringify(body)===JSON.stringify(bodies[0])),'the same broom and body remain connected throughout singing');
+});
+
+
+test('learned plant and dust words stop at half of stage one without relying on caller flags',()=>{
+ const tasks=[{id:'plant',type:'plant',slot:0},{id:'dust',type:'dust',position:{x:.25,y:.6}},{id:'cat',type:'cat',door:1,waiting:2}].map(task=>({...task,total:20,remaining:16}));
+ const game={level:1,stage:{goal:30},stageCompleted:14,tasks};
+ const before=renderRecord(game);
+ assert.ok(before.written.some(t=>t.text==='מים!'));assert.ok(before.written.some(t=>t.text==='אבק!'));
+ const halfway=renderRecord({...game,stageCompleted:15});
+ const staleCaller=renderRecord({...game,stageCompleted:15},{},{showTaskLabels:{plant:true,dust:true}});
+ const laterStage=renderRecord({...game,level:2,stageCompleted:0});
+ for(const result of [halfway,staleCaller,laterStage]){
+  assert.ok(!result.written.some(t=>['מים!','מהר!','אבק!'].includes(t.text)),'learned words cannot return at halfway or in later stages');
+  assert.ok(result.strokes.some(s=>s.color==='#00aee5'),'the plant glow remains');
+  assert.ok(result.fills.includes('#00d5f1'),'the watering time bar remains');
+  assert.ok(result.fills.includes('#9bdde8'),'the dust time bar remains');
+  assert.ok(result.written.some(t=>t.text==='מחכה בחוץ…'),'the new-cat label policy is independent');
+ }
 });

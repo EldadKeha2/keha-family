@@ -524,6 +524,10 @@ function drawRoom(ctx,l,{time,english,reduced}){
 export function renderHouse(ctx,g,visual={},options={}){
  const width=options.width||ctx.canvas.width,height=options.height||ctx.canvas.height,time=options.time||0,reduced=!!options.reduced,images=options.images||{},english=!!options.english;
  const l=getHouseLayout(width,height),M=Math.min(width,height),pulseTime=reduced?0:time,showTaskLabels={plant:true,dust:true,cat:true,...visual.showTaskLabels};
+ // Learned plant and dust cues stay quiet even when a stale caller omits or
+ // explicitly enables labels. Their physical signals and time bars remain.
+ const learnedBasicTasks=(g?.level??1)>1||(Number.isFinite(g?.stage?.goal)&&g.stageCompleted>=g.stage.goal/2);
+ if(learnedBasicTasks){showTaskLabels.plant=false;showTaskLabels.dust=false;}
  ctx.save();ctx.clearRect(0,0,width,height);ctx.lineCap='round';drawRoom(ctx,l,{time:pulseTime,english,reduced});
  const activePlants=new Map((g?.tasks||[]).filter(t=>t.type==='plant').map(t=>[t.slot,t]));
  const missedPlants=new Map((visual.departures||[]).filter(d=>d.type==='plant-missed'&&(d.age||0)<(d.duration||1.8)).map(d=>[d.slot,d]));

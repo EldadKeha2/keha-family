@@ -24,9 +24,9 @@ function gameAt(level){
   assert.equal(g.level,level,'fixture must complete each stage and its guest objective before advancing');g.events=[];return g;
 }
 
-function fixture({english=false,startLevel=1,failSave=false,initialScores=[],width=960,height=600}={}){
+function fixture({english=false,startLevel=1,failSave=false,initialScores=[],width=960,height=600,speech=false}={}){
   let now=100000,sequence=0,backs=0,game=null,actor=null,html='',saveStatus=failSave?503:200;
-  const nodes=new Map(),listeners=new Map(),frames=new Map(),requests=[],writes=[],sounds=[],draws=[];let audioStops=0;
+  const nodes=new Map(),listeners=new Map(),frames=new Map(),requests=[],writes=[],sounds=[],audioEvents=[],spoken=[],draws=[];let audioStops=0;
   const register=(target,type,fn,{signal}={})=>{const key=`${target}.${type}`;if(!listeners.has(key))listeners.set(key,new Set());listeners.get(key).add(fn);signal?.addEventListener('abort',()=>listeners.get(key)?.delete(fn),{once:true});};
   const emit=(target,type,event={})=>{for(const fn of [...listeners.get(`${target}.${type}`)||[]])fn(event);};
   const context=new Proxy({},{get:(target,key)=>key in target?target[key]:()=>{}});
@@ -45,16 +45,18 @@ function fixture({english=false,startLevel=1,failSave=false,initialScores=[],wid
     if(path.endsWith('/scores'))return Response.json({scores:initialScores});return Response.json({person:{profile:`/media/${path.split('/')[2]}.webp`}});
   }}};
   class Image{constructor(){this.complete=true;this.naturalWidth=100;}set src(value){this.url=value;queueMicrotask(()=>this.onload?.());}}
-  const audio={unlock(){return Promise.resolve(true);},setEnabled(){},stop(){audioStops++;},play(kind){sounds.push(kind);}};
+  class Utterance{constructor(text){this.text=text;}}
+  const synthesis=speech?{getVoices:()=>[{name:english?'Samantha':'Carmit',lang:english?'en-US':'he-IL'}],speak(utterance){spoken.push(utterance.text);utterance.onstart?.();utterance.onend?.();},cancel(){}}:null;
+  const audio={unlock(){return Promise.resolve(true);},setEnabled(){},stop(){audioStops++;},play(kind){sounds.push(kind);audioEvents.push({kind,action:actor?.action,walking:!!actor?.walking,progress:actor?.actionProgress,plants:game?.stats.plants,dust:game?.stats.dust});}};
   vm.runInNewContext(source+'\nwindow.test={mountRutiHouse,pauseRutiHouse,state,render,processEvents,tutorialGuide:typeof tutorialGuide==="function"?tutorialGuide:null};',{
     ...engine,...motion,...character,HOUSE_LESSONS,window,document,Image,Response,AbortController,crypto:webcrypto,performance:{now:()=>now},
-    createHouse(){game=gameAt(startLevel);return game;},createHouseActor(start){actor=motion.createHouseActor(start);return actor;},
+    createRutiPerformance:options=>character.createRutiPerformance({...options,synthesis,Utterance:speech?Utterance:null}),createHouse(){game=gameAt(startLevel);return game;},createHouseActor(start){actor=motion.createHouseActor(start);return actor;},
     PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse(_ctx,g,visual){draws.push({level:g.level,phase:g.phase,actor:{...visual.actor},showTaskLabels:visual.showTaskLabels?{...visual.showTaskLabels}:null});},
     drawRutiCelebration(_ctx,visual){draws.push({celebration:true,progress:visual.progress,actor:{...visual.actor}});},createSceneAssets:()=>({family:{},icons:{},ready:Promise.resolve()}),houseArtwork:()=>'<svg></svg>',iconArtwork:id=>`<svg data-icon="${id}"></svg>`,createHouseSound:()=>audio,createRutiSong:()=>({mount(){},stop(){},pause(){},setEnabled(){}}),
     requestAnimationFrame(fn){const id=++sequence;frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id)
   });
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
-  return {root,nodes,frames,requests,writes,sounds,draws,document,window,flush,get audioStops(){return audioStops;},get game(){return game;},get actor(){return actor;},get state(){return window.test.state;},get html(){return html;},get backs(){return backs;},
+  return {root,nodes,frames,requests,writes,sounds,audioEvents,spoken,draws,document,window,flush,get audioStops(){return audioStops;},get game(){return game;},get actor(){return actor;},get state(){return window.test.state;},get html(){return html;},get backs(){return backs;},
     mount(){window.test.mountRutiHouse(root,()=>backs++);},async start(acknowledge=true){this.mount();await flush();await this.click('[data-rh-start]');if(acknowledge)await this.acknowledge();},async acknowledge(){if(this.state.briefing){await this.click('[data-rh-understand-answer]',{rhUnderstandAnswer:'0'});await this.click('[data-rh-begin-stage]');}},
     async click(selector,dataset={}){emit('root','click',{target:{closest:s=>s===selector?{dataset}:null}});await flush();},
     async choose(id){await this.click('[data-rh-tool]',{rhTool:id});},async act(id){await this.click('[data-rh-target]',{rhTarget:id});},
@@ -229,15 +231,36 @@ test('all ten simplified stages remain winnable with physical movement and direc
 });
 
 
-test('the first two watering and dust responses teach the player, then repeated success text disappears',async()=>{
+test('watering and dust completion stay free of speech and prose from their first successful action',async()=>{
  for(const english of [false,true])for(const [kind,stat] of [['plant','plants'],['dust','dust']]){
-  const f=fixture({english});await f.start();
+  const f=fixture({english,speech:true});await f.start();f.spoken.length=0;
+  await f.choose(kind==='plant'?'water':'broom');assert.equal(f.actor.speechText,'');assert.equal(f.actor.speaking,false);assert.equal(f.spoken.length,0,'selecting a household tool does not start spoken instructions');
   for(let count=1;count<=3;count++){
    f.game.stats[stat]=count;f.game.events.push({type:'success',kind,points:40});f.window.test.processEvents();
-   if(count<3)assert.ok(toast(f),'opening feedback stays visible');
-   else{assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');}
+   assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.equal(f.actor.speaking,false);assert.equal(f.spoken.length,0);
   }
  }
+});
+
+ test('physical watering and sweeping audio starts once at the action, followed by a reward only after success',async()=>{
+  for(const [kind,stat,selected] of [['plant','plants','water'],['dust','dust','broom']]){
+    const f=fixture({speech:true});await f.start();f.spoken.length=0;
+    if(kind==='dust'){f.game.tasks=[{id:'test-dust',type:'dust',slot:0,position:{x:.68,y:.6},total:24,remaining:24}];f.game.events=[];}
+    const task=f.game.tasks.find(t=>t.type===kind);await f.choose(selected);await f.act(task.id);assert.equal(f.actor.walking,true);assert.equal(f.sounds.filter(sound=>sound===`${kind==='plant'?'water':'dust'}-action`).length,0,'walking toward a task is not the physical action');
+    f.until(()=>f.actor.action===selected);const action=f.audioEvents.filter(event=>event.kind===`${kind==='plant'?'water':'dust'}-action`);assert.equal(action.length,1);assert.equal(action[0].action,selected);assert.equal(action[0].walking,false);assert.ok(action[0].progress<.1);assert.equal(f.sounds.filter(sound=>sound===`${kind==='plant'?'water':'dust'}-reward`).length,0);
+    f.advance(150);assert.equal(f.sounds.filter(sound=>sound===`${kind==='plant'?'water':'dust'}-action`).length,1,'a continuing animation does not replay the action sound every frame');
+    f.until(()=>f.game.stats[stat]===1);assert.equal(f.sounds.filter(sound=>sound===`${kind==='plant'?'water':'dust'}-reward`).length,1);const reward=f.audioEvents.find(event=>event.kind===`${kind==='plant'?'water':'dust'}-reward`);assert.equal(reward[stat],1);assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.equal(f.spoken.length,0);
+  }
+});
+
+ test('interrupted, wrong-tool and expired targets never play a watering or dust reward',async()=>{
+  for(const during of ['walking','acting']){
+    const f=fixture();await f.start();const plant=f.game.tasks[0];await f.choose('water');await f.act(plant.id);
+    if(during==='walking')f.advance(150);else f.until(()=>f.actor.action==='water'&&f.actor.actionProgress>.2);
+    const begun=f.sounds.filter(kind=>kind==='water-action').length;assert.equal(begun,during==='walking'?0:1);await f.choose('broom');f.advance(3000);assert.equal(f.game.stats.plants,0);assert.equal(f.sounds.filter(kind=>kind.endsWith('-reward')).length,0);
+    await f.act(plant.id);f.advance(150);assert.equal(f.sounds.filter(kind=>kind.endsWith('-reward')).length,0,'the wrong selected tool cannot reward a target');
+  }
+  const expired=fixture();await expired.start();const task=expired.game.tasks[0];await expired.choose('water');await expired.act(task.id);expired.game.tasks=[];expired.advance(5000);assert.equal(expired.game.stats.plants,0);assert.equal(expired.sounds.filter(kind=>kind==='water-reward').length,0);
 });
 
 test('familiar plant and dust guidance fades halfway through the opening without hiding controls or progress',async()=>{
