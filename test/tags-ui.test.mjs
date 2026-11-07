@@ -28,6 +28,18 @@ test('a saved face immediately updates the ordinary tagging widget and survives 
  f.tags.clearInline(host);f.tags.mountInline(host,photo('a'));assert.ok(host._tagWidget.store.selected().has('yona'));assert.equal(f.requests.length,0);
 });
 
+test('new names from face tagging immediately join the roster even before a tagging widget is mounted',async()=>{
+ const extra={id:'extra-friend',name:'חברה חדשה',extra:true},f=fixture(()=>Response.json({people:[...Object.values(family.people)]}));
+ f.emit({operation:'faces',item:{...photo('new-name'),tags:[extra]},taggedPeople:[extra]});
+ const matches=await f.tags.findPeople(extra.name);assert.equal(matches.length,1);assert.equal(matches[0].id,extra.id);
+ await f.tags.findPeople(extra.name);assert.equal(f.requests.filter(r=>r.path==='api/tag-people').length,1,'Repeated searches reuse the loaded roster');
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('new-name'),tags:[extra]});assert.match(host._tagWidget.selectedHost.innerHTML,/חברה חדשה/);f.tags.clearInline(host);
+});
+test('face search loads persisted extra names on the first search after a page reload',async()=>{
+ const extra={id:'extra-older-friend',name:'אורח ותיק',extra:true},f=fixture(()=>Response.json({people:[...Object.values(family.people),extra]}));
+ const matches=await f.tags.findPeople(extra.name);assert.equal(matches.length,1);assert.equal(matches[0].id,extra.id);assert.equal(f.requests[0].path,'api/tag-people');
+});
+
 test('a face saved during an ordinary tag request cannot be removed by its older response',async()=>{
  let resolveFirst,calls=0;const f=fixture(()=>{calls++;if(calls===1)return new Promise(resolve=>{resolveFirst=resolve;});return Response.json({item:{...photo('a'),tags:[family.people.yona,family.people.shlomo],tagsRevision:'latest'}});}),host=new NodeStub();f.tags.mountInline(host,photo('a'));
  const store=host._tagWidget.store;store.enqueue(family.people.shlomo,true);const saving=store.run();await new Promise(resolve=>setImmediate(resolve));

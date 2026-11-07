@@ -2,6 +2,8 @@
   'use strict';
   const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalizeName=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
+  const choices='[data-face-person],[data-face-add]';
   const labels=new Map();let current=null,serial=0,geometry=null;
   const remember=(id,faces,item)=>{labels.set(id,{faces,time:Date.now(),tagsRevision:item?.tagsRevision});if(labels.size>128)labels.delete(labels.keys().next().value);};
   const helpers=()=>geometry||=import('./face-geometry.mjs?v=1');
@@ -69,41 +71,46 @@
     c.popup=bubble;c.dialog.append(bubble);place(c);if(touch)c.labelTimer=setTimeout(()=>{if(live(c)&&c.popup===bubble)closePopup(c);},3000);
   }
   async function results(c,query){
-    const panel=c.popup;if(!panel?.classList.contains('face-picker'))return;const sequence=++c.searchSequence,host=panel.querySelector('[data-face-results]');
+    const panel=c.popup;if(c.saving||!panel?.classList.contains('face-picker'))return;const sequence=++c.searchSequence,host=panel.querySelector('[data-face-results]');
+    host.replaceChildren();host.setAttribute('aria-busy','true');
     try{
-      const people=await window.FamilyTags.findPeople(query,(c.item.tags||[]).map(person=>person.id));if(!live(c)||c.popup!==panel||sequence!==c.searchSequence)return;
-      host.innerHTML=people.map(person=>`<button class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="${person.id===c.active?.personId}"><span class="face-person-check" aria-hidden="true">${person.id===c.active?.personId?'✓':'＋'}</span><span><strong dir="auto">${safe(I.personName(person))}</strong><small>${safe(person.context)}</small></span></button>`).join('')||`<p class="face-no-results">${tr('לא נמצא שם מתאים.','No matching name.')}</p>`;
-      for(const button of host.querySelectorAll('[data-face-person]'))button.addEventListener('click',()=>save(c,button.dataset.facePerson));place(c);
-    }catch(error){if(live(c)&&c.popup===panel)panel.querySelector('[data-face-status]').textContent=error.message;}
+      const people=await window.FamilyTags.findPeople(query,(c.item.tags||[]).map(person=>person.id));if(!live(c)||c.saving||c.popup!==panel||sequence!==c.searchSequence)return;
+      const name=String(query).trim().replace(/\s+/g,' '),key=normalizeName(name),exact=people.some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalizeName(alias)===key));
+      host.innerHTML=people.map(person=>`<button class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="${person.id===c.active?.personId}"><span class="face-person-check" aria-hidden="true">${person.id===c.active?.personId?'✓':'＋'}</span><span><strong dir="auto">${safe(I.personName(person))}</strong><small>${safe(person.context)}</small></span></button>`).join('')||`<p class="face-no-results">${tr('לא נמצא שם מתאים. אפשר להוסיף שם חדש.','No matching name. You can add a new name.')}</p>`;
+      if(key&&!exact)host.innerHTML+=`<button class="face-person-option face-add-name" type="button" role="option" data-face-add aria-selected="false"><span class="face-person-check" aria-hidden="true">＋</span><span><strong dir="auto">${tr('הוספת השם ״','Add “')}${safe(name)}${tr('״','”')}</strong><small>${tr('תיוג הפנים בשם חדש','Tag this face with a new name')}</small></span></button>`;
+      for(const button of host.querySelectorAll('[data-face-person]'))button.addEventListener('click',()=>save(c,{personId:button.dataset.facePerson}));
+      host.querySelector('[data-face-add]')?.addEventListener('click',()=>save(c,{name}));place(c);
+      host.setAttribute('aria-busy','false');
+    }catch(error){if(live(c)&&c.popup===panel&&sequence===c.searchSequence){host.setAttribute('aria-busy','false');panel.querySelector('[data-face-status]').textContent=error.message;}}
   }
   async function openPicker(c,face){
     if(!live(c)||c.saving)return;closePopup(c);c.active=face;c.selection.hidden=false;
     if(c.loadError){c.loadError=false;c.loading=load(c,true).catch(error=>{c.loadError=true;throw error;});c.loading.catch(()=>{});}
     const panel=document.createElement('div');panel.className='face-popover face-picker';panel.setAttribute('role','dialog');panel.setAttribute('aria-label',tr('תיוג פנים בתמונה','Tag a face in the photo'));panel.dir=I.isEnglish?'ltr':'rtl';
-    panel.innerHTML=`<header><strong>${tr('מי בתמונה?','Who is this?')}</strong><button type="button" data-face-close aria-label="${tr('סגירה','Close')}">×</button></header>${face.person?`<p class="face-current-name" dir="auto">${safe(photoName(face))}</p>`:''}<label class="visually-hidden" for="facePersonSearch">${tr('חיפוש שם בן או בת משפחה','Search for a family member')}</label><input id="facePersonSearch" type="search" autocomplete="off" maxlength="120" placeholder="${tr('הקלידו שם בן משפחה…','Type a family member’s name…')}" aria-controls="facePersonResults" aria-autocomplete="list"><div id="facePersonResults" class="face-person-results" data-face-results role="listbox" aria-label="${tr('בני משפחה','Family members')}"></div><p class="face-save-status" data-face-status role="status"></p><div class="face-picker-actions"><button type="button" data-face-adjust>${tr('דיוק אזור הפנים','Adjust face area')}</button>${face.person?`<button type="button" data-face-remove>${tr('ניקוי תיוג הפנים','Clear face label')}</button>`:''}</div>`;
+    panel.innerHTML=`<header><strong>${tr('מי בתמונה?','Who is this?')}</strong><button type="button" data-face-close aria-label="${tr('סגירה','Close')}">×</button></header>${face.person?`<p class="face-current-name" dir="auto">${safe(photoName(face))}</p>`:''}<label class="visually-hidden" for="facePersonSearch">${tr('חיפוש או הוספת שם','Search or add a name')}</label><input id="facePersonSearch" type="search" autocomplete="off" maxlength="120" placeholder="${tr('חפשו או הוסיפו שם…','Search or add a name…')}" aria-controls="facePersonResults" aria-autocomplete="list"><div id="facePersonResults" class="face-person-results" data-face-results role="listbox" aria-label="${tr('שמות לתיוג הפנים','Names for this face')}"></div><p class="face-save-status" data-face-status role="status"></p><div class="face-picker-actions"><button type="button" data-face-adjust>${tr('דיוק אזור הפנים','Adjust face area')}</button>${face.person?`<button type="button" data-face-remove>${tr('ניקוי תיוג הפנים','Clear face label')}</button>`:''}</div>`;
     c.popup=panel;c.dialog.append(panel);place(c);
     const input=panel.querySelector('input');input.addEventListener('input',()=>results(c,input.value));
-    input.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closePopup(c);}if(event.key==='ArrowDown'){event.preventDefault();panel.querySelector('[data-face-person]')?.focus();}});
-    panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closePopup(c);}else if(['ArrowDown','ArrowUp'].includes(event.key)&&event.target.matches('[data-face-person]')){event.preventDefault();const buttons=[...panel.querySelectorAll('[data-face-person]')],index=buttons.indexOf(event.target);buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}});
+    input.addEventListener('keydown',event=>{if(event.isComposing)return;if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closePopup(c);}if(event.key==='ArrowDown'){event.preventDefault();panel.querySelector(choices)?.focus();}if(event.key==='Enter'){event.preventDefault();event.stopPropagation();const options=[...panel.querySelectorAll(choices)];if(options.length===1)options[0].click();else options[0]?.focus();}});
+    panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closePopup(c);}else if(['ArrowDown','ArrowUp'].includes(event.key)&&event.target.matches(choices)){event.preventDefault();const buttons=[...panel.querySelectorAll(choices)],index=buttons.indexOf(event.target);buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}});
     panel.querySelector('[data-face-close]').addEventListener('click',()=>closePopup(c));
     panel.querySelector('[data-face-adjust]').addEventListener('click',()=>{panel.remove();c.popup=null;c.adjust=true;c.guide.hidden=false;c.stage.classList.add('face-adjusting');place(c);});
-    panel.querySelector('[data-face-remove]')?.addEventListener('click',()=>save(c,null));
+    panel.querySelector('[data-face-remove]')?.addEventListener('click',()=>save(c,{personId:null}));
     input.focus({preventScroll:true});results(c,'');
     try{
       await c.loading;if(!live(c)||c.popup!==panel)return;
       const stored=c.saved.find(saved=>c.geom.sameRegion(saved.rect,face.rect));if(stored){c.active=stored;place(c);}
     }catch(error){if(live(c)&&c.popup===panel)panel.querySelector('[data-face-status]').textContent=tr('לא ניתן לקרוא את תיוגי הפנים כרגע. סגרו ונסו שוב.','Face labels are currently unavailable. Close and try again.');}
   }
-  async function save(c,personId){
+  async function save(c,selection){
     if(!live(c)||c.saving||!c.active)return;const panel=c.popup,face={...c.active};c.saving=true;
-    if(panel){panel.querySelector('[data-face-status]').textContent=tr('שומר את התיוג…','Saving the tag…');for(const button of panel.querySelectorAll('button'))button.disabled=true;}
+    if(panel){panel.querySelector('[data-face-status]').textContent=tr('שומר את התיוג…','Saving the tag…');for(const control of panel.querySelectorAll('button,input'))control.disabled=true;}
     try{
       await c.loading;await window.FamilyTags.flush(c.item.id);
       const known=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));
-      const result=await request('api/media/'+c.item.id+'/faces/save',{method:'POST',body:JSON.stringify({faceId:known?.id||face.id,personId,rect:face.rect,expectedRevision:known?.revision||null})});
+      const result=await request('api/media/'+c.item.id+'/faces/save',{method:'POST',body:JSON.stringify({faceId:known?.id||face.id,...selection,rect:face.rect,expectedRevision:known?.revision||null})});
       remember(c.item.id,result.faces,result.item);window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
-      if(live(c)){c.saving=false;apply(c,result.faces);closePopup(c);announce(c,personId?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('הקישור לפנים הוסר. התיוג הכללי של התמונה נשאר.','The face label was cleared. The photo’s ordinary tag remains.'));if(result.face)showLabel(c,result.face,touchMode());}
-    }catch(error){if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const button of panel.querySelectorAll('button'))button.disabled=false;}}
+      if(live(c)){c.saving=false;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('הקישור לפנים הוסר. התיוג הכללי של התמונה נשאר.','The face label was cleared. The photo’s ordinary tag remains.'));if(result.face)showLabel(c,result.face,touchMode());}
+    }catch(error){if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const control of panel.querySelectorAll('button,input'))control.disabled=false;}}
     finally{c.saving=false;}
   }
   function point(c,event){if(!c.image.naturalWidth)return null;const r=imageArea(c);if(event.clientX<r.x||event.clientX>r.x+r.width||event.clientY<r.y||event.clientY>r.y+r.height)return null;return {x:(event.clientX-r.x)/r.width,y:(event.clientY-r.y)/r.height};}

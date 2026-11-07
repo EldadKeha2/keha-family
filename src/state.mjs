@@ -128,18 +128,20 @@ export class FamilyState {
     if(typeof p.faceId!=='string'||!/^[a-f0-9]{32}$/.test(p.faceId))throw new HttpError(400,'אזור הפנים אינו תקין.');
     const faces=this.faces(item.id,true),previous=faces.find(face=>face.id===p.faceId);
     if((previous?.revision||null)!==p.expectedRevision)throw new HttpError(409,'תיוג הפנים עודכן בינתיים. פתחו אותו מחדש לפני שמירה.');
-    if(p.personId===null){
+    if(p.personId===null&&p.name===undefined){
       if(previous)this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,p.faceId);
       return {saved:true,operation:'faces',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),face:null};
     }
-    if(typeof p.personId!=='string')throw new HttpError(400,'בחרו אדם מרשימת בני המשפחה.');
-    this.person(p.personId);const rect=faceRect(p.rect);
+    if(p.name!==undefined?(p.personId!==undefined||typeof p.name!=='string'):typeof p.personId!=='string')throw new HttpError(400,'בחרו אדם מהרשימה או הזינו שם חדש.');
+    const selection=p.name===undefined?{personId:p.personId}:{name:p.name},rect=faceRect(p.rect);
     const tagged=new Set(this.tagIds(item.id)),replaced=faces.filter(face=>face.id!==p.faceId&&!tagged.has(face.personId)&&overlap(face.rect,rect)>.6);
     if(!previous&&faces.length-replaced.length>=FACE_LIMIT)throw new HttpError(400,'אפשר לתייג עד 150 אזורי פנים בתמונה.');
     if(faces.some(face=>face.id!==p.faceId&&tagged.has(face.personId)&&overlap(face.rect,rect)>.6))throw new HttpError(409,'אזור הפנים הזה כבר תויג. פתחו אותו מחדש כדי לשנות את השם.');
-    const now=new Date().toISOString(),face={id:p.faceId,rect,personId:p.personId,revision:uid(),createdAt:previous?.createdAt||now,updatedAt:now};
     // A face label and its ordinary photo tag are saved in the same transaction.
-    const result=this.patchTags(item.id,[{personId:p.personId,tagged:true}]);
+    // Resolve free names through the same roster as ordinary tags, so existing
+    // names are reused and an invalid or conflicting face cannot leave an orphan.
+    const result=this.patchTags(item.id,[{...selection,tagged:true}]),personId=result.taggedPeople[0].id;
+    const now=new Date().toISOString(),face={id:p.faceId,rect,personId,revision:uid(),createdAt:previous?.createdAt||now,updatedAt:now};
     for(const old of replaced)this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,old.id);
     this.sql.exec('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?) ON CONFLICT(media_id,id) DO UPDATE SET person_id=excluded.person_id,data=excluded.data',item.id,face.id,face.personId,JSON.stringify(face));
     const saved=this.faces(item.id);return {...result,operation:'faces',faces:saved,face:saved.find(item=>item.id===face.id)};

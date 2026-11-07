@@ -22,6 +22,8 @@
 .face-person-option>span:last-child{display:flex;flex-direction:column;min-width:0;gap:2px}
 .face-person-option strong{font-weight:500;font-size:calc(14px * var(--a11y-text-scale,1));overflow-wrap:anywhere}
 .face-person-option small{font-size:calc(11px * var(--a11y-text-scale,1));color:#928164;line-height:1.35}
+#mediaViewer .face-add-name{background:#f1f4e9;border-top:1px solid #cbd3bb}
+#mediaViewer .face-add-name strong{font-weight:600}
 .face-person-check{display:grid;place-items:center;width:21px;height:21px;flex:0 0 21px;color:#859067;border:1px solid #cbd3bb;border-radius:4px;background:#f6f6eb}
 .face-picker .face-save-status{font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.6;color:#8f633e;margin:6px 0 0}
 .face-picker .face-save-status:empty{display:none}

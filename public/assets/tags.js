@@ -22,16 +22,16 @@
     if(p?.siblings?.length)return (I18n.isEnglish?'Sibling of ':'אח/אחות של ')+p.siblings.map(name).join(' / ');
     return person.extra?I18n.t('שם נוסף באלבומים'):branch||I18n.t('השורשים של כולנו');
   }
-  const stores=new Map(),roster=new Map();let rosterPromise=null,rosterTime=0,rosterVersion=0,modalWidget=null,modalStore=null,closeRequested=false,newCounter=0;
+  const stores=new Map(),roster=new Map();let rosterPromise=null,rosterTime=0,rosterFetched=false,rosterVersion=0,modalWidget=null,modalStore=null,closeRequested=false,newCounter=0;
   async function request(path,options={}){
     const response=await I18n.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
     let result;try{result=await response.json();}catch{throw Error(I18n.t('לא התקבלה תשובה מהשרת. נסו שוב.'));}
     if(!response.ok)throw Error(I18n.error(result.error)||I18n.t('התיוג לא נשמר.'));return result;
   }
   function addPerson(person){if(!person?.id)return;const old=roster.get(person.id);roster.set(person.id,{...old,...person});rosterVersion++;}
-  async function loadRoster(){
-    if(rosterPromise)return rosterPromise;if(roster.size&&Date.now()-rosterTime<300000)return;
-    rosterPromise=request('api/tag-people').then(result=>{result.people.forEach(addPerson);rosterTime=Date.now();}).finally(()=>{rosterPromise=null;});return rosterPromise;
+  async function loadRoster(force=false){
+    if(rosterPromise)return rosterPromise;if(!force&&roster.size&&Date.now()-rosterTime<300000)return;
+    rosterPromise=request('api/tag-people').then(result=>{result.people.forEach(addPerson);rosterTime=Date.now();rosterFetched=true;}).finally(()=>{rosterPromise=null;});return rosterPromise;
   }
   class TagStore {
     constructor(id,item){this.id=id;this.item=item||{id,tags:[]};this.saved=new Map((item?.tags||[]).map(person=>[person.id,person]));this.queue=[];this.active=[];this.aliases=new Map();this.listeners=new Set();this.error='';this.status='';this.ready=Boolean(item?.tags&&item.tagsRevision);this.timer=null;this.loading=null;this.refreshPending=false;}
@@ -184,7 +184,9 @@
   function clearInline(host){host._tagWidget?.destroy();delete host._tagWidget;delete host.dataset.media;host.replaceChildren();}
   function init(){
     window.addEventListener('family-media-changed',event=>{
-      const result=event.detail,item=result.item,store=item&&stores.get(item.id);if(!store||result.operation!=='faces')return;
+      const result=event.detail,item=result.item;if(result.operation!=='faces')return;
+      for(const person of result.taggedPeople||[])addPerson(person);
+      const store=item&&stores.get(item.id);if(!store)return;
       if(store.active.length)store.refreshPending=true;
       store.item=item;store.saved=new Map((item.tags||[]).map(person=>[person.id,person]));store.ready=true;store.emit();
     });
@@ -200,7 +202,7 @@
   }
   for(const person of Object.values(window.FAMILY_DATA.people))addPerson(person);rosterTime=Date.now();
   async function findPeople(query='',preferred=[]){
-    await loadRoster();const normalized=normalize(query),first=new Set(preferred);
+    await loadRoster(!rosterFetched);const normalized=normalize(query),first=new Set(preferred);
     return [...roster.values()].filter(person=>Number.isFinite(matchRank(person,normalized))).sort((a,b)=>matchRank(a,normalized)-matchRank(b,normalized)||(first.has(b.id)-first.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale)).slice(0,50).map(person=>({...person,context:personContext(person)}));
   }
   async function flush(id){

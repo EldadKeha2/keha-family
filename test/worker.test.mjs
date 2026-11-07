@@ -79,6 +79,30 @@ test('face edits reject stale or duplicate regions, remain isolated by photo, an
   const tags=(await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags;assert.deepEqual(tags.map(p=>p.id),['shlomo','yona']);assert.equal((await(await f.call('/api/media/'+a.id+'/faces')).json()).faces.length,0);
  }finally{await f.close();}
 });
+test('a new face name becomes one extra album person, persists after restart and is reused across photos',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await taggedUpload(f),b=await taggedUpload(f),rect={x:.2,y:.1,width:.17,height:.22},name='חברה חדשה מהטיול';
+  const response=await f.call('/api/media/'+a.id+'/faces/save',{method:'POST',body:{faceId:'e'.repeat(32),name:'  חברה   חדשה מהטיול  ',rect,expectedRevision:null}});assert.equal(response.status,200);const result=await response.json(),person=result.face.person;
+  assert.equal(person.name,name);assert.equal(person.extra,true);assert.match(person.id,/^extra-/);assert.equal(result.face.personId,person.id);assert.deepEqual(result.item.tags.map(p=>p.id),[person.id]);assert.deepEqual(result.face.rect,rect);assert.equal(family.people[person.id],undefined);
+  const album=await(await f.call('/api/people/'+person.id+'/page')).json();assert.equal(album.albums.photos.items[0].id,a.id);
+  f.restart();const reopened=await(await f.call('/api/media/'+a.id+'/faces')).json();assert.equal(reopened.faces[0].person.name,name);assert.equal(reopened.faces[0].personId,person.id);
+  const second=await f.call('/api/media/'+b.id+'/faces/save',{method:'POST',body:{faceId:'f'.repeat(32),name,rect,expectedRevision:null}});assert.equal(second.status,200);assert.equal((await second.json()).face.personId,person.id);
+  const roster=await(await f.call('/api/tag-people')).json();assert.equal(roster.people.filter(p=>p.name===name).length,1);assert.equal(f.objects.size,2,'Face labels must not duplicate photo files');
+ }finally{await f.close();}
+});
+test('free face names reuse existing aliases and invalid or conflicting saves leave no extra people',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),rect={x:.2,y:.1,width:.17,height:.22},faceId='e'.repeat(32);
+  const save=body=>f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId,rect,expectedRevision:null,...body}});
+  const count=()=>f.database.prepare('SELECT COUNT(*) AS n FROM people').get().n,initial=count();
+  for(const body of [{name:'   '},{name:123},{name:'א'.repeat(121)},{name:'חדש',personId:'yona'},{name:'חדש',personId:null},{name:'חדש',rect:{...rect,width:0}}])assert.equal((await save(body)).status,400);
+  assert.equal(count(),initial);assert.equal((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces.length,0);
+  let response=await save({name:'Yona Nakash'});assert.equal(response.status,200);const saved=(await response.json()).face;assert.equal(saved.personId,'yona');assert.equal(count(),initial);
+  assert.equal((await save({name:'אדם שלא ייווצר'})).status,409);
+  assert.equal((await save({name:'אדם שלא ייווצר',faceId:'f'.repeat(32)})).status,409);assert.equal(count(),initial);
+  response=await save({name:'שם נוסף תקין',expectedRevision:saved.revision});assert.equal(response.status,200);const changed=(await response.json()).face;assert.equal(changed.person.name,'שם נוסף תקין');assert.notEqual(changed.personId,'yona');assert.equal(changed.id,faceId);
+ }finally{await f.close();}
+});
 test('face inputs are bounded, invalid saves are atomic, and ordinary tag removal and undo also hide and restore face labels',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f),faceId='d'.repeat(32),rect={x:.4,y:.2,width:.1,height:.2};
