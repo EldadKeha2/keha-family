@@ -67,6 +67,20 @@ test('a face label atomically adds an ordinary tag, preserves other people, and 
   const backup=await(await f.call('/api/export')).json();assert.equal(backup.faceTags[0].mediaId,item.id);assert.equal(backup.faceTags[0].personId,'yona');assert.equal(f.objects.size,1,'Face coordinates must not duplicate photo files');
  }finally{await f.close();}
 });
+test('small background faces and substantially overlapping people keep distinct names after save and restart',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);
+  const boxes=[{x:.1,y:.2,width:.1,height:.1},{x:.12,y:.2,width:.1,height:.1},{x:.8,y:.2,width:6/4096,height:8/3072}];
+  for(const [index,personId] of ['yona','shlomo','ruti'].entries()){
+   const response=await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:String(index+1).repeat(32),personId,rect:boxes[index],expectedRevision:null}});
+   assert.equal(response.status,200,await response.clone().text());
+  }
+  f.restart();const saved=await(await f.call('/api/media/'+item.id+'/faces')).json();
+  assert.deepEqual(saved.faces.map(face=>face.personId),['yona','shlomo','ruti']);assert.ok(saved.faces[2].rect.width<.005);
+  const duplicate=await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:'4'.repeat(32),personId:'yona',rect:boxes[0],expectedRevision:null}});
+  assert.equal(duplicate.status,409,'The same face still cannot be saved twice');
+ }finally{await f.close();}
+});
 test('face edits reject stale or duplicate regions, remain isolated by photo, and clearing a face preserves ordinary tags',async()=>{
  const f=fixture();try{
   await f.connect();const a=await taggedUpload(f),b=await taggedUpload(f),id='b'.repeat(32),rect={x:.1,y:.2,width:.2,height:.3};

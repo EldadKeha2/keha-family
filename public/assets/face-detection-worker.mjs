@@ -1,6 +1,7 @@
 import {FaceDetector} from './vendor/mediapipe/vision_bundle.mjs';
-import {clampRect,sameRegion,unrotateRect} from './face-geometry.mjs?v=2';
-import {detectionRegions} from './face-scan.mjs?v=1';
+import {clampRect,sameRegion,unrotateRect} from './face-geometry.mjs?v=3';
+import {detectionRegions} from './face-scan.mjs?v=2';
+import {createYuNet,projectYuNet,confirmYuNet,sameDetection} from './face-yunet.mjs?v=1';
 import pico from './vendor/pico/pico.mjs';
 
 // Model files are hosted with the site. Detection must not send photos or metrics elsewhere.
@@ -37,12 +38,36 @@ async function cpuFaces(bitmap,onProgress=()=>{},supplemental=false){
   }
   return found.sort((a,b)=>b.score-a.score).slice(0,150);
 }
+async function detailedFaces(bitmap,onProgress){
+  const engine=await createYuNet(),size={width:bitmap.width,height:bitmap.height},tile=new OffscreenCanvas(640,640),candidates=[];
+  const regions=detectionRegions(size.width,size.height,[1024,384]);
+  let pass=0;
+  try{
+    for(const region of regions){
+      const scale=640/Math.max(region.width,region.height),drawn={width:Math.round(region.width*scale),height:Math.round(region.height*scale)};
+      const scan=async flipped=>{
+        const ctx=tile.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,640,640);ctx.save();
+        if(flipped){ctx.translate(drawn.width,0);ctx.scale(-1,1);}
+        ctx.drawImage(bitmap,region.x,region.y,region.width,region.height,0,0,drawn.width,drawn.height);ctx.restore();
+        const faces=(await engine.detect(tile)).map(face=>projectYuNet(face,region,size,drawn,flipped)).filter(Boolean);
+        const accepted=confirmYuNet(candidates,faces,++pass);onProgress(accepted);return faces;
+      };
+      const faces=await scan(false);
+      // A second viewpoint helps asymmetric occlusion and verifies weak faces.
+      if(faces.length||pass===1)await scan(true);
+    }
+    return true;
+  }finally{tile.width=tile.height=1;}
+}
 self.onmessage=async event=>{
   const {id,bitmap}=event.data;
-  const found=[],publish=(engine,partial=true)=>self.postMessage({id,faces:found.toSorted((a,b)=>b.score-a.score).slice(0,150),engine,partial});
-  const add=faces=>{for(const face of faces){const previous=found.findIndex(other=>sameRegion(other.rect,face.rect));if(previous<0)found.push(face);else if(found[previous].score<face.score)found[previous]=face;}};
+  const found=[],publish=(engine,partial=true)=>self.postMessage({id,faces:found.toSorted((a,b)=>b.score-a.score).slice(0,150).map(({rect,score})=>({rect,score})),engine,partial});
+  const add=faces=>{for(const face of faces){const previous=found.findIndex(other=>sameDetection(other,face));if(previous<0)found.push(face);else if(found[previous].score<face.score)found[previous]=face;}};
+  let detailed=false;
   try{
-    if(!graphics()){await cpuFaces(bitmap,faces=>{add(faces);publish('pico');});publish('pico',false);return;}
+    // CPU/WASM works on phones and browsers without a graphics context too.
+    try{let passes=0;detailed=await detailedFaces(bitmap,faces=>{add(faces);if(++passes%4===0||passes===1)publish('yunet');});publish('yunet');}catch{}
+    if(!graphics()){await cpuFaces(bitmap,faces=>{add(faces);publish(detailed?'yunet+pico':'pico');},detailed&&found.length>0);publish(detailed?'yunet+pico':'pico',false);return;}
     const engine=await model(),width=bitmap.width,height=bitmap.height,regions=detectionRegions(width,height),tile=new OffscreenCanvas(1,1);
     let scanned=0;
     for(const region of regions){
@@ -55,13 +80,13 @@ self.onmessage=async event=>{
         const sx=region.width/tile.width,sy=region.height/tile.height,rect=clampRect({x:(region.x+b.originX*sx)/width,y:(region.y+b.originY*sy)/height,width:b.width*sx/width,height:b.height*sy/height}),score=detection.categories?.[0]?.score||0;
         add([{rect,score}]);
       }
-      if(++scanned%8===0||scanned===1)publish('mediapipe');
+      if(++scanned%8===0||scanned===1)publish(detailed?'yunet+mediapipe':'mediapipe');
     }
-    tile.width=tile.height=1;publish('mediapipe');
+    tile.width=tile.height=1;publish(detailed?'yunet+mediapipe':'mediapipe');
     // PICO also supplements successful model results: one large face must not
     // prevent a native-detail scan for smaller faces elsewhere in the photo.
-    try{await cpuFaces(bitmap,faces=>{add(faces.filter(face=>!found.some(other=>sameRegion(other.rect,face.rect))));publish('mediapipe+pico');},found.length>0);}catch{}
-    publish('mediapipe+pico',false);
+    try{await cpuFaces(bitmap,faces=>{add(faces.filter(face=>!found.some(other=>sameRegion(other.rect,face.rect))));publish(detailed?'yunet+mediapipe+pico':'mediapipe+pico');},found.length>0);}catch{}
+    publish(detailed?'yunet+mediapipe+pico':'mediapipe+pico',false);
   }catch(error){hasGraphics=false;try{detector?.close();}catch{}detector=undefined;try{await cpuFaces(bitmap,faces=>{add(faces);publish('pico');});publish('pico',false);}catch{if(found.length)publish('mediapipe',false);else self.postMessage({id,error:String(error?.message||'Face detection is unavailable')});}}
   finally{bitmap.close();}
 };

@@ -5,8 +5,8 @@ import vm from 'node:vm';
 import * as geometryModule from '../public/assets/face-geometry.mjs';
 
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
- .replace("import('./face-geometry.mjs?v=2')",'Promise.resolve(geometryModule)')
- .replace("import('./face-detector.mjs?v=4')",'Promise.resolve(detectorModule)');
+ .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
+ .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
 function fixture(detected=[]){
  const view={width:360,height:800},created=[];
  class Node extends EventTarget{
@@ -73,4 +73,9 @@ test('late incremental results from a closed photo cannot repaint the next photo
  const f=fixture([first]);await f.mount('first');const oldProgress=f.progress;f.faces.clear();await f.mount('next');
  const buttons=f.find('face-hit-buttons'),before=buttons.children.map(button=>button.dataset.faceId);oldProgress([second]);
  assert.deepEqual(buttons.children.map(button=>button.dataset.faceId),before);assert.equal(buttons.children[0].style.left,first.rect.x*100+'%');f.faces.clear();
+});
+test('incremental overlapping detections never give two face buttons the same selection identity',async()=>{
+ const f=fixture([first]);await f.mount();const buttons=f.find('face-hit-buttons'),previous=buttons.children[0].dataset.faceId;
+ f.progress([first,{rect:{...first.rect,x:first.rect.x+.001},score:.8}]);
+ const ids=buttons.children.map(button=>button.dataset.faceId);assert.equal(ids[0],previous);assert.equal(new Set(ids).size,2);f.faces.clear();
 });

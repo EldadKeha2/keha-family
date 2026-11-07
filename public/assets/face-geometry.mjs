@@ -2,9 +2,9 @@ export function intersection(a,b){return Math.max(0,Math.min(a.x+a.width,b.x+b.w
 export function sameRegion(a,b){
   const area=intersection(a,b),aa=a.width*a.height,bb=b.width*b.height;
   // Containment alone can swallow a neighbouring small face inside a broad box.
-  return Math.min(aa,bb)/Math.max(aa,bb)>.45&&area/Math.max(.000001,aa+bb-area)>.4&&
-    Math.abs(a.x+a.width/2-b.x-b.width/2)<Math.min(a.width,b.width)*.35&&
-    Math.abs(a.y+a.height/2-b.y-b.height/2)<Math.min(a.height,b.height)*.35;
+  return Math.min(aa,bb)/Math.max(aa,bb)>.45&&area/Math.max(Number.EPSILON,aa+bb-area)>.4&&
+    Math.abs(a.x+a.width/2-b.x-b.width/2)<Math.min(a.width,b.width)*.18&&
+    Math.abs(a.y+a.height/2-b.y-b.height/2)<Math.min(a.height,b.height)*.18;
 }
 export function unrotateRect(rect,turn){
   if(turn===90)return {x:rect.y,y:1-rect.x-rect.width,width:rect.height,height:rect.width};
@@ -13,8 +13,8 @@ export function unrotateRect(rect,turn){
   return {...rect};
 }
 export function clampRect(rect){
-  const x=Math.max(0,Math.min(.995,rect.x)),y=Math.max(0,Math.min(.995,rect.y));
-  return {x,y,width:Math.max(.005,Math.min(1-x,rect.width)),height:Math.max(.005,Math.min(1-y,rect.height))};
+  const x=Math.max(0,Math.min(.9995,rect.x)),y=Math.max(0,Math.min(.9995,rect.y));
+  return {x,y,width:Math.max(.0005,Math.min(1-x,rect.width)),height:Math.max(.0005,Math.min(1-y,rect.height))};
 }
 export function mergeFaces(saved,detected){return [...saved,...detected.filter(face=>!saved.some(label=>sameRegion(label.rect,face.rect)))].slice(0,150);}
 export function chooseFace(faces,point,size){
@@ -23,7 +23,7 @@ export function chooseFace(faces,point,size){
   if(inside.length>1){const smallest=Math.min(...inside.map(face=>face.rect.width*face.rect.height));for(let i=candidates.length-1;i>=0;i--)if(candidates[i].rect.width*candidates[i].rect.height>smallest*2)candidates.splice(i,1);}
   return candidates.sort((a,b)=>Math.hypot((point.x-a.rect.x-a.rect.width/2)*size.width,(point.y-a.rect.y-a.rect.height/2)*size.height)-Math.hypot((point.x-b.rect.x-b.rect.width/2)*size.width,(point.y-b.rect.y-b.rect.height/2)*size.height))[0]||null;
 }
-export function manualRect(point,size){const width=Math.min(.3,Math.max(.005,32/size.width)),height=Math.min(.4,Math.max(.005,32/size.height));return clampRect({x:Math.max(0,Math.min(1-width,point.x-width/2)),y:Math.max(0,Math.min(1-height,point.y-height/2)),width,height});}
+export function manualRect(point,size){const width=Math.min(.3,Math.max(.0005,32/size.width)),height=Math.min(.4,Math.max(.0005,32/size.height));return clampRect({x:Math.max(0,Math.min(1-width,point.x-width/2)),y:Math.max(0,Math.min(1-height,point.y-height/2)),width,height});}
 export function popoverPosition(face,panel,viewport){
   const gap=8,pad=8,left=viewport.left||0,top=viewport.top||0,right=left+viewport.width,bottom=top+viewport.height;
   const width=Math.min(panel.width,viewport.width-2*pad),height=Math.min(panel.height,viewport.height-2*pad);

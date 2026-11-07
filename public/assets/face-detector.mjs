@@ -1,4 +1,4 @@
-import {detectionSize} from './face-scan.mjs?v=1';
+import {detectionSize} from './face-scan.mjs?v=2';
 const cache=new Map();let worker=null,active=null,queued=null,nextId=0;
 function finish(error,faces){
   const job=active;if(!job)return;clearTimeout(job.timer);job.signal?.removeEventListener('abort',job.cancel);active=null;
@@ -10,11 +10,11 @@ async function run(){
   if(job.signal?.aborted){job.reject(new DOMException('Cancelled','AbortError'));return run();}
   active=job;
   try{
-    if(!worker){worker=new Worker(new URL('./face-detection-worker.mjs?v=4',import.meta.url),{type:'module'});worker.onmessage=event=>{if(event.data.id!==active?.id)return;const {faces,engine,partial}=event.data;if(faces){faces.engine=engine||'mediapipe';if(partial){active.partial=faces;active.onProgress?.(faces);return;}}finish(event.data.error?Error(event.data.error):null,faces);};worker.onerror=()=>{worker?.terminate();worker=null;finish(active?.partial?.length?null:Error('Face detection is unavailable'),active?.partial);};}
+    if(!worker){worker=new Worker(new URL('./face-detection-worker.mjs?v=5',import.meta.url),{type:'module'});worker.onmessage=event=>{if(event.data.id!==active?.id)return;const {faces,engine,partial}=event.data;if(faces){faces.engine=engine||'mediapipe';if(partial){active.partial=faces;active.onProgress?.(faces);return;}}finish(event.data.error?Error(event.data.error):null,faces);};worker.onerror=()=>{worker?.terminate();worker=null;finish(active?.partial?.length?null:Error('Face detection is unavailable'),active?.partial);};}
     const size=detectionSize(job.image.naturalWidth,job.image.naturalHeight),bitmap=await createImageBitmap(job.image,{resizeWidth:size.width,resizeHeight:size.height,resizeQuality:'high'});
     if(active!==job){bitmap.close();return;}
     if(job.signal?.aborted){bitmap.close();return finish(new DOMException('Cancelled','AbortError'));}
-    job.timer=setTimeout(()=>{worker?.terminate();worker=null;finish(job.partial?.length?null:Error('Face detection timed out'),job.partial);},45000);
+    job.timer=setTimeout(()=>{worker?.terminate();worker=null;finish(job.partial?.length?null:Error('Face detection timed out'),job.partial);},90000);
     worker.postMessage({id:job.id,bitmap},[bitmap]);
   }catch(error){if(active===job)finish(error);}
 }

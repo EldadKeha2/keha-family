@@ -44,6 +44,48 @@
     "pico/pico.mjs": {
       "bytes": 5618,
       "sha256": "de468f07bfff2bb19855b7bfbb064e69ebb4c32f775d97cacc621a1787e1b4cc"
+    },
+    "yunet/LICENSE": {
+      "bytes": 1085,
+      "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958"
+    },
+    "yunet/face_detection_yunet_2023mar.onnx": {
+      "bytes": 232589,
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+    },
+    "onnxruntime/LICENSE": {
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    "onnxruntime/ort-wasm-simd-threaded.mjs": {
+      "bytes": 20856,
+      "sha256": "30dd851d9c00622940500f71ddd2ff8820c5cb65270816080175b958705385a8"
+    },
+    "onnxruntime/ort-wasm-simd-threaded.wasm": {
+      "bytes": 11210254,
+      "sha256": "71aef04959c5c1b6de461b6538e2058e306610034a85aad2742d0c7fd4533fe4"
+    },
+    "onnxruntime/ort.wasm.min.mjs": {
+      "bytes": 48259,
+      "sha256": "6ef726f355b791129f7ddf3f62e7877a16b9b777abe87004b8ab306e6b9cf265"
+    },
+    "onnxruntime/ThirdPartyNotices.txt": {
+      "bytes": 326866,
+      "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
     }
+  },
+  "yunet": {
+    "source": "https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet",
+    "model": "face_detection_yunet_2023mar.onnx",
+    "license": "MIT",
+    "input": "BGR float32 [1,3,640,640] without normalization",
+    "purpose": "Face boxes and ephemeral landmark coordinates only; no identity descriptors"
+  },
+  "onnxruntime": {
+    "package": "onnxruntime-web",
+    "version": "1.22.0",
+    "source": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.22.0.tgz",
+    "license": "MIT",
+    "execution": "Single-threaded WASM; all runtime files hosted on this site"
   }
 }

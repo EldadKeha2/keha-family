@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {detectionSize} from '../public/assets/face-scan.mjs';
 import {detectionRegions} from '../public/assets/face-scan.mjs';
 import {clampRect,sameRegion,unrotateRect} from '../public/assets/face-geometry.mjs';
+import {sameDetection,projectYuNet,confirmYuNet} from '../public/assets/face-yunet.mjs';
 
 const source=(await readFile(new URL('../public/assets/face-detector.mjs',import.meta.url),'utf8'))
  .replace(/^import .*;\n/,'').replace('export function detectFaces','function detectFaces').replaceAll('import.meta.url',JSON.stringify('https://family.example/assets/face-detector.mjs'))+'\nglobalThis.detectFaces=detectFaces;';
@@ -63,7 +64,7 @@ test('the worker finds close small faces through fine crops, projects coordinate
  const FaceDetector={createFromOptions:async()=>({detect:tile=>{calls++;const [x,y,w,h]=tile.crop;return {detections:targets.filter(face=>face.x>=x&&face.y>=y&&face.x+face.width<=x+w&&face.y+face.height<=y+h&&face.width/w*128>=8).map(face=>({boundingBox:{originX:(face.x-x)*tile.width/w,originY:(face.y-y)*tile.height/h,width:face.width*tile.width/w,height:face.height*tile.height/h},categories:[{score:.9}]}))};}})};
  const pico={unpack_cascade:()=>{},run_cascade:image=>++picoCalls===1?[[height*.7,width*.8,24,12]]:[],cluster_detections:d=>d};
  const self={location:{href:'https://family.example/assets/face-detection-worker.mjs',origin:'https://family.example'},fetch:async()=>new Response(new ArrayBuffer(1)),postMessage:message=>messages.push(message)};
- vm.runInNewContext(workerSource,{FaceDetector,pico,clampRect,sameRegion,unrotateRect,detectionRegions,self,fetch:(...args)=>self.fetch(...args),OffscreenCanvas:Canvas,URL,Response});
+ vm.runInNewContext(workerSource,{FaceDetector,pico,clampRect,sameRegion,sameDetection,createYuNet:async()=>{throw Error('Detailed model unavailable');},unrotateRect,detectionRegions,self,fetch:(...args)=>self.fetch(...args),OffscreenCanvas:Canvas,URL,Response});
  await self.onmessage({data:{id:7,bitmap:{width,height,close(){closed=true;}}}});
  const final=messages.at(-1);assert.equal(final.partial,false);assert.equal(final.engine,'mediapipe+pico');assert.equal(closed,true);assert.equal(picoCalls,4);assert.ok(calls>5);
  for(const target of targets)assert.ok(final.faces.some(face=>Math.abs(face.rect.x-target.x/width)<1e-9&&Math.abs(face.rect.width-target.width/width)<1e-9),'Every face keeps its original normalized coordinates');

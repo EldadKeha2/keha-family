@@ -14,7 +14,7 @@ import {rexScore,REX_SCORE_LIMIT} from './rex-scores.mjs';
 import {netoTetrisScore,NETO_TETRIS_SCORE_LIMIT} from './neto-tetris-scores.mjs';
 import {rutiHouseScore,RUTI_HOUSE_SCORE_LIMIT,RUTI_HOUSE_SCORE_FIELDS} from './ruti-house-scores.mjs';
 import {nurseryCollection} from './nursery.mjs';
-import {faceRect,overlap,FACE_LIMIT} from './faces.mjs';
+import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -134,9 +134,9 @@ export class FamilyState {
     }
     if(p.name!==undefined?(p.personId!==undefined||typeof p.name!=='string'):typeof p.personId!=='string')throw new HttpError(400,'בחרו אדם מהרשימה או הזינו שם חדש.');
     const selection=p.name===undefined?{personId:p.personId}:{name:p.name},rect=faceRect(p.rect);
-    const tagged=new Set(this.tagIds(item.id)),replaced=faces.filter(face=>face.id!==p.faceId&&!tagged.has(face.personId)&&overlap(face.rect,rect)>.6);
+    const tagged=new Set(this.tagIds(item.id)),replaced=faces.filter(face=>face.id!==p.faceId&&!tagged.has(face.personId)&&sameFaceRegion(face.rect,rect));
     if(!previous&&faces.length-replaced.length>=FACE_LIMIT)throw new HttpError(400,'אפשר לתייג עד 150 אזורי פנים בתמונה.');
-    if(faces.some(face=>face.id!==p.faceId&&tagged.has(face.personId)&&overlap(face.rect,rect)>.6))throw new HttpError(409,'אזור הפנים הזה כבר תויג. פתחו אותו מחדש כדי לשנות את השם.');
+    if(faces.some(face=>face.id!==p.faceId&&tagged.has(face.personId)&&sameFaceRegion(face.rect,rect)))throw new HttpError(409,'אזור הפנים הזה כבר תויג. פתחו אותו מחדש כדי לשנות את השם.');
     // A face label and its ordinary photo tag are saved in the same transaction.
     // Resolve free names through the same roster as ordinary tags, so existing
     // names are reused and an invalid or conflicting face cannot leave an orphan.
