@@ -24,14 +24,14 @@ function gameAt(level){
   assert.equal(g.level,level,'fixture must complete each stage and its guest objective before advancing');g.events=[];return g;
 }
 
-function fixture({english=false,startLevel=1,failSave=false,initialScores=[]}={}){
+function fixture({english=false,startLevel=1,failSave=false,initialScores=[],width=960,height=600}={}){
   let now=100000,sequence=0,backs=0,game=null,actor=null,html='',saveStatus=failSave?503:200;
   const nodes=new Map(),listeners=new Map(),frames=new Map(),requests=[],writes=[],sounds=[],draws=[];
   const register=(target,type,fn,{signal}={})=>{const key=`${target}.${type}`;if(!listeners.has(key))listeners.set(key,new Set());listeners.get(key).add(fn);signal?.addEventListener('abort',()=>listeners.get(key)?.delete(fn),{once:true});};
   const emit=(target,type,event={})=>{for(const fn of [...listeners.get(`${target}.${type}`)||[]])fn(event);};
   const context=new Proxy({},{get:(target,key)=>key in target?target[key]:()=>{}});
   const body=()=>html+[...nodes.values()].map(n=>n.innerHTML).join('');
-  function node(dataset={}){const classes=new Set();return {dataset,width:960,height:600,style:{setProperty(name,value){this[name]=value;}},classList:{add(value){classes.add(value);},remove(value){classes.delete(value);},toggle(value,on){if(on===undefined)on=!classes.has(value);if(on)classes.add(value);else classes.delete(value);return on;},contains(value){return classes.has(value);}},textContent:'',innerHTML:'',hidden:false,disabled:false,attributes:{},setAttribute(name,value){this.attributes[name]=value;},getContext:()=>context,focus(){},scrollIntoView(){},animate(){},getBoundingClientRect:()=>({left:0,top:0,width:960,height:600})};}
+  function node(dataset={}){const classes=new Set();return {dataset,width,height,style:{setProperty(name,value){this[name]=value;}},classList:{add(value){classes.add(value);},remove(value){classes.delete(value);},toggle(value,on){if(on===undefined)on=!classes.has(value);if(on)classes.add(value);else classes.delete(value);return on;},contains(value){return classes.has(value);}},textContent:'',innerHTML:'',hidden:false,disabled:false,attributes:{},setAttribute(name,value){this.attributes[name]=value;},getContext:()=>context,focus(){},scrollIntoView(){},animate(){},getBoundingClientRect:()=>({left:0,top:0,width,height})};}
   const root={classList:{add(){},remove(){}},addEventListener:(type,fn,options)=>register('root',type,fn,options),get innerHTML(){return html;},set innerHTML(value){html=value;nodes.clear();},querySelector(selector){
     const present=selector.startsWith('[')?body().includes(selector.slice(1,-1)):body().includes(selector.slice(1));if(!present)return null;
     if(!nodes.has(selector))nodes.set(selector,node());const found=nodes.get(selector);if(selector==='[data-rh-begin-stage]'){const tag=body().match(/<button[^>]*data-rh-begin-stage[^>]*>/)?.[0]||'';found.disabled=/\sdisabled(?:\s|>)/.test(tag);}return found;
@@ -118,6 +118,22 @@ test('the first stage shows only two tools and four unnamed pots, starts safely 
     }
     assert.equal(new Set(slots.slice(0,4)).size,4);assert.equal(f.game.stageCompleted,6);assert.equal(engine.firstStagePace(f.game).untimed,false);
     await finishWateringStage(f);assert.equal(f.game.stats.plants,30);assert.equal(f.game.wateredSlots.length,30);assert.equal(new Set(f.game.wateredSlots).size,4);assert.ok(f.game.stats.dust>0);assert.equal(f.game.stageCompleted,30);assert.equal(f.game.completedLevels,1);assert.equal(f.game.phase,'stage-complete');
+  }
+});
+
+test('portrait canvases complete all four opening plant positions through the ordinary tool and target controls',async()=>{
+  for(const [width,height] of [[388,544.6],[390,570],[320,500]])for(const english of [false,true]){
+    const f=fixture({width,height,english});await f.start();
+    const slots=[];await f.choose('water');
+    for(let count=1;count<=4;count++){
+      f.until(()=>f.game.tasks.some(task=>task.type==='plant'));
+      const task=f.game.tasks.find(task=>task.type==='plant');slots.push(task.slot);
+      await f.act(task.id);
+      assert.equal(f.state.motion.busy,true,`target ${task.slot} at ${width}×${height} must start walking or watering`);
+      f.until(()=>f.game.stats.plants===count,15000);
+      assert.ok(f.game.score>0);assert.equal(f.actor.walking,false);assert.equal(f.actor.action,null);
+    }
+    assert.equal(new Set(slots).size,4,'every permanent plant is reachable from the opening and previous interaction');
   }
 });
 
