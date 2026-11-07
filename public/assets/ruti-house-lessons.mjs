@@ -1,5 +1,6 @@
 // Shown immediately before a new activity is introduced, after the home screen.
-// Stages 8–10 build on these skills and introduce no additional lesson.
+// Familiar faster rounds (2 and 4) begin immediately, without repeating lessons.
+// Stages 8–10 also build on familiar skills.
 export const HOUSE_LESSONS = Object.freeze({
   1: {
     he: 'קודם, קצת מים לעציצים',
@@ -21,38 +22,18 @@ export const HOUSE_LESSONS = Object.freeze({
     retryHe: 'העציץ צריך מים. חפשו את המשפך ונסו שוב.',
     retryEn: 'The plant needs water. Look for the watering can and try again.'
   },
-  2: {
-    he: 'עוד פינות נקיות בבית',
-    en: 'More clean corners in the house',
-    icons: ['broom', 'dust', 'water'],
-    steps: [
-      { he: 'ממשיכים להשקות את העציצים כשהם זוהרים.', en: 'Keep watering the plants when they glow.' },
-      { he: 'כשמופיע אבק, בוחרים מטאטא ולוחצים על ענן האבק. הכלי מתחלף מיד ביד.', en: 'When dust appears, select the broom and tap the dust cloud. The tool switches in hand instantly.' },
-      { he: 'האבק לא מחכה לנצח. מחליפים כלי לפי המשימה ומגיעים בזמן.', en: 'Dust will not wait forever. Switch tools to match the task and arrive in time.' }
-    ],
-    question: { he: 'באיזה כלי מנקים אבק?', en: 'Which tool cleans the dust?' },
-    answers: [
-      { he: 'מטאטא', en: 'Broom' },
-      { he: 'משפך', en: 'Watering can' }
-    ],
-    correctIndex: 0,
-    successHe: 'נכון! המטאטא מחזיר את הבית להיות מבריק.',
-    successEn: 'Right! The broom makes the house sparkle again.',
-    retryHe: 'המשפך מיועד לעציצים. בשביל האבק בוחרים מטאטא.',
-    retryEn: 'The watering can is for plants. Dust needs the broom.'
-  },
   3: {
     he: 'מי מחכה ליד הדלת?',
     en: 'Who is waiting by the door?',
     icons: ['hand', 'cat', 'water'],
     steps: [
-      { he: 'שומרים על העציצים ומציצים גם בשתי הדלתות.', en: 'Care for the plants and keep an eye on both doors.' },
-      { he: 'כשרואים חתול, בוחרים את היד עם הכיתוב ״לכו מפה!״.', en: 'When a cat appears, choose the hand marked “Shoo!”.' },
-      { he: 'לוחצים על החתול. רותי ניגשת ומבריחה אותו לפני שייכנס.', en: 'Tap the cat. Ruti walks over and shoos it away before it gets inside.' }
+      { he: 'ממשיכים להשקות ולטאטא, ושומרים על הכניסה הראשית ועל הדלת האחורית הקטנה.', en: 'Keep watering and sweeping, and watch the main entrance and the small back door.' },
+      { he: 'כשרואים חתול, בוחרים את היד עם הכיתוב ״לכו מפה״.', en: 'When a cat appears, choose the hand marked “Shoo!”.' },
+      { he: 'החתולים מתגנבים לאט. לוחצים על החתול עם היד כדי להבריח אותו. שלושה חתולים שנכנסו מסיימים את המשחק.', en: 'The cats sneak in slowly. Choose the hand and tap a cat to shoo it away. Three cats inside end the game.' }
     ],
     question: { he: 'מה בוחרים כדי להבריח חתול?', en: 'What do you select to shoo a cat away?' },
     answers: [
-      { he: 'היד של ״לכו מפה!״', en: 'The “Shoo!” hand' },
+      { he: 'היד של ״לכו מפה״', en: 'The “Shoo!” hand' },
       { he: 'מגש אוכל', en: 'Serving tray' }
     ],
     correctIndex: 0,
@@ -60,26 +41,6 @@ export const HOUSE_LESSONS = Object.freeze({
     successEn: 'Shoo! Now you know how to guard the door.',
     retryHe: 'את המגש שומרים למשפחה. חתולים מבריחים עם היד.',
     retryEn: 'Save the tray for the family. Shoo cats away with the hand.'
-  },
-  4: {
-    he: 'העציצים, האבק והחתולים ביחד',
-    en: 'Plants, dust and cats together',
-    icons: ['water', 'broom', 'hand'],
-    steps: [
-      { he: 'משפך לעציצים, מטאטא לאבק, ויד כדי להבריח חתולים.', en: 'Watering can for plants, broom for dust, and hand to shoo cats.' },
-      { he: 'בוחרים את הכלי הנכון, ואז את החפץ שצריך טיפול.', en: 'Choose the right tool, then the object that needs attention.' },
-      { he: 'חתול שנכנס הוא פסילה. שלוש פסילות מסיימות את המשחק.', en: 'A cat entering costs a life. Three cats entering end the game.' }
-    ],
-    question: { he: 'איזה אירוע גורם לפסילה?', en: 'Which event costs a life?' },
-    answers: [
-      { he: 'חתול הצליח להיכנס לבית', en: 'A cat gets inside the house' },
-      { he: 'ענן אבק נעלם לפני שניקינו', en: 'A dust cloud disappears before it is cleaned' }
-    ],
-    correctIndex: 0,
-    successHe: 'נכון. שומרים במיוחד על הדלתות!',
-    successEn: 'Right. Give the doors extra attention!',
-    retryHe: 'אבק שפספסנו לא מוריד חיים. חתול שנכנס לבית כן.',
-    retryEn: 'Missed dust does not cost a life. A cat getting inside does.'
   },
   5: {
     he: 'מישהו הגיע לאכול',

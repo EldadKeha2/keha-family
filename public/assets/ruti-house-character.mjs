@@ -29,12 +29,31 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
  else if(time<(actor.expressionUntil??0))frame=actor.expression==='cheer'?9:actor.expression==='concern'?10:0;
  else if(blinking)frame=11;
  const cycle=reduced?0:Math.sin(time*(walking?12:1.9));
- const dance=reduced?0:Math.sin(time*7.8);
- return {frame,lift:reduced?0:celebrating?Math.abs(dance)*4.5:walking?Math.abs(cycle)*1.8:accent*.45,
-  lean:reduced?0:celebrating?dance*.045:action==='broom'?Math.sin(time*10)*.028:action==='hand'?Math.sin(time*14)*.025:cycle*.008+(talking?Math.sin(speechAge*3.1)*.009+accent*.006:0),
-  breath:reduced?1:1+Math.sin(time*1.9)*.006+(celebrating?Math.sin(time*7.8)*.002:0),talking,
-  headTilt:reduced?0:(talking?Math.sin(speechAge*3.1)*.008+accent*.004:Math.sin(time*.83)*.004),
-  headLift:reduced?0:(talking?accent*.0025:Math.sin(time*1.9)*.0008)};
+ // Music can supply its beat duration. Head articulation and the right/left
+ // Yemenite step share that beat while the real broom stays in her hands.
+ const beatSeconds=Number.isFinite(actor.celebrationBeatSeconds)&&actor.celebrationBeatSeconds>0?Math.max(.18,Math.min(1.2,actor.celebrationBeatSeconds)):.3;
+ const songAge=Math.max(0,time-(actor.celebrationStartedAt??0)),songPosition=songAge/beatSeconds,songBeat=Math.floor(songPosition),songPart=songPosition%1;
+ const danceStep=songBeat%4,danceSide=songBeat%8<4?1:-1,dancing=celebrating&&!reduced;
+ const transfer=Math.min(1,songPart/.68),ease=transfer*transfer*(3-2*transfer);
+ const weight=[.025,-.014,.007,.007,-.025,.014,-.007,-.007],depth=[-.006,0,.004,.004,-.006,0,.004,.004],stepIndex=songBeat%8;
+ const blend=values=>values[(stepIndex+7)%8]+(values[stepIndex]-values[(stepIndex+7)%8])*ease;
+ // Three grounded weight transfers are followed by an entire still beat. The
+ // next four-beat measure mirrors the leading foot and changes weight back.
+ const pulse=dancing&&danceStep<3?Math.sin(songPart*Math.PI):0;
+ const leadFoot=danceStep!==1,activeRight=danceSide>0?leadFoot:!leadFoot;
+ const footShift=pulse*(leadFoot?.012:-.008)*danceSide;
+ const heldNote=songBeat%8===7&&songPart<.4;
+ const singing=celebrating&&(songBeat%8!==7||heldNote);
+ const headFrame=!celebrating?frame:reduced?0:blinking?11:!singing?0:heldNote?8:songPart<.09||songPart>.82?0:songPart<.53?7:8;
+ return {frame,headFrame,singing,danceStep,danceSide,
+  danceX:dancing?blend(weight):0,danceDepth:dancing?blend(depth):0,
+  footLeftX:dancing&&!activeRight?footShift:0,footRightX:dancing&&activeRight?footShift:0,
+  footLeftLift:dancing&&!activeRight?pulse*.015:0,footRightLift:dancing&&activeRight?pulse*.015:0,
+  lift:reduced?0:celebrating?pulse*1.5:walking?Math.abs(cycle)*1.8:accent*.45,
+  lean:reduced?0:celebrating?blend(weight)*1.1:action==='broom'?Math.sin(time*10)*.028:action==='hand'?Math.sin(time*14)*.025:cycle*.008+(talking?Math.sin(speechAge*3.1)*.009+accent*.006:0),
+  breath:reduced?1:1+Math.sin(time*1.9)*.006+(celebrating?pulse*.002:0),talking,
+  headTilt:reduced?0:(celebrating?Math.sin(songPosition*Math.PI*.5)*.02:talking?Math.sin(speechAge*3.1)*.008+accent*.004:Math.sin(time*.83)*.004),
+  headLift:reduced?0:(celebrating?pulse*.003:talking?accent*.0025:Math.sin(time*1.9)*.0008)};
 }
 
 const LINES=Object.freeze({

@@ -1,6 +1,6 @@
-import {iconArtwork} from './ruti-house-art.mjs';
-import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=1';
-import {drawDustSignal} from './ruti-house-dust.mjs?v=2';
+import {iconArtwork} from './ruti-house-art.mjs?v=3';
+import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=3';
+import {drawDustSignal} from './ruti-house-dust.mjs?v=3';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -41,7 +41,7 @@ export function getHouseLayout(width,height){
    return {x,y,slot,variety:PLANT_VARIETIES[slot].id,hitRadius:portrait?.10:.08,anchor:{x:x+(x>.7?-55:55)/width,y:y+24/height},
     signal:{x:signal.cx/width,y:(signal.by+signal.h/2)/height,hitRadius:signal.w/(2*M)}};
   });
- const doors=[{x:.945,y:.765,hitRadius:.071,anchor:{x:.945-55/width,y:.765},side:'right'},{x:.045,y:.55,hitRadius:.071,anchor:{x:.045+55/width,y:.55},side:'left'}];
+ const doors=[{x:.945,y:.765,hitRadius:.071,anchor:{x:.945-55/width,y:.765},side:'right',kind:'main',visualScale:1.35},{x:.045,y:.55,hitRadius:.071,anchor:{x:.045+55/width,y:.55},side:'left',kind:'back',visualScale:.8}];
  const sofa=portrait?{x:.48,y:.43,w:.28,h:.105}:{x:.50,y:.43,w:.26,h:.125};
  const table=portrait?{x:.45,y:.68,w:.26,h:.09}:{x:.47,y:.68,w:.25,h:.105};
  const counter={x:.045,y:.13,w:portrait?.91:.74,h:portrait?.155:.18};
@@ -113,7 +113,7 @@ function line(ctx,x1,y1,x2,y2,color,width=2){ctx.beginPath();ctx.moveTo(x1,y1);c
 function polygon(ctx,points,fill,stroke=null){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}}
 function imageReady(image){return image&&image.complete&&image.naturalWidth>0;}
 function icon(ctx,images,id,x,y,size){const image=images?.icons?.[id];if(imageReady(image)){ctx.drawImage(image,x-size/2,y-size/2,size,size);return true;}return false;}
-function label(ctx,text,x,y,{size=12,color='#574634',align='center',weight='600',halo=true}={}){ctx.font=`${weight} ${size}px system-ui,sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';if(halo){ctx.strokeStyle='#fff6df';ctx.lineWidth=4;ctx.strokeText(text,x,y);}ctx.fillStyle=color;ctx.fillText(text,x,y);}
+function label(ctx,text,x,y,{size=12,color='#574634',align='center',weight='600',halo=true}={}){ctx.direction=/[\u0590-\u05ff]/.test(text)?'rtl':'ltr';ctx.font=`${weight} ${size}px system-ui,sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';if(halo){ctx.strokeStyle='#fff6df';ctx.lineWidth=4;ctx.strokeText(text,x,y);}ctx.fillStyle=color;ctx.fillText(text,x,y);}
 function halo(ctx,x,y,r,time,color='#dfa742',urgent=false){const pulse=.5+.5*Math.sin(time*(urgent?9:4));const gradient=ctx.createRadialGradient(x,y,r*.15,x,y,r*1.8);gradient.addColorStop(0,color+'77');gradient.addColorStop(1,color+'00');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(x,y,r*(1.45+pulse*.15),0,Math.PI*2);ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=2+pulse;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(x,y,r*(1.05+pulse*.05),0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
 function timer(ctx,x,y,r,task){
  if(task.untimed)return;
@@ -196,15 +196,15 @@ function drawPlantHalo(ctx,x,y,size,task,time,reduced){
  ctx.strokeStyle='#00aee5';ctx.lineWidth=2.5;ctx.stroke();
  ctx.restore();
 }
-function drawPlantSignal(ctx,x,y,size,task,{english,width}){
+function drawPlantSignal(ctx,x,y,size,task,{english,width,showLabel=true}){
  const ratio=task.untimed?1:clamp(task.remaining/task.total,0,1),urgent=!task.untimed&&ratio<.3;
- const {w,h,cx,bx,by}=plantSignalGeometry(x,y,size,width),color=urgent?'#b9233d':'#00648c';
+ const geometry=plantSignalGeometry(x,y,size,width),{h,cx,by}=geometry,w=showLabel?geometry.w:28,bx=cx-w/2,color=urgent?'#b9233d':'#00648c';
  ctx.save();ctx.lineWidth=2;
  polygon(ctx,[[x-8,by+h-1],[x+8,by+h-1],[x,by+h+10]],'#ffffff','#123e4b');
  box(ctx,bx,by,w,h,color,'#ffffff',7);
  // A large water drop supplements the text and urgent color change.
- const dx=bx+12,dy=by+10;ctx.beginPath();ctx.moveTo(dx,dy-7);ctx.bezierCurveTo(dx-1,dy-4,dx-6,dy,dx-6,dy+3);ctx.bezierCurveTo(dx-6,dy+10,dx+6,dy+10,dx+6,dy+3);ctx.bezierCurveTo(dx+6,dy,dx+1,dy-4,dx,dy-7);ctx.fillStyle='#bff5ff';ctx.fill();
- label(ctx,urgent?(english?'Hurry!':'מהר!'):(english?'Water!':'מים!'),cx-1,by+h/2,{size:10,color:'#ffffff',halo:false,weight:'900'});
+ const dx=showLabel?bx+12:cx,dy=by+10;ctx.beginPath();ctx.moveTo(dx,dy-7);ctx.bezierCurveTo(dx-1,dy-4,dx-6,dy,dx-6,dy+3);ctx.bezierCurveTo(dx-6,dy+10,dx+6,dy+10,dx+6,dy+3);ctx.bezierCurveTo(dx+6,dy,dx+1,dy-4,dx,dy-7);ctx.fillStyle='#bff5ff';ctx.fill();
+ if(showLabel)label(ctx,urgent?(english?'Hurry!':'מהר!'):(english?'Water!':'מים!'),cx-1,by+h/2,{size:10,color:'#ffffff',halo:false,weight:'900'});
  if(!task.untimed){
   const barY=y+size*.84;box(ctx,x-size*.49,barY,size*.98,7,'#123e4b','#ffffff',3);
   if(ratio>0)box(ctx,x-size*.49+1,barY+1,(size*.98-2)*ratio,5,urgent?'#f65c62':'#00d5f1',null,2);
@@ -219,7 +219,7 @@ function drawDust(ctx,x,y,size,time,remaining){
  ctx.restore();
 }
 
-function drawCat(ctx,x,y,size,time,progress,side){
+function drawCat(ctx,x,y,size,time,progress,side,showLabel=true){
  ctx.save();ctx.translate(x,y);if(side==='left')ctx.scale(-1,1);const s=size/64;ctx.scale(s,s);ctx.lineWidth=2;ctx.lineCap='round';
  ellipse(ctx,0,22,27,6,'#543d2926');
  ctx.save();ctx.translate(20,4);ctx.rotate(Math.sin(time*3)*.18);ctx.beginPath();ctx.moveTo(0,9);ctx.bezierCurveTo(22,7,19,-14,11,-15);ctx.strokeStyle='#aa8058';ctx.lineWidth=7;ctx.stroke();ctx.restore();
@@ -229,7 +229,7 @@ function drawCat(ctx,x,y,size,time,progress,side){
  polygon(ctx,[[-24,-20],[-23,-13],[-18,-18]],'#d29b93');polygon(ctx,[[-7,-20],[-13,-18],[-8,-14]],'#d29b93');
  ellipse(ctx,-23,-8,2,2.6,'#4f4d36');ellipse(ctx,-10,-8,2,2.6,'#4f4d36');polygon(ctx,[[-18,-2],[-14,-2],[-16,1]],'#b47770');
  line(ctx,-27,-1,-37,-3,'#786249',1);line(ctx,-27,3,-37,5,'#786249',1);line(ctx,-7,0,2,-3,'#786249',1);
- if(progress>.7)label(ctx,'!',5,-34,{size:20,color:'#c14f35'});
+ if(showLabel&&progress>.7)label(ctx,'!',5,-34,{size:20,color:'#c14f35'});
  ctx.restore();
 }
 
@@ -260,27 +260,61 @@ const RUTI_PIVOTS=[197.5,165,162.5,105,165,154.5,183.5,167,197.5,179,172,168];
 const RUTI_NECKLINES=[106,106,106,110,108,108,110,108,108,110,108,110];
 const RUTI_ORIENTATIONS=[-1,1,1,1,1,1,-1,-1,-1,-1,-1,-1];
 const RUTI_BODY_WIDTH=.91;
+// Speech poses share Ruti's face but use different registration and direction.
+// Neck anchors align their original, unstretched head pixels to the broom body.
+const RUTI_SPEECH_HEADS={
+ 0:{x:169,w:111,neckX:214,neckY:101},7:{x:137,w:114,neckX:180,neckY:101},
+ 8:{x:166,w:115,neckX:211,neckY:101},11:{x:143,w:109,neckX:181,neckY:101}
+};
 function drawRutiFrame(ctx,atlas,frame,height,pose){
  const cw=atlas.naturalWidth/RUTI_ATLAS.columns,ch=atlas.naturalHeight/RUTI_ATLAS.rows;
  const sx=(frame%4)*cw+.5,sy=Math.floor(frame/4)*ch+.5,scale=height/345;
  const neck=RUTI_NECKLINES[frame],pivot=RUTI_PIVOTS[frame];
- function strip(top,bottom,narrow){
+ function strip(top,bottom,narrow,{left=0,right=frame===3&&top>=190?244:362}={}){
   // The watering image includes a static spray beyond the real nozzle. Trim
   // only that spray and replace it with droplets that land on the chosen pot.
-  const right=frame===3&&top>=190?244:362;
   // Adjacent transformed strips overlap slightly so subpixel rasterization
   // cannot expose hairline gaps across the blouse during the larger dance.
   const from=Math.max(0,top-.75),to=Math.min(362,bottom+.75);
-  ctx.drawImage(atlas,sx,sy+from/362*(ch-1),right/362*(cw-1),(to-from)/362*(ch-1),
-   -pivot*scale*narrow,(from-355)*scale,right*scale*narrow,(to-from)*scale);
+  ctx.drawImage(atlas,sx+left/362*(cw-1),sy+from/362*(ch-1),(right-left)/362*(cw-1),(to-from)/362*(ch-1),
+   (left-pivot)*scale*narrow,(from-355)*scale,(right-left)*scale*narrow,(to-from)*scale);
  }
  ctx.save();const neckY=(neck-355)*scale;
  ctx.translate(0,neckY);ctx.rotate(pose.headTilt||0);ctx.translate(0,-neckY+(pose.headLift||0)*height);
- strip(0,neck,1);ctx.restore();
+ const speechHead=frame===4?RUTI_SPEECH_HEADS[pose.headFrame]:null;
+ if(speechHead){
+  // Keep the leaning shoulders and arms, but exclude the original broom
+  // head silhouette so the animated head can never produce a double face.
+  ctx.save();ctx.beginPath();ctx.rect(-pivot*scale,-355*scale,362*scale,(neck+1)*scale);
+  for(const [i,[hx,hy]] of [[155,0],[280,0],[280,109],[210,109],[180,102],[164,87],[155,70]].entries()){
+   const px=(hx-pivot)*scale,py=(hy-355)*scale;i?ctx.lineTo(px,py):ctx.moveTo(px,py);
+  }
+  ctx.closePath();ctx.clip('evenodd');strip(0,neck,1);ctx.restore();
+  ctx.save();ctx.translate((198-pivot)*scale,(105-355)*scale);ctx.scale(-1,1);
+  const headX=(pose.headFrame%4)*cw+.5+speechHead.x/362*(cw-1),headY=Math.floor(pose.headFrame/4)*ch+.5;
+  ctx.beginPath();
+  for(const [i,[hx,hy]] of [[speechHead.x,0],[speechHead.x+speechHead.w,0],[speechHead.x+speechHead.w,90],[speechHead.neckX+27,98],[speechHead.neckX+17,104],[speechHead.neckX-17,104],[speechHead.neckX-25,96],[speechHead.x,90]].entries()){
+   const px=(hx-speechHead.neckX)*scale,py=(hy-speechHead.neckY)*scale;i?ctx.lineTo(px,py):ctx.moveTo(px,py);
+  }
+  ctx.closePath();ctx.clip();
+  ctx.drawImage(atlas,headX,headY,speechHead.w/362*(cw-1),104/362*(ch-1),
+   (speechHead.x-speechHead.neckX)*scale,-speechHead.neckY*scale,speechHead.w*scale,104*scale);
+  ctx.restore();
+ }else strip(0,neck,1);
+ ctx.restore();
  for(let i=0;i<6;i++){const top=neck+i*6;strip(top,top+6,1-(1-RUTI_BODY_WIDTH)*(i+.5)/6);}
  const bodyTop=neck+36;
  if(frame===3){strip(bodyTop,190,RUTI_BODY_WIDTH);strip(190,362,RUTI_BODY_WIDTH);}
- else strip(bodyTop,362,RUTI_BODY_WIDTH);
+ else if(frame===4&&speechHead){
+  // Three weight transfers and a held beat alternate the grounded feet. The
+  // broom bristles stay attached to their shaft while each foot takes its step.
+  strip(bodyTop,310,RUTI_BODY_WIDTH);
+  ctx.save();ctx.translate((pose.footLeftX||0)*height,-(pose.footLeftLift||0)*height);
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:0,right:130});ctx.restore();
+  ctx.save();ctx.translate((pose.footRightX||0)*height,-(pose.footRightLift||0)*height);
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:130,right:205});ctx.restore();
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:205,right:362});
+ }else strip(bodyTop,362,RUTI_BODY_WIDTH);
 }
 
 /** World-pixel geometry keeps the nozzle and stream aimed at the actual pot. */
@@ -305,7 +339,7 @@ function drawRuti(ctx,x,y,height,actor,images,time,reduced,waterTarget=null){
  const pose=rutiPose(actor,time,{reduced}),atlas=images.rutiAtlas;
  const watering=actor.action==='water'&&waterTarget?getRutiWateringGeometry({x,y},waterTarget,height,pose):null;
  const direction=(watering?.facing??(actor.facing<0?-1:1))*RUTI_ORIENTATIONS[pose.frame];
- ctx.save();ctx.translate(x,y);
+ ctx.save();ctx.translate(x+(pose.danceX||0)*height,y+(pose.danceDepth||0)*height);
  ellipse(ctx,0,-1,height*.21,height*.045,'#4c382c35');
  ctx.translate(0,-pose.lift);ctx.rotate(pose.lean);ctx.scale(direction,pose.breath);
  drawRutiFrame(ctx,atlas,pose.frame,height,pose);
@@ -324,9 +358,13 @@ function drawRuti(ctx,x,y,height,actor,images,time,reduced,waterTarget=null){
 }
 
 /** Large broom dance on the existing scene canvas; all motion uses game time. */
-export function drawRutiCelebration(ctx,{width,height,time=0,reduced=false,images={},actor={},progress=1}={}){
- const entrance=reduced?1:1-Math.pow(1-clamp(progress/.12,0,1),3);
- const dancerHeight=Math.min(height*.56,width*.73,350),cx=width*.5,feet=height*.83;
+export function drawRutiCelebration(ctx,{width,height,time=0,reduced=false,images={},actor={},progress=1,withMusic=false}={}){
+ const entrance=reduced?1:1-Math.pow(1-clamp(progress,0,1),3);
+ const smallMusic=withMusic&&width<=700,cx=withMusic&&!smallMusic?width*.39:width*.5;
+ // The real music player remains visible beside the dancer on desktop and
+ // below her on phones; its reserved space also leaves the Next footer clear.
+ const feet=smallMusic?height-305:Math.min(height*.83,height-78);
+ const dancerHeight=smallMusic?Math.max(60,Math.min(height*.35,width*.63,height-380)):Math.min(height*.56,width*.73,350,feet-height*.25);
  ctx.save();ctx.fillStyle='#fff8e6e8';ctx.fillRect(0,0,width,height);
  const glow=ctx.createRadialGradient(cx,feet-dancerHeight*.48,10,cx,feet-dancerHeight*.48,dancerHeight*.73);
  glow.addColorStop(0,'#fffdf5');glow.addColorStop(1,'#fff8d600');ctx.fillStyle=glow;ctx.fillRect(0,height*.2,width,height*.68);
@@ -345,7 +383,7 @@ export function drawRutiCelebration(ctx,{width,height,time=0,reduced=false,image
 function drawRutiSpeech(ctx,x,y,height,actor,time,width){
  if(!actor.speechText||time>=(actor.speechUntil||0))return;
  const fontSize=clamp(width*.025,11,14),padding=11,maxWidth=Math.min(210,width-18);
- ctx.save();ctx.font=`700 ${fontSize}px system-ui,sans-serif`;
+ ctx.save();ctx.direction=/[\u0590-\u05ff]/.test(actor.speechText)?'rtl':'ltr';ctx.font=`700 ${fontSize}px system-ui,sans-serif`;
  const words=actor.speechText.split(' '),lines=[];let current='';
  for(const word of words){const next=current?`${current} ${word}`:word;if(current&&ctx.measureText(next).width>maxWidth-padding*2){lines.push(current);current=word;}else current=next;}
  if(current)lines.push(current);
@@ -470,12 +508,12 @@ function drawRoom(ctx,l,{time,english,reduced}){
  // Low bookshelf in the foreground gives depth to the room.
  const bx=W*.21,by=H*.933,bw=W*.34,bh=H*.049;box(ctx,bx,by,bw,bh,'#b88b5f','#8e6845',3);for(let i=0;i<12;i++){const x=bx+5+i*(bw-10)/12;box(ctx,x,by+5,(bw-16)/14,bh-9,['#809984','#ba8065','#d0af69','#a8b092'][i%4],null,1);}
  // Doorways physically open to a sunny strip of outdoor garden.
- for(const door of l.doors){const dx=door.x*W,dy=door.y*H,dw=M*.105,dh=M*.19,sgn=door.side==='left'?1:-1;
+ for(const door of l.doors){const dw=M*.105*door.visualScale,dh=M*.19*door.visualScale,dx=clamp(door.x*W,dw*.5+2,W-dw*.5-2),dy=door.y*H,sgn=door.side==='left'?1:-1;
   box(ctx,dx-dw*.5,dy-dh,dw,dh+M*.02,'#b9ca9a','#977652',4);box(ctx,dx-dw*.38,dy-dh*.93,dw*.76,dh*.93,'#dce0b0',null,2);
   for(let i=0;i<3;i++)ellipse(ctx,dx+sgn*(dw*.12+i*dw*.1),dy-dh*.25-i*dh*.08,dw*.19,dh*.18,'#9fb57e66');
   polygon(ctx,[[dx+sgn*dw*.48,dy-dh],[dx+sgn*dw*.10,dy-dh*.82],[dx+sgn*dw*.10,dy],[dx+sgn*dw*.48,dy]],'#ad7e53','#80603f');ellipse(ctx,dx+sgn*dw*.18,dy-dh*.42,M*.005,M*.005,'#e5c58c');
   ellipse(ctx,dx-sgn*dw*.45,dy+M*.025,dw*.75,M*.026,'#b7885f','#946c46');line(ctx,dx-dw*.4,dy+M*.02,dx+dw*.4,dy+M*.02,'#d8b385',1.5);
-  label(ctx,door.side==='right'?(english?'Welcome':'ברוכים הבאים'):(english?'Side door':'דלת צדדית'),dx-sgn*dw*.30,dy+M*.038,{size:clamp(M*.019,8,11),color:'#765c3e',weight:'500',halo:false});
+  label(ctx,door.side==='right'?(english?'Welcome':'ברוכים הבאים'):(english?'Back door':'דלת אחורית'),dx-sgn*dw*.30,dy+M*.038,{size:clamp(M*.019,8,11),color:'#765c3e',weight:'500',halo:false});
  }
  // Soft diagonal sunlight and edge shading integrate the furniture.
  ctx.save();ctx.globalAlpha=.075;polygon(ctx,[[W*.84,H*.31],[W,H*.31],[W*.70,H*.94],[W*.42,H*.94]],'#fff4bf');ctx.restore();
@@ -485,7 +523,7 @@ function drawRoom(ctx,l,{time,english,reduced}){
 
 export function renderHouse(ctx,g,visual={},options={}){
  const width=options.width||ctx.canvas.width,height=options.height||ctx.canvas.height,time=options.time||0,reduced=!!options.reduced,images=options.images||{},english=!!options.english;
- const l=getHouseLayout(width,height),M=Math.min(width,height),pulseTime=reduced?0:time;
+ const l=getHouseLayout(width,height),M=Math.min(width,height),pulseTime=reduced?0:time,showTaskLabels={plant:true,dust:true,cat:true,...visual.showTaskLabels};
  ctx.save();ctx.clearRect(0,0,width,height);ctx.lineCap='round';drawRoom(ctx,l,{time:pulseTime,english,reduced});
  const activePlants=new Map((g?.tasks||[]).filter(t=>t.type==='plant').map(t=>[t.slot,t]));
  const missedPlants=new Map((visual.departures||[]).filter(d=>d.type==='plant-missed'&&(d.age||0)<(d.duration||1.8)).map(d=>[d.slot,d]));
@@ -493,13 +531,13 @@ export function renderHouse(ctx,g,visual={},options={}){
   const p=l.plants[i],task=activePlants.get(i),missed=missedPlants.get(i),x=p.x*width,y=p.y*height,size=M*(l.portrait?.15:.12);
   if(task)drawPlantHalo(ctx,x,y,size,task,pulseTime,reduced);
   drawPlant(ctx,x,y,size,i,task?true:missed?'missed':false,pulseTime);
-  if(task)drawPlantSignal(ctx,x,y,size,task,{english,width});
+  if(task)drawPlantSignal(ctx,x,y,size,task,{english,width,showLabel:showTaskLabels.plant});
   if(missed&&!task){
    const w=clamp(size*1.15,67,88),cx=clamp(x,w/2+4,width-w/2-4),by=y-size*.68;
    ctx.save();ctx.globalAlpha=reduced?1:1-clamp(((missed.age||0)/(missed.duration||1.8)-.65)/.35,0,1);
    box(ctx,cx-w/2,by,w,22,'#a61f38','#ffffff',6);
    line(ctx,cx-w/2+7,by+7,cx-w/2+14,by+15,'#ffffff',2.3);line(ctx,cx-w/2+14,by+7,cx-w/2+7,by+15,'#ffffff',2.3);
-   label(ctx,english?'Missed':'פספסתם',cx+6,by+11,{size:10,color:'#ffffff',halo:false,weight:'800'});ctx.restore();
+   if(showTaskLabels.plant)label(ctx,english?'Missed':'פספסתם',cx+6,by+11,{size:10,color:'#ffffff',halo:false,weight:'800'});ctx.restore();
   }
  }
  // Food is one simple hospitality action. The counter stays uncluttered
@@ -522,7 +560,7 @@ export function renderHouse(ctx,g,visual={},options={}){
  const actors=[];
  for(const task of g?.tasks||[]){
   const p=getTaskLocation(task,l),x=p.x*width,y=p.y*height;
-  if(task.type==='dust')drawDustSignal(ctx,x,y,M*.095,task,pulseTime,{reduced,english,width});
+  if(task.type==='dust')drawDustSignal(ctx,x,y,M*.095,task,pulseTime,{reduced,english,width,showLabel:showTaskLabels.dust});
   if(task.type==='guest')actors.push({y,draw:()=>{
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=task.untimed?1:clamp(task.total-task.remaining,0,1),guestX=x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=y+M*.04;
    halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',!task.untimed&&task.remaining/task.total<.25);
@@ -533,8 +571,8 @@ export function renderHouse(ctx,g,visual={},options={}){
   if(task.type==='cat')actors.push({y:y+M*.03,draw:()=>{
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.untimed||task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
    const catX=x+sgn*M*(-.025+progress*.09),catY=y+M*.015;
-   halo(ctx,catX,catY-M*.012,M*.058,pulseTime,'#d26b44',progress>.65);drawCat(ctx,catX,catY,M*.115,pulseTime,progress,d.side);timer(ctx,catX,catY-M*.01,M*.066,task);
-   if(waiting){
+   halo(ctx,catX,catY-M*.012,M*.058,pulseTime,'#d26b44',progress>.65);drawCat(ctx,catX,catY,M*.115,pulseTime,progress,d.side,showTaskLabels.cat);timer(ctx,catX,catY-M*.01,M*.066,task);
+   if(waiting&&showTaskLabels.cat){
     const bx=catX+sgn*M*.068,by=catY-M*.092;
     ellipse(ctx,catX+sgn*M*.015,catY-M*.058,M*.005,M*.005,'#fff4d9','#c4a071');
     ellipse(ctx,catX+sgn*M*.030,catY-M*.073,M*.008,M*.008,'#fff4d9','#c4a071');
@@ -556,7 +594,7 @@ export function renderHouse(ctx,g,visual={},options={}){
   }else if(departure.type==='cat'||departure.type==='cat-enter'){
    const entering=departure.type==='cat-enter',p=reduced?1:progress;
    const px=door.x*width+sgn*M*(entering?.025+p*.18:.035-p*.19),py=door.y*height+M*(.015+(entering?p*.085:0));
-   actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawCat(ctx,px,py,M*.115,pulseTime*2,1,entering?door.side:(door.side==='left'?'right':'left'));ctx.restore();}});
+   actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawCat(ctx,px,py,M*.115,pulseTime*2,1,entering?door.side:(door.side==='left'?'right':'left'),showTaskLabels.cat);ctx.restore();}});
   }
  }
  const actor=visual.actor||{...l.spawn};const actorX=(actor.x??l.spawn.x)*width,actorY=(actor.y??l.spawn.y)*height;

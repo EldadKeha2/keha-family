@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {RECIPES,TOOLS,POINTS,HOUSE_SLOTS,STAGES,firstStagePace,createHouse,advanceHouse,advanceStage,selectTool,actHouse} from '../public/assets/ruti-house-engine.mjs';
+import {RECIPES,TOOLS,POINTS,HOUSE_SLOTS,STAGES,firstStagePace,secondStagePace,createHouse,advanceHouse,advanceStage,selectTool,actHouse} from '../public/assets/ruti-house-engine.mjs';
 
 const game=()=>createHouse({random:()=>.5});
 const needed=t=>({plant:'water',dust:'broom',cat:'hand',guest:'serve'}[t.type]);
@@ -83,8 +83,12 @@ test('all serving stages stay completable without cooking tools or inventory',()
   for(const n of [5,6,7,8,9,10]){const g=atStage(n);assert.equal(selectTool(g,'serve'),true);assert.ok(!g.unlockedTools.includes('bowl'));assert.deepEqual(g.unlockedRecipes,[]);finishStage(g);assert.equal(g.completedLevels,n);}
 });
 
-test('the first cats wait eight seconds before a generous sixty-second approach, and level three has no dust',()=>{
-  const g=atStage(3),cat=g.tasks[0];assert.equal(cat.type,'cat');assert.equal(cat.waiting,8);assert.equal(cat.remaining,60);advanceHouse(g,8);assert.equal(cat.state,'approaching');assert.equal(cat.waiting,0);assert.equal(cat.remaining,60);advanceHouse(g,10);assert.ok(Math.abs(cat.remaining-50)<1e-8);assert.equal(g.strikes,0);assert.ok(g.tasks.every(t=>t.type!=='dust'));clearTask(g,cat);assert.equal(g.stats.cats,1);assert.equal(g.strikes,0);
+test('the first cats wait briefly and then visibly sneak toward a doorway over a generous response window',()=>{
+  const g=atStage(3),cat=g.tasks[0];assert.equal(cat.type,'cat');assert.equal(cat.waiting,3);assert.equal(cat.remaining,38);
+  advanceHouse(g,3);assert.equal(cat.state,'approaching');assert.equal(cat.waiting,0);assert.equal(cat.remaining,38);
+  advanceHouse(g,10);assert.ok(Math.abs(cat.remaining-28)<1e-8);assert.equal(g.strikes,0);
+  assert.deepEqual(g.stage.types,['cat','plant','dust']);assert.deepEqual(g.unlockedTools,['water','broom','hand']);
+  clearTask(g,cat);assert.equal(g.stats.cats,1);assert.equal(g.strikes,0);
 });
 
 test('later stages respect concurrency, four fixed pots and shared doorways while difficulty rises',()=>{
@@ -107,4 +111,38 @@ test('all ten stages retain exact score accounting, paused transition clocks and
 
 test('invalid deltas preserve clocks and split frames produce the same tutorial task',()=>{
   const g=game();for(const dt of [0,-1,NaN,Infinity,undefined])advanceHouse(g,dt);assert.equal(g.elapsed,0);const a=game(),b=game();advanceHouse(a,7);for(let n=0;n<70;n++)advanceHouse(b,.1);assert.equal(a.elapsed,b.elapsed);assert.deepEqual(a.tasks,b.tasks);
+});
+
+
+test('level two repeats thirty waterings and sweeping at a substantially faster pace without a relaxed opening',()=>{
+ const g=game();finishStage(g);const openingElapsed=g.stageElapsed,plantsBefore=g.stats.plants;
+ assert.equal(advanceStage(g),true);assert.equal(g.level,2);assert.equal(g.stage.goal,30);
+ assert.deepEqual(g.stage.types,['plant','dust']);assert.deepEqual(g.unlockedTools,['water','broom']);assert.equal(g.stage.newFeature,null);
+ assert.equal(g.tasks[0].type,'plant');assert.equal(g.tasks[0].untimed,undefined);assert.equal(g.tasks[0].total,11);
+ const initialPace=secondStagePace(g);assert.equal(initialPace.maxActive,2);assert.equal(initialPace.spawnDelay,1.2);
+ const slots=[],sweeps=[];let guard=0;
+ while(g.phase==='playing'&&guard++<3000){
+  if(!g.tasks.length){advanceHouse(g,.1);continue;}
+  const task=g.tasks[0],before=g.stageCompleted;
+  if(task.type==='plant')slots.push(task.slot);else sweeps.push(task.id);
+  clearTask(g,task);
+  assert.equal(g.stageCompleted,before+(task.type==='plant'?1:0));
+  if(g.stageCompleted>=15&&g.phase==='playing'){const faster=secondStagePace(g);assert.equal(faster.maxActive,3);assert.equal(faster.plant,9);assert.equal(faster.dust,12);assert.equal(faster.spawnDelay,1);}
+ }
+ assert.ok(guard<3000);assert.equal(g.stats.plants-plantsBefore,30);assert.equal(slots.length,30);assert.equal(new Set(slots).size,4);assert.ok(sweeps.length>0);
+ assert.ok(g.stageElapsed<openingElapsed*.65,'the repeated stage should finish substantially faster at the same perfect-response speed');assert.equal(g.completedLevels,2);
+});
+
+test('only stage three introduces cats, both entrances get visitors, and stage four repeats the same tasks faster',()=>{
+ for(const plan of STAGES.slice(0,2))assert.ok(!plan.types.includes('cat'));
+ assert.equal(STAGES[2].newFeature,'cat');assert.equal(STAGES[3].newFeature,null);
+ assert.deepEqual(STAGES[3].types,STAGES[2].types);assert.deepEqual(STAGES[3].unlockedTools,STAGES[2].unlockedTools);
+ assert.ok(STAGES[3].goal>STAGES[2].goal);assert.ok(STAGES[3].maxActive>STAGES[2].maxActive);assert.ok(STAGES[3].spawnDelay<STAGES[2].spawnDelay);
+ for(const kind of ['cat','plant','dust'])assert.ok(STAGES[3].deadlines[kind]<STAGES[2].deadlines[kind]);
+ for(const level of [3,4]){
+  const g=atStage(level),doors=[];let guard=0;
+  while(g.phase==='playing'&&guard++<3000){if(!g.tasks.length){advanceHouse(g,.1);continue;}const t=g.tasks[0];if(t.type==='cat')doors.push(t.door);clearTask(g,t);}
+  assert.ok(guard<3000);assert.deepEqual(new Set(doors),new Set([0,1]));
+  assert.ok(doors.every((door,index)=>index===0||door!==doors[index-1]),'cats use the other available entrance on their next visit');
+ }
 });

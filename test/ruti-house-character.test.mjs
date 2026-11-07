@@ -142,3 +142,30 @@ test('repeated-action captions can disappear without suppressing the voice or ex
  assert.equal(f.actor.speechText,'');assert.match(f.utterances[1].text,/[\u0590-\u05ff]/);
  f.utterances[1].onstart();assert.equal(f.actor.speaking,true);
 });
+
+test('celebration sings through changing head poses while the real broom body remains fixed',()=>{
+ const actor={celebrating:true,celebrationStartedAt:10};
+ const poses=[10.01,10.09,10.2,10.27].map(time=>rutiPose(actor,time));
+ assert.ok(poses.every(pose=>pose.frame===4));
+ assert.deepEqual(new Set(poses.map(pose=>pose.headFrame)),new Set([0,7,8]));
+ assert.equal(rutiPose(actor,12.3).singing,false,'the phrase has a visible breathing rest');
+ assert.equal(rutiPose(actor,14.49).singing,true,'a fresh phrase continues after the rest');
+ assert.equal(rutiPose(actor,10.2,{reduced:true}).headFrame,0);
+ const paused=rutiPose(actor,10.2);assert.deepEqual(rutiPose(actor,10.2),paused);
+});
+
+test('the Yemenite celebration takes three weight transfers then holds, and the next measure mirrors the leading foot',()=>{
+ const actor={celebrating:true,celebrationStartedAt:0,celebrationBeatSeconds:.4};
+ const right=[.28,.68,1.08].map(time=>rutiPose(actor,time));
+ assert.deepEqual(right.map(pose=>pose.danceStep),[0,1,2]);
+ assert.ok(right[0].danceX>0&&right[1].danceX<0&&right[2].danceX>0);
+ assert.ok(right[0].footRightLift>0&&right[1].footLeftLift>0&&right[2].footRightLift>0);
+ for(const time of [1.25,1.45,1.59]){
+  const hold=rutiPose(actor,time);assert.equal(hold.danceStep,3);assert.ok(Math.abs(hold.danceX-right[2].danceX)<1e-12);
+  assert.equal(hold.footRightLift,0);assert.equal(hold.footLeftLift,0);assert.equal(hold.lift,0);
+ }
+ const left=rutiPose(actor,1.88);assert.equal(left.danceSide,-1);assert.ok(left.footLeftLift>0);
+ assert.ok(Math.abs(left.danceX+right[0].danceX)<1e-12);
+ assert.ok(Math.abs(left.footLeftX+right[0].footRightX)<1e-12);
+ for(const field of ['danceX','danceDepth','footLeftX','footRightX','footLeftLift','footRightLift'])assert.equal(rutiPose(actor,.28,{reduced:true})[field],0);
+});

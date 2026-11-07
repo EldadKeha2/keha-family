@@ -37,3 +37,10 @@ test('untimed dust stays visible without numbers or a countdown bar',()=>{
  assert.ok(!c.texts.includes('∞'));assert.ok(c.texts.includes('אבק!'));
  assert.ok(!c.strokes.some(s=>s.width===2&&s.color==='#ffffff'));
 });
+
+
+test('quiet dust keeps its silhouette and time bar after its word label is learned',()=>{
+ const c=canvas();drawDustSignal(c.ctx,160,200,37,{remaining:5,total:24},1,{width:320,showLabel:false});
+ assert.equal(c.texts.length,0);assert.ok(c.strokes.some(s=>s.width===7&&s.color==='#ffffff'));
+ assert.ok(c.strokes.some(s=>s.width===2&&s.color==='#ffffff'),'the deadline bar remains visible');
+});

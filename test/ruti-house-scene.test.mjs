@@ -107,7 +107,7 @@ test('waiting cats announce that they are outside and the label disappears when 
  const cat={id:'cat-test',type:'cat',door:0,slot:0,waiting:6,waitingTotal:6,total:38,remaining:38};
  const g={tasks:[cat],inventory:{},kitchen:{}};
  renderHouse(ctx,g,{actor:{x:.4,y:.5}},{width:1000,height:580,time:1,images:{}});
- assert.ok(written.includes('מחכה בחוץ…'));assert.ok(written.includes('ברוכים הבאים'));assert.ok(written.includes('דלת צדדית'));
+ assert.ok(written.includes('מחכה בחוץ…'));assert.ok(written.includes('ברוכים הבאים'));assert.ok(written.includes('דלת אחורית'));
  written.length=0;cat.waiting=0;renderHouse(ctx,g,{actor:{x:.4,y:.5}},{width:1000,height:580,time:2,images:{},english:true});
  assert.ok(!written.includes('Waiting…'));assert.ok(!written.includes('מחכה בחוץ…'));
 });
@@ -255,4 +255,49 @@ test('the enlarged broom dancer preserves full-width head art and narrows only t
   assert.ok(Math.abs(bodyScale/headScale-.91)<1e-10,'only the body becomes slightly narrower');
   assert.ok(head[8]>0&&body[8]>0);assert.ok(numbers.every(Number.isFinite));
  }
+});
+
+
+test('the large main entrance and smaller back door are visually distinct before any tasks begin',()=>{
+ for(const [width,height] of sizes){
+  const {doors}=getHouseLayout(width,height),[main,back]=doors;
+  assert.equal(main.kind,'main');assert.equal(back.kind,'back');
+  assert.ok(main.visualScale/back.visualScale>1.6,'the main door is clearly taller and wider');
+  assert.ok(main.x>back.x);assert.ok(main.anchor.x<main.x&&back.anchor.x>back.x,'the original reachable indoor anchors are preserved');
+ }
+});
+
+test('quiet task signals retain art and deadline bars while suppressing learned labels',()=>{
+ const tasks=[{id:'p',type:'plant',slot:0},{id:'d',type:'dust',position:{x:.25,y:.6}},{id:'c',type:'cat',door:1,waiting:2}].map(t=>({...t,total:10,remaining:2}));
+ const game={level:3,tasks},normal=renderRecord(game),quiet=renderRecord(game,{}, {showTaskLabels:{plant:false,dust:false,cat:false}});
+ assert.ok(normal.written.some(t=>t.text==='מהר!'));assert.ok(normal.written.some(t=>t.text==='אבק!'));assert.ok(normal.written.some(t=>t.text==='מחכה בחוץ…'));
+ for(const text of ['מים!','מהר!','אבק!','מחכה בחוץ…','!'])assert.ok(!quiet.written.some(t=>t.text===text),`${text} is no longer repeated after learning`);
+ for(const color of ['#00aee5','#ffffff','#8b234c'])assert.ok(quiet.strokes.some(s=>s.color===color),'physical task signals remain visible');
+ assert.ok(quiet.fills.includes('#f65c62'),'the watering deadline bar remains');
+ assert.ok(quiet.fills.includes('#ee759c'),'the dust deadline bar remains');
+});
+
+test('Hebrew labels and speech use RTL punctuation while English remains LTR',()=>{
+ const written=[],gradient={addColorStop(){}};
+ const ctx=new Proxy({canvas:{width:390,height:570},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},measureText(text){return {width:text.length*6};},fillText(text){written.push({text,direction:this.direction,align:this.textAlign});}},{get:(target,key)=>key in target?target[key]:(()=>{})});
+ const g={level:2,tasks:[{id:'p',type:'plant',slot:0,total:20,remaining:18},{id:'d',type:'dust',position:{x:.3,y:.6},total:20,remaining:18}]};
+ for(const english of [false,true]){
+  written.length=0;renderHouse(ctx,g,{actor:{x:.4,y:.5,speechText:english?'Every drop with love.':'כל טיפה באהבה.',speechUntil:10}},{width:390,height:570,time:2,english});
+  assert.ok(written.length>2);
+  for(const item of written)if(/[a-z\u0590-\u05ff]/i.test(item.text))assert.equal(item.direction,/[\u0590-\u05ff]/.test(item.text)?'rtl':'ltr');
+  assert.ok(written.filter(item=>item.text.endsWith('!')||item.text.endsWith('.')).every(item=>item.align==='center'));
+ }
+});
+
+test('singing composites alternate original heads while retaining the same narrowed broom body',()=>{
+ const atlas={complete:true,naturalWidth:1448,naturalHeight:1086},calls=[],gradient={addColorStop(){}};
+ const ctx=new Proxy({createRadialGradient(){return gradient;},drawImage(...args){calls.push(args);}}, {get:(target,key)=>key in target?target[key]:(()=>{})});
+ const heads=new Set(),bodies=[];
+ for(const time of [.02,.11,.20,3.43]){
+  calls.length=0;drawRutiCelebration(ctx,{width:390,height:570,time,images:{rutiAtlas:atlas},actor:{celebrationStartedAt:0}});
+  const head=calls.find(call=>call[3]<150&&call[4]<120);assert.ok(head,'the face is a separate original atlas crop');
+  heads.add(`${head[1]}:${head[2]}`);bodies.push(calls.at(-1).slice(1,5));
+ }
+ assert.ok(heads.size>=3,'open, closed, rounded mouths or blinks vary during the song');
+ assert.ok(bodies.every(body=>JSON.stringify(body)===JSON.stringify(bodies[0])),'the same broom and body remain connected throughout singing');
 });

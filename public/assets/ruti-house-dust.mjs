@@ -14,10 +14,10 @@ function cloud(ctx,size){
  ctx.closePath();
 }
 function text(ctx,value,x,y,size){
- ctx.font=`800 ${size}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,x,y);
+ ctx.direction=/[\u0590-\u05ff]/.test(value)?'rtl':'ltr';ctx.font=`800 ${size}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(value,x,y);
 }
 
-export function drawDustSignal(ctx,x,y,size,task,time,{reduced=false,english=false,width=1000}={}){
+export function drawDustSignal(ctx,x,y,size,task,time,{reduced=false,english=false,width=1000,showLabel=true}={}){
  const ratio=task.untimed?1:clamp(task.total>0?task.remaining/task.total:0,0,1);
  const urgent=!task.untimed&&ratio<.25,pulse=reduced?.5:.5+.5*Math.sin(time*Math.PI*2*.9);
  const edge=urgent?'#8b234c':'#274b51',accent=urgent?'#ee759c':'#9bdde8';
@@ -42,6 +42,7 @@ export function drawDustSignal(ctx,x,y,size,task,time,{reduced=false,english=fal
 
  const w=clamp(size*2.2,88,106),h=29,cx=clamp(x,w/2+5,width-w/2-5),bx=cx-w/2,by=Math.max(5,y-size*.96-h);
  ctx.save();ctx.lineWidth=2;
+ if(showLabel){
  ctx.beginPath();ctx.moveTo(cx-6,by+h-1);ctx.lineTo(cx+6,by+h-1);ctx.lineTo(x,y-size*.69);ctx.closePath();ctx.fillStyle='#fffdf2';ctx.fill();ctx.strokeStyle=edge;ctx.stroke();
  ctx.beginPath();ctx.roundRect(bx,by,w,h,8);ctx.fillStyle=edge;ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=2.5;ctx.stroke();
  // A small straw broom reinforces the text for people who cannot read it.
@@ -49,6 +50,7 @@ export function drawDustSignal(ctx,x,y,size,task,time,{reduced=false,english=fal
  ctx.beginPath();ctx.moveTo(ix+3,iy-7);ctx.lineTo(ix-3,iy+6);ctx.strokeStyle='#ffffff';ctx.lineWidth=2.5;ctx.stroke();
  ctx.beginPath();ctx.moveTo(ix-5,iy+3);ctx.lineTo(ix,iy+6);ctx.lineTo(ix-2,iy+12);ctx.lineTo(ix-10,iy+8);ctx.closePath();ctx.fillStyle='#f6d991';ctx.fill();
  ctx.fillStyle='#ffffff';text(ctx,english?'Dust!':'אבק!',cx+1,by+h/2,13);
+ }
  if(!task.untimed){
   const barWidth=size*1.34,barY=y+size*.63;
   ctx.beginPath();ctx.roundRect(x-barWidth/2,barY,barWidth,7,3);ctx.fillStyle=edge;ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.stroke();
