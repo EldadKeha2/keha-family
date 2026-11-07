@@ -615,8 +615,5 @@ export function renderHouse(ctx,g,visual={},options={}){
   portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced,waterTarget,quiet})});
  actors.sort((a,b)=>a.y-b.y);for(const actor of actors)actor.draw();
  if(!quiet)drawRutiSpeech(ctx,actorX,actorY,actorHeight,actor,time,width);
- // Navigation destination marker remains part of the floor rather than a card.
- const destination=visual.destination||visual.targetPosition;
- if(destination&&actor.walking){const x=destination.x*width,y=destination.y*height;ctx.strokeStyle='#58785d';ctx.lineWidth=2;ctx.setLineDash([3,4]);ctx.beginPath();ctx.ellipse(x,y,M*.025,M*.012,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
  ctx.restore();return l;
 }
