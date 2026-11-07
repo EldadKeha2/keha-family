@@ -1,5 +1,5 @@
 // Shown immediately before a new activity is introduced, after the home screen.
-// Familiar faster rounds (2 and 4) begin immediately, without repeating lessons.
+// Familiar faster round (2) begin immediately, without repeating lessons.
 // Stages 8–10 also build on familiar skills.
 export const HOUSE_LESSONS = Object.freeze({
   1: {
@@ -9,7 +9,7 @@ export const HOUSE_LESSONS = Object.freeze({
     steps: [
       { he: 'לוחצים על המשפך למטה והוא מופיע מיד ביד של רותי.', en: 'Tap the watering can below and it appears in Ruti’s hand instantly.' },
       { he: 'לוחצים על העציץ הזוהר, ורותי ניגשת להשקות.', en: 'Tap the glowing plant and Ruti walks over to water it.' },
-      { he: 'בבית ארבעה עציצים שונים. משלימים 30 השקיות בסך הכול: מתחילים בנחת, ובהמשך מופיעים שעונים ובקשות חופפות. כשמופיע אבק, עוברים למטאטא.', en: 'There are four different plants. Complete 30 waterings in total: begin gently, then timers and overlapping requests appear. Switch to the broom when dust appears.' }
+      { he: 'בבית ארבעה עציצים שונים. משלימים מטלות של השקיה וניקוי: מתחילים בנחת, ובהמשך מופיעים שעונים ובקשות חופפות. כשמופיע אבק, עוברים למטאטא.', en: 'There are four different plants. Complete watering and cleaning tasks: begin gently, then timers and overlapping requests appear. Switch to the broom when dust appears.' }
     ],
     question: { he: 'באיזה כלי משקים את העציץ?', en: 'Which tool waters the plant?' },
     answers: [
@@ -42,6 +42,19 @@ export const HOUSE_LESSONS = Object.freeze({
     retryHe: 'את המגש שומרים למשפחה. חתולים מבריחים עם היד.',
     retryEn: 'Save the tray for the family. Shoo cats away with the hand.'
   },
+  4: {
+    he:'אורה נכנסת לוויכוח',en:'Ora joins the argument',icons:['argue'],
+    steps:[
+      {he:'כל מטלה שהושלמה מקדמת את השלב. הסמלים למעלה מסכמים השקיות, ניקוי, חתולים, אירוח והצלחות מול אורה.',en:'Every completed task advances the level. The icons above summarize watering, sweeping, cats, guests and wins against Ora.'},
+      {he:'אחרי המטלה העשירית הראש של אורה יופיע בזמן אקראי, פעם אחת בכל שלב.',en:'After the tenth task, Ora’s head appears at a random point, once per level.'},
+      {he:'מהר! לוחצים על סמל האיש שמתווכח ואז על הראש של אורה לפני שהיא נעלמת. הסמל נדלק רק כשהיא מופיעה.',en:'Quick! Tap the arguing-person icon, then Ora’s head before she disappears. The icon lights up only while she is here.'},
+      {he:'ניצחון מזכה ב־5,000 נקודות ועוצר את המשחק להודעה של 5 שניות. בשלב הזה יש יותר זמן לתפוס אותה; בהמשך החלון מתקצר.',en:'Win 5,000 points and pause for a five-second message. This level gives you more time to catch her; later windows get shorter.'}
+    ],
+    question:{he:'איך מנצחים את אורה בוויכוח?',en:'How do you win the argument with Ora?'},
+    answers:[{he:'סמל האיש שמתווכח, ואז הראש של אורה',en:'Arguing-person icon, then Ora’s head'},{he:'משפך, ואז אורה',en:'Watering can, then Ora'}],correctIndex:0,
+    successHe:'בדיוק! הסמל ואז אורה, לפני שהיא נעלמת.',successEn:'Exactly! The icon, then Ora, before she disappears.',
+    retryHe:'חפשו את סמל האיש שמתווכח. קודם הסמל, ואז אורה.',retryEn:'Look for the arguing-person icon. First the icon, then Ora.'
+  },
   5: {
     he: 'מישהו הגיע לאכול',
     en: 'Someone has come for a meal',
@@ -69,7 +82,7 @@ export const HOUSE_LESSONS = Object.freeze({
     steps: [
       { he: 'ממשיכים להשקות, לנקות ולשמור על הדלתות.', en: 'Keep watering, cleaning and watching the doors.' },
       { he: 'כדי להגיש ארוחה, בוחרים אוכל ולוחצים ישירות על האורח.', en: 'To serve a meal, choose Food and tap the guest directly.' },
-      { he: 'רותי בוחרת בעצמה אחד מהמטעמים. אירוח נותן הכי הרבה נקודות.', en: 'Ruti chooses a homemade treat herself. Feeding guests earns the most points.' }
+      { he: 'רותי בוחרת בעצמה אחד מהמטעמים. אירוח נותן נקודות נוספות.', en: 'Ruti chooses a homemade treat herself. Feeding guests earns extra points.' }
     ],
     question: { he: 'צריך לבחור מנה במטבח לפני ההגשה?', en: 'Do you need to choose a kitchen dish before serving?' },
     answers: [
@@ -87,7 +100,7 @@ export const HOUSE_LESSONS = Object.freeze({
     en: 'A house full of family',
     icons: ['serve', 'water', 'broom', 'hand'],
     steps: [
-      { he: 'נשארים עם אותם ארבעה כלים: משפך, מטאטא, יד ואוכל.', en: 'Keep using the same four tools: watering can, broom, hand and Food.' },
+      { he: 'ממשיכים עם משפך, מטאטא, יד ואוכל. כשאורה מופיעה, עוברים לסמל הוויכוח.', en: 'Keep using the watering can, broom, hand and Food. Switch to the argument icon when Ora appears.' },
       { he: 'הבית נעשה עמוס יותר. שמים לב לטיפות, לשעונים ולדלתות.', en: 'The house gets busier. Watch the water drops, timers and doors.' },
       { he: 'אורח מקבל אוכל בלחיצה אחת אחרי שבוחרים בסמל האוכל.', en: 'A guest receives a meal with one tap after you choose the Food icon.' }
     ],

@@ -1,6 +1,7 @@
-import {iconArtwork} from './ruti-house-art.mjs?v=3';
+import {iconArtwork} from './ruti-house-art.mjs?v=4';
 import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=3';
 import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
+import {CAT_COATS} from './ruti-house-engine.mjs?v=8';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -9,7 +10,7 @@ export const PLANT_VARIETIES=Object.freeze([
  {id:'fern',he:'שרך',en:'Fern'},
  {id:'pothos',he:'פוטוס',en:'Pothos'}
 ].map(Object.freeze));
-const ICON_IDS=[...FOOD_IDS,'water','broom','hand','serve','plant','dust','cat'];
+const ICON_IDS=[...FOOD_IDS,'water','broom','hand','argue','serve','plant','dust','cat'];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const length=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const departureRoutes=new WeakMap();
@@ -24,6 +25,7 @@ export function createSceneAssets({family={}}={}){
  function load(url,put){if(typeof Image==='undefined')return;const image=new Image();put(image);jobs.push(new Promise(resolve=>{image.onload=resolve;image.onerror=resolve;}));image.src=url;}
  load('assets/games/ruti-house/ruti-head-cutout-v1.png',image=>images.ruti=image);
  load('assets/games/ruti-house/ruti-character-atlas-v1.webp',image=>images.rutiAtlas=image);
+ load('assets/games/portraits/ora.webp',image=>images.ora=image);
  for(const id of ICON_IDS)load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(iconArtwork(id)),image=>images.icons[id]=image);
  for(const [id,value] of Object.entries(family)){if(typeof value==='string')load(value,image=>images.family[id]=image);else if(value)images.family[id]=value;}
  images.ready=Promise.all(jobs).then(()=>images);return images;
@@ -71,12 +73,13 @@ function nearestFloor(layout,point){
 
 export function getTaskLocation(task,layout){
  if(task.type==='plant')return layout.plants[Math.abs(task.slot||0)%layout.plants.length];
+ if(task.type==='ora'){const p=nearestFloor(layout,task.position);return {...p,hitRadius:.09,anchor:{...p}};}
  if(task.type==='dust'){
   const raw=task.position||{x:.15+((task.slot||0)*.137)% .70,y:.40+((task.slot||0)*.113)% .45};
   const p=nearestFloor(layout,raw);return {...p,hitRadius:layout.portrait?.070:.052,anchor:{...p}};
  }
  const index=Math.abs(task.door??task.doorIndex??task.slot??0)%layout.doors.length;
- const door=layout.doors[index];return {...door,anchor:{...door.anchor}};
+ const door=layout.doors[index];return {...door,hitRadius:door.hitRadius*(task.type==='cat'?(task.size||1):1),anchor:{...door.anchor}};
 }
 
 /** Walkable-floor A* with inflated furniture boundaries and diagonal corner checks. */
@@ -221,17 +224,40 @@ function drawDust(ctx,x,y,size,time,remaining){
  ctx.restore();
 }
 
-function drawCat(ctx,x,y,size,time,progress,side,showLabel=true){
+function drawCat(ctx,x,y,size,time,progress,side,showLabel=true,appearance={}){
+ const coat=CAT_COATS[appearance.coat]||CAT_COATS[0];
  ctx.save();ctx.translate(x,y);if(side==='left')ctx.scale(-1,1);const s=size/64;ctx.scale(s,s);ctx.lineWidth=2;ctx.lineCap='round';
  ellipse(ctx,0,22,27,6,'#543d2926');
- ctx.save();ctx.translate(20,4);ctx.rotate(Math.sin(time*3)*.18);ctx.beginPath();ctx.moveTo(0,9);ctx.bezierCurveTo(22,7,19,-14,11,-15);ctx.strokeStyle='#aa8058';ctx.lineWidth=7;ctx.stroke();ctx.restore();
- ellipse(ctx,3,9,23,15,'#c49b6f','#76583e');
- const step=Math.sin(time*6)*Math.min(progress,.8)*3;line(ctx,-11,16,-13+step,26,'#ac8058',6);line(ctx,15,16,17-step,26,'#ac8058',6);
- polygon(ctx,[[-25,-8],[-27,-28],[-14,-20],[-5,-27],[-3,-7]],'#ccaa7f','#76583e');ellipse(ctx,-15,-7,17,14,'#d5b48b','#76583e');
+ ctx.save();ctx.translate(20,4);ctx.rotate(Math.sin(time*3)*.18);ctx.beginPath();ctx.moveTo(0,9);ctx.bezierCurveTo(22,7,19,-14,11,-15);ctx.strokeStyle=coat.body;ctx.lineWidth=7;ctx.stroke();ctx.restore();
+ ellipse(ctx,3,9,23,15,coat.body,coat.edge);
+ const step=Math.sin(time*6)*Math.min(progress,.8)*3;line(ctx,-11,16,-13+step,26,coat.body,6);line(ctx,15,16,17-step,26,coat.body,6);
+ polygon(ctx,[[-25,-8],[-27,-28],[-14,-20],[-5,-27],[-3,-7]],coat.head,coat.edge);ellipse(ctx,-15,-7,17,14,coat.head,coat.edge);
  polygon(ctx,[[-24,-20],[-23,-13],[-18,-18]],'#d29b93');polygon(ctx,[[-7,-20],[-13,-18],[-8,-14]],'#d29b93');
+ if(coat.pattern==='tabby'){
+  for(const px of [-7,3,13])line(ctx,px,0,px+3,8,coat.patch,3);
+  for(const px of [-22,-15,-8])line(ctx,px,-19,px+2,-13,coat.patch,2);
+ }else if(coat.pattern==='spots'){
+  ellipse(ctx,8,8,7,6,coat.patch);ellipse(ctx,-3,2,5,4,coat.patch);ellipse(ctx,-9,-13,5,6,coat.patch);
+ }else{
+  ellipse(ctx,-10,7,8,10,coat.patch);ellipse(ctx,-17,-1,9,5,coat.patch);
+  line(ctx,-13,21,-13+step,26,coat.patch,6);line(ctx,17,21,17-step,26,coat.patch,6);
+ }
  ellipse(ctx,-23,-8,2,2.6,'#4f4d36');ellipse(ctx,-10,-8,2,2.6,'#4f4d36');polygon(ctx,[[-18,-2],[-14,-2],[-16,1]],'#b47770');
  line(ctx,-27,-1,-37,-3,'#786249',1);line(ctx,-27,3,-37,5,'#786249',1);line(ctx,-7,0,2,-3,'#786249',1);
  if(showLabel&&progress>.7)label(ctx,'!',5,-34,{size:20,color:'#c14f35'});
+ ctx.restore();
+}
+
+function drawOra(ctx,x,y,size,task,images,time,reduced){
+ const r=size*.5,bob=reduced?0:Math.sin(time*5)*2;
+ ctx.save();ctx.translate(x,y+bob);ctx.shadowColor='#f9c04c';ctx.shadowBlur=18;
+ ellipse(ctx,0,0,r+4,r+4,'#fff1ba','#cf703b');ctx.shadowBlur=0;
+ ctx.save();ctx.beginPath();ctx.ellipse(0,0,r,r,0,0,Math.PI*2);ctx.clip();
+ if(imageReady(images.ora))ctx.drawImage(images.ora,95,0,410,400,-r,-r,size,size);
+ else{ellipse(ctx,0,0,r,r,'#e3bd97');label(ctx,'אורה',0,0,{size:14,color:'#463b32',halo:false});}
+ ctx.restore();icon(ctx,images,'argue',r*.85,-r*.78,size*.48);
+ const ratio=clamp(task.remaining/task.total,0,1);box(ctx,-r,r+8,size,7,'#634638',null,3);
+ if(ratio>0)box(ctx,-r+1,r+9,(size-2)*ratio,5,ratio<.35?'#fa7462':'#f4ce61',null,2);
  ctx.restore();
 }
 
@@ -580,7 +606,7 @@ export function renderHouse(ctx,g,visual={},options={}){
   if(task.type==='cat')actors.push({y:y+M*.03,draw:()=>{
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.untimed||task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
    const catX=x+sgn*M*(-.025+progress*.09),catY=y+M*.015;
-   halo(ctx,catX,catY-M*.012,M*.058,pulseTime,'#d26b44',progress>.65);drawCat(ctx,catX,catY,M*.115,pulseTime,progress,d.side,showTaskLabels.cat);timer(ctx,catX,catY-M*.01,M*.066,task);
+   halo(ctx,catX,catY-M*.012,M*.058,pulseTime,'#d26b44',progress>.65);drawCat(ctx,catX,catY,M*.115*(task.size||1),pulseTime,progress,d.side,showTaskLabels.cat,task);timer(ctx,catX,catY-M*.01,M*.066,task);
    if(waiting&&showTaskLabels.cat){
     const bx=catX+sgn*M*.068,by=catY-M*.092;
     ellipse(ctx,catX+sgn*M*.015,catY-M*.058,M*.005,M*.005,'#fff4d9','#c4a071');
@@ -603,7 +629,7 @@ export function renderHouse(ctx,g,visual={},options={}){
   }else if(departure.type==='cat'||departure.type==='cat-enter'){
    const entering=departure.type==='cat-enter',p=reduced?1:progress;
    const px=door.x*width+sgn*M*(entering?.025+p*.18:.035-p*.19),py=door.y*height+M*(.015+(entering?p*.085:0));
-   actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawCat(ctx,px,py,M*.115,pulseTime*2,1,entering?door.side:(door.side==='left'?'right':'left'),showTaskLabels.cat);ctx.restore();}});
+   actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawCat(ctx,px,py,M*.115*(departure.size||1),pulseTime*2,1,entering?door.side:(door.side==='left'?'right':'left'),showTaskLabels.cat,departure);ctx.restore();}});
   }
  }
  const actor=visual.actor||{...l.spawn};const actorX=(actor.x??l.spawn.x)*width,actorY=(actor.y??l.spawn.y)*height;
@@ -615,5 +641,6 @@ export function renderHouse(ctx,g,visual={},options={}){
   portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced,waterTarget,quiet})});
  actors.sort((a,b)=>a.y-b.y);for(const actor of actors)actor.draw();
  if(!quiet)drawRutiSpeech(ctx,actorX,actorY,actorHeight,actor,time,width);
+ if(g?.ora){const p=getTaskLocation(g.ora,l);drawOra(ctx,p.x*width,p.y*height,M*.16,g.ora,images,time,reduced);}
  ctx.restore();return l;
 }

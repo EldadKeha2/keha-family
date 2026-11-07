@@ -12,31 +12,41 @@ export const TOOLS=Object.freeze([
   {id:'water',he:'משפך',en:'Watering can',emoji:'🚿'},
   {id:'broom',he:'מטאטא',en:'Broom',emoji:'🧹'},
   {id:'hand',he:'לכו מפה',en:'Shoo!',emoji:'✋'},
+  {id:'argue',he:'ויכוח עם אורה',en:'Argue with Ora',emoji:'🗣️'},
   {id:'serve',he:'אוכל',en:'Food',emoji:'🍽️'}
 ].map(Object.freeze));
 export const POINTS=Object.freeze({meal:300,snack:200,plant:40,dust:20,cat:60,dish:20});
 export const HOUSE_SLOTS=Object.freeze({plant:4,dust:6,cat:2,guest:2});
 export const HOUSE_GUESTS=Object.freeze(['roi','hila','rivi']);
 export const STOCK_LIMIT=3;
+export const ORA_BONUS=5000;
+export const CAT_COATS=Object.freeze([
+  {body:'#c49b6f',head:'#d5b48b',edge:'#76583e',patch:'#98623d',pattern:'tabby'},
+  {body:'#767e8b',head:'#a4aab5',edge:'#39414d',patch:'#454b57',pattern:'tabby'},
+  {body:'#f4ece0',head:'#fff7eb',edge:'#847767',patch:'#c17f46',pattern:'spots'},
+  {body:'#353a43',head:'#4d535d',edge:'#222831',patch:'#f1eee5',pattern:'tuxedo'},
+  {body:'#d5c8ad',head:'#f0e4cf',edge:'#6c6151',patch:'#7e5942',pattern:'spots'}
+].map(Object.freeze));
+export const oraWindow=level=>level===4?6:Math.max(1.6,4.4-(level-5)*.55);
 const stage=(level,he,en,newFeature,goal,maxActive,order,deadlines,catWait,spawnDelay,{requiredDish=null,requiredMeal=false}={})=>Object.freeze({
   level,he,en,newFeature,goal,maxActive,types:Object.freeze([...new Set(order)]),order:Object.freeze(order),deadlines:Object.freeze(deadlines),catWait,spawnDelay,
   untimed:false,requiredDish,requiredMeal,
-  hintHe:level===1?'משקים 30 פעמים את ארבעת העציצים. מתחילים בנחת; בהמשך מגיבים להבהוב בזמן ומטאטאים כשמופיע אבק.':level===2?'אותם ארבעה עציצים ואותו מטאטא, בקצב מהיר יותר. משלימים עוד 30 השקיות.':level===3?'משקים, מטאטאים ומבריחים חתולים משתי הכניסות.':level===4?'אותם כלים, יותר בקשות ופחות זמן. שומרים גם על שתי הכניסות.':requiredMeal?'בוחרים אוכל ולוחצים על האורח. רותי מגישה לו אחד מהמטעמים שלה.':'ניגשים למשימות ושומרים על בית מלא חיים.',
-  hintEn:level===1?'Water the four plants 30 times. Start gently, then respond to their flashing signals before time runs out and sweep when dust appears.':level===2?'The same four plants and broom, at a faster pace. Complete another 30 waterings.':level===3?'Water, sweep and shoo cats away from both entrances.':level===4?'The same tools, more requests and less time. Watch both entrances.':requiredMeal?'Choose Food and tap the guest. Ruti serves one of her delicious dishes.':'Care for each task and keep the home full of life.',
-  unlockedTools:Object.freeze(['water','broom',...(level>=3?['hand']:[]),...(level>=5?['serve']:[])]),
+  hintHe:level===1?'מטפלים בארבעת העציצים ובבית. מתחילים בנחת; בהמשך מגיבים להבהוב בזמן ומטאטאים כשמופיע אבק.':level===2?'אותם ארבעה עציצים ואותו מטאטא, בקצב מהיר יותר. משלימים מטלות נוספות.':level===3?'משקים, מטאטאים ומבריחים חתולים משתי הכניסות.':level===4?'אותם כלים, יותר בקשות ופחות זמן. שומרים גם על שתי הכניסות.':requiredMeal?'בוחרים אוכל ולוחצים על האורח. רותי מגישה לו אחד מהמטעמים שלה.':'ניגשים למשימות ושומרים על בית מלא חיים.',
+  hintEn:level===1?'Care for the four plants and the home. Start gently, then respond to their flashing signals before time runs out and sweep when dust appears.':level===2?'The same four plants and broom, at a faster pace. Complete more household tasks.':level===3?'Water, sweep and shoo cats away from both entrances.':level===4?'The same tools, more requests and less time. Watch both entrances.':requiredMeal?'Choose Food and tap the guest. Ruti serves one of her delicious dishes.':'Care for each task and keep the home full of life.',
+  unlockedTools:Object.freeze(['water','broom',...(level>=3?['hand']:[]),...(level>=4?['argue']:[]),...(level>=5?['serve']:[])]),
   unlockedRecipes:Object.freeze([])
 });
 export const STAGES=Object.freeze([
   stage(1,'הגינה מתעוררת','The garden wakes up','water',30,2,['plant','dust'],{plant:20,dust:24},0,2.3),
   stage(2,'הגינה בקצב מהיר','The garden picks up the pace',null,30,3,['plant','plant','plant','dust','plant'],{plant:11,dust:14},0,1.2),
-  stage(3,'חתולים בשתי הכניסות','Cats at both entrances','cat',20,3,['cat','plant','plant','dust','plant'],{plant:18,dust:22,cat:38},3,1.8),
-  stage(4,'הבית מגביר קצב','The house picks up the pace',null,24,4,['cat','plant','plant','dust','plant'],{plant:12,dust:16,cat:25},2,1.2),
-  stage(5,'משהו טעים לאורחים','A treat for our guests','guests',7,2,['guest','plant','dust','cat','plant'],{plant:45,dust:35,cat:40,guest:65},7,5,{requiredMeal:true}),
-  stage(6,'כולם נשארים לאכול','Everyone stays for a meal','hospitality',9,3,['guest','plant','cat','dust','guest'],{plant:40,dust:30,cat:35,guest:65},6,4.5,{requiredMeal:true}),
-  stage(7,'עוד משפחה בדלת','More family at the door','combined',11,4,['plant','guest','cat','dust','guest'],{plant:35,dust:26,cat:30,guest:55},6,4),
-  stage(8,'בקצב של רותי','Ruti’s rhythm',null,13,4,['guest','cat','plant','dust','guest','plant'],{plant:30,dust:22,cat:22,guest:48},5,3.6),
-  stage(9,'כולם בדרך','Everyone is on the way',null,16,5,['cat','guest','plant','dust','guest','cat','plant'],{plant:25,dust:17,cat:14,guest:40},4,3.1),
-  stage(10,'הלב של הבית','The heart of the home',null,20,6,['guest','cat','plant','dust','guest','cat','dust','plant'],{plant:22,dust:14,cat:9,guest:35},3.5,2.6)
+  stage(3,'חתולים בשתי הכניסות','Cats at both entrances','cat',30,3,['cat','plant','plant','dust','plant'],{plant:18,dust:22,cat:38},3,1.8),
+  stage(4,'הבית מגביר קצב','The house picks up the pace',null,30,4,['cat','plant','plant','dust','plant'],{plant:12,dust:16,cat:25},2,1.2),
+  stage(5,'משהו טעים לאורחים','A treat for our guests','guests',30,3,['guest','plant','dust','cat','plant'],{plant:45,dust:35,cat:40,guest:65},7,2.3,{requiredMeal:true}),
+  stage(6,'כולם נשארים לאכול','Everyone stays for a meal','hospitality',30,3,['guest','plant','cat','dust','guest'],{plant:40,dust:30,cat:35,guest:65},6,2,{requiredMeal:true}),
+  stage(7,'עוד משפחה בדלת','More family at the door','combined',30,4,['plant','guest','cat','dust','guest'],{plant:35,dust:26,cat:30,guest:55},6,1.8),
+  stage(8,'בקצב של רותי','Ruti’s rhythm',null,30,4,['guest','cat','plant','dust','guest','plant'],{plant:30,dust:22,cat:22,guest:48},5,1.6),
+  stage(9,'כולם בדרך','Everyone is on the way',null,30,5,['cat','guest','plant','dust','guest','cat','plant'],{plant:25,dust:17,cat:14,guest:40},4,1.4),
+  stage(10,'הלב של הבית','The heart of the home',null,30,6,['guest','cat','plant','dust','guest','cat','dust','plant'],{plant:22,dust:14,cat:9,guest:35},3.5,1.2)
 ]);
 // One extended opening lesson: six relaxed waterings, then progressively
 // shorter response windows that still allow Ruti to fetch a tool and walk.
@@ -82,7 +92,7 @@ function spawn(g,type){
   const total=current[type],task={id:`${type}-${++g.serial}`,type,slot,remaining:total,total,createdAt:g.elapsed};
   if(current.untimed)task.untimed=true;
   if(isDoor)task.door=task.slot;
-  if(type==='cat'){task.waiting=g.stage.catWait;task.waitingTotal=task.waiting;task.state=task.waiting>0?'waiting':'approaching';}
+  if(type==='cat'){task.waiting=g.stage.catWait;task.waitingTotal=task.waiting;task.state=task.waiting>0?'waiting':'approaching';task.coat=Math.floor(random(g)*CAT_COATS.length);task.size=choose(g,[.8,1,1.18]);}
   if(type==='dust')task.position=dustPosition(g);
   if(type==='guest'){const available=HOUSE_GUESTS.filter(guest=>!g.tasks.some(t=>t.type==='guest'&&t.guest===guest));if(!available.length)return null;task.guest=choose(g,available);task.recipeId=choose(g,RECIPES).id;}
   g.tasks.push(task);g.spawned++;emit(g,{type:'spawn',kind:type,targetId:task.id});return task;
@@ -90,6 +100,8 @@ function spawn(g,type){
 function nextTask(g){const order=g.level===1?(g.stageCompleted<6?['plant']:['plant','plant','plant','dust','plant']):g.stage.order;for(let n=0;n<order.length;n++){if(spawn(g,order[g.typeCursor++%order.length]))return true;}return false;}
 function startStage(g,index){
   const plan=STAGES[index];Object.assign(g,{stage:plan,level:plan.level,phase:'playing',stageCompleted:0,stageElapsed:0,tasks:[],selected:null,typeCursor:0,spawned:0,spawnRemaining:plan.spawnDelay,tutorial:null,lastCatDoor:null});breakCombo(g);
+  g.stageStats={meals:0,snacks:0,plants:0,dust:0,cats:0,dishes:0,oraWins:0};
+  g.ora=null;g.oraAttempted=false;g.oraAt=plan.level>=4?10+Math.floor(random(g)*13):Infinity;g.oraBonusRemaining=0;
   g.unlockedTools=[...plan.unlockedTools];g.unlockedRecipes=[...plan.unlockedRecipes];
   g.requiredDishComplete=!plan.requiredDish;g.requiredMealComplete=!plan.requiredMeal;g.cookingFocus=plan.requiredDish;
   g.lessonObjective=plan.requiredDish?{kind:'dish',recipeId:plan.requiredDish,complete:false}:plan.requiredMeal?{kind:'meal',complete:false}:null;
@@ -102,7 +114,7 @@ function startStage(g,index){
   emit(g,{type:'stage-start',level:g.level,goal:plan.goal,newFeature:plan.newFeature});
 }
 function finishStage(g){
-  g.completedLevels=g.level;g.tasks=[];g.spawnRemaining=0;
+  g.completedLevels=g.level;g.tasks=[];g.ora=null;g.spawnRemaining=0;
   if(g.level===STAGES.length){g.phase='finished';g.won=true;}else g.phase='stage-complete';
   emit(g,{type:'stage-clear',level:g.level,stageScore:g.stageScores[g.level-1],won:g.won});if(g.won)emit(g,{type:'finished',score:g.score,won:true});
 }
@@ -118,27 +130,37 @@ function responseReward(g,task,respondedAt){
 }
 function success(g,kind,targetId,extra={}){
   g.combo++;g.bestCombo=Math.max(g.bestCombo,g.combo);g.comboRemaining=g.level<5?16:12;g.multiplier=1+Math.min(4,Math.floor(g.combo/5))*.25;
-  const points=Math.round(POINTS[kind]*g.multiplier*(extra.speedMultiplier??1));g.score+=points;g.stageScores[g.level-1]+=points;g.stats[statsKey[kind]]++;
+  const points=Math.round(POINTS[kind]*g.multiplier*(extra.speedMultiplier??1));g.score+=points;g.stageScores[g.level-1]+=points;g.stats[statsKey[kind]]++;g.stageStats[statsKey[kind]]++;
   const event=emit(g,{type:'success',kind,points,targetId,combo:g.combo,multiplier:g.multiplier,ok:true,...extra});
-  let counts=g.level<=2?kind==='plant':kind!=='dish';
-  if(kind==='dish'&&!g.requiredDishComplete&&extra.recipeId===g.stage.requiredDish){g.requiredDishComplete=true;g.cookingFocus=null;g.lessonObjective.complete=true;counts=true;emit(g,{type:'lesson-complete',kind:'dish',recipeId:extra.recipeId});}
+  const counts=kind!=='dish';
+  if(kind==='dish'&&!g.requiredDishComplete&&extra.recipeId===g.stage.requiredDish){g.requiredDishComplete=true;g.cookingFocus=null;g.lessonObjective.complete=true;emit(g,{type:'lesson-complete',kind:'dish',recipeId:extra.recipeId});}
   if(kind==='meal'&&!g.requiredMealComplete){g.requiredMealComplete=true;g.lessonObjective.complete=true;emit(g,{type:'lesson-complete',kind:'meal'});}
   if(counts)g.stageCompleted=Math.min(g.stage.goal,g.stageCompleted+1);
+  if(counts&&g.level>=4&&!g.oraAttempted&&g.stageCompleted>=g.oraAt){
+    g.oraAttempted=true;const total=oraWindow(g.level);
+    g.ora={id:`ora-${++g.serial}`,type:'ora',position:{x:.22+random(g)*.56,y:.39+random(g)*.38},remaining:total,total,armed:false};
+    emit(g,{type:'ora-spawn',targetId:g.ora.id});
+  }
   if(g.level===2)g.spawnRemaining=Math.min(g.spawnRemaining,secondStagePace(g).spawnDelay);
   if(g.level===1){const current=firstStagePace(g);g.spawnRemaining=Math.min(g.spawnRemaining,current.spawnDelay);if(current.phase!==g.practicePhase){g.practicePhase=current.phase;emit(g,{type:'pace-up',kind:'plant',phase:current.phase,remaining:g.stage.goal-g.stageCompleted});}}
-  if(g.stageCompleted>=g.stage.goal&&g.requiredDishComplete&&g.requiredMealComplete)finishStage(g);
+  if(g.stageCompleted>=g.stage.goal)finishStage(g);
   return event;
 }
 export function createHouse({random:source=Math.random}={}){
   const g={phase:'playing',won:false,elapsed:0,stageElapsed:0,level:1,score:0,strikes:0,combo:0,bestCombo:0,multiplier:1,comboRemaining:0,selected:null,
     stageCompleted:0,completedLevels:0,stageScores:Array(10).fill(0),unlockedTools:[],unlockedRecipes:[],seededRecipes:[],tutorial:null,plantDeck:[],wateredSlots:[],
-    inventory:Object.fromEntries(RECIPES.map(r=>[r.id,0])),kitchen:Object.fromEntries(RECIPES.map(r=>[r.id,{step:0,remaining:0,state:'prep'}])),tasks:[],stats:{meals:0,snacks:0,plants:0,dust:0,cats:0,dishes:0,missed:0},events:[],serial:0,random:typeof source==='function'?source:Math.random};
+    inventory:Object.fromEntries(RECIPES.map(r=>[r.id,0])),kitchen:Object.fromEntries(RECIPES.map(r=>[r.id,{step:0,remaining:0,state:'prep'}])),tasks:[],stats:{meals:0,snacks:0,plants:0,dust:0,cats:0,dishes:0,missed:0,oraWins:0},events:[],serial:0,random:typeof source==='function'?source:Math.random};
   startStage(g,0);return g;
 }
 export function advanceStage(g){if(g.phase!=='stage-complete'||g.level>=STAGES.length)return false;startStage(g,g.level);return true;}
-export function selectTool(g,id){if(g.phase!=='playing'||!toolIds.has(id)||!g.unlockedTools.includes(id))return false;g.selected=id;return true;}
+export function selectTool(g,id){if(g.phase!=='playing'||!toolIds.has(id)||!g.unlockedTools.includes(id)||(id==='argue'&&!g.ora))return false;g.selected=id;if(id==='argue')g.ora.armed=true;return true;}
 export function actHouse(g,targetId,{respondedAt}={}){
   if(g.phase!=='playing'||typeof targetId!=='string')return null;
+  if(g.ora?.id===targetId){
+    if(g.selected!=='argue'||!g.ora.armed)return emit(g,{type:'wrong',kind:'ora',targetId,required:'argue',ok:false});
+    g.ora=null;g.selected=null;g.score+=ORA_BONUS;g.stageScores[g.level-1]+=ORA_BONUS;g.stats.oraWins++;g.stageStats.oraWins++;g.stageCompleted++;g.phase='ora-bonus';g.oraBonusRemaining=5;
+    return emit(g,{type:'ora-win',kind:'ora',points:ORA_BONUS,targetId,ok:true});
+  }
   if(targetId.startsWith('cook-')){
     const r=recipeById.get(targetId.slice(5));if(!r)return null;
     if(!g.unlockedRecipes.includes(r.id))return emit(g,{type:'locked',kind:'dish',targetId,recipeId:r.id,ok:false});
@@ -157,6 +179,7 @@ export function actHouse(g,targetId,{respondedAt}={}){
 }
 function tick(g,dt){
   g.elapsed=round(g.elapsed+dt);g.stageElapsed=round(g.stageElapsed+dt);
+  if(g.ora){g.ora.remaining=Math.max(0,round(g.ora.remaining-dt));if(g.ora.remaining===0){const targetId=g.ora.id;g.ora=null;if(g.selected==='argue')g.selected=null;emit(g,{type:'ora-missed',targetId});}}
   if(!pace(g).untimed&&g.comboRemaining>0){g.comboRemaining=Math.max(0,g.comboRemaining-dt);if(g.comboRemaining<1e-8)breakCombo(g);}
   for(const r of RECIPES){const k=g.kitchen[r.id];if(k.state!=='cooking')continue;k.remaining=Math.max(0,k.remaining-dt);if(k.remaining<1e-8){k.remaining=0;k.step=0;k.state='prep';g.inventory[r.id]=Math.min(STOCK_LIMIT,g.inventory[r.id]+1);success(g,'dish',`cook-${r.id}`,{recipeId:r.id,ready:true});if(g.phase!=='playing')return;}}
   for(const task of [...g.tasks]){
@@ -169,6 +192,7 @@ function tick(g,dt){
   const current=pace(g);if(g.tasks.length<current.maxActive){g.spawnRemaining=Math.max(0,round(g.spawnRemaining-dt));if(g.spawnRemaining===0){nextTask(g);g.spawnRemaining=current.spawnDelay;}}
 }
 export function advanceHouse(g,seconds){
+  if(g.phase==='ora-bonus'&&Number.isFinite(seconds)&&seconds>0){g.oraBonusRemaining=Math.max(0,round(g.oraBonusRemaining-seconds));if(g.oraBonusRemaining===0){g.phase='playing';emit(g,{type:'ora-bonus-end'});if(g.stageCompleted>=g.stage.goal)finishStage(g);}return g;}
   if(g.phase!=='playing'||!Number.isFinite(seconds)||seconds<=0)return g;let remaining=Math.min(seconds,60);
   while(remaining>1e-8&&g.phase==='playing'){const dt=Math.min(.1,remaining);tick(g,dt);remaining-=dt;}return g;
 }

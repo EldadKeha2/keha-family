@@ -42,9 +42,28 @@
 
 /* Familiar play uses pictures, numbers and sound. Text stays available in
    instructions, pause screens, stage celebrations and accessible labels. */
-.rh-quiet .rh-top h3,.rh-quiet .rh-lives small,.rh-quiet .rh-level small,.rh-quiet [data-rh-stage-name],.rh-quiet .rh-tool strong,.rh-quiet .rh-tool kbd,.rh-quiet .rh-tool-instruction,.rh-quiet .rh-scene-toast,.rh-quiet .rh-tooltip,.rh-quiet [data-rh-hint]{display:none!important}
+.rh-quiet .rh-top h3,.rh-quiet .rh-level small,.rh-quiet [data-rh-stage-name],.rh-quiet .rh-tool strong,.rh-quiet .rh-tool kbd,.rh-quiet .rh-tool-instruction,.rh-quiet .rh-scene-toast,.rh-quiet .rh-tooltip,.rh-quiet [data-rh-hint]{display:none!important}
 .rh-quiet .rh-back,.rh-quiet .rh-pause{font-size:0;min-width:40px;min-height:36px}
 .rh-quiet .rh-back:before{content:'→';font-size:20px}.rh-quiet[dir=ltr] .rh-back:before{content:'←'}.rh-quiet .rh-pause:before{content:'Ⅱ';font-size:18px}
 .rh-quiet .rh-level>span{font-size:0}.rh-quiet .rh-level>span b{font-size:23px}.rh-quiet .rh-level>span:before{content:'⚑';font-size:17px;margin-inline-end:6px}
-.rh-quiet .rh-lives:before{content:'🐈';margin-inline-end:6px}
+
 .rh-quiet .rh-active .rh-tool,.rh-active.rh-quiet .rh-tool{min-height:65px;padding-bottom:4px}.rh-active.rh-quiet .rh-top{min-height:36px}.rh-quiet .rh-status{min-height:42px}
+
+/* Remaining chances and the brief argument challenge. */
+.rh-lives [data-rh-strikes]{display:flex;align-items:center;justify-content:center;gap:5px;min-height:35px;letter-spacing:0}
+.rh-life-symbol{display:block;width:28px;height:34px;object-fit:contain}.rh-life-symbol svg{display:block;width:100%;height:100%}
+.rh-ora-ready .rh-tool-art{animation:rh-ora-invite .55s ease-in-out infinite alternate;filter:drop-shadow(0 0 5px #f2a62d)}
+.rh-ora-ready:after{content:'!';position:absolute;top:0;inset-inline-end:15%;background:#b54c2f;color:#fff4d8;border:2px solid #fff4d8;border-radius:50%;width:21px;height:21px;font-size:15px;font-weight:900;z-index:4}
+.rh-tool[data-rh-tool=argue]:disabled{opacity:.35}.rh-hotspot[data-rh-ora-target]{z-index:5}
+.rh-ora-bonus{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:90%}.rh-ora-bonus-icon{width:76px;height:76px}.rh-ora-bonus-icon svg{width:100%;height:100%}
+.rh-ora-bonus h4{font-size:clamp(24px,4vw,36px);line-height:1.4}.rh-ora-bonus p{font-size:26px;font-weight:900;color:#9b5c24}.rh-ora-bonus>b{display:grid;place-items:center;width:68px;height:68px;border-radius:50%;background:#41684e;color:#fff5d2;font-size:42px;font-variant-numeric:tabular-nums}
+@keyframes rh-ora-invite{to{transform:translateY(-5px) scale(1.12)}}
+@media(max-width:700px){.rh-life-symbol{width:21px;height:27px}.rh-lives [data-rh-strikes]{gap:3px;min-height:28px}.rh-ora-bonus p{font-size:22px}}
+@media(prefers-reduced-motion:reduce){.rh-ora-ready .rh-tool-art{animation:none}}
+
+/* Success-only summary: the target stays out of the player interface. */
+.rh-task-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none;padding:7px 14px;background:#f9f3df;color:#365c47;border-inline:1px solid #b6a27d;border-bottom:1px solid #d8c9a6;direction:rtl}
+.ruti-house[dir=ltr] .rh-task-summary{direction:ltr}.rh-task-summary>strong{display:flex;align-items:center;gap:10px;font-size:12px;line-height:1.35}.rh-task-summary>strong>b{font-size:25px;font-variant-numeric:tabular-nums}
+.rh-task-tallies{display:flex;align-items:center;justify-content:flex-end;gap:12px}.rh-task-tally{display:flex;align-items:center;gap:4px}.rh-task-tally>span{display:block;width:29px;height:29px}.rh-task-tally svg{display:block;width:100%;height:100%}.rh-task-tally>b{font-size:17px;font-variant-numeric:tabular-nums;min-width:16px;text-align:center}
+.rh-objective-quiet{display:none!important}
+@media(max-width:700px){.rh-task-summary{padding:5px 8px;gap:6px}.rh-task-summary>strong{font-size:10px;gap:6px;max-width:95px}.rh-task-summary>strong>b{font-size:22px}.rh-task-tallies{gap:7px}.rh-task-tally{flex-direction:column;gap:0}.rh-task-tally>span{width:23px;height:23px}.rh-task-tally>b{font-size:12px;line-height:1.1}}

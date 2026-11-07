@@ -119,3 +119,17 @@ test('v3 speed and combo rewards save, retry and survive restart without relaxin
     assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_scores').get().n,1);
   }finally{f.close();}
 });
+
+test('v4 persists exact Ora bonuses and thirty-task level totals, without changing legacy score validation',async()=>{
+ const f=fixture();try{
+  const body={...entry(201,0),version:4,score:9000,level:4,completedLevels:3,plants:100,oraWins:1,bestCombo:10,elapsed:350,stageScores:[1200,1200,1200,5400,0,0,0,0,0,0]};
+  assert.equal((await f.call(body)).status,200);assert.equal((await f.call(body)).status,200);f.restart();
+  const row=(await (await f.call()).json()).scores[0];assert.equal(row.oraWins,1);assert.equal(row.version,4);assert.deepEqual(row.stageScores,body.stageScores);
+  assert.equal((await f.call({...body,oraWins:0})).status,409);
+  for(const changes of [{oraWins:2},{oraWins:1.5},{oraWins:-1},{plants:99,score:8960,stageScores:[1200,1200,1200,5360,0,0,0,0,0,0]},{plants:121},{score:8999,stageScores:[1200,1200,1200,5399,0,0,0,0,0,0]}]){
+   assert.equal((await f.call({...body,requestId:'b'.repeat(32),...changes})).status,400);
+  }
+  const won={...body,requestId:'c'.repeat(32),level:10,completedLevels:10,plants:293,oraWins:7,score:46720,stageScores:[1200,1200,1200,6160,6160,6160,6160,6160,6160,6160]};
+  assert.equal((await f.call(won)).status,200);assert.equal((await f.call({...entry(202),version:3,completedLevels:1,stageScores:[60600,0,0,0,0,0,0,0,0,0]})).status,200);
+ }finally{f.close();}
+});
