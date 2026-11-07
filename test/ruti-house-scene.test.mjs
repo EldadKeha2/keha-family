@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {RECIPES} from '../public/assets/ruti-house-engine.mjs';
-import {getHouseLayout,getTaskLocation,findHousePath,renderHouse} from '../public/assets/ruti-house-scene.mjs';
+import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse} from '../public/assets/ruti-house-scene.mjs';
 
 const sizes=[[1000,580],[390,570],[320,500]];
 const inside=(point,obstacle,margin=0)=>point.x>obstacle.x-margin&&point.x<obstacle.x+obstacle.w+margin&&point.y>obstacle.y-margin&&point.y<obstacle.y+obstacle.h+margin;
@@ -27,13 +27,13 @@ function checkWalk(layout,from,to){
  return path;
 }
 
-test('five permanent pots and five physical dishes retain their positions when tasks expire or stages change',()=>{
+test('four distinct permanent pots and counter anchors retain their positions when tasks expire or stages change',()=>{
  for(const [width,height] of sizes){
   const first=getHouseLayout(width,height),again=getHouseLayout(width,height);
-  assert.equal(first.plants.length,5);assert.deepEqual(Object.keys(first.recipes),RECIPES.map(recipe=>recipe.id));
+  assert.equal(first.plants.length,4);assert.deepEqual(first.plants.map(p=>p.variety),['geranium','petunia','fern','pothos']);assert.deepEqual(Object.keys(first.recipes),RECIPES.map(recipe=>recipe.id));
   assert.deepEqual(first.plants,again.plants);assert.deepEqual(first.recipes,again.recipes);
-  const plantPositions=new Set(first.plants.map(p=>`${p.x}:${p.y}`));assert.equal(plantPositions.size,5);
-  for(let slot=0;slot<5;slot++){
+  const plantPositions=new Set(first.plants.map(p=>`${p.x}:${p.y}`));assert.equal(plantPositions.size,4);
+  for(let slot=0;slot<4;slot++){
    const active=getTaskLocation({id:`plant-${slot}`,type:'plant',slot,remaining:20,total:20},first);
    const expiring=getTaskLocation({id:`later-${slot}`,type:'plant',slot,remaining:.01,total:5},again);
    assert.deepEqual(active,first.plants[slot]);assert.deepEqual(expiring,active);
@@ -139,13 +139,66 @@ test('untimed practice targets use infinity without deadline arcs, urgency or an
  assert.ok(!written.includes('∞'));
 });
 
-test('a missing required cooking objective highlights only its designated physical dish',()=>{
- const highlights=[];const gradient={addColorStop(){}};
- const ctx=new Proxy({canvas:{width:1000,height:580},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},beginPath(){this.pathArc=null;},arc(x,y,r){this.pathArc={x,y,r};},stroke(){if(this.strokeStyle==='#d9a326')highlights.push(this.pathArc);}},{get:(target,key)=>key in target?target[key]:(()=>{})});
- for(const [level,recipeId] of [[5,'tahini'],[7,'kubaneh']]){
-  highlights.length=0;const game={level,stage:{requiredDish:recipeId},requiredDishComplete:false,tasks:[],inventory:{},kitchen:{}};
-  renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,time:5,images:{}});
-  const p=getHouseLayout(1000,580).recipes[recipeId];assert.equal(highlights.length,1);assert.equal(highlights[0].x,p.x*1000);assert.equal(highlights[0].y,p.y*580);
-  highlights.length=0;game.requiredDishComplete=true;renderHouse(ctx,game,{actor:{x:.4,y:.5}},{width:1000,height:580,time:6,images:{}});assert.equal(highlights.length,0,'the cooking coach glow disappears after the required dish is prepared');
+function renderRecord(game,options={},visual={}){
+ const written=[],strokes=[],fills=[];const gradient={addColorStop(){}};
+ const width=options.width||390,height=options.height||570;
+ const ctx=new Proxy({canvas:{width,height},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},beginPath(){this.pathArc=null;},arc(x,y,r){this.pathArc={x,y,r};},stroke(){strokes.push({color:this.strokeStyle,width:this.lineWidth,arc:this.pathArc});},fill(){fills.push(this.fillStyle);},fillText(text,x,y){written.push({text,x,y});}},{get:(target,key)=>key in target?target[key]:(()=>{})});
+ renderHouse(ctx,game,{actor:{x:.4,y:.5},...visual},{width,height,time:options.time??2,images:{},...options});
+ return {written,strokes,fills};
+}
+
+test('all four plants remain identifiable by species, flowers, leaves and pot colors before any request',()=>{
+ const expected=['geranium','petunia','fern','pothos'];assert.deepEqual(PLANT_VARIETIES.map(p=>p.id),expected);
+ for(const english of [false,true]){
+  const r=renderRecord({level:1,tasks:[],inventory:{},kitchen:{}},{english});
+  for(const plant of PLANT_VARIETIES)assert.ok(r.written.some(t=>t.text===(english?plant.en:plant.he)),'every permanent pot has a readable species name');
+  for(const color of ['#d91f3b','#8f32d2','#55a641','#238f4c','#bd573f','#315cb2','#e7d3a4','#238c83'])assert.ok(r.fills.includes(color)||r.strokes.some(s=>s.color===color),`the distinct plant artwork includes ${color}`);
  }
+});
+
+test('watering requests stay strongly outlined in every pulse phase and become static under reduced motion',()=>{
+ const game={level:1,tasks:[{id:'p',type:'plant',slot:0,untimed:true,total:1,remaining:1}],inventory:{},kitchen:{}};
+ const outlineRadius=[];
+ for(const time of [0,.2,.65]){
+  const r=renderRecord(game,{time});
+  for(const color of ['#123e4b','#ffffff','#00aee5'])assert.ok(r.strokes.some(s=>s.color===color),'high contrast rings never blink off');
+  assert.ok(r.fills.some(color=>['#fff18fea','#fffbd9f2'].includes(color)),'persistent bright spotlight separates the pot from the room');
+  assert.ok(r.written.some(t=>t.text==='מים!'));assert.ok(r.written.some(t=>t.text==='∞'));
+  outlineRadius.push(r.strokes.find(s=>s.color==='#00aee5').arc.r);
+ }
+ assert.ok(new Set(outlineRadius).size>1,'normal motion gently pulses the watering outline');
+ const first=renderRecord(game,{time:0,reduced:true}),later=renderRecord(game,{time:100,reduced:true});
+ assert.equal(first.strokes.find(s=>s.color==='#00aee5').arc.r,later.strokes.find(s=>s.color==='#00aee5').arc.r,'reduced motion uses an equally clear static outline');
+});
+
+test('urgent plant requests show words and numeric time in addition to color, with edge badges inside the canvas',()=>{
+ for(const [width,height] of [...sizes,[280,500]]){
+  const layout=getHouseLayout(width,height),tasks=layout.plants.map(p=>({id:`p-${p.slot}`,type:'plant',slot:p.slot,total:12,remaining:2.2}));
+  const r=renderRecord({level:1,tasks,inventory:{},kitchen:{}},{width,height,english:true});
+  const badges=r.written.filter(t=>t.text==='Hurry!'),timers=r.written.filter(t=>t.text==='3s');
+  assert.equal(badges.length,4);assert.equal(timers.length,4);
+  assert.ok(badges.every(t=>t.x>=28&&t.x<=width-28),'urgent words stay within the screen even for edge pots');
+  assert.ok(timers.every(t=>t.x>=10&&t.x<=width-10),'countdown stays within the screen');
+  assert.ok(r.fills.includes('#f65c62'),'the countdown bar also marks the short remaining window');
+ }
+});
+
+test('early stages keep an empty counter and later hospitality uses one prepared platter without recipes or stock badges',()=>{
+ for(const level of [1,2,3,4]){
+  const r=renderRecord({level,unlockedTools:['water','broom'],tasks:[],inventory:{tahini:3},kitchen:{}});
+  assert.ok(!r.written.some(t=>['מטעמי הבית','טחינה','גזר וצימוקים','קובנה','חצילים','לזניה','3'].includes(t.text)),'early stages have no food menu or stock counters');
+ }
+ const r=renderRecord({level:5,unlockedTools:['water','broom','hand','serve'],tasks:[],inventory:{tahini:3},kitchen:{}});
+ assert.equal(r.written.filter(t=>t.text==='מטעמי הבית').length,1);
+ assert.ok(!r.written.some(t=>['טחינה','גזר וצימוקים','קובנה','חצילים','לזניה','3'].includes(t.text)),'prepared food is one simple action, not a recipe grid');
+});
+
+test('missed watering briefly wilts the correct pot and shows an explicit failure badge',()=>{
+ const game={level:1,tasks:[],inventory:{},kitchen:{}};
+ const active=renderRecord(game,{}, {departures:[{type:'plant-missed',slot:2,age:.3,duration:1.8}]});
+ assert.equal(active.written.filter(t=>t.text==='פספסתם').length,1);
+ const expired=renderRecord(game,{}, {departures:[{type:'plant-missed',slot:2,age:1.8,duration:1.8}]});
+ assert.ok(!expired.written.some(t=>t.text==='פספסתם'));
+ const reduced=renderRecord(game,{reduced:true,english:true},{departures:[{type:'plant-missed',slot:2,age:.3,duration:1.8}]});
+ assert.ok(reduced.written.some(t=>t.text==='Missed'),'failure remains explicit without animation');
 });

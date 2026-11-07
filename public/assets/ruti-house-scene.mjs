@@ -1,10 +1,20 @@
 import {iconArtwork} from './ruti-house-art.mjs';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
-const ICON_IDS=[...FOOD_IDS,'bowl','knife','oven','water','broom','hand','serve','peanuts','plant','dust','cat'];
+export const PLANT_VARIETIES=Object.freeze([
+ {id:'geranium',he:'גרניום',en:'Geranium'},
+ {id:'petunia',he:'פטוניה',en:'Petunia'},
+ {id:'fern',he:'שרך',en:'Fern'},
+ {id:'pothos',he:'פוטוס',en:'Pothos'}
+].map(Object.freeze));
+const ICON_IDS=[...FOOD_IDS,'water','broom','hand','serve','plant','dust','cat'];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const length=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const departureRoutes=new WeakMap();
+function plantSignalGeometry(x,y,size,width){
+ const w=clamp(size*1.2,69,92),h=21,cx=clamp(x,w/2+4,width-w/2-4),by=Math.max(4,y-size*1.4);
+ return {w,h,cx,bx:cx-w/2,by};
+}
 
 /** Images are immediately usable when loaded; ready never rejects for optional art. */
 export function createSceneAssets({family={}}={}){
@@ -22,8 +32,12 @@ export function getHouseLayout(width,height){
  const xs=portrait?[.12,.31,.50,.69,.88]:[.12,.265,.41,.555,.70];
  const recipeY=portrait?.17:.165,anchorY=portrait?.345:.36;
  const recipes=Object.fromEntries(FOOD_IDS.map((id,i)=>[id,{x:xs[i],y:recipeY,hitRadius:portrait?.07:.052,anchor:{x:xs[i],y:anchorY}}]));
- const plants=(portrait?[[.88,.39],[.89,.61],[.73,.87],[.12,.87],[.31,.53]]:[[.86,.335],[.91,.53],[.75,.86],[.12,.86],[.30,.53]])
-  .map(([x,y],slot)=>({x,y,slot,hitRadius:portrait?.07:.053,anchor:{x:x+(x>.7?-55:55)/width,y:y+24/height}}));
+ const plants=(portrait?[[.88,.39],[.89,.61],[.73,.87],[.12,.87]]:[[.86,.335],[.91,.53],[.75,.86],[.12,.86]])
+  .map(([x,y],slot)=>{
+   const M=Math.min(width,height),signal=plantSignalGeometry(x*width,y*height,M*(portrait?.15:.12),width);
+   return {x,y,slot,variety:PLANT_VARIETIES[slot].id,hitRadius:portrait?.10:.08,anchor:{x:x+(x>.7?-55:55)/width,y:y+24/height},
+    signal:{x:signal.cx/width,y:(signal.by+signal.h/2)/height,hitRadius:signal.w/(2*M)}};
+  });
  const doors=[{x:.945,y:.765,hitRadius:.071,anchor:{x:.945-55/width,y:.765},side:'right'},{x:.045,y:.55,hitRadius:.071,anchor:{x:.045+55/width,y:.55},side:'left'}];
  const sofa=portrait?{x:.48,y:.43,w:.28,h:.105}:{x:.50,y:.43,w:.26,h:.125};
  const table=portrait?{x:.45,y:.68,w:.26,h:.09}:{x:.47,y:.68,w:.25,h:.105};
@@ -103,19 +117,96 @@ function timer(ctx,x,y,r,task){
  const ratio=clamp(task.remaining/task.total,0,1);ctx.beginPath();ctx.arc(x,y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*ratio);ctx.strokeStyle=ratio<.25?'#c94a3e':ratio<.5?'#df9f36':'#67885a';ctx.lineWidth=4;ctx.stroke();
 }
 
+function plantLeaf(ctx,x,y,w,h,rotation,color,heart=false){
+ ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.lineWidth=1.2;
+ if(heart){ctx.beginPath();ctx.moveTo(0,-h*.2);ctx.bezierCurveTo(-w,-h,-w*1.2,h*.1,0,h);ctx.bezierCurveTo(w*1.2,h*.1,w,-h,0,-h*.2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#245638';ctx.stroke();}
+ else ellipse(ctx,0,0,w,h,color,'#2c633e');
+ line(ctx,0,-h*.45,0,h*.7,'#b4d68b',.8);ctx.restore();
+}
+function geraniumFlower(ctx,x,y){
+ for(let i=0;i<7;i++){const a=i*Math.PI*2/7,cx=x+Math.cos(a)*5,cy=y+Math.sin(a)*5;for(let petal=0;petal<5;petal++){const b=petal*Math.PI*2/5;ellipse(ctx,cx+Math.cos(b)*2.4,cy+Math.sin(b)*2.4,2.5,2.5,i%2?'#fb514c':'#d91f3b');}ellipse(ctx,cx,cy,1.3,1.3,'#ffdd81');}
+}
+function petuniaFlower(ctx,x,y,size){
+ ctx.save();ctx.translate(x,y);ctx.beginPath();
+ for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?size*.5:size;const px=Math.cos(a)*r,py=Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}
+ ctx.closePath();ctx.fillStyle='#8f32d2';ctx.fill();ctx.strokeStyle='#e4b8ff';ctx.lineWidth=1.4;ctx.stroke();
+ ellipse(ctx,0,0,size*.25,size*.25,'#fbefb6');ellipse(ctx,0,0,size*.11,size*.11,'#55206e');ctx.restore();
+}
 function drawPlant(ctx,x,y,size,index,thirsty,time){
- const pots=['#c27d56','#d8a267','#76968c','#bc745e','#bc9a64'];const leaf=['#658b51','#668968','#829752','#688c5e','#759e69'][index%5];
+ const pots=['#bd573f','#315cb2','#e7d3a4','#238c83'];
  ctx.save();ctx.translate(x,y);const s=size/64;ctx.scale(s,s);ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';
- ellipse(ctx,0,21,25,7,'#785b3a22');
- const sway=thirsty?Math.sin(time*5)*1.5:Math.sin(time*1.1+index)*.7;
- const droop=thirsty?9:0;
- for(let i=0;i<6;i++){
-  const direction=i%2?-1:1,ax=direction*(12+(i%3)*6),ay=-5-i*6+droop;
-  line(ctx,0,10,ax+sway,ay,'#57784c',2.5);
-  ctx.save();ctx.translate(ax+sway,ay);ctx.rotate(direction*(.6+droop*.04));ellipse(ctx,0,0,6+index%3,13-(i%2)*3,thirsty?'#afa05b':leaf,'#57754a');line(ctx,0,-8,0,8,'#a8bb7d',1);ctx.restore();
+ ellipse(ctx,0,23,26,7,'#65401d30');
+ const sway=Math.sin(time*1.1+index)*.7,droop=thirsty==='missed'?11:thirsty?3:0;
+ if(thirsty==='missed')ctx.globalAlpha=.68;
+ if(index===0){
+  // Rounded, scalloped leaves and dense red flower heads identify geranium.
+  for(const [lx,ly,r] of [[-17,-9,7],[14,-10,8],[-10,-24,7],[9,-25,6]]){
+   line(ctx,0,8,lx,ly,'#2f713d',2.4);
+   for(let k=0;k<7;k++){const a=k*Math.PI*2/7;ellipse(ctx,lx+Math.cos(a)*r*.6,ly+Math.sin(a)*r*.6,r*.55,r*.55,'#3e9a4a');}
+   ellipse(ctx,lx,ly,r*.75,r*.75,'#398b45');line(ctx,lx,ly,lx+3,ly-5,'#b1d774',.9);
+  }
+  for(const [fx,fy] of [[-15,-36],[14,-38],[0,-51]]){line(ctx,0,7,fx+sway,fy+droop,'#38763f',2.4);geraniumFlower(ctx,fx+sway,fy+droop);}
+ }else if(index===1){
+  // Low cascading growth and large purple trumpet flowers identify petunia.
+  for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(0,7);ctx.bezierCurveTo(side*16,-36,side*34,-12+droop,side*25,17+droop);ctx.strokeStyle='#317046';ctx.lineWidth=2.2;ctx.stroke();}
+  for(const [lx,ly,a] of [[-12,-21,-.7],[11,-22,.7],[-24,-8,-1],[23,-6,1],[-23,11,-.5],[22,14,.6],[0,-31,0]])plantLeaf(ctx,lx+sway,ly+droop,4.5,8,a,'#347d43');
+  for(const [fx,fy,r] of [[-20,-27,9],[13,-32,10],[-29,3,8],[27,7,9],[0,-13,10]])petuniaFlower(ctx,fx+sway,fy+droop,r);
+ }else if(index===2){
+  // A fan of feathered, non-flowering fronds gives the fern a separate silhouette.
+  for(let frond=0;frond<7;frond++){
+   const angle=-Math.PI*.89+frond*Math.PI*.13,reach=30+(frond%3)*7,tx=Math.cos(angle)*reach,ty=Math.sin(angle)*reach-9;
+   line(ctx,0,8,tx+sway,ty+droop,'#35763d',1.7);
+   for(let j=1;j<=7;j++){const t=j/8,cx=(tx+sway)*t,cy=8+(ty+droop-8)*t,leafSize=6.5*(1-t*.65),normal=angle+Math.PI/2;
+    for(const side of [-1,1]){const ex=cx+Math.cos(normal)*leafSize*side,ey=cy+Math.sin(normal)*leafSize*side;line(ctx,cx,cy,ex,ey,j%2?'#55a641':'#287e3e',2.9);}
+   }
+  }
+ }else{
+  // Broad variegated hearts on hanging vines distinguish pothos from the fern.
+  for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(0,3);ctx.bezierCurveTo(side*17,-18,side*31,12,side*24,35);ctx.strokeStyle='#2e743e';ctx.lineWidth=2.5;ctx.stroke();}
+  for(const [lx,ly,a] of [[-10,-27,-.5],[10,-31,.5],[-20,-10,-.7],[18,-9,.65],[-26,9,-.5],[26,11,.5],[-24,28,-.25],[23,31,.35],[0,-13,0]]){
+   line(ctx,0,6,lx+sway,ly,'#397c43',1.2);plantLeaf(ctx,lx+sway,ly+droop,6.2,10.5,a,'#238f4c',true);
+   ctx.save();ctx.translate(lx+sway,ly+droop);ctx.rotate(a);polygon(ctx,[[0,-2],[-3,2],[0,8],[2,2]],'#a5ca5d');ctx.restore();
+  }
  }
- polygon(ctx,[[-18,8],[18,8],[13,31],[-12,31]],pots[index%5],'#805f43');box(ctx,-21,5,42,9,pots[index%5],'#805f43',3);line(ctx,-9,17,-7,26,'#f7d8b044',3);
- if(index===4)for(const [fx,fy] of [[-15,-9],[12,-17],[0,-27]]){for(let p=0;p<5;p++)ellipse(ctx,fx+Math.cos(p*1.26)*4,fy+Math.sin(p*1.26)*4,3,3,'#d19a8d');ellipse(ctx,fx,fy,2,2,'#eccc75');}
+ // Different pot colors and markings remain visible while the leaves are thirsty.
+ polygon(ctx,[[-18,8],[18,8],[13,31],[-12,31]],pots[index],'#534c38');
+ if(index===0){line(ctx,-12,19,12,19,'#f4c782',2);line(ctx,-11,24,11,24,'#f4c782',1);}
+ if(index===1)for(const px of [-9,0,9])polygon(ctx,[[px,15],[px+3,19],[px,23],[px-3,19]],'#d7e8ff');
+ if(index===2){line(ctx,-14,17,14,17,'#498655',3);line(ctx,-12,25,12,25,'#498655',3);}
+ if(index===3)for(const px of [-9,0,9])line(ctx,px,15,px*.8,27,'#b4ede0',1.4);
+ box(ctx,-21,5,42,9,pots[index],'#534c38',3);line(ctx,-10,16,-8,27,'#fff7dc66',2);
+ ctx.restore();
+}
+
+function drawPlantHalo(ctx,x,y,size,task,time,reduced){
+ const pulse=reduced?.7:.5+.5*Math.sin(time*Math.PI*2*1.1),cy=y-size*.15,r=size*(.59+pulse*.035);
+ ctx.save();
+ // The pale disk and three solid outlines stay on at every animation frame.
+ // Only the surrounding glow breathes; there is never an invisible phase.
+ ctx.shadowColor='#fff34d';ctx.shadowBlur=12+pulse*12;
+ ellipse(ctx,x,cy,r,r,pulse>.55?'#fff18fea':'#fffbd9f2');ctx.shadowBlur=0;
+ // A separate expanding cyan ring makes the slow blink unmistakable while
+ // the plant, its label and its solid white outline remain continuously visible.
+ if(!reduced){ctx.beginPath();ctx.arc(x,cy,size*(.68+pulse*.10),0,Math.PI*2);ctx.strokeStyle=`rgba(0,142,206,${.25+pulse*.65})`;ctx.lineWidth=3.5;ctx.stroke();}
+ ctx.beginPath();ctx.arc(x,cy,r,0,Math.PI*2);ctx.strokeStyle='#123e4b';ctx.lineWidth=8;ctx.stroke();
+ ctx.strokeStyle='#ffffff';ctx.lineWidth=5;ctx.stroke();
+ ctx.strokeStyle='#00aee5';ctx.lineWidth=2.5;ctx.stroke();
+ ctx.restore();
+}
+function drawPlantSignal(ctx,x,y,size,task,{english,width}){
+ const ratio=task.untimed?1:clamp(task.remaining/task.total,0,1),urgent=!task.untimed&&ratio<.3;
+ const {w,h,cx,bx,by}=plantSignalGeometry(x,y,size,width),color=urgent?'#b9233d':'#00648c';
+ ctx.save();ctx.lineWidth=2;
+ polygon(ctx,[[x-8,by+h-1],[x+8,by+h-1],[x,by+h+10]],'#ffffff','#123e4b');
+ box(ctx,bx,by,w,h,color,'#ffffff',7);
+ // A large water drop supplements the text and urgent color change.
+ const dx=bx+12,dy=by+10;ctx.beginPath();ctx.moveTo(dx,dy-7);ctx.bezierCurveTo(dx-1,dy-4,dx-6,dy,dx-6,dy+3);ctx.bezierCurveTo(dx-6,dy+10,dx+6,dy+10,dx+6,dy+3);ctx.bezierCurveTo(dx+6,dy,dx+1,dy-4,dx,dy-7);ctx.fillStyle='#bff5ff';ctx.fill();
+ label(ctx,urgent?(english?'Hurry!':'מהר!'):(english?'Water!':'מים!'),cx-1,by+h/2,{size:10,color:'#ffffff',halo:false,weight:'900'});
+ label(ctx,task.untimed?'∞':`${Math.ceil(task.remaining)}s`,bx+w-12,by+h/2,{size:10,color:'#ffffff',halo:false,weight:'800'});
+ if(!task.untimed){
+  const barY=y+size*.84;box(ctx,x-size*.49,barY,size*.98,7,'#123e4b','#ffffff',3);
+  if(ratio>0)box(ctx,x-size*.49+1,barY+1,(size*.98-2)*ratio,5,urgent?'#f65c62':'#00d5f1',null,2);
+ }
  ctx.restore();
 }
 
@@ -278,29 +369,39 @@ export function renderHouse(ctx,g,visual={},options={}){
  const l=getHouseLayout(width,height),M=Math.min(width,height),pulseTime=reduced?0:time;
  ctx.save();ctx.clearRect(0,0,width,height);ctx.lineCap='round';drawRoom(ctx,l,{time:pulseTime,english,reduced});
  const activePlants=new Map((g?.tasks||[]).filter(t=>t.type==='plant').map(t=>[t.slot,t]));
+ const missedPlants=new Map((visual.departures||[]).filter(d=>d.type==='plant-missed'&&(d.age||0)<(d.duration||1.8)).map(d=>[d.slot,d]));
  for(let i=0;i<l.plants.length;i++){
-  const p=l.plants[i],task=activePlants.get(i),x=p.x*width,y=p.y*height,size=M*(l.portrait?.15:.12);
-  if(task)halo(ctx,x,y-size*.18,size*.42,pulseTime,'#db9d35',!task.untimed&&task.remaining/task.total<.25);
-  drawPlant(ctx,x,y,size,i,!!task,pulseTime);
-  if(task){timer(ctx,x,y-size*.16,size*.52,task);label(ctx,english?'Water!':'מים!',x,y-size*.72,{size:clamp(M*.024,11,14),color:'#925c28'});}
- }
- // Five recognizable physical dishes stay in place throughout every stage.
- for(const id of FOOD_IDS){
-  const p=l.recipes[id],x=p.x*width,y=p.y*height,size=M*(l.portrait?.125:.105),stock=g?.inventory?.[id]??0,kitchen=g?.kitchen?.[id];
-  ellipse(ctx,x,y+size*.27,size*.46,size*.11,'#7f684527');
-  if(g?.stage?.requiredDish===id&&!g.requiredDishComplete){
-   halo(ctx,x,y,size*.65,pulseTime,'#d9a326');
-   ctx.save();ctx.strokeStyle='#efd28a';ctx.lineWidth=2.5;
-   for(let ray=0;ray<8;ray++){const a=ray*Math.PI/4+pulseTime*.1,r=size*.83;line(ctx,x+Math.cos(a)*r,y+Math.sin(a)*r,x+Math.cos(a)*(r+size*.10),y+Math.sin(a)*(r+size*.10),'#efd28a',2.5);}
-   ctx.restore();
+  const p=l.plants[i],task=activePlants.get(i),missed=missedPlants.get(i),x=p.x*width,y=p.y*height,size=M*(l.portrait?.15:.12);
+  if(task)drawPlantHalo(ctx,x,y,size,task,pulseTime,reduced);
+  drawPlant(ctx,x,y,size,i,task?true:missed?'missed':false,pulseTime);
+  const plantName=english?PLANT_VARIETIES[i].en:PLANT_VARIETIES[i].he;
+  label(ctx,plantName,x,y+size*.66,{size:clamp(M*.022,9,12),color:'#254c36',weight:'800'});
+  if(task)drawPlantSignal(ctx,x,y,size,task,{english,width});
+  if(missed&&!task){
+   const w=clamp(size*1.15,67,88),cx=clamp(x,w/2+4,width-w/2-4),by=y-size*.68;
+   ctx.save();ctx.globalAlpha=reduced?1:1-clamp(((missed.age||0)/(missed.duration||1.8)-.65)/.35,0,1);
+   box(ctx,cx-w/2,by,w,22,'#a61f38','#ffffff',6);
+   line(ctx,cx-w/2+7,by+7,cx-w/2+14,by+15,'#ffffff',2.3);line(ctx,cx-w/2+14,by+7,cx-w/2+7,by+15,'#ffffff',2.3);
+   label(ctx,english?'Missed':'פספסתם',cx+6,by+11,{size:10,color:'#ffffff',halo:false,weight:'800'});ctx.restore();
   }
-  if(kitchen?.state==='cooking')halo(ctx,x,y,size*.43,pulseTime,'#e4ad46');
-  if(!icon(ctx,images,id,x,y,size)){ellipse(ctx,x,y,size*.43,size*.18,'#eee0b6','#9f8967');ellipse(ctx,x,y-size*.06,size*.34,size*.14,['#eee0b2','#df9d55','#c18b4d','#b7a282','#daa25a'][FOOD_IDS.indexOf(id)]);}
-  const short=english?{tahini:'Tahini',carrot:'Carrot',kubaneh:'Kubaneh',eggplant:'Eggplant',lasagna:'Lasagna'}:{tahini:'טחינה',carrot:'גזר וצימוקים',kubaneh:'קובנה',eggplant:'חצילים',lasagna:'לזניה'};
-  label(ctx,short[id],x,y+size*.67,{size:clamp(M*.022,10,13),color:'#63513b'});
-  ellipse(ctx,x+size*.37,y-size*.30,size*.13,size*.13,stock?'#6f8c5b':'#b19770','#f4e4bf');label(ctx,String(stock),x+size*.37,y-size*.30,{size:clamp(size*.22,9,13),color:'#fff9e9',halo:false,weight:'800'});
-  if(kitchen?.state==='cooking'){const total={tahini:2.5,carrot:3,kubaneh:8,eggplant:5,lasagna:9}[id];timer(ctx,x,y,size*.55,{remaining:total-kitchen.remaining,total});for(let i=0;i<3;i++){const t=(pulseTime*.5+i/3)%1;ellipse(ctx,x+(i-1)*size*.16+Math.sin(time*2+i)*2,y-size*(.33+t*.35),1.3,2.8,'#fffae7'+Math.round((1-t)*180).toString(16).padStart(2,'0'));}}
  }
+ // Food is one simple hospitality action. The counter stays uncluttered
+ // during the early plant/cleaning lessons, then holds one decorative platter.
+ const canServe=g?.unlockedTools?g.unlockedTools.includes('serve'):g?.level>=5;
+ if(canServe){
+  const x=width*.41,y=height*.175,size=M*(l.portrait?.15:.12);
+  ellipse(ctx,x,y+size*.26,size*.76,size*.19,'#73502e22');
+  ellipse(ctx,x,y+size*.15,size*.80,size*.26,'#ecdfb9','#8a7652');
+  ellipse(ctx,x,y+size*.11,size*.69,size*.19,'#fff6dd','#c7b589');
+  // A loaf, tahini bowl and greens are scenery, not separate selectable meals.
+  ellipse(ctx,x-size*.22,y-size*.03,size*.26,size*.20,'#ce8b3e','#9b612a');
+  for(let slash=0;slash<3;slash++)line(ctx,x-size*.36+slash*size*.12,y-size*.12,x-size*.31+slash*size*.12,y+size*.02,'#f6d091',2);
+  ellipse(ctx,x+size*.27,y+size*.03,size*.24,size*.13,'#9aa780','#647455');
+  ellipse(ctx,x+size*.27,y-size*.01,size*.22,size*.10,'#f1dcb0','#aa9b6f');
+  for(let leaf=0;leaf<5;leaf++)ellipse(ctx,x+size*(.02+(leaf%3)*.065),y-size*(.09+(leaf%2)*.08),size*.06,size*.035,['#4a984d','#85ae55'][leaf%2]);
+  label(ctx,english?'Homemade treats':'מטעמי הבית',x,y+size*.65,{size:clamp(M*.023,10,14),color:'#63513b'});
+ }
+
  const actors=[];
  for(const task of g?.tasks||[]){
   const p=getTaskLocation(task,l),x=p.x*width,y=p.y*height;
@@ -309,7 +410,7 @@ export function renderHouse(ctx,g,visual={},options={}){
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=task.untimed?1:clamp(task.total-task.remaining,0,1),guestX=x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=y+M*.04;
    halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',!task.untimed&&task.remaining/task.total<.25);
    const portrait=images.family?.[task.guest]||images[task.guest];drawHuman(ctx,guestX,guestY,M*(l.portrait?.175:.17),{portrait,guest:true,index:task.guest==='hila'?1:task.guest==='rivi'?2:0,time:pulseTime,walking:arrival<1&&!reduced,facing:d.side==='left'?1:-1});
-   const bubbleX=guestX+(d.side==='left'?1:-1)*M*.062,bubbleY=guestY-M*.145;ellipse(ctx,bubbleX,bubbleY,M*.035,M*.035,'#fff3d4','#c59b54');icon(ctx,images,task.recipeId,bubbleX,bubbleY,M*.06);
+   const bubbleX=guestX+(d.side==='left'?1:-1)*M*.062,bubbleY=guestY-M*.145;ellipse(ctx,bubbleX,bubbleY,M*.035,M*.035,'#fff3d4','#c59b54');icon(ctx,images,'serve',bubbleX,bubbleY,M*.06);
    const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי'};label(ctx,names[task.guest]||task.guest,guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
   }});
   if(task.type==='cat')actors.push({y:y+M*.03,draw:()=>{
