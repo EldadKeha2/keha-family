@@ -42,9 +42,9 @@
 
 /* Familiar play uses pictures, numbers and sound. Text stays available in
    instructions, pause screens, stage celebrations and accessible labels. */
-.rh-quiet .rh-top h3,.rh-quiet .rh-status small,.rh-quiet [data-rh-stage-name],.rh-quiet .rh-tool strong,.rh-quiet .rh-tool kbd,.rh-quiet .rh-tool-instruction,.rh-quiet .rh-scene-toast,.rh-quiet .rh-tooltip,.rh-quiet [data-rh-hint]{display:none!important}
+.rh-quiet .rh-top h3,.rh-quiet .rh-lives small,.rh-quiet .rh-level small,.rh-quiet [data-rh-stage-name],.rh-quiet .rh-tool strong,.rh-quiet .rh-tool kbd,.rh-quiet .rh-tool-instruction,.rh-quiet .rh-scene-toast,.rh-quiet .rh-tooltip,.rh-quiet [data-rh-hint]{display:none!important}
 .rh-quiet .rh-back,.rh-quiet .rh-pause{font-size:0;min-width:40px;min-height:36px}
 .rh-quiet .rh-back:before{content:'→';font-size:20px}.rh-quiet[dir=ltr] .rh-back:before{content:'←'}.rh-quiet .rh-pause:before{content:'Ⅱ';font-size:18px}
 .rh-quiet .rh-level>span{font-size:0}.rh-quiet .rh-level>span b{font-size:23px}.rh-quiet .rh-level>span:before{content:'⚑';font-size:17px;margin-inline-end:6px}
-.rh-quiet .rh-score:before{content:'★';color:#f4d37c;margin-inline-end:6px}.rh-quiet .rh-stage-score:before{content:'✦';margin-inline-end:6px}.rh-quiet .rh-lives:before{content:'🐈';margin-inline-end:6px}
+.rh-quiet .rh-lives:before{content:'🐈';margin-inline-end:6px}
 .rh-quiet .rh-active .rh-tool,.rh-active.rh-quiet .rh-tool{min-height:65px;padding-bottom:4px}.rh-active.rh-quiet .rh-top{min-height:36px}.rh-quiet .rh-status{min-height:42px}
