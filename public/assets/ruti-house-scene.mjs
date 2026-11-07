@@ -1,7 +1,7 @@
 import {iconArtwork} from './ruti-house-art.mjs?v=4';
 import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=5';
 import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
-import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=9';
+import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=11';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -13,7 +13,7 @@ export const PLANT_VARIETIES=Object.freeze([
 const ICON_IDS=[...FOOD_IDS,'water','broom','hand','argue','serve','peanuts','plant','dust','cat'];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const length=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-const departureRoutes=new WeakMap();
+const guestRoutes=new WeakMap();
 function plantSignalGeometry(x,y,size,width){
  const w=clamp(size*1.2,69,92),h=21,cx=clamp(x,w/2+4,width-w/2-4),by=Math.max(4,y-size*1.4);
  return {w,h,cx,bx:cx-w/2,by};
@@ -52,13 +52,33 @@ export function getHouseLayout(width,height){
  const doors=[{x:.945,y:.765,hitRadius:.071,anchor:{x:.945-55/width,y:.765},side:'right',kind:'main',visualScale:1.35},{x:.045,y:.55,hitRadius:.071,anchor:{x:.045+55/width,y:.55},side:'left',kind:'back',visualScale:.8}];
  const sofa=portrait?{x:.48,y:.43,w:.28,h:.105}:{x:.50,y:.43,w:.26,h:.125};
  const table=portrait?{x:.45,y:.68,w:.26,h:.09}:{x:.47,y:.68,w:.25,h:.105};
- const obstacles=[counter,sofa,table,...plants.map(p=>({x:p.x-.033,y:p.y-.028,w:.066,h:.04}))];
- const layout={width,height,portrait,recipes,plants,doors,pickup:{x:.40,y:.90,hitRadius:.06,anchor:{x:.40,y:.84}},obstacles,sofa,table,counter,
+ const guestSeats=[
+  {kind:'sofa',x:sofa.x+sofa.w*.25,y:sofa.y+sofa.h*.55,approachY:sofa.y+sofa.h+.055},
+  {kind:'dining',x:table.x+table.w*.2,y:table.y+table.h*1.08,approachY:table.y+table.h+.10},
+  {kind:'armchair',x:.85,y:.55,facing:-1},
+  {kind:'sofa',x:sofa.x+sofa.w*.73,y:sofa.y+sofa.h*.55,approachY:sofa.y+sofa.h+.055},
+  {kind:'dining',x:table.x+table.w*.2,y:table.y-table.h*.06,approachY:table.y-.075},
+  {kind:'armchair',x:.29,y:.51},
+  {kind:'dining',x:table.x+table.w*.8,y:table.y-table.h*.06,approachY:table.y-.075},
+  {kind:'dining',x:table.x+table.w*.8,y:table.y+table.h*1.08,approachY:table.y+table.h+.10}
+ ];
+ const M=Math.min(width,height);
+ const armchairs=guestSeats.filter(s=>s.kind==='armchair').map(s=>({x:s.x-M*.07/width,y:s.y-M*.025/height,w:M*.14/width,h:M*.11/height}));
+ const obstacles=[counter,sofa,table,...armchairs,...plants.map(p=>({x:p.x-.033,y:p.y-.028,w:.066,h:.04}))];
+ const layout={width,height,portrait,recipes,plants,doors,pickup:{x:.40,y:.90,hitRadius:.06,anchor:{x:.40,y:.84}},obstacles,sofa,table,counter,guestSeats,
   walkBounds:{left:.055,right:.945,top:portrait?.325:.34,bottom:.94},spawn:{x:.42,y:.51}};
  // Reach is measured in CSS pixels so a wider canvas never leaves Ruti a
  // metre from her watering target. Project awkward anchors onto open floor.
  for(const target of [...plants,...doors])target.anchor=nearestFloor(layout,target.anchor);
+ for(const seat of guestSeats)seat.anchor=nearestFloor(layout,{x:seat.x,y:seat.approachY??seat.y+.10});
  return layout;
+}
+
+const guestHeight=layout=>Math.min(layout.width,layout.height)*(layout.portrait?.26:.235);
+/** The same seat identity follows its furniture when the screen is resized. */
+export function getHouseGuestSeat(index,layout){
+ const seat=layout.guestSeats[Math.abs(index||0)%layout.guestSeats.length];
+ return {...seat,seatY:seat.y,y:seat.y+guestHeight(layout)*.23/layout.height,hitRadius:.12,facing:seat.facing||1};
 }
 
 function blocked(layout,point,margin=0){return layout.obstacles.some(o=>point.x>o.x-margin&&point.x<o.x+o.w+margin&&point.y>o.y-margin&&point.y<o.y+o.h+margin);}
@@ -75,6 +95,7 @@ function nearestFloor(layout,point){
 
 export function getTaskLocation(task,layout){
  if(task.type==='plant')return layout.plants[Math.abs(task.slot||0)%layout.plants.length];
+ if(task.type==='guest'&&task.resident&&Number.isInteger(task.seat))return getHouseGuestSeat(task.seat,layout);
  if(task.type==='ora'){const p={x:clamp(task.position.x,.08,.92),y:clamp(task.position.y,.28,.90)};return {...p,hitRadius:.09,anchor:{...p}};}
  if(task.type==='dust'){
   const raw=task.position||{x:.15+((task.slot||0)*.137)% .70,y:.40+((task.slot||0)*.113)% .45};
@@ -273,15 +294,22 @@ function routePosition(points,progress,width,height){
  return {...points.at(-1),facing:1};
 }
 
-function guestDeparturePosition(departure,layout,progress){
- const key=`${layout.width}:${layout.height}`;let cached=departureRoutes.get(departure);
+/** Served guests walk to their own seat once, then remain there between levels. */
+export function residentGuestPose(resident,layout,elapsed,{reduced=false}={}){
+ const seat=getHouseGuestSeat(resident.seat,layout);
+ if(reduced)return {...seat,walking:false,sitting:1};
+ const key=`${layout.width}:${layout.height}:${resident.seat}`;let cached=guestRoutes.get(resident);
  if(!cached||cached.key!==key){
-  const door=layout.doors[Math.abs(departure.door??0)%2],sgn=door.side==='left'?1:-1,M=Math.min(layout.width,layout.height);
+  const door=layout.doors[Math.abs(resident.door??0)%2],sgn=door.side==='left'?1:-1,M=Math.min(layout.width,layout.height);
   const start={x:door.x+sgn*M*.04/layout.width,y:door.y+M*.04/layout.height};
-  const goal=nearestFloor(layout,{x:.42,y:.64});
-  cached={key,points:[start,door.anchor,...findHousePath(layout,door.anchor,goal)]};departureRoutes.set(departure,cached);
+  const points=[start,door.anchor,...findHousePath(layout,door.anchor,seat.anchor)];
+  const distance=points.slice(1).reduce((sum,p,i)=>sum+Math.hypot((p.x-points[i].x)*layout.width,(p.y-points[i].y)*layout.height),0);
+  cached={key,points,duration:clamp(distance/(M*.32),1.6,7.5)};guestRoutes.set(resident,cached);
  }
- return routePosition(cached.points,progress,layout.width,layout.height);
+ const age=Math.max(0,elapsed-(resident.servedAt||0));
+ if(age<cached.duration)return {...routePosition(cached.points,age/cached.duration,layout.width,layout.height),walking:true,sitting:0};
+ const progress=clamp((age-cached.duration)/.5,0,1),blend=progress*progress*(3-2*progress),from=cached.points.at(-1);
+ return {...seat,x:from.x+(seat.x-from.x)*blend,y:from.y+(seat.y-from.y)*blend,walking:false,sitting:blend};
 }
 
 // Only the body is narrowed. Full-width head pixels above each neckline keep
@@ -421,7 +449,7 @@ function drawRutiSpeech(ctx,x,y,height,actor,time,width){
 // Two full-body poses retain the actual family likeness, neck and clothing.
 // Both atlases share the same cell geometry and scale, so silhouettes do not
 // disclose whether a guest should receive a meal or peanuts.
-export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,facing=1,reduced=false}={}){
+export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,facing=1,reduced=false,sitting=0}={}){
  const familyIndex=HOUSE_GUESTS.indexOf(id),column=familyIndex>=0?familyIndex:HOUSE_VISITORS.indexOf(id);
  const atlas=familyIndex>=0?images?.familyAtlas:images?.visitorAtlas;
  if(column<0||!imageReady(atlas))return false;
@@ -432,7 +460,20 @@ export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,faci
  const bob=walking&&!reduced?Math.abs(Math.sin(time*8))*height*.012:reduced?0:Math.sin(time*1.7+column)*height*.002;
  ctx.save();ctx.translate(x,y-bob);ellipse(ctx,0,1,height*.15,height*.025,'#4c382c25');
  if(facing<0)ctx.scale(-1,1);
- ctx.drawImage(atlas,column*cw+.5,row*ch+.5,cw-1,ch-1,-w*center,-h*foot,w,h);ctx.restore();return true;
+ if(sitting>0){
+  // The face, neck, hands and torso keep their original pixels and scale.
+  // Foreshortened legs and a lap plate give the front-facing seated pose.
+  const bend=clamp(sitting,0,1),hip=ch*.60,top=-h*foot+(h*foot-height*.23-hip*scale)*bend;
+  const lower=(ch-hip)*scale*(1-bend)+height*.27*bend;
+  ctx.drawImage(atlas,column*cw+.5,.5,cw-1,hip,-w*center,top,w,hip*scale);
+  ctx.drawImage(atlas,column*cw+.5,hip+.5,cw-1,ch-hip-1,-w*center,top+hip*scale-.3,w,lower);
+  if(bend>.75){
+   const lap=top+hip*scale-height*.025;
+   ellipse(ctx,0,lap,height*.12,height*.035,'#f3e7c9','#aa9975');
+   ellipse(ctx,0,lap-height*.008,height*.09,height*.016,'#d9c39a');
+  }
+ }else ctx.drawImage(atlas,column*cw+.5,row*ch+.5,cw-1,ch-1,-w*center,-h*foot,w,h);
+ ctx.restore();return true;
 }
 const residentRoutes=new WeakMap();
 /** A persistent indoor cat walks around furniture and jumps onto real surfaces. */
@@ -463,8 +504,8 @@ export function residentCatPose(cat,layout,elapsed){
  return {...route.segments[0].points[0],facing:1,surface:'floor',walking:false,jumping:false};
 }
 
-function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null,quiet=false}={}){
- if(guest&&drawHouseGuest(ctx,x,y,height,guestId,images,time,{walking,facing,reduced}))return;
+function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=0,time=0,facing=1,walking=false,sitting=0,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null,quiet=false}={}){
+ if(guest&&drawHouseGuest(ctx,x,y,height,guestId,images,time,{walking,facing,reduced,sitting}))return;
  if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced,waterTarget);return;}
  ctx.save();ctx.translate(x,y);const s=height/100;ctx.scale(s,s);ctx.lineCap='round';ctx.lineJoin='round';
  const cycle=walking?Math.sin(time*13):0,bob=walking?Math.abs(cycle)*2:Math.sin(time*1.8)*.4;
@@ -528,6 +569,26 @@ function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=
  ctx.restore();
 }
 
+function drawDiningTableSurface(ctx,l){
+ const W=l.width,H=l.height,M=Math.min(W,H),t=l.table,tx=t.x*W,ty=t.y*H,tw=t.w*W,th=t.h*H;
+ ellipse(ctx,tx+tw/2,ty+th*.40,tw*.55,th*.54,'#b38353','#8d633e');ellipse(ctx,tx+tw/2,ty+th*.29,tw*.55,th*.49,'#d3aa75','#946d46');
+ box(ctx,tx+tw*.45,ty-th*.18,tw*.13,th*.85,'#efe0b7',null,1);for(const dx of [.16,.83])ellipse(ctx,tx+tw*dx,ty+th*.30,tw*.09,th*.14,'#f4e9c8','#9ba488');
+ ellipse(ctx,tx+tw*.515,ty+th*.30,M*.013,M*.018,'#8f9c77','#6b7b5c');line(ctx,tx+tw*.515,ty+th*.20,tx+tw*.515,ty-th*.15,'#6f8b57',2);for(let i=0;i<3;i++){const fx=tx+tw*(.48+i*.035),fy=ty-th*(.13+(i%2)*.12);ellipse(ctx,fx,fy,M*.008,M*.007,['#d6a065','#c78c7d'][i%2]);}
+}
+
+function drawGuestArmchairs(ctx,l){
+ const M=Math.min(l.width,l.height);
+ for(const seat of l.guestSeats.filter(s=>s.kind==='armchair')){
+  const x=seat.x*l.width,y=seat.y*l.height,w=M*.14,h=M*.21;
+  ellipse(ctx,x,y+h*.36,w*.64,h*.09,'#60482e22');
+  for(const dx of [-.34,.34])box(ctx,x+w*dx-w*.045,y+h*.12,w*.09,h*.28,'#896441',null,2);
+  box(ctx,x-w*.48,y-h*.65,w*.96,h*.79,'#8f9f83','#68785e',M*.015);
+  box(ctx,x-w*.38,y-h*.56,w*.76,h*.49,'#aeb99a','#8a9b7b',M*.012);
+  box(ctx,x-w*.47,y-h*.03,w*.94,h*.24,'#c6b58a','#8a9b7b',M*.012);
+  for(const dx of [-.56,.42])box(ctx,x+w*dx,y-h*.19,w*.14,h*.44,'#8c9e7d','#657953',M*.008);
+ }
+}
+
 function drawRoom(ctx,l,{time,english,reduced,quiet=false}){
  const W=l.width,H=l.height,M=Math.min(W,H),P=(x,y)=>[x*W,y*H];ctx.lineWidth=Math.max(1,M/430);ctx.lineJoin='round';
  const wall=ctx.createLinearGradient(0,0,0,H*.36);wall.addColorStop(0,'#f9edd2');wall.addColorStop(1,'#e4d1ac');
@@ -565,13 +626,12 @@ function drawRoom(ctx,l,{time,english,reduced,quiet=false}){
  const s=l.sofa,x=s.x*W,y=s.y*H,w=s.w*W,h=s.h*H;
  ellipse(ctx,x+w/2,y+h*.94,w*.54,h*.18,'#6d4c2f20');box(ctx,x+4,y-h*.16,w-8,h*.55,'#b98960','#8c6649',M*.025);box(ctx,x,y+h*.2,w,h*.72,'#c7996d','#8c6649',M*.025);box(ctx,x+w*.13,y+h*.28,w*.74,h*.44,'#d5af7c','#b1875d',M*.018);box(ctx,x-4,y+h*.12,w*.14,h*.8,'#bb8b5f','#8c6649',M*.015);box(ctx,x+w*.86,y+h*.12,w*.14,h*.8,'#bb8b5f','#8c6649',M*.015);
  ctx.save();ctx.translate(x+w*.29,y+h*.24);ctx.rotate(-.12);box(ctx,-w*.09,-h*.14,w*.19,h*.43,'#9ba584','#6f7e60',M*.008);ctx.restore();ctx.save();ctx.translate(x+w*.72,y+h*.28);ctx.rotate(.14);box(ctx,-w*.09,-h*.14,w*.18,h*.4,'#bb7765','#9a6050',M*.008);ctx.restore();box(ctx,x+w*.48,y+h*.05,w*.16,h*.81,'#eee1be',null,2);for(let i=0;i<6;i++)line(ctx,x+w*.49,y+h*(.14+i*.11),x+w*.63,y+h*(.14+i*.11),'#c9ad83',1.2);
+ drawGuestArmchairs(ctx,l);
  // Rug and dining table, with four chairs and a little vase.
  const t=l.table,tx=t.x*W,ty=t.y*H,tw=t.w*W,th=t.h*H;
  ctx.save();ctx.translate(tx+tw/2,ty+th/2);ctx.rotate(-.03);box(ctx,-tw*.72,-th*.92,tw*1.44,th*1.84,'#b96852','#e9c98a',M*.008);for(let i=0;i<9;i++){const q=-tw*.65+i*tw*.16;polygon(ctx,[[q,0],[q+tw*.05,-th*.25],[q+tw*.10,0],[q+tw*.05,th*.25]],'#ddba7d');}ctx.restore();
  for(const [dx,dy] of [[.12,-.22],[.73,-.22],[.12,.90],[.73,.90]]){box(ctx,tx+tw*dx,ty+th*dy,tw*.17,th*.42,'#b68a5e','#805b3c',M*.01);}
- ellipse(ctx,tx+tw/2,ty+th*.88,tw*.56,th*.25,'#68492825');box(ctx,tx+tw*.10,ty+th*.6,tw*.05,th*.62,'#92683f',null,2);box(ctx,tx+tw*.84,ty+th*.6,tw*.05,th*.62,'#92683f',null,2);ellipse(ctx,tx+tw/2,ty+th*.40,tw*.55,th*.54,'#b38353','#8d633e');ellipse(ctx,tx+tw/2,ty+th*.29,tw*.55,th*.49,'#d3aa75','#946d46');
- box(ctx,tx+tw*.45,ty-th*.18,tw*.13,th*.85,'#efe0b7',null,1);for(const dx of [.16,.83])ellipse(ctx,tx+tw*dx,ty+th*.30,tw*.09,th*.14,'#f4e9c8','#9ba488');
- ellipse(ctx,tx+tw*.515,ty+th*.30,M*.013,M*.018,'#8f9c77','#6b7b5c');line(ctx,tx+tw*.515,ty+th*.20,tx+tw*.515,ty-th*.15,'#6f8b57',2);for(let i=0;i<3;i++){const fx=tx+tw*(.48+i*.035),fy=ty-th*(.13+(i%2)*.12);ellipse(ctx,fx,fy,M*.008,M*.007,['#d6a065','#c78c7d'][i%2]);}
+ ellipse(ctx,tx+tw/2,ty+th*.88,tw*.56,th*.25,'#68492825');box(ctx,tx+tw*.10,ty+th*.6,tw*.05,th*.62,'#92683f',null,2);box(ctx,tx+tw*.84,ty+th*.6,tw*.05,th*.62,'#92683f',null,2);drawDiningTableSurface(ctx,l);
  // Low bookshelf in the foreground gives depth to the room.
  const bx=W*.21,by=H*.933,bw=W*.34,bh=H*.049;box(ctx,bx,by,bw,bh,'#b88b5f','#8e6845',3);for(let i=0;i<12;i++){const x=bx+5+i*(bw-10)/12;box(ctx,x,by+5,(bw-16)/14,bh-9,['#809984','#ba8065','#d0af69','#a8b092'][i%4],null,1);}
  // Doorways physically open to a sunny strip of outdoor garden.
@@ -635,9 +695,9 @@ export function renderHouse(ctx,g,visual={},options={}){
   const p=getTaskLocation(task,l),x=p.x*width,y=p.y*height;
   if(task.type==='dust')drawDustSignal(ctx,x,y,M*.095,task,pulseTime,{reduced,english,width,showLabel:showTaskLabels.dust});
   if(task.type==='guest')actors.push({y,draw:()=>{
-   const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=task.untimed?1:clamp(task.total-task.remaining,0,1),guestX=x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=y+M*.04;
+   const d=l.doors[Math.abs(task.door??task.slot??0)%2],arrival=task.untimed?1:clamp(task.total-task.remaining,0,1),guestX=task.resident?x:x+(d.side==='left'?1:-1)*M*(.008+arrival*.032),guestY=task.resident?y:y+M*.04;
    halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',!task.untimed&&task.remaining/task.total<.25);
-   const portrait=images.family?.[task.guest]||images[task.guest];drawHuman(ctx,guestX,guestY,M*(l.portrait?.26:.235),{portrait,guest:true,guestId:task.guest,images,reduced,index:task.guest==='hila'?1:task.guest==='rivi'?2:0,time:pulseTime,walking:arrival<1&&!reduced,facing:d.side==='left'?1:-1});
+   const portrait=images.family?.[task.guest]||images[task.guest];if(!task.resident)drawHuman(ctx,guestX,guestY,M*(l.portrait?.26:.235),{portrait,guest:true,guestId:task.guest,images,reduced,index:task.guest==='hila'?1:task.guest==='rivi'?2:0,time:pulseTime,walking:arrival<1&&!reduced,facing:d.side==='left'?1:-1});
    const bubbleX=guestX+(d.side==='left'?1:-1)*M*.062,bubbleY=guestY-M*.225;ellipse(ctx,bubbleX,bubbleY,M*.035,M*.035,'#fff3d4','#c59b54');if(g.level<11)icon(ctx,images,'serve',bubbleX,bubbleY,M*.06);else{line(ctx,bubbleX-M*.012,bubbleY,bubbleX+M*.012,bubbleY,'#776543',2);ellipse(ctx,bubbleX-M*.012,bubbleY-M*.01,M*.003,M*.003,'#776543');ellipse(ctx,bubbleX+M*.012,bubbleY-M*.01,M*.003,M*.003,'#776543');}
    const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi',lihi:'Lihi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי',lihi:'ליהי'};if(!quiet)label(ctx,names[task.guest]||(english?'Visitor':'אורח'),guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
   }});
@@ -654,25 +714,29 @@ export function renderHouse(ctx,g,visual={},options={}){
    }
   }});
  }
- // Short world-space departures keep completed interactions physical: guests
- // head toward the table, shooed cats run outdoors, and intruders slip inside.
+ // Only shooed cats leave; served guests are persistent household residents.
  for(const departure of visual.departures||[]){
   const progress=clamp((departure.age||0)/(departure.duration||1.5),0,1);if(progress>=1)continue;
   const door=l.doors[Math.abs(departure.door??0)%2],sgn=door.side==='left'?1:-1;
   const fade=1-clamp((progress-.62)/.38,0,1);
-  if(departure.type==='guest'){
-   const p=guestDeparturePosition(departure,l,reduced?1:progress),px=p.x*width,py=p.y*height;
-   actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawHuman(ctx,px,py,M*(l.portrait?.26:.235),{portrait:images.family?.[departure.guest]||images[departure.guest],guest:true,guestId:departure.guest,images,reduced,index:departure.guest==='hila'?1:departure.guest==='rivi'?2:0,time:pulseTime,walking:!reduced,facing:p.facing});
-    if(!quiet)label(ctx,english?'Thank you!':'תודה רותי!',px,py-M*.20,{size:clamp(M*.025,11,15),color:'#6b8254'});ctx.restore();}});
-  }else if(departure.type==='cat'||departure.type==='cat-enter'){
+  if(departure.type==='cat'||departure.type==='cat-enter'){
    const entering=departure.type==='cat-enter',p=reduced?1:progress;
    const px=door.x*width+sgn*M*(entering?.025+p*.18:.035-p*.19),py=door.y*height+M*(.015+(entering?p*.085:0));
    actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawCat(ctx,px,py,M*.115*(departure.size||1),pulseTime*2,1,entering?door.side:(door.side==='left'?'right':'left'),showTaskLabels.cat,departure);ctx.restore();}});
   }
  }
+ for(const resident of g?.guestsInside||[]){
+  const p=residentGuestPose(resident,l,g.elapsed||0,{reduced});
+  actors.push({y:p.y*height,draw:()=>drawHuman(ctx,p.x*width,p.y*height,guestHeight(l),{
+   portrait:images.family?.[resident.guest]||images[resident.guest],guest:true,guestId:resident.guest,images,reduced,
+   index:Math.max(0,HOUSE_GUESTS.indexOf(resident.guest)),time:pulseTime,walking:p.walking,sitting:p.sitting,facing:p.facing
+  })});
+ }
+ const tableDepth=(l.table.y+l.table.h*.58)*height;
+ if(g?.guestsInside?.length)actors.push({y:tableDepth,draw:()=>drawDiningTableSurface(ctx,l)});
  for(const cat of g?.catsInside||[]){
   const p=residentCatPose(cat,l,reduced?(cat.enteredAt||0)+3:g.elapsed||0),size=M*.115*(cat.size||1),py=p.y*height-size*26/64;
-  actors.push({y:p.y*height,draw:()=>drawCat(ctx,p.x*width,py,size,reduced?0:g.elapsed||0,p.walking?1:0,p.facing>0?'left':'right',false,cat)});
+  actors.push({y:p.surface==='table'?Math.max(tableDepth+1,p.y*height):p.y*height,draw:()=>drawCat(ctx,p.x*width,py,size,reduced?0:g.elapsed||0,p.walking?1:0,p.facing>0?'left':'right',false,cat)});
  }
  const actor=visual.actor||{...l.spawn};const actorX=(actor.x??l.spawn.x)*width,actorY=(actor.y??l.spawn.y)*height;
  const actorHeight=clamp(M*(l.portrait?.28:.245),l.portrait?94:102,l.portrait?116:140);

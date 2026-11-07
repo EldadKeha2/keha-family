@@ -1,11 +1,47 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {RECIPES} from '../public/assets/ruti-house-engine.mjs';
-import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse,getRutiWateringGeometry,drawRutiCelebration} from '../public/assets/ruti-house-scene.mjs';
+import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse,getRutiWateringGeometry,drawRutiCelebration,getHouseGuestSeat,residentGuestPose,drawHouseGuest} from '../public/assets/ruti-house-scene.mjs';
 
 const sizes=[[1000,580],[390,570],[320,500]];
 const inside=(point,obstacle,margin=0)=>point.x>obstacle.x-margin&&point.x<obstacle.x+obstacle.w+margin&&point.y>obstacle.y-margin&&point.y<obstacle.y+obstacle.h+margin;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+test('eight stable guest seats stay inside the room with reachable serving positions on desktop and mobile',()=>{
+ for(const [width,height] of [...sizes,[1130,530]]){
+  const layout=getHouseLayout(width,height),seats=layout.guestSeats.map((_,i)=>getHouseGuestSeat(i,layout));
+  assert.equal(seats.length,8);assert.equal(new Set(seats.map(s=>`${s.x}:${s.y}`)).size,8);
+  for(const [seat,position] of seats.entries()){
+   assert.ok(position.x>.15&&position.x<.9&&position.y>.4&&position.y<.94);
+   assert.deepEqual(getTaskLocation({type:'guest',resident:true,seat,door:0},layout),position);
+   checkWalk(layout,layout.spawn,position.anchor);
+  }
+ }
+});
+
+test('served guests reach their own seats continuously and remain seated after animations and level changes',()=>{
+ for(const [width,height] of sizes)for(let seat=0;seat<8;seat++){
+  const layout=getHouseLayout(width,height),person={guest:'hila',seat,door:seat%2,servedAt:10};let previous;
+  for(let elapsed=10;elapsed<=19;elapsed+=.05){
+   const p=residentGuestPose(person,layout,elapsed);assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y));
+   if(previous)assert.ok(Math.hypot((p.x-previous.x)*width,(p.y-previous.y)*height)<Math.min(width,height)*.045,'the walk and sit transition never teleport');previous=p;
+  }
+  const settled=residentGuestPose(person,layout,100),later=residentGuestPose(person,layout,1000);
+  assert.equal(settled.sitting,1);assert.equal(settled.walking,false);assert.deepEqual(later,settled);
+  assert.deepEqual(residentGuestPose(person,layout,10,{reduced:true}),settled,'reduced motion seats people immediately');
+ }
+});
+
+test('seated guests retain the original face, neck and torso at natural scale for all eight identities',()=>{
+ const family={complete:true,naturalWidth:1536,naturalHeight:1024},visitors={...family},calls=[];
+ const ctx=new Proxy({drawImage(...args){calls.push(args);}},{get:(target,key)=>key in target?target[key]:()=>{}});
+ for(const [index,id] of ['roi','hila','rivi','lihi','visitor-man','visitor-hila','visitor-rivi','visitor-lihi'].entries()){
+  calls.length=0;assert.equal(drawHouseGuest(ctx,100,200,110,id,{familyAtlas:family,visitorAtlas:visitors},12,{sitting:1}),true);
+  assert.equal(calls.length,2);const upper=calls[0];assert.equal(upper[0],index<4?family:visitors);
+  assert.equal(upper[1],(index%4)*384+.5);assert.equal(upper[2],.5);assert.ok(upper[4]>300,'the connected head, neck and upper body remain one image');
+  assert.ok(Math.abs(upper[7]/384-upper[8]/upper[4])<.001,'the upper body keeps its proportions');
+ }
+});
 
 function checkWalk(layout,from,to){
  const path=findHousePath(layout,from,to);
@@ -112,15 +148,17 @@ test('waiting cats announce that they are outside and the label disappears when 
  assert.ok(!written.includes('Waiting…'));assert.ok(!written.includes('מחכה בחוץ…'));
 });
 
-test('served guests thank Ruti while entering; retreating and entering cats render with finite poses',()=>{
- const written=[],numbers=[];const gradient={addColorStop(){}};
- const ctx=new Proxy({canvas:{width:1000,height:580},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},fillText(value){written.push(value);},translate(x,y){numbers.push(x,y);}}, {get:(target,key)=>key in target?target[key]:(()=>{})});
- const departures=[{type:'guest',guest:'hila',door:0,age:.4,duration:1.5},{type:'cat',door:1,age:.4,duration:1},{type:'cat-enter',door:0,age:.4,duration:1.3}];
- const game={tasks:[],inventory:{},kitchen:{}};
- for(const [width,height] of sizes)renderHouse(ctx,game,{actor:{x:.4,y:.5},departures},{width,height,time:3,images:{}});
- assert.ok(written.includes('תודה רותי!'));assert.ok(numbers.length>0&&numbers.every(Number.isFinite));
- written.length=0;departures[0].age=1.5;renderHouse(ctx,game,{actor:{x:.4,y:.5},departures},{width:1000,height:580,time:4,images:{}});
- assert.ok(!written.includes('תודה רותי!'),'a completed departure disappears');
+test('served guests still render long after departure timers end and cats keep finite departure poses',()=>{
+ const calls=[],numbers=[],atlas={complete:true,naturalWidth:1536,naturalHeight:1024},gradient={addColorStop(){}};
+ const ctx=new Proxy({canvas:{width:1000,height:580},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},drawImage(...args){calls.push(args);},translate(x,y){numbers.push(x,y);}}, {get:(target,key)=>key in target?target[key]:(()=>{})});
+ const departures=[{type:'cat',door:1,age:.4,duration:1},{type:'cat-enter',door:0,age:.4,duration:1.3}];
+ const game={level:11,tasks:[],guestsInside:[{guest:'hila',seat:0,door:0,servedAt:0}],inventory:{},kitchen:{}};
+ for(const [width,height] of sizes)for(const elapsed of [20,200]){
+  calls.length=0;game.elapsed=elapsed;
+  renderHouse(ctx,game,{actor:{x:.4,y:.5},departures},{width,height,time:elapsed,images:{familyAtlas:atlas}});
+  assert.equal(calls.filter(c=>c[0]===atlas).length,2,'the seated guest never fades out');
+ }
+ assert.ok(numbers.length>0&&numbers.every(Number.isFinite));
 });
 
 test('untimed practice targets omit timer labels and deadline arcs without an approaching cat',()=>{

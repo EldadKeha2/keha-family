@@ -79,6 +79,36 @@ test('one Food tool directly serves a random valid delicacy without picking up d
   assert.equal(selectTool(g,'peanuts'),false);assert.equal(g.stats.snacks,0);
 });
 
+test('served family and visitors keep separate seats across levels without duplicating people or scoring twice',()=>{
+ const g=atStage(11),ids=['roi','hila','rivi','lihi','visitor-man','visitor-hila','visitor-rivi','visitor-lihi'];
+ for(const [index,guest] of ids.entries()){
+  const task={id:`seat-${guest}`,type:'guest',guest,food:index<4?'serve':'peanuts',recipeId:index<4?'tahini':null,slot:0,door:index%2,total:28,remaining:28,createdAt:g.elapsed};
+  g.tasks.push(task);g.stageIssued++;const before=g.guestsInside.length;
+  selectTool(g,'water');assert.equal(actHouse(g,task.id).ok,false);assert.equal(g.guestsInside.length,before);
+  clearTask(g,task);const resident=g.guestsInside.find(p=>p.guest===guest);assert.ok(resident);assert.equal(resident.lastServedAt,g.elapsed);
+  const score=g.score;assert.equal(actHouse(g,task.id),null);assert.equal(g.score,score,'seating and duplicate clicks never award more points');
+ }
+ assert.equal(g.guestsInside.length,8);assert.equal(new Set(g.guestsInside.map(p=>p.guest)).size,8);assert.equal(new Set(g.guestsInside.map(p=>p.seat)).size,8);
+ const seats=()=>g.guestsInside.map(({guest,seat,servedAt})=>({guest,seat,servedAt}));
+ const seated=seats();finishStage(g);assert.equal(advanceStage(g),true);assert.deepEqual(seats(),seated);
+ assert.deepEqual(game().guestsInside,[],'a fresh game starts with an empty house');
+});
+
+test('a repeat food request belongs to the already seated guest and missed requests leave that person inside',()=>{
+ const g=atStage(6);
+ function waitForGuest(id){
+  let guard=0;
+  while(g.phase==='playing'&&guard++<3000){
+   const wanted=g.tasks.find(t=>t.type==='guest'&&(!id||t.guest===id));if(wanted)return wanted;
+   if(g.tasks.length)clearTask(g);advanceHouse(g,.1);
+  }
+  assert.fail('a rare guest request should arrive during this level');
+ }
+ const first=waitForGuest();clearTask(g,first);const person=g.guestsInside.find(p=>p.guest===first.guest),seat=person.seat,arrival=person.servedAt;
+ const again=waitForGuest(first.guest);assert.equal(again.resident,true);assert.equal(again.seat,seat);assert.equal(g.guestsInside.filter(p=>p.guest===first.guest).length,1);
+ again.remaining=.01;advanceHouse(g,.02);assert.ok(!g.tasks.includes(again));assert.ok(g.guestsInside.includes(person));assert.equal(person.servedAt,arrival);
+});
+
 test('all serving stages stay completable without cooking tools or inventory',()=>{
   for(const n of [6,7,8,9,10,11,12]){const g=atStage(n);assert.equal(selectTool(g,'serve'),true);assert.ok(!g.unlockedTools.includes('bowl'));assert.deepEqual(g.unlockedRecipes,[]);finishStage(g);assert.equal(g.completedLevels,n);}
 });

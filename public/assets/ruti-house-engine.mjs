@@ -20,6 +20,7 @@ export const POINTS=Object.freeze({meal:300,snack:200,plant:40,dust:20,cat:60,di
 export const HOUSE_SLOTS=Object.freeze({plant:4,dust:6,cat:2,guest:2});
 export const HOUSE_GUESTS=Object.freeze(['roi','hila','rivi','lihi']);
 export const HOUSE_VISITORS=Object.freeze(['visitor-man','visitor-hila','visitor-rivi','visitor-lihi']);
+export const HOUSE_GUEST_SEATS=8;
 export const STOCK_LIMIT=3;
 export const ORA_BONUS=5000;
 export const CAT_COATS=Object.freeze([
@@ -82,7 +83,14 @@ function dustPosition(g){
 }
 function spawn(g,type){
   const current=pace(g);if(g.tasks.length>=current.maxActive||g.stageIssued>=g.stage.goal)return null;
-  const isDoor=type==='cat'||type==='guest',free=Array.from({length:HOUSE_SLOTS[type]},(_,i)=>i).filter(slot=>!g.tasks.some(t=>t.slot===slot&&(isDoor?t.type==='cat'||t.type==='guest':t.type===type)));
+  let guest,resident;
+  if(type==='guest'){
+    const pool=g.stage.guestMode==='mixed'?[...HOUSE_GUESTS,...HOUSE_VISITORS]:HOUSE_GUESTS;
+    const available=pool.filter(id=>!g.tasks.some(t=>t.type==='guest'&&t.guest===id)&&!g.guestsInside.some(p=>p.guest===id&&g.elapsed-p.lastServedAt<10));
+    if(!available.length)return null;
+    guest=choose(g,available);resident=g.guestsInside.find(p=>p.guest===guest);
+  }
+  const isDoor=type==='cat'||type==='guest'&&!resident,free=Array.from({length:HOUSE_SLOTS[type]},(_,i)=>i).filter(slot=>!g.tasks.some(t=>t.slot===slot&&(isDoor?t.type==='cat'||t.type==='guest'&&!t.resident:t.type===type)));
   if(!free.length)return null;
   let slot=choose(g,free);
   if(g.level<=2&&type==='plant'){
@@ -98,7 +106,7 @@ function spawn(g,type){
   if(isDoor)task.door=task.slot;
   if(type==='cat'){task.waiting=g.stage.catWait;task.waitingTotal=task.waiting;task.state=task.waiting>0?'waiting':'approaching';task.coat=Math.floor(random(g)*CAT_COATS.length);task.size=choose(g,[.8,1,1.18]);}
   if(type==='dust')task.position=dustPosition(g);
-  if(type==='guest'){const pool=g.stage.guestMode==='mixed'?[...HOUSE_GUESTS,...HOUSE_VISITORS]:HOUSE_GUESTS;const available=pool.filter(guest=>!g.tasks.some(t=>t.type==='guest'&&t.guest===guest));if(!available.length)return null;task.guest=choose(g,available);task.food=HOUSE_VISITORS.includes(task.guest)?'peanuts':'serve';task.recipeId=task.food==='serve'?choose(g,RECIPES).id:null;}
+  if(type==='guest'){task.guest=guest;task.food=HOUSE_VISITORS.includes(guest)?'peanuts':'serve';task.recipeId=task.food==='serve'?choose(g,RECIPES).id:null;if(resident){task.resident=true;task.seat=resident.seat;}}
   g.tasks.push(task);g.spawned++;g.stageIssued++;emit(g,{type:'spawn',kind:type,targetId:task.id});return task;
 }
 function nextTask(g){const order=g.level===1?(g.stageResolved<6?['plant']:['plant','plant','plant','dust','plant']):g.stage.order;for(let n=0;n<order.length;n++){if(spawn(g,order[g.typeCursor++%order.length]))return true;}return false;}
@@ -162,7 +170,7 @@ function resolveTask(g,{deferFinish=false}={}){
 export function createHouse({random:source=Math.random}={}){
   const g={phase:'playing',won:false,elapsed:0,stageElapsed:0,level:1,score:0,strikes:0,combo:0,bestCombo:0,multiplier:1,comboRemaining:0,selected:null,
     stageCompleted:0,completedLevels:0,stageScores:Array(STAGES.length).fill(0),unlockedTools:[],unlockedRecipes:[],seededRecipes:[],tutorial:null,plantDeck:[],wateredSlots:[],
-    inventory:Object.fromEntries(RECIPES.map(r=>[r.id,0])),kitchen:Object.fromEntries(RECIPES.map(r=>[r.id,{step:0,remaining:0,state:'prep'}])),tasks:[],catsInside:[],stats:{meals:0,snacks:0,plants:0,dust:0,cats:0,dishes:0,missed:0,oraWins:0},events:[],serial:0,random:typeof source==='function'?source:Math.random};
+    inventory:Object.fromEntries(RECIPES.map(r=>[r.id,0])),kitchen:Object.fromEntries(RECIPES.map(r=>[r.id,{step:0,remaining:0,state:'prep'}])),tasks:[],catsInside:[],guestsInside:[],stats:{meals:0,snacks:0,plants:0,dust:0,cats:0,dishes:0,missed:0,oraWins:0},events:[],serial:0,random:typeof source==='function'?source:Math.random};
   startStage(g,0);return g;
 }
 export function advanceStage(g){if(g.phase!=='stage-complete'||g.level>=STAGES.length)return false;startStage(g,g.level);return true;}
@@ -185,7 +193,16 @@ export function actHouse(g,targetId,{respondedAt}={}){
   }
   const index=g.tasks.findIndex(t=>t.id===targetId);if(index<0)return null;const task=g.tasks[index];
   if(task.type==='guest'){
-    const required=task.food||'serve';if(g.selected===required){g.tasks.splice(index,1);return success(g,required==='peanuts'?'snack':'meal',targetId,{guest:task.guest,recipeId:task.recipeId,...responseReward(g,task,respondedAt)});}return emit(g,{type:'wrong',kind:'guest',targetId,required,ok:false});
+    const required=task.food||'serve';if(g.selected===required){
+      g.tasks.splice(index,1);
+      let resident=g.guestsInside.find(p=>p.guest===task.guest);
+      if(!resident){
+        const seats=Array.from({length:HOUSE_GUEST_SEATS},(_,i)=>i).filter(seat=>!g.guestsInside.some(p=>p.seat===seat));
+        resident={id:task.id,guest:task.guest,door:task.door??task.slot??0,seat:choose(g,seats),servedAt:g.elapsed};g.guestsInside.push(resident);
+      }
+      resident.lastServedAt=g.elapsed;resident.food=required;resident.recipeId=task.recipeId;
+      return success(g,required==='peanuts'?'snack':'meal',targetId,{guest:task.guest,recipeId:task.recipeId,...responseReward(g,task,respondedAt)});
+    }return emit(g,{type:'wrong',kind:'guest',targetId,required,ok:false});
   }
   if(g.selected!==needTool[task.type])return emit(g,{type:'wrong',kind:task.type,targetId,required:needTool[task.type],ok:false});
   g.tasks.splice(index,1);if(g.level===1&&task.type==='plant')g.wateredSlots.push(task.slot);return success(g,task.type,targetId,responseReward(g,task,respondedAt));

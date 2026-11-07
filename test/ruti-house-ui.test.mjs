@@ -196,6 +196,7 @@ test('the single Food tool serves a homemade dish directly to the guest without 
     const f=fixture({english,startLevel:6});await f.start();f.until(()=>f.game.tasks.some(t=>t.type==='guest'),30000);const guest=f.game.tasks.find(t=>t.type==='guest'),before=f.game.score,stock=f.game.inventory[guest.recipeId];await f.choose('serve');f.until(()=>!f.state.motion.busy);assert.equal(f.actor.tool,'serve');
     assert.deepEqual(f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool),['water','broom','hand','argue','serve']);assert.ok(f.root.querySelectorAll('[data-rh-target]').every(b=>!b.dataset.rhTarget.startsWith('cook-')));
     const initialMeals=f.game.stats.meals;await f.act(guest.id);assert.equal(f.state.motion.busy,true);assert.equal(f.actor.carryDish,guest.recipeId);assert.equal(f.game.stats.meals,initialMeals);f.advance(100);f.until(()=>f.game.stats.meals===initialMeals+1);assert.equal(f.game.inventory[guest.recipeId],stock);assert.equal(f.actor.carryDish,null);assert.ok(f.game.score-before>300&&f.game.score-before<=600);assert.equal(f.game.requiredMealComplete,true);assert.equal(f.game.stats.snacks,0);assert.equal(f.game.stats.dishes,0);assert.ok(f.draws.some(d=>d.actor.carryDish===guest.recipeId&&d.actor.walking));
+    const seated=f.game.guestsInside.find(p=>p.guest===guest.guest);assert.ok(seated);assert.ok(!f.state.departures.some(p=>p.type==='guest'),'served guests never enter the disappearing departure animation');
   }
 });
 
@@ -376,6 +377,7 @@ test('advanced visitors require the correct refreshment through the ordinary too
  const f=fixture({startLevel:11});await f.start();const visitor={id:'visitor-qa',type:'guest',guest:'visitor-hila',food:'peanuts',door:1,slot:1,total:28,remaining:28,createdAt:f.game.elapsed};
  f.game.tasks=[visitor];f.game.stageIssued++;f.window.test.render();await f.choose('serve');await f.act(visitor.id);assert.equal(f.state.motion.busy,false);assert.ok(f.game.tasks.includes(visitor));assert.ok(f.sounds.includes('wrong'));assert.equal(toast(f),'','late levels do not reveal the correct food in text');
  const before=f.game.stats.snacks;await f.choose('peanuts');await f.act(visitor.id);assert.equal(f.state.motion.busy,true);f.until(()=>f.game.stats.snacks===before+1);assert.equal(f.actor.carryDish,null);assert.ok(!f.game.tasks.includes(visitor));
+ assert.ok(f.game.guestsInside.some(p=>p.guest===visitor.guest));assert.ok(!f.state.departures.some(p=>p.type==='guest'));
 });
 
 
