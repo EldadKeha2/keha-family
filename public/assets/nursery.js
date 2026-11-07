@@ -77,10 +77,12 @@
       xhr.onerror=()=>reject(Error(tr('ההעלאה נקטעה. נסו שוב.','The upload was interrupted. Please try again.')));xhr.onabort=xhr.onerror;xhr.send(file);
     });
   }
-  function addFiles(id,files){
+  async function addFiles(id,files){
     if(!member(id)||!app().apiEnabled)return;
-    const selected=[...files].filter(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name));
+    let selected=[...files].filter(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name));
     if(!selected.length){app().toast(tr('בחרו תמונות מהגלריה או מהמצלמה.','Choose photos from your gallery or camera.'));return;}
+    try{selected=await window.FamilyPhotoEditor.prepare(selected);}catch{app().toast(tr('מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.','The photo editor could not open. Refresh the page and try again.'));return;}
+    if(!selected?.length)return;
     errors.delete(id);queue.push({id,files:selected});runUploads();
   }
   async function runUploads(){

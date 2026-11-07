@@ -151,13 +151,19 @@
     }catch(error){captionStatus(draft.kind,draft.file,I18n.t('לא נשמר · נסו שוב'),true);notify(error.message);}finally{draft.saving=false;}
   }
   function flushCaptions(){for(const[key,draft]of drafts)if(draft.dirty)saveCaption(key);}
-  function addFiles(kind,files,clipboard=false) {
+  async function addFiles(kind,files,clipboard=false) {
     if(!canSave())return;
     const candidates=[...files], selected=candidates.filter(file=>kind==='videos'?/^video\//i.test(file.type)||/\.(mp4|webm|mov|m4v)$/i.test(file.name):/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name));
     if(!selected.length){notify(kind==='videos'?I18n.t('בחרו סרטון MP4, WebM, MOV או M4V.'):I18n.t('בחרו תמונות מהגלריה או מהמצלמה.'));return;}
     if(selected.length<candidates.length)notify(I18n.t('חלק מהקבצים לא התאימו לגלריה הזו. שאר הקבצים יועלו.'));
     const group=kind==='videos'?$('videoUploadCategory').value:'family';
-    queues[kind].push(...selected.map(file=>({file,clipboard,group})));runUploads(kind);
+    let approved=selected;
+    if(kind!=='videos'){
+      try{approved=await window.FamilyPhotoEditor.prepare(selected);}catch{notify(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+      if(!approved?.length)return;
+    }
+    // Only approved files enter the upload queue; saved media has no edit action.
+    queues[kind].push(...approved.map(file=>({file,clipboard,group})));runUploads(kind);
   }
   function uploadFile(kind,file,name,onProgress,group) {
     return new Promise((resolve,reject)=>{
@@ -191,7 +197,7 @@
       const{file,clipboard,group}=queues[kind].shift();
       try{
         if(file.size>(kind==='videos'?90*1024*1024:50*1024*1024))throw Error(kind==='videos'?I18n.t('הסרטון גדול מ־90MB.'):I18n.t('התמונה גדולה מ־50MB.'));
-        const filename=clipboard?I18n.t('צילום_מסך_')+new Date().toISOString().replace(/[:.]/g,'-')+'.png':file.name;
+        const filename=clipboard?I18n.t('צילום_מסך_')+new Date().toISOString().replace(/[:.]/g,'-')+(file.name.match(/\.[^.]+$/)?.[0]||'.png'):file.name;
         progress.hidden=false;progress.value=0;status.textContent=I18n.t('מעלה ')+filename+'…';
         const result=await uploadFile(kind,file,filename,percent=>{progress.value=percent;status.textContent=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הקובץ…'):I18n.html`מעלה ${filename} · ${percent}%`;},group);
         saved++;savedFiles.push(result.file);if(kind==='gallery'){galleryPage.page=1;galleryPage.size=100;galleryPage.query='';galleryPage.filter='all';state.query='';$('searchInput').value='';}state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
@@ -206,9 +212,9 @@
   function acceptDrop(event){if(!allowSharedInput())return false;$(state.view+'Dropzone').classList.remove('drag-over');addFiles(state.view,event.dataTransfer.files);return true;}
   function dragOver(){if(allowSharedInput())$(state.view+'Dropzone').classList.add('drag-over');}
   function acceptPaste(event){
-    if(state.view!=='photos'||!allowSharedInput())return;
+    if(!['photos','gallery'].includes(state.view)||!allowSharedInput())return;
     const files=[...(event.clipboardData?.items||[])].filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);
-    if(files.length){event.preventDefault();addFiles('photos',files,true);}
+    if(files.length){event.preventDefault();addFiles(state.view,files,true);}
   }
   function openBirthday(id,mode='birth') {
     if(mode!=='death')return;

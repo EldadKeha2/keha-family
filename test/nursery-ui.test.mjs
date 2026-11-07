@@ -6,7 +6,7 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/nursery.js',import.meta.url),'utf8');
 const empty=id=>({kind:'nursery:'+id,items:[],count:0,pagination:{page:1,pages:1,total:0,size:10}});
-function fixture({navigation=false,entryUrl='https://family.test/#nursery',english=false,albumFetch}={}){
+function fixture({navigation=false,entryUrl='https://family.test/#nursery',english=false,albumFetch,prepare=async files=>files}={}){
   const browser=navigation?browserHistory(entryUrl):null;let view=browser?browser.location.hash.slice(1).split('/')[0]:'nursery';
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),sent=[],registered=[];
   const people=[{id:'yona',name:'Yona',profile:'/adult-profile.jpg'},{id:'shlomo',name:'Shlomo'},{id:'extended',name:'Extended',extended:true},{id:'extra-guest',name:'Guest',extra:true}];
@@ -14,6 +14,7 @@ function fixture({navigation=false,entryUrl='https://family.test/#nursery',engli
   const location=browser?.location||{hash:'#nursery'},document={body:{dataset:{}},visibilityState:'visible',querySelector:()=>null,getElementById:node,addEventListener(type,fn){events.set(type,fn);}};
   const window={FamilyI18n:{isEnglish:english,searchNames:p=>p.name,mediaName:p=>p.name,error:String,fetch:async path=>path==='api/nursery'?Response.json({albums:{}}):albumFetch?albumFetch(path):Response.json(empty(path.split('/').pop().split('?')[0]))},FamilyMedia:{register(scope,items){registered.push({scope,items});}},addEventListener(type,fn){windowEvents.set(type,fn);browser?.addEventListener(type,fn);},scrollTo(){},FAMILY_API_TOKEN:'test'};
   window.FamilyApp={getPeople:()=>people,getPersonSummary:id=>people.find(p=>p.id===id),nameOf:id=>people.find(p=>p.id===id)?.name||id,apiEnabled:true,getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyNursery.activate(next);},toast(){}};
+  window.FamilyPhotoEditor={prepare};
   class XHR{
     constructor(){this.upload={};}open(method,url){this.url=url;}setRequestHeader(){}send(file){this.file=file;sent.push(this);}
     complete(result,status=201){this.status=status;this.responseText=JSON.stringify(result);this.onload();}
@@ -33,7 +34,7 @@ test('nursery cards follow new core members automatically and exclude extended a
 });
 test('an upload retains the selected album owner when the visitor moves to another member',async()=>{
  const f=fixture();await f.flush();f.open('yona');await f.flush();f.click('[data-nursery-upload]');assert.equal(f.node('nurseryUploadInput').dataset.personId,'yona');
- f.open('shlomo');await f.flush();f.select([{name:'first-smile.jpg',type:'image/jpeg',size:100}]);assert.equal(f.sent.length,1);assert.match(f.sent[0].url,/api\/nursery\/yona\/upload/);
+ f.open('shlomo');await f.flush();f.select([{name:'first-smile.jpg',type:'image/jpeg',size:100}]);await f.flush();assert.equal(f.sent.length,1);assert.match(f.sent[0].url,/api\/nursery\/yona\/upload/);
  const item={id:'baby-yona',src:'/media/baby-yona',name:'First smile'};f.sent[0].complete({collection:{...empty('yona'),items:[item],count:1,pagination:{page:1,pages:1,total:1,size:10}}});await f.flush();
  assert.match(f.html,/Shlomo/);assert.doesNotMatch(f.html,/baby-yona/);assert.equal(f.location.hash,'#nursery/shlomo');
 });
@@ -44,8 +45,16 @@ test('a slow album response cannot replace the next person’s album, and Englis
 });
 test('a refresh started before an upload cannot hide the newly saved photo',async()=>{
  let resolveAlbum;const f=fixture({albumFetch:()=>new Promise(resolve=>{resolveAlbum=resolve;})});await f.flush();f.open('yona');f.click('[data-nursery-upload]');f.select([{name:'baby.jpg',type:'image/jpeg',size:100}]);
- const item={id:'new-photo',src:'/media/new-photo',name:'Saved baby photo'};f.sent[0].complete({collection:{...empty('yona'),items:[item],count:1,pagination:{page:1,pages:1,total:1,size:10}}});await f.flush();assert.match(f.html,/new-photo/);
+ await f.flush();const item={id:'new-photo',src:'/media/new-photo',name:'Saved baby photo'};f.sent[0].complete({collection:{...empty('yona'),items:[item],count:1,pagination:{page:1,pages:1,total:1,size:10}}});await f.flush();assert.match(f.html,/new-photo/);
  resolveAlbum(Response.json(empty('yona')));await f.flush();assert.match(f.html,/new-photo/);assert.match(f.html,/התמונה נוספה/);
+});
+
+test('photo uploads wait for approval, send only edited bytes, and cancel without sending',async()=>{
+ let approve;const f=fixture({prepare:()=>new Promise(resolve=>{approve=resolve;})});await f.flush();f.open('yona');await f.flush();f.click('[data-nursery-upload]');
+ f.select([{name:'original.jpg',type:'image/jpeg',size:100}]);await f.flush();assert.equal(f.sent.length,0);
+ const edited={name:'cropped.jpg',type:'image/jpeg',size:50};approve([edited]);await f.flush();assert.equal(f.sent.length,1);assert.equal(f.sent[0].file,edited);
+ f.sent[0].complete({collection:empty('yona')});await f.flush();
+ f.select([{name:'cancel.jpg',type:'image/jpeg',size:100}]);await f.flush();approve(null);await f.flush();assert.equal(f.sent.length,1);
 });
 
 test('nursery Back and Forward traverse album owners and the list without replacing history',async()=>{

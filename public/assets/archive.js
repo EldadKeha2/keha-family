@@ -182,9 +182,13 @@
       xhr.onerror=()=>reject(Error(I18n.t('ההעלאה נקטעה. בדקו את החיבור ונסו שוב.')));xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));xhr.send(file);
     });
   }
-  function addFiles(key,input){
+  async function addFiles(key,input){
     if(!key||!canSave())return;
-    const files=[...input];if(!files.length)return;
+    let files=[...input];if(!files.length)return;
+    if(files.some(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name))){
+      try{files=await window.FamilyPhotoEditor.prepare(files);}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+      if(!files?.length)return;
+    }
     const item=uploadStates.get(key);
     const status=item?.pending?item:{saved:0,failed:0,pending:0,message:'',active:false,percent:0};status.pending+=files.length;uploadStates.set(key,status);
     jobs.push(...files.map(file=>({key,file})));runUploads();

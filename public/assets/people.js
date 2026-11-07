@@ -85,8 +85,13 @@
       xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Please try again.')));return;}if(xhr.status>=200&&xhr.status<300)resolve(result);else reject(Error(I.error(result.error)));};xhr.onerror=()=>reject(Error(tr('ההעלאה נקטעה. נסו שוב.','The upload was interrupted. Please try again.')));xhr.send(file);
     });
   }
-  function queue(id,kind,files){
-    if(!app().apiEnabled)return;state.queue.push(...[...files].map(file=>({id,kind,file})));runUploads();
+  async function queue(id,kind,files){
+    if(!app().apiEnabled)return;let approved=[...files];
+    if(kind==='photos'){
+      try{approved=await window.FamilyPhotoEditor.prepare(approved);}catch{app().toast(tr('מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.','The photo editor could not open. Refresh the page and try again.'));return;}
+      if(!approved?.length)return;
+    }
+    state.queue.push(...approved.map(file=>({id,kind,file})));runUploads();
   }
   async function runUploads(){
     if(state.running)return;state.running=true;let saved=0;

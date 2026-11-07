@@ -451,13 +451,16 @@
     } finally {mediaLoading = false;}
   }
 
-  function addUploads(files, fromClipboard=false) {
+  async function addUploads(files, fromClipboard=false) {
     if (!apiEnabled) {toast(I18n.t('ההעלאה אינה זמינה כרגע. נסו לרענן את הדף.'));return;}
     if (!state.currentPerson || !$('personDialog').open) return;
-    const selected = Array.from(files).filter(file => /^image\/(jpeg|png|webp|gif|avif)$/i.test(file.type) || imageTypes.test(file.name));
+    const personId=state.currentPerson;
+    let selected = Array.from(files).filter(file => /^image\/(jpeg|png|webp|gif|avif)$/i.test(file.type) || imageTypes.test(file.name));
     if (!selected.length) {toast(I18n.t('בחרו תמונת JPG, PNG, WEBP, GIF או AVIF.'));return;}
     if (selected.length < files.length) toast(I18n.t('חלק מהקבצים אינם בפורמט נתמך. יתר התמונות יישמרו.'));
-    uploads.push({personId:state.currentPerson,files:selected,clipboard:fromClipboard});
+    try{selected=await window.FamilyPhotoEditor.prepare(selected);}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+    if(!selected?.length)return;
+    uploads.push({personId,files:selected,clipboard:fromClipboard});
     runUploads();
   }
 
@@ -476,7 +479,7 @@
         try {
           if (file.size > 50*1024*1024) throw Error(I18n.t('אפשר להעלות עד 50MB לתמונה.'));
           const date = new Date().toISOString().replace(/[:.]/g,'-');
-          const filename = batch.clipboard ? I18n.t('צילום_מסך_') + date + '.png' : file.name;
+          const filename = batch.clipboard ? I18n.t('צילום_מסך_') + date + (file.name.match(/\.[^.]+$/)?.[0]||'.png') : file.name;
           const response = await I18n.fetch('api/people/' + encodeURIComponent(batch.personId) + '/photos?filename=' + encodeURIComponent(filename), {
             method:'POST',headers:{'Content-Type':file.type || 'application/octet-stream','X-Family-Token':window.FAMILY_API_TOKEN},body:file
           });
