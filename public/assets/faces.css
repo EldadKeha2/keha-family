@@ -1,5 +1,17 @@
 /* Face controls overlay the existing photo; they never change the gallery layout. */
 .media-stage.has-face-layer{position:relative}
+.media-stage.has-face-zoom{display:block}
+.face-photo-scroll{width:100%;max-height:48dvh;overflow:auto;overscroll-behavior:contain;position:relative;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.face-photo-surface{position:relative;margin-inline:auto;flex-shrink:0}
+#mediaViewer .face-photo-surface img{width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;user-select:none;-webkit-user-drag:none}
+.face-zoom-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;padding:6px 10px;background:#f6f2e7;color:#64714e;border-bottom:1px solid #ddd4bc;font:calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+.face-zoom-toolbar>div{display:flex;align-items:center;gap:4px;direction:ltr}
+#mediaViewer .face-zoom-toolbar button{min-width:38px;min-height:38px;padding:4px 8px;border:1px solid #d2c8ad;border-radius:6px;background:#fffdf6;color:#4e603e;font-size:18px}
+#mediaViewer .face-zoom-toolbar [data-face-zoom-reset]{font-size:12px;direction:initial}
+#mediaViewer .face-zoom-toolbar button:disabled{opacity:.4;cursor:default}
+.face-zoom-toolbar output{min-width:46px;text-align:center;font-variant-numeric:tabular-nums}
+.media-stage.face-adjusting .face-photo-scroll{touch-action:none}
+@media(max-width:700px){.face-photo-scroll{max-height:43dvh}.face-zoom-toolbar{gap:2px;padding:4px 8px}.face-zoom-toolbar>span{flex:1;min-width:120px}.face-zoom-toolbar>div{margin-inline-start:auto}}
 .face-layer{position:absolute;inset:0;pointer-events:none;z-index:2}
 .face-image-area{position:absolute;pointer-events:none}
 #mediaViewer .face-hit{position:absolute;pointer-events:auto;min-height:0;min-width:0;padding:0;border:0;background:transparent;border-radius:4px;box-shadow:none;font-size:0;cursor:pointer;touch-action:manipulation}

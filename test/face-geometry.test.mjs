@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect} from '../public/assets/face-geometry.mjs';
+import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion} from '../public/assets/face-geometry.mjs';
+import {detectionSize,detectionRegions} from '../public/assets/face-scan.mjs';
 import {faceRect} from '../src/faces.mjs';
 
 test('normalized face positions survive portrait, landscape and phone display sizes',()=>{
@@ -18,6 +19,30 @@ test('saved names stay attached to their own rectangles and detections never ass
 test('touching small nearby faces picks the closest centre instead of a neighbouring overlapping hit target',()=>{
  const faces=[{id:'left',rect:{x:.1,y:.1,width:.03,height:.03}},{id:'right',rect:{x:.15,y:.1,width:.03,height:.03}}],size={width:320,height:320};
  assert.equal(chooseFace(faces,{x:.165,y:.115},size).id,'right');assert.equal(chooseFace(faces,{x:.115,y:.115},size).id,'left');assert.equal(chooseFace(faces,{x:.8,y:.8},size),null);
+});
+test('dense overlapping faces and small faces inside a broad box remain separate from saved names',()=>{
+ const left={id:'left',personId:'one',rect:{x:.1,y:.2,width:.04,height:.05}},right={id:'right',rect:{x:.116,y:.2,width:.04,height:.05}},broad={id:'broad',rect:{x:.08,y:.18,width:.14,height:.16}};
+ assert.equal(sameRegion(left.rect,right.rect),false);assert.equal(sameRegion(left.rect,broad.rect),false);
+ assert.deepEqual(mergeFaces([left],[right,broad]).map(face=>face.id),['left','right','broad']);
+ assert.equal(chooseFace([broad,right,left],{x:.12,y:.225},{width:320,height:320}).id,'left');
+ assert.equal(chooseFace([broad,left,right],{x:.145,y:.225},{width:320,height:320}).id,'right');
+ const tinyNeighbour={id:'nearby',rect:{x:.132,y:.2,width:.008,height:.01}};
+ assert.equal(chooseFace([tinyNeighbour,left],{x:.127,y:.205},{width:320,height:320}).id,'left','A padded neighbour must never steal a tap inside the actual face');
+});
+test('manual selection shrinks with photo zoom so adjacent small faces can be tagged separately',()=>{
+ const size={width:3200,height:2400},left=manualRect({x:.5,y:.5},size),right=manualRect({x:.516,y:.5},size);
+ assert.equal(left.width*size.width,32);assert.equal(left.height*size.height,32);assert.equal(sameRegion(left,right),false);
+ assert.doesNotThrow(()=>faceRect(left));assert.doesNotThrow(()=>faceRect(right));
+});
+test('large photos retain detail within a bounded bitmap budget and every small face fits inside an overlapping fine tile',()=>{
+ for(const [w,h] of [[6000,4000],[4000,6000],[8000,8000],[12000,1000],[320,240]]){
+  const size=detectionSize(w,h),regions=detectionRegions(size.width,size.height);
+  assert.ok(size.width<=w&&size.height<=h);assert.ok(Math.max(size.width,size.height)<=4096);assert.ok(size.width*size.height<12_010_000);assert.ok(regions.length<=128);
+  if(w===6000)assert.ok(size.width>1920,'Do not discard high-resolution detail before the tiled scan');
+  const fine=regions.filter(r=>Math.max(r.width,r.height)<=512);
+  if(Math.max(size.width,size.height)<=512)continue;
+  for(let y=0;y<=size.height-48;y+=37)for(let x=0;x<=size.width-48;x+=37)assert.ok(fine.some(r=>r.x<=x&&r.y<=y&&r.x+r.width>=x+48&&r.y+r.height>=y+48),`Missing seam coverage at ${x},${y}`);
+ }
 });
 test('the name picker prefers the right of a face and stays within narrow or keyboard-reduced viewports',()=>{
  const desktop=popoverPosition({x:200,y:100,width:90,height:100},{width:280,height:340},{width:1280,height:800});assert.equal(desktop.x,298);
