@@ -79,7 +79,7 @@ function spawn(g,type){
     slot=g.plantDeck.splice(index,1)[0];g.lastPlantSlot=slot;
   }
   if(type==='cat'){const otherDoor=free.filter(value=>value!==g.lastCatDoor);if(otherDoor.length)slot=choose(g,otherDoor);g.lastCatDoor=slot;}
-  const total=current[type],task={id:`${type}-${++g.serial}`,type,slot,remaining:total,total};
+  const total=current[type],task={id:`${type}-${++g.serial}`,type,slot,remaining:total,total,createdAt:g.elapsed};
   if(current.untimed)task.untimed=true;
   if(isDoor)task.door=task.slot;
   if(type==='cat'){task.waiting=g.stage.catWait;task.waitingTotal=task.waiting;task.state=task.waiting>0?'waiting':'approaching';}
@@ -106,9 +106,19 @@ function finishStage(g){
   if(g.level===STAGES.length){g.phase='finished';g.won=true;}else g.phase='stage-complete';
   emit(g,{type:'stage-clear',level:g.level,stageScore:g.stageScores[g.level-1],won:g.won});if(g.won)emit(g,{type:'finished',score:g.score,won:true});
 }
+function responseReward(g,task,respondedAt){
+  // Use active game time at the correct click, before Ruti walks or animates.
+  // Cat waiting is part of its visible response window; practice still has
+  // no deadline, but earns a smaller bonus if the player takes more time.
+  const at=Number.isFinite(respondedAt)?Math.min(g.elapsed,respondedAt):g.elapsed;
+  const responseSeconds=Math.max(0,round(at-(task.createdAt??0)));
+  const window=task.total+(task.waitingTotal||0);
+  const speedMultiplier=1+(window>0?Math.max(0,1-responseSeconds/window):0);
+  return {responseSeconds,speedMultiplier};
+}
 function success(g,kind,targetId,extra={}){
   g.combo++;g.bestCombo=Math.max(g.bestCombo,g.combo);g.comboRemaining=g.level<5?16:12;g.multiplier=1+Math.min(4,Math.floor(g.combo/5))*.25;
-  const points=Math.round(POINTS[kind]*g.multiplier);g.score+=points;g.stageScores[g.level-1]+=points;g.stats[statsKey[kind]]++;
+  const points=Math.round(POINTS[kind]*g.multiplier*(extra.speedMultiplier??1));g.score+=points;g.stageScores[g.level-1]+=points;g.stats[statsKey[kind]]++;
   const event=emit(g,{type:'success',kind,points,targetId,combo:g.combo,multiplier:g.multiplier,ok:true,...extra});
   let counts=g.level<=2?kind==='plant':kind!=='dish';
   if(kind==='dish'&&!g.requiredDishComplete&&extra.recipeId===g.stage.requiredDish){g.requiredDishComplete=true;g.cookingFocus=null;g.lessonObjective.complete=true;counts=true;emit(g,{type:'lesson-complete',kind:'dish',recipeId:extra.recipeId});}
@@ -127,7 +137,7 @@ export function createHouse({random:source=Math.random}={}){
 }
 export function advanceStage(g){if(g.phase!=='stage-complete'||g.level>=STAGES.length)return false;startStage(g,g.level);return true;}
 export function selectTool(g,id){if(g.phase!=='playing'||!toolIds.has(id)||!g.unlockedTools.includes(id))return false;g.selected=id;return true;}
-export function actHouse(g,targetId){
+export function actHouse(g,targetId,{respondedAt}={}){
   if(g.phase!=='playing'||typeof targetId!=='string')return null;
   if(targetId.startsWith('cook-')){
     const r=recipeById.get(targetId.slice(5));if(!r)return null;
@@ -140,10 +150,10 @@ export function actHouse(g,targetId){
   }
   const index=g.tasks.findIndex(t=>t.id===targetId);if(index<0)return null;const task=g.tasks[index];
   if(task.type==='guest'){
-    if(g.selected==='serve'){g.tasks.splice(index,1);return success(g,'meal',targetId,{guest:task.guest,recipeId:task.recipeId});}return emit(g,{type:'wrong',kind:'guest',targetId,required:'serve',ok:false});
+    if(g.selected==='serve'){g.tasks.splice(index,1);return success(g,'meal',targetId,{guest:task.guest,recipeId:task.recipeId,...responseReward(g,task,respondedAt)});}return emit(g,{type:'wrong',kind:'guest',targetId,required:'serve',ok:false});
   }
   if(g.selected!==needTool[task.type])return emit(g,{type:'wrong',kind:task.type,targetId,required:needTool[task.type],ok:false});
-  g.tasks.splice(index,1);if(g.level===1&&task.type==='plant')g.wateredSlots.push(task.slot);return success(g,task.type,targetId);
+  g.tasks.splice(index,1);if(g.level===1&&task.type==='plant')g.wateredSlots.push(task.slot);return success(g,task.type,targetId,responseReward(g,task,respondedAt));
 }
 function tick(g,dt){
   g.elapsed=round(g.elapsed+dt);g.stageElapsed=round(g.stageElapsed+dt);

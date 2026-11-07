@@ -74,7 +74,7 @@ test('one Food tool directly serves a random valid delicacy without picking up d
   const g=atStage(5),guest=g.tasks[0];assert.equal(guest.type,'guest');assert.ok(RECIPES.some(r=>r.id===guest.recipeId));
   assert.ok(Object.values(g.inventory).every(n=>n===0));assert.equal(g.requiredMealComplete,false);const before=g.score;
   selectTool(g,'water');assert.equal(actHouse(g,guest.id).type,'wrong');const event=clearTask(g,guest,'serve');
-  assert.equal(event.kind,'meal');assert.equal(event.recipeId,guest.recipeId);assert.equal(g.score-before,POINTS.meal);assert.equal(g.stats.meals,1);
+  assert.equal(event.kind,'meal');assert.equal(event.recipeId,guest.recipeId);assert.equal(g.score-before,POINTS.meal*2);assert.equal(g.stats.meals,1);
   assert.equal(g.requiredMealComplete,true);assert.equal(g.lessonObjective.complete,true);assert.ok(Object.values(g.inventory).every(n=>n===0));
   assert.equal(selectTool(g,'peanuts'),false);assert.equal(g.stats.snacks,0);
 });
@@ -145,4 +145,41 @@ test('only stage three introduces cats, both entrances get visitors, and stage f
   assert.ok(guard<3000);assert.deepEqual(new Set(doors),new Set([0,1]));
   assert.ok(doors.every((door,index)=>index===0||door!==doors[index-1]),'cats use the other available entrance on their next visit');
  }
+});
+
+test('faster responses earn progressively more points at the same success streak',()=>{
+  const scores=[];
+  for(const delay of [0,5,10,19.5]){
+    const g=game(),task=g.tasks[0];advanceHouse(g,delay);
+    const result=clearTask(g,task);scores.push(result.points);
+    assert.equal(result.responseSeconds,delay);assert.equal(result.combo,1);
+    assert.equal(g.score,result.points);assert.equal(g.stageScores[0],result.points);
+  }
+  assert.deepEqual(scores,[80,70,60,41]);
+});
+
+test('reaction bonus uses the correct click time rather than walking time and pauses freeze its clock',()=>{
+  const g=game(),task=g.tasks[0];advanceHouse(g,2);
+  selectTool(g,'broom');assert.equal(actHouse(g,task.id).ok,false);
+  selectTool(g,'water');const clickedAt=g.elapsed;
+  // Animate a long walk after the accepted response.
+  advanceHouse(g,8);const result=actHouse(g,task.id,{respondedAt:clickedAt});
+  assert.equal(result.responseSeconds,2);assert.equal(result.points,76);
+  assert.equal(actHouse(g,task.id,{respondedAt:clickedAt}),null);
+  // No active-game ticks are delivered while paused; wall time is irrelevant.
+  const paused=game(),pausedTask=paused.tasks[0];advanceHouse(paused,2);
+  advanceHouse(paused,0);assert.equal(clearTask(paused,pausedTask).points,76);
+});
+
+test('dust, cats and guests all receive speed bonuses, including the cat waiting window',()=>{
+  for(const [level,type,kind] of [[2,'dust','dust'],[3,'cat','cat'],[5,'guest','meal']]){
+    const g=atStage(level);let attempts=0;
+    while(!g.tasks.some(t=>t.type===type)&&attempts++<1000){if(g.tasks.length)clearTask(g);else advanceHouse(g,.1);}
+    const task=g.tasks.find(t=>t.type===type);assert.ok(task);
+    g.combo=0;g.comboRemaining=0;
+    const delay=2;advanceHouse(g,delay);const result=clearTask(g,task);
+    assert.equal(result.kind,kind);assert.equal(result.responseSeconds,delay);
+    assert.ok(result.points>POINTS[kind]&&result.points<POINTS[kind]*2);
+    if(type==='cat')assert.equal(result.speedMultiplier,1+(1-delay/(task.total+task.waitingTotal)));
+  }
 });

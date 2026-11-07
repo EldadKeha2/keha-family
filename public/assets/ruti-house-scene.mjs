@@ -1,6 +1,6 @@
 import {iconArtwork} from './ruti-house-art.mjs?v=3';
 import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=3';
-import {drawDustSignal} from './ruti-house-dust.mjs?v=4';
+import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -35,16 +35,19 @@ export function getHouseLayout(width,height){
  const xs=portrait?[.12,.31,.50,.69,.88]:[.12,.265,.41,.555,.70];
  const recipeY=portrait?.17:.165,anchorY=portrait?.345:.36;
  const recipes=Object.fromEntries(FOOD_IDS.map((id,i)=>[id,{x:xs[i],y:recipeY,hitRadius:portrait?.07:.052,anchor:{x:xs[i],y:anchorY}}]));
- const plants=(portrait?[[.88,.39],[.89,.61],[.73,.87],[.12,.87]]:[[.86,.335],[.91,.53],[.75,.86],[.12,.86]])
+ const counter={x:.045,y:.13,w:portrait?.91:.74,h:portrait?.155:.18};
+ // The blue petunia rests on the stone, away from the main entrance.
+ const potSize=Math.min(width,height)*(portrait?.15:.12);
+ const counterPlantY=counter.y+counter.h*.35-potSize*31/64/height;
+ const plants=(portrait?[[.88,.39],[.82,counterPlantY],[.73,.87],[.12,.87]]:[[.86,.335],[.68,counterPlantY],[.75,.86],[.12,.86]])
   .map(([x,y],slot)=>{
    const M=Math.min(width,height),signal=plantSignalGeometry(x*width,y*height,M*(portrait?.15:.12),width);
-   return {x,y,slot,variety:PLANT_VARIETIES[slot].id,hitRadius:portrait?.10:.08,anchor:{x:x+(x>.7?-55:55)/width,y:y+24/height},
+   return {x,y,slot,variety:PLANT_VARIETIES[slot].id,hitRadius:portrait?.10:.08,anchor:slot===1?{x,y:counter.y+counter.h+.045}:{x:x+(x>.7?-55:55)/width,y:y+24/height},
     signal:{x:signal.cx/width,y:(signal.by+signal.h/2)/height,hitRadius:signal.w/(2*M)}};
   });
  const doors=[{x:.945,y:.765,hitRadius:.071,anchor:{x:.945-55/width,y:.765},side:'right',kind:'main',visualScale:1.35},{x:.045,y:.55,hitRadius:.071,anchor:{x:.045+55/width,y:.55},side:'left',kind:'back',visualScale:.8}];
  const sofa=portrait?{x:.48,y:.43,w:.28,h:.105}:{x:.50,y:.43,w:.26,h:.125};
  const table=portrait?{x:.45,y:.68,w:.26,h:.09}:{x:.47,y:.68,w:.25,h:.105};
- const counter={x:.045,y:.13,w:portrait?.91:.74,h:portrait?.155:.18};
  const obstacles=[counter,sofa,table,...plants.map(p=>({x:p.x-.033,y:p.y-.028,w:.066,h:.04}))];
  const layout={width,height,portrait,recipes,plants,doors,pickup:{x:.40,y:.90,hitRadius:.06,anchor:{x:.40,y:.84}},obstacles,sofa,table,counter,
   walkBounds:{left:.055,right:.945,top:portrait?.325:.34,bottom:.94},spawn:{x:.42,y:.51}};
@@ -199,7 +202,7 @@ function drawPlantHalo(ctx,x,y,size,task,time,reduced){
 function drawPlantSignal(ctx,x,y,size,task,{english,width,showLabel=true}){
  const ratio=task.untimed?1:clamp(task.remaining/task.total,0,1),urgent=!task.untimed&&ratio<.3;
  const {h,cx,by}=plantSignalGeometry(x,y,size,width),color=urgent?'#b9233d':'#00648c';
- ctx.save();ctx.lineWidth=1.4;
+ ctx.save();ctx.lineWidth=1.4;ctx.shadowBlur=0;ctx.shadowColor='transparent';ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;ctx.filter='none';
  // The drop belongs to the physical watering cue. Learned words have no
  // card, halo, border or colored background around them.
  const dx=showLabel?cx-24:cx,dy=by+10;ctx.beginPath();ctx.moveTo(dx,dy-7);ctx.bezierCurveTo(dx-1,dy-4,dx-6,dy,dx-6,dy+3);ctx.bezierCurveTo(dx-6,dy+10,dx+6,dy+10,dx+6,dy+3);ctx.bezierCurveTo(dx+6,dy,dx+1,dy-4,dx,dy-7);ctx.fillStyle='#00a9d5';ctx.fill();ctx.strokeStyle='#ffffff';ctx.stroke();
@@ -322,7 +325,9 @@ export function getRutiWateringGeometry(actor,target,height,pose={}){
  const nozzleX=(244-RUTI_PIVOTS[3])*height/345*RUTI_BODY_WIDTH*facing,nozzleY=-165*height/345*breath;
  const start={x:actor.x+Math.cos(lean)*nozzleX-Math.sin(lean)*nozzleY,
   y:actor.y-(pose.lift||0)+Math.sin(lean)*nozzleX+Math.cos(lean)*nozzleY};
- return {facing,start,end:{x:target.x,y:target.y},control:{x:start.x+(target.x-start.x)*.62,y:start.y+Math.max(4,(target.y-start.y)*.12)}};
+ // An elevated counter pot needs a higher arc so the final drops fall into
+ // its rim, rather than travelling upward through its side.
+ return {facing,start,end:{x:target.x,y:target.y},control:{x:start.x+(target.x-start.x)*.62,y:Math.min(start.y+Math.max(4,(target.y-start.y)*.12),target.y-height*.12)}};
 }
 function drawWaterStream(ctx,geometry,height,time,reduced){
  const {start,end,control}=geometry;

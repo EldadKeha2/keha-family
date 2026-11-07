@@ -154,7 +154,7 @@ test('selecting a tool changes it in hand instantly without moving Ruti, then ta
   assert.equal(f.actor.tool,'broom');assert.equal(f.game.selected,'broom');assert.equal(f.state.motion.busy,false);assert.deepEqual({x:f.actor.x,y:f.actor.y},start);f.advance(2000);assert.deepEqual({x:f.actor.x,y:f.actor.y},start);assert.equal(f.game.stats.plants,0);
   await f.choose('water');assert.equal(f.actor.tool,'water');assert.equal(f.game.selected,'water');assert.equal(f.state.motion.busy,false);assert.deepEqual({x:f.actor.x,y:f.actor.y},start);await f.act(plant.id);
   assert.equal(f.game.stats.plants,0);assert.equal(f.state.pendingTarget,null);assert.equal(f.state.motion.busy,true);f.advance(100);assert.equal(f.game.stats.plants,0);assert.notDeepEqual({x:f.actor.x,y:f.actor.y},start);
-  const elapsed=f.until(()=>f.game.stats.plants===1);assert.ok(elapsed>1000);assert.equal(f.game.score,40);assert.equal(f.game.level,1);assert.equal(f.game.phase,'playing');assert.equal(f.game.stageCompleted,1);assert.equal(f.frames.size,1);assert.ok(f.draws.some(d=>d.actor.tool==='water'&&d.actor.walking));assert.ok(f.draws.some(d=>d.actor.action==='water'&&d.actor.actionProgress>0&&d.actor.actionProgress<1));f.until(()=>f.game.tasks.length===1);assert.notEqual(f.game.tasks[0].slot,plant.slot);
+  const elapsed=f.until(()=>f.game.stats.plants===1);assert.ok(elapsed>1000);assert.equal(f.game.score,76);assert.equal(f.game.level,1);assert.equal(f.game.phase,'playing');assert.equal(f.game.stageCompleted,1);assert.equal(f.frames.size,1);assert.ok(f.draws.some(d=>d.actor.tool==='water'&&d.actor.walking));assert.ok(f.draws.some(d=>d.actor.action==='water'&&d.actor.actionProgress>0&&d.actor.actionProgress<1));f.until(()=>f.game.tasks.length===1);assert.notEqual(f.game.tasks[0].slot,plant.slot);
 });
 
 test('switching tools during a walk or watering cancels the old task without teleporting or awarding a stale completion',async()=>{
@@ -164,13 +164,13 @@ test('switching tools during a walk or watering cancels the old task without tel
     assert.equal(f.state.motion.busy,true);assert.equal(f.game.stats.plants,0);const where={x:f.actor.x,y:f.actor.y};await f.choose('broom');
     assert.equal(f.actor.tool,'broom');assert.equal(f.game.selected,'broom');assert.equal(f.actor.action,null);assert.equal(f.state.motion.busy,false);assert.deepEqual({x:f.actor.x,y:f.actor.y},where);f.advance(5000);
     assert.deepEqual({x:f.actor.x,y:f.actor.y},where);assert.equal(f.game.stats.plants,0);assert.equal(f.game.score,0);assert.ok(f.game.tasks.some(t=>t.id===plant.id));
-    await f.choose('water');await f.act(plant.id);f.until(()=>f.game.stats.plants===1);assert.equal(f.game.score,40);assert.equal(f.game.stageCompleted,1);
+    await f.choose('water');await f.act(plant.id);f.until(()=>f.game.stats.plants===1);assert.ok(f.game.score>40&&f.game.score<80);assert.equal(f.game.stageCompleted,1);
   }
 });
 
 test('reselecting the tool already in hand preserves the current walk and completes the task exactly once',async()=>{
   const f=fixture();await f.start();const plant=f.game.tasks[0];await f.choose('water');await f.act(plant.id);f.advance(200);const where={x:f.actor.x,y:f.actor.y};
-  await f.choose('water');assert.equal(f.state.motion.busy,true);assert.deepEqual({x:f.actor.x,y:f.actor.y},where);assert.equal(f.actor.tool,'water');f.until(()=>f.game.stats.plants===1);f.advance(1000);assert.equal(f.game.stats.plants,1);assert.equal(f.game.score,40);
+  await f.choose('water');assert.equal(f.state.motion.busy,true);assert.deepEqual({x:f.actor.x,y:f.actor.y},where);assert.equal(f.actor.tool,'water');f.until(()=>f.game.stats.plants===1);f.advance(1000);assert.equal(f.game.stats.plants,1);assert.equal(f.game.score,80);
 });
 
 test('the enlarged singing broom dance waits for Next indefinitely while game clocks, score and strikes stay frozen',async()=>{
@@ -195,14 +195,14 @@ test('the single Food tool serves a homemade dish directly to the guest without 
   for(const english of [false,true]){
     const f=fixture({english,startLevel:6});await f.start();f.until(()=>f.game.tasks.some(t=>t.type==='guest'));const guest=f.game.tasks.find(t=>t.type==='guest'),before=f.game.score,stock=f.game.inventory[guest.recipeId];await f.choose('serve');f.until(()=>!f.state.motion.busy);assert.equal(f.actor.tool,'serve');
     assert.deepEqual(f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool),['water','broom','hand','serve']);assert.ok(f.root.querySelectorAll('[data-rh-target]').every(b=>!b.dataset.rhTarget.startsWith('cook-')));
-    const initialMeals=f.game.stats.meals;await f.act(guest.id);assert.equal(f.state.motion.busy,true);assert.equal(f.actor.carryDish,guest.recipeId);assert.equal(f.game.stats.meals,initialMeals);f.advance(100);f.until(()=>f.game.stats.meals===initialMeals+1);assert.equal(f.game.inventory[guest.recipeId],stock);assert.equal(f.actor.carryDish,null);assert.equal(f.game.score-before,300);assert.equal(f.game.requiredMealComplete,true);assert.equal(f.game.stats.snacks,0);assert.equal(f.game.stats.dishes,0);assert.ok(f.draws.some(d=>d.actor.carryDish===guest.recipeId&&d.actor.walking));
+    const initialMeals=f.game.stats.meals;await f.act(guest.id);assert.equal(f.state.motion.busy,true);assert.equal(f.actor.carryDish,guest.recipeId);assert.equal(f.game.stats.meals,initialMeals);f.advance(100);f.until(()=>f.game.stats.meals===initialMeals+1);assert.equal(f.game.inventory[guest.recipeId],stock);assert.equal(f.actor.carryDish,null);assert.equal(f.game.score-before,600);assert.equal(f.game.requiredMealComplete,true);assert.equal(f.game.stats.snacks,0);assert.equal(f.game.stats.dishes,0);assert.ok(f.draws.some(d=>d.actor.carryDish===guest.recipeId&&d.actor.walking));
   }
 });
 
-test('the third cat ends the run and v2 saves preserve stage scores, statistics and retry identifiers',async()=>{
+test('the third cat ends the run and v3 saves preserve stage scores, statistics and retry identifiers',async()=>{
   for(const english of [false,true]){
     const f=fixture({english,startLevel:3,failSave:true});await f.start();assert.equal(f.key('Digit3'),true);assert.equal(f.game.selected,'hand');for(const digit of [5,6,7,8])assert.equal(f.key(`Digit${digit}`),false);assert.equal(f.key('Digit1',{editable:true}),false);assert.equal(f.game.selected,'hand');f.game.tasks=[];f.game.events=[];for(let i=0;i<3;i++)f.game.tasks.push({id:`test-cat-${i}`,type:'cat',slot:i%2,door:i%2,state:'approaching',waiting:0,total:.1,remaining:.1});f.advance(300);await f.flush();assert.equal(f.game.phase,'finished');assert.equal(f.game.strikes,3);assert.equal(f.frames.size,0);assert.match(f.html,/data-rh-score-form/);
-    await f.submit();assert.equal(f.writes.length,0);f.input('  Player One  ');await f.submit();assert.equal(f.writes.length,1);assert.match(f.html,english?/Could not save your score/:/שמירה נכשלה/);f.allowSave();await f.submit();assert.equal(f.writes.length,2);const payload=f.writes[1];assert.equal(payload.requestId,f.writes[0].requestId);assert.equal(payload.name,'Player One');assert.equal(payload.version,2);assert.equal(payload.completedLevels,2);assert.deepEqual(payload.stageScores,[...f.game.stageScores]);assert.equal(payload.stageScores.reduce((a,b)=>a+b,0),payload.score);assert.ok(payload.stageScores[0]>0);assert.equal(payload.level,3);assert.equal(payload.plants,f.game.stats.plants);assert.equal(payload.elapsed,Math.floor(f.game.elapsed));assert.equal(f.requests.find(r=>r.options?.method==='POST').options.headers['X-Family-Token'],'test-token');assert.match(f.html,english?/Score saved! Your rank/:/השיא נשמר! המקום שלכם/);await f.submit();assert.equal(f.writes.length,2);
+    await f.submit();assert.equal(f.writes.length,0);f.input('  Player One  ');await f.submit();assert.equal(f.writes.length,1);assert.match(f.html,english?/Could not save your score/:/שמירה נכשלה/);f.allowSave();await f.submit();assert.equal(f.writes.length,2);const payload=f.writes[1];assert.equal(payload.requestId,f.writes[0].requestId);assert.equal(payload.name,'Player One');assert.equal(payload.version,3);assert.equal(payload.completedLevels,2);assert.deepEqual(payload.stageScores,[...f.game.stageScores]);assert.equal(payload.stageScores.reduce((a,b)=>a+b,0),payload.score);assert.ok(payload.stageScores[0]>0);assert.equal(payload.level,3);assert.equal(payload.plants,f.game.stats.plants);assert.equal(payload.elapsed,Math.floor(f.game.elapsed));assert.equal(f.requests.find(r=>r.options?.method==='POST').options.headers['X-Family-Token'],'test-token');assert.match(f.html,english?/Score saved! Your rank/:/השיא נשמר! המקום שלכם/);await f.submit();assert.equal(f.writes.length,2);
   }
 });
 
@@ -226,8 +226,8 @@ test('all ten simplified stages remain winnable with physical movement and direc
     f.advance(100);
   }
   assert.equal(f.state.celebrating,true);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/השלמת את כל עשרת השלבים!/);assert.doesNotMatch(f.html,/data-rh-score-form/);f.advance(30000);assert.equal(f.state.celebrating,true);assert.doesNotMatch(f.html,/data-rh-score-form/);f.input('Too early');await f.submit();assert.equal(f.writes.length,0,'the final score cannot be saved until the player ends the celebration');await f.click('[data-rh-next]');assert.equal(f.state.celebrating,false);assert.equal(f.game.won,true,JSON.stringify({level:f.game.level,strikes:f.game.strikes,elapsed:f.game.elapsed,completed:[...completed],requiredMealComplete:f.game.requiredMealComplete,tasks:f.game.tasks.map(t=>({type:t.type,remaining:t.remaining,waiting:t.waiting}))}));assert.equal(f.game.completedLevels,10);assert.equal(completed.size,9);assert.ok(f.game.strikes<3);assert.equal(f.game.stageScores.reduce((a,b)=>a+b,0),f.game.score);assert.ok(f.game.stageScores.every(points=>points>0));assert.ok(f.game.stats.plants>=60);assert.equal(f.game.stats.dishes,0);assert.equal(f.game.stats.snacks,0);assert.ok(f.game.stats.meals>=1);assert.match(f.html,/כל עשרת השלבים/);assert.equal(f.frames.size,0);
-  f.input('אלופת הבית');await f.submit();assert.equal(f.writes.length,1);const entry=rutiHouseScore(f.writes[0]);assert.equal(entry.version,2);assert.equal(entry.completedLevels,10);assert.equal(entry.level,10);assert.equal(entry.score,f.game.score);assert.equal(entry.name,'אלופת הבית');assert.equal(entry.stageScores.reduce((a,b)=>a+b,0),entry.score);
-  t.diagnostic(`Ten levels won in ${Math.floor(f.game.elapsed)} game seconds with ${f.game.strikes} strikes; thirty-water opening and direct guest meals completed; ${entry.score} points pass the production v2 validator.`);
+  f.input('אלופת הבית');await f.submit();assert.equal(f.writes.length,1);const entry=rutiHouseScore(f.writes[0]);assert.equal(entry.version,3);assert.equal(entry.completedLevels,10);assert.equal(entry.level,10);assert.equal(entry.score,f.game.score);assert.equal(entry.name,'אלופת הבית');assert.equal(entry.stageScores.reduce((a,b)=>a+b,0),entry.score);
+  t.diagnostic(`Ten levels won in ${Math.floor(f.game.elapsed)} game seconds with ${f.game.strikes} strikes; thirty-water opening and direct guest meals completed; ${entry.score} points pass the production v3 validator.`);
 });
 
 
@@ -301,4 +301,25 @@ test('every later stage keeps normal reactions silent and unlabeled while lesson
     await f.click('[data-rh-pause]');assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),false);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/All timers are paused/:/כל השעונים עצרו/);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/data-rh-pause/);
     await f.click('[data-rh-pause]');assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),true);assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');
   }
+});
+
+test('identical player reactions earn identical points despite different walks, and repeat clicks preserve the response',async()=>{
+  const results=[];
+  for(const near of [false,true]){
+    const f=fixture();await f.start();await f.choose('water');const task=f.game.tasks[0];
+    if(near){const anchor=getHouseLayout(1000,580).plants[task.slot].anchor;f.actor.x=anchor.x;f.actor.y=anchor.y;}
+    f.advance(2000);const responseSeconds=f.game.elapsed-task.createdAt;await f.act(task.id);f.advance(100);await f.act(task.id);
+    const walkingMs=f.until(()=>f.game.stats.plants===1);
+    results.push({points:f.game.score,responseSeconds,walkingMs});
+  }
+  assert.equal(results[0].points,76);assert.equal(results[1].points,76);
+  assert.equal(results[0].responseSeconds,results[1].responseSeconds);
+  assert.ok(results[0].walkingMs>results[1].walkingMs+500);
+});
+
+test('only the physical plant has a tutorial outline, never the water word hit area',async()=>{
+  const f=fixture();await f.start();const buttons=f.nodes.get('[data-rh-hotspots]').innerHTML.match(/<button[^>]+>/g);
+  const signal=buttons.find(b=>b.includes('aria-hidden="true"'));
+  assert.ok(signal);assert.ok(!signal.includes('rh-guided-target'));
+  assert.equal(buttons.filter(b=>b.includes('rh-guided-target')).length,1);
 });
