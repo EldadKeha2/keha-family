@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {File} from 'node:buffer';
 import {readFile} from 'node:fs/promises';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
-function fixture({english=false,native=true,files=true,cancel=false,clipboard=true,defer=false}={}){
+function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false}={}){
   const nodes=new Map(),events=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
     constructor(){this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.classList={toggle(){}};this.children=new Map();}
@@ -24,16 +25,38 @@ function fixture({english=false,native=true,files=true,cancel=false,clipboard=tr
     close(){this.open=false;this.handlers.get('close')?.();}
   }
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
-  const location={origin:'https://family.test',href:'https://family.test/?lang='+(english?'en-US':'he')+'#gallery'};
+  const browser=navigation?browserHistory('https://family.test/?lang='+(english?'en-US':'he')+'#gallery'):null;
+  const location=browser?.location||{origin:'https://family.test',href:'https://family.test/?lang='+(english?'en-US':'he')+'#gallery'};
   const window={FamilyApp:{apiEnabled:true,toast(){}},FamilyTags:{taggable:item=>['photo','video'].includes(item.kind),mountInline(){},clearInline(){},controls:()=>'',labels:()=>''},addEventListener(){}};
   window.FamilyI18n={isEnglish:english,language:english?'en-US':'he',t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:p=>p.name||'',fetch:async(path,options)=>{requests.push({path,options});return{ok:true,blob:()=>defer?new Promise(resolve=>pending.push(resolve)):Promise.resolve(new Blob(['picture'],{type:'image/jpeg'}))};}};
   const navigator={userActivation:{isActive:true},clipboard:{async writeText(value){if(!clipboard)throw Error('Unavailable');copied.push(value);}}};
   if(native){navigator.canShare=()=>files;navigator.share=async data=>{shared.push(data);if(cancel)throw Object.assign(Error('Cancelled'),{name:'AbortError'});};}
   const document={activeElement:null,getElementById:get,querySelectorAll:()=>[],createElement:()=>new Node(),addEventListener:(type,callback)=>events.set(type,callback)};
-  vm.runInNewContext(source,{window,document,location,navigator,File,Blob,URL,history:{replaceState(){}},clearTimeout,setTimeout});events.get('DOMContentLoaded')();
+  if(browser)window.addEventListener=browser.addEventListener;
+  const context=vm.createContext({window,document,location,navigator,File,Blob,URL,history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
+  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
-  return {window,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
+  return {browser,photo,window,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
+test('Back closes a media viewer in its original album and Forward restores the cached photo once',async()=>{
+  const f=fixture({navigation:true}),url=f.browser.location.href;
+  f.open('a');assert.equal(f.browser.location.search,'?lang=he&media=a');assert.equal(f.get('mediaViewer').open,true);
+  const length=f.browser.history.length;
+  f.browser.history.back();await f.browser.flush();assert.equal(f.browser.location.href,url);assert.equal(f.get('mediaViewer').open,false);
+  f.browser.history.forward();await f.browser.flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('copyMediaLink').handlers.has('click'),true);
+  assert.equal(f.browser.history.length,length);assert.equal(f.requests.length,0,'cached Forward must not fetch the shared link again');
+  f.close();await f.browser.flush();assert.equal(f.browser.location.href,url);
+  f.browser.history.back();await f.browser.flush();assert.equal(f.browser.location.hash,'#tree');assert.equal(f.get('mediaViewer').open,false);
+});
+
+test('moving between photos keeps one viewer history entry and returns to the album from the last photo',async()=>{
+  const f=fixture({navigation:true});f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
+  const length=f.browser.history.length;
+  f.get('mediaNext').handlers.get('click')();assert.equal(f.browser.location.search,'?lang=he&media=b');
+  assert.equal(f.browser.history.length,length);f.close();await f.browser.flush();
+  assert.equal(f.browser.location.hash,'#gallery');assert.equal(f.browser.location.search,'?lang=he');
+  f.browser.history.forward();await f.browser.flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.browser.location.search,'?lang=he&media=b');
+});
 test('Instagram shares an actual file through the native sheet and reuses the prepared file only for its own photo',async()=>{
   const f=fixture();f.open('a');await f.click();assert.equal(f.shared.length,1);assert.equal(f.shared[0].files.length,1);assert.equal(await f.shared[0].files[0].text(),'picture');assert.equal(f.shared[0].files[0].type,'image/jpeg');assert.equal(f.shared[0].url,undefined);assert.equal(f.requests[0].path,'/media/a');assert.equal(f.requests[0].options.cache,'force-cache');assert.equal(f.get('shareMediaInstagram').disabled,false);
   await f.click();assert.equal(f.requests.length,1);f.open('b');await f.click();assert.equal(f.requests.length,2);assert.equal(f.requests[1].path,'/media/b');

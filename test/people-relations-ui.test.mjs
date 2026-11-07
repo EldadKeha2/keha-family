@@ -3,29 +3,50 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import family from '../src/family.mjs';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const relationsSource=await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8');
 const peopleSource=await readFile(new URL('../public/assets/people.js',import.meta.url),'utf8');
-async function fixture(id='eldad',{english=false,overrides={}}={}){
-  const nodes=new Map(),listeners=new Map(),requests=[],location={hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
+async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={}}={}){
+  const browser=navigation?browserHistory(entryUrl||'https://family.test/#person/'+id):null;let view=browser?browser.location.hash.slice(1).split('/')[0]:'person';
+  const nodes=new Map(),listeners=new Map(),requests=[],location=browser?.location||{hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
   function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
   const summary=id=>({...family.people[id],...overrides[id]});
   const window={FAMILY_DATA:family,FamilyI18n:{isEnglish:english,language:english?'en-US':'he',error:String,fetch:async url=>{
     requests.push(String(url));const id=decodeURIComponent(String(url).match(/api\/people\/([^/]+)\/page/)[1]);
     return {ok:true,status:200,json:async()=>({person:summary(id),revision:id,albums:Object.fromEntries(['photos','videos','documents'].map(key=>[key,{items:[],page:1,pages:1,total:0}]))})};
-  }},scrollTo(){},addEventListener:(event,callback)=>callbacks.set(event,callback)};
-  window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},getView:()=> 'person',setView:view=>window.FamilyPeople.activate(view)};
+  }},scrollTo(){},addEventListener(event,callback){callbacks.set(event,callback);browser?.addEventListener(event,callback);}};
+  window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
   const document={getElementById:node,addEventListener:(event,callback)=>callbacks.set(event,callback),querySelector:()=>null,visibilityState:'visible'};
-  const context=vm.createContext({window,document,location,history:{pushState(_a,_b,hash){location.hash=hash;}},URLSearchParams,URL,console,setInterval:()=>0,setTimeout,clearTimeout});
+  const context=vm.createContext({window,document,location,history:browser?.history||{pushState(_a,_b,hash){location.hash=hash;}},matchMedia:()=>({matches:false}),URLSearchParams,URL,console,setInterval:()=>0,setTimeout,clearTimeout});
+  if(browser){vm.runInContext(navigationSource,context);browser.addEventListener('popstate',()=>{const next=location.hash.slice(1).split('/')[0];if(next!==view)window.FamilyApp.setView(next,false);});}
   vm.runInContext(relationsSource,context);vm.runInContext(peopleSource,context);callbacks.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
-  return {window,location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
+  return {window,browser,get view(){return view;},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
     let prevented=false,stopped=false;
     await listeners.get('personPageContent:click')({button:0,ctrlKey:modifier,preventDefault(){prevented=true;},stopPropagation(){stopped=true;},target:{closest:selector=>selector==='[data-person-relative]'?{dataset:{personRelative:id}}:null}});
     await flush();return {prevented,stopped};
   }};
 }
 const group=(html,key)=>html.match(new RegExp('<section class="person-family-group" data-relative-kind="'+key+'"[\\s\\S]*?<\\/section>'))[0];
+
+test('Back restores each relative page and then the actual source section; Forward renders the correct person',async()=>{
+  for(const english of [false,true]){
+    const f=await fixture('eldad',{navigation:true,english,entryUrl:'https://family.test/#calendar'});
+    f.window.FamilyPeople.open('eldad');await f.flush();await f.clickRelative('yehiel');await f.clickRelative('yona');
+    const length=f.browser.history.length;
+    f.browser.history.back();await f.flush();assert.match(f.html,english?/Yehiel/:/יחיאל/);assert.equal(f.location.hash,'#person/yehiel');
+    f.browser.history.back();await f.flush();assert.match(f.html,english?/Eldad/:/אלדד/);assert.equal(f.location.hash,'#person/eldad');
+    await f.back();await f.flush();assert.equal(f.view,'calendar');assert.equal(f.location.hash,'#calendar');
+    f.browser.history.forward();await f.flush();assert.equal(f.location.hash,'#person/eldad');assert.match(f.html,english?/Eldad/:/אלדד/);
+    assert.equal(f.browser.history.length,length);
+  }
+});
+
+test('the personal Back link has a useful parent on a fresh direct entry',async()=>{
+  const f=await fixture('eldad',{navigation:true});await f.back();await f.flush();
+  assert.equal(f.view,'directory');assert.equal(f.location.hash,'#directory');
+});
 
 test('personal pages show four localized family groups in order, with cached photos and one page request',async()=>{
   for(const english of [false,true]){

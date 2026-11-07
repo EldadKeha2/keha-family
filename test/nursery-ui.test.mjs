@@ -2,25 +2,29 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/nursery.js',import.meta.url),'utf8');
 const empty=id=>({kind:'nursery:'+id,items:[],count:0,pagination:{page:1,pages:1,total:0,size:10}});
-function fixture({english=false,albumFetch}={}){
+function fixture({navigation=false,entryUrl='https://family.test/#nursery',english=false,albumFetch}={}){
+  const browser=navigation?browserHistory(entryUrl):null;let view=browser?browser.location.hash.slice(1).split('/')[0]:'nursery';
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),sent=[],registered=[];
   const people=[{id:'yona',name:'Yona',profile:'/adult-profile.jpg'},{id:'shlomo',name:'Shlomo'},{id:'extended',name:'Extended',extended:true},{id:'extra-guest',name:'Guest',extra:true}];
   const node=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',value:'',dataset:{},hidden:false,clicks:0,handlers:new Map(),click(){this.clicks++;},addEventListener(type,fn){this.handlers.set(type,fn);}});return nodes.get(id);};
-  const location={hash:'#nursery'},document={body:{dataset:{}},visibilityState:'visible',querySelector:()=>null,getElementById:node,addEventListener(type,fn){events.set(type,fn);}};
-  const window={FamilyI18n:{isEnglish:english,searchNames:p=>p.name,mediaName:p=>p.name,error:String,fetch:async path=>path==='api/nursery'?Response.json({albums:{}}):albumFetch?albumFetch(path):Response.json(empty(path.split('/').pop().split('?')[0]))},FamilyMedia:{register(scope,items){registered.push({scope,items});}},addEventListener(type,fn){windowEvents.set(type,fn);},scrollTo(){},FAMILY_API_TOKEN:'test'};
-  window.FamilyApp={getPeople:()=>people,getPersonSummary:id=>people.find(p=>p.id===id),nameOf:id=>people.find(p=>p.id===id)?.name||id,apiEnabled:true,getView:()=> 'nursery',setView(view){window.FamilyNursery.activate(view);},toast(){}};
+  const location=browser?.location||{hash:'#nursery'},document={body:{dataset:{}},visibilityState:'visible',querySelector:()=>null,getElementById:node,addEventListener(type,fn){events.set(type,fn);}};
+  const window={FamilyI18n:{isEnglish:english,searchNames:p=>p.name,mediaName:p=>p.name,error:String,fetch:async path=>path==='api/nursery'?Response.json({albums:{}}):albumFetch?albumFetch(path):Response.json(empty(path.split('/').pop().split('?')[0]))},FamilyMedia:{register(scope,items){registered.push({scope,items});}},addEventListener(type,fn){windowEvents.set(type,fn);browser?.addEventListener(type,fn);},scrollTo(){},FAMILY_API_TOKEN:'test'};
+  window.FamilyApp={getPeople:()=>people,getPersonSummary:id=>people.find(p=>p.id===id),nameOf:id=>people.find(p=>p.id===id)?.name||id,apiEnabled:true,getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyNursery.activate(next);},toast(){}};
   class XHR{
     constructor(){this.upload={};}open(method,url){this.url=url;}setRequestHeader(){}send(file){this.file=file;sent.push(this);}
     complete(result,status=201){this.status=status;this.responseText=JSON.stringify(result);this.onload();}
   }
-  vm.runInNewContext(source,{window,document,location,history:{pushState(_a,_b,hash){location.hash=hash;}},XMLHttpRequest:XHR,Map,Set,URLSearchParams,Response});
+  const context=vm.createContext({window,document,location,history:browser?.history||{pushState(_a,_b,hash){location.hash=hash;}},matchMedia:()=>({matches:true}),URL,XMLHttpRequest:XHR,Map,Set,URLSearchParams,Response});
+  if(browser){vm.runInContext(navigationSource,context);browser.addEventListener('popstate',()=>{const next=location.hash.slice(1).split('/')[0];if(next!==view)window.FamilyApp.setView(next,false);});}
+  vm.runInContext(source,context);
   events.get('DOMContentLoaded')();
   const click=(selector,dataset={})=>node('nurseryContent').handlers.get('click')({preventDefault(){},target:{closest:s=>s===selector?{dataset}:null}});
   const open=id=>click('[data-nursery-person]',{nurseryPerson:id});
-  return {people,window,nodes,node,sent,registered,location,open,click,flush:()=>new Promise(resolve=>setImmediate(resolve)),get html(){return node('nurseryContent').innerHTML;},select(files){const input=node('nurseryUploadInput');input.files=files;input.handlers.get('change')({target:input});}};
+  return {browser,get view(){return view;},people,window,nodes,node,sent,registered,location,open,click,flush:()=>new Promise(resolve=>setImmediate(resolve)),get html(){return node('nurseryContent').innerHTML;},select(files){const input=node('nurseryUploadInput');input.files=files;input.handlers.get('change')({target:input});}};
 }
 test('nursery cards follow new core members automatically and exclude extended and tag-only people',async()=>{
  const f=fixture();await f.flush();assert.match(f.html,/#nursery\/yona/);assert.doesNotMatch(f.html,/#nursery\/(extended|extra-guest)/);assert.doesNotMatch(f.html,/adult-profile/);
@@ -42,4 +46,20 @@ test('a refresh started before an upload cannot hide the newly saved photo',asyn
  let resolveAlbum;const f=fixture({albumFetch:()=>new Promise(resolve=>{resolveAlbum=resolve;})});await f.flush();f.open('yona');f.click('[data-nursery-upload]');f.select([{name:'baby.jpg',type:'image/jpeg',size:100}]);
  const item={id:'new-photo',src:'/media/new-photo',name:'Saved baby photo'};f.sent[0].complete({collection:{...empty('yona'),items:[item],count:1,pagination:{page:1,pages:1,total:1,size:10}}});await f.flush();assert.match(f.html,/new-photo/);
  resolveAlbum(Response.json(empty('yona')));await f.flush();assert.match(f.html,/new-photo/);assert.match(f.html,/התמונה נוספה/);
+});
+
+test('nursery Back and Forward traverse album owners and the list without replacing history',async()=>{
+  const f=fixture({navigation:true});await f.flush();f.open('yona');await f.flush();f.open('shlomo');await f.flush();
+  const length=f.browser.history.length;
+  f.browser.history.back();await f.flush();assert.equal(f.location.hash,'#nursery/yona');assert.match(f.html,/Yona/);assert.doesNotMatch(f.html,/Shlomo/);
+  f.browser.history.back();await f.flush();assert.equal(f.location.hash,'#nursery');assert.match(f.html,/#nursery\/shlomo/);
+  f.browser.history.forward();await f.flush();f.browser.history.forward();await f.flush();
+  assert.equal(f.location.hash,'#nursery/shlomo');assert.match(f.html,/Shlomo/);assert.equal(f.browser.history.length,length);
+});
+
+test('returning from a directly opened baby album consumes its nursery parent',async()=>{
+  const f=fixture({navigation:true,entryUrl:'https://family.test/?lang=en-US#nursery/yona',english:true});await f.flush();
+  assert.match(f.html,/My baby photos/);f.click('[data-nursery-back]');await f.flush();
+  assert.equal(f.location.hash,'#nursery');assert.match(f.html,/We were little once/);
+  f.browser.history.back();await f.flush();assert.equal(f.view,'home');
 });

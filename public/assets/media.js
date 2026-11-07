@@ -10,6 +10,7 @@
   const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
   let noticeTimer,expectedCaption='',captionEditing=false;
   let instagramPrepared={id:null,file:null};
+  let restoringLink='';
   const tr=(he,en)=>I18n.isEnglish?en:he;
   function shareURL(item){const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);url.hash='gallery';return url.href;}
 
@@ -98,6 +99,7 @@
     if(!state.items.length)return;
     state.index=(index+state.items.length)%state.items.length;
     const item=current();state.activeId=identity(item);captionEditing=false;clearStage();metadata();
+    if($('mediaViewer').open)syncMediaRoute(item,true);
     const stage=$('mediaStage');stage.classList.toggle('is-video',item.kind==='video');stage.classList.toggle('is-document',item.kind==='document');
     if(item.provider==='youtube'&&/^[\w-]{11}$/.test(item.youtubeId)){
       const frame=document.createElement('iframe');
@@ -124,7 +126,11 @@
     state.scope=scope||items[index]?.scope||'shared';state.items=items;albums.set(state.scope,items);
     state.opener=document.activeElement;
     document.querySelectorAll('video').forEach(video=>video.pause());
-    show(index);if(!$('mediaViewer').open)$('mediaViewer').showModal();
+    show(index);if(!$('mediaViewer').open){syncMediaRoute(current());$('mediaViewer').showModal();}
+  }
+  function syncMediaRoute(item,replace=false){
+    if(!window.FamilyNavigation||!item?.id)return;
+    const url=new URL(location.href);url.searchParams.set('media',item.id);window.FamilyNavigation.go(url.href,{replace});
   }
   function openFrom(scope,id){const items=albums.get(scope)||[];open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
   function requestDelete(scope,id){
@@ -173,8 +179,13 @@
     finally{state.deleting=false;$('confirmMediaDelete').disabled=false;$('cancelMediaDelete').disabled=false;}
   }
   async function openSharedLink(){
-    const id=new URL(location.href).searchParams.get('media');if(!/^[a-f0-9]{32}$/.test(id||''))return;
-    try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));open([result.item],0,'link:'+result.item.id);}catch(error){app()?.toast(error.message);}
+    const href=location.href,id=new URL(href).searchParams.get('media');
+    if(!id){restoringLink='';if($('mediaViewer').open)$('mediaViewer').close();return;}
+    if($('mediaViewer').open&&state.activeId===id||restoringLink===href)return;
+    for(const [scope,items]of albums){const index=items.findIndex(item=>identity(item)===id);if(index>=0){open(items,index,scope);return;}}
+    if(!/^[a-f0-9]{32}$/.test(id))return;
+    restoringLink=href;
+    try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
   async function saveOpenedCaption(event){
     event.preventDefault();const item=current();if(!item)return;
@@ -196,6 +207,7 @@
     $('openedProfilePhoto').addEventListener('click',async()=>{if(!current()||!state.scope?.startsWith('personal:'))return;const id=state.scope.slice(9),button=$('openedProfilePhoto');button.disabled=true;try{const response=await I18n.fetch('api/people/'+encodeURIComponent(id)+'/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({file:current().file})});const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));app().updatePerson(id,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id}}));notify(tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));}catch(error){notify(error.message);}finally{button.disabled=false;}});
     window.addEventListener('family-media-changed',event=>{const result=event.detail;if(!result.item)return;for(const [scope,items]of [...albums]){const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope),updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);register(scope,updated);}});
     openSharedLink();
+    window.addEventListener('popstate',openSharedLink);window.addEventListener('hashchange',openSharedLink);
     document.addEventListener('click',event=>{
       const open=event.target.closest('[data-media-open]');if(open){openFrom(open.dataset.mediaScope,open.dataset.mediaOpen);return;}
       const remove=event.target.closest('[data-media-delete]');if(remove)requestDelete(remove.dataset.mediaScope,remove.dataset.mediaDelete);
@@ -207,7 +219,7 @@
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
-    $('mediaViewer').addEventListener('close',()=>{instagramPrepared={id:null,file:null};const url=new URL(location.href);if(url.searchParams.has('media')){url.searchParams.delete('media');history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
+    $('mediaViewer').addEventListener('close',()=>{instagramPrepared={id:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     $('mediaViewer').addEventListener('click',event=>{if(event.target===$('mediaViewer'))$('mediaViewer').close();});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||event.target.closest('input,textarea'))return;

@@ -5,12 +5,13 @@ import {readFile} from 'node:fs/promises';
 import {quizGrade} from '../public/assets/quiz.mjs';
 import {makeChickQuiz,withinChickTarget} from '../public/assets/chick.mjs';
 import {webcrypto} from 'node:crypto';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=(await readFile(new URL('../public/assets/games.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 const questions=Array.from({length:10},(_,i)=>({id:'photo-'+i,src:'/media/photo-'+i,correctId:'p0',options:Array.from({length:4},(_,j)=>({id:'p'+j,name:'אדם '+j,nameEn:'Person '+j}))}));
 const kinshipQuestions=questions.map(q=>({...q,kind:'kinship',subject:{id:'rivi',name:'ריוי גנדלמן',nameEn:'Revital Gandelman',gender:'f',profile:'/media/rivi'},reference:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha',gender:'m',profile:'/media/eldad'},options:[{id:'p0',name:'בת דודה',nameEn:'First cousin'},{id:'p1',name:'אחות',nameEn:'Sister'},{id:'p2',name:'אחיינית',nameEn:'Niece'},{id:'p3',name:'נכדה',nameEn:'Granddaughter'}]}));
 const triviaQuestions=questions.map(q=>({...q,kind:'trivia',subject:kinshipQuestions[0].subject,prompt:'באיזו שנה נולדה ריוי גנדלמן?',promptEn:'In which year was Revital Gandelman born?',options:q.options.map((o,i)=>({...o,name:String(1970+i),nameEn:String(1970+i)}))}));
-function fixture({entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false}={}){
+function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false}={}){
   let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null,northMounts=0,northPauses=0,northBack=null,netoMounts=0,netoPauses=0,netoBack=null,rutiMounts=0,rutiPauses=0,rutiBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
   const chickQuestions=makeChickQuiz(()=>.5);
   class Node{
@@ -35,15 +36,22 @@ function fixture({entryUrl=null,english=false,autoImages=true,count=10,nativeSha
   for(const id of ['familyGamesContent','gamesView','result','gameShareStatus','gameShareFallback'])nodes.set(id,new Node());
   nodes.get('gameShareFallback').hidden=true;
   const document={visibilityState:'visible',getElementById:id=>nodes.get(id),addEventListener:(kind,callback)=>documentEvents.set(kind,callback)};
-  const window={location:{origin:'https://family.test',pathname:'/',href:entryUrl||'https://family.test/?media=private-image&lang=he#games'},FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:english,language:english?'en-US':'he',personName:p=>english?p?.nameEn:p?.name,error:String,fetch:async(path,options)=>{requests.push(path);if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push({path,body});return {ok:true,json:async()=>({saved:true,language:body.language})};}const base=path.split('?')[0],selected=base.endsWith('relationships')?kinshipQuestions:base.endsWith('/trivia')?triviaQuestions:questions;return {ok:true,json:async()=>({questions:selected.slice(0,count).map(q=>customTrivia&&base.endsWith('/trivia')?{...q,subject:null,prompt:'שאלה מותאמת <script>',promptEn:'Custom question <script>'}:q),available:count})};}},FamilyApp:{getView:()=> 'games'}};
+  const browser=navigation?browserHistory(entryUrl||'https://family.test/?lang='+(english?'en-US':'he')+'#games'):null;let view='games';
+  const window={location:browser?.location||{origin:'https://family.test',pathname:'/',href:entryUrl||'https://family.test/?media=private-image&lang=he#games'},FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:english,language:english?'en-US':'he',personName:p=>english?p?.nameEn:p?.name,error:String,fetch:async(path,options)=>{requests.push(path);if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push({path,body});return {ok:true,json:async()=>({saved:true,language:body.language})};}const base=path.split('?')[0],selected=base.endsWith('relationships')?kinshipQuestions:base.endsWith('/trivia')?triviaQuestions:questions;return {ok:true,json:async()=>({questions:selected.slice(0,count).map(q=>customTrivia&&base.endsWith('/trivia')?{...q,subject:null,prompt:'שאלה מותאמת <script>',promptEn:'Custom question <script>'}:q),available:count})};}},FamilyApp:{getView:()=> 'games'}};
+  if(browser){
+    window.addEventListener=browser.addEventListener;window.FamilyApp.getView=()=>view;
+    window.FamilyApp.setView=(next,sync=true)=>{if(sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyGames?.activate(next);};
+    browser.addEventListener('popstate',()=>{const next=browser.location.hash.slice(1).split('/')[0];if(next!==view)window.FamilyApp.setView(next,false);});
+  }
   const navigator={clipboard:{async writeText(value){if(clipboardError)throw Error('Clipboard unavailable');copied.push(value);}}};
   if(nativeShare)navigator.share=async data=>{shared.push(data);if(shareError)throw Object.assign(Error('Share unavailable'),{name:shareError});};
   const FakeDate=class extends Date{static now(){return now;}};
-  vm.runInNewContext(source,{window,document,navigator,URL,crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},mountRutiHouse(_root,onBack){rutiMounts++;rutiBack=onBack;},pauseRutiHouse(){rutiPauses++;},quizGrade,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
+  const context=vm.createContext({window,document,navigator,URL,location:browser?.location,history:browser?.history,matchMedia:()=>({matches:phone}),crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},mountRutiHouse(_root,onBack){rutiMounts++;rutiBack=onBack;},pauseRutiHouse(){rutiPauses++;},quizGrade,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
+  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);
   documentEvents.get('DOMContentLoaded')();
   const root=nodes.get('familyGamesContent'),flush=()=>new Promise(resolve=>setImmediate(resolve));
   async function click(selector,node={},detail=1,position={}){prevented=false;root.handlers.get('click')({...position,detail,preventDefault(){prevented=true;},target:{closest:s=>s===selector?node:null}});await flush();}
-  return {window,nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get rutiMounts(){return rutiMounts;},get rutiPauses(){return rutiPauses;},backFromRuti(){rutiBack();},get netoMounts(){return netoMounts;},get netoPauses(){return netoPauses;},backFromNeto(){netoBack();},get northMounts(){return northMounts;},get northPauses(){return northPauses;},backFromNorth(){northBack();},get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
+  return {window,browser,get view(){return view;},nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get rutiMounts(){return rutiMounts;},get rutiPauses(){return rutiPauses;},backFromRuti(){rutiBack();},get netoMounts(){return netoMounts;},get netoPauses(){return netoPauses;},backFromNeto(){netoBack();},get northMounts(){return northMounts;},get northPauses(){return northPauses;},backFromNorth(){northBack();},get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
     messenger:()=>click('[data-game-share-messenger]'),
     openTrivia:()=>click('[data-game-start]',{dataset:{gameStart:'trivia',gameHome:'trivia'}}),
     click,input(id,value){nodes.get(id).value=value;root.handlers.get('input')({target:{id,value}});},
@@ -273,4 +281,49 @@ test('a direct Ruti’s House link opens only once and allows returning to game 
     assert.equal(f.rutiMounts,1);assert.equal(f.netoMounts,0);assert.equal(f.requests.length,0);
     f.backFromRuti();assert.match(f.html,/family-game-choices/);f.window.FamilyGames.activate('games');assert.equal(f.rutiMounts,1);
   }
+});
+
+test('browser and phone Back return every routed game to the lobby; Forward restores the selected game once',async()=>{
+  const ids=['photos','kinship','missing','trivia','chick','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
+  for(const phone of [false,true])for(const english of [false,true])for(const game of ids){
+    const f=fixture({navigation:true,phone,english});
+    await f.start(game);assert.equal(f.browser.location.hash,'#games/'+game);
+    const length=f.browser.history.length;
+    f.browser.history.back();await f.browser.flush();
+    assert.equal(f.view,'games');assert.equal(f.browser.location.hash,'#games');
+    assert.match(f.html,/family-game-choices/);assert.equal(f.intervals.size,0);
+    f.browser.history.forward();await f.browser.flush();
+    assert.equal(f.view,'games');assert.equal(f.browser.location.hash,'#games/'+game);
+    const mountKey={puzzle:'puzzleMounts',jachnun:'jachnunMounts',rex:'rexMounts',soup:'soupMounts',north:'northMounts','neto-tetris':'netoMounts','ruti-house':'rutiMounts'}[game];
+    if(mountKey)assert.equal(f[mountKey],2,game);else assert.doesNotMatch(f.html,/family-game-choices/,game);
+    assert.equal(f.browser.history.length,length);
+    f.browser.history.back();await f.browser.flush();f.browser.history.back();await f.browser.flush();
+    assert.equal(f.view,phone?'home':'tree');assert.equal(f.intervals.size,0);
+  }
+});
+
+test('all game back buttons use the existing lobby entry and a second Back leaves games',async()=>{
+  for(const [game,back]of [['puzzle','backFromPuzzle'],['jachnun','backFromJachnun'],['rex','backFromRex'],['soup','backFromSoup'],['north','backFromNorth'],['neto-tetris','backFromNeto'],['ruti-house','backFromRuti'],['photos','lobby'],['trivia','lobby'],['chick','lobby']]){
+    const f=fixture({navigation:true,phone:true});await f.start(game);f[back]();await f.browser.flush();
+    assert.equal(f.browser.location.hash,'#games');assert.match(f.html,/family-game-choices/);
+    f.browser.history.back();await f.browser.flush();assert.equal(f.view,'home');
+  }
+});
+
+test('direct game links and legacy links return to the lobby without reopening the game on another visit',async()=>{
+  for(const game of ['soup','north','neto-tetris','ruti-house','puzzle','chick','trivia'])for(const legacy of [false,true]){
+    const f=fixture({navigation:true,phone:true,entryUrl:'https://family.test/?lang=en-GB'+(legacy?'&game='+game+'#games':'#games/'+game)});
+    await f.browser.flush();assert.equal(f.browser.location.hash,'#games/'+game);assert.doesNotMatch(f.html,/family-game-choices/);
+    f.browser.history.back();await f.browser.flush();assert.match(f.html,/family-game-choices/);
+    f.window.FamilyApp.setView('gallery');f.window.FamilyApp.setView('games');await f.browser.flush();
+    assert.match(f.html,/family-game-choices/);assert.equal(f.browser.location.search,'?lang=en-GB');
+  }
+});
+
+test('Back from another section restores the game route and one more Back restores its lobby',async()=>{
+  const f=fixture({navigation:true,phone:true});await f.start('ruti-house');const mounts=f.rutiMounts;
+  f.window.FamilyApp.setView('gallery');assert.equal(f.view,'gallery');
+  f.browser.history.back();await f.browser.flush();assert.equal(f.browser.location.hash,'#games/ruti-house');
+  assert.equal(f.rutiMounts,mounts+1,'popstate and hashchange must not mount twice');
+  f.browser.history.back();await f.browser.flush();assert.match(f.html,/family-game-choices/);
 });

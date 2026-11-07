@@ -30,21 +30,20 @@
   const post=(path,body)=>request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   function setStatus(id,message='',failed=false){$(id).textContent=message;$(id).classList.toggle('failed',failed);}
   function urlFor(view,id){return view==='weddings'?'#weddings'+(id?'/'+encodeURIComponent(id):''):view==='nostalgia'?'#nostalgia':'';}
-  function replaceRoute(){if(!['weddings','nostalgia'].includes(state.view))return;const hash=urlFor(state.view,state.weddingId);if(location.hash!==hash)history.replaceState(null,'',location.pathname+location.search+hash);}
   function route(){
     const [view,rawId]=location.hash.slice(1).split('/');
     if(view==='weddings'){
       let id;try{id=rawId?decodeURIComponent(rawId):null;}catch{id=null;}
-      state.weddingId=pairById.has(id)?id:null;state.query='';$('searchInput').value='';app().setView('weddings');
+      state.weddingId=pairById.has(id)?id:null;state.query='';$('searchInput').value='';app().setView('weddings',false);
       if(rawId&&!state.weddingId)toast(I18n.t('הזוג לא נמצא. אפשר לבחור זוג מרשימת החתונות.'));
-    }else if(view==='nostalgia'){app().setView('nostalgia');}
-    else if(!view&&(state.view==='weddings'||state.view==='nostalgia'))app().setView(matchMedia('(max-width:700px)').matches?'home':'tree');
+    }else if(view==='nostalgia'){app().setView('nostalgia',false);}
+    else if(!view&&(state.view==='weddings'||state.view==='nostalgia'))app().setView(matchMedia('(max-width:700px)').matches?'home':'tree',false);
   }
   function openWedding(id){
     if(id&&!pairById.has(id))return;
     state.weddingId=id;state.query='';$('searchInput').value='';
-    const hash=urlFor('weddings',id);if(location.hash!==hash)history.pushState(null,'',hash);
-    app().setView('weddings');$('weddingsView').scrollIntoView({block:'start',behavior:'instant'});
+    const hash=urlFor('weddings',id);if(window.FamilyNavigation)window.FamilyNavigation.go(hash);else if(location.hash!==hash)history.pushState(null,'',hash);
+    app().setView('weddings',false);$('weddingsView').scrollIntoView({block:'start',behavior:'instant'});
   }
   function yearsText(record){
     const years=window.FamilyDates.age(record?.date);if(years===null)return '';
@@ -239,7 +238,10 @@
     const changed=state.view!==view;state.view=view;if(changed)state.query='';
     $('weddingsView').hidden=view!=='weddings';$('nostalgiaView').hidden=view!=='nostalgia';
     if(!state.ready)return;
-    replaceRoute();
+    if(view==='weddings'){
+      let id;try{id=decodeURIComponent(location.hash.split('/')[1]||'');}catch{id=null;}
+      state.weddingId=pairById.has(id)?id:null;
+    }
     if(view==='weddings'){$('weddingsOverview').hidden=Boolean(state.weddingId);$('weddingDetail').hidden=!state.weddingId;if(state.weddingId){renderWedding(state.weddingId);refreshWedding(state.weddingId);}else{renderWeddings();refreshWeddings();}}
     if(view==='nostalgia'){renderCollection('nostalgia');refreshNostalgia();}
     document.querySelectorAll('#weddingsView video,#nostalgiaView video').forEach(video=>{if(!video.closest('section.portal-view')||video.closest('section.portal-view').hidden)video.pause();});
@@ -258,7 +260,7 @@
     $('weddingBranchFilter').insertAdjacentHTML('beforeend',I18n.t('<option value="root">השורשים של כולנו</option>')+family.branches.map(branch=>`<option value="${branch.id}">${safe(I18n.branchName(branch))}</option>`).join(''));
     document.addEventListener('click',event=>{
       const open=event.target.closest('[data-open-wedding]');if(open){openWedding(open.dataset.openWedding);return;}
-      if(event.target.closest('[data-wedding-back]')){openWedding(null);return;}
+      if(event.target.closest('[data-wedding-back]')){if(!window.FamilyNavigation?.returnTo('#weddings'))openWedding(null);return;}
       const date=event.target.closest('[data-edit-wedding-date]');if(date){openDate(date.dataset.editWeddingDate);return;}
       if(event.target.closest('#editWeddingDate')){openDate(state.weddingId);return;}
       const upload=event.target.closest('[data-archive-upload]');if(upload){if(!canSave())return;const key=scope();if(!key)return;const input=$(prefix(key)+'UploadInput');const kind=upload.dataset.archiveKind;input.accept=kind==='photo'?'image/jpeg,image/png,image/webp,image/gif,image/avif':kind==='video'?'video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm':kind==='document'?'.pdf,.doc,.docx,.txt,.md':'image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm,.pdf,.doc,.docx,.txt,.md';input.dataset.scope=key;input.value='';input.click();return;}

@@ -93,7 +93,7 @@
     if(!validViews.has(view))return;if(view==='home'&&!isPhone())view='tree';
     const previous = state.view;
     stopTreeMotion();
-    if(syncRoute){const target=view==='weddings'&&location.hash.startsWith('#weddings')?location.hash:'#'+view;if(location.hash!==target)history.pushState(null,'',target);}
+    if(syncRoute){const target='#'+view;if(window.FamilyNavigation)window.FamilyNavigation.go(target);else if(location.hash!==target)history.pushState(null,'',target);}
     if($('mobileNavDialog').open)$('mobileNavDialog').close();
     state.view = view;
     if (previous !== view) {state.query='';$('searchInput').value='';}

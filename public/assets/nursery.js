@@ -60,7 +60,7 @@
   function navigate(id){
     if(id&&!member(id))return;
     const hash=id?'#nursery/'+encodeURIComponent(id):'#nursery';
-    if(location.hash!==hash)history.pushState(null,'',hash);
+    if(window.FamilyNavigation)window.FamilyNavigation.go(hash);else if(location.hash!==hash)history.pushState(null,'',hash);
     state.query='';$('searchInput').value='';app().setView('nursery',false);window.scrollTo({top:0,behavior:'instant'});
   }
   function pick(camera=false){
@@ -105,7 +105,7 @@
     state.ready=true;activate(app().getView());
     $('nurseryContent').addEventListener('click',event=>{
       const person=event.target.closest('[data-nursery-person]');if(person){event.preventDefault();navigate(person.dataset.nurseryPerson);return;}
-      if(event.target.closest('[data-nursery-back]')){event.preventDefault();navigate(null);return;}
+      if(event.target.closest('[data-nursery-back]')){event.preventDefault();if(!window.FamilyNavigation?.returnTo('#nursery'))navigate(null);return;}
       if(event.target.closest('[data-nursery-upload]')){pick();return;}
       if(event.target.closest('[data-nursery-camera]')){pick(true);return;}
       if(event.target.closest('[data-nursery-retry]')){if(state.id)loadAlbum(state.id);else loadIndex();return;}
