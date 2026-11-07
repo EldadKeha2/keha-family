@@ -1,6 +1,6 @@
 import {iconArtwork} from './ruti-house-art.mjs?v=3';
 import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=3';
-import {drawDustSignal} from './ruti-house-dust.mjs?v=3';
+import {drawDustSignal} from './ruti-house-dust.mjs?v=4';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -198,13 +198,12 @@ function drawPlantHalo(ctx,x,y,size,task,time,reduced){
 }
 function drawPlantSignal(ctx,x,y,size,task,{english,width,showLabel=true}){
  const ratio=task.untimed?1:clamp(task.remaining/task.total,0,1),urgent=!task.untimed&&ratio<.3;
- const geometry=plantSignalGeometry(x,y,size,width),{h,cx,by}=geometry,w=showLabel?geometry.w:28,bx=cx-w/2,color=urgent?'#b9233d':'#00648c';
- ctx.save();ctx.lineWidth=2;
- polygon(ctx,[[x-8,by+h-1],[x+8,by+h-1],[x,by+h+10]],'#ffffff','#123e4b');
- box(ctx,bx,by,w,h,color,'#ffffff',7);
- // A large water drop supplements the text and urgent color change.
- const dx=showLabel?bx+12:cx,dy=by+10;ctx.beginPath();ctx.moveTo(dx,dy-7);ctx.bezierCurveTo(dx-1,dy-4,dx-6,dy,dx-6,dy+3);ctx.bezierCurveTo(dx-6,dy+10,dx+6,dy+10,dx+6,dy+3);ctx.bezierCurveTo(dx+6,dy,dx+1,dy-4,dx,dy-7);ctx.fillStyle='#bff5ff';ctx.fill();
- if(showLabel)label(ctx,urgent?(english?'Hurry!':'מהר!'):(english?'Water!':'מים!'),cx-1,by+h/2,{size:10,color:'#ffffff',halo:false,weight:'900'});
+ const {h,cx,by}=plantSignalGeometry(x,y,size,width),color=urgent?'#b9233d':'#00648c';
+ ctx.save();ctx.lineWidth=1.4;
+ // The drop belongs to the physical watering cue. Learned words have no
+ // card, halo, border or colored background around them.
+ const dx=showLabel?cx-24:cx,dy=by+10;ctx.beginPath();ctx.moveTo(dx,dy-7);ctx.bezierCurveTo(dx-1,dy-4,dx-6,dy,dx-6,dy+3);ctx.bezierCurveTo(dx-6,dy+10,dx+6,dy+10,dx+6,dy+3);ctx.bezierCurveTo(dx+6,dy,dx+1,dy-4,dx,dy-7);ctx.fillStyle='#00a9d5';ctx.fill();ctx.strokeStyle='#ffffff';ctx.stroke();
+ if(showLabel)label(ctx,urgent?(english?'Hurry!':'מהר!'):(english?'Water!':'מים!'),cx+5,by+h/2,{size:11,color,halo:false,weight:'900'});
  if(!task.untimed){
   const barY=y+size*.84;box(ctx,x-size*.49,barY,size*.98,7,'#123e4b','#ffffff',3);
   if(ratio>0)box(ctx,x-size*.49+1,barY+1,(size*.98-2)*ratio,5,urgent?'#f65c62':'#00d5f1',null,2);
@@ -397,7 +396,7 @@ function drawRutiSpeech(ctx,x,y,height,actor,time,width){
  ctx.restore();
 }
 
-function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null}={}){
+function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,facing=1,walking=false,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null,quiet=false}={}){
  if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced,waterTarget);return;}
  ctx.save();ctx.translate(x,y);const s=height/100;ctx.scale(s,s);ctx.lineCap='round';ctx.lineJoin='round';
  const cycle=walking?Math.sin(time*13):0,bob=walking?Math.abs(cycle)*2:Math.sin(time*1.8)*.4;
@@ -446,7 +445,7 @@ function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,faci
    const swing=sweeping?Math.sin(time*15)*.15:0;ctx.save();ctx.translate(handX,handY);ctx.rotate(direction*.28+swing);line(ctx,0,-13,0,34,'#ad7b51',4);polygon(ctx,[[-5,27],[6,27],[12,43],[-12,43]],'#d6b568','#967346');for(let i=-6;i<=6;i+=4)line(ctx,i,32,i*1.4,42,'#b08e48',1);ctx.restore();
    if(sweeping)for(let i=0;i<5;i++)ellipse(ctx,handX+Math.cos(time*9+i)*19,7+Math.sin(i)*3,2,1.4,'#c5b087');
   }else if(active==='hand'){
-   icon(ctx,images,'hand',px,py-5,23);if(waving)label(ctx,english?'Shoo!':'לכו מפה!',0,-118,{size:13,color:'#a5553e'});
+   icon(ctx,images,'hand',px,py-5,23);if(waving&&!quiet)label(ctx,english?'Shoo!':'לכו מפה!',0,-118,{size:13,color:'#a5553e'});
   }else{
    if(active==='serve'){
     ellipse(ctx,px,py+7,21,5,'#d8c99e','#837552');
@@ -461,7 +460,7 @@ function drawHuman(ctx,x,y,height,{portrait=null,guest=false,index=0,time=0,faci
  ctx.restore();
 }
 
-function drawRoom(ctx,l,{time,english,reduced}){
+function drawRoom(ctx,l,{time,english,reduced,quiet=false}){
  const W=l.width,H=l.height,M=Math.min(W,H),P=(x,y)=>[x*W,y*H];ctx.lineWidth=Math.max(1,M/430);ctx.lineJoin='round';
  const wall=ctx.createLinearGradient(0,0,0,H*.36);wall.addColorStop(0,'#f9edd2');wall.addColorStop(1,'#e4d1ac');
  ctx.fillStyle=wall;ctx.fillRect(0,0,W,H);
@@ -513,12 +512,12 @@ function drawRoom(ctx,l,{time,english,reduced}){
   for(let i=0;i<3;i++)ellipse(ctx,dx+sgn*(dw*.12+i*dw*.1),dy-dh*.25-i*dh*.08,dw*.19,dh*.18,'#9fb57e66');
   polygon(ctx,[[dx+sgn*dw*.48,dy-dh],[dx+sgn*dw*.10,dy-dh*.82],[dx+sgn*dw*.10,dy],[dx+sgn*dw*.48,dy]],'#ad7e53','#80603f');ellipse(ctx,dx+sgn*dw*.18,dy-dh*.42,M*.005,M*.005,'#e5c58c');
   ellipse(ctx,dx-sgn*dw*.45,dy+M*.025,dw*.75,M*.026,'#b7885f','#946c46');line(ctx,dx-dw*.4,dy+M*.02,dx+dw*.4,dy+M*.02,'#d8b385',1.5);
-  label(ctx,door.side==='right'?(english?'Welcome':'ברוכים הבאים'):(english?'Back door':'דלת אחורית'),dx-sgn*dw*.30,dy+M*.038,{size:clamp(M*.019,8,11),color:'#765c3e',weight:'500',halo:false});
+  if(!quiet)label(ctx,door.side==='right'?(english?'Welcome':'ברוכים הבאים'):(english?'Back door':'דלת אחורית'),dx-sgn*dw*.30,dy+M*.038,{size:clamp(M*.019,8,11),color:'#765c3e',weight:'500',halo:false});
  }
  // Soft diagonal sunlight and edge shading integrate the furniture.
  ctx.save();ctx.globalAlpha=.075;polygon(ctx,[[W*.84,H*.31],[W,H*.31],[W*.70,H*.94],[W*.42,H*.94]],'#fff4bf');ctx.restore();
  const vignette=ctx.createRadialGradient(W*.5,H*.5,M*.20,W*.5,H*.5,Math.max(W,H)*.76);vignette.addColorStop(0,'#69482700');vignette.addColorStop(1,'#6948271a');ctx.fillStyle=vignette;ctx.fillRect(0,0,W,H);
- label(ctx,english?'Ruti’s kitchen':'המטבח של רותי',W*.41,H*.113,{size:clamp(M*.025,11,16),color:'#756045',weight:'700'});
+ if(!quiet)label(ctx,english?'Ruti’s kitchen':'המטבח של רותי',W*.41,H*.113,{size:clamp(M*.025,11,16),color:'#756045',weight:'700'});
 }
 
 export function renderHouse(ctx,g,visual={},options={}){
@@ -527,8 +526,9 @@ export function renderHouse(ctx,g,visual={},options={}){
  // Learned plant and dust cues stay quiet even when a stale caller omits or
  // explicitly enables labels. Their physical signals and time bars remain.
  const learnedBasicTasks=(g?.level??1)>1||(Number.isFinite(g?.stage?.goal)&&g.stageCompleted>=g.stage.goal/2);
- if(learnedBasicTasks){showTaskLabels.plant=false;showTaskLabels.dust=false;}
- ctx.save();ctx.clearRect(0,0,width,height);ctx.lineCap='round';drawRoom(ctx,l,{time:pulseTime,english,reduced});
+ const quiet=!!visual.quiet||learnedBasicTasks;
+ if(quiet){showTaskLabels.plant=false;showTaskLabels.dust=false;showTaskLabels.cat=false;}
+ ctx.save();ctx.clearRect(0,0,width,height);ctx.lineCap='round';drawRoom(ctx,l,{time:pulseTime,english,reduced,quiet});
  const activePlants=new Map((g?.tasks||[]).filter(t=>t.type==='plant').map(t=>[t.slot,t]));
  const missedPlants=new Map((visual.departures||[]).filter(d=>d.type==='plant-missed'&&(d.age||0)<(d.duration||1.8)).map(d=>[d.slot,d]));
  for(let i=0;i<l.plants.length;i++){
@@ -536,7 +536,7 @@ export function renderHouse(ctx,g,visual={},options={}){
   if(task)drawPlantHalo(ctx,x,y,size,task,pulseTime,reduced);
   drawPlant(ctx,x,y,size,i,task?true:missed?'missed':false,pulseTime);
   if(task)drawPlantSignal(ctx,x,y,size,task,{english,width,showLabel:showTaskLabels.plant});
-  if(missed&&!task){
+  if(missed&&!task&&!quiet){
    const w=clamp(size*1.15,67,88),cx=clamp(x,w/2+4,width-w/2-4),by=y-size*.68;
    ctx.save();ctx.globalAlpha=reduced?1:1-clamp(((missed.age||0)/(missed.duration||1.8)-.65)/.35,0,1);
    box(ctx,cx-w/2,by,w,22,'#a61f38','#ffffff',6);
@@ -558,7 +558,7 @@ export function renderHouse(ctx,g,visual={},options={}){
   ellipse(ctx,x+size*.27,y+size*.03,size*.24,size*.13,'#9aa780','#647455');
   ellipse(ctx,x+size*.27,y-size*.01,size*.22,size*.10,'#f1dcb0','#aa9b6f');
   for(let leaf=0;leaf<5;leaf++)ellipse(ctx,x+size*(.02+(leaf%3)*.065),y-size*(.09+(leaf%2)*.08),size*.06,size*.035,['#4a984d','#85ae55'][leaf%2]);
-  label(ctx,english?'Homemade treats':'מטעמי הבית',x,y+size*.65,{size:clamp(M*.023,10,14),color:'#63513b'});
+  if(!quiet)label(ctx,english?'Homemade treats':'מטעמי הבית',x,y+size*.65,{size:clamp(M*.023,10,14),color:'#63513b'});
  }
 
  const actors=[];
@@ -570,7 +570,7 @@ export function renderHouse(ctx,g,visual={},options={}){
    halo(ctx,guestX,guestY-M*.06,M*.065,pulseTime,'#f1ba49',!task.untimed&&task.remaining/task.total<.25);
    const portrait=images.family?.[task.guest]||images[task.guest];drawHuman(ctx,guestX,guestY,M*(l.portrait?.175:.17),{portrait,guest:true,index:task.guest==='hila'?1:task.guest==='rivi'?2:0,time:pulseTime,walking:arrival<1&&!reduced,facing:d.side==='left'?1:-1});
    const bubbleX=guestX+(d.side==='left'?1:-1)*M*.062,bubbleY=guestY-M*.145;ellipse(ctx,bubbleX,bubbleY,M*.035,M*.035,'#fff3d4','#c59b54');icon(ctx,images,'serve',bubbleX,bubbleY,M*.06);
-   const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי'};label(ctx,names[task.guest]||task.guest,guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
+   const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי'};if(!quiet)label(ctx,names[task.guest]||task.guest,guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
   }});
   if(task.type==='cat')actors.push({y:y+M*.03,draw:()=>{
    const d=l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.untimed||task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
@@ -594,7 +594,7 @@ export function renderHouse(ctx,g,visual={},options={}){
   if(departure.type==='guest'){
    const p=guestDeparturePosition(departure,l,reduced?1:progress),px=p.x*width,py=p.y*height;
    actors.push({y:py,draw:()=>{ctx.save();ctx.globalAlpha=fade;drawHuman(ctx,px,py,M*(l.portrait?.175:.17),{portrait:images.family?.[departure.guest]||images[departure.guest],guest:true,index:departure.guest==='hila'?1:departure.guest==='rivi'?2:0,time:pulseTime,walking:!reduced,facing:p.facing});
-    label(ctx,english?'Thank you!':'תודה רותי!',px,py-M*.20,{size:clamp(M*.025,11,15),color:'#6b8254'});ctx.restore();}});
+    if(!quiet)label(ctx,english?'Thank you!':'תודה רותי!',px,py-M*.20,{size:clamp(M*.025,11,15),color:'#6b8254'});ctx.restore();}});
   }else if(departure.type==='cat'||departure.type==='cat-enter'){
    const entering=departure.type==='cat-enter',p=reduced?1:progress;
    const px=door.x*width+sgn*M*(entering?.025+p*.18:.035-p*.19),py=door.y*height+M*(.015+(entering?p*.085:0));
@@ -607,9 +607,9 @@ export function renderHouse(ctx,g,visual={},options={}){
  const plant=wateringTask?getTaskLocation(wateringTask,l):actor.action==='water'?l.plants.reduce((nearest,p)=>length(p.anchor,actor)<length(nearest.anchor,actor)?p:nearest):null;
  const waterTarget=plant?{x:plant.x*width,y:plant.y*height+M*(l.portrait?.15:.12)*.125}:null;
  actors.push({y:actorY,draw:()=>drawHuman(ctx,actorX,actorY,actorHeight,{
-  portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced,waterTarget})});
+  portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced,waterTarget,quiet})});
  actors.sort((a,b)=>a.y-b.y);for(const actor of actors)actor.draw();
- drawRutiSpeech(ctx,actorX,actorY,actorHeight,actor,time,width);
+ if(!quiet)drawRutiSpeech(ctx,actorX,actorY,actorHeight,actor,time,width);
  // Navigation destination marker remains part of the floor rather than a card.
  const destination=visual.destination||visual.targetPosition;
  if(destination&&actor.walking){const x=destination.x*width,y=destination.y*height;ctx.strokeStyle='#58785d';ctx.lineWidth=2;ctx.setLineDash([3,4]);ctx.beginPath();ctx.ellipse(x,y,M*.025,M*.012,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}

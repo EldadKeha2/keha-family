@@ -115,10 +115,10 @@ export function createHouseSound({Audio=globalThis.AudioContext||globalThis.webk
           hush(at+.33,.29,{type:'bandpass',hz:1500,to:700,volume:.08});break;
         // Success rewards are short, separate gestures: a clear rising water
         // sparkle and a warmer two-note sweep pluck, with no noise or speech.
-        case 'water-reward':notes([79,84,88],at,{gap:.065,duration:.145,volume:.105});break;
+        case 'water-reward':notes([79,84,88],at,{gap:.11,duration:.415,volume:.105});break;
         case 'dust-reward':
-          tone(frequency(67),at,.13,{wave:'triangle',volume:.13,filter:1700});
-          tone(frequency(72),at+.09,.145,{wave:'triangle',volume:.105,filter:1900});break;
+          tone(frequency(67),at,.30,{wave:'triangle',volume:.12,filter:1700});
+          tone(frequency(72),at+.14,.42,{wave:'triangle',volume:.10,filter:1900});break;
         case 'cat':meow(at);hush(at+.1,.15,{hz:900,to:350,volume:.055});break;
         case 'ready':notes([79,84,79,84],at,{gap:.105,duration:.19,volume:.13});break;
         case 'guest':notes([79,72],at,{gap:.2,duration:.38,volume:.17});break;

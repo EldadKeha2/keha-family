@@ -1,77 +1,79 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createRutiSong,RUTI_SONG_VIDEO_ID,RUTI_SONG_ORIGIN} from '../public/assets/ruti-house-music.mjs';
+import {createRutiSong,RUTI_SONG_SOURCE} from '../public/assets/ruti-house-music.mjs';
 
-function fixture({english=false}={}){
- const frames=[],posts=[],messages=new Set();
- const win={location:{origin:'https://family.example'},addEventListener(type,fn){if(type==='message')messages.add(fn);},removeEventListener(type,fn){if(type==='message')messages.delete(fn);}};
- function container(){return {children:[],appendChild(frame){frame.parentNode?.children.splice(frame.parentNode.children.indexOf(frame),1);this.children.push(frame);frame.parentNode=this;}};}
- const doc={createElement(tag){assert.equal(tag,'iframe');const listeners=new Map();const frame={style:{},parentNode:null,contentWindow:{postMessage(value,origin){posts.push({frame,data:JSON.parse(value),origin});}},addEventListener(type,fn){listeners.set(type,fn);},removeEventListener(type,fn){if(listeners.get(type)===fn)listeners.delete(type);},remove(){if(this.parentNode){this.parentNode.children.splice(this.parentNode.children.indexOf(this),1);this.parentNode=null;}},load(){listeners.get('load')?.();},get lateLoad(){return listeners.get('load');}};frames.push(frame);return frame;}};
- const song=createRutiSong({english:()=>english,window:win,document:doc});
- const emit=(data,{origin=RUTI_SONG_ORIGIN,source=frames.at(-1)?.contentWindow}={})=>{for(const fn of [...messages])fn({origin,source,data});};
- return {song,frames,posts,messages,container,emit,functions:()=>posts.map(p=>p.data.func).filter(Boolean)};
+function fixture({src='/test-song.mp3',random=()=>.5,blocked=false,deferred=false}={}){
+ const audios=[],pending=[];
+ class Audio{
+  constructor(){this.listeners=new Map();this.duration=NaN;this.currentTime=0;this.paused=true;this.readyState=0;this.loads=0;this.plays=0;this.pauses=0;audios.push(this);}
+  addEventListener(type,fn){this.listeners.set(type,fn);}
+  removeEventListener(type,fn){if(this.listeners.get(type)===fn)this.listeners.delete(type);}
+  load(){this.loads++;}
+  pause(){this.paused=true;this.pauses++;}
+  play(){this.plays++;if(blocked)return Promise.reject(Error('Autoplay blocked'));if(deferred)return new Promise(resolve=>pending.push(()=>{this.paused=false;resolve();}));this.paused=false;return Promise.resolve();}
+  removeAttribute(name){if(name==='src')this.src='';}
+  metadata(duration){this.duration=duration;this.readyState=1;this.listeners.get('loadedmetadata')?.();}
+  error(){this.listeners.get('error')?.();}
+ }
+ const song=createRutiSong({src,random,Audio,document:null});
+ return {song,audios,pending,flush:()=>new Promise(resolve=>setImmediate(resolve))};
 }
 
-test('the requested song uses one visible official player with looping, controls and the current origin',()=>{
- for(const english of [false,true]){
-  const f=fixture({english}),parent=f.container();assert.equal(f.song.mount(parent),true);const frame=f.frames[0],url=new URL(frame.src);
-  assert.equal(url.origin,RUTI_SONG_ORIGIN);assert.equal(url.pathname,`/embed/${RUTI_SONG_VIDEO_ID}`);
-  for(const key of ['enablejsapi','autoplay','loop','playsinline','controls'])assert.equal(url.searchParams.get(key),'1');
-  assert.equal(url.searchParams.get('playlist'),RUTI_SONG_VIDEO_ID);assert.equal(url.searchParams.get('origin'),'https://family.example');
-  assert.equal(frame.style.minWidth,'200px');assert.equal(frame.style.minHeight,'200px');assert.match(frame.allow,/autoplay/);assert.equal(frame.referrerPolicy,'strict-origin-when-cross-origin');
-  assert.match(frame.title,english?/Zion Golan/:/ציון גולן/);
-  f.song.mount(parent);f.song.mount(parent);assert.equal(f.frames.length,1);assert.equal(parent.children.length,1);assert.equal(f.messages.size,1);
-  assert.ok(f.posts.every(p=>p.origin===RUTI_SONG_ORIGIN));
- }
+test('no configured song makes no request, creates no player UI and stays silent',()=>{
+ assert.equal(RUTI_SONG_SOURCE,null);const f=fixture({src:null});assert.equal(f.song.mount(null),false);
+ f.song.setEnabled(true);f.song.update(1);assert.equal(f.audios.length,0);assert.equal(f.song.time(),null);
+ f.song.pause();f.song.stop();
 });
 
-test('pause and mute take effect before or after readiness without recreating or rewinding the player',()=>{
- const f=fixture(),parent=f.container();f.song.mount(parent);const frame=f.frames[0];
- f.song.pause();assert.equal(f.functions().at(-1),'pauseVideo');
- frame.load();f.emit({event:'onReady'});assert.equal(f.functions().at(-1),'pauseVideo');
- f.song.mount(parent,{enabled:true,paused:false});assert.deepEqual(f.functions().slice(-2),['unMute','playVideo']);
- f.song.setEnabled(false);assert.deepEqual(f.functions().slice(-2),['pauseVideo','mute']);
- f.emit({event:'onStateChange',info:1});assert.deepEqual(f.functions().slice(-2),['pauseVideo','mute']);
- f.song.pause();f.song.setEnabled(true);assert.equal(f.functions().at(-1),'pauseVideo','unmuting while paused cannot resume playback');
- f.song.mount(parent,{enabled:true,paused:false});assert.deepEqual(f.functions().slice(-2),['unMute','playVideo']);assert.equal(f.frames.length,1);
- f.song.stop();assert.equal(parent.children.length,0);assert.equal(f.messages.size,0);
+test('the audio-only song starts at a random position after metadata and loops without controls',async()=>{
+ const f=fixture();assert.equal(f.song.mount(null),true);const audio=f.audios[0];
+ assert.equal(audio.src,'/test-song.mp3');assert.equal(audio.preload,'metadata');assert.equal(audio.loop,true);assert.equal(audio.controls,false);assert.equal(audio.loads,1);assert.equal(audio.plays,0);
+ audio.metadata(120);await f.flush();assert.equal(audio.currentTime,54);assert.equal(audio.plays,1);assert.equal(audio.paused,false);assert.equal(f.song.time(),54);
+ audio.currentTime=58.2;assert.equal(f.song.time(),58.2);
+ f.song.mount(null);f.song.update(100);assert.equal(f.audios.length,1);assert.equal(audio.currentTime,58.2);assert.equal(audio.plays,1);
 });
 
-test('muted or paused initial mounts disable autoplay, and a late load keeps them quiet',()=>{
+test('each new celebration chooses a new random start while pausing and resuming preserves position',async()=>{
+ const fractions=[.1,.8];const f=fixture({random:()=>fractions.shift()});
+ f.song.mount(null);const first=f.audios[0];first.metadata(112);await f.flush();assert.equal(first.currentTime,10);
+ first.currentTime=13;f.song.pause();assert.equal(first.paused,true);f.song.mount(null,{paused:false});await f.flush();assert.equal(first.currentTime,13);assert.equal(f.audios.length,1);
+ f.song.stop();assert.equal(first.src,'');assert.equal(f.song.time(),null);
+ f.song.mount(null);const second=f.audios[1];second.metadata(112);await f.flush();assert.equal(second.currentTime,80);assert.equal(f.audios.length,2);
+});
+
+test('initially disabled or paused music does not create or load audio until explicitly enabled',async()=>{
  for(const options of [{enabled:false},{paused:true}]){
-  const f=fixture();f.song.mount(f.container(),options);assert.equal(new URL(f.frames[0].src).searchParams.get('autoplay'),'0');
-  f.frames[0].load();f.emit({event:'onReady'});assert.ok(!f.functions().includes('playVideo'));
+  const f=fixture();assert.equal(f.song.mount(null,options),true);assert.equal(f.audios.length,0);
+  f.song.mount(null,{enabled:true,paused:false});assert.equal(f.audios.length,1);f.audios[0].metadata(120);await f.flush();assert.equal(f.audios[0].paused,false);
+ }
+ const f=fixture();f.song.setEnabled(true);assert.equal(f.audios.length,0,'sound toggles outside a celebration cannot start loading');
+});
+
+test('muting and pausing before late metadata keep playback quiet; unmuting a paused song does not resume it',async()=>{
+ const f=fixture();f.song.mount(null);const audio=f.audios[0];f.song.setEnabled(false);audio.metadata(120);await f.flush();assert.equal(audio.plays,0);assert.equal(audio.paused,true);assert.equal(audio.muted,true);
+ f.song.pause();f.song.setEnabled(true);await f.flush();assert.equal(audio.plays,0);assert.equal(audio.paused,true);
+ f.song.mount(null,{paused:false,enabled:true});await f.flush();assert.equal(audio.plays,1);assert.equal(audio.muted,false);
+ f.song.setEnabled(false);assert.equal(audio.paused,true);assert.equal(audio.muted,true);
+});
+
+test('Next releases audio and stale metadata cannot start a removed or later celebration',async()=>{
+ const f=fixture();f.song.mount(null);const old=f.audios[0],late=old.listeners.get('loadedmetadata');f.song.stop();old.duration=120;late();await f.flush();assert.equal(old.plays,0);assert.equal(old.src,'');assert.equal(old.listeners.size,0);
+ f.song.mount(null);const current=f.audios[1];late();assert.equal(current.plays,0);current.metadata(120);await f.flush();assert.equal(current.plays,1);assert.equal(old.plays,0);
+});
+
+test('late play promises cannot restart music after Next, mute or pause',async()=>{
+ for(const operation of ['stop','pause','mute']){
+  const f=fixture({deferred:true});f.song.mount(null);const audio=f.audios[0];audio.metadata(120);assert.equal(f.pending.length,1);
+  if(operation==='mute')f.song.setEnabled(false);else f.song[operation]();f.pending.shift()();await f.flush();assert.equal(audio.paused,true);
  }
 });
 
-test('player time accepts only trusted messages from the mounted iframe and resets when the celebration ends',()=>{
- const f=fixture();f.song.mount(f.container());assert.equal(f.song.time(),null);
- f.emit({event:'infoDelivery',info:{currentTime:12}},{origin:'https://other.example'});assert.equal(f.song.time(),null);
- f.emit({event:'infoDelivery',info:{currentTime:12}},{source:{}});assert.equal(f.song.time(),null);
- f.emit('invalid-json');f.emit(null);f.emit({event:'unrelated',info:{currentTime:12}});assert.equal(f.song.time(),null);
- f.emit(JSON.stringify({event:'infoDelivery',info:{currentTime:12.5}}));assert.equal(f.song.time(),12.5);
- for(const value of ['13',-1,Infinity,NaN])f.emit({event:'infoDelivery',info:{currentTime:value}});
- assert.equal(f.song.time(),12.5);f.song.pause();assert.equal(f.song.time(),12.5);
- f.song.stop();assert.equal(f.song.time(),null);f.emit({event:'infoDelivery',info:{currentTime:20}});assert.equal(f.song.time(),null);
+test('blocked playback and invalid or short durations fail gracefully without retries or unhandled rejections',async()=>{
+ const f=fixture({blocked:true});f.song.mount(null);const audio=f.audios[0];audio.metadata(10);await f.flush();assert.equal(audio.currentTime,0);assert.equal(audio.paused,true);
+ for(let i=0;i<100;i++)f.song.update(i);assert.equal(audio.plays,1);audio.error();assert.equal(f.song.time(),null);
+ for(const duration of [NaN,Infinity,-1]){const x=fixture();x.song.mount(null);x.audios[0].metadata(duration);await x.flush();assert.equal(x.audios[0].currentTime,0);}
 });
 
-test('Next removes the player and stale load callbacks cannot restart it or a newer celebration',()=>{
- const f=fixture(),parent=f.container();f.song.mount(parent);const old=f.frames[0],lateLoad=old.lateLoad;
- f.song.stop();assert.deepEqual(f.functions().slice(-2),['pauseVideo','stopVideo']);const stoppedPosts=f.posts.length;lateLoad();assert.equal(f.posts.length,stoppedPosts);
- f.song.mount(parent);const current=f.frames[1],newPosts=f.posts.length;lateLoad();assert.equal(f.posts.length,newPosts);
- f.emit({event:'onReady'},{source:old.contentWindow});assert.equal(f.posts.length,newPosts);
- current.load();assert.ok(f.posts.slice(newPosts).every(p=>p.frame===current));assert.equal(parent.children.length,1);
-});
-
-test('readiness retries are bounded and use game time without background timers',()=>{
- const f=fixture();f.song.mount(f.container());f.posts.length=0;
- for(let i=0;i<500;i++)f.song.update(i/10);
- assert.equal(f.posts.filter(p=>p.data.event==='listening').length,10);
- const before=f.posts.length;f.song.update(Infinity);f.song.update(NaN);assert.equal(f.posts.length,before);
- f.emit({event:'onReady'});const after=f.posts.length;f.song.update(100);assert.equal(f.posts.length,after);
- f.song.stop();f.song.update(200);assert.equal(f.posts.length,after+2);
-});
-
-test('a missing browser environment leaves the game usable',()=>{
- const song=createRutiSong({window:null,document:null});assert.equal(song.mount({}),false);song.pause();song.setEnabled(false);song.update(10);song.stop();assert.equal(song.time(),null);
+test('source alias works and a missing audio environment leaves the game usable',()=>{
+ const f=fixture();const song=createRutiSong({source:'/approved.mp3',Audio:null,document:null});assert.equal(song.mount(null),true);assert.equal(song.time(),null);song.pause();song.setEnabled(false);song.stop();assert.equal(f.audios.length,0);
 });

@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {drawDustSignal} from '../public/assets/ruti-house-dust.mjs';
 
 function canvas(){
- const texts=[],numbers=[],strokes=[],shadows=[];
- const ctx=new Proxy({fillText(value){texts.push(String(value));},stroke(){strokes.push({color:this.strokeStyle,width:this.lineWidth});}}, {
+ const texts=[],numbers=[],strokes=[],shadows=[],rectangles=[];
+ const ctx=new Proxy({roundRect(...args){rectangles.push(args);numbers.push(...args.filter(v=>typeof v==='number'));},fillText(value){texts.push(String(value));},stroke(){strokes.push({color:this.strokeStyle,width:this.lineWidth});}}, {
   get(target,key){if(key in target)return target[key];return (...args)=>{numbers.push(...args.filter(v=>typeof v==='number'));};},
   set(target,key,value){target[key]=value;if(key==='shadowBlur')shadows.push(value);return true;}
  });
- return {ctx,texts,numbers,strokes,shadows};
+ return {ctx,texts,numbers,strokes,shadows,rectangles};
 }
 
 test('dust keeps its white outline, dark border, label and deadline through every pulse',()=>{
@@ -43,4 +43,13 @@ test('quiet dust keeps its silhouette and time bar after its word label is learn
  const c=canvas();drawDustSignal(c.ctx,160,200,37,{remaining:5,total:24},1,{width:320,showLabel:false});
  assert.equal(c.texts.length,0);assert.ok(c.strokes.some(s=>s.width===7&&s.color==='#ffffff'));
  assert.ok(c.strokes.some(s=>s.width===2&&s.color==='#ffffff'),'the deadline bar remains visible');
+});
+
+
+test('the initial dust word has no framed background while its physical cloud and bar stay outlined',()=>{
+ const timed=canvas();drawDustSignal(timed.ctx,160,200,37,{remaining:15,total:24},1,{width:320});
+ assert.ok(timed.texts.includes('אבק!'));assert.ok(timed.rectangles.every(rect=>rect[3]<=7),'rounded rectangles are only the thin time bar, never a word badge');
+ assert.ok(timed.strokes.some(s=>s.width===7&&s.color==='#ffffff'),'the physical dust cloud keeps its clear outline');
+ const practice=canvas();drawDustSignal(practice.ctx,160,200,37,{untimed:true,total:1,remaining:1},1,{width:320});
+ assert.ok(practice.texts.includes('אבק!'));assert.equal(practice.rectangles.length,0,'the untimed label is plain text with no frame');
 });

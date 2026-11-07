@@ -40,17 +40,11 @@ export function drawDustSignal(ctx,x,y,size,task,time,{reduced=false,english=fal
  }
  ctx.restore();
 
- const w=clamp(size*2.2,88,106),h=29,cx=clamp(x,w/2+5,width-w/2-5),bx=cx-w/2,by=Math.max(5,y-size*.96-h);
+ const labelY=Math.max(12,y-size*1.25),labelX=clamp(x,30,width-30);
  ctx.save();ctx.lineWidth=2;
- if(showLabel){
- ctx.beginPath();ctx.moveTo(cx-6,by+h-1);ctx.lineTo(cx+6,by+h-1);ctx.lineTo(x,y-size*.69);ctx.closePath();ctx.fillStyle='#fffdf2';ctx.fill();ctx.strokeStyle=edge;ctx.stroke();
- ctx.beginPath();ctx.roundRect(bx,by,w,h,8);ctx.fillStyle=edge;ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=2.5;ctx.stroke();
- // A small straw broom reinforces the text for people who cannot read it.
- const ix=bx+13,iy=by+12;
- ctx.beginPath();ctx.moveTo(ix+3,iy-7);ctx.lineTo(ix-3,iy+6);ctx.strokeStyle='#ffffff';ctx.lineWidth=2.5;ctx.stroke();
- ctx.beginPath();ctx.moveTo(ix-5,iy+3);ctx.lineTo(ix,iy+6);ctx.lineTo(ix-2,iy+12);ctx.lineTo(ix-10,iy+8);ctx.closePath();ctx.fillStyle='#f6d991';ctx.fill();
- ctx.fillStyle='#ffffff';text(ctx,english?'Dust!':'אבק!',cx+1,by+h/2,13);
- }
+ // Plain ink introduces the dust without putting another framed card or
+ // glow behind the word. The physical cloud above stays strongly outlined.
+ if(showLabel){ctx.fillStyle=edge;text(ctx,english?'Dust!':'אבק!',labelX,labelY,13);}
  if(!task.untimed){
   const barWidth=size*1.34,barY=y+size*.63;
   ctx.beginPath();ctx.roundRect(x-barWidth/2,barY,barWidth,7,3);ctx.fillStyle=edge;ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.stroke();

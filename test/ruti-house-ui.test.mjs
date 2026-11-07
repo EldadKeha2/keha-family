@@ -51,7 +51,7 @@ function fixture({english=false,startLevel=1,failSave=false,initialScores=[],wid
   vm.runInNewContext(source+'\nwindow.test={mountRutiHouse,pauseRutiHouse,state,render,processEvents,tutorialGuide:typeof tutorialGuide==="function"?tutorialGuide:null};',{
     ...engine,...motion,...character,HOUSE_LESSONS,window,document,Image,Response,AbortController,crypto:webcrypto,performance:{now:()=>now},
     createRutiPerformance:options=>character.createRutiPerformance({...options,synthesis,Utterance:speech?Utterance:null}),createHouse(){game=gameAt(startLevel);return game;},createHouseActor(start){actor=motion.createHouseActor(start);return actor;},
-    PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse(_ctx,g,visual){draws.push({level:g.level,phase:g.phase,actor:{...visual.actor},showTaskLabels:visual.showTaskLabels?{...visual.showTaskLabels}:null});},
+    PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse(_ctx,g,visual){draws.push({level:g.level,phase:g.phase,actor:{...visual.actor},quiet:visual.quiet,showTaskLabels:visual.showTaskLabels?{...visual.showTaskLabels}:null});},
     drawRutiCelebration(_ctx,visual){draws.push({celebration:true,progress:visual.progress,actor:{...visual.actor}});},createSceneAssets:()=>({family:{},icons:{},ready:Promise.resolve()}),houseArtwork:()=>'<svg></svg>',iconArtwork:id=>`<svg data-icon="${id}"></svg>`,createHouseSound:()=>audio,createRutiSong:()=>({mount(){},stop(){},pause(){},setEnabled(){}}),
     requestAnimationFrame(fn){const id=++sequence;frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id)
   });
@@ -177,9 +177,9 @@ test('the enlarged singing broom dance waits for Next indefinitely while game cl
   for(const english of [false,true]){
     const f=fixture({english});await f.start();f.game.strikes=1;await finishWateringStage(f);assert.equal(f.frames.size,1);
     const score=f.game.score,elapsed=f.game.elapsed,overlay=f.nodes.get('[data-rh-overlay]').innerHTML;
-    assert.match(overlay,english?/You reached Level/:/עברת לשלב/);assert.match(overlay,/data-rh-next/);assert.equal(f.state.celebrating,true);assert.equal(f.actor.celebrating,true);assert.ok(f.draws.some(d=>d.celebration));
+    assert.match(overlay,english?/You reached Level/:/עברת לשלב/);assert.match(overlay,/data-rh-next/);assert.equal(f.state.celebrating,true);assert.equal(f.actor.celebrating,true);assert.ok(f.draws.some(d=>d.celebration));assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),false,'the stage announcement and Next button remain readable during the dance');
     f.advance(120000);assert.equal(f.game.level,1);assert.equal(f.game.phase,'stage-complete');assert.equal(f.game.elapsed,elapsed);assert.equal(f.game.score,score);assert.equal(f.game.strikes,1);assert.equal(f.state.celebrating,true);assert.ok(f.state.celebrationElapsed>119);assert.equal(f.frames.size,1);
-    const stops=f.audioStops;await f.click('[data-rh-next]');assert.equal(f.game.level,2);assert.equal(f.game.phase,'playing');assert.equal(f.game.strikes,1);assert.equal(f.game.score,score);assert.equal(f.actor.tool,null);assert.equal(f.actor.celebrating,false);assert.equal(f.state.celebrating,false);assert.ok(f.audioStops>stops);assert.equal(f.state.briefing,false,'the faster repeat adds no repeated lesson');assert.equal(f.frames.size,1);
+    const stops=f.audioStops;await f.click('[data-rh-next]');assert.equal(f.game.level,2);assert.equal(f.game.phase,'playing');assert.equal(f.game.strikes,1);assert.equal(f.game.score,score);assert.equal(f.actor.tool,null);assert.equal(f.actor.celebrating,false);assert.equal(f.state.celebrating,false);assert.ok(f.audioStops>stops);assert.equal(f.state.briefing,false,'the faster repeat adds no repeated lesson');assert.equal(f.frames.size,1);assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),true,'ordinary play resumes with icons and progress instead of labels');
     await f.click('[data-rh-next]');assert.equal(f.game.level,2,'a second Next click cannot skip another stage');
   }
 });
@@ -263,25 +263,42 @@ test('watering and dust completion stay free of speech and prose from their firs
   const expired=fixture();await expired.start();const task=expired.game.tasks[0];await expired.choose('water');await expired.act(task.id);expired.game.tasks=[];expired.advance(5000);assert.equal(expired.game.stats.plants,0);assert.equal(expired.sounds.filter(kind=>kind==='water-reward').length,0);
 });
 
-test('familiar plant and dust guidance fades halfway through the opening without hiding controls or progress',async()=>{
+test('guidance and captions disappear at exactly fifteen opening waterings while icons and progress stay usable',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english});await f.start();assert.ok(f.nodes.get('[data-rh-hint]').textContent);assert.equal(f.draws.findLast(d=>!d.celebration).showTaskLabels?.plant,true);
-    let steps=0;while(f.game.stageCompleted<15&&steps++<10000)completeEngineTask(f.game);assert.equal(f.game.stageCompleted,15);f.advance(150);
-    assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');const visual=f.draws.findLast(d=>!d.celebration);assert.equal(visual.showTaskLabels.plant,false);assert.equal(visual.showTaskLabels.dust,false);
+    const f=fixture({english,speech:true});await f.start();assert.ok(f.nodes.get('[data-rh-hint]').textContent);assert.equal(f.draws.findLast(d=>!d.celebration).showTaskLabels?.plant,true);
+    let steps=0;while(f.game.stageCompleted<14&&steps++<10000)completeEngineTask(f.game);assert.equal(f.game.stageCompleted,14);f.advance(150);
+    assert.equal(f.draws.findLast(d=>!d.celebration).quiet,false);assert.equal(f.draws.findLast(d=>!d.celebration).showTaskLabels.plant,true);assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),false);
+    f.game.events.push({type:'wrong',required:'water'});f.window.test.processEvents();assert.ok(toast(f),'an instruction can still appear before the cutoff');
+    f.actor.speechText='A current instruction';f.actor.speaking=true;f.spoken.length=0;
+    while(f.game.stageCompleted<15&&steps++<10000)completeEngineTask(f.game);assert.equal(f.game.stageCompleted,15);f.advance(150);
+    assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');const visual=f.draws.findLast(d=>!d.celebration);assert.equal(visual.quiet,true);assert.equal(visual.showTaskLabels.plant,false);assert.equal(visual.showTaskLabels.dust,false);assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),true);assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.equal(f.actor.speaking,false);assert.equal(f.spoken.length,0);
     await f.choose('broom');assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');await f.choose('water');assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.equal(f.nodes.get('[data-rh-progress]').textContent,'15 / 30');
     assert.deepEqual(f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool),['water','broom']);
     for(const target of f.root.querySelectorAll('[data-rh-target]'))assert.ok(target.dataset.rhTarget,'accessible task controls remain available after visual guidance fades');
   }
-  const repeat=fixture({startLevel:2});await repeat.start();assert.equal(repeat.state.briefing,false);assert.equal(repeat.nodes.get('[data-rh-hint]').textContent,'');await repeat.choose('water');assert.equal(toast(repeat),'');assert.equal(repeat.actor.speechText,'');
 });
 
-test('cats introduce the new hand once and familiar cat guidance disappears after three successful shooings',async()=>{
+test('cats introduce the hand before level three, then the first cat already uses quiet controls and physical feedback',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,startLevel:3});await f.start();assert.ok(f.nodes.get('[data-rh-hint]').textContent);let visual=f.draws.findLast(d=>!d.celebration);assert.equal(visual.showTaskLabels.cat,true);assert.equal(visual.showTaskLabels.plant,false);assert.equal(visual.showTaskLabels.dust,false);
-    for(let count=1;count<=3;count++){
-      f.until(()=>f.game.tasks.some(t=>t.type==='cat'),60000);const cat=f.game.tasks.find(t=>t.type==='cat');await performTask(f,cat);f.until(()=>f.game.stats.cats===count);f.advance(150);
+    const f=fixture({english,startLevel:3,speech:true});await f.start(false);assert.equal(f.state.briefing,true);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/hand|Shoo/i:/יד|לכו מפה/);assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),false);
+    await f.acknowledge();f.spoken.length=0;assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');const visual=f.draws.findLast(d=>!d.celebration);assert.equal(visual.quiet,true);assert.deepEqual(visual.showTaskLabels,{cat:false,plant:false,dust:false});
+    f.until(()=>f.game.tasks.some(t=>t.type==='cat'),60000);const cat=f.game.tasks.find(t=>t.type==='cat'),before=f.game.stats.cats;await performTask(f,cat);f.until(()=>f.game.stats.cats===before+1);f.advance(150);
+    assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.equal(f.actor.speaking,false);assert.equal(f.spoken.length,0);assert.ok(f.sounds.includes('cat'),'successful shooing retains its sound feedback');
+    await f.choose('water');await f.choose('hand');assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.equal(f.spoken.length,0);assert.deepEqual(f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool),['water','broom','hand']);
+  }
+});
+
+test('every later stage keeps normal reactions silent and unlabeled while lessons and pause screens remain readable',async()=>{
+  for(const english of [false,true])for(let level=2;level<=10;level++){
+    const f=fixture({english,startLevel:level,speech:true});await f.start(false);
+    if(f.state.briefing){assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),false);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/data-rh-begin-stage/);await f.acknowledge();}
+    assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),true);assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');const visual=f.draws.findLast(d=>!d.celebration);assert.equal(visual.quiet,true);assert.ok(Object.values(visual.showTaskLabels).every(value=>value===false));
+    f.spoken.length=0;
+    for(const event of [{type:'pace-up',phase:2},{type:'cat-approach'},{type:'wrong',required:'water'},{type:'strike',targetId:'departed-cat'},{type:'missed',kind:'plant'},{type:'missed',kind:'guest'},{type:'success',kind:'cat'},{type:'success',kind:'meal'}]){
+      f.game.events.push(event);f.window.test.processEvents();assert.equal(toast(f),'',`level ${level}: ${event.type} must not add prose`);assert.equal(f.actor.speechText,'');assert.equal(f.actor.speaking,false);assert.equal(f.spoken.length,0);
     }
-    assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');visual=f.draws.findLast(d=>!d.celebration);assert.equal(visual.showTaskLabels.cat,false);assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');
-    await f.choose('water');await f.choose('hand');assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.deepEqual(f.root.querySelectorAll('[data-rh-tool]').map(b=>b.dataset.rhTool),['water','broom','hand']);
+    await f.choose('hand');await f.choose('serve');assert.equal(toast(f),'');assert.equal(f.actor.speechText,'');assert.equal(f.spoken.length,0);assert.equal(f.nodes.get('[data-rh-progress]').textContent,`${f.game.stageCompleted} / ${f.game.stage.goal}`);assert.ok(f.root.querySelectorAll('[data-rh-tool]').length>=2);
+    await f.click('[data-rh-pause]');assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),false);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/All timers are paused/:/כל השעונים עצרו/);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/data-rh-pause/);
+    await f.click('[data-rh-pause]');assert.equal(f.root.querySelector('.ruti-house').classList.contains('rh-quiet'),true);assert.equal(f.nodes.get('[data-rh-hint]').textContent,'');
   }
 });

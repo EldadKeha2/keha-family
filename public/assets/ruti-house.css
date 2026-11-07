@@ -40,6 +40,11 @@
 .rh-objective-quiet{min-height:32px!important;justify-content:flex-end}.rh-objective-quiet [data-rh-hint]:empty{display:none}
 @media(max-width:700px){.rh-cheer-footer{gap:10px}.rh-next-stage{font-size:18px;min-width:105px;min-height:44px}.rh-dance-cheer .rh-break-points{font-size:26px;padding:5px 14px}}
 
-.rh-song-player{position:absolute;width:240px;height:200px;right:20px;bottom:90px;z-index:12;background:#1d211a;border-radius:12px;overflow:hidden;box-shadow:0 5px 20px #243b2533}
-.rh-song-player[hidden]{display:none}.rh-song-player iframe{display:block;border:0;width:100%;height:100%;min-width:200px;min-height:200px}
-@media(max-width:700px){.rh-active .rh-scene.rh-song-celebration{min-height:610px;flex:none}.rh-song-player{width:200px;height:200px;right:calc(50% - 100px);bottom:82px}}
+/* Familiar play uses pictures, numbers and sound. Text stays available in
+   instructions, pause screens, stage celebrations and accessible labels. */
+.rh-quiet .rh-top h3,.rh-quiet .rh-status small,.rh-quiet [data-rh-stage-name],.rh-quiet .rh-tool strong,.rh-quiet .rh-tool kbd,.rh-quiet .rh-tool-instruction,.rh-quiet .rh-scene-toast,.rh-quiet .rh-tooltip,.rh-quiet [data-rh-hint]{display:none!important}
+.rh-quiet .rh-back,.rh-quiet .rh-pause{font-size:0;min-width:40px;min-height:36px}
+.rh-quiet .rh-back:before{content:'→';font-size:20px}.rh-quiet[dir=ltr] .rh-back:before{content:'←'}.rh-quiet .rh-pause:before{content:'Ⅱ';font-size:18px}
+.rh-quiet .rh-level>span{font-size:0}.rh-quiet .rh-level>span b{font-size:23px}.rh-quiet .rh-level>span:before{content:'⚑';font-size:17px;margin-inline-end:6px}
+.rh-quiet .rh-score:before{content:'★';color:#f4d37c;margin-inline-end:6px}.rh-quiet .rh-stage-score:before{content:'✦';margin-inline-end:6px}.rh-quiet .rh-lives:before{content:'🐈';margin-inline-end:6px}
+.rh-quiet .rh-active .rh-tool,.rh-active.rh-quiet .rh-tool{min-height:65px;padding-bottom:4px}.rh-active.rh-quiet .rh-top{min-height:36px}.rh-quiet .rh-status{min-height:42px}

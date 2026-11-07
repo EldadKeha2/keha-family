@@ -42,13 +42,13 @@ test('watering pours for about .8 seconds and sweeping makes two separated physi
  const dustEnd=Math.max(...dust.sources.map(value=>value.stops[0]));assert.ok(dustEnd>.62&&dustEnd<.7);
 });
 
-test('success rewards are short distinct pitches and never repeat the physical action sound',async()=>{
+test('success rewards have distinct pitches and a pleasant longer decay without repeating the physical action sound',async()=>{
  const water=fixture();await water.sound.unlock();water.sound.play('water-reward');
  const dust=fixture();await dust.sound.unlock();dust.sound.play('dust-reward');
- for(const f of [water,dust]){
-  assert.ok(f.sources.every(value=>value.kind==='oscillator'));
-  assert.ok(Math.max(...f.sources.map(value=>value.stops[0]))<.32,'a reward stays shorter than one third of a second');
- }
+ for(const f of [water,dust])assert.ok(f.sources.every(value=>value.kind==='oscillator'));
+ const waterEnd=Math.max(...water.sources.map(value=>value.stops[0])),dustEnd=Math.max(...dust.sources.map(value=>value.stops[0]));
+ assert.ok(waterEnd>.6&&waterEnd<.7,'the water sparkle rings for about two thirds of a second');
+ assert.ok(dustEnd>.55&&dustEnd<.65,'the warm sweep pluck decays for about .6 seconds');
  assert.equal(water.sources.length,6,'three light chimes each have a soft octave partial');
  assert.equal(dust.sources.length,2,'the warmer sweep reward is a two-note pluck');
  const waterNotes=water.sources.filter((_value,i)=>i%2===0).map(value=>value.frequency.events[0][0]);

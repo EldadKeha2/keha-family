@@ -188,7 +188,7 @@ test('early stages keep an empty counter and later hospitality uses one prepared
   assert.ok(!r.written.some(t=>['מטעמי הבית','טחינה','גזר וצימוקים','קובנה','חצילים','לזניה','3'].includes(t.text)),'early stages have no food menu or stock counters');
  }
  const r=renderRecord({level:5,unlockedTools:['water','broom','hand','serve'],tasks:[],inventory:{tahini:3},kitchen:{}});
- assert.equal(r.written.filter(t=>t.text==='מטעמי הבית').length,1);
+ assert.equal(r.written.filter(t=>t.text==='מטעמי הבית').length,0,'later stages keep the food artwork without decorative words');assert.ok(r.fills.includes('#ce8b3e'),'the prepared platter remains on the counter');
  assert.ok(!r.written.some(t=>['טחינה','גזר וצימוקים','קובנה','חצילים','לזניה','3'].includes(t.text)),'prepared food is one simple action, not a recipe grid');
 });
 
@@ -280,7 +280,7 @@ test('quiet task signals retain art and deadline bars while suppressing learned 
 test('Hebrew labels and speech use RTL punctuation while English remains LTR',()=>{
  const written=[],gradient={addColorStop(){}};
  const ctx=new Proxy({canvas:{width:390,height:570},createLinearGradient(){return gradient;},createRadialGradient(){return gradient;},measureText(text){return {width:text.length*6};},fillText(text){written.push({text,direction:this.direction,align:this.textAlign});}},{get:(target,key)=>key in target?target[key]:(()=>{})});
- const g={level:2,tasks:[{id:'p',type:'plant',slot:0,total:20,remaining:18},{id:'d',type:'dust',position:{x:.3,y:.6},total:20,remaining:18}]};
+ const g={level:1,tasks:[{id:'p',type:'plant',slot:0,total:20,remaining:18},{id:'d',type:'dust',position:{x:.3,y:.6},total:20,remaining:18}]};
  for(const english of [false,true]){
   written.length=0;renderHouse(ctx,g,{actor:{x:.4,y:.5,speechText:english?'Every drop with love.':'כל טיפה באהבה.',speechUntil:10}},{width:390,height:570,time:2,english});
   assert.ok(written.length>2);
@@ -316,6 +316,33 @@ test('learned plant and dust words stop at half of stage one without relying on 
   assert.ok(result.strokes.some(s=>s.color==='#00aee5'),'the plant glow remains');
   assert.ok(result.fills.includes('#00d5f1'),'the watering time bar remains');
   assert.ok(result.fills.includes('#9bdde8'),'the dust time bar remains');
-  assert.ok(result.written.some(t=>t.text==='מחכה בחוץ…'),'the new-cat label policy is independent');
+  assert.equal(result.written.length,0,'the quiet scene contains no decorative canvas words');
  }
+});
+
+
+test('initial water and dust words are plain ink while the physical thirsty-plant halo remains intact',()=>{
+ const tasks=[{id:'p',type:'plant',slot:0},{id:'d',type:'dust',position:{x:.25,y:.6}}].map(task=>({...task,total:20,remaining:16}));
+ const initial=renderRecord({level:1,stage:{goal:30},stageCompleted:0,tasks},{time:2});
+ assert.ok(initial.written.some(t=>t.text==='מים!'));assert.ok(initial.written.some(t=>t.text==='אבק!'));
+ assert.ok(!initial.fills.includes('#00648c')&&!initial.fills.includes('#b9233d'),'word labels have no colored badge background');
+ const quiet=renderRecord({level:1,stage:{goal:30},stageCompleted:15,tasks},{time:2});
+ const initialHalo=initial.strokes.find(s=>s.color==='#00aee5'),quietHalo=quiet.strokes.find(s=>s.color==='#00aee5');
+ assert.ok(initialHalo&&quietHalo,'the physical thirsty-plant halo is present in both modes');
+ assert.deepEqual(initialHalo.arc,quietHalo.arc,'removing word decorations never changes the physical plant halo');
+ assert.equal(initialHalo.width,quietHalo.width);assert.ok(quiet.fills.includes('#00a9d5'),'the water drop stays visible');
+});
+
+test('quiet mode removes every canvas word, bubble and missed badge while preserving live physical cues',()=>{
+ const tasks=[{id:'p',type:'plant',slot:0},{id:'d',type:'dust',position:{x:.25,y:.6}},{id:'c',type:'cat',door:1,waiting:2},{id:'g',type:'guest',door:0,guest:'hila'}].map(task=>({...task,total:20,remaining:16}));
+ const visual={actor:{x:.4,y:.5,action:'hand',tool:'hand',speechText:'לכו מפה, חתולים!',speechUntil:10},departures:[{type:'plant-missed',slot:2,age:.3,duration:1.8},{type:'guest',guest:'hila',door:0,age:.3,duration:1.5}]};
+ for(const game of [{level:1,stage:{goal:30},stageCompleted:15,tasks,unlockedTools:['serve']},{level:3,tasks,unlockedTools:['serve']}]){
+  const result=renderRecord(game,{time:2},visual);
+  assert.equal(result.written.length,0,'no room labels, names, cat words, thanks or speech are drawn');
+  assert.ok(!result.fills.includes('#a61f38'),'the missed-word badge is gone');
+  for(const color of ['#00aee5','#ffffff','#274b51'])assert.ok(result.strokes.some(s=>s.color===color),'physical plant, dust and task cues remain');
+  for(const color of ['#00a9d5','#00d5f1','#9bdde8','#ce8b3e'])assert.ok(result.fills.includes(color),'drops, time bars and food art remain');
+ }
+ const forced=renderRecord({level:1,stage:{goal:30},stageCompleted:0,tasks},{time:2},{...visual,quiet:true});
+ assert.equal(forced.written.length,0,'an explicit quiet scene is honored before the automatic cutoff too');
 });
