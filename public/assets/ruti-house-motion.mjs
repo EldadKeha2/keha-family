@@ -11,12 +11,15 @@ const EPSILON=1e-7;
 const coordinate=(value,fallback)=>Number.isFinite(value)?Math.max(0,Math.min(1,value)):fallback;
 const validPoint=point=>point&&Number.isFinite(point.x)&&Number.isFinite(point.y);
 
-// A wide board needs much longer pointer travel. Keep phone pacing and give
-// desktop walking a separate boost; action and household clocks stay real time.
-export function houseWalkingSpeed(width=390){return .68*(Number.isFinite(width)&&width>700?3.5:1);}
+// Wide desktop rooms must not take longer to cross than phone rooms.
+// This changes walking only; watering, sweeping and game deadlines stay timed.
+export function houseWalkingSpeed({width=1,height=1,desktop=false}={}){
+  const ratio=Number.isFinite(width/height)&&width/height>0?Math.max(.25,Math.min(4,width/height)):1;
+  return .68*(desktop?5*Math.max(1,ratio):1);
+}
 
 export function createHouseMotion(actor,findPath=(from,to)=>[to],{speed=.65,aspect=()=>1}={}){
-  function maximumSpeed(){const value=typeof speed==='function'?speed():speed;return Number.isFinite(value)&&value>0?value:.65;}
+  const currentSpeed=()=>{const value=typeof speed==='function'?speed():speed;return Number.isFinite(value)&&value>0?value:.65;};
   let route=[],cursor=0,velocity=0,phase='idle',command=null,actionTime=0;
 
   function ratio(){
@@ -90,12 +93,13 @@ export function createHouseMotion(actor,findPath=(from,to)=>[to],{speed=.65,aspe
         return null;
       }
       if(time<=EPSILON)return null;
-      const scale=ratio(),left=remainingDistance(scale),limit=maximumSpeed(),acceleration=limit*6;
+      const scale=ratio(),left=remainingDistance(scale);
       if(left<EPSILON){arrive();continue;}
       // Short integration steps make acceleration and braking independent of
       // display refresh rate, and keep every corner on the pathfinder's route.
       const step=Math.min(time,1/90);
-      const desired=Math.min(limit,Math.sqrt(2*acceleration*left));
+      const maximumSpeed=currentSpeed(),acceleration=maximumSpeed*6;
+      const desired=Math.min(maximumSpeed,Math.sqrt(2*acceleration*left));
       const next=velocity+Math.max(-acceleration*step,Math.min(acceleration*step,desired-velocity));
       const travel=(velocity+next)*.5*step;
       const used=travel>=left?step*(left/travel):step;

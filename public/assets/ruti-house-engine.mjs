@@ -1,4 +1,5 @@
 import {EXTRA_FAMILY_GUESTS} from './ruti-house-guests.mjs?v=1';
+import {houseStageBonuses} from './ruti-house-bonuses.mjs?v=1';
 // Ruti's bustling home: all clocks are game time, so pausing needs no catch-up.
 const step=(tool,he,en)=>Object.freeze({tool,he,en});
 export const RECIPES=Object.freeze([
@@ -115,6 +116,7 @@ function nextTask(g){const order=g.level===1?(g.stageResolved<6?['plant']:['plan
 function startStage(g,index){
   const plan=STAGES[index];Object.assign(g,{stage:plan,level:plan.level,phase:'playing',stageCompleted:0,stageIssued:0,stageResolved:0,stageElapsed:0,tasks:[],selected:null,typeCursor:0,spawned:0,spawnRemaining:plan.spawnDelay,tutorial:null,lastCatDoor:null});breakCombo(g);
   g.stageStats={meals:0,snacks:0,plants:0,dust:0,cats:0,dishes:0,oraWins:0};
+  g.stageMisses={plant:0,dust:0};
   g.ora=null;g.oraAttempted=false;g.oraAt=plan.level>=4?10+Math.floor(random(g)*13):Infinity;g.oraBonusRemaining=0;g.nextGuestAt=plan.guestMode?15.4+random(g)*7.6:Infinity;
   g.unlockedTools=[...plan.unlockedTools];g.unlockedRecipes=[...plan.unlockedRecipes];
   const first=HOUSE_GUESTS.filter(id=>!g.familyVisits.includes(id)),candidates=(first.length?first:EXTRA_FAMILY_GUESTS.map(person=>person.id)).filter(id=>!g.familyVisits.includes(id));g.stageGuestChoices=[];g.stageGuestsInvited=[];
@@ -130,9 +132,13 @@ function startStage(g,index){
   emit(g,{type:'stage-start',level:g.level,goal:plan.goal,newFeature:plan.newFeature});
 }
 function finishStage(g){
+  if(g.stageResults[g.level-1])return;
+  const result={plants:g.stageStats.plants,dust:g.stageStats.dust,missedPlants:g.stageMisses.plant,missedDust:g.stageMisses.dust,completed:g.stageCompleted};
+  g.stageResults[g.level-1]=result;
+  const bonus=houseStageBonuses(result);g.score+=bonus.total;g.stageScores[g.level-1]+=bonus.total;
   g.completedLevels=g.level;g.tasks=[];g.ora=null;g.spawnRemaining=0;g.guestsInside=[];
   if(g.level===STAGES.length){g.phase='finished';g.won=true;}else g.phase='stage-complete';
-  emit(g,{type:'stage-clear',level:g.level,stageScore:g.stageScores[g.level-1],won:g.won});if(g.won)emit(g,{type:'finished',score:g.score,won:true});
+  emit(g,{type:'stage-clear',level:g.level,stageScore:g.stageScores[g.level-1],bonus,won:g.won});if(g.won)emit(g,{type:'finished',score:g.score,won:true});
 }
 function responseReward(g,task,respondedAt){
   // Use active game time at the correct click, before Ruti walks or animates.
@@ -173,7 +179,7 @@ function resolveTask(g,{deferFinish=false}={}){
 }
 export function createHouse({random:source=Math.random}={}){
   const g={phase:'playing',won:false,elapsed:0,stageElapsed:0,level:1,score:0,strikes:0,combo:0,bestCombo:0,multiplier:1,comboRemaining:0,selected:null,
-    stageCompleted:0,completedLevels:0,stageScores:Array(STAGES.length).fill(0),unlockedTools:[],unlockedRecipes:[],seededRecipes:[],tutorial:null,plantDeck:[],wateredSlots:[],
+    stageCompleted:0,completedLevels:0,stageScores:Array(STAGES.length).fill(0),stageResults:Array(STAGES.length).fill(null),unlockedTools:[],unlockedRecipes:[],seededRecipes:[],tutorial:null,plantDeck:[],wateredSlots:[],
     inventory:Object.fromEntries(RECIPES.map(r=>[r.id,0])),kitchen:Object.fromEntries(RECIPES.map(r=>[r.id,{step:0,remaining:0,state:'prep'}])),tasks:[],catsInside:[],guestsInside:[],familyVisits:[],stats:{meals:0,snacks:0,plants:0,dust:0,cats:0,dishes:0,missed:0,oraWins:0},events:[],serial:0,random:typeof source==='function'?source:Math.random};
   startStage(g,0);return g;
 }
@@ -220,7 +226,7 @@ function tick(g,dt){
   for(const task of [...g.tasks]){
     if(task.untimed)continue;let approachDt=dt;
     if(task.type==='cat'&&task.waiting>0){const wait=Math.min(task.waiting,dt);task.waiting=Math.max(0,round(task.waiting-wait));approachDt-=wait;if(task.waiting===0){task.state='approaching';emit(g,{type:'cat-approach',kind:'cat',targetId:task.id});}}
-    task.remaining=Math.max(0,task.remaining-approachDt);if(task.remaining>=1e-8)continue;g.tasks.splice(g.tasks.indexOf(task),1);g.stats.missed++;breakCombo(g);g.spawnRemaining=pace(g).spawnDelay;
+    task.remaining=Math.max(0,task.remaining-approachDt);if(task.remaining>=1e-8)continue;g.tasks.splice(g.tasks.indexOf(task),1);g.stats.missed++;if(task.type in g.stageMisses)g.stageMisses[task.type]++;breakCombo(g);g.spawnRemaining=pace(g).spawnDelay;
     if(task.type==='cat'){g.catsInside.push({id:task.id,coat:task.coat,size:task.size,door:task.door,window:task.window,enteredAt:g.elapsed,pathSeed:random(g)});g.strikes++;emit(g,{type:'strike',kind:'cat',targetId:task.id,strikes:g.strikes});if(g.strikes===3){g.stageResolved++;g.phase='finished';g.won=false;g.tasks=[];g.ora=null;emit(g,{type:'finished',score:g.score,won:false});return;}}
     else emit(g,{type:'missed',kind:task.type,targetId:task.id,guest:task.guest});
     resolveTask(g);if(g.phase!=='playing')return;

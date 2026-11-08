@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {webcrypto} from 'node:crypto';
 import * as engine from '../public/assets/ruti-house-engine.mjs';
 import * as motion from '../public/assets/ruti-house-motion.mjs';
+import * as bonuses from '../public/assets/ruti-house-bonuses.mjs';
 import * as bridge from '../public/assets/ruti-house-bridge.mjs';
 import {EXTRA_FAMILY_GUESTS} from '../public/assets/ruti-house-guests.mjs';
 import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,getHouseGuestSeat,findHousePath} from '../public/assets/ruti-house-scene.mjs';
@@ -26,7 +27,7 @@ function gameAt(level){
   assert.equal(g.level,level,'fixture must complete each stage and its guest objective before advancing');g.events=[];return g;
 }
 
-function fixture({english=false,startLevel=1,failSave=false,initialScores=[],width=960,height=600,speech=false}={}){
+function fixture({english=false,startLevel=1,failSave=false,initialScores=[],width=960,height=600,speech=false,desktop=false}={}){
   let now=100000,sequence=0,backs=0,game=null,actor=null,html='',saveStatus=failSave?503:200,runs=0;
   const nodes=new Map(),listeners=new Map(),frames=new Map(),requests=[],writes=[],sounds=[],audioEvents=[],spoken=[],draws=[];let audioStops=0;
   const register=(target,type,fn,{signal}={})=>{const key=`${target}.${type}`;if(!listeners.has(key))listeners.set(key,new Set());listeners.get(key).add(fn);signal?.addEventListener('abort',()=>listeners.get(key)?.delete(fn),{once:true});};
@@ -42,7 +43,7 @@ function fixture({english=false,startLevel=1,failSave=false,initialScores=[],wid
     if(selector==='[data-rh-target]')return [...new Set([...body().matchAll(/data-rh-target="([^"]+)"/g)].map(m=>m[1]))].map(id=>{const key=`[data-rh-target="${id}"]`;if(!nodes.has(key))nodes.set(key,node({rhTarget:id}));return nodes.get(key);});return [];
   }};
   const document={hidden:false,visibilityState:'visible',documentElement:{hasAttribute:()=>false},addEventListener:(type,fn,options)=>register('document',type,fn,options)};
-  const window={devicePixelRatio:1,FAMILY_API_TOKEN:'test-token',matchMedia:()=>({matches:false}),addEventListener:(type,fn,options)=>register('window',type,fn,options),FamilyI18n:{isEnglish:english,fetch:async(path,options)=>{
+  const window={navigator:{userAgent:desktop?'Windows Chrome':'Android Mobile'},devicePixelRatio:1,FAMILY_API_TOKEN:'test-token',matchMedia:query=>({matches:query.includes('max-width')&&width<=700}),addEventListener:(type,fn,options)=>register('window',type,fn,options),FamilyI18n:{isEnglish:english,fetch:async(path,options)=>{
     requests.push({path,options});if(options?.method==='POST'){const entry=JSON.parse(options.body);writes.push(entry);return Response.json(saveStatus===200?{saved:true,rank:1,scores:[{...entry,id:entry.requestId}]}:{error:'שמירה נכשלה'},{status:saveStatus});}
     if(path.endsWith('/scores'))return Response.json({scores:initialScores});return Response.json({person:{profile:`/media/${path.split('/')[2]}.webp`}});
   }}};
@@ -51,7 +52,7 @@ function fixture({english=false,startLevel=1,failSave=false,initialScores=[],wid
   const synthesis=speech?{getVoices:()=>[{name:english?'Samantha':'Carmit',lang:english?'en-US':'he-IL'}],speak(utterance){spoken.push(utterance.text);utterance.onstart?.();utterance.onend?.();},cancel(){}}:null;
   const audio={unlock(){return Promise.resolve(true);},setEnabled(){},stop(){audioStops++;},play(kind){sounds.push(kind);audioEvents.push({kind,action:actor?.action,walking:!!actor?.walking,progress:actor?.actionProgress,plants:game?.stats.plants,dust:game?.stats.dust});}};
   vm.runInNewContext(source+'\nwindow.test={mountRutiHouse,pauseRutiHouse,state,render,processEvents,tutorialGuide:typeof tutorialGuide==="function"?tutorialGuide:null};',{
-    ...engine,...motion,...character,...bridge,EXTRA_FAMILY_GUESTS,HOUSE_LESSONS,window,document,Image,Response,AbortController,crypto:webcrypto,performance:{now:()=>now},
+    ...engine,...motion,...character,...bridge,...bonuses,EXTRA_FAMILY_GUESTS,HOUSE_LESSONS,window,document,Image,Response,AbortController,crypto:webcrypto,performance:{now:()=>now},
     createRutiPerformance:options=>character.createRutiPerformance({...options,synthesis,Utterance:speech?Utterance:null}),createHouse(){game=gameAt(runs++?1:startLevel);return game;},createHouseActor(start){actor=motion.createHouseActor(start);return actor;},
     PLANT_VARIETIES,getHouseLayout,getTaskLocation,getHouseGuestSeat,findHousePath,renderHouse(_ctx,g,visual){draws.push({level:g.level,phase:g.phase,actor:{...visual.actor},quiet:visual.quiet,showTaskLabels:visual.showTaskLabels?{...visual.showTaskLabels}:null});},
     drawRutiCelebration(_ctx,visual){draws.push({celebration:true,progress:visual.progress,actor:{...visual.actor}});},createSceneAssets:()=>({family:{},icons:{},ready:Promise.resolve()}),houseArtwork:()=>'<svg></svg>',iconArtwork:id=>`<svg data-icon="${id}"></svg>`,createHouseSound:()=>audio,createRutiSong:()=>({mount(){},stop(){},pause(){},setEnabled(){}}),
@@ -253,10 +254,10 @@ test('the single Food tool serves a homemade dish directly to the guest without 
   }
 });
 
-test('the third cat ends the run and v5 saves preserve stage scores, statistics and retry identifiers',async()=>{
+test('the third cat ends the run and v6 saves preserve stage scores, statistics and retry identifiers',async()=>{
   for(const english of [false,true]){
     const f=fixture({english,startLevel:3,failSave:true});await f.start();assert.equal(f.key('Digit3'),true);assert.equal(f.game.selected,'hand');for(const digit of [5,6,7,8])assert.equal(f.key(`Digit${digit}`),false);assert.equal(f.key('Digit1',{editable:true}),false);assert.equal(f.game.selected,'hand');f.game.tasks=[];f.game.events=[];for(let i=0;i<3;i++)f.game.tasks.push({id:`test-cat-${i}`,type:'cat',slot:i%2,door:i%2,state:'approaching',waiting:0,total:.1,remaining:.1});f.advance(300);await f.flush();assert.equal(f.game.phase,'finished');assert.equal(f.game.strikes,3);assert.equal(f.frames.size,0);assert.match(f.html,/data-rh-score-form/);
-    await f.submit();assert.equal(f.writes.length,0);f.input('  Player One  ');await f.submit();assert.equal(f.writes.length,1);assert.match(f.html,english?/Could not save your score/:/שמירה נכשלה/);f.allowSave();await f.submit();assert.equal(f.writes.length,2);const payload=f.writes[1];assert.equal(payload.requestId,f.writes[0].requestId);assert.equal(payload.name,'Player One');assert.equal(payload.version,5);assert.equal(payload.completedLevels,2);assert.deepEqual(payload.stageScores,[...f.game.stageScores]);assert.equal(payload.stageScores.reduce((a,b)=>a+b,0),payload.score);assert.ok(payload.stageScores[0]>0);assert.equal(payload.level,3);assert.equal(payload.plants,f.game.stats.plants);assert.equal(payload.elapsed,Math.floor(f.game.elapsed));assert.equal(f.requests.find(r=>r.options?.method==='POST').options.headers['X-Family-Token'],'test-token');assert.match(f.html,english?/Score saved! Your rank/:/השיא נשמר! המקום שלכם/);await f.submit();assert.equal(f.writes.length,2);
+    await f.submit();assert.equal(f.writes.length,0);f.input('  Player One  ');await f.submit();assert.equal(f.writes.length,1);assert.match(f.html,english?/Could not save your score/:/שמירה נכשלה/);f.allowSave();await f.submit();assert.equal(f.writes.length,2);const payload=f.writes[1];assert.equal(payload.requestId,f.writes[0].requestId);assert.equal(payload.name,'Player One');assert.equal(payload.version,6);assert.equal(payload.completedLevels,2);assert.deepEqual(payload.stageScores,[...f.game.stageScores]);assert.equal(payload.stageScores.reduce((a,b)=>a+b,0),payload.score);assert.ok(payload.stageScores[0]>0);assert.equal(payload.level,3);assert.equal(payload.plants,f.game.stats.plants);assert.equal(payload.elapsed,Math.floor(f.game.elapsed));assert.equal(f.requests.find(r=>r.options?.method==='POST').options.headers['X-Family-Token'],'test-token');assert.match(f.html,english?/Score saved! Your rank/:/השיא נשמר! המקום שלכם/);await f.submit();assert.equal(f.writes.length,2);
   }
 });
 
@@ -280,8 +281,8 @@ test('all twelve stages remain winnable with physical movement and direct food s
     f.advance(100);
   }
   assert.equal(f.state.celebrating,true);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/הבית כולו בידיים טובות!/);assert.doesNotMatch(f.html,/data-rh-score-form/);f.advance(30000);assert.equal(f.state.celebrating,true);assert.doesNotMatch(f.html,/data-rh-score-form/);f.input('Too early');await f.submit();assert.equal(f.writes.length,0,'the final score cannot be saved until the player ends the celebration');await f.click('[data-rh-next]');assert.equal(f.state.celebrating,false);assert.equal(f.game.won,true,JSON.stringify({level:f.game.level,strikes:f.game.strikes,elapsed:f.game.elapsed,completed:[...completed],requiredMealComplete:f.game.requiredMealComplete,tasks:f.game.tasks.map(t=>({type:t.type,remaining:t.remaining,waiting:t.waiting}))}));assert.equal(f.game.completedLevels,12);assert.equal(completed.size,11);assert.ok(f.game.strikes<3);assert.equal(f.game.stageScores.reduce((a,b)=>a+b,0),f.game.score);assert.ok(f.game.stageScores.every(points=>points>0));assert.ok(f.game.stats.plants>=60);assert.equal(f.game.stats.dishes,0);assert.ok(f.game.stats.snacks>=0);assert.ok(f.game.stats.meals>=1);assert.match(f.html,/כל הבית/);assert.equal(f.frames.size,0);
-  f.input('אלופת הבית');await f.submit();assert.equal(f.writes.length,1);const entry=rutiHouseScore(f.writes[0]);assert.equal(entry.version,5);assert.equal(entry.completedLevels,12);assert.equal(entry.level,12);assert.equal(entry.score,f.game.score);assert.equal(entry.name,'אלופת הבית');assert.equal(entry.stageScores.reduce((a,b)=>a+b,0),entry.score);
-  t.diagnostic(`Twelve levels won in ${Math.floor(f.game.elapsed)} game seconds with ${f.game.strikes} strikes; thirty-water opening and direct guest meals completed; ${entry.score} points pass the production v5 validator.`);
+  f.input('אלופת הבית');await f.submit();assert.equal(f.writes.length,1);const entry=rutiHouseScore(f.writes[0]);assert.equal(entry.version,6);assert.equal(entry.completedLevels,12);assert.equal(entry.level,12);assert.equal(entry.score,f.game.score);assert.equal(entry.name,'אלופת הבית');assert.equal(entry.stageScores.reduce((a,b)=>a+b,0),entry.score);
+  t.diagnostic(`Twelve levels won in ${Math.floor(f.game.elapsed)} game seconds with ${f.game.strikes} strikes; thirty-water opening and direct guest meals completed; ${entry.score} points pass the production v6 validator.`);
 });
 
 
@@ -495,4 +496,45 @@ test('all twelve stages have their own localised names in the HUD and the next-s
   if(f.state.briefing)assert.ok(f.nodes.get('[data-rh-overlay]').innerHTML.includes(title));
  }
  const f=fixture();await f.start();await finishWateringStage(f);assert.ok(f.nodes.get('[data-rh-overlay]').innerHTML.includes(engine.STAGES[1].he));
+});
+
+test('desktop walks finish substantially sooner, including the installed-app layout, without shortening the watering action',async()=>{
+ const times=[];
+ for(const desktop of [false,true]){
+  const f=fixture({desktop,width:1130,height:530});await f.start();await f.choose('water');await f.act(f.game.tasks[0].id);
+  const walk=f.until(()=>f.actor.action==='water');const before=f.game.elapsed;
+  f.advance(600);assert.equal(f.game.stats.plants,0,'the physical watering animation keeps its full duration');
+  f.until(()=>f.game.stats.plants===1);assert.ok(f.game.elapsed-before>=.95);
+  times.push(walk);
+ }
+ assert.ok(times[1]<=450,JSON.stringify(times));assert.ok(times[0]>times[1]*3,JSON.stringify(times));
+});
+
+test('Restart beside Pause discards the old run, motion and overlays while preserving sound preference',async()=>{
+ for(const paused of [false,true]){
+  const f=fixture({desktop:true});await f.start();await f.click('[data-rh-sound]');await f.choose('water');await f.act(f.game.tasks[0].id);f.advance(50);
+  if(paused)await f.click('[data-rh-pause]');
+  const run=f.state.run.id,old=f.game;assert.match(f.html,/data-rh-pause[\s\S]*data-rh-restart/);
+  await f.click('[data-rh-restart]');await f.click('[data-rh-restart-confirm]');assert.notEqual(f.state.run.id,run);assert.notEqual(f.game,old);assert.equal(f.game.level,1);assert.equal(f.game.score,0);assert.equal(f.state.paused,false);assert.equal(f.state.briefing,true);assert.equal(f.state.sound,false);assert.equal(f.state.motion.busy,false);assert.equal(f.state.oraInteraction,null);assert.equal(f.state.bridge,null);
+  await f.acknowledge();f.advance(2000);assert.equal(f.game.score,0);assert.equal(f.game.stats.plants,0);assert.equal(f.frames.size,1);assert.equal(f.listenerCount('root','click'),1);
+ }
+});
+
+
+test('bridge announces the friends and paused housework, then hides the banner on return in both languages',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english,startLevel:7});await f.start();f.game.stageResolved=15;f.advance(100);
+  assert.ok(f.state.bridge);assert.equal(f.root.querySelector('[data-rh-bridge-banner]').hidden,false);
+  assert.match(f.html,english?/The friends have arrived!/:/החברות הגיעו!/);assert.match(f.html,english?/Housework pauses for a game of bridge/:/עוצרים את מטלות הבית למשחק ברידג/);
+  f.until(()=>!f.state.bridge,60000);assert.equal(f.root.querySelector('[data-rh-bridge-banner]').hidden,true);
+ }
+});
+
+test('stage celebration shows each cumulative bonus and its total, which remains unchanged while waiting for Next',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english,desktop:true});await f.start();await finishWateringStage(f);
+  const overlay=f.nodes.get('[data-rh-overlay]').innerHTML;
+  assert.match(overlay,/rh-stage-bonuses/);assert.match(overlay,english?/All dust tasks/:/כל מטלות האבק/);assert.match(overlay,/500/);assert.match(overlay,/1,000/);assert.match(overlay,/2,000/);assert.match(overlay,/3,500/);
+  const total=f.game.score;f.advance(30000);assert.equal(f.game.score,total);assert.equal(f.game.stageResults[0].completed,30);
+ }
 });

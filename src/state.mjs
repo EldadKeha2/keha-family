@@ -50,6 +50,7 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS ruti_house_score_details(id TEXT PRIMARY KEY,version INTEGER NOT NULL,completed_levels INTEGER NOT NULL,stage_scores TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS ruti_house_ora_bonuses(id TEXT PRIMARY KEY,wins INTEGER NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS ruti_house_run_metrics(id TEXT PRIMARY KEY,missed INTEGER NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS ruti_house_completion_bonuses(id TEXT PRIMARY KEY,stage_results TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
@@ -384,7 +385,7 @@ export class FamilyState {
         const rank=this.rows('SELECT count(*) AS n FROM neto_tetris_scores s JOIN neto_tetris_scores own ON own.id=? WHERE s.score>own.score OR (s.score=own.score AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id)))',entry.id)[0].n+1;
         return {saved:true,id:entry.id,rank,...this.run('game.neto-tetris.scores')};
       }
-      case 'game.ruti-house.scores':return {scores:this.rows('SELECT s.id,s.name,s.score,s.level,s.meals,s.snacks,s.plants,s.dust,s.cats,s.dishes,s.bestCombo,s.elapsed,s.created_at AS createdAt,d.version,d.completed_levels AS completedLevels,d.stage_scores AS stageScores,COALESCE(o.wins,0) AS oraWins,COALESCE(m.missed,0) AS missed FROM ruti_house_scores s LEFT JOIN ruti_house_score_details d ON d.id=s.id LEFT JOIN ruti_house_ora_bonuses o ON o.id=s.id LEFT JOIN ruti_house_run_metrics m ON m.id=s.id ORDER BY s.score DESC,s.created_at,s.id LIMIT ?',RUTI_HOUSE_SCORE_LIMIT).map(row=>({...row,stageScores:row.stageScores===null?null:JSON.parse(row.stageScores)})),limit:RUTI_HOUSE_SCORE_LIMIT};
+      case 'game.ruti-house.scores':return {scores:this.rows('SELECT s.id,s.name,s.score,s.level,s.meals,s.snacks,s.plants,s.dust,s.cats,s.dishes,s.bestCombo,s.elapsed,s.created_at AS createdAt,d.version,d.completed_levels AS completedLevels,d.stage_scores AS stageScores,COALESCE(o.wins,0) AS oraWins,COALESCE(m.missed,0) AS missed,b.stage_results AS stageResults FROM ruti_house_scores s LEFT JOIN ruti_house_score_details d ON d.id=s.id LEFT JOIN ruti_house_ora_bonuses o ON o.id=s.id LEFT JOIN ruti_house_run_metrics m ON m.id=s.id LEFT JOIN ruti_house_completion_bonuses b ON b.id=s.id ORDER BY s.score DESC,s.created_at,s.id LIMIT ?',RUTI_HOUSE_SCORE_LIMIT).map(row=>({...row,stageScores:row.stageScores===null?null:JSON.parse(row.stageScores),stageResults:row.stageResults===null?null:JSON.parse(row.stageResults)})),limit:RUTI_HOUSE_SCORE_LIMIT};
       case 'game.ruti-house.score.add':{
         const entry=rutiHouseScore(p),previous=this.rows('SELECT name,score,level,meals,snacks,plants,dust,cats,dishes,bestCombo,elapsed FROM ruti_house_scores WHERE id=?',entry.id)[0];
         if(previous&&['name',...RUTI_HOUSE_SCORE_FIELDS].some(key=>previous[key]!==entry[key]))throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
@@ -394,10 +395,13 @@ export class FamilyState {
         if(previous&&priorMissed!==entry.missed)throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
         const priorOra=this.rows('SELECT wins FROM ruti_house_ora_bonuses WHERE id=?',entry.id)[0]?.wins??0;
         if(previous&&priorOra!==entry.oraWins)throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
+        const priorResults=this.rows('SELECT stage_results FROM ruti_house_completion_bonuses WHERE id=?',entry.id)[0]?.stage_results??null;
+        if(previous&&priorResults!==(entry.stageResults===null?null:JSON.stringify(entry.stageResults)))throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
         if(!previous)this.sql.exec('INSERT INTO ruti_house_scores(id,name,score,level,meals,snacks,plants,dust,cats,dishes,bestCombo,elapsed,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',entry.id,entry.name,...RUTI_HOUSE_SCORE_FIELDS.map(key=>entry[key]),new Date().toISOString());
         if(!previous&&entry.version!==null)this.sql.exec('INSERT INTO ruti_house_score_details(id,version,completed_levels,stage_scores) VALUES(?,?,?,?)',entry.id,entry.version,entry.completedLevels,JSON.stringify(entry.stageScores));
-        if(!previous&&[4,5].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_ora_bonuses(id,wins) VALUES(?,?)',entry.id,entry.oraWins);
-        if(!previous&&entry.version===5)this.sql.exec('INSERT INTO ruti_house_run_metrics(id,missed) VALUES(?,?)',entry.id,entry.missed);
+        if(!previous&&[4,5,6].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_ora_bonuses(id,wins) VALUES(?,?)',entry.id,entry.oraWins);
+        if(!previous&&[5,6].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_run_metrics(id,missed) VALUES(?,?)',entry.id,entry.missed);
+        if(!previous&&entry.version===6)this.sql.exec('INSERT INTO ruti_house_completion_bonuses(id,stage_results) VALUES(?,?)',entry.id,JSON.stringify(entry.stageResults));
         const rank=this.rows('SELECT count(*) AS n FROM ruti_house_scores s JOIN ruti_house_scores own ON own.id=? WHERE s.score>own.score OR (s.score=own.score AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id)))',entry.id)[0].n+1;
         return {saved:true,id:entry.id,rank,...this.run('game.ruti-house.scores')};
       }

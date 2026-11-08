@@ -2,7 +2,7 @@ import {GUEST_ART} from './ruti-house-guests.mjs?v=1';
 import {iconArtwork} from './ruti-house-art.mjs?v=4';
 import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=6';
 import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
-import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=12';
+import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=13';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -340,7 +340,15 @@ const RUTI_ORIENTATIONS=[-1,1,1,1,1,1,-1,-1,-1,-1,-1,-1];
 export function guestEatingPose(resident,layout,elapsed,{reduced=false}={}){
  const seated=residentGuestPose(resident,layout,elapsed,{reduced}),route=guestRoutes.get(resident);
  const age=Math.max(0,elapsed-(resident.servedAt||0)-(route?.duration||0)-.5);
- return {bite:seated.sitting>.9&&age<18?(reduced?.5:Math.max(0,Math.sin(age*Math.PI/1.15))):0,remaining:Math.max(0,1-age/18)};
+ const cycleSeconds=3.1+(resident.seat||0)*.07,duration=cycleSeconds*7;
+ if(age>=duration)return {bite:0,remaining:0};
+ const part=(age%cycleSeconds)/cycleSeconds,ease=n=>{const t=clamp(n,0,1);return t*t*(3-2*t);};
+ const active=seated.sitting>.9,atMouth=part>=.43&&part<.61;
+ const lift=part<.19?0:part<.43?ease((part-.19)/.24):part<.61?1:1-ease((part-.61)/.24);
+ return {bite:active?(reduced?.35:lift):0,remaining:Math.max(0,1-Math.floor(age/cycleSeconds)/7),
+  scoop:active&&part<.43,chew:active&&!reduced&&part>=.50&&part<.91?Math.abs(Math.sin((part-.5)*Math.PI*16)):0,
+  mouth:active&&!reduced&&atMouth?Math.sin((part-.43)/.18*Math.PI):0,
+  lean:active&&!reduced?Math.sin(lift*Math.PI/2)*.012:0,active};
 }
 const RUTI_BODY_WIDTH=.62;
 export function drawRutiFrame(ctx,atlas,frame,height,pose={}){
@@ -437,13 +445,13 @@ function drawRuti(ctx,x,y,height,actor,images,time,reduced,waterTarget=null){
 }
 
 /** Large broom dance on the existing scene canvas; all motion uses game time. */
-export function drawRutiCelebration(ctx,{width,height,time=0,reduced=false,images={},actor={},progress=1,withMusic=false}={}){
+export function drawRutiCelebration(ctx,{width,height,time=0,reduced=false,images={},actor={},progress=1,withMusic=false,bonusPanel=false}={}){
  const entrance=reduced?1:1-Math.pow(1-clamp(progress,0,1),3);
  const smallMusic=withMusic&&width<=700,cx=withMusic&&!smallMusic?width*.39:width*.5;
  // The real music player remains visible beside the dancer on desktop and
  // below her on phones; its reserved space also leaves the Next footer clear.
  const feet=smallMusic?height-305:Math.min(height*.83,height-78);
- const dancerHeight=smallMusic?Math.max(60,Math.min(height*.35,width*.63,height-380)):Math.min(height*.56,width*.73,350,feet-height*.25);
+ const dancerHeight=smallMusic?Math.max(60,Math.min(height*.35,width*.63,height-380)):Math.min(height*.56,width*.73,350,feet-height*.25,bonusPanel?Math.max(80,feet-height*.17-126):Infinity);
  ctx.save();ctx.fillStyle='#fff8e6e8';ctx.fillRect(0,0,width,height);
  const glow=ctx.createRadialGradient(cx,feet-dancerHeight*.48,10,cx,feet-dancerHeight*.48,dancerHeight*.73);
  glow.addColorStop(0,'#fffdf5');glow.addColorStop(1,'#fff8d600');ctx.fillStyle=glow;ctx.fillRect(0,height*.2,width,height*.68);
@@ -489,6 +497,7 @@ export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,faci
  const foot=extra?extra.footByRow[row]:familyIndex>=0?(row===0?482:490)/512:.98;
  const bob=walking&&!reduced?Math.abs(Math.sin(time*8))*height*.012:reduced?0:Math.sin(time*1.7+column)*height*.002;
  ctx.save();ctx.translate(x,y-bob);ellipse(ctx,0,1,height*.15,height*.025,'#4c382c25');
+ if(sitting>.8&&eating?.active)ctx.rotate(eating.lean||0);
  if(facing<0)ctx.scale(-1,1);
  if(sitting>0){
   // The face, neck, hands and torso keep their original pixels and scale.
@@ -504,10 +513,35 @@ export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,faci
   }
  }else ctx.drawImage(atlas,column*cw+.5,row*ch+.5,cw-1,ch-1,-w*center,-h*foot,w,h);
  if(food){
-  const lap=-height*(sitting>.8?.31:.49),plateX=height*.025;
-  ellipse(ctx,plateX,lap,height*.11,height*.029,'#fff1ce','#a38b65');
-  if(!eating||eating.remaining>.03){ctx.save();ctx.globalAlpha=eating?Math.max(.15,eating.remaining):1;icon(ctx,images,food,plateX,lap-height*.025,height*.14);ctx.restore();}
-  if(sitting>.8&&eating?.bite>0){const hand={x:plateX+(height*.018-plateX)*eating.bite,y:lap+(-height*.84-lap)*eating.bite};line(ctx,-height*.105,-height*.68,hand.x,hand.y,'#c79676',height*.043);ellipse(ctx,hand.x,hand.y,height*.024,height*.021,'#e4b18b');line(ctx,hand.x,hand.y,hand.x+height*.04,hand.y-height*.014,'#c7c5ad',height*.012);}
+  const lap=-height*(sitting>.8?.31:.49),plateX=height*.025,remaining=eating?.remaining??1;
+  ellipse(ctx,plateX,lap,height*.12,height*.034,'#fffbec','#a38b65');
+  ellipse(ctx,plateX,lap-height*.006,height*.095,height*.022,'#e8d9ba');
+  // Seven distinct portions disappear as bites are taken, leaving the plate.
+  const portionColor={peanuts:'#c18b4f',tahini:'#dcc691',carrot:'#df8b36',kubaneh:'#bb783b',eggplant:'#946749',lasagna:'#cb703e'}[food]||'#c99154';
+  const portions=Math.ceil(remaining*7);
+  for(let n=0;n<portions;n++){const a=n*2.4,r=height*(.018+n*.005);ellipse(ctx,plateX+Math.cos(a)*r,lap-height*.012+Math.sin(a)*r*.34,height*(food==='peanuts'?.011:.018),height*.010,portionColor);}
+  if(sitting>.8&&eating?.active){
+   // Calibrated atlas mouth positions, rather than a generic point above the face.
+   const face=familyIndex>=0?[[218/384,90/512],[176/384,103/512],[172/384,97/512],[160/384,108/512]][column]:[.53,.185];
+   const top=-height*.23-ch*.60*scale,mouth={x:(face[0]-center)*w,y:top+face[1]*h};
+   const lift=eating.bite,tip={x:plateX+(mouth.x-plateX)*lift,y:lap-height*.018+(mouth.y-lap+height*.018)*lift};
+   const hand={x:tip.x-height*.047,y:tip.y+height*.016};
+   const shoulder={x:-height*.13,y:top+height*.30},elbow={x:-height*(.20-lift*.035),y:lap-height*(.035+lift*.16)};
+   const sleeve=familyIndex>=0?['#43596b','#494845','#3d4551','#e3d4b9'][column]:extra?'#697267':['#536679','#484647','#3e4755','#eadfca'][column];
+   ctx.lineCap='round';ctx.lineJoin='round';
+   line(ctx,shoulder.x,shoulder.y,elbow.x,elbow.y,sleeve,height*.060);
+   line(ctx,elbow.x,elbow.y,hand.x,hand.y,'#b98365',height*.039);
+   line(ctx,elbow.x,elbow.y,hand.x,hand.y,'#d6a17f',height*.030);
+   ellipse(ctx,hand.x,hand.y,height*.022,height*.018,'#e4b18b','#b78365');
+   if(food!=='peanuts'){
+    line(ctx,hand.x,hand.y,tip.x,tip.y,'#7d817d',height*.014);
+    line(ctx,hand.x-height*.002,hand.y-height*.003,tip.x,tip.y-height*.003,'#f6f4df',height*.006);
+    ellipse(ctx,tip.x,tip.y,height*.018,height*.009,'#c5c6b7');
+   }
+   if(eating.scoop&&remaining>0)ellipse(ctx,tip.x,tip.y-height*.007,height*.014,height*.010,portionColor);
+   if(eating.mouth>.05){ellipse(ctx,mouth.x,mouth.y,height*.022,height*(.007+eating.mouth*.010),'#673c32');ellipse(ctx,mouth.x,mouth.y-height*.003,height*.015,height*.004,'#f5e9da');}
+   else if(eating.chew>.05){line(ctx,mouth.x-height*.018,mouth.y,mouth.x+height*.018,mouth.y+eating.chew*height*.005,'#9b5e4d',height*.009);}
+  }
  }
  ctx.restore();return true;
 }

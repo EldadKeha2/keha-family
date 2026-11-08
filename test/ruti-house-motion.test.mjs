@@ -98,7 +98,7 @@ test('desktop movement removes the long cross-screen wait while phone pacing and
   for(const [width,height]of [[390,570],[960,600],[1130,530],[1440,750]]){
     const layout=getHouseLayout(width,height);
     const elapsed=layout.plants.map(plant=>{
-      const actor=createHouseActor({x:.51,y:.83}),controller=createHouseMotion(actor,(from,to)=>findHousePath(layout,from,to),{speed:()=>houseWalkingSpeed(width),aspect:()=>width/height});
+      const actor=createHouseActor({x:.51,y:.83}),controller=createHouseMotion(actor,(from,to)=>findHousePath(layout,from,to),{speed:()=>houseWalkingSpeed({width,height,desktop:width>700}),aspect:()=>width/height});
       controller.walkTo(plant.anchor,{action:'water',duration:1.05});let time=0,actingTime=0;
       while(controller.busy&&time<30){const wasActing=controller.state==='acting';controller.tick(1/120);time+=1/120;if(wasActing)actingTime+=1/120;}
       assert.ok(actingTime>=1.03&&actingTime<=1.06,'watering itself retains its real duration');
@@ -106,15 +106,25 @@ test('desktop movement removes the long cross-screen wait while phone pacing and
     });
     times.push(elapsed);
   }
-  assert.equal(houseWalkingSpeed(390),.68);assert.equal(houseWalkingSpeed(700),.68);
+  assert.equal(houseWalkingSpeed({width:390,desktop:false}),.68);assert.equal(houseWalkingSpeed({width:700,desktop:false}),.68);
   for(const desktop of times.slice(1))for(let i=0;i<4;i++)assert.ok(desktop[i]<=times[0][i]+.08,'a corresponding desktop plant no longer takes longer to reach');
 });
 
 test('responsive speed changes keep the current route and pending action instead of resetting or duplicating it',()=>{
-  const actor=createHouseActor({x:.1,y:.5});let width=390;
-  const controller=createHouseMotion(actor,undefined,{speed:()=>houseWalkingSpeed(width)});
+  const actor=createHouseActor({x:.1,y:.5});let width=390;const height=570;
+  const controller=createHouseMotion(actor,undefined,{speed:()=>houseWalkingSpeed({width,height,desktop:width>700})});
   controller.walkTo({x:.9,y:.5},{action:'water',duration:.5,payload:'one'});controller.tick(.1);
   const before=actor.x;width=1130;controller.tick(.1);assert.ok(actor.x>before);
   assert.equal(actor.action,null);assert.deepEqual(finish(controller),{action:'water',payload:'one'});
   assert.equal(controller.tick(2),null);
+});
+
+test('desktop speed compensates for wide rooms and adapts mid-walk without altering the action clock',()=>{
+ let desktop=false,width=390,height=570;
+ const actor=createHouseActor({x:.1,y:.5}),motion=createHouseMotion(actor,undefined,{speed:()=>houseWalkingSpeed({width,height,desktop}),aspect:()=>width/height});
+ motion.walkTo({x:.9,y:.5},{action:'water',duration:1,payload:'plant'});motion.tick(.1);const before=actor.x;
+ desktop=true;width=1130;height=530;motion.tick(.25);assert.ok(actor.x>before+.3);while(actor.walking)motion.tick(.01);
+ const actionStart=actor.actionProgress;motion.tick(.2);assert.ok(Math.abs(actor.actionProgress-actionStart-.2)<1e-8,'speed applies to walking only');
+ assert.equal(houseWalkingSpeed({width:1130,height:530,desktop:false}),.68);
+ assert.ok(Math.abs(houseWalkingSpeed({width:Infinity,height:0,desktop:true})-3.4)<1e-10);
 });

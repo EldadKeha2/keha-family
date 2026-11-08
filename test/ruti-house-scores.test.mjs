@@ -148,3 +148,18 @@ test('v5 stores twelve-stage runs with missed tasks, exact Ora bonuses, safe ret
   assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_run_metrics').get().n,2);
  }finally{f.close();}
 });
+
+test('v6 saves cumulative stage bonuses with verified task summaries, legacy entries and idempotent retries',async()=>{
+ const f=fixture();try{
+  const summary={plants:24,dust:6,missedPlants:0,missedDust:0,completed:30};
+  const body={...entry(601,0),version:6,score:4580,level:2,completedLevels:1,plants:24,dust:6,missed:0,oraWins:0,bestCombo:30,elapsed:100,stageScores:[4580,...Array(11).fill(0)],stageResults:[summary,...Array(11).fill(null)]};
+  assert.equal((await f.call(body)).status,200);assert.equal((await f.call(body)).status,200);f.restart();
+  const row=(await (await f.call()).json()).scores[0];assert.equal(row.version,6);assert.deepEqual(row.stageResults,body.stageResults);assert.equal(row.score,4580);
+  for(const changes of [{stageResults:null},{stageResults:Array(12).fill(summary)},{stageResults:[{...summary,completed:31},...Array(11).fill(null)]},{stageResults:[{...summary,dust:7},...Array(11).fill(null)]},{score:4581,stageScores:[4581,...Array(11).fill(0)],plants:0,dust:0}])assert.equal((await f.call({...body,requestId:'e'.repeat(32),...changes})).status,400);
+  const partial={...body,requestId:'d'.repeat(32),score:2060,plants:24,dust:5,missed:1,bestCombo:29,stageScores:[2060,...Array(11).fill(0)],stageResults:[{...summary,dust:5,missedDust:1,completed:29},...Array(11).fill(null)]};
+  assert.equal((await f.call(partial)).status,200);
+  const changed={...partial,stageResults:[{...partial.stageResults[0],missedPlants:1,missedDust:0},...Array(11).fill(null)]};
+  assert.equal((await f.call(changed)).status,409,'a valid alternative summary cannot replace the saved run');
+  assert.equal((await f.call(entry(602))).status,200);assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_completion_bonuses').get().n,2);
+ }finally{f.close();}
+});

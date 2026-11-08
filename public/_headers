@@ -5,3 +5,18 @@
 /assets/face-detection-worker.mjs
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net; object-src 'none'
   Referrer-Policy: no-referrer
+
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/assets/*.js
+  Cache-Control: no-cache
+
+/assets/*.mjs
+  Cache-Control: no-cache
+
+/assets/*.css
+  Cache-Control: no-cache
