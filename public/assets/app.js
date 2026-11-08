@@ -573,6 +573,8 @@
 
   const viewport=$('treeViewport');let drag=null,pinch=null;
   const touches=new Map();
+  viewport.addEventListener('selectstart',event=>event.preventDefault());
+  viewport.addEventListener('dragstart',event=>event.preventDefault());
   viewport.addEventListener('click',event=>{if(performance.now()<suppressClickUntil){event.preventDefault();event.stopImmediatePropagation();}},true);
   viewport.addEventListener('pointerdown',event=>{
     stopTreeMotion();if(event.button>0)return;
@@ -589,6 +591,7 @@
     if(!drag.started&&Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>6){
       if(drag.nativeScroll&&Math.abs(event.clientY-drag.startY)>=Math.abs(event.clientX-drag.startX))return;
       drag.started=true;viewport.setPointerCapture(event.pointerId);viewport.classList.add('dragging');
+      if(!drag.touch){const selection=window.getSelection?.();if(selection&&(viewport.contains(selection.anchorNode)||viewport.contains(selection.focusNode)))selection.removeAllRanges();}
     }
     if(!drag.started)return;
     const dt=Math.max(1,event.timeStamp-drag.time);drag.vx=.4*drag.vx+.6*(event.clientX-drag.lastX)/dt;drag.vy=.4*drag.vy+.6*(event.clientY-drag.lastY)/dt;drag.lastX=event.clientX;drag.lastY=event.clientY;drag.time=event.timeStamp;
