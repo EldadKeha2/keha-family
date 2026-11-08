@@ -43,6 +43,12 @@ test('gallery forwards each prepared photo with its own metadata body and header
   f.sent[0].complete();await f.flush();assert.equal(f.sent.length,2);assert.equal(f.sent[1].file,bodyTwo);assert.equal(f.sent[1].headers['X-Family-Photo-Metadata-Length'],'120');assert.equal(f.sent[1].headers['Content-Type'],'image/png');
   f.sent[1].complete();await f.flush();
 });
+test('photo editor receives the selected destination even if the visitor changes tabs',async()=>{
+  for(const kind of ['gallery','photos']){
+    let context;const f=fixture(async(files,options)=>{context=options;return [];});f.select(kind,[original]);await f.flush();
+    assert.equal(context.scope,kind);assert.equal(f.sent.length,0);
+  }
+});
 test('videos retain the normal upload flow and never enter the photo editor',async()=>{
   let calls=0;const f=fixture(async files=>{calls++;return files;}),video={name:'family.mp4',type:'video/mp4',size:50};
   f.select('videos',[video]);assert.equal(calls,0);assert.equal(f.sent.length,1);assert.equal(f.sent[0].file,video);f.sent[0].complete();await f.flush();

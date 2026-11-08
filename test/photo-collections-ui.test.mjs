@@ -21,12 +21,12 @@ function fixture(english=false){
  const selected=(node,collection)=>new RegExp('data-photo-collection="'+collection+'"[^>]*aria-pressed="true"').test(node.innerHTML);
  return {window,document,groups,requests,messages,item,group,button,click,respond,selected};
 }
-test('profiles show three small icons, gallery shows only family, and native album photos are already marked in both languages',()=>{
+test('family photo buttons stay out of galleries and viewers while profiles retain baby and wedding albums in both languages',()=>{
  for(const english of [false,true]){
   const f=fixture(english),profile=f.group(f.item('one',['gallery','photos','nursery:tomer']));
-  assert.equal((profile.innerHTML.match(/data-photo-collection=/g)||[]).length,3);
-  assert.equal(f.selected(profile,'photos'),true);assert.equal(f.selected(profile,'nursery:tomer'),true);assert.equal(f.selected(profile,'wedding:u-tomer'),false);
-  const gallery=f.group(f.item(),'gallery');assert.equal((gallery.innerHTML.match(/data-photo-collection=/g)||[]).length,1);assert.match(gallery.innerHTML,/data-photo-collection="photos"/);
+  assert.equal((profile.innerHTML.match(/data-photo-collection=/g)||[]).length,2);
+  assert.doesNotMatch(profile.innerHTML,/data-photo-collection="photos"/);assert.equal(f.selected(profile,'nursery:tomer'),true);assert.equal(f.selected(profile,'wedding:u-tomer'),false);
+  for(const scope of ['gallery','photos','link:gallery','link:photos','link:personal:tomer'])assert.equal(f.window.FamilyPhotoCollections.controls(f.item(),scope),'',scope);
   const unavailable=f.group(f.item(),'personal:extra');assert.equal((unavailable.innerHTML.match(/disabled/g)||[]).length,2);
   assert.equal(f.window.FamilyPhotoCollections.controls({...f.item(),kind:'video'},'personal:tomer'),'');
  }
@@ -43,11 +43,11 @@ test('one tap saves the exact photo and owner, blocks repeated taps and keeps co
  assert.equal(f.selected({innerHTML:f.window.FamilyPhotoCollections.controls(f.item(),'personal:tomer')},'wedding:u-tomer'),true);
 });
 test('a failed album save leaves the icon unmarked and ready to retry',async()=>{
- const f=fixture(),g=f.group(),b=f.button(g,'photos');f.click(b);
- await f.respond(0,null,false);assert.equal(f.selected(g,'photos'),false);assert.equal(b.disabled,false);assert.equal(f.messages.at(-1),'Connection lost');
- f.click(b);assert.equal(f.requests.length,2);await f.respond(1,f.item('one',['gallery','photos']));assert.equal(f.selected(g,'photos'),true);
+ const f=fixture(),g=f.group(),b=f.button(g,'wedding:u-tomer');f.click(b);
+ await f.respond(0,null,false);assert.equal(f.selected(g,'wedding:u-tomer'),false);assert.equal(b.disabled,false);assert.equal(f.messages.at(-1),'Connection lost');
+ f.click(b);assert.equal(f.requests.length,2);await f.respond(1,f.item('one',['gallery','wedding:u-tomer']));assert.equal(f.selected(g,'wedding:u-tomer'),true);
 });
 test('a save finishing after a photo change never marks the next photo',async()=>{
- const f=fixture(),first=f.group(),b=f.button(first,'photos');f.click(b);f.groups.length=0;const second=f.group(f.item('two'));
- await f.respond(0,f.item('one',['gallery','photos']));assert.equal(f.selected(second,'photos'),false);
+ const f=fixture(),first=f.group(),b=f.button(first,'nursery:tomer');f.click(b);f.groups.length=0;const second=f.group(f.item('two'));
+ await f.respond(0,f.item('one',['gallery','nursery:tomer']));assert.equal(f.selected(second,'nursery:tomer'),false);
 });

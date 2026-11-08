@@ -19,6 +19,14 @@
 .photo-edit-caption{display:flex;flex-direction:column;gap:6px;min-width:0}
 .photo-edit-caption textarea{height:68px;min-height:68px;resize:vertical}
 .photo-edit-metadata input:focus-visible,.photo-edit-metadata textarea:focus-visible{outline:2px solid #8b9b67;outline-offset:2px}
+.photo-edit-family-choice{grid-column:1/-1;position:relative;display:flex;align-items:center;gap:9px;padding-top:8px;border-top:1px solid #e5d8bc;color:#685c42;font-size:14px;cursor:pointer}
+.photo-edit-family-choice input{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;padding:0;margin:-1px;border:0}
+.photo-edit-family-symbol{position:relative;display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;border:1px solid #d8cfb9;border-radius:8px;background:#faf7ee;color:#92866a}
+.photo-edit-family-symbol svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+.photo-edit-family-choice input:checked+.photo-edit-family-symbol{background:#e8efdc;border-color:#91a570;color:#4f6839}
+.photo-edit-family-choice input:checked+.photo-edit-family-symbol::after{content:'✓';position:absolute;inset-inline-end:-4px;bottom:-3px;display:grid;place-items:center;width:17px;height:17px;border-radius:50%;background:#607b46;color:white;font:12px/1 Arial,sans-serif}
+.photo-edit-family-choice input:focus-visible+.photo-edit-family-symbol{outline:2px solid #7b905e;outline-offset:3px}
+.photo-edit-family-choice input:disabled~span{opacity:.45;cursor:default}
 .photo-edit-remove{display:inline-flex;align-items:center;justify-content:center;gap:7px;margin-inline-start:auto;min-height:44px;padding:8px 10px;border:1px solid #dbb6ac;border-radius:8px;background:#fff6f2;color:#a13729;font:inherit;font-size:14px;cursor:pointer}
 .photo-edit-remove:hover{background:#fbe7df;border-color:#b46251}
 .photo-edit-remove svg{flex-shrink:0}
@@ -31,6 +39,8 @@
   .photo-edit-date-fields{gap:7px}
   .photo-edit-date legend,.photo-edit-caption{font-size:14px}
   .photo-edit-caption textarea{height:58px;min-height:58px}
+  .photo-edit-family-choice{justify-self:start;width:44px;padding:0;border:0}
+  .photo-edit-family-text{display:none}
   .photo-edit-remove{margin-inline-start:0;font-size:13px;padding:7px 9px}
   .photo-upload-editor:not(.is-existing) .photo-edit-viewport{height:min(28dvh,calc(var(--photo-editor-height,100dvh) * .32));min-height:100px}
   .photo-upload-editor:not(.is-existing) .photo-edit-footer{bottom:-16px;padding-bottom:5px}

@@ -595,6 +595,7 @@ export class FamilyState {
         if(item.category==='personal')this.person(item.personId);
         else validCollection(item.category);
         this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,JSON.stringify(item));
+        if(p.familyPhoto===true&&item.category!=='photos')this.sql.exec('INSERT INTO media_collections(media_id,collection,added_at) VALUES(?,?,?)',item.id,'photos',item.createdAt);
         this.touchMedia(item);
         return {saved:true};
       }

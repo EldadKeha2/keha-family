@@ -78,6 +78,28 @@ test('photo upload dates and descriptions save together in every album and retai
   const legacy=await taggedUpload(f);const item=(await(await f.call('/api/media/'+legacy.id+'/view')).json()).item;assert.deepEqual(item.takenDate,{day:null,month:null,year:null});assert.equal(item.caption,'');
  }finally{await f.close();}
 });
+test('family photo selection on upload links the same file to Family photos from every album and survives restart',async()=>{
+ const f=fixture();try{
+  await f.connect();const ids=[],paths=['/api/collections/gallery/upload','/api/collections/photos/upload','/api/people/yona/photos','/api/nursery/yona/upload','/api/weddings/u-tomer/upload','/api/nostalgia/upload'];
+  for(const [index,path]of paths.entries()){
+   const response=await uploadWithDetails(f,path,{date:{year:1980+index},caption:'Family '+index,familyPhoto:true});assert.equal(response.status,201,await response.clone().text());
+   const result=await response.json(),item=(result.collection?.items||result.person.gallery).find(value=>value.file===result.file);ids.push(item.id);
+   assert.ok(item.collections.includes('photos'));assert.equal(item.caption,'Family '+index);assert.deepEqual(item.tags,[]);
+   assert.deepEqual(Buffer.from(await(await f.call(item.src)).arrayBuffer()),photo);
+  }
+  const plain=await uploadWithDetails(f,paths[0],{caption:'Ordinary photo',familyPhoto:false});assert.equal(plain.status,201);const plainResult=await plain.json();
+  assert.ok(!plainResult.collection.items.find(value=>value.file===plainResult.file).collections.includes('photos'));
+  f.restart();const album=await(await f.call('/api/collections/photos')).json();assert.equal(album.count,paths.length);assert.deepEqual(new Set(album.items.map(item=>item.id)),new Set(ids));
+  assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections').get().n,paths.length-1);assert.equal(f.objects.size,paths.length+1);
+ }finally{await f.close();}
+});
+test('a failed family album link rolls back the uploaded media record and removes the unused file',async()=>{
+ const f=fixture();try{
+  await f.connect();const before=f.database.prepare('SELECT count(*) AS n FROM media').get().n;f.database.exec("CREATE TRIGGER reject_family_link BEFORE INSERT ON media_collections WHEN NEW.collection='photos' BEGIN SELECT RAISE(ABORT,'test album failure'); END");
+  const result=await uploadWithDetails(f,'/api/collections/gallery/upload',{familyPhoto:true});assert.equal(result.status,500);
+  await f.flush();assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,before);assert.equal(f.objects.size,0);
+ }finally{await f.close();}
+});
 test('malformed upload metadata is rejected before creating a file or media record',async()=>{
  const f=fixture();try{
   await f.connect();const before=f.objects.size;

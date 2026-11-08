@@ -27,7 +27,8 @@ export function normalizeUploadMetadata(value){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new RangeError('Invalid photo metadata');
   const caption=value.caption??'';
   if(typeof caption!=='string'||caption.length>5000)throw new RangeError('Invalid photo caption');
-  return {date:photoDate(value.date),caption};
+  if(value.familyPhoto!==undefined&&typeof value.familyPhoto!=='boolean')throw new RangeError('Invalid family photo choice');
+  return {date:photoDate(value.date),caption,...(value.familyPhoto===undefined?{}:{familyPhoto:value.familyPhoto})};
 }
 
 export function photoUploadPayload(file,metadata){

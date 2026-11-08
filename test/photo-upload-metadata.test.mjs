@@ -34,6 +34,14 @@ test('photo metadata travels with the body, preserving original bytes and long m
   assert.deepEqual(bytes.subarray(length),new Uint8Array(await original.arrayBuffer()));
   assert.equal(payload.body.size,length+original.size);assert.equal(payload.body.type,'image/jpeg');
   assert.deepEqual(photoUploadPayload(original,null),{body:original,headers:{}});
-  for(const value of [{date:{day:31,month:4}},{caption:42},{caption:'a'.repeat(5001)},null,[]])assert.throws(()=>normalizeUploadMetadata(value));
+  for(const value of [{date:{day:31,month:4}},{caption:42},{caption:'a'.repeat(5001)},{familyPhoto:'true'},null,[]])assert.throws(()=>normalizeUploadMetadata(value));
   assert.throws(()=>decodeUploadMetadata(new Uint8Array([255,255])));
+});
+test('family photo selection stays attached to each upload without changing legacy metadata',async()=>{
+  const file=new File(['pixels'],'photo.png',{type:'image/png'});
+  for(const familyPhoto of [true,false]){
+    const payload=photoUploadPayload(file,{date:{year:1980},caption:'Family',familyPhoto}),bytes=new Uint8Array(await payload.body.arrayBuffer()),length=Number(payload.headers[PHOTO_METADATA_HEADER]);
+    assert.deepEqual(decodeUploadMetadata(bytes.subarray(0,length)),{date:{day:null,month:null,year:1980},caption:'Family',familyPhoto});
+  }
+  assert.equal(Object.hasOwn(normalizeUploadMetadata({caption:''}),'familyPhoto'),false);
 });

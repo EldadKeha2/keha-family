@@ -5,17 +5,16 @@
   const items=new Map(),pending=new Set();
   const icons={
     baby:'<circle cx="12" cy="12" r="8"/><path d="M10 4c0 3 4 2 3 0M8 11h.01M16 11h.01M9 15c2 2 4 2 6 0M4 10c-3 0-3 5 0 5m16-5c3 0 3 5 0 5"/>',
-    wedding:'<circle cx="9" cy="14" r="6"/><circle cx="16" cy="14" r="5"/><path d="m6 6 3-4 3 4-3 3Z"/>',
-    family:'<circle cx="6" cy="7" r="3"/><circle cx="18" cy="7" r="3"/><circle cx="12" cy="13" r="2.5"/><path d="M1 20v-4a5 5 0 0 1 7-4m15 8v-4a5 5 0 0 0-7-4M7 22v-2a5 5 0 0 1 10 0v2"/>'
+    wedding:'<circle cx="9" cy="14" r="6"/><circle cx="16" cy="14" r="5"/><path d="m6 6 3-4 3 4-3 3Z"/>'
   };
   function targets(scope){
     const id=scope?.startsWith('personal:')?scope.slice(9):null;
     const family=window.FAMILY_DATA,person=id&&(window.FamilyApp?.getPerson?.(id)||family?.people?.[id]);
     const pair=id&&Object.values(family?.units||{}).find(unit=>unit.people?.length===2&&unit.people.includes(id));
-    return [...(id?[
+    return id?[
       {icon:'baby',collection:person&&!person.extended&&!person.extra?'nursery:'+id:null,label:tr('אלבום התינוקייה','Baby album')},
       {icon:'wedding',collection:pair?'wedding:'+pair.id:null,label:tr('אלבום החתונה','Wedding album')}
-    ]:[]),{icon:'family',collection:'photos',label:tr('תמונות משפחתיות','Family photos')}];
+    ]:[];
   }
   function buttons(item,scope){
     const memberships=items.get(item.id)?.collections||item.collections||[item.scope];
@@ -26,7 +25,7 @@
     }).join('');
   }
   function controls(item,scope){
-    if(item.kind!=='photo'||!item.id||!scope?.startsWith('personal:')&&!scope?.startsWith('link:')&&!['gallery','photos'].includes(scope))return '';
+    if(item.kind!=='photo'||!item.id||!scope?.startsWith('personal:'))return '';
     items.set(item.id,{...item,collections:[...new Set([...(items.get(item.id)?.collections||[]),...(item.collections||[item.scope])])]});
     if(items.size>512)items.delete(items.keys().next().value);
     return `<div class="photo-collections" data-collection-photo="${safe(item.id)}" data-collection-scope="${safe(scope)}" role="group" aria-label="${tr('אלבומי התמונה','Photo albums')}">${buttons(item,scope)}</div>`;

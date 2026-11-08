@@ -103,7 +103,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
     transfer.catch(()=>{});
   }
   await Promise.all([putObject(env,item.key,body,item.size,item.mime),transfer]);
-  try{await db('media.add',{item});}
+  try{await db('media.add',{item,familyPhoto:metadata?.familyPhoto===true});}
   catch(error){ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));throw error;}
   if(personId){const url=new URL(request.url);if(url.searchParams.get('layout')==='page')return json({saved:true,file:item.file,...await db('person.page',{id:personId,photos:url.searchParams.get('photos'),videos:url.searchParams.get('videos'),documents:url.searchParams.get('documents')})},201);return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);}
   return json({saved:true,file:item.file,collection:await db('collection',{kind:category})},201);

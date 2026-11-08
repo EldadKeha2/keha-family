@@ -196,7 +196,7 @@
     const group=kind==='videos'?$('videoUploadCategory').value:'family';
     let approved=selected;
     if(kind!=='videos'){
-      try{approved=await window.FamilyPhotoEditor.prepare(selected);}catch{notify(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+      try{approved=await window.FamilyPhotoEditor.prepare(selected,{scope:kind});}catch{notify(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
       if(!approved?.length)return;
     }
     // Only approved files enter the upload queue; saved media has no edit action.
