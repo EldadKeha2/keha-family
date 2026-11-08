@@ -12,7 +12,10 @@ export function galleryOrdering(options={}){
     if(!Number.isSafeInteger(seed)||seed<0||seed>0xffffffff)throw new HttpError(400,'בחרו סדר תמונות תקין.');
     let mixed=Math.imul(seed^(seed>>>16),0x21f0aaad);mixed=Math.imul(mixed^(mixed>>>15),0x735a2d97);mixed^=mixed>>>15;
     const multiplier=(mixed>>>0)%2147483645+2;
-    return {sort,seed,sql:'((m.rowid * ?) % 2147483647) ASC,m.id ASC',args:[multiplier]};
+    // A nonlinear rank avoids keeping sequential uploads in repeating strides.
+    // Each factor is below 2^31, so their product fits SQLite's signed integer.
+    const rank='CAST(((m.rowid * ?) % 2147483647) AS INTEGER)';
+    return {sort,seed,sql:'(('+rank+' * '+rank+') % 2147483647) ASC,m.id ASC',args:[multiplier,multiplier]};
   }
   const direction=sort.endsWith('-asc')?'ASC':'DESC';
   if(sort.startsWith('tags-'))return {sort,seed:null,sql:'(SELECT count(*) FROM media_tags sort_tags WHERE sort_tags.media_id=m.id) '+direction+',m.rowid DESC',args:[]};

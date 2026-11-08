@@ -21,6 +21,7 @@ test('seeded random ordering is stable across every page and metadata edits, and
     db.exec('CREATE TABLE media(id TEXT PRIMARY KEY,data TEXT)');for(let n=0;n<205;n++)db.prepare('INSERT INTO media VALUES(?,?)').run(String(n),'{}');
     const page=(seed,offset=0,size=100)=>{const order=galleryOrdering({sort:'random',seed});return db.prepare('SELECT m.id FROM media m ORDER BY '+order.sql+' LIMIT ? OFFSET ?').all(...order.args,size,offset).map(row=>row.id);};
     const first=page(101),all=[...first,...page(101,100),...page(101,200)];assert.equal(all.length,205);assert.equal(new Set(all).size,205);assert.deepEqual(page(101,0,500),all);
+    assert.ok(new Set(all.slice(1).map((id,index)=>Number(id)-Number(all[index]))).size>20,'Sequential uploads should not remain in repeating strides');
     db.prepare('UPDATE media SET data=? WHERE id=?').run('{"caption":"changed"}','7');assert.deepEqual(page(101),first);assert.notDeepEqual(page(102),first);
   }finally{db.close();}
 });
