@@ -81,14 +81,15 @@
   #photoUploadEditor:not(.is-existing) .photo-edit-close{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;font-size:26px;line-height:1;border:1px solid #b69a68;border-radius:6px;background:#fff9ee;color:#65563c}
   #photoUploadEditor:not(.is-existing) .photo-edit-close:hover{background:#f1e5d0;border-color:#927342}
   #photoUploadEditor:not(.is-existing)>.photo-edit-pager{order:1;gap:10px;margin:10px 0 12px}
-  #photoUploadEditor:not(.is-existing) .photo-edit-pager button{min-height:32px;padding:5px 11px;font-size:calc(13px * var(--a11y-text-scale,1));line-height:1.4}
+  #photoUploadEditor:not(.is-existing) .photo-edit-pager button{min-height:32px;padding:5px 11px;font-size:calc(13px * var(--a11y-text-scale,1));line-height:1.4;background:var(--olive);border-color:var(--olive);color:#fffdf6}
+  #photoUploadEditor:not(.is-existing) .photo-edit-pager button:hover:not(:disabled){background:#48583d}
   #photoUploadEditor:not(.is-existing) .photo-edit-pager strong{font-size:calc(13px * var(--a11y-text-scale,1));font-weight:500}
   #photoUploadEditor:not(.is-existing) #photoEditFilename{display:none}
   #photoUploadEditor:not(.is-existing)>.photo-edit-hint{order:2;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.45;margin:7px 0 10px}
   #photoUploadEditor:not(.is-existing) .photo-edit-metadata{grid-template-columns:minmax(340px,.95fr) minmax(0,1.05fr);padding:9px 10px;gap:16px;margin-bottom:10px;align-items:start}
   #photoUploadEditor:not(.is-existing) .photo-edit-date{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:0 10px;align-items:start}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-label,#photoUploadEditor:not(.is-existing) .photo-edit-caption{font-size:calc(14px * var(--a11y-text-scale,1));line-height:20px}
-  #photoUploadEditor:not(.is-existing) .photo-edit-date-label{white-space:nowrap}
+  #photoUploadEditor:not(.is-existing) .photo-edit-date-label{white-space:nowrap;align-self:end;margin-block-end:9px}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields{margin-top:0}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields label{line-height:20px}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields input{height:38px}
