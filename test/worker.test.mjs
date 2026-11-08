@@ -1161,6 +1161,24 @@ test('manual all-faces confirmation persists, excludes partial and scan queues, 
  }finally{await f.close();}
 });
 
+test('all-faces confirmation survives rotation, cropping, restoration and restart without reviving revoked reviews',async()=>{
+ const f=fixture();try{
+  await f.connect();let a=await galleryPhoto(f,'ReviewedEdit.jpg'),b=await galleryPhoto(f,'IncompleteEdit.jpg');
+  a=(await(await f.call('/api/media/'+a.id+'/faces/save',{method:'POST',body:{faceId:'a'.repeat(32),personId:'yona',rect:detectedGalleryFaces[0].rect,expectedRevision:null}})).json()).item;
+  const review=(item,complete)=>f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{photoRevision:item.photoRevision||'original',tagsRevision:item.tagsRevision,complete}});
+  assert.equal((await review(a,true)).status,200);const completedAt=f.database.prepare('SELECT completed_at FROM media_face_reviews WHERE media_id=?').get(a.id).completed_at;
+  for(const action of ['rotate','crop','restore']){
+   const response=action==='restore'?await f.call('/api/media/'+a.id+'/versions/original/restore',{method:'POST',body:{expectedVersion:a.photoRevision}}):await photoEdit(f,a,{expectedVersion:a.photoRevision||'original',rotation:action==='rotate'?1:0,...(action==='crop'?{crop:{x:.05,y:.05,width:.9,height:.9}}:{})});
+   assert.equal(response.status,action==='restore'?200:201);a=(await response.json()).item;assert.equal(a.faceSummary.reviewed,true,action);assert.equal(a.faceSummary.partial,false);assert.deepEqual(a.tags.map(p=>p.id),['yona']);
+   const complete=await(await f.call('/api/collections/gallery?filter=complete')).json();assert.deepEqual(complete.items.map(p=>p.id),[a.id]);assert.equal(complete.filterCounts.complete,1);assert.ok(!(await(await f.call('/api/gallery/face-scan')).json()).items.some(p=>p.id===a.id));
+   f.restart();assert.equal((await(await f.call('/api/media/'+a.id+'/faces')).json()).item.faceSummary.reviewed,true);assert.equal(f.database.prepare('SELECT completed_at FROM media_face_reviews WHERE media_id=?').get(a.id).completed_at,completedAt);
+  }
+  assert.equal((await review(a,false)).status,200);a=(await(await photoEdit(f,a,{expectedVersion:a.photoRevision})).json()).item;assert.equal(a.faceSummary.reviewed,false,'An explicitly removed check must stay removed');
+  assert.equal((await review(a,true)).status,200);await f.call('/api/media/'+a.id+'/tag',{method:'POST',body:{personId:'shlomo',tagged:true}});a=(await(await photoEdit(f,a,{expectedVersion:a.photoRevision})).json()).item;assert.equal(a.faceSummary.reviewed,false,'Editing must not revive a review invalidated by changed tags');
+  b=(await(await photoEdit(f,b)).json()).item;assert.ok(!b.faceSummary?.reviewed,'Editing never marks an unfinished photo complete');
+ }finally{await f.close();}
+});
+
 test('ignored false detections persist only for that photo revision, survive rescanning and support Undo without removing names',async()=>{
  const f=fixture();try{
   await f.connect();const item=await galleryPhoto(f,'Ignore.jpg'),other=await galleryPhoto(f,'Unaffected.jpg');await saveGalleryScan(f,item);await saveGalleryScan(f,other);

@@ -143,6 +143,7 @@ export class FamilyState {
   }
   savePhotoVersion(item,version,faces){
     const previous=this.currentPhotoVersion(item);
+    const reviewed=this.rows('SELECT media_id FROM media_face_reviews WHERE media_id=? AND photo_revision=? AND tags_revision=?',item.id,previous.id,this.tagsRevision(item.id))[0];
     this.sql.exec('INSERT INTO photo_versions(media_id,id,data) VALUES(?,?,?) ON CONFLICT(media_id,id) DO UPDATE SET data=excluded.data',item.id,previous.id,JSON.stringify(previous));
     const now=new Date().toISOString(),next={...version,createdAt:now,faces:faces.map(face=>({...face,revision:uid(),updatedAt:now}))};
     this.sql.exec('INSERT INTO photo_versions(media_id,id,data) VALUES(?,?,?)',item.id,next.id,JSON.stringify(next));
@@ -152,6 +153,9 @@ export class FamilyState {
     this.sql.exec('DELETE FROM media_faces WHERE media_id=?',item.id);
     for(const face of next.faces)this.sql.exec('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?)',item.id,face.id,face.personId,JSON.stringify(face));
     this.touchTags(item.id);
+    // Editing moves existing labels with the pixels. Carry the visitor's valid
+    // completion check forward while keeping its original confirmation date.
+    if(reviewed)this.sql.exec('UPDATE media_face_reviews SET photo_revision=?,tags_revision=? WHERE media_id=?',next.id,this.tagsRevision(item.id),item.id);
     this.touchMedia(item);
     return {...this.mediaChanged(item,'photo-edit'),...this.photoVersions(item)};
   }
