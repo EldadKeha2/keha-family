@@ -25,10 +25,12 @@ function fixture(english=false){
 }
 for(const english of [false,true])test('checkboxes keep independent people and family selections through search, removal and reset '+(english?'English':'Hebrew'),async()=>{
  const f=fixture(english);await f.open();
+ assert.equal(f.get('clearGalleryFilter').hidden,true);
  assert.match(f.get('galleryPersonFilter').innerHTML,/type="checkbox"/);
  assert.match(f.get('galleryFamily4').innerHTML,english?/Family of Matan Gandelman/:/המשפחה של מתן גנדלמן/);
  for(const id of ['u-roi','u-naama','u-yarden'])assert.ok(![2,3,4].some(g=>f.get('galleryFamily'+g).innerHTML.includes('data-gallery-family="'+id+'"')));
  f.change('person','yona',true);f.change('person','ruti',true);
+ assert.equal(f.get('clearGalleryFilter').hidden,false);
  f.change('family','u-matan-g',true);f.change('family','u-moran',true);f.change('family','u-becker',true);
  assert.equal(f.query().person,'ruti,yona');assert.equal(f.query().unit,'u-becker,u-matan-g,u-moran');
  assert.equal(f.get('galleryPeopleChoiceCount').textContent,'(2)');
@@ -40,6 +42,8 @@ for(const english of [false,true])test('checkboxes keep independent people and f
  assert.equal(f.query().person,'eldad,ruti');assert.equal(f.query().unit,'u-becker,u-matan-g');
  assert.equal(f.get('galleryFamily3ChoiceCount').textContent,'');
  f.reset();assert.equal(f.query().person,'');assert.equal(f.query().unit,'');
+ assert.equal(f.get('clearGalleryFilter').hidden,true);
+ f.change('family','u-moran',true);assert.equal(f.get('clearGalleryFilter').hidden,false);f.change('family','u-moran',false);assert.equal(f.get('clearGalleryFilter').hidden,true);
  for(const id of ['galleryPersonFilter','galleryFamily2','galleryFamily3','galleryFamily4'])assert.doesNotMatch(f.get(id).innerHTML,/ checked/);
  assert.equal(f.get('galleryPersonSearch').value,'');
  f.change('person','ruti',true);f.get('galleryPeopleChoices').open=true;f.get('galleryFamily2Choices').open=true;await f.open();assert.equal(f.query().person,'');assert.equal(f.get('galleryFilterPanel').hidden,true);

@@ -34,6 +34,7 @@ function render(){
   const collection=window.FamilyPortal.getCollection('gallery'),q=window.FamilyPortal.galleryQuery(),p=collection.pagination;
   state.resultsReady=Boolean(p&&(p.person||'')===q.person&&(p.unit||'')===q.unit&&(p.query||'')===q.query.trim());
   toggle.hidden=!all;toggle.setAttribute('aria-expanded',String(open));$('galleryFilterPanel').hidden=!open;
+  $('clearGalleryFilter').hidden=!(state.people.size||state.families.size);
   $('galleryPeopleChoiceCount').textContent=state.people.size?'('+state.people.size+')':'';
   for(const generation of [2,3,4]){
     const count=[...state.families].filter(id=>window.FAMILY_DATA.units[id]?.generation===generation).length;

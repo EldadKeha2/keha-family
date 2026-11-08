@@ -41,11 +41,11 @@
   <link rel="stylesheet" href="assets/differences.css?v=a11y1">
   <link rel="stylesheet" href="assets/nursery.css?v=a11y1">
   <link rel="stylesheet" href="assets/faces.css?v=compact-filters-v1">
-  <link rel="stylesheet" href="assets/gallery-filter.css?v=3">
+  <link rel="stylesheet" href="assets/gallery-filter.css?v=quiet-filter-v4">
   <link rel="stylesheet" href="assets/photo-collections.css?v=desktop-captions-v1">
   <link rel="stylesheet" href="assets/navigation.css?v=a11y1">
   <link rel="stylesheet" href="assets/accessibility.css?v=a11y1">
-  <link rel="stylesheet" href="assets/mobile-header.css?v=desktop1">
+  <link rel="stylesheet" href="assets/mobile-header.css?v=compact-inner-v1">
   <link rel="stylesheet" href="assets/home-scroll.css?v=1">
   <script src="assets/maintenance.js" defer></script>
   <script src="assets/family-fallback.js" defer></script>
@@ -63,7 +63,7 @@
   <script src="assets/photo-collections.js?v=1" defer></script>
   <script src="assets/media.js?v=photo-refresh-v1" defer></script>
   <script src="assets/portal.js?v=desktop-captions-v1" defer></script>
-  <script src="assets/gallery-filter.js?v=3" type="module"></script>
+  <script src="assets/gallery-filter.js?v=quiet-filter-v4" type="module"></script>
   <script src="assets/updates.js" defer></script>
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
   <script src="assets/people.js?v=friends-v1" defer></script>
@@ -139,8 +139,7 @@
               <details class="gallery-filter-field" id="galleryFamily3Choices" name="gallery-filter-choices"><summary><span>משפחה דור שלישי</span><span class="gallery-choice-count" id="galleryFamily3ChoiceCount"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gallery-filter-options"><div class="gallery-checkbox-list" id="galleryFamily3"></div></div></details>
               <details class="gallery-filter-field" id="galleryFamily4Choices" name="gallery-filter-choices"><summary><span>משפחה דור רביעי</span><span class="gallery-choice-count" id="galleryFamily4ChoiceCount"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gallery-filter-options"><div class="gallery-checkbox-list" id="galleryFamily4"></div></div></details>
             </div>
-            <div class="gallery-filter-note"><p>כל סימון מוסיף תמונות של האדם או המשפחה. משפחה כוללת בני זוג וצאצאים.</p><button type="button" id="clearGalleryFilter">איפוס הסינון</button></div>
-            <p class="gallery-selection-hint">הקישו על תמונה לבחירה או לביטול. ״בחר הכל״ כולל גם את העמודים הבאים.</p>
+            <button type="button" class="gallery-filter-reset" id="clearGalleryFilter" hidden>איפוס הסינון</button>
           </section>
           <div class="gallery-selection-bar" id="gallerySelectionTop" hidden></div>
           <div class="gallery-face-scan" hidden><span id="galleryFaceScanStatus" role="status"></span><button id="retryGalleryFaceScan" type="button" hidden>ניסיון נוסף לסריקת התמונות</button></div>

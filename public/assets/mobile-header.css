@@ -50,3 +50,33 @@
   html[data-a11y-text] .site-header .header-preferences{width:100%}
   html[data-a11y-text] .site-header .language-switcher-label{white-space:normal;text-align:center}
 }
+
+/* Internal phone pages use the space occupied by the home shortcut controls. */
+@media(max-width:700px){
+  body:not([data-active-view=home]) .site-header{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"preferences brand" "navigation navigation";column-gap:8px;padding-top:8px}
+  body:not([data-active-view=home]) .site-header .brand{white-space:nowrap;font-size:calc(15px * var(--a11y-text-scale,1));gap:5px}
+  body:not([data-active-view=home]) .site-header .brand span{max-width:none;white-space:nowrap}
+  body:not([data-active-view=home]) .site-header .brand img{width:26px;height:26px;flex-basis:26px}
+  body:not([data-active-view=home]) .site-header .header-preferences{flex-direction:row;direction:ltr;align-items:center;justify-self:start;width:auto;gap:6px}
+  body:not([data-active-view=home]) .site-header .language-selector{width:82px;flex:0 0 82px;direction:rtl}
+  body:not([data-active-view=home]) .site-header .language-switcher{gap:2px}
+  body:not([data-active-view=home]) .site-header .a11y-trigger{min-height:34px;padding:4px 5px;white-space:nowrap;direction:rtl}
+  html[lang^=en] body:not([data-active-view=home]) .site-header .brand{font-size:calc(12px * var(--a11y-text-scale,1))}
+  html[lang^=en] body:not([data-active-view=home]) .site-header .a11y-trigger{width:34px;min-width:34px;padding:5px}
+  html[lang^=en] body:not([data-active-view=home]) .site-header .a11y-trigger>span:not(.a11y-active-dot){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+}
+@media(max-width:360px){
+  body:not([data-active-view=home]) .site-header .brand{font-size:calc(14px * var(--a11y-text-scale,1))}
+  body:not([data-active-view=home]) .site-header .header-preferences{gap:4px}
+}
+@media(max-width:340px){
+  body:not([data-active-view=home]) .site-header .language-selector{width:76px;flex-basis:76px}
+  body:not([data-active-view=home]) .site-header .language-switcher button{width:24px}
+  body:not([data-active-view=home]) .site-header .a11y-trigger{width:34px;min-width:34px;padding:5px}
+  body:not([data-active-view=home]) .site-header .a11y-trigger>span:not(.a11y-active-dot){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  html[lang^=en] body:not([data-active-view=home]) .site-header .brand{font-size:calc(11px * var(--a11y-text-scale,1))}
+}
+@media(max-width:700px){
+  html[data-a11y-text] body:not([data-active-view=home]) .site-header{grid-template-columns:minmax(0,1fr);grid-template-areas:"brand" "preferences" "navigation";row-gap:6px}
+  html[data-a11y-text] body:not([data-active-view=home]) .site-header .header-preferences{width:auto}
+}
