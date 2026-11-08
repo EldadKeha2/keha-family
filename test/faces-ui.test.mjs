@@ -21,7 +21,7 @@ function fixture(detected=[],{desktop=false}={}){
   replaceChildren(...nodes){for(const node of [...this.children])node.remove();this.append(...nodes);}
   setAttribute(name,value){this[name]=value;}
   querySelector(selector){if(!this.queries.has(selector)){const node=new Node();node.selector=selector;this.queries.set(selector,node);}return this.queries.get(selector);}
-  querySelectorAll(){return [];}
+  querySelectorAll(selector){const classes=selector.split(',').filter(value=>value.startsWith('.')).map(value=>value.slice(1)),nodes=[...this.children,...this.queries.values()];return nodes.flatMap(node=>[...(classes.some(name=>node.classList.contains(name))?[node]:[]),...node.querySelectorAll(selector)]);}
   contains(node){return node===this||[...this.children,...this.queries.values()].some(child=>child.contains(node));}
   closest(selector){return this.matches(selector)?this:this.parent?.closest(selector)||null;}
   matches(selector){return selector==='[data-face-handle]'?Boolean(this.dataset.faceHandle):selector==='.'+this.className;}
@@ -36,19 +36,47 @@ function fixture(detected=[],{desktop=false}={}){
    return {x:0,y:0,left:0,top:0,width:280,height:240};
   }
  }
- const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node(),title=new Node('h2'),download=new Node('a'),edit=new Node('button');root.append(title,stage);title.append(download,edit);stage.append(image);
+ const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node(),title=new Node('h2'),download=new Node('a'),edit=new Node('button');dialog.append(root);root.append(title,stage);title.append(download,edit);stage.append(image);
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
  const document=new Node();document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
  const window=new Node();window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
  let progress,detectionImage;
  const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{progress=onProgress;detectionImage=img;return detected;}};
- vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});
+ const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
- return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
+ return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+
+test('repeated metadata refreshes reuse one face viewer and remove leftover external controls',async()=>{
+ const f=fixture([first]),options={highlightMissing:true},item={scope:'gallery',tagsRevision:'t1'};await f.mount('dated',options,item);
+ const toolbar=f.find('face-zoom-toolbar'),review=f.find('face-review-button'),note=f.find('face-missing-note');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
+ for(const year of [2006,2007,2008]){
+  // Simulate controls left outside the stage by an interrupted older render.
+  for(const name of ['face-zoom-toolbar','face-missing-note','face-review-button','face-review-status']){const orphan=f.document.createElement('div');orphan.className=name;(name==='face-review-button'?f.title:f.dialog).append(orphan);}
+  f.faces.update({id:'dated',kind:'photo',...item,takenDate:{year}});
+  await f.mount('dated',options,{...item,takenDate:{year}});
+  for(const name of ['face-zoom-toolbar','face-missing-note','face-review-button','face-review-status'])assert.equal(f.dialog.querySelectorAll('.'+name).length,1,name);
+  assert.equal(f.find('face-zoom-toolbar'),toolbar);assert.equal(f.find('face-review-button'),review);assert.equal(f.find('face-missing-note'),note);assert.equal(toolbar.querySelector('[data-face-zoom-level]').textContent,'150%');
+ }
+ f.faces.clear();for(const name of ['face-zoom-toolbar','face-missing-note','face-review-button','face-review-status'])assert.equal(f.dialog.querySelectorAll('.'+name).length,0,name);
+});
+
+test('stage ownership disposes a previous face controller and ignores its delayed detections',async()=>{
+ const f=fixture([first]);await f.mount('dated',{highlightMissing:true},{scope:'gallery'});const oldProgress=f.progress,oldToolbar=f.find('face-zoom-toolbar');
+ f.reboot();await f.mount('dated',{highlightMissing:true},{scope:'gallery',takenDate:{year:2006}});assert.equal(oldToolbar.parent,null);
+ const hits=f.find('face-hit-buttons'),before=hits.children.map(node=>node.dataset.faceId);oldProgress([second]);assert.deepEqual(hits.children.map(node=>node.dataset.faceId),before);
+ for(const name of ['face-zoom-toolbar','face-missing-note','face-review-button','face-review-status'])assert.equal(f.dialog.querySelectorAll('.'+name).length,1,name);
+ f.window.FamilyFaces.clear();assert.equal(f.dialog.querySelectorAll('.face-zoom-toolbar').length,0);assert.equal(f.title.children.length,2);
+});
+
+test('metadata received before face controls are ready is retained without interrupting mounting',async()=>{
+ const f=fixture(),pending=f.mount('dated',{highlightMissing:true},{scope:'gallery'});
+ assert.doesNotThrow(()=>f.faces.update({id:'dated',kind:'photo',scope:'gallery',takenDate:{year:2006},faceSummary:{reviewed:true}}));await pending;
+ assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(f.find('face-missing-note').hidden,true);assert.equal(f.dialog.querySelectorAll('.face-zoom-toolbar').length,1);f.faces.clear();
+});
 
 test('the upload wizard reuses face picking, frame editing and completion without a media write or gallery scan',async()=>{
  const f=fixture([first],{desktop:true}),requests=[],person={id:'yona',name:'יונה'},originalBitmap={width:6000,height:4000},saved={...first,id:'a'.repeat(32),personId:'yona',person};let reviewed=false,face=saved;
