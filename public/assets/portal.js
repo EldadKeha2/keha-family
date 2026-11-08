@@ -357,6 +357,15 @@
     $('birthdayForm').addEventListener('submit',saveBirthday);$('storyForm').addEventListener('submit',saveStory);
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
+      if(event.detail.operation==='collection'&&event.detail.item){
+        const item=event.detail.item;
+        for(const [kind,collection] of Object.entries(state.collections))if(kind!==event.detail.scope&&collection.items?.some(photo=>photo.id===item.id)){
+          collection.items=collection.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);revisions[kind]=null;
+          if(state.view===kind)renderCollection(kind);
+        }
+        // A native Family photo can become a gallery photo when unlinked.
+        revisions.gallery=null;
+      }
       if(['photo-edit','caption','labels','photo-date'].includes(event.detail.operation)&&event.detail.item){
         const item=event.detail.item;for(const [kind,collection] of Object.entries(state.collections))if(collection.items?.some(photo=>photo.id===item.id)){collection.items=collection.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);itemVersions[kind]=(itemVersions[kind]||0)+1;revisions[kind]=null;if(state.view===kind)renderCollection(kind);}
         if(event.detail.operation==='photo-date'&&item.scope==='gallery'&&galleryPage.sort.startsWith('taken-')){revisions.gallery=null;refreshCollection('gallery',true);}

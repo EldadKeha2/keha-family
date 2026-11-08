@@ -304,6 +304,35 @@ test('photo album shortcuts link the original to family photos, its own nursery 
   assert.equal((await(await f.call('/api/nursery/tomer')).json()).items[0].caption,'One original, shared description');
  }finally{await f.close();}
 });
+for(const origin of ['gallery','photos'])test('Family photos can remove and re-add a '+origin+' upload without losing its original, tags or versions',async()=>{
+ const f=fixture();try{
+  await f.connect();const original=await taggedUpload(f,'/api/collections/'+origin);await setTags(f,original,['tomer']);
+  const edit=await photoEdit(f,original);assert.equal(edit.status,201);const item=(await edit.json()).item;
+  const toggle=(included,extra={})=>f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection:'photos',scope:origin,included},...extra});
+  if(origin==='gallery')assert.equal((await toggle(true)).status,200);
+  await f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection:'nursery:tomer',scope:'personal:tomer'}});
+  const before=await f.call('/api/collections/photos'),objects=f.objects.size,versions=await(await f.call('/api/media/'+item.id+'/versions')).json();
+  const response=await toggle(false);assert.equal(response.status,200,await response.clone().text());const removed=await response.json();
+  assert.equal(removed.included,false);assert.equal(removed.collection.count,0);assert.equal(removed.item.collections.includes('photos'),false);assert.equal(removed.item.collections.includes('nursery:tomer'),true);
+  assert.equal(removed.item.id,item.id);assert.equal(removed.item.file,item.file);assert.equal(removed.item.src,item.src);assert.equal(removed.item.photoRevision,item.photoRevision);assert.deepEqual(removed.item.tags,item.tags);
+  const fresh=await f.call('/api/collections/photos',{headers:{'If-None-Match':before.headers.get('ETag')}});assert.equal(fresh.status,200);assert.equal((await fresh.json()).count,0);
+  assert.equal((await(await toggle(false)).json()).collection.revision,removed.collection.revision,'Repeated removal is idempotent');
+  f.restart();const gallery=await(await f.call('/api/collections/gallery')).json();assert.equal(gallery.items.filter(photo=>photo.id===item.id).length,1);assert.equal(gallery.items.find(photo=>photo.id===item.id).collections.includes('photos'),false);
+  assert.equal((await(await f.call('/api/people/tomer/page')).json()).albums.photos.items[0].id,item.id);assert.equal((await(await f.call('/api/nursery/tomer')).json()).items[0].id,item.id);
+  assert.equal((await(await f.call('/api/media/'+item.id+'/versions')).json()).versions.length,versions.versions.length);assert.equal((await f.call('/media/'+item.id)).status,200);assert.equal(f.objects.size,objects);
+  const added=await(await toggle(true)).json();assert.equal(added.included,true);assert.equal(added.collection.count,1);assert.equal(added.collection.items[0].id,item.id);assert.equal(f.objects.size,objects);
+ }finally{await f.close();}
+});
+test('family membership changes validate booleans and retain normal write protection',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);await setTags(f,item,['tomer']);
+  const change=(body,extra={})=>f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection:'photos',scope:'photos',...body},...extra});
+  for(const included of ['false',null,0])assert.equal((await change({included})).status,400);
+  assert.equal((await change({included:false},{clientHeaders:false})).status,403);
+  assert.equal((await change({included:false,collection:'nursery:tomer',scope:'personal:tomer'})).status,400);
+  assert.equal((await(await f.call('/api/collections/photos')).json()).count,1);
+ }finally{await f.close();}
+});
 test('album shortcuts reject wrong people, unrelated weddings, nonphotos and forged writes',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer']);

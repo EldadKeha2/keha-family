@@ -54,6 +54,18 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
  };
 }
 
+test('Family photo membership updates cached gallery metadata without changing filters or the open image',async()=>{
+ const f=fixture([photo('a',[{id:'yona'}])]);await f.flush();f.filter('partial');await f.flush();await f.window.FamilyPortal.sortGallery('taken-asc');f.open('a');
+ const query={...f.window.FamilyPortal.galleryQuery()},image=f.get('mediaStage').children[0];
+ for(const included of [true,false]){
+  const item={...f.server[0],collections:included?['gallery','photos']:['gallery']};
+  f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'collection',scope:'photos',included,item,collection:{items:included?[item]:[],count:Number(included),revision:'photos-'+included}}}));await f.flush();
+  assert.equal(f.window.FamilyPortal.getCollection('gallery').items[0].collections.includes('photos'),included);
+  assert.equal(f.window.FamilyPortal.getCollection('photos').count,Number(included));
+  assert.deepEqual({...f.window.FamilyPortal.galleryQuery()},query);assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaStage').children[0],image);
+ }
+ f.close();f.open('a');assert.equal(f.window.FamilyMedia.current().collections.includes('photos'),false);f.close();
+});
 test('X, photo paging and browser returns keep the selected tagging category on desktop and phones',async()=>{
  for(const phone of [false,true])for(const filter of ['partial','untagged','complete']){
   const items=[photo('a',filter==='untagged'?[]:[{id:'person-0'}]),photo('b',filter==='untagged'?[]:[{id:'person-0'}])];

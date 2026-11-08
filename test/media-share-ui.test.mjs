@@ -38,6 +38,13 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
+test('photo viewers request the family album toggle and keep current pixels while membership changes',()=>{
+ const f=fixture(),calls=[];f.window.FamilyPhotoCollections={controls(item,scope,options){calls.push({item,scope,options});return item.kind==='photo'?'family-toggle':'';}};
+ f.open();assert.equal(calls.at(-1).options.viewer,true);assert.equal(f.get('mediaViewerCollections').innerHTML,'family-toggle');
+ const image=f.get('mediaStage').content[0];f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'collection',scope:'photos',included:true,item:{...f.photo(),collections:['gallery','photos']}}}));
+ assert.equal(f.get('mediaStage').content[0],image);assert.equal(calls.at(-1).item.collections.includes('photos'),true);
+ f.window.FamilyMedia.open([{id:'video',kind:'video',src:'/media/video'}],0,'videos');assert.equal(f.get('mediaViewerCollections').innerHTML,'');
+});
 test('photo editing refreshes the displayed pixels, face coordinates and download, including after reopening',async()=>{
  for(const scope of ['gallery','personal:ruti','wedding:parents','nostalgia','nursery:ruti']){
   const f=fixture(),calls=[],mounts=[],photo=f.photo(),edited={...photo,src:'/media/a?v=new',photoRevision:'new'};

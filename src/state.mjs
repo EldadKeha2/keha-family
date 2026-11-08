@@ -567,6 +567,8 @@ export class FamilyState {
       case 'media.collection.add':{
         const item=this.media(p.id),kind=validCollection(p.collection);
         if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר להוסיף לאלבומים האלה תמונות בלבד.');
+        const included=p.included===undefined?true:p.included;
+        if(typeof included!=='boolean'||(!included&&kind!=='photos'))throw new HttpError(400,'אפשר להסיר כאן שיוך לתמונות משפחתיות בלבד.');
         if(kind!=='photos'){
           const personId=typeof p.scope==='string'&&p.scope.startsWith('personal:')?p.scope.slice(9):null;
           if(!personId||!this.relatedPeople(item).includes(personId))throw new HttpError(400,'בחרו תמונה מתוך הפרופיל של האדם המתאים.');
@@ -576,11 +578,20 @@ export class FamilyState {
             if(!couple(kind.slice(8)).people.includes(personId))throw new HttpError(400,'בחרו את החתונה של האדם בפרופיל.');
           }else throw new HttpError(400,'בחרו תמונות משפחתיות, תינוקייה או חתונה.');
         }
-        if(!this.mediaCollections(item).includes(kind)){
+        const present=this.mediaCollections(item).includes(kind);
+        if(included&&!present){
           this.sql.exec('INSERT OR IGNORE INTO media_collections(media_id,collection,added_at) VALUES(?,?,?)',item.id,kind,new Date().toISOString());
           this.touchMedia(item);
         }
-        return {saved:true,operation:'collection',scope:kind,item:this.mediaPublic(item),collection:this.collection(kind),affectedPersonIds:this.relatedPeople(item),...(kind.startsWith('wedding:')?{wedding:this.wedding(kind.slice(8))}:{})};
+        if(!included&&present){
+          this.sql.exec('DELETE FROM media_collections WHERE media_id=? AND collection=?',item.id,kind);
+          if(item.category==='photos'){
+            item.category='gallery';item.updatedAt=new Date().toISOString();
+            this.sql.exec('UPDATE media SET category=?,data=? WHERE id=?',item.category,JSON.stringify(item),item.id);
+          }
+          this.touch(kind);this.touchMedia(item);
+        }
+        return {saved:true,operation:'collection',scope:kind,included,item:this.mediaPublic(item),collection:this.collection(kind),affectedPersonIds:this.relatedPeople(item),...(kind.startsWith('wedding:')?{wedding:this.wedding(kind.slice(8))}:{})};
       }
       case 'gallery.face.scan':return this.galleryFaceScan(p);
       case 'media.face.scan.save':return this.saveFaceScan(p);

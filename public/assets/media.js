@@ -35,7 +35,7 @@
   }
   function metadata(){
     const item=current();if(!item)return;
-    const albumControls=$('mediaViewerCollections');if(albumControls)albumControls.innerHTML=window.FamilyPhotoCollections?.controls(item,state.scope)||'';
+    const albumControls=$('mediaViewerCollections');if(albumControls)albumControls.innerHTML=window.FamilyPhotoCollections?.controls(item,state.scope,{viewer:true})||'';
     $('mediaViewerCaption').textContent=$('mediaHeaderCaption').textContent=item.caption||'';
     const descriptionLabel=item.kind==='video'?tr('הוסף תיאור לסרטון','Add a video description'):item.kind==='document'?tr('הוסף תיאור למסמך','Add a document description'):tr('הוסף תיאור לתמונה','Add a photo description');
     const desktopDescriptionLabel=item.kind==='video'?tr('להוספת תיאור לסרטון','Add a video description'):item.kind==='document'?tr('להוספת תיאור למסמך','Add a document description'):tr('להוספת תיאור לתמונה','Add a photo description');
