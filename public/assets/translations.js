@@ -623,6 +623,7 @@ window.FAMILY_TRANSLATIONS={
   "תזכורות משפחתיות, ישר למייל": "Family reminders, straight to your inbox",
   "התזכורות המשפחתיות שלנו": "Our family reminders",
   "תמונות בעמוד": "Photos per page",
+  "לעמוד": "per page",
   "דפדוף בתמונות": "Browse photos",
   "הקודם": "Previous",
   "הבא": "Next",

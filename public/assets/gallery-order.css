@@ -1,4 +1,4 @@
-.gallery-header-upload{display:none}
+.gallery-header-upload,.gallery-page-size-mobile{display:none}
 .gallery-pager-wrap{position:relative;display:flow-root}
 .gallery-mobile-filter-dock{display:none}
 .gallery-pager[data-gallery-pager]{display:grid;grid-template-columns:auto minmax(145px,220px) minmax(0,1fr) auto;align-items:center;gap:12px}
@@ -13,16 +13,19 @@
 .gallery-pager .gallery-page-buttons{display:flex;align-items:center;gap:7px;min-width:0}
 .gallery-page-buttons svg{display:none;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
 @media(max-width:700px){
-  .gallery-pager[data-gallery-pager]{grid-template-columns:88px minmax(0,1fr) 92px;gap:8px 6px;padding:12px 0;margin:10px 0 14px}
-  .gallery-pager .gallery-page-size{grid-column:1;grid-row:1;gap:4px;font-size:11px}
-  .gallery-pager .gallery-page-size select{flex:0 0 48px;width:48px;height:44px;padding:4px 1px;font-size:12px}
-  .gallery-pager .gallery-sort-field{grid-column:2;grid-row:1;width:100%}
-  .gallery-pager .gallery-sort-field select{font-size:12px;padding-inline-start:6px;padding-inline-end:19px}
-  .gallery-sort-field>span{inset-inline-start:7px}
-  .gallery-sort-field>svg{inset-inline-end:4px;width:14px;height:14px}
+  .gallery-pager[data-gallery-pager]{grid-template-columns:66px minmax(0,1fr) 84px;gap:8px 6px;padding:12px 0;margin:10px 0 14px}
+  .gallery-pager .gallery-sort-field{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;border:1px solid #cfc2a2;border-radius:6px;background:#fffdf6;color:#6e7059}
+  .gallery-sort-field>span{position:static;padding-inline-end:12px;color:inherit;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.2;white-space:nowrap}
+  .gallery-pager .gallery-sort-field select{position:absolute;inset:0;z-index:1;opacity:0;padding:0;font-size:16px}
+  .gallery-sort-field:focus-within{outline:2px solid #586d45;outline-offset:2px}
+  .gallery-sort-field>svg{inset-inline-end:4px;top:16px;width:12px;height:12px}
+  .gallery-pager .gallery-page-size{grid-column:2;grid-row:1;justify-content:center;gap:4px;font-size:calc(11px * var(--a11y-text-scale,1))}
+  .gallery-page-size>span{flex:0 1 auto;min-width:0}
+  .gallery-page-size-desktop{display:none}.gallery-page-size-mobile{display:inline}
+  .gallery-pager .gallery-page-size select{flex:0 0 46px;width:46px;height:44px;padding:4px 1px;font-size:calc(12px * var(--a11y-text-scale,1))}
   .gallery-pager .gallery-page-buttons{grid-column:3;grid-row:1;gap:4px}
-  .gallery-pager .gallery-page-buttons button{display:grid;place-items:center;flex:0 0 44px;width:44px;min-width:44px;height:44px;min-height:44px;padding:0}
-  .gallery-page-buttons button>span{display:none}.gallery-page-buttons svg{display:block}
+  .gallery-pager .gallery-page-buttons button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex:1 1 0;width:40px;min-width:0;height:44px;min-height:44px;padding:2px}
+  .gallery-page-buttons button>span{display:block;order:1;font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.2;white-space:nowrap}.gallery-page-buttons svg{display:block;width:16px;height:16px}
   html[dir=rtl] .gallery-page-buttons svg{transform:rotate(180deg)}
   .gallery-pager [data-gallery-page-label]{grid-column:1/-1;grid-row:2;font-size:12px;line-height:1.4;margin:0}
   body[data-active-view=gallery] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:12px 14px 8px}
@@ -39,15 +42,23 @@
   body[data-active-view=gallery] .gallery-tag-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
   body[data-active-view=gallery] .gallery-tag-filters button{min-width:0;padding-inline:6px;gap:4px;font-size:calc(13px * var(--a11y-text-scale,1));white-space:nowrap}
   .gallery-pager-wrap>.gallery-pager{margin-top:0}
-  .gallery-pager-wrap [data-gallery-page-label]{padding-inline-end:46px}
-  .gallery-mobile-filter-dock{display:block;position:absolute;inset-inline-end:0;bottom:15px}
-  .gallery-mobile-filter-dock .gallery-refine-toggle{box-sizing:border-box;width:40px;height:36px;min-height:36px;padding:7px}
+  .gallery-pager-wrap:has(.gallery-refine-toggle:not([hidden]))>.gallery-pager{grid-template-columns:40px 66px minmax(0,1fr) 84px}
+  .gallery-pager-wrap:has(.gallery-refine-toggle:not([hidden])) .gallery-sort-field{grid-column:2}
+  .gallery-pager-wrap:has(.gallery-refine-toggle:not([hidden])) .gallery-page-size{grid-column:3}
+  .gallery-pager-wrap:has(.gallery-refine-toggle:not([hidden])) .gallery-page-buttons{grid-column:4}
+  .gallery-mobile-filter-dock{display:block;position:absolute;inset-inline-start:0;top:13px}
+  .gallery-mobile-filter-dock:has(.gallery-refine-toggle[hidden]){display:none}
+  .gallery-mobile-filter-dock .gallery-refine-toggle{box-sizing:border-box;width:40px;height:44px;min-height:44px;padding:8px}
   .gallery-mobile-filter-dock .gallery-refine-toggle span{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
-  .gallery-pager-wrap:has(>.gallery-pager[hidden]) .gallery-mobile-filter-dock{position:static;display:flex;justify-content:flex-end;padding-bottom:6px}
-  .gallery-pager-wrap:not(:has(.gallery-refine-toggle:not([hidden]))) [data-gallery-page-label]{padding-inline-end:0}
+  .gallery-pager-wrap:has(>.gallery-pager[hidden]) .gallery-mobile-filter-dock{position:static;padding-bottom:6px}
   html[data-a11y-text] body[data-active-view=gallery] .gallery-tag-filters{grid-template-columns:1fr}
 }
 @media(max-width:360px){
+  .gallery-pager[data-gallery-pager]{grid-template-columns:60px minmax(0,1fr) 76px;column-gap:4px}
+  .gallery-pager-wrap:has(.gallery-refine-toggle:not([hidden]))>.gallery-pager{grid-template-columns:36px 60px minmax(0,1fr) 76px}
+  .gallery-mobile-filter-dock .gallery-refine-toggle{width:36px;padding:7px}
+  .gallery-pager .gallery-page-size{font-size:calc(10px * var(--a11y-text-scale,1));gap:2px}
+  .gallery-pager .gallery-page-size select{flex-basis:46px;width:46px}
   body[data-active-view=gallery] .gallery-tag-filters button{font-size:calc(11.5px * var(--a11y-text-scale,1));padding-inline:4px}
   body[data-active-view=gallery] .gallery-tag-filters button::before{width:14px;height:14px;flex-basis:14px}
 }
