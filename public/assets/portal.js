@@ -324,7 +324,16 @@
     ready=true;
     document.addEventListener('click',event=>{
       const galleryFilter=event.target.closest('[data-gallery-filter]');if(galleryFilter){const filter=galleryFilter.dataset.galleryFilter;if(!['all','untagged','partial','complete'].includes(filter)||filter===galleryPage.filter)return;galleryPage.filter=filter;galleryPage.person=galleryPage.unit=galleryPage.labels='';galleryPage.page=1;window.FamilyGalleryFilter?.category(filter);clearTimeout(gallerySearchTimer);for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter===filter));refreshCollection('gallery',true);return;}
-      const pager=event.target.closest('[data-gallery-next],[data-gallery-prev]');if(pager){if(pager.disabled)return;galleryPage.page=Math.max(1,galleryPage.page+(pager.hasAttribute('data-gallery-next')?1:-1));refreshCollection('gallery',true).then(()=>$('sharedGalleryGrid').scrollIntoView({block:'start',behavior:'instant'}));return;}
+      const pager=event.target.closest('[data-gallery-next],[data-gallery-prev]');if(pager){
+        if(pager.disabled)return;
+        const phone=matchMedia('(max-width:700px)').matches,topPager=Boolean(pager.closest('.gallery-pager-wrap'));
+        galleryPage.page=Math.max(1,galleryPage.page+(pager.hasAttribute('data-gallery-next')?1:-1));
+        refreshCollection('gallery',true).then(()=>{
+          if(state.view!=='gallery')return;
+          if(phone){if(!topPager)window.scrollTo({top:0,behavior:'instant'});}
+          else $('sharedGalleryGrid').scrollIntoView({block:'start',behavior:'instant'});
+        });return;
+      }
       const close=event.target.closest('[data-close-dialog]');if(close){$(close.dataset.closeDialog).close();return;}
       const death=event.target.closest('[data-edit-death]');if(death){openBirthday(death.dataset.editDeath,'death');return;}
       const upload=event.target.closest('[data-upload-collection]');if(upload){if(!canSave())return;const input=$({videos:'sharedVideosInput',photos:'sharedPhotosInput',gallery:'sharedGalleryInput'}[upload.dataset.uploadCollection]);input.value='';input.click();return;}
