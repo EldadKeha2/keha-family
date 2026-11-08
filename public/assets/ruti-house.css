@@ -42,7 +42,7 @@
 
 /* Familiar play uses pictures, numbers and sound. Text stays available in
    instructions, pause screens, stage celebrations and accessible labels. */
-.rh-quiet .rh-top h3,.rh-quiet .rh-level small,.rh-quiet [data-rh-stage-name],.rh-quiet .rh-tool strong,.rh-quiet .rh-tool kbd,.rh-quiet .rh-tool-instruction,.rh-quiet .rh-scene-toast,.rh-quiet .rh-tooltip,.rh-quiet [data-rh-hint]{display:none!important}
+.rh-quiet .rh-top h3,.rh-quiet .rh-level small,.rh-quiet .rh-tool strong,.rh-quiet .rh-tool kbd,.rh-quiet .rh-tool-instruction,.rh-quiet .rh-scene-toast,.rh-quiet .rh-tooltip,.rh-quiet [data-rh-hint]{display:none!important}
 .rh-quiet .rh-back,.rh-quiet .rh-pause{font-size:0;min-width:40px;min-height:36px}
 .rh-quiet .rh-back:before{content:'→';font-size:20px}.rh-quiet[dir=ltr] .rh-back:before{content:'←'}.rh-quiet .rh-pause:before{content:'Ⅱ';font-size:18px}
 .rh-quiet .rh-level>span{font-size:0}.rh-quiet .rh-level>span b{font-size:23px}.rh-quiet .rh-level>span:before{content:'⚑';font-size:17px;margin-inline-end:6px}
@@ -81,3 +81,9 @@
 @media(max-width:700px){.rh-active{width:100%;max-width:100%}.rh-restart-label{display:none}.rh-restart{padding:3px 7px;min-width:32px;height:30px}.rh-top>h3{min-width:0;overflow:hidden;text-overflow:ellipsis}}
 @media(max-width:380px){.rh-active .rh-top>h3{font-size:16px}.rh-active .rh-top-controls{gap:3px}}
 .ruti-house.rh-quiet .rh-pause{font-size:0}
+
+/* The stage name stays visible while familiar action prompts remain compact. */
+.rh-level [data-rh-stage-name]{display:block;max-width:15em;font-size:clamp(12px,1.15vw,16px);line-height:1.3;white-space:normal;overflow-wrap:anywhere;color:#fff0bd}
+.rh-briefing-stage-name{margin:0 0 10px;color:var(--rh-green);font-weight:700;font-size:clamp(18px,2.4vw,25px)}
+.rh-stage-announcement{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:100%}
+.rh-next-stage-name{margin:0;padding:4px 14px;border-radius:12px;background:#fff9e9e6;color:#355b43;font-size:clamp(18px,2.5vw,26px);font-weight:700;line-height:1.3}

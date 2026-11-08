@@ -16,9 +16,9 @@
   function pause(){clearTimeout(timer);timer=null;job?.abort();}
   function start(){if(!eligible()||job||timer||finished)return;timer=setTimeout(()=>{timer=null;run();},250);}
   async function save(item,faces,signal){
-    if(faces.complete===false)return null;
-    const {FACE_SCAN_VERSION}=await import('./face-coverage.mjs?v=1');
-    const result=await request('api/media/'+item.id+'/faces/detection',{method:'POST',signal,body:JSON.stringify({photoRevision:item.photoRevision||'original',version:FACE_SCAN_VERSION,faces:faces.map(({rect,score})=>({rect,score}))})});
+    if(faces.complete===false||!Array.isArray(faces.galleryFaces))return null;
+    const {FACE_SCAN_VERSION}=await import('./face-coverage.mjs?v=2');
+    const result=await request('api/media/'+item.id+'/faces/detection',{method:'POST',signal,body:JSON.stringify({photoRevision:item.photoRevision||'original',version:FACE_SCAN_VERSION,faces:faces.galleryFaces.map(({rect,score})=>({rect,score}))})});
     window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));return result;
   }
   function imageFor(item,signal){
@@ -33,12 +33,12 @@
     try{
       const batch=await request('api/gallery/face-scan?after='+after,{signal:controller.signal});pending=batch.pending;
       if(!batch.items.length){finished=true;status();return;}
-      const {detectFaces}=await import('./face-detector.mjs?v=7');
+      const {detectFaces}=await import('./face-detector.mjs?v=8');
       for(const item of batch.items){
         if(!eligible()||controller.signal.aborted)break;
         try{
           const image=await imageFor(item,controller.signal),faces=await detectFaces(item.id+':'+(item.photoRevision||'original'),image,controller.signal);
-          if(faces.complete===false)throw Error('Face scan incomplete');
+          if(faces.complete===false||!Array.isArray(faces.galleryFaces))throw Error('Face scan incomplete');
           await save(item,faces,controller.signal);pending=Math.max(0,pending-1);
         }catch(error){if(controller.signal.aborted)break;failed++;}
         after=item.cursor;status();

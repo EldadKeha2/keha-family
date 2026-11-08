@@ -28,8 +28,8 @@ test('detection streams early faces, retains high-resolution source detail and r
  assert.equal(f.bitmaps[0].options.resizeWidth,4096);assert.equal(f.bitmaps[0].options.resizeQuality,'high');
  const early=[{rect:{x:.1,y:.2,width:.02,height:.03},score:.8}];f.workers[0].reply({faces:early,partial:true,engine:'mediapipe'});
  assert.equal(progress.length,1);assert.equal(progress[0].engine,'mediapipe');
- const completed=[...early,{rect:{x:.125,y:.2,width:.02,height:.03},score:.7}];f.workers[0].reply({faces:completed,engine:'mediapipe+pico'});
- assert.equal((await pending).length,2);assert.equal((await f.detect('photo-a',image)).length,2);assert.equal(f.bitmaps.length,1);
+ const completed=[...early,{rect:{x:.125,y:.2,width:.02,height:.03},score:.7}];f.workers[0].reply({faces:completed,galleryFaces:early,engine:'mediapipe+pico'});
+ const result=await pending;assert.equal(result.length,2);assert.equal(result.galleryFaces.length,1);assert.equal((await f.detect('photo-a',image)).length,2);assert.equal(f.bitmaps.length,1);
 });
 test('closing a photo cancels its running scan and a late bitmap cannot leak into the next photo',async()=>{
  let completeOld,closed=false;
@@ -69,5 +69,5 @@ test('the worker finds close small faces through fine crops, projects coordinate
  await self.onmessage({data:{id:7,bitmap:{width,height,close(){closed=true;}}}});
  const final=messages.at(-1);assert.equal(final.partial,false);assert.equal(final.engine,'mediapipe+pico');assert.equal(closed,true);assert.equal(picoCalls,4);assert.ok(calls>5);
  for(const target of targets)assert.ok(final.faces.some(face=>Math.abs(face.rect.x-target.x/width)<1e-9&&Math.abs(face.rect.width-target.width/width)<1e-9),'Every face keeps its original normalized coordinates');
- assert.equal(final.faces.length,4,'PICO must add a missed small face even when MediaPipe already found others');assert.ok(messages.some(message=>message.partial&&message.faces.length>0));
+ assert.equal(final.faces.length,4,'PICO must add a missed small face even when MediaPipe already found others');assert.equal(final.galleryFaces.length,3,'Fallback-only ornament detections must not make a fully tagged photo partial');for(const target of targets)assert.ok(final.galleryFaces.some(face=>Math.abs(face.rect.x-target.x/width)<1e-9),'Nearby tiny faces remain in the gallery evidence');assert.ok(messages.some(message=>message.partial&&message.faces.length>0));
 });

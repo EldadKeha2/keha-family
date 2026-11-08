@@ -61,12 +61,14 @@ async function detailedFaces(bitmap,onProgress){
 }
 self.onmessage=async event=>{
   const {id,bitmap}=event.data;
-  const found=[],publish=(engine,partial=true)=>self.postMessage({id,faces:separateFaces(found).toSorted((a,b)=>b.score-a.score).slice(0,150).map(({rect,score})=>({rect,score})),engine,partial});
+  let galleryFaces=null;
+  const found=[],snapshotFaces=()=>separateFaces(found).toSorted((a,b)=>b.score-a.score).slice(0,150).map(({rect,score})=>({rect,score}));
+  const publish=(engine,partial=true)=>self.postMessage({id,faces:snapshotFaces(),galleryFaces,engine,partial});
   const add=faces=>{for(const face of faces){const previous=found.findIndex(other=>sameDetection(other,face));if(previous<0)found.push(face);else if(found[previous].score<face.score)found[previous]=face;}};
   let detailed=false;
   try{
     // CPU/WASM works on phones and browsers without a graphics context too.
-    try{let passes=0;detailed=await detailedFaces(bitmap,faces=>{add(faces);if(++passes%4===0||passes===1)publish('yunet');});publish('yunet');}catch{}
+    try{let passes=0;detailed=await detailedFaces(bitmap,faces=>{add(faces);if(++passes%4===0||passes===1)publish('yunet');});galleryFaces=snapshotFaces();publish('yunet');}catch{}
     if(!graphics()){await cpuFaces(bitmap,faces=>{add(faces);publish(detailed?'yunet+pico':'pico');},detailed&&found.length>0);publish(detailed?'yunet+pico':'pico',false);return;}
     const engine=await model(),width=bitmap.width,height=bitmap.height,regions=detectionRegions(width,height),tile=new OffscreenCanvas(1,1);
     let scanned=0;
@@ -82,7 +84,7 @@ self.onmessage=async event=>{
       }
       if(++scanned%8===0||scanned===1)publish(detailed?'yunet+mediapipe':'mediapipe');
     }
-    tile.width=tile.height=1;publish(detailed?'yunet+mediapipe':'mediapipe');
+    tile.width=tile.height=1;galleryFaces=snapshotFaces();publish(detailed?'yunet+mediapipe':'mediapipe');
     // PICO also supplements successful model results: one large face must not
     // prevent a native-detail scan for smaller faces elsewhere in the photo.
     try{await cpuFaces(bitmap,faces=>{add(faces.filter(face=>!found.some(other=>sameRegion(other.rect,face.rect))));publish(detailed?'yunet+mediapipe+pico':'mediapipe+pico');},found.length>0);}catch{}

@@ -43,17 +43,17 @@ const stage=(level,he,en,newFeature,goal,maxActive,order,deadlines,catWait,spawn
 });
 export const STAGES=Object.freeze([
   stage(1,'הגינה מתעוררת','The garden wakes up','water',30,2,['plant','dust'],{plant:20,dust:24},0,2.3),
-  stage(2,'הגינה בקצב מהיר','The garden picks up the pace',null,30,3,['plant','plant','plant','dust','plant'],{plant:11,dust:14},0,1.2),
-  stage(3,'חתולים בשתי הכניסות','Cats at both entrances','cat',30,3,['cat','plant','plant','dust','plant'],{plant:18,dust:22,cat:38},3,1.8),
-  stage(4,'הבית מגביר קצב','The house picks up the pace',null,30,4,['cat','plant','plant','dust','plant'],{plant:12,dust:16,cat:25},2,1.2),
-  stage(5,'הקצב עולה','Picking up the pace',null,30,4,['cat','plant','plant','dust','plant'],{plant:10,dust:13,cat:21},1.6,1),
-  stage(6,'משהו טעים למשפחה','A treat for the family','guests',30,3,['plant','dust','cat','plant'],{plant:30,dust:26,cat:32,guest:55},5,1.8,{requiredMeal:true}),
-  stage(7,'עוד משפחה בדלת','More family at the door',null,30,4,['plant','cat','dust','plant'],{plant:27,dust:23,cat:27,guest:48},4.5,1.6),
-  stage(8,'בקצב של רותי','Ruti’s rhythm',null,30,4,['cat','plant','dust','plant'],{plant:24,dust:20,cat:22,guest:42},4,1.4),
-  stage(9,'כולם בדרך','Everyone is on the way',null,30,5,['cat','plant','dust','plant','cat','plant'],{plant:21,dust:17,cat:17,guest:36},3.5,1.2),
-  stage(10,'הלב של הבית','The heart of the home',null,30,5,['cat','plant','dust','plant','cat','dust','plant'],{plant:19,dust:15,cat:13,guest:31},3,1.1),
-  stage(11,'מי בא להתארח?','Who is visiting?','peanuts',30,5,['cat','plant','dust','plant','cat','dust','plant'],{plant:18,dust:14,cat:12,guest:28},2.5,1),
-  stage(12,'דלת פתוחה','An open door',null,30,6,['cat','plant','dust','plant','cat','dust','plant'],{plant:16,dust:12,cat:10,guest:24},2,.9)
+  stage(2,'רסיסים של בוקר','Morning droplets',null,30,3,['plant','plant','plant','dust','plant'],{plant:11,dust:14},0,1.2),
+  stage(3,'מי מיילל בדלת?','Who is meowing at the door?','cat',30,3,['cat','plant','plant','dust','plant'],{plant:18,dust:22,cat:38},3,1.8),
+  stage(4,'המטאטא לא נח','The broom never rests',null,30,4,['cat','plant','plant','dust','plant'],{plant:12,dust:16,cat:25},2,1.2),
+  stage(5,'בקצב של רותי','Ruti’s rhythm',null,30,4,['cat','plant','plant','dust','plant'],{plant:10,dust:13,cat:21},1.6,1),
+  stage(6,'משהו טעים מהלב','A treat from the heart','guests',30,3,['plant','dust','cat','plant'],{plant:30,dust:26,cat:32,guest:55},5,1.8,{requiredMeal:true}),
+  stage(7,'הבית מלא שמחה','A house full of joy',null,30,4,['plant','cat','dust','plant'],{plant:27,dust:23,cat:27,guest:48},4.5,1.6),
+  stage(8,'פותחים שולחן','Setting the table',null,30,4,['cat','plant','dust','plant'],{plant:24,dust:20,cat:22,guest:42},4,1.4),
+  stage(9,'כל המשפחה בדרך','The whole family is on the way',null,30,5,['cat','plant','dust','plant','cat','plant'],{plant:21,dust:17,cat:17,guest:36},3.5,1.2),
+  stage(10,'עוד כיסא לשולחן','One more chair at the table',null,30,5,['cat','plant','dust','plant','cat','dust','plant'],{plant:19,dust:15,cat:13,guest:31},3,1.1),
+  stage(11,'בוטנים ופינוקים','Peanuts and little treats','peanuts',30,5,['cat','plant','dust','plant','cat','dust','plant'],{plant:18,dust:14,cat:12,guest:28},2.5,1),
+  stage(12,'הלב של הבית','The heart of the home',null,30,6,['cat','plant','dust','plant','cat','dust','plant'],{plant:16,dust:12,cat:10,guest:24},2,.9)
 ]);
 // One extended opening lesson: six relaxed waterings, then progressively
 // shorter response windows that still allow Ruti to fetch a tool and walk.

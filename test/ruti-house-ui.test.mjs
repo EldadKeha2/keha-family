@@ -485,3 +485,14 @@ test('midway through level seven bridge pauses every task for twenty seated seco
  f.until(()=>f.state.bridge===null,20000);assert.equal(f.actor.sitting,0);assert.equal(f.state.paused,false);const resumed=f.game.elapsed;f.advance(300);assert.ok(f.game.elapsed>resumed);
  assert.equal(f.state.bridge,null,'The same middle-of-stage event does not replay');assert.doesNotMatch(JSON.stringify(HOUSE_LESSONS),/ברידג|bridge/i);
 });
+
+
+test('all twelve stages have their own localised names in the HUD and the next-stage celebration',async()=>{
+ assert.equal(new Set(engine.STAGES.map(s=>s.he)).size,12);assert.equal(new Set(engine.STAGES.map(s=>s.en)).size,12);
+ for(const english of [false,true])for(const plan of engine.STAGES){
+  const f=fixture({english,startLevel:plan.level});await f.start(false);const title=english?plan.en:plan.he;
+  assert.ok(f.html.includes(title),`Level ${plan.level} shows its name`);assert.doesNotMatch(f.html,/Level \d+ of 12|שלב \d+ מתוך 12/);
+  if(f.state.briefing)assert.ok(f.nodes.get('[data-rh-overlay]').innerHTML.includes(title));
+ }
+ const f=fixture();await f.start();await finishWateringStage(f);assert.ok(f.nodes.get('[data-rh-overlay]').innerHTML.includes(engine.STAGES[1].he));
+});
