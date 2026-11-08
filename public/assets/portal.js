@@ -10,7 +10,7 @@
   const collectionId=(kind,suffix)=>kind==='gallery'&&['Grid','Count','Empty'].includes(suffix)?'sharedGallery'+suffix:kind+suffix;
   const galleryPage={page:1,size:100,query:'',filter:'all',person:'',unit:''};let gallerySearchTimer,galleryDeferred=false;
   const holdGallery=()=>(galleryPage.filter!=='all'||galleryPage.person||galleryPage.unit)&&window.FamilyMedia.isOpen?.('gallery')===true;
-  const revisions = {}, signatures = {}, loading = {}, queues = {photos:[], videos:[],gallery:[]}, running = {}, drafts = new Map();
+  const revisions = {}, photoEditVersions = {}, signatures = {}, loading = {}, queues = {photos:[], videos:[],gallery:[]}, running = {}, drafts = new Map();
   let ready = false;
   function canSave() {if (app()?.apiEnabled) return true;notify(I18n.t('כדי לשמור שינויים, פתחו את האתר באמצעות קובץ ההפעלה.'));return false;}
   async function request(path, options={}) {
@@ -126,12 +126,12 @@
     if(kind==='gallery'&&holdGallery()&&!reviewNavigation){galleryDeferred=true;return;}
     if(loading[kind]){if(kind==='gallery'&&force){loading.galleryQueued=true;loading.galleryReviewQueued||=reviewNavigation;}return;}
     loading[kind] = true;
-    const requestedRevision=revisions[kind],requestedGallery=JSON.stringify(galleryPage);
+    const requestedRevision=revisions[kind],requestedPhotoEditVersion=photoEditVersions[kind],requestedGallery=JSON.stringify(galleryPage);
     const pageQuery=kind==='gallery'?'?'+new URLSearchParams({page:galleryPage.page,size:galleryPage.size,q:galleryPage.query,filter:galleryPage.filter,person:galleryPage.person,unit:galleryPage.unit}):'';
     try {
       const result = await request('api/collections/'+kind+pageQuery,{headers:!force&&revisions[kind]?{'If-None-Match':'"'+revisions[kind]+'"'}:{}});
       if(kind==='gallery'&&holdGallery()&&!reviewNavigation){galleryDeferred=true;return;}
-      if (!result || revisions[kind]!==requestedRevision||(kind==='gallery'&&JSON.stringify(galleryPage)!==requestedGallery)) return;
+      if (!result || photoEditVersions[kind]!==requestedPhotoEditVersion||revisions[kind]!==requestedRevision||(kind==='gallery'&&JSON.stringify(galleryPage)!==requestedGallery)) return;
       if(kind==='gallery'&&result.pagination)galleryPage.page=result.pagination.page;
       state.collections[kind]=result;revisions[kind]=result.revision;
       if(kind==='gallery')window.FamilyGalleryFaces?.check();
@@ -307,7 +307,7 @@
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
       if(event.detail.operation==='photo-edit'&&event.detail.item){
-        const item=event.detail.item;for(const [kind,collection] of Object.entries(state.collections))if(collection.items?.some(photo=>photo.id===item.id)){collection.items=collection.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);revisions[kind]=null;if(state.view===kind)renderCollection(kind);}
+        const item=event.detail.item;for(const [kind,collection] of Object.entries(state.collections))if(collection.items?.some(photo=>photo.id===item.id)){collection.items=collection.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);photoEditVersions[kind]=(photoEditVersions[kind]||0)+1;revisions[kind]=null;if(state.view===kind)renderCollection(kind);}
         return;
       }
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;

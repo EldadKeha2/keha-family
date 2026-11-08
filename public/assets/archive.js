@@ -7,7 +7,7 @@
   const family=window.FAMILY_DATA;
   const couples=Object.values(family.units).filter(unit=>unit.people.length===2).sort((a,b)=>a.generation-b.generation);
   const pairById=new Map(couples.map(pair=>[pair.id,pair]));
-  const summaries=new Map(),details=new Map(),collections=new Map(),loading=new Map(),filters=new Map(),drafts=new Map(),greetingDrafts=new Map(),greetingPending=new Set(),uploadStates=new Map();
+  const summaries=new Map(),details=new Map(),collections=new Map(),photoEditVersions=new Map(),loading=new Map(),filters=new Map(),drafts=new Map(),greetingDrafts=new Map(),greetingPending=new Set(),uploadStates=new Map();
   const jobs=[];
   const state={view:'tree',weddingId:null,query:'',ready:false,uploading:false,weddingsLoaded:false,editingDate:null};
   const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15Z"/></svg>';
@@ -86,16 +86,18 @@
   }
   async function refreshWedding(id){
     const key='wedding:'+id;if(loading.get(key))return;loading.set(key,true);
+    const photoEditVersion=photoEditVersions.get(key);
     if(!details.has(id))setStatus('weddingsStatus',I18n.t('טוען את עמוד החתונה…'));
     try{
-      const result=await request(base(key));details.set(id,result);summaries.set(id,result);collections.set(key,result.collection);
+      const result=await request(base(key));if(photoEditVersions.get(key)!==photoEditVersion)return;details.set(id,result);summaries.set(id,result);collections.set(key,result.collection);
       if(state.weddingId===id){setStatus('weddingsStatus');renderWedding(id);}
     }catch(error){if(state.weddingId===id)setStatus('weddingsStatus',error.message,true);}finally{loading.set(key,false);}
   }
   async function refreshNostalgia(){
     const key='nostalgia';if(loading.get(key))return;loading.set(key,true);
+    const photoEditVersion=photoEditVersions.get(key);
     if(!collections.has(key))setStatus('nostalgiaStatus',I18n.t('פותח את אלבום הזיכרונות…'));
-    try{const result=await request(base(key));collections.set(key,result);setStatus('nostalgiaStatus');if(scope()===key)renderCollection(key);}
+    try{const result=await request(base(key));if(photoEditVersions.get(key)!==photoEditVersion)return;collections.set(key,result);setStatus('nostalgiaStatus');if(scope()===key)renderCollection(key);}
     catch(error){setStatus('nostalgiaStatus',error.message,true);}finally{loading.set(key,false);}
   }
   function renderCollection(key){
@@ -108,8 +110,9 @@
     const cards=[];
     for(const item of items){
       let card=oldCards.get(item.file);
+      if(card&&card.dataset.mediaSrc!==item.src)card=null;
       if(!card){
-        card=document.createElement('article');card.className='shared-media-card';card.dataset.mediaFile=item.file;
+        card=document.createElement('article');card.className='shared-media-card';card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;
         let viewer;
         if(item.kind==='photo')viewer=I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(key)}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.src)}" alt="${safe(item.caption||I18n.mediaName(item))}" loading="lazy"></button>`;
         else if(item.kind==='video')viewer=I18n.html`<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||I18n.mediaName(item))}"><source src="${safe(item.src)}" type="${safe(item.mime)}"></video></div><div class="video-file-info"><span>${safe(I18n.mediaName(item))}</span><a href="${safe(item.src)}" download="${safe(item.filename)}">הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הסרטון לא מתנגן כאן. אפשר להוריד את המקור או להעלות MP4 עם H.264.</p>`;
@@ -279,7 +282,7 @@
     $('weddingBranchFilter').addEventListener('change',renderWeddings);$('weddingDateForm').addEventListener('submit',saveDate);$('clearWeddingDate').addEventListener('click',event=>saveDate(event,true));$('weddingGreetingForm').addEventListener('submit',saveGreeting);
     window.addEventListener('family-media-changed',event=>{
       if(event.detail.operation==='photo-edit'&&event.detail.item){
-        const item=event.detail.item;for(const [key,album] of collections)if(album.items?.some(photo=>photo.id===item.id)){album.items=album.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);if(scope()===key)renderCollection(key);}
+        const item=event.detail.item;for(const [key,album] of collections)if(album.items?.some(photo=>photo.id===item.id)){album.items=album.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);photoEditVersions.set(key,(photoEditVersions.get(key)||0)+1);if(scope()===key)renderCollection(key);}
         for(const pair of summaries.values())if(pair.cover?.split('?')[0]==='/media/'+item.id)pair.cover=item.src;
         if(state.view==='weddings'&&!state.weddingId)renderWeddings();return;
       }

@@ -6,10 +6,11 @@
   const albums=new Map();
   const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null};
   const identity=item=>item.id||item.file;
+  const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
   const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
   let noticeTimer,expectedCaption='',captionEditing=false;
-  let instagramPrepared={id:null,file:null};
+  let renderedVersion=null,instagramPrepared={key:null,file:null};
   let restoringLink='';
   const tr=(he,en)=>I18n.isEnglish?en:he;
   function shareURL(item){const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);url.hash='gallery';return url.href;}
@@ -26,7 +27,9 @@
     state.items=items;
     if(!items.length){$('mediaViewer').close();return;}
     if(index<0)show(Math.min(state.index,items.length-1));
-    else {state.index=index;if(active?.src!==items[index].src)show(index);else metadata();}
+    // Compare with the pixels actually mounted in the viewer: mutation events
+    // may already have merged the new source into the active item's metadata.
+    else {state.index=index;if(renderedVersion!==versionKey(items[index]))show(index);else metadata();}
   }
   function metadata(){
     const item=current();if(!item)return;
@@ -39,7 +42,7 @@
     $('shareMediaWhatsApp').href='https://wa.me/?text='+encodeURIComponent(label+'\n'+url);
     $('shareMediaFacebook').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);
     $('shareMediaEmail').href='mailto:?subject='+encodeURIComponent(label)+'&body='+encodeURIComponent(label+'\n\n'+url);
-    if(instagramPrepared.id!==identity(item)){instagramPrepared={id:identity(item),file:null};$('shareMediaInstagram').disabled=false;$('shareMediaInstagram').removeAttribute('aria-busy');}
+    if(instagramPrepared.key!==versionKey(item)){instagramPrepared={key:versionKey(item),file:null};$('shareMediaInstagram').disabled=false;$('shareMediaInstagram').removeAttribute('aria-busy');}
     $('shareMediaInstagram').hidden=item.kind==='document';
     $('instagramShareHelp').hidden=true;
     $('downloadForInstagram').href=item.src;$('downloadForInstagram').download=item.filename||'';
@@ -75,18 +78,18 @@
   }
   async function shareInstagram(event){
     event.preventDefault();const item=current();if(!item)return;
-    const id=identity(item),button=$('shareMediaInstagram'),isCurrent=()=>identity(current()||{})===id&&$('mediaViewer').open;
+    const key=versionKey(item),button=$('shareMediaInstagram'),isCurrent=()=>versionKey(current()||{})===key&&$('mediaViewer').open;
     if(!navigator.share||!navigator.canShare||item.provider==='youtube'){await instagramFallback(item);return;}
     const type=item.mime||'',extensions={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/avif':'avif','video/mp4':'mp4','video/webm':'webm'};
     if(!extensions[type]){await instagramFallback(item);return;}
     button.disabled=true;button.setAttribute('aria-busy','true');
     try{
-      let file=instagramPrepared.id===id?instagramPrepared.file:null;
+      let file=instagramPrepared.key===key?instagramPrepared.file:null;
       if(!file){
         $('mediaShareStatus').textContent=tr('מכינים את התמונה לשיתוף…','Preparing the photo to share…');
         const response=await I18n.fetch(item.src,{cache:'force-cache'});if(!response.ok)throw Error('Media unavailable');
         const blob=await response.blob();if(!isCurrent())return;
-        file=new File([blob],'family-memory.'+extensions[type],{type});instagramPrepared={id,file};
+        file=new File([blob],'family-memory.'+extensions[type],{type});instagramPrepared={key,file};
       }
       if(!navigator.canShare({files:[file]})){await instagramFallback(item);return;}
       if(navigator.userActivation?.isActive===false){$('mediaShareStatus').textContent=tr('התמונה מוכנה. לחצו שוב על Instagram ובחרו אותו בחלון השיתוף.','The photo is ready. Tap Instagram again, then choose it in the sharing menu.');return;}
@@ -96,6 +99,7 @@
     finally{if(isCurrent()){button.disabled=false;button.removeAttribute('aria-busy');}}
   }
   function clearStage(){
+    renderedVersion=null;
     window.FamilyFaces?.clear();
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
     $('mediaStage').replaceChildren();
@@ -103,7 +107,7 @@
   function show(index){
     if(!state.items.length)return;
     state.index=(index+state.items.length)%state.items.length;
-    const item=current();state.activeId=identity(item);captionEditing=false;clearStage();metadata();
+    const item=current();state.activeId=identity(item);captionEditing=false;clearStage();renderedVersion=versionKey(item);metadata();
     if($('mediaViewer').open)syncMediaRoute(item,true);
     const stage=$('mediaStage');stage.classList.toggle('is-video',item.kind==='video');stage.classList.toggle('is-document',item.kind==='document');
     if(item.provider==='youtube'&&/^[\w-]{11}$/.test(item.youtubeId)){
@@ -246,7 +250,7 @@
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
-    $('mediaViewer').addEventListener('close',()=>{instagramPrepared={id:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
+    $('mediaViewer').addEventListener('close',()=>{instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open]')||event.target.closest('input,textarea'))return;
       if(event.key===(I18n.isEnglish?'ArrowLeft':'ArrowRight')){event.preventDefault();show(state.index-1);}

@@ -8,7 +8,7 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 const source=await readFile(new URL('../public/assets/archive.js',import.meta.url),'utf8');
 function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddings'}={}){
   const browser=navigation?browserHistory(entryUrl):null;let view=navigation?new URL(entryUrl).hash.slice(1).split('/')[0]:'nostalgia';
-  const nodes=new Map(),handlers=new Map(),requests=[];
+  const nodes=new Map(),handlers=new Map(),windowEvents=new Map(),requests=[],intervals=[];
   class Node{
     constructor(){this.dataset={};this.children=[];this.className='';this.innerHTML='';this.value='';this.textContent='';this.parent=null;this.widgets=new Map();this.clicks=0;this.classList={add(){},remove(){},toggle(){}};}
     get firstElementChild(){return this.children[0]||null;}
@@ -30,16 +30,15 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
   }
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
   const document={activeElement:null,visibilityState:'visible',getElementById:get,createElement:()=>new Node(),querySelector:()=>null,querySelectorAll:()=>[],addEventListener(type,fn){handlers.set(type,fn);}};
-  const window={FAMILY_DATA:navigation?family:{people:{},units:{},branches:[]},FAMILY_API_TOKEN:'test',FamilyDates:{age:()=>null},FamilyTags:{refresh(){}},FamilyMedia:{register(){},controls:()=>''},FamilyI18n:{isEnglish:false,t:String,html:(parts,...values)=>parts.reduce((text,part,i)=>text+part+(values[i]??''),''),mediaName:item=>item.name,error:String,fetch:async path=>{requests.push(path);if(path==='api/weddings')return Response.json({weddings:[]});if(path.startsWith('api/weddings/'))return Response.json({id:path.split('/').pop(),greetings:[],collection:{items:[],count:0}});return Response.json({items,count:items.length});}},addEventListener(){}};
+  const window={FAMILY_DATA:navigation?family:{people:{},units:{},branches:[]},FAMILY_API_TOKEN:'test',FamilyDates:{age:()=>null},FamilyTags:{refresh(){}},FamilyMedia:{register(){},controls:()=>''},FamilyI18n:{isEnglish:false,t:String,html:(parts,...values)=>parts.reduce((text,part,i)=>text+part+(values[i]??''),''),mediaName:item=>item.name,error:String,fetch:async path=>{requests.push(path);if(path==='api/weddings')return Response.json({weddings:[]});if(path.startsWith('api/weddings/'))return Response.json({id:path.split('/').pop(),greetings:[],collection:{items,count:items.length}});return Response.json({items,count:items.length});}},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);browser?.addEventListener(type,fn);}};
   window.FamilyI18n.branchName=b=>b?.name||'';
   window.FamilyApp={apiEnabled:true,getView:()=>view,nameOf:id=>family.people[id]?.name||id,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyArchive.activate(next);},toast(){}};
-  if(browser)window.addEventListener=browser.addEventListener;
-  const context=vm.createContext({window,document,location:browser?.location||{hash:'#nostalgia',pathname:'/',search:''},history:browser?.history||{replaceState(){}},URL,setInterval(){},clearTimeout(){},setTimeout(){},matchMedia:()=>({matches:false})});
+  const context=vm.createContext({window,document,location:browser?.location||{hash:'#nostalgia',pathname:'/',search:''},history:browser?.history||{replaceState(){}},URL,setInterval:fn=>intervals.push(fn),clearTimeout(){},setTimeout(){},matchMedia:()=>({matches:false})});
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);
   handlers.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const click=(selector,dataset)=>handlers.get('click')({target:{closest:s=>s===selector?{dataset}:null}});
-  return {browser,window,get view(){return view;},openWedding:id=>click('[data-open-wedding]',{openWedding:id}),back:()=>click('[data-wedding-back]'),nodes,requests,flush,get grid(){return get('nostalgiaGrid');},upload(kind){click('[data-archive-upload]',{archiveUpload:'nostalgia',archiveKind:kind});},filter(kind){click('[data-archive-filter]',{archiveFilter:kind});}};
+  return {browser,window,get view(){return view;},openWedding:id=>click('[data-open-wedding]',{openWedding:id}),back:()=>click('[data-wedding-back]'),nodes,requests,flush,poll:()=>intervals.forEach(fn=>fn()),change:detail=>{for(const fn of windowEvents.get('family-media-changed')||[])fn({detail});},get grid(){return get('nostalgiaGrid');},upload(kind){click('[data-archive-upload]',{archiveUpload:'nostalgia',archiveKind:kind});},filter(kind){click('[data-archive-filter]',{archiveFilter:kind});}};
 }
 const item=(kind,n)=>({id:String(n),file:n+'.'+({photo:'jpg',video:'mp4',document:'pdf'}[kind]),filename:'Memory '+n,name:'Memory '+n,kind,src:'/media/'+n,mime:{photo:'image/jpeg',video:'video/mp4',document:'application/pdf'}[kind],size:100});
 
@@ -51,6 +50,26 @@ test('nostalgia separates images, films and documents and preserves a playing vi
   const video=f.grid.children.find(n=>n.dataset.mediaKind==='video'),player=video.querySelector('video');
   f.filter('all');assert.equal(f.grid.children.find(n=>n.dataset.mediaKind==='video'),video);assert.equal(video.querySelector('video'),player);
   f.filter('video');assert.equal(f.grid.children.filter(n=>n.dataset.mediaKind).length,1);assert.equal(f.grid.children.find(n=>n.dataset.mediaKind),video);
+});
+
+test('edited wedding and nostalgia photos replace cached thumbnails while unrelated video players remain mounted',async()=>{
+ for(const scope of ['nostalgia','wedding:'+family.root]){
+  const f=fixture([item('photo',1),item('video',2)],scope==='nostalgia'?{}:{navigation:true,entryUrl:'https://family.test/#weddings/'+family.root});await f.flush();
+  const grid=scope==='nostalgia'?f.grid:f.nodes.get('weddingMediaGrid'),before=grid.children.find(n=>n.dataset.mediaKind==='photo'),video=grid.children.find(n=>n.dataset.mediaKind==='video');
+  assert.ok(before);const edited={...item('photo',1),src:'/media/1?v=edited',photoRevision:'edited'};
+  f.change({operation:'photo-edit',scope,item:edited});
+  const after=grid.children.find(n=>n.dataset.mediaKind==='photo');assert.match(after.innerHTML,/src="\/media\/1\?v=edited"/);assert.notEqual(after,before);assert.equal(grid.children.find(n=>n.dataset.mediaKind==='video'),video);
+  f.filter('all');assert.match(grid.children.find(n=>n.dataset.mediaKind==='photo').innerHTML,/src="\/media\/1\?v=edited"/);
+ }
+});
+test('an archive refresh requested before an edit cannot restore the old photo in the viewer or gallery',async()=>{
+ for(const scope of ['nostalgia','wedding:'+family.root]){
+  const original=item('photo',1),f=fixture([original],scope==='nostalgia'?{}:{navigation:true,entryUrl:'https://family.test/#weddings/'+family.root});await f.flush();let resolve;
+  f.window.FamilyI18n.fetch=()=>new Promise(done=>{resolve=done;});f.poll();assert.ok(resolve);
+  const edited={...original,src:'/media/1?v=latest',photoRevision:'latest'};f.change({operation:'photo-edit',scope,item:edited});
+  resolve(Response.json(scope==='nostalgia'?{items:[original],count:1}:{id:family.root,greetings:[],collection:{items:[original],count:1}}));await f.flush();
+  const grid=scope==='nostalgia'?f.grid:f.nodes.get('weddingMediaGrid');assert.match(grid.children.find(n=>n.dataset.mediaKind==='photo').innerHTML,/src="\/media\/1\?v=latest"/);
+ }
 });
 
 test('wedding history restores the correct couple and overview without adding entries during Back or Forward',async()=>{

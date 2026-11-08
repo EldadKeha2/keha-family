@@ -42,6 +42,7 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity}={}){
   filter(name){for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-filter]'?{dataset:{galleryFilter:name}}:null}});},
   open:id=>window.FamilyMedia.openFrom('gallery',id),close:()=>get('closeMediaViewer').click(),poll:()=>intervals.forEach(fn=>fn()),defer(){nextDeferred=true;},
   change(id,operation='tags',tagCount=1){const item=server.find(i=>i.id===id);item.tags=Array.from({length:tagCount},(_,i)=>({id:'person-'+i,name:'Person '+i}));item.tagsRevision='tags-'+(++revision);item.faceSummary={total:2,unmatched:2-tagCount,partial:tagCount>0,reviewed:false};window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'gallery',item:structuredClone(item)}}));},
+  edit(id){const item=server.find(i=>i.id===id);item.photoRevision='edit-'+(++revision);item.src='/media/'+id+'?v='+item.photoRevision;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'photo-edit',scope:'gallery',item:structuredClone(item)}}));return item.src;},
   review(id,complete=true){const item=server.find(i=>i.id===id);item.faceSummary={...item.faceSummary,reviewed:complete,partial:!complete&&item.tags.length>0};revision++;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'face-review',scope:'gallery',item:structuredClone(item)}}));},
   get cards(){return get('sharedGalleryGrid').children.map(card=>card.dataset.mediaFile);}
  };
@@ -56,6 +57,20 @@ test('a first tag moves a photo exclusively to partial after X, where it waits f
  f.filter('partial');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
  f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);f.filter('complete');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
  f.filter('untagged');await f.flush();assert.deepEqual(f.cards,['b.jpg']);f.filter('all');await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);
+});
+
+test('an edited gallery photo stays current in its viewer, thumbnail and reopened view in every tagging category',async()=>{
+ for(const filter of ['all','untagged','partial','complete']){
+  const a=photo('a',filter==='partial'?[{id:'yona'}]:[]);if(filter==='complete')a.faceSummary.reviewed=true;
+  const f=fixture([a]);await f.flush();if(filter!=='all'){f.filter(filter);await f.flush();}f.open('a');const edited=f.edit('a');
+  assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaStage').children[0].src,edited);f.close();await f.flush();
+  assert.equal(f.get('sharedGalleryGrid').children[0].dataset.mediaSrc,edited);assert.match(f.get('sharedGalleryGrid').children[0].innerHTML,/\?v=edit-/);
+  f.open('a');assert.equal(f.get('mediaStage').children[0].src,edited);f.close();
+ }
+});
+test('a slow refresh between two saved edits cannot roll the gallery back to the first edit',async()=>{
+ const f=fixture();await f.flush();f.open('a');f.edit('a');f.defer();f.poll();assert.equal(f.pending.length,1);const latest=f.edit('a');f.pending.shift()();await f.flush();
+ assert.equal(f.get('mediaStage').children[0].src,latest);assert.equal(f.get('sharedGalleryGrid').children[0].dataset.mediaSrc,latest);f.close();f.open('a');assert.equal(f.get('mediaStage').children[0].src,latest);
 });
 test('tagging the final detected face stays partial until completion, which does not close the viewer',async()=>{
  const f=fixture([photo('a',[{id:'person-0'}])]);await f.flush();f.filter('partial');await f.flush();f.open('a');f.change('a','faces',2);await f.flush();

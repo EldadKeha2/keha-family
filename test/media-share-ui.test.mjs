@@ -9,15 +9,15 @@ const source=await readFile(new URL('../public/assets/media.js',import.meta.url)
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
-    constructor(){this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.classList={toggle(){}};this.children=new Map();}
+    constructor(){this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.classList={toggle(){}};this.children=new Map();this.content=[];}
     addEventListener(type,callback){this.handlers.set(type,callback);}
     setAttribute(key,value){this[key]=value;}
     getAttribute(key){return key in this?String(this[key]):null;}
     removeAttribute(key){delete this[key];}
     querySelector(selector){if(!this.children.has(selector))this.children.set(selector,new Node());return this.children.get(selector);}
     querySelectorAll(){return [];}
-    replaceChildren(){}
-    append(){}
+    replaceChildren(...nodes){this.content=nodes;}
+    append(...nodes){this.content.push(...nodes);}
     focus(){}
     select(){}
     load(){}
@@ -38,15 +38,26 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
-test('photo editing opens the selected gallery or profile photo and refreshes its download in place',async()=>{
- for(const scope of ['gallery','personal:ruti']){
-  const f=fixture(),calls=[],photo=f.photo(),edited={...photo,src:'/media/a?v=new',photoRevision:'new'};
+test('photo editing refreshes the displayed pixels, face coordinates and download, including after reopening',async()=>{
+ for(const scope of ['gallery','personal:ruti','wedding:parents','nostalgia','nursery:ruti']){
+  const f=fixture(),calls=[],mounts=[],photo=f.photo(),edited={...photo,src:'/media/a?v=new',photoRevision:'new'};
+  f.window.FamilyFaces={clear(){},update(){},mount(_stage,img,item){mounts.push({img,item});}};
   f.window.FamilyPhotoEditor={async edit(item){calls.push(item);return {operation:'photo-edit',scope:'gallery',item:edited};}};
   f.window.FamilyMedia.open([photo],0,scope);assert.equal(f.get('editOpenedPhoto').hidden,false);
+  const previousImage=f.get('mediaStage').content[0];
   await f.get('editOpenedPhoto').handlers.get('click')();assert.equal(calls.length,1);assert.equal(calls[0].id,'a');assert.equal(f.get('mediaOriginal').href,edited.src);assert.equal(f.get('mediaViewer').open,true);
+  assert.equal(f.get('mediaStage').content[0].src,edited.src);assert.notEqual(f.get('mediaStage').content[0],previousImage);assert.equal(mounts.at(-1).item.photoRevision,'new');
+  const editedImage=f.get('mediaStage').content[0];f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'tags',item:{...edited,tags:[{id:'yona'}]}}}));
+  assert.equal(f.get('mediaStage').content[0],editedImage,'Metadata updates must preserve the image and its active face controls');
+  f.close();f.window.FamilyMedia.openFrom(scope,'a');assert.equal(f.get('mediaStage').content[0].src,edited.src);
   f.window.FamilyMedia.open([{id:'video',kind:'video',src:'/media/video'}],0,scope);assert.equal(f.get('editOpenedPhoto').hidden,true);
   await f.get('editOpenedPhoto').handlers.get('click')();assert.equal(calls.length,1);
  }
+});
+test('editing a retained photo refreshes its pixels without adding it back to the filtered album',async()=>{
+ const f=fixture(),edited={...f.photo(),src:'/media/a?v=edited',photoRevision:'edited'};f.open();f.window.FamilyMedia.register('gallery',[],{retainCurrent:true});
+ f.window.FamilyPhotoEditor={edit:async()=>({operation:'photo-edit',scope:'gallery',item:edited})};await f.get('editOpenedPhoto').handlers.get('click')();
+ assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaStage').content[0].src,edited.src);f.close();f.window.FamilyMedia.openFrom('gallery','a');assert.equal(f.get('mediaViewer').open,false);
 });
 test('editor cancellation leaves the current photo unchanged and editing keys cannot move the underlying album',async()=>{
  const f=fixture();f.window.FamilyPhotoEditor={edit:async()=>null};f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
@@ -76,6 +87,15 @@ test('moving between photos keeps one viewer history entry and returns to the al
 test('Instagram shares an actual file through the native sheet and reuses the prepared file only for its own photo',async()=>{
   const f=fixture();f.open('a');await f.click();assert.equal(f.shared.length,1);assert.equal(f.shared[0].files.length,1);assert.equal(await f.shared[0].files[0].text(),'picture');assert.equal(f.shared[0].files[0].type,'image/jpeg');assert.equal(f.shared[0].url,undefined);assert.equal(f.requests[0].path,'/media/a');assert.equal(f.requests[0].options.cache,'force-cache');assert.equal(f.get('shareMediaInstagram').disabled,false);
   await f.click();assert.equal(f.requests.length,1);f.open('b');await f.click();assert.equal(f.requests.length,2);assert.equal(f.requests[1].path,'/media/b');
+});
+test('sharing a photo after editing fetches its new pixels and discards preparation of the old revision',async()=>{
+ for(const inFlight of [false,true]){
+  const f=fixture({defer:inFlight});f.open();const sharing=f.click();await new Promise(resolve=>setImmediate(resolve));if(!inFlight)await sharing;
+  const edited={...f.photo(),src:'/media/a?v=new',photoRevision:'new'};f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'photo-edit',scope:'gallery',item:edited}}));
+  if(inFlight){f.pending.shift()(new Blob(['old'],{type:'image/jpeg'}));await sharing;assert.equal(f.shared.length,0);assert.equal(f.get('shareMediaInstagram').disabled,false);}
+  const latest=f.click();await new Promise(resolve=>setImmediate(resolve));if(inFlight)f.pending.shift()(new Blob(['edited'],{type:'image/jpeg'}));await latest;
+  assert.equal(f.requests.length,2);assert.equal(f.requests.at(-1).path,edited.src);if(inFlight)assert.equal(await f.shared[0].files[0].text(),'edited');
+ }
 });
 test('unsupported sharing offers a photo download and a copied deep link, in both languages',async()=>{
   for(const english of [false,true])for(const native of [false,true]){
