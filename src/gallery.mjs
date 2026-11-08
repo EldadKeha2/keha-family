@@ -2,6 +2,12 @@ import family from './family.mjs';
 import {HttpError,text} from './http.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION} from '../public/assets/face-coverage.mjs';
 import {familyMemberIds,hasFamily} from '../public/assets/gallery-family.mjs';
+import {PHOTO_LABELS} from '../public/assets/photo-labels-catalog.mjs';
+export function galleryLabels(value){
+  const source=text(value||'','תגיות',200),labels=[...new Set(source?source.split(','):[])].sort();
+  if(labels.some(id=>!PHOTO_LABELS.some(label=>label.id===id)))throw new HttpError(400,'בחרו תגיות מהרשימה.');
+  return labels;
+}
 function refinementIds(value,label){
   const source=text(value||'',label,40000);
   if(!source)return [];
@@ -16,5 +22,6 @@ export function galleryRefinement(options={}){
 }
 export function galleryRevision(revision,options={}){
   const {person,unit}=galleryRefinement(options),filter=options.filter||'all';
-  return revision+':'+FACE_SCAN_VERSION+':'+GALLERY_FILTER_VERSION+':'+Number(options.page||1)+':'+Number(options.size||100)+':'+encodeURIComponent((options.query||'').trim())+(filter==='all'?'':':'+filter)+(person||unit?':refine2:'+encodeURIComponent(person)+':'+encodeURIComponent(unit):'');
+  const labels=galleryLabels(options.labels).join(',');
+  return revision+':'+FACE_SCAN_VERSION+':'+GALLERY_FILTER_VERSION+':'+Number(options.page||1)+':'+Number(options.size||100)+':'+encodeURIComponent((options.query||'').trim())+(filter==='all'?'':':'+filter)+(person||unit?':refine2:'+encodeURIComponent(person)+':'+encodeURIComponent(unit):'')+(labels?':labels:'+labels:'');
 }

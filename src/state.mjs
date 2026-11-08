@@ -17,7 +17,8 @@ import {nurseryCollection} from './nursery.mjs';
 import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
-import {galleryRefinement,galleryRevision} from './gallery.mjs';
+import {galleryRefinement,galleryRevision,galleryLabels} from './gallery.mjs';
+import {PHOTO_LABELS,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -271,7 +272,7 @@ export class FamilyState {
   mediaCollections(item){return [...new Set([...(item.category==='personal'?[]:[item.category]),...this.rows('SELECT collection FROM media_collections WHERE media_id=?',item.id).map(row=>row.collection)])];}
   mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,nameEn:item.nameEn||null,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:photoSource(item),...(item.photoRevision?{photoRevision:item.photoRevision}:{}),uploadedAt:item.createdAt,tags:this.tags(item.id),tagsRevision:this.tagsRevision(item.id),
     collections:this.mediaCollections(item),
-    ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item)}:{}),
+    ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels)}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
   mediaChanged(item,operation,ids=this.relatedPeople(item)){
@@ -358,10 +359,12 @@ export class FamilyState {
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
     const refinement=galleryRefinement(options);
+    const labels=galleryLabels(options.labels);
     if(refinement.people.length){
       if(this.rows('SELECT id FROM people WHERE id IN (SELECT value FROM json_each(?))',JSON.stringify(refinement.people)).length!==refinement.people.length)throw new HttpError(400,'בחרו אדם מהרשימה.');
     }
     if(refinement.members.length){where+=' AND EXISTS (SELECT 1 FROM media_tags f WHERE f.media_id=m.id AND f.person_id IN (SELECT value FROM json_each(?)))';args.push(JSON.stringify(refinement.members));}
+    if(labels.length){where+=" AND EXISTS (SELECT 1 FROM json_each(m.data,'$.labels') label WHERE label.value IN (SELECT value FROM json_each(?)))";args.push(JSON.stringify(labels));}
     const unfinished="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty'))";
     const tagged="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id)",untagged='NOT '+tagged+' AND '+unfinished;
     if(filter==='untagged')where+=' AND '+untagged;
@@ -375,10 +378,10 @@ export class FamilyState {
     if(options.selection)return {ids:this.rows('SELECT m.id FROM media m WHERE '+where+' ORDER BY m.rowid DESC',...args).map(row=>row.id)};
     const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+untagged+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
     const filterCounts={all:counts.all_count,untagged:counts.untagged_count,complete:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND NOT ('+unfinished+')',kind)[0].n,partial:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND '+partial,kind)[0].n};
-    const total=query||refinement.person||refinement.unit?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
+    const total=query||refinement.person||refinement.unit||labels.length?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
-    return {kind,items,count:total,filterCounts,revision:galleryRevision(revision,{page,size,query,filter,...refinement}),pagination:{page,size,total,pages,query,filter,person:refinement.person,unit:refinement.unit}};
+    return {kind,items,count:total,filterCounts,revision:galleryRevision(revision,{page,size,query,filter,...refinement,labels:labels.join(',')}),pagination:{page,size,total,pages,query,filter,person:refinement.person,unit:refinement.unit,labels:labels.join(',')}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   albumCover(kind,fallback){
@@ -557,6 +560,13 @@ export class FamilyState {
       case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');const ignoredFaces=this.ignoredFaces(item);return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:withoutIgnored(this.faceScan(item)?.faces||[],ignoredFaces),ignoredFaces};}
       case 'media.face.ignore':return this.ignoreFace(p);
       case 'media.face.save':return this.saveFace(p);
+      case 'media.labels.patch':{
+        const item=this.photo(p.id);
+        if(typeof p.tagged!=='boolean'||!PHOTO_LABELS.some(label=>label.id===p.label))throw new HttpError(400,'בחרו תגית מהרשימה.');
+        const labels=new Set(photoLabels(item.labels));if(p.tagged)labels.add(p.label);else labels.delete(p.label);
+        item.labels=photoLabels([...labels]);item.updatedAt=new Date().toISOString();this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchMedia(item);
+        return {saved:true,operation:'labels',scope:this.mediaScope(item),item:this.mediaPublic(item)};
+      }
       case 'media.caption.id':{
         const item=this.media(p.id),caption=text(p.caption,'כיתוב',5000);
         if((item.caption||'')!==p.expectedCaption)throw new HttpError(409,'הכיתוב השתנה. פתחו שוב את העריכה לפני שמירה.');

@@ -67,6 +67,7 @@
     const deleteLabel=I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,state.scope)?I18n.t('הסרה מהאלבום'):tr('מחק פריט','Delete item');
     $('mediaViewerDelete').querySelector('span').textContent=deleteLabel;$('mediaViewerDelete').title=deleteLabel;
     window.FamilyTags.mountInline($('mediaTagPanel'),item);
+    window.FamilyPhotoLabels?.mount(item);
     window.FamilyFaces?.update(item);
   }
   async function instagramFallback(item){

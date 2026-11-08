@@ -1,14 +1,15 @@
 import {familyOptions,familyLabel} from './gallery-family.mjs?v=2';
+import {PHOTO_LABELS,photoLabelName} from './photo-labels-catalog.mjs?v=1';
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
-const state={open:false,people:new Set(),families:new Set(),selected:new Set(),version:0,busy:false,resultsReady:false};
+const state={open:false,people:new Set(),families:new Set(),labels:new Set(),selected:new Set(),version:0,busy:false,resultsReady:false};
 const downloadIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>';
 const previewIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
 let roster=[],ready=false;
 function status(message='',error=false){const host=$('gallerySelectionStatus');if(!host)return;host.textContent=message;host.hidden=!message;host.classList.toggle('is-error',error);}
 function clearSelection(){state.selected.clear();state.version++;state.busy=false;status();render();}
-function criteria(){return {person:[...state.people].sort().join(','),unit:[...state.families].sort().join(',')};}
+function criteria(){return {person:[...state.people].sort().join(','),unit:[...state.families].sort().join(','),labels:[...state.labels].sort().join(',')};}
 function checkboxes(host,items,selected,kind){
   host.innerHTML=items.map(item=>'<label class="gallery-check-option"><input type="checkbox" data-gallery-'+kind+'="'+safe(item.id)+'"'+(selected.has(item.id)?' checked':'')+'><span>'+safe(item.label)+'</span></label>').join('')||'<p class="gallery-filter-empty">'+tr('לא נמצאו התאמות','No matches found')+'</p>';
 }
@@ -25,17 +26,19 @@ function fillPeople(){
   checkboxes($('galleryPersonFilter'),people,state.people,'person');
 }
 function apply(){clearSelection();window.FamilyPortal.refineGallery(criteria());}
-function clearCriteria(){state.people.clear();state.families.clear();if(ready){$('galleryPersonSearch').value='';fillPeople();fillFamilies();}}
-function reset(){state.open=false;for(const id of ['galleryPeopleChoices','galleryFamily2Choices','galleryFamily3Choices','galleryFamily4Choices'])$(id).open=false;clearCriteria();clearSelection();}
+function fillLabels(){checkboxes($('galleryLabelFilter'),PHOTO_LABELS.map(label=>({id:label.id,label:photoLabelName(label,I.isEnglish)})),state.labels,'label');}
+function clearCriteria(){state.people.clear();state.families.clear();state.labels.clear();if(ready){$('galleryPersonSearch').value='';fillPeople();fillFamilies();fillLabels();}}
+function reset(){state.open=false;for(const id of ['galleryPeopleChoices','galleryFamily2Choices','galleryFamily3Choices','galleryFamily4Choices','galleryLabelChoices'])$(id).open=false;clearCriteria();clearSelection();}
 function category(filter){if(filter!=='all')reset();render();}
 function render(){
   if(!ready)return;
   const all=window.FamilyPortal.galleryQuery().filter==='all',open=all&&state.open,toggle=$('galleryFilterToggle');
   const collection=window.FamilyPortal.getCollection('gallery'),q=window.FamilyPortal.galleryQuery(),p=collection.pagination;
-  state.resultsReady=Boolean(p&&(p.person||'')===q.person&&(p.unit||'')===q.unit&&(p.query||'')===q.query.trim());
+  state.resultsReady=Boolean(p&&(p.person||'')===q.person&&(p.unit||'')===q.unit&&(p.labels||'')===(q.labels||'')&&(p.query||'')===q.query.trim());
   toggle.hidden=!all;toggle.setAttribute('aria-expanded',String(open));$('galleryFilterPanel').hidden=!open;
-  $('clearGalleryFilter').hidden=!(state.people.size||state.families.size);
+  $('clearGalleryFilter').hidden=!(state.people.size||state.families.size||state.labels.size);
   $('galleryPeopleChoiceCount').textContent=state.people.size?'('+state.people.size+')':'';
+  $('galleryLabelChoiceCount').textContent=state.labels.size?'('+state.labels.size+')':'';
   for(const generation of [2,3,4]){
     const count=[...state.families].filter(id=>window.FAMILY_DATA.units[id]?.generation===generation).length;
     $('galleryFamily'+generation+'ChoiceCount').textContent=count?'('+count+')':'';
@@ -61,7 +64,7 @@ function render(){
 async function selectAll(){
   if(state.busy)return;state.busy=true;const version=++state.version;status(tr('בוחרים את כל תוצאות הסינון…','Selecting all matching photos…'));render();
   try{
-    const q=window.FamilyPortal.galleryQuery(),response=await I.fetch('api/gallery/selection?'+new URLSearchParams({q:q.query,person:q.person,unit:q.unit}),{cache:'no-store'}),result=await response.json();
+    const q=window.FamilyPortal.galleryQuery(),response=await I.fetch('api/gallery/selection?'+new URLSearchParams({q:q.query,person:q.person,unit:q.unit,labels:q.labels||''}),{cache:'no-store'}),result=await response.json();
     if(!response.ok)throw Error(I.error(result.error));if(version!==state.version)return;
     state.selected=new Set(result.ids);status();
   }catch(error){if(version===state.version)status(error.message,true);}
@@ -81,18 +84,18 @@ function init(){
   const barHTML='<button type="button" data-gallery-select-all>'+tr('בחר הכל','Select all')+'</button><button type="button" data-gallery-clear-selection>'+tr('ביטול הבחירה','Clear selection')+'</button><span class="gallery-selection-count" data-gallery-selected-count></span><button type="button" class="gallery-download-selected" data-gallery-download>'+downloadIcon+'<span>'+tr('הורדת הנבחרות','Download selected')+'</span></button>';
   for(const id of ['gallerySelectionTop','gallerySelectionBottom'])$(id).innerHTML=barHTML;
   $('gallerySelectionTop').querySelector('[data-gallery-selected-count]').setAttribute('aria-live','polite');
-  roster=Object.values(window.FAMILY_DATA.people).filter(p=>!p.placeholder);ready=true;fillFamilies();fillPeople();render();
+  roster=Object.values(window.FAMILY_DATA.people).filter(p=>!p.placeholder);ready=true;fillFamilies();fillPeople();fillLabels();$('galleryLabelSummary').textContent=tr('תגיות','Labels');render();
   $('galleryFilterToggle').addEventListener('click',async()=>{
-    if(state.open){reset();window.FamilyPortal.refineGallery({person:'',unit:''});return;}
+    if(state.open){reset();window.FamilyPortal.refineGallery({person:'',unit:'',labels:''});return;}
     state.open=true;render();
     try{const response=await I.fetch('api/tag-people',{cache:'no-store'});if(response.ok){const result=await response.json();roster=result.people;fillPeople();}}catch{}
   });
   $('galleryPersonSearch').addEventListener('input',fillPeople);
   $('galleryFilterPanel').addEventListener('change',event=>{
     const input=event.target;
-    const person=input.dataset.galleryPerson,family=input.dataset.galleryFamily;
-    if(!person&&!family)return;
-    const selected=person?state.people:state.families,id=person||family;
+    const person=input.dataset.galleryPerson,family=input.dataset.galleryFamily,label=input.dataset.galleryLabel;
+    if(!person&&!family&&!label)return;
+    const selected=person?state.people:family?state.families:state.labels,id=person||family||label;
     if(input.checked)selected.add(id);else selected.delete(id);
     apply();
   });

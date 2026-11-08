@@ -144,7 +144,7 @@
     window.addEventListener('hashchange',route);window.addEventListener('popstate',route);
     const refresh=()=>{if(state.view!=='person'||!state.id||state.running)return;clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>load(true),150);};
     window.addEventListener('family-person-changed',event=>{if(event.detail.id===state.id)refresh();});
-    window.addEventListener('family-media-changed',event=>{if(event.detail.affectedPersonIds?.includes(state.id)){tagsDirty=true;if(!$('mediaViewer').open&&!$('tagPeopleDialog').open){tagsDirty=false;refresh();}}else if(event.detail.people?.[state.id]||event.detail.person?.id===state.id)refresh();});
+    window.addEventListener('family-media-changed',event=>{if(event.detail.operation==='labels'&&event.detail.item){const item=event.detail.item;for(const album of Object.values(state.data?.albums||{}))album.items=album.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);return;}if(event.detail.affectedPersonIds?.includes(state.id)){tagsDirty=true;if(!$('mediaViewer').open&&!$('tagPeopleDialog').open){tagsDirty=false;refresh();}}else if(event.detail.people?.[state.id]||event.detail.person?.id===state.id)refresh();});
     const finishTags=()=>{if(tagsDirty&&!document.querySelector('dialog[open]')){tagsDirty=false;refresh();}};
     $('mediaViewer').addEventListener('close',finishTags);$('tagPeopleDialog').addEventListener('close',finishTags);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.view==='person')load();});

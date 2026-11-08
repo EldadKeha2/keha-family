@@ -232,5 +232,5 @@
       if(result.faces)apply(c,result.faces);else if(['tags','untag','retag','restore'].includes(result.operation))load(c,true).catch(()=>{});
     });
   });
-  window.FamilyFaces={mount,clear,update};
+  window.FamilyFaces={mount,clear,update,fit(){if(current?.image.naturalWidth)fitZoom(current);}};
 })();

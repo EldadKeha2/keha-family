@@ -281,7 +281,7 @@
     for(const id of ['weddingDropzone','nostalgiaDropzone'])$(id).addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(id).contains(event.relatedTarget))$(id).classList.remove('drag-over');});
     $('weddingBranchFilter').addEventListener('change',renderWeddings);$('weddingDateForm').addEventListener('submit',saveDate);$('clearWeddingDate').addEventListener('click',event=>saveDate(event,true));$('weddingGreetingForm').addEventListener('submit',saveGreeting);
     window.addEventListener('family-media-changed',event=>{
-      if(event.detail.operation==='photo-edit'&&event.detail.item){
+      if(['photo-edit','caption','labels'].includes(event.detail.operation)&&event.detail.item){
         const item=event.detail.item;for(const [key,album] of collections)if(album.items?.some(photo=>photo.id===item.id)){album.items=album.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);photoEditVersions.set(key,(photoEditVersions.get(key)||0)+1);if(scope()===key)renderCollection(key);}
         for(const pair of summaries.values())if(pair.cover?.split('?')[0]==='/media/'+item.id)pair.cover=item.src;
         if(state.view==='weddings'&&!state.weddingId)renderWeddings();return;

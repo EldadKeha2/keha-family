@@ -120,6 +120,7 @@
     document.addEventListener('paste',event=>{if(!canDrop()||event.target.closest('input,textarea,[contenteditable=true]'))return;const files=[...(event.clipboardData?.items||[])].filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);if(files.length){event.preventDefault();addFiles(state.id,files);}});
     window.addEventListener('family-people-loaded',render);window.addEventListener('family-person-changed',render);
     window.addEventListener('family-media-changed',event=>{
+      if(event.detail.operation==='labels'&&event.detail.item){const item=event.detail.item;for(const [id,album]of albums)if(album.items.some(photo=>photo.id===item.id))applyAlbum(id,{...album,items:album.items.map(photo=>photo.id===item.id?{...photo,...item}:photo)},true);render();return;}
       const result=event.detail;if(!result.scope?.startsWith('nursery:'))return;const id=result.scope.slice(8);
       if(result.collection)applyAlbum(id,result.collection,true);
       if(state.view==='nursery'&&state.id===id){loadAlbum(id,state.page);}else render();

@@ -5,7 +5,7 @@
 .gallery-refine-toggle svg,.gallery-selection-bar svg,.gallery-selection-preview svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
 .gallery-refine-toggle[aria-expanded=true]{background:#586d45;color:#fffdf5;border-color:#586d45;box-shadow:inset 0 2px 4px #26381633}
 .gallery-filter-panel{margin:0 0 10px;padding:16px;border:1px solid #d9d3bc;border-radius:9px;background:#f7f5eb;color:#566143}
-.gallery-refine-fields{display:grid;grid-template-columns:1.25fr repeat(3,1fr);align-items:start;gap:14px}
+.gallery-refine-fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:start;gap:14px}
 .gallery-filter-field{min-width:0;margin:0;padding:0;border:1px solid #d5ccb6;border-radius:6px;background:#fffdf7;font:calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans)}
 .gallery-filter-field summary{display:flex;align-items:center;gap:6px;min-height:44px;padding:9px 10px;box-sizing:border-box;list-style:none;cursor:pointer;color:#4c583e;font:inherit}
 .gallery-filter-field summary::-webkit-details-marker{display:none}

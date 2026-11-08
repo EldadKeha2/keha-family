@@ -1179,6 +1179,28 @@ test('all-faces confirmation survives rotation, cropping, restoration and restar
  }finally{await f.close();}
 });
 
+test('photo subject labels persist independently of people and completion, filter with families, and survive editing and restoration',async()=>{
+ const f=fixture();try{
+  await f.connect();let a=await galleryPhoto(f,'Birthday.jpg'),b=await galleryPhoto(f,'Travel.jpg'),c=await galleryPhoto(f,'Holiday.jpg');
+  a=(await(await f.call('/api/media/'+a.id+'/tag',{method:'POST',body:{personId:'yehiel',tagged:true}})).json()).item;
+  await f.call('/api/media/'+a.id+'/faces/review',{method:'POST',body:{photoRevision:'original',tagsRevision:a.tagsRevision,complete:true}});
+  const patch=(item,label,tagged=true,extra={})=>f.call('/api/media/'+item.id+'/labels',{method:'POST',body:{label,tagged},...extra});
+  let result=await(await patch(a,'birthdays')).json();assert.deepEqual(result.item.labels,['birthdays']);assert.equal(result.item.faceSummary.reviewed,true);assert.equal(result.item.tagsRevision,a.tagsRevision);assert.deepEqual(result.item.tags.map(p=>p.id),['yehiel']);
+  await patch(a,'holidays');await patch(b,'abroad');await patch(c,'holidays');await patch(a,'birthdays');
+  const query=async q=>await(await f.call('/api/collections/gallery?'+q)).json();
+  let filtered=await query('labels=holidays');assert.equal(filtered.count,2);assert.deepEqual(filtered.items.map(i=>i.id),[c.id,a.id]);assert.equal(filtered.pagination.labels,'holidays');
+  assert.deepEqual((await query('labels=abroad,holidays')).items.map(i=>i.id),[c.id,b.id,a.id]);
+  assert.deepEqual((await query('labels=holidays&person=yehiel')).items.map(i=>i.id),[a.id]);assert.deepEqual((await query('labels=holidays&unit=u-yehiel')).items.map(i=>i.id),[a.id]);
+  assert.deepEqual((await(await f.call('/api/gallery/selection?labels=holidays')).json()).ids,[c.id,a.id]);
+  const cached=await f.call('/api/collections/gallery?labels=abroad'),etag=cached.headers.get('ETag');assert.equal((await f.call('/api/collections/gallery?labels=holidays',{headers:{'If-None-Match':etag}})).status,200);assert.equal((await f.call('/api/collections/gallery?labels=abroad',{headers:{'If-None-Match':etag}})).status,304);
+  assert.equal((await query('filter=untagged')).count,2,'Subject labels do not pretend that people have been tagged');assert.equal((await query('filter=complete&labels=birthdays')).count,1);
+  for(const [label,tagged]of [['unknown',true],['birthdays','yes']])assert.equal((await patch(a,label,tagged)).status,400);assert.equal((await patch(a,'purim',true,{clientHeaders:false})).status,403);assert.equal((await f.call('/api/collections/gallery?labels=unknown')).status,400);assert.equal((await f.call('/api/gallery/selection?labels=unknown')).status,400);
+  a=(await(await photoEdit(f,a)).json()).item;assert.deepEqual(a.labels,['birthdays','holidays']);assert.equal(a.faceSummary.reviewed,true);
+  await f.call('/api/media/'+a.id+'/delete',{method:'POST',body:{scope:'gallery'}});await f.call('/api/media/'+a.id+'/restore',{method:'POST',body:{scope:'gallery'}});f.restart();assert.deepEqual((await(await f.call('/api/media/'+a.id+'/view')).json()).item.labels,['birthdays','holidays']);
+  result=await(await patch(a,'birthdays',false)).json();assert.deepEqual(result.item.labels,['holidays']);assert.equal(result.item.faceSummary.reviewed,true);assert.equal((await query('labels=birthdays')).count,0);
+ }finally{await f.close();}
+});
+
 test('ignored false detections persist only for that photo revision, survive rescanning and support Undo without removing names',async()=>{
  const f=fixture();try{
   await f.connect();const item=await galleryPhoto(f,'Ignore.jpg'),other=await galleryPhoto(f,'Unaffected.jpg');await saveGalleryScan(f,item);await saveGalleryScan(f,other);

@@ -231,7 +231,7 @@ export default {
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
       if(path==='/api/gallery/face-scan'&&request.method==='GET')return json(await db('gallery.face.scan',{after:url.searchParams.get('after')}));
-      if(path==='/api/gallery/selection'&&request.method==='GET')return json(await db('gallery.selection',{person:url.searchParams.get('person'),unit:url.searchParams.get('unit'),query:url.searchParams.get('q')}));
+      if(path==='/api/gallery/selection'&&request.method==='GET')return json(await db('gallery.selection',{person:url.searchParams.get('person'),unit:url.searchParams.get('unit'),labels:url.searchParams.get('labels'),query:url.searchParams.get('q')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/versions$/.exec(path))&&request.method==='GET')return json(await db('photo.versions',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/faces$/.exec(path))&&request.method==='GET')return json(await db('media.faces',{id:match[1]}));
       if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page')}));
@@ -244,14 +244,14 @@ export default {
       }
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){
-        const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all',person=url.searchParams.get('person'),unit=url.searchParams.get('unit');
+        const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all',person=url.searchParams.get('person'),unit=url.searchParams.get('unit'),labels=url.searchParams.get('labels');
         if(kind==='gallery'&&!['all','untagged','partial','complete'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
         if(request.headers.has('If-None-Match')){
           const current=await db('collection.revision',{kind});
-          const revision=kind==='gallery'?galleryRevision(current.revision,{page,size,query,filter,person,unit}):current.revision;
+          const revision=kind==='gallery'?galleryRevision(current.revision,{page,size,query,filter,person,unit,labels}):current.revision;
           if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});
         }
-        return snapshot(request,await db('collection',{kind,page,size,query,filter,person,unit}));
+        return snapshot(request,await db('collection',{kind,page,size,query,filter,person,unit,labels}));
       }
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
@@ -274,6 +274,7 @@ export default {
         if((match=/^\/api\/nursery\/([^/]+)\/upload$/.exec(path)))return await upload(request,env,db,ctx,{category:nurseryCollection(decodeURIComponent(match[1]))});
         if((match=/^\/api\/memorial\/([^/]+)\/candles$/.exec(path))){const body=await readJSON(request,1000);return json(await db('candle.light',{id:decodeURIComponent(match[1]),visitorId:body.visitorId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/tags\/patch$/.exec(path))){const body=await readJSON(request,64000);return json(await db('media.tags.patch',{id:match[1],changes:body.changes}));}
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/labels$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.labels.patch',{id:match[1],label:body.label,tagged:body.tagged}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/caption$/.exec(path))){const body=await readJSON(request,40000);return json(await db('media.caption.id',{id:match[1],caption:body.caption,expectedCaption:body.expectedCaption}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|tag|untag|retag)$/.exec(path))){
           const body=await readJSON(request,match[2]==='tags'?64000:2000);
