@@ -56,7 +56,7 @@
 .rh-ora-ready:after{content:'!';position:absolute;top:0;inset-inline-end:15%;background:#b54c2f;color:#fff4d8;border:2px solid #fff4d8;border-radius:50%;width:21px;height:21px;font-size:15px;font-weight:900;z-index:4}
 .rh-tool[data-rh-tool=argue]:disabled{opacity:.35}.rh-hotspot[data-rh-ora-target]{z-index:5}
 .rh-ora-bonus{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:90%}.rh-ora-bonus-icon{width:76px;height:76px}.rh-ora-bonus-icon svg{width:100%;height:100%}
-.rh-ora-bonus h4{font-size:clamp(24px,4vw,36px);line-height:1.4}.rh-ora-bonus p{font-size:26px;font-weight:900;color:#9b5c24}.rh-ora-bonus>b{display:grid;place-items:center;width:68px;height:68px;border-radius:50%;background:#41684e;color:#fff5d2;font-size:42px;font-variant-numeric:tabular-nums}
+.rh-ora-bonus h4{font-size:clamp(24px,4vw,36px);line-height:1.4}.rh-ora-bonus p{font-size:26px;font-weight:900;color:#9b5c24}.rh-ora-timeline{width:min(270px,65vw);height:12px;border-radius:8px;overflow:hidden;background:#d8ceb0;border:1px solid #b8a778;margin-top:7px}.rh-ora-timeline>i{display:block;width:100%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6e8d58,#41684e);transform-origin:left center;transition:transform .08s linear}
 @keyframes rh-ora-invite{to{transform:translateY(-5px) scale(1.12)}}
 @media(max-width:700px){.rh-life-symbol{width:21px;height:27px}.rh-lives [data-rh-strikes]{gap:3px;min-height:28px}.rh-ora-bonus p{font-size:22px}}
 @media(prefers-reduced-motion:reduce){.rh-ora-ready .rh-tool-art{animation:none}}

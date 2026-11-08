@@ -17,6 +17,7 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
  else if(action==='water')frame=3;
  else if(action==='broom')frame=4;
  else if(action==='hand')frame=5;
+ else if(action==='argue')frame=reduced?5:[5,7,0,8,5,7][Math.floor(time*5)%6];
  else if(action==='serve'||action==='peanuts')frame=6;
  else if(walking)frame=Math.floor((actor.walkTime??time)*6)%2?1:2;
  else if(talking&&!reduced){
@@ -45,13 +46,13 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
  const heldNote=songBeat%8===7&&songPart<.4;
  const singing=celebrating&&(songBeat%8!==7||heldNote);
  const headFrame=!celebrating?frame:reduced?0:blinking?11:!singing?0:heldNote?8:songPart<.09||songPart>.82?0:songPart<.53?7:8;
- return {frame,headFrame,singing,danceStep,danceSide,
+ return {frame,headFrame,singing,danceStep,danceSide,sitting:Math.max(0,Math.min(1,actor.sitting||0)),
   mouthOpen:dancing&&singing&&headFrame!==11?Math.sin(Math.PI*Math.min(1,songPart/.86)):0,
   danceX:dancing?blend(weight):0,danceDepth:dancing?blend(depth):0,
   footLeftX:dancing&&!activeRight?footShift:0,footRightX:dancing&&activeRight?footShift:0,
   footLeftLift:dancing&&!activeRight?pulse*.015:0,footRightLift:dancing&&activeRight?pulse*.015:0,
   lift:reduced?0:celebrating?pulse*1.5:walking?Math.abs(cycle)*1.8:accent*.45,
-  lean:reduced?0:celebrating?blend(weight)*1.1:action==='broom'?Math.sin(time*10)*.028:action==='hand'?Math.sin(time*14)*.025:cycle*.008+(talking?Math.sin(speechAge*3.1)*.009+accent*.006:0),
+  lean:reduced?0:celebrating?blend(weight)*1.1:action==='broom'?Math.sin(time*10)*.028:action==='hand'?Math.sin(time*14)*.025:action==='argue'?Math.sin(time*8)*.018:cycle*.008+(talking?Math.sin(speechAge*3.1)*.009+accent*.006:0),
   breath:reduced?1:1+Math.sin(time*1.9)*.006+(celebrating?pulse*.002:0),talking,
   headTilt:reduced||celebrating?0:(talking?Math.sin(speechAge*3.1)*.008+accent*.004:Math.sin(time*.83)*.004),
   headLift:reduced?0:(celebrating?0:talking?accent*.0025:Math.sin(time*1.9)*.0008)};

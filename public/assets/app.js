@@ -84,6 +84,7 @@
     $('branchBar').innerHTML = I18n.html`<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + data.branches.map(b => `<button class="branch-chip${state.branch===b.id?' active':''}" data-branch="${b.id}" style="--branch-color:${b.color}" aria-pressed="${state.branch===b.id}"><span class="chip-dot"></span>${safe(I18n.branchName(b))}</button>`).join('');
   }
   function selectBranch(id) {
+    $('searchResults').hidden=true;
     state.branch = id;
     if (id !== 'all') state.mode = 'branch';
     else state.mode = 'overview';
@@ -130,11 +131,14 @@
     window.FamilyGames?.activate(state.view);
     if (isTree) renderTree(); else if (isDirectory) renderDirectory();
   }
+  function directoryMatches(query) {
+    return people.filter(p => (state.directoryGroup==='extended'?p.extended:!p.extended) && (state.directoryGroup==='extended'||state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
+  }
   function renderDirectory() {
     const query = normalize(state.query);
     document.querySelectorAll('[data-directory-group]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.directoryGroup===state.directoryGroup)));
     $('branchBar').hidden=state.directoryGroup==='extended';
-    const selected = people.filter(p => (state.directoryGroup==='extended'?p.extended:!p.extended) && (state.directoryGroup==='extended'||state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
+    const selected = directoryMatches(query);
     $('directoryCount').textContent = I18n.html`${selected.length} ${I18n.isEnglish?I18n.word(selected.length,'card','cards'):I18n.t('כרטיסים')}${state.directoryGroup!=='extended'&&state.branch!=='all'?' · '+I18n.branchName(branchFor(state.branch)):''}`;
     $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`).join('');
     $('emptySearch').hidden = selected.length > 0;
@@ -421,15 +425,21 @@
     if (!$('lightbox').open) $('lightbox').showModal();
   }
 
+  function fitSearchResults() {
+    const results=$('searchResults');if(results.hidden)return;
+    const viewport=window.visualViewport,bottom=(viewport?.offsetTop||0)+(viewport?.height||window.innerHeight);
+    results.style.maxHeight=Math.max(64,Math.min(420,bottom-results.getBoundingClientRect().top-10))+'px';
+  }
   function showSearch() {
     const query=normalize(state.query);
     if(state.view==='person'){$('searchResults').hidden=true;window.FamilyPeople?.search(state.query);return;}
     if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);window.FamilyNursery?.search(state.query);$('searchResults').hidden=true;return;}
-    if(state.view==='directory'){renderDirectory();$('searchResults').hidden=true;return;}
-    if(!query){$('searchResults').hidden=true;return;}
-    const matches=people.filter(p=>!p.extended&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
-    $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button class="search-result" data-search-person="${p.id}"><span>${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
+    if(state.view==='directory')renderDirectory();
+    if(!query&&state.view!=='directory'){$('searchResults').hidden=true;return;}
+    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
+    $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button type="button" class="search-result" data-search-person="${p.id}"><span>${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
     $('searchResults').hidden=false;
+    fitSearchResults();
   }
 
   async function loadFamilyMedia(force=false) {
@@ -503,9 +513,9 @@
     const person=event.target.closest('[data-person]');if(person){openPerson(person.dataset.person);return;}
     const branch=event.target.closest('[data-branch]');if(branch){selectBranch(branch.dataset.branch);return;}
     const openBranch=event.target.closest('[data-open-branch]');if(openBranch){selectBranch(openBranch.dataset.openBranch);return;}
-    const group=event.target.closest('[data-directory-group]');if(group){state.directoryGroup=group.dataset.directoryGroup;state.query='';$('searchInput').value='';renderDirectory();return;}
+    const group=event.target.closest('[data-directory-group]');if(group){$('searchResults').hidden=true;state.directoryGroup=group.dataset.directoryGroup;state.query='';$('searchInput').value='';renderDirectory();return;}
     const view=event.target.closest('[data-view]');if(view){setView(view.dataset.view);return;}
-    const search=event.target.closest('[data-search-person]');if(search){$('searchResults').hidden=true;openPerson(search.dataset.searchPerson);return;}
+    const search=event.target.closest('[data-search-person]');if(search){$('searchResults').hidden=true;$('searchInput').blur();openPerson(search.dataset.searchPerson);return;}
     const photo=event.target.closest('[data-open-photo]');if(photo){openPhoto(state.gallery.findIndex(p=>p.file===photo.dataset.openPhoto));return;}
     const profile=event.target.closest('[data-set-profile]');if(profile){chooseProfilePhoto(profile.dataset.owner,profile.dataset.setProfile);return;}
     const save=event.target.closest('[data-save-caption]');if(save){saveCaption(keyFor(save.dataset.owner,save.dataset.saveCaption));return;}
@@ -544,7 +554,11 @@
   $('previousPhoto').addEventListener('click',()=>openPhoto(state.photoIndex-1));
   $('nextPhoto').addEventListener('click',()=>openPhoto(state.photoIndex+1));
   $('searchInput').addEventListener('input',()=>{state.query=$('searchInput').value;showSearch();});
-  $('searchInput').addEventListener('focus',()=>{if(state.query)showSearch();});
+  $('searchInput').addEventListener('focus',()=>{if(state.query||state.view==='directory')showSearch();});
+  $('searchInput').addEventListener('click',()=>{if(state.query||state.view==='directory')showSearch();});
+  window.visualViewport?.addEventListener('resize',fitSearchResults);
+  window.visualViewport?.addEventListener('scroll',fitSearchResults);
+  window.addEventListener('resize',fitSearchResults);
   $('searchInput').addEventListener('keydown',e=>{if(e.key==='Escape')$('searchResults').hidden=true;if(e.key==='Enter'){const first=$('searchResults').querySelector('[data-search-person]');if(first&&!$('searchResults').hidden)first.click();}});
   $('homeLink').addEventListener('click',e=>{e.preventDefault();state.branch='all';state.mode='overview';state.query='';$('searchInput').value='';renderBranches();setView(isPhone()?'home':'tree');});
   $('overviewButton').addEventListener('click',()=>{state.branch='all';state.mode='overview';renderBranches();renderTree();});

@@ -34,6 +34,12 @@ test('walking alternates steps while speech opens and closes the mouth only duri
  assert.equal(rutiPose({speaking:true,speechUntil:2},3).frame,0);
 });
 
+test('arguing uses raised-hand and mouth poses while reduced motion holds one clear gesture',()=>{
+ const poses=[0,.2,.4,.6,.8,1].map(time=>rutiPose({action:'argue'},time));
+ assert.deepEqual(new Set(poses.map(p=>p.frame)),new Set([5,7,0,8]));
+ for(const time of [0,.2,1,5])assert.equal(rutiPose({action:'argue'},time,{reduced:true}).frame,5);
+});
+
 test('reduced motion keeps task and emotion cues while stopping steps, mouth cycling, blinking and body motion',()=>{
  for(const actor of [{walking:true,walkTime:.2},{speaking:true,speechUntil:20},{},
   {action:'broom'},{expression:'concern',expressionUntil:20},{expression:'cheer',expressionUntil:20}]){

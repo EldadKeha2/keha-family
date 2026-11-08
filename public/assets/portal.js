@@ -299,6 +299,10 @@
     $('birthdayForm').addEventListener('submit',saveBirthday);$('storyForm').addEventListener('submit',saveStory);
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
+      if(event.detail.operation==='photo-edit'&&event.detail.item){
+        const item=event.detail.item;for(const [kind,collection] of Object.entries(state.collections))if(collection.items?.some(photo=>photo.id===item.id)){collection.items=collection.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);revisions[kind]=null;if(state.view===kind)renderCollection(kind);}
+        return;
+      }
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
       if(!result.collection){if(result.item&&result.operation==='tags'){
         const collection=state.collections[kind],previous=collection.items.find(item=>item.id===result.item.id);

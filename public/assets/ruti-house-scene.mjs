@@ -1,7 +1,8 @@
+import {GUEST_ART} from './ruti-house-guests.mjs?v=1';
 import {iconArtwork} from './ruti-house-art.mjs?v=4';
-import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=5';
+import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=6';
 import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
-import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=11';
+import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=12';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -27,6 +28,7 @@ export function createSceneAssets({family={}}={}){
  load('assets/games/ruti-house/ruti-character-atlas-v1.webp',image=>images.rutiAtlas=image);
  load('assets/games/ruti-house/family-guests-v1.png',image=>images.familyAtlas=image);
  load('assets/games/ruti-house/strangers-v1.png',image=>images.visitorAtlas=image);
+ images.familyExtraAtlases={};let extrasReady;images.loadExtraFamily=()=>extrasReady||=(async()=>{const first=jobs.length;for(const atlas of ['a','b','c'])load('assets/games/ruti-house/family-guests-extra-'+atlas+'-v1.png',image=>images.familyExtraAtlases[atlas]=image);await Promise.all(jobs.slice(first));return images;})();
  load('assets/games/portraits/ora.webp',image=>images.ora=image);
  for(const id of ICON_IDS)load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(iconArtwork(id)),image=>images.icons[id]=image);
  for(const [id,value] of Object.entries(family)){if(typeof value==='string')load(value,image=>images.family[id]=image);else if(value)images.family[id]=value;}
@@ -67,6 +69,8 @@ export function getHouseLayout(width,height){
  const obstacles=[counter,sofa,table,...armchairs,...plants.map(p=>({x:p.x-.033,y:p.y-.028,w:.066,h:.04}))];
  const layout={width,height,portrait,recipes,plants,doors,pickup:{x:.40,y:.90,hitRadius:.06,anchor:{x:.40,y:.84}},obstacles,sofa,table,counter,guestSeats,
   walkBounds:{left:.055,right:.945,top:portrait?.325:.34,bottom:.94},spawn:{x:.42,y:.51}};
+ const windowBounds=[{x:portrait?.055:.062,y:.022,w:portrait?.15:.125,h:.095},{x:portrait?.70:.81,y:portrait?.32:.14,w:portrait?.25:.17,h:portrait?.14:.17}];
+ layout.windows=windowBounds.map((bounds,index)=>({kind:'window',bounds,x:bounds.x+bounds.w*.5,y:bounds.y+bounds.h*.88,side:index===0?'left':'right',hitRadius:.075,anchor:nearestFloor(layout,{x:bounds.x+bounds.w*.5,y:index===0?counter.y+counter.h+.055:bounds.y+bounds.h+.13})}));
  // Reach is measured in CSS pixels so a wider canvas never leaves Ruti a
  // metre from her watering target. Project awkward anchors onto open floor.
  for(const target of [...plants,...doors])target.anchor=nearestFloor(layout,target.anchor);
@@ -95,8 +99,12 @@ function nearestFloor(layout,point){
 
 export function getTaskLocation(task,layout){
  if(task.type==='plant')return layout.plants[Math.abs(task.slot||0)%layout.plants.length];
+ if(task.type==='cat'&&Number.isInteger(task.window)){const entry=layout.windows[Math.abs(task.window)%layout.windows.length];return {...entry,hitRadius:entry.hitRadius*(task.size||1),anchor:{...entry.anchor}};}
  if(task.type==='guest'&&task.resident&&Number.isInteger(task.seat))return getHouseGuestSeat(task.seat,layout);
- if(task.type==='ora'){const p={x:clamp(task.position.x,.08,.92),y:clamp(task.position.y,.28,.90)};return {...p,hitRadius:.09,anchor:{...p}};}
+ if(task.type==='ora'){
+  const p={x:clamp(task.position.x,.08,.92),y:clamp(task.position.y,.28,.90)},M=Math.min(layout.width,layout.height);
+  return {...p,hitRadius:.09,anchor:nearestFloor(layout,{x:p.x+(p.x>.5?-1:1)*M*.17/layout.width,y:p.y+M*.17/layout.height})};
+ }
  if(task.type==='dust'){
   const raw=task.position||{x:.15+((task.slot||0)*.137)% .70,y:.40+((task.slot||0)*.113)% .45};
   const p=nearestFloor(layout,raw);return {...p,hitRadius:layout.portrait?.070:.052,anchor:{...p}};
@@ -272,8 +280,8 @@ function drawCat(ctx,x,y,size,time,progress,side,showLabel=true,appearance={}){
 }
 
 function drawOra(ctx,x,y,size,task,images,time,reduced){
- const r=size*.5,bob=reduced?0:Math.sin(time*5)*2;
- ctx.save();ctx.translate(x,y+bob);ctx.shadowColor='#f9c04c';ctx.shadowBlur=18;
+ const r=size*.5,bob=reduced?0:Math.sin(time*(task.arguing?9:5))*2;
+ ctx.save();ctx.translate(x,y+bob);if(task.arguing&&!reduced)ctx.rotate(Math.sin(time*7)*.035);ctx.shadowColor='#f9c04c';ctx.shadowBlur=18;
  ellipse(ctx,0,0,r+4,r+4,'#fff1ba','#cf703b');ctx.shadowBlur=0;
  ctx.save();ctx.beginPath();ctx.ellipse(0,0,r,r,0,0,Math.PI*2);ctx.clip();
  if(imageReady(images.ora))ctx.drawImage(images.ora,95,0,410,400,-r,-r,size,size);
@@ -282,6 +290,18 @@ function drawOra(ctx,x,y,size,task,images,time,reduced){
  const ratio=clamp(task.remaining/task.total,0,1);box(ctx,-r,r+8,size,7,'#634638',null,3);
  if(ratio>0)box(ctx,-r+1,r+9,(size-2)*ratio,5,ratio<.35?'#fa7462':'#f4ce61',null,2);
  ctx.restore();
+}
+
+function drawArgumentExchange(ctx,ruti,ora,size,time,reduced,width){
+ const side=ora.x>ruti.x?1:-1,w=size*.09,h=size*.05;
+ for(const [index,person] of [ruti,ora].entries()){
+  const turn=index===0?side:-side,x=clamp(person.x+turn*w*.18,w/2+5,width-w/2-5),y=Math.max(h+9,person.y-size*.11);
+  ctx.save();ctx.globalAlpha=reduced?1:(Math.floor(time*2)%2===index?1:.55);
+  box(ctx,x-w/2,y-h/2,w,h,'#fff5d9','#a46d3f',h*.25);
+  polygon(ctx,[[x-turn*w*.14,y+h/2],[x+turn*w*.1,y+h/2],[person.x,person.y-size*.045]],'#fff5d9','#a46d3f');
+  for(let dot=0;dot<3;dot++)ellipse(ctx,x+(dot-1)*w*.22,y+(reduced?0:Math.sin(time*9+dot+index)*h*.07),Math.max(1.2,size*.004),Math.max(1.2,size*.004),'#8b573b');
+  ctx.restore();
+ }
 }
 
 function routePosition(points,progress,width,height){
@@ -317,6 +337,11 @@ export function residentGuestPose(resident,layout,elapsed,{reduced=false}={}){
 const RUTI_PIVOTS=[197.5,165,162.5,105,165,154.5,183.5,167,197.5,179,172,168];
 const RUTI_NECKLINES=[106,106,106,110,108,108,110,108,108,110,108,110];
 const RUTI_ORIENTATIONS=[-1,1,1,1,1,1,-1,-1,-1,-1,-1,-1];
+export function guestEatingPose(resident,layout,elapsed,{reduced=false}={}){
+ const seated=residentGuestPose(resident,layout,elapsed,{reduced}),route=guestRoutes.get(resident);
+ const age=Math.max(0,elapsed-(resident.servedAt||0)-(route?.duration||0)-.5);
+ return {bite:seated.sitting>.9&&age<18?(reduced?.5:Math.max(0,Math.sin(age*Math.PI/1.15))):0,remaining:Math.max(0,1-age/18)};
+}
 const RUTI_BODY_WIDTH=.91;
 function drawRutiFrame(ctx,atlas,frame,height,pose){
  const cw=atlas.naturalWidth/RUTI_ATLAS.columns,ch=atlas.naturalHeight/RUTI_ATLAS.rows;
@@ -328,8 +353,10 @@ function drawRutiFrame(ctx,atlas,frame,height,pose){
   // Adjacent transformed strips overlap slightly so subpixel rasterization
   // cannot expose hairline gaps across the blouse during the larger dance.
   const from=Math.max(0,top-.75),to=Math.min(362,bottom+.75);
-  ctx.drawImage(atlas,sx+left/362*(cw-1),sy+from/362*(ch-1),(right-left)/362*(cw-1),(to-from)/362*(ch-1),
-   (left-pivot)*scale*narrow,(from-355)*scale,(right-left)*scale*narrow,(to-from)*scale);
+  const draw=(a,b)=>{const bend=pose.sitting||0,legs=a>=230?1-bend*.5:1,dy=a>=230?(230-355)*scale+(a-230)*scale*legs:(a-355)*scale;
+   ctx.drawImage(atlas,sx+left/362*(cw-1),sy+a/362*(ch-1),(right-left)/362*(cw-1),(b-a)/362*(ch-1),(left-pivot)*scale*narrow,dy+height*.22*bend,(right-left)*scale*narrow,(b-a)*scale*legs);
+  };
+  if(pose.sitting>0&&from<230&&to>230){draw(from,230.5);draw(230,to);}else draw(from,to);
  }
  if(frame===4){
   // One original image contains the head, neck, collar, shoulders and hands.
@@ -449,14 +476,14 @@ function drawRutiSpeech(ctx,x,y,height,actor,time,width){
 // Two full-body poses retain the actual family likeness, neck and clothing.
 // Both atlases share the same cell geometry and scale, so silhouettes do not
 // disclose whether a guest should receive a meal or peanuts.
-export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,facing=1,reduced=false,sitting=0}={}){
- const familyIndex=HOUSE_GUESTS.indexOf(id),column=familyIndex>=0?familyIndex:HOUSE_VISITORS.indexOf(id);
- const atlas=familyIndex>=0?images?.familyAtlas:images?.visitorAtlas;
+export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,facing=1,reduced=false,sitting=0,food=null,eating=null}={}){
+ const extra=GUEST_ART[id],familyIndex=HOUSE_GUESTS.indexOf(id),column=extra?extra.column:familyIndex>=0?familyIndex:HOUSE_VISITORS.indexOf(id);
+ const atlas=extra?images?.familyExtraAtlases?.[extra.atlas]:familyIndex>=0?images?.familyAtlas:images?.visitorAtlas;
  if(column<0||!imageReady(atlas))return false;
  const cw=atlas.naturalWidth/4,ch=atlas.naturalHeight/2,row=walking&&!reduced?Math.floor(time*4)%2:0;
- const scale=height/(ch*.91),w=cw*scale,h=ch*scale;
- const center=familyIndex>=0?[[203,186,175,158],[214,193,184,169]][row][column]/384:.5;
- const foot=familyIndex>=0?(row===0?482:490)/512:.98;
+ const scale=height/(ch*(extra?.bodySpan||.91)),w=cw*scale,h=ch*scale;
+ const center=extra?extra.center:familyIndex>=0?[[203,186,175,158],[214,193,184,169]][row][column]/384:.5;
+ const foot=extra?extra.footByRow[row]:familyIndex>=0?(row===0?482:490)/512:.98;
  const bob=walking&&!reduced?Math.abs(Math.sin(time*8))*height*.012:reduced?0:Math.sin(time*1.7+column)*height*.002;
  ctx.save();ctx.translate(x,y-bob);ellipse(ctx,0,1,height*.15,height*.025,'#4c382c25');
  if(facing<0)ctx.scale(-1,1);
@@ -473,6 +500,12 @@ export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,faci
    ellipse(ctx,0,lap-height*.008,height*.09,height*.016,'#d9c39a');
   }
  }else ctx.drawImage(atlas,column*cw+.5,row*ch+.5,cw-1,ch-1,-w*center,-h*foot,w,h);
+ if(food){
+  const lap=-height*(sitting>.8?.31:.49),plateX=height*.025;
+  ellipse(ctx,plateX,lap,height*.11,height*.029,'#fff1ce','#a38b65');
+  if(!eating||eating.remaining>.03){ctx.save();ctx.globalAlpha=eating?Math.max(.15,eating.remaining):1;icon(ctx,images,food,plateX,lap-height*.025,height*.14);ctx.restore();}
+  if(sitting>.8&&eating?.bite>0){const hand={x:plateX+(height*.018-plateX)*eating.bite,y:lap+(-height*.84-lap)*eating.bite};line(ctx,-height*.105,-height*.68,hand.x,hand.y,'#c79676',height*.043);ellipse(ctx,hand.x,hand.y,height*.024,height*.021,'#e4b18b');line(ctx,hand.x,hand.y,hand.x+height*.04,hand.y-height*.014,'#c7c5ad',height*.012);}
+ }
  ctx.restore();return true;
 }
 const residentRoutes=new WeakMap();
@@ -480,7 +513,7 @@ const residentRoutes=new WeakMap();
 export function residentCatPose(cat,layout,elapsed){
  const key=`${layout.width}:${layout.height}`;let route=residentRoutes.get(cat);
  if(!route||route.key!==key){
-  const seed=cat.pathSeed??.5,c=layout.counter,s=layout.sofa,t=layout.table,door=layout.doors[Math.abs(cat.door??0)%2];
+  const seed=cat.pathSeed??.5,c=layout.counter,s=layout.sofa,t=layout.table,door=Number.isInteger(cat.window)?layout.windows[Math.abs(cat.window)%2]:layout.doors[Math.abs(cat.door??0)%2];
   const counterFloor=nearestFloor(layout,{x:c.x+c.w*(.2+seed*.2),y:c.y+c.h+.06});
   const counterTop={x:counterFloor.x,y:c.y+c.h*.31};
   const sofaFloor=nearestFloor(layout,{x:s.x-.055,y:s.y+s.h+.04}),sofaTop={x:s.x+s.w*.28,y:s.y+s.h*.48};
@@ -489,6 +522,7 @@ export function residentCatPose(cat,layout,elapsed){
   const walk=target=>{const points=[last,...findHousePath(layout,last,target)],distance=points.slice(1).reduce((sum,p,i)=>sum+Math.hypot((p.x-points[i].x)*layout.width,(p.y-points[i].y)*layout.height),0);segments.push({points,duration:Math.max(.4,distance/(Math.min(layout.width,layout.height)*.17)),surface:'floor'});last=target;};
   const jump=(target,surface)=>{segments.push({points:[last,target],duration:1.05,jump:true,surface});last=target;};
   const rest=(duration,surface)=>segments.push({points:[last,last],duration,surface,rest:true});
+  if(door.kind==='window'){last={x:door.x,y:door.y};jump(door.anchor,'floor');}
   walk(counterFloor);jump(counterTop,'counter');rest(3+seed*2,'counter');jump(counterFloor,'floor');
   walk(sofaFloor);jump(sofaTop,'sofa');rest(3,'sofa');jump(sofaFloor,'floor');
   walk(tableFloor);jump(tableTop,'table');rest(2.5,'table');jump(tableFloor,'floor');walk(roam);rest(2,'floor');walk(door.anchor);
@@ -504,8 +538,8 @@ export function residentCatPose(cat,layout,elapsed){
  return {...route.segments[0].points[0],facing:1,surface:'floor',walking:false,jumping:false};
 }
 
-function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=0,time=0,facing=1,walking=false,sitting=0,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null,quiet=false}={}){
- if(guest&&drawHouseGuest(ctx,x,y,height,guestId,images,time,{walking,facing,reduced,sitting}))return;
+function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=0,time=0,facing=1,walking=false,sitting=0,food=null,eating=null,action=null,tool=null,carryDish=null,actionProgress=0,images=null,english=false,actor=null,reduced=false,waterTarget=null,quiet=false}={}){
+ if(guest&&drawHouseGuest(ctx,x,y,height,guestId,images,time,{walking,facing,reduced,sitting,food,eating}))return;
  if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced,waterTarget);return;}
  ctx.save();ctx.translate(x,y);const s=height/100;ctx.scale(s,s);ctx.lineCap='round';ctx.lineJoin='round';
  const cycle=walking?Math.sin(time*13):0,bob=walking?Math.abs(cycle)*2:Math.sin(time*1.8)*.4;
@@ -576,6 +610,17 @@ function drawDiningTableSurface(ctx,l){
  ellipse(ctx,tx+tw*.515,ty+th*.30,M*.013,M*.018,'#8f9c77','#6b7b5c');line(ctx,tx+tw*.515,ty+th*.20,tx+tw*.515,ty-th*.15,'#6f8b57',2);for(let i=0;i<3;i++){const fx=tx+tw*(.48+i*.035),fy=ty-th*(.13+(i%2)*.12);ellipse(ctx,fx,fy,M*.008,M*.007,['#d6a065','#c78c7d'][i%2]);}
 }
 
+function drawBridgeHand(ctx,x,y,height,seconds,index,facing){
+ const active=Math.floor(seconds/.9)%4===index,lift=active?Math.sin((seconds%.9)/.9*Math.PI):0,handX=x+(facing<0?-1:1)*height*.10,handY=y-height*(.43+lift*.12);
+ line(ctx,x-height*.10,y-height*.58,handX,handY,'#ca9d7e',height*.035);
+ for(let card=0;card<4;card++){ctx.save();ctx.translate(handX+(card-1.5)*height*.018,handY);ctx.rotate((card-1.5)*.12);box(ctx,-height*.028,-height*.045,height*.056,height*.085,'#fff5da','#977c59',1);line(ctx,-height*.017,-height*.025,height*.017,height*.02,['#a84d3a','#355c4e'][card%2],height*.007);ctx.restore();}
+}
+function drawBridgeTable(ctx,l,seconds){
+ const x=(l.table.x+l.table.w*.5)*l.width,y=(l.table.y+l.table.h*.29)*l.height,w=l.table.w*l.width,h=l.table.h*l.height,M=Math.min(l.width,l.height);
+ ellipse(ctx,x,y,w*.40,h*.39,'#416d57','#c5b989');
+ const turn=Math.floor(seconds/.9)%4;
+ for(let i=0;i<=turn;i++){ctx.save();ctx.translate(x+(i%2?1:-1)*M*.019,y+(i<2?-1:1)*M*.009);ctx.rotate((i-1.5)*.18);box(ctx,-M*.014,-M*.021,M*.028,M*.042,'#fff9e8','#9c8d71',1);label(ctx,['♠','♥','♣','♦'][i],0,0,{size:Math.max(7,M*.019),color:i%2?'#a54b3b':'#35513d',halo:false});ctx.restore();}
+}
 function drawGuestArmchairs(ctx,l){
  const M=Math.min(l.width,l.height);
  for(const seat of l.guestSeats.filter(s=>s.kind==='armchair')){
@@ -601,7 +646,11 @@ function drawRoom(ctx,l,{time,english,reduced,quiet=false}){
  // Wainscoting and kitchen tiles.
  for(let x=0;x<W*.79;x+=M*.06){line(ctx,x,H*.10,x,H*.30,'#a59f7926',1);line(ctx,x,H*.18,x+M*.06,H*.18,'#a59f7926',1);}
  const cabinetY=H*.025,cabinetH=H*.075,cabinetW=W*(l.portrait?.15:.115);
- for(let i=0;i<5;i++){const x=l.recipes[FOOD_IDS[i]].x*W-cabinetW/2;box(ctx,x,cabinetY,cabinetW,cabinetH,'#91a181','#65765b',M*.008);box(ctx,x+5,cabinetY+5,cabinetW-10,cabinetH-10,'#9eac8c','#b5c09f',3);line(ctx,x+cabinetW*.7,cabinetY+cabinetH*.7,x+cabinetW*.84,cabinetY+cabinetH*.7,'#e3cea2',M*.007);}
+ for(let i=1;i<5;i++){const x=l.recipes[FOOD_IDS[i]].x*W-cabinetW/2;box(ctx,x,cabinetY,cabinetW,cabinetH,'#91a181','#65765b',M*.008);box(ctx,x+5,cabinetY+5,cabinetW-10,cabinetH-10,'#9eac8c','#b5c09f',3);line(ctx,x+cabinetW*.7,cabinetY+cabinetH*.7,x+cabinetW*.84,cabinetY+cabinetH*.7,'#e3cea2',M*.007);}
+ const added=l.windows[0].bounds,ax=added.x*W,ay=added.y*H,aw=added.w*W,ah=added.h*H;
+ box(ctx,ax-3,ay-3,aw+6,ah+6,'#bd9e73','#88714e',4);box(ctx,ax,ay,aw,ah,'#b8d8d0',null,2);
+ for(let i=0;i<4;i++)ellipse(ctx,ax+aw*(.12+i*.25),ay+ah*.7,aw*.2,ah*.2,'#93b17a88');
+ line(ctx,ax+aw*.5,ay,ax+aw*.5,ay+ah,'#fff1ce',3);line(ctx,ax,ay+ah*.55,ax+aw,ay+ah*.55,'#fff1ce',3);line(ctx,ax-3,ay+ah+3,ax+aw+3,ay+ah+3,'#a67f50',4);
  // Counter lower cabinets and gently bevelled stone slab.
  const c=l.counter;const cx=c.x*W,cy=c.y*H,cw=c.w*W,ch=c.h*H;
  ctx.shadowColor='#65492d38';ctx.shadowBlur=9;ctx.shadowOffsetY=5;box(ctx,cx,cy+ch*.28,cw,ch*.74,'#8e9f7d','#687553',5);ctx.shadowBlur=0;ctx.shadowOffsetY=0;
@@ -702,7 +751,7 @@ export function renderHouse(ctx,g,visual={},options={}){
    const names=english?{roi:'Roei',roei:'Roei',hila:'Hila',rivi:'Rivi',revital:'Rivi',lihi:'Lihi'}:{roi:'רועי',roei:'רועי',hila:'הילה',rivi:'ריוי',revital:'ריוי',lihi:'ליהי'};if(!quiet)label(ctx,names[task.guest]||(english?'Visitor':'אורח'),guestX,guestY+M*.027,{size:clamp(M*.024,11,14),color:'#6d5038'});timer(ctx,bubbleX,bubbleY,M*.040,task);
   }});
   if(task.type==='cat')actors.push({y:y+M*.03,draw:()=>{
-   const d=l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.untimed||task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
+   const d=Number.isInteger(task.window)?l.windows[Math.abs(task.window)%2]:l.doors[Math.abs(task.door??task.slot??0)%2],waiting=task.untimed||task.waiting>0,progress=waiting?0:1-task.remaining/task.total,sgn=d.side==='left'?1:-1;
    const catX=x+sgn*M*(-.025+progress*.09),catY=y+M*.015;
    halo(ctx,catX,catY-M*.012,M*.058,pulseTime,'#d26b44',progress>.65);drawCat(ctx,catX,catY,M*.115*(task.size||1),pulseTime,progress,d.side,showTaskLabels.cat,task);timer(ctx,catX,catY-M*.01,M*.066,task);
    if(waiting&&showTaskLabels.cat){
@@ -717,7 +766,7 @@ export function renderHouse(ctx,g,visual={},options={}){
  // Only shooed cats leave; served guests are persistent household residents.
  for(const departure of visual.departures||[]){
   const progress=clamp((departure.age||0)/(departure.duration||1.5),0,1);if(progress>=1)continue;
-  const door=l.doors[Math.abs(departure.door??0)%2],sgn=door.side==='left'?1:-1;
+  const door=Number.isInteger(departure.window)?l.windows[Math.abs(departure.window)%2]:l.doors[Math.abs(departure.door??0)%2],sgn=door.side==='left'?1:-1;
   const fade=1-clamp((progress-.62)/.38,0,1);
   if(departure.type==='cat'||departure.type==='cat-enter'){
    const entering=departure.type==='cat-enter',p=reduced?1:progress;
@@ -729,24 +778,28 @@ export function renderHouse(ctx,g,visual={},options={}){
   const p=residentGuestPose(resident,l,g.elapsed||0,{reduced});
   actors.push({y:p.y*height,draw:()=>drawHuman(ctx,p.x*width,p.y*height,guestHeight(l),{
    portrait:images.family?.[resident.guest]||images[resident.guest],guest:true,guestId:resident.guest,images,reduced,
-   index:Math.max(0,HOUSE_GUESTS.indexOf(resident.guest)),time:pulseTime,walking:p.walking,sitting:p.sitting,facing:p.facing
+   index:Math.max(0,HOUSE_GUESTS.indexOf(resident.guest)),time:pulseTime,walking:p.walking,sitting:p.sitting,facing:p.facing,food:resident.recipeId||resident.food||'serve',eating:guestEatingPose(resident,l,g.elapsed||0,{reduced})
   })});
  }
  const tableDepth=(l.table.y+l.table.h*.58)*height;
- if(g?.guestsInside?.length)actors.push({y:tableDepth,draw:()=>drawDiningTableSurface(ctx,l)});
+ if(g?.guestsInside?.length||visual.bridge?.active)actors.push({y:tableDepth,draw:()=>{drawDiningTableSurface(ctx,l);if(visual.bridge?.phase==='playing')drawBridgeTable(ctx,l,visual.bridge.playedSeconds);}});
  for(const cat of g?.catsInside||[]){
   const p=residentCatPose(cat,l,reduced?(cat.enteredAt||0)+3:g.elapsed||0),size=M*.115*(cat.size||1),py=p.y*height-size*26/64;
   actors.push({y:p.surface==='table'?Math.max(tableDepth+1,p.y*height):p.y*height,draw:()=>drawCat(ctx,p.x*width,py,size,reduced?0:g.elapsed||0,p.walking?1:0,p.facing>0?'left':'right',false,cat)});
  }
+ if(visual.bridge?.active)for(const [index,friend] of visual.bridge.players.entries())actors.push({y:friend.y*height,draw:()=>{
+  drawHuman(ctx,friend.x*width,friend.y*height,guestHeight(l),{guest:true,guestId:friend.guest,images,time:pulseTime,reduced,walking:friend.walking,sitting:friend.sitting,facing:friend.facing});
+  if(visual.bridge.phase==='playing')drawBridgeHand(ctx,friend.x*width,friend.y*height,guestHeight(l),visual.bridge.playedSeconds,index+1,friend.facing);
+ }});
  const actor=visual.actor||{...l.spawn};const actorX=(actor.x??l.spawn.x)*width,actorY=(actor.y??l.spawn.y)*height;
  const actorHeight=clamp(M*(l.portrait?.28:.245),l.portrait?94:102,l.portrait?116:140);
  const wateringTask=actor.action==='water'?(g?.tasks||[]).find(task=>task.id===(actor.targetId||visual.focusTarget)&&task.type==='plant'):null;
  const plant=wateringTask?getTaskLocation(wateringTask,l):actor.action==='water'?l.plants.reduce((nearest,p)=>length(p.anchor,actor)<length(nearest.anchor,actor)?p:nearest):null;
  const waterTarget=plant?{x:plant.x*width,y:plant.y*height+M*(l.portrait?.15:.12)*.125}:null;
- actors.push({y:actorY,draw:()=>drawHuman(ctx,actorX,actorY,actorHeight,{
-  portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced,waterTarget,quiet})});
+ actors.push({y:actorY,draw:()=>{drawHuman(ctx,actorX,actorY,actorHeight,{
+  portrait:images.ruti,time,facing:actor.facing??1,walking:!!actor.walking,action:actor.action,tool:actor.tool,carryDish:actor.carryDish,actionProgress:actor.actionProgress||0,images,english,actor,reduced,waterTarget,quiet});if(visual.bridge?.phase==='playing')drawBridgeHand(ctx,actorX,actorY,actorHeight,visual.bridge.playedSeconds,0,actor.facing);}});
  actors.sort((a,b)=>a.y-b.y);for(const actor of actors)actor.draw();
  if(!quiet)drawRutiSpeech(ctx,actorX,actorY,actorHeight,actor,time,width);
- if(g?.ora){const p=getTaskLocation(g.ora,l);drawOra(ctx,p.x*width,p.y*height,M*.16,g.ora,images,time,reduced);}
+ if(g?.ora){const p=getTaskLocation(g.ora,l),arguing=actor.action==='argue'&&visual.focusTarget===g.ora.id;drawOra(ctx,p.x*width,p.y*height,M*.16,{...g.ora,arguing},images,time,reduced);if(arguing)drawArgumentExchange(ctx,{x:actorX,y:actorY-actorHeight*.86},{x:p.x*width,y:p.y*height},M,time,reduced,width);}
  ctx.restore();return l;
 }

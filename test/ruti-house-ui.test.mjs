@@ -5,7 +5,9 @@ import {readFile} from 'node:fs/promises';
 import {webcrypto} from 'node:crypto';
 import * as engine from '../public/assets/ruti-house-engine.mjs';
 import * as motion from '../public/assets/ruti-house-motion.mjs';
-import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath} from '../public/assets/ruti-house-scene.mjs';
+import * as bridge from '../public/assets/ruti-house-bridge.mjs';
+import {EXTRA_FAMILY_GUESTS} from '../public/assets/ruti-house-guests.mjs';
+import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,getHouseGuestSeat,findHousePath} from '../public/assets/ruti-house-scene.mjs';
 import {rutiHouseScore} from '../src/ruti-house-scores.mjs';
 import * as character from '../public/assets/ruti-house-character.mjs';
 import {HOUSE_LESSONS} from '../public/assets/ruti-house-lessons.mjs';
@@ -49,9 +51,9 @@ function fixture({english=false,startLevel=1,failSave=false,initialScores=[],wid
   const synthesis=speech?{getVoices:()=>[{name:english?'Samantha':'Carmit',lang:english?'en-US':'he-IL'}],speak(utterance){spoken.push(utterance.text);utterance.onstart?.();utterance.onend?.();},cancel(){}}:null;
   const audio={unlock(){return Promise.resolve(true);},setEnabled(){},stop(){audioStops++;},play(kind){sounds.push(kind);audioEvents.push({kind,action:actor?.action,walking:!!actor?.walking,progress:actor?.actionProgress,plants:game?.stats.plants,dust:game?.stats.dust});}};
   vm.runInNewContext(source+'\nwindow.test={mountRutiHouse,pauseRutiHouse,state,render,processEvents,tutorialGuide:typeof tutorialGuide==="function"?tutorialGuide:null};',{
-    ...engine,...motion,...character,HOUSE_LESSONS,window,document,Image,Response,AbortController,crypto:webcrypto,performance:{now:()=>now},
+    ...engine,...motion,...character,...bridge,EXTRA_FAMILY_GUESTS,HOUSE_LESSONS,window,document,Image,Response,AbortController,crypto:webcrypto,performance:{now:()=>now},
     createRutiPerformance:options=>character.createRutiPerformance({...options,synthesis,Utterance:speech?Utterance:null}),createHouse(){game=gameAt(startLevel);return game;},createHouseActor(start){actor=motion.createHouseActor(start);return actor;},
-    PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse(_ctx,g,visual){draws.push({level:g.level,phase:g.phase,actor:{...visual.actor},quiet:visual.quiet,showTaskLabels:visual.showTaskLabels?{...visual.showTaskLabels}:null});},
+    PLANT_VARIETIES,getHouseLayout,getTaskLocation,getHouseGuestSeat,findHousePath,renderHouse(_ctx,g,visual){draws.push({level:g.level,phase:g.phase,actor:{...visual.actor},quiet:visual.quiet,showTaskLabels:visual.showTaskLabels?{...visual.showTaskLabels}:null});},
     drawRutiCelebration(_ctx,visual){draws.push({celebration:true,progress:visual.progress,actor:{...visual.actor}});},createSceneAssets:()=>({family:{},icons:{},ready:Promise.resolve()}),houseArtwork:()=>'<svg></svg>',iconArtwork:id=>`<svg data-icon="${id}"></svg>`,createHouseSound:()=>audio,createRutiSong:()=>({mount(){},stop(){},pause(){},setEnabled(){}}),
     requestAnimationFrame(fn){const id=++sequence;frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id)
   });
@@ -325,7 +327,7 @@ test('only the physical plant has a tutorial outline, never the water word hit a
   assert.equal(buttons.filter(b=>b.includes('rh-guided-target')).length,1);
 });
 
-test('level four explains Ora with the argument icon, requires both clicks, and shows a pausable five-second bonus',async()=>{
+test('Ruti walks to Ora and argues before awarding a bonus, followed by a pausable draining timeline',async()=>{
  for(const english of [false,true]){
   const f=fixture({startLevel:4,english});await f.start(false);
   assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/data-icon="argue"/);
@@ -334,11 +336,35 @@ test('level four explains Ora with the argument icon, requires both clicks, and 
   let guard=0;while(!f.game.ora&&guard++<12000)completeEngineTask(f.game);assert.ok(f.game.ora);f.advance(100);
   const ora=f.game.ora,before=f.game.score;assert.equal(f.nodes.get('[data-rh-tool="argue"]').disabled,false);assert.equal(f.nodes.get('[data-rh-tool="argue"]').classList.contains('rh-ora-ready'),true);
   await f.act(ora.id);assert.equal(f.game.stats.oraWins,0);await f.choose('argue');assert.equal(f.game.score,before);assert.equal(f.game.ora,ora);await f.act(ora.id);
-  assert.equal(f.game.phase,'ora-bonus');assert.equal(f.game.score-before,5000);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/Well done!/:/כל הכבוד!/);
+  assert.equal(f.game.phase,'playing');assert.equal(f.game.score,before);assert.equal(f.game.stats.oraWins,0);assert.equal(f.state.oraInteraction.targetId,ora.id);assert.equal(f.actor.walking,true);
+  const start={x:f.actor.x,y:f.actor.y},acceptedAt=f.game.elapsed,deadlinesBefore=JSON.stringify(f.game.tasks);f.advance(200);
+  assert.ok(Math.hypot(f.actor.x-start.x,f.actor.y-start.y)>.001,'Ruti visibly moves through the house');
+  assert.equal(f.game.elapsed,acceptedAt);assert.equal(JSON.stringify(f.game.tasks),deadlinesBefore,'A timely accepted click protects household deadlines during the animation');
+  f.until(()=>f.actor.action==='argue');const destination=getTaskLocation(ora,getHouseLayout(960,600)).anchor;
+  assert.ok(Math.hypot(f.actor.x-destination.x,f.actor.y-destination.y)<.005,'The conversation happens beside Ora');
+  assert.equal(f.game.score,before);f.advance(600);assert.equal(f.game.stats.oraWins,0,'The conversation must finish before the victory prompt');
+  f.until(()=>f.game.phase==='ora-bonus');
+  assert.equal(f.game.score-before,5000);assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/You won the argument!/:/ניצחת בוויכוח!/);
+  assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,/role="progressbar"/);assert.doesNotMatch(f.nodes.get('[data-rh-overlay]').innerHTML,/data-rh-ora-countdown/);
   const elapsed=f.game.elapsed,deadlines=JSON.stringify(f.game.tasks);f.advance(2000);assert.equal(f.game.elapsed,elapsed);assert.equal(JSON.stringify(f.game.tasks),deadlines);
+  const fill=Number(f.nodes.get('[data-rh-ora-time]').style.transform.match(/scaleX\(([^)]+)\)/)[1]);assert.ok(fill>.5&&fill<.7,'The bar drains instead of displaying countdown digits');
   await f.click('[data-rh-pause]');const remaining=f.game.oraBonusRemaining;f.advance(60000);assert.equal(f.game.oraBonusRemaining,remaining);await f.click('[data-rh-pause]');
   f.until(()=>f.game.phase==='playing',5000);assert.equal(f.game.stats.oraWins,1);assert.equal(f.nodes.get('[data-rh-overlay]').hidden,true);
  }
+});
+
+test('a last-moment Ora click remains valid through walking, pausing and repeated clicks',async()=>{
+ const f=fixture({startLevel:4,width:360,height:720});await f.start();
+ let guard=0;while(!f.game.ora&&guard++<12000)completeEngineTask(f.game);f.advance(100);
+ const ora=f.game.ora;await f.choose('argue');ora.remaining=.01;const before=f.game.score;await f.act(ora.id);
+ await f.act(ora.id);await f.choose('water');assert.equal(f.game.selected,'argue');assert.equal(f.state.oraInteraction.targetId,ora.id);
+ f.advance(200);await f.click('[data-rh-pause]');const paused={x:f.actor.x,y:f.actor.y,remaining:ora.remaining};f.advance(60000);
+ assert.equal(f.actor.x,paused.x);assert.equal(f.actor.y,paused.y);assert.equal(ora.remaining,paused.remaining);
+ await f.click('[data-rh-pause]');f.until(()=>f.actor.action==='argue');f.advance(350);
+ assert.equal(f.game.ora,ora);assert.equal(f.game.score,before);
+ f.visibility(true);const progress=f.actor.actionProgress;f.advance(60000);assert.equal(f.actor.actionProgress,progress);f.visibility(false);await f.click('[data-rh-pause]');
+ f.until(()=>f.game.phase==='ora-bonus');assert.equal(f.game.stats.oraWins,1);assert.equal(f.game.score-before,5000);
+ await f.act(ora.id);assert.equal(f.game.stats.oraWins,1);
 });
 
 test('remaining lives use Ruti heads first and cat symbols from level three, with one fewer symbol per strike',async()=>{
@@ -382,7 +408,8 @@ test('advanced visitors require the correct refreshment through the ordinary too
 
 
 test('briefings introduce Ora only at level four and describe guest serving without arrival rules',()=>{
- const lesson=HOUSE_LESSONS[4];assert.equal(lesson.steps.length,3);
+ const lesson=HOUSE_LESSONS[4];assert.equal(lesson.steps.length,2);
+ assert.equal(HOUSE_LESSONS[6].steps.length,2);
  for(const language of ['he','en']){
   const words=lesson.steps.map(s=>s[language]).join(' ');
   assert.match(words,language==='he'?/5,000 נקודות/:/5,000 points/);
@@ -390,5 +417,20 @@ test('briefings introduce Ora only at level four and describe guest serving with
   assert.doesNotMatch(words,/5 שניות|five.second|בהמשך|later|tenth|עשירית|פעם אחת/);
   for(const [level,later] of Object.entries(HOUSE_LESSONS))if(Number(level)>4)assert.doesNotMatch(JSON.stringify(later),/אורה|Ora/);
   assert.doesNotMatch(HOUSE_LESSONS[6].steps.map(s=>s[language]).join(' '),/15|seconds|שניות|after|אחרי/);
+  assert.doesNotMatch(HOUSE_LESSONS[3].steps.map(s=>s[language]).join(' '),/מסתובב|roams/);
+  assert.doesNotMatch(words,/כל מטלה שהסתיימה|Every resolved task/);
+  assert.doesNotMatch(JSON.stringify(HOUSE_LESSONS),/רועי|הילה|ריוי|ליהי|Roei|Hila|Rivi|Lihi/);
  }
+});
+
+test('midway through level seven bridge pauses every task for twenty seated seconds and resumes without a click',async()=>{
+ const f=fixture({startLevel:7});await f.start();f.game.stageResolved=15;f.game.stageCompleted=15;f.game.stageIssued=20;f.advance(100);
+ assert.ok(f.state.bridge);assert.equal(f.state.bridgePlayed,true);const elapsed=f.game.elapsed,tasks=JSON.stringify(f.game.tasks);
+ await f.choose('water');assert.equal(f.actor.tool,null);
+ f.until(()=>f.state.bridge?.phase==='playing',15000);assert.equal(f.actor.sitting,1);assert.equal(f.state.bridge.visual().players.length,3);
+ // A slow display still gets twenty real active seconds, without advancing household clocks.
+ f.jump(19000);f.advance(17);assert.ok(f.state.bridge.playedSeconds>=19);assert.equal(f.state.bridge.phase,'playing');assert.equal(f.game.elapsed,elapsed);assert.equal(JSON.stringify(f.game.tasks),tasks);
+ await f.click('[data-rh-pause]');const bridgeTime=f.state.bridge.playedSeconds;f.advance(60000);assert.equal(f.state.bridge.playedSeconds,bridgeTime);await f.click('[data-rh-pause]');
+ f.until(()=>f.state.bridge===null,20000);assert.equal(f.actor.sitting,0);assert.equal(f.state.paused,false);const resumed=f.game.elapsed;f.advance(300);assert.ok(f.game.elapsed>resumed);
+ assert.equal(f.state.bridge,null,'The same middle-of-stage event does not replay');assert.doesNotMatch(JSON.stringify(HOUSE_LESSONS),/ברידג|bridge/i);
 });

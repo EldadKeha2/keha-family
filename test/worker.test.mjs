@@ -57,6 +57,69 @@ function fixture(){
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
 
+async function photoEdit(f,item,{expectedVersion='original',baseVersion=expectedVersion,rotation=1,crop={x:0,y:0,width:1,height:1},bytes=Buffer.concat([photo,Buffer.from('edited')]),clientHeaders=true}={}){
+  const query=new URLSearchParams({expectedVersion,baseVersion,rotation,crop:JSON.stringify(crop),filename:'edited.jpg'});
+  return f.call('/api/media/'+item.id+'/edit?'+query,{method:'POST',body:bytes,clientHeaders,headers:{'Content-Type':'image/jpeg','Content-Length':String(bytes.length)}});
+}
+test('editing one photo keeps its original bytes, profile, tags, captions and album membership',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer']);
+  await f.call('/api/media/'+item.id+'/caption',{method:'POST',body:{caption:'Keep this description',expectedCaption:''}});
+  await f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection:'photos',scope:'gallery'}});
+  await f.call('/api/people/tomer/profile',{method:'POST',body:{file:item.file}});
+  const initial=await(await f.call('/api/media/'+item.id+'/versions')).json();assert.equal(initial.currentVersion,'original');assert.equal(initial.versions.length,1);assert.equal(f.objects.size,1);
+  const response=await photoEdit(f,item);assert.equal(response.status,201,await response.clone().text());const saved=await response.json();
+  assert.equal(saved.item.id,item.id);assert.equal(saved.item.file,item.file);assert.equal(saved.item.caption,'Keep this description');assert.deepEqual(saved.item.tags.map(person=>person.id),['tomer']);assert.deepEqual(new Set(saved.item.collections),new Set(['gallery','photos']));
+  assert.equal(saved.versions.length,2);assert.match(saved.currentVersion,/^[a-f0-9]{32}$/);assert.equal(saved.people.tomer.profile,saved.item.src);assert.match(saved.item.src,/\?v=/);
+  assert.deepEqual(Buffer.from(await(await f.call('/media/'+item.id+'?version=original')).arrayBuffer()),photo);
+  assert.deepEqual(Buffer.from(await(await f.call(saved.item.src)).arrayBuffer()),Buffer.concat([photo,Buffer.from('edited')]));
+  for(const kind of ['gallery','photos']){const album=await(await f.call('/api/collections/'+kind)).json();assert.equal(album.count,1);assert.equal(album.items[0].src,saved.item.src);}
+  const album=await(await f.call('/api/people/tomer/page')).json();assert.equal(album.person.profile,saved.item.src);assert.equal(album.albums.photos.items[0].src,saved.item.src);
+  assert.equal(f.objects.size,2);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,7);
+  f.restart();const history=await(await f.call('/api/media/'+item.id+'/versions')).json();assert.equal(history.versions.length,2);assert.equal(history.currentVersion,saved.currentVersion);
+  assert.equal((await(await f.call('/api/export')).json()).photoVersions.length,2);
+ }finally{await f.close();}
+});
+test('restoring an older photo preserves later versions and restores its face coordinates',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);await setTags(f,item,['yona']);
+  const faceId='e'.repeat(32),rect={x:.1,y:.2,width:.2,height:.3};
+  await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId,personId:'yona',rect,expectedRevision:null}});
+  const before=await(await f.call('/api/media/'+item.id+'/faces')).json();const saved=await(await photoEdit(f,item)).json();let faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(faces.faces[0].personId,'yona');assert.ok(Math.abs(faces.faces[0].rect.x-.5)<1e-9);assert.notEqual(faces.item.tagsRevision,before.item.tagsRevision);
+  const restored=await f.call('/api/media/'+item.id+'/versions/original/restore',{method:'POST',body:{expectedVersion:saved.currentVersion}});assert.equal(restored.status,200,await restored.clone().text());const result=await restored.json();
+  assert.equal(result.versions.length,3);assert.notEqual(result.currentVersion,'original');assert.notEqual(result.currentVersion,saved.currentVersion);assert.equal(f.objects.size,2,'Restoration reuses existing bytes');
+  assert.deepEqual(Buffer.from(await(await f.call(result.item.src)).arrayBuffer()),photo);
+  faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(faces.faces[0].rect,rect);assert.equal(faces.faces[0].id,faceId);
+  const cropped=await(await photoEdit(f,item,{expectedVersion:result.currentVersion,rotation:0,crop:{x:.5,y:.5,width:.5,height:.5}})).json();
+  assert.equal((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces.length,0);assert.deepEqual(cropped.item.tags.map(person=>person.id),['yona'],'Cropping never removes ordinary person tags');
+  const back=await f.call('/api/media/'+item.id+'/versions/'+saved.currentVersion+'/restore',{method:'POST',body:{expectedVersion:cropped.currentVersion}});assert.equal(back.status,200);
+  assert.ok(Math.abs((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces[0].rect.x-.5)<1e-9);
+ }finally{await f.close();}
+});
+test('concurrent edits reject the stale version without deleting the winner or the original',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);const edits=await Promise.all([photoEdit(f,item),photoEdit(f,item)]);
+  assert.deepEqual(edits.map(response=>response.status).sort(),[201,409]);await f.flush();assert.equal(f.objects.size,2);
+  const history=await(await f.call('/api/media/'+item.id+'/versions')).json();assert.equal(history.versions.length,2);
+  assert.equal((await photoEdit(f,item)).status,409);assert.equal((await f.call('/api/media/'+item.id+'/versions/original/restore',{method:'POST',body:{expectedVersion:'original'}})).status,409);
+  for(const version of history.versions)assert.equal((await f.call(version.src)).status,200);
+ }finally{await f.close();}
+});
+test('photo history validates writes, isolates photo versions and follows deletion and undo',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),other=await taggedUpload(f);
+  assert.equal((await photoEdit(f,item,{clientHeaders:false})).status,403);assert.equal((await photoEdit(f,item,{crop:{x:-1,y:0,width:1,height:1}})).status,400);
+  assert.equal((await photoEdit(f,item,{bytes:Buffer.from('not an image')})).status,415);assert.equal(f.objects.size,2);
+  const saved=await(await photoEdit(f,item)).json();
+  assert.equal((await f.call('/media/'+other.id+'?version='+saved.currentVersion)).status,404);assert.equal((await f.call('/media/'+item.id+'?version=../../secret')).status,400);
+  const clip=await taggedUpload(f,'/api/collections/videos',video,'film.mp4');assert.equal((await photoEdit(f,clip)).status,400);assert.equal((await f.call('/api/media/'+clip.id+'/versions')).status,400);
+  await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'photos'}});
+  assert.equal((await f.call('/api/media/'+item.id+'/versions')).status,404);assert.equal((await f.call('/media/'+item.id+'?version=original')).status,404);assert.ok(!(await(await f.call('/api/export')).json()).photoVersions.some(version=>version.mediaId===item.id));
+  await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:'photos'}});
+  assert.equal((await(await f.call('/api/media/'+item.id+'/versions')).json()).versions.length,2);assert.equal((await f.call('/media/'+item.id+'?version=original')).status,200);
+ }finally{await f.close();}
+});
+
 test('photo album shortcuts link the original to family photos, its own nursery and its own wedding exactly once',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer','shani']);
@@ -498,7 +561,7 @@ test('wedding greetings are durable, separate for every couple and exported with
     assert.equal((await f.call('/api/weddings/u-naama/greetings',{method:'POST',body:{body:'מזל טוב'}})).status,404);
     f.restart();const wedding=await (await f.call(path)).json();assert.equal(wedding.greetingCount,1);assert.equal(wedding.greetings[0].author,'משפחת קהא');
     assert.equal((await (await f.call('/api/weddings/u-bosmat')).json()).greetingCount,0);
-    const backup=await (await f.call('/api/export')).json();assert.equal(backup.schemaVersion,2);assert.equal(backup.weddings.length,23);assert.equal(backup.greetings.length,1);assert.equal(backup.people.length,Object.keys(family.people).length);
+    const backup=await (await f.call('/api/export')).json();assert.equal(backup.schemaVersion,3);assert.equal(backup.weddings.length,23);assert.equal(backup.greetings.length,1);assert.equal(backup.people.length,Object.keys(family.people).length);
   }finally{await f.close();}
 });
 test('nostalgia supports photos, video and downloadable documents without altering other albums',async()=>{

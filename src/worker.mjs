@@ -96,6 +96,27 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
   if(personId){const url=new URL(request.url);if(url.searchParams.get('layout')==='page')return json({saved:true,file:item.file,...await db('person.page',{id:personId,photos:url.searchParams.get('photos'),videos:url.searchParams.get('videos'),documents:url.searchParams.get('documents')})},201);return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);}
   return json({saved:true,file:item.file,collection:await db('collection',{kind:category})},201);
 }
+async function editPhoto(request,env,db,ctx,id){
+  if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני שמירת תמונות.');
+  const params=new URL(request.url).searchParams;let crop;
+  try{crop=JSON.parse(params.get('crop'));}catch{throw new HttpError(400,'פרטי החיתוך אינם תקינים.');}
+  const change={id,expectedVersion:params.get('expectedVersion'),baseVersion:params.get('baseVersion'),rotation:Number(params.get('rotation')),crop};
+  await db('photo.prepare',change);
+  const media=await streamUpload(request,LIMITS.photo);let format;
+  try{format=sniff(media.head);}catch(error){await media.body.cancel();throw error;}
+  const versionId=uid(),version={id:versionId,key:'photo-versions/'+id+'/'+versionId+format.ext,mime:format.mime,size:media.size,filename:filename(params.get('filename'))};
+  let body=media.body,transfer=Promise.resolve();
+  if(typeof FixedLengthStream!=='undefined'){const fixed=new FixedLengthStream(media.size);transfer=body.pipeTo(fixed.writable);body=fixed.readable;transfer.catch(()=>{});}
+  try{await Promise.all([putObject(env,version.key,body,media.size,format.mime),transfer]);}
+  catch(error){ctx.waitUntil(deleteObject(env,version.key).catch(()=>{}));throw error;}
+  try{return json(await db('photo.save',{...change,version}),201);}
+  catch(error){
+    // A known transaction rejection cannot reference this unique staged file.
+    // Keep bytes after an uncertain state-service failure: its commit may have succeeded.
+    if(error.status>=400&&error.status<500)ctx.waitUntil(deleteObject(env,version.key).catch(()=>{}));
+    throw error;
+  }
+}
 async function story(request,env,db,ctx,id){
   const bytes=await boundedBody(request,LIMITS.story),contentType=request.headers.get('Content-Type')||'';
   let fields={},files=[];
@@ -198,6 +219,7 @@ export default {
       }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
+      if((match=/^\/api\/media\/([a-f0-9]{32})\/versions$/.exec(path))&&request.method==='GET')return json(await db('photo.versions',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/faces$/.exec(path))&&request.method==='GET')return json(await db('media.faces',{id:match[1]}));
       if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
@@ -223,11 +245,13 @@ export default {
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia'}));
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
-        const item=await db('media.get',{id:match[1]});
+        const item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]});
         if(item.provider==='youtube')return new Response(null,{status:302,headers:{Location:'https://www.youtube.com/watch?v='+item.youtubeId,'Cache-Control':'no-store'}});
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/edit$/.exec(path)))return await editPhoto(request,env,db,ctx,match[1]);
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/versions\/(original|[a-f0-9]{32})\/restore$/.exec(path))){const body=await readJSON(request,2000);return json(await db('photo.restore',{id:match[1],versionId:match[2],expectedVersion:body.expectedVersion}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/collections$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.collection.add',{id:match[1],collection:body.collection,scope:body.scope}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/save$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.save',{id:match[1],faceId:body.faceId,personId:body.personId,name:body.name,rect:body.rect,expectedRevision:body.expectedRevision}));}
         if((match=/^\/api\/nursery\/([^/]+)\/upload$/.exec(path)))return await upload(request,env,db,ctx,{category:nurseryCollection(decodeURIComponent(match[1]))});

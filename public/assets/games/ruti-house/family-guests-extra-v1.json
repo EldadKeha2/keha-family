@@ -1,0 +1,713 @@
+{
+  "version": 1,
+  "assetType": "family-guest-character-atlases",
+  "generator": "built-in image_gen",
+  "columns": 4,
+  "rows": 2,
+  "frameRows": {
+    "idle": 0,
+    "walk": 1
+  },
+  "coordinateNotes": "All normalized coordinates are relative to an individual equal 384x512 cell. Bounds use visible alpha >127; footAnchorNormalized is the bottom of visible shoes at column-center x=0.5. A/c walking silhouettes have slightly higher foot baselines; use frame anchors when aligning to ground. Sources retain genuine alpha and original generated PNG pixels.",
+  "atlases": [
+    {
+      "id": "family-extra-a",
+      "path": "/assets/games/ruti-house/family-guests-extra-a-v1.png",
+      "columns": 4,
+      "rows": 2,
+      "width": 1536,
+      "height": 1024,
+      "cellWidth": 384,
+      "cellHeight": 512,
+      "transparent": true,
+      "characters": [
+        {
+          "id": "eldad",
+          "name": "אלדד קהא",
+          "nameEn": "Eldad Keha",
+          "column": 0,
+          "referencePath": "/assets/games/portraits/eldad.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.296875,
+                0.054688,
+                0.721354,
+                0.949219
+              ],
+              "centerNormalized": {
+                "x": 0.509115,
+                "y": 0.501953
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.949219
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.257812,
+                0.056641,
+                0.817708,
+                0.910156
+              ],
+              "centerNormalized": {
+                "x": 0.53776,
+                "y": 0.483398
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.910156
+              }
+            }
+          }
+        },
+        {
+          "id": "avigail",
+          "name": "אביגיל נובל",
+          "nameEn": "Avigail Noble",
+          "column": 1,
+          "referencePath": "/assets/games/portraits/avigail.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.273438,
+                0.056641,
+                0.708333,
+                0.951172
+              ],
+              "centerNormalized": {
+                "x": 0.490885,
+                "y": 0.503906
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.951172
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.200521,
+                0.060547,
+                0.789062,
+                0.908203
+              ],
+              "centerNormalized": {
+                "x": 0.494792,
+                "y": 0.484375
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.908203
+              }
+            }
+          }
+        },
+        {
+          "id": "eddie",
+          "name": "אדי פיש",
+          "nameEn": "Adi Fish",
+          "column": 2,
+          "referencePath": "/assets/games/portraits/eddie.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.242188,
+                0.052734,
+                0.739583,
+                0.949219
+              ],
+              "centerNormalized": {
+                "x": 0.490885,
+                "y": 0.500977
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.949219
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.182292,
+                0.0625,
+                0.789062,
+                0.910156
+              ],
+              "centerNormalized": {
+                "x": 0.485677,
+                "y": 0.486328
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.910156
+              }
+            }
+          }
+        },
+        {
+          "id": "yarden",
+          "name": "ירדן גנדלמן",
+          "nameEn": "Yarden Gandelman",
+          "column": 3,
+          "referencePath": "/assets/games/portraits/yarden.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.257812,
+                0.064453,
+                0.677083,
+                0.951172
+              ],
+              "centerNormalized": {
+                "x": 0.467448,
+                "y": 0.507812
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.951172
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.182292,
+                0.072266,
+                0.763021,
+                0.908203
+              ],
+              "centerNormalized": {
+                "x": 0.472656,
+                "y": 0.490234
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.908203
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "family-extra-b",
+      "path": "/assets/games/ruti-house/family-guests-extra-b-v1.png",
+      "columns": 4,
+      "rows": 2,
+      "width": 1536,
+      "height": 1024,
+      "cellWidth": 384,
+      "cellHeight": 512,
+      "transparent": true,
+      "characters": [
+        {
+          "id": "raya",
+          "name": "רעיה בלום",
+          "nameEn": "Raia Bloom",
+          "column": 0,
+          "referencePath": "/assets/games/portraits/raya.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.294271,
+                0.027344,
+                0.736979,
+                0.984375
+              ],
+              "centerNormalized": {
+                "x": 0.515625,
+                "y": 0.505859
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.984375
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.21875,
+                0.025391,
+                0.804688,
+                0.988281
+              ],
+              "centerNormalized": {
+                "x": 0.511719,
+                "y": 0.506836
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.988281
+              }
+            }
+          }
+        },
+        {
+          "id": "elinor",
+          "name": "אלינור נובל",
+          "nameEn": "Elinor Noble",
+          "column": 1,
+          "referencePath": "/assets/games/portraits/elinor.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.268229,
+                0.03125,
+                0.703125,
+                0.984375
+              ],
+              "centerNormalized": {
+                "x": 0.485677,
+                "y": 0.507812
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.984375
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.192708,
+                0.03125,
+                0.846354,
+                0.984375
+              ],
+              "centerNormalized": {
+                "x": 0.519531,
+                "y": 0.507812
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.984375
+              }
+            }
+          }
+        },
+        {
+          "id": "ora",
+          "name": "אורה פיש",
+          "nameEn": "Ora Fish",
+          "column": 2,
+          "referencePath": "/assets/games/portraits/ora.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.244792,
+                0.025391,
+                0.708333,
+                0.986328
+              ],
+              "centerNormalized": {
+                "x": 0.476562,
+                "y": 0.505859
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.986328
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.174479,
+                0.027344,
+                0.828125,
+                0.986328
+              ],
+              "centerNormalized": {
+                "x": 0.501302,
+                "y": 0.506836
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.986328
+              }
+            }
+          }
+        },
+        {
+          "id": "ariel-n",
+          "name": "אריאל נובל",
+          "nameEn": "Ariele Noble",
+          "column": 3,
+          "referencePath": "/assets/games/portraits/ariel-n.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.231771,
+                0.029297,
+                0.739583,
+                0.980469
+              ],
+              "centerNormalized": {
+                "x": 0.485677,
+                "y": 0.504883
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.980469
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.197917,
+                0.029297,
+                0.84375,
+                0.988281
+              ],
+              "centerNormalized": {
+                "x": 0.520833,
+                "y": 0.508789
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.988281
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "family-extra-c",
+      "path": "/assets/games/ruti-house/family-guests-extra-c-v1.png",
+      "columns": 4,
+      "rows": 2,
+      "width": 1536,
+      "height": 1024,
+      "cellWidth": 384,
+      "cellHeight": 512,
+      "transparent": true,
+      "characters": [
+        {
+          "id": "tomer",
+          "name": "תומר פיש",
+          "nameEn": "Tomer Fish",
+          "column": 0,
+          "referencePath": "/assets/games/heads/tomer.png",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.307292,
+                0.064453,
+                0.721354,
+                0.951172
+              ],
+              "centerNormalized": {
+                "x": 0.514323,
+                "y": 0.507812
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.951172
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.242188,
+                0.066406,
+                0.817708,
+                0.927734
+              ],
+              "centerNormalized": {
+                "x": 0.529948,
+                "y": 0.49707
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.927734
+              }
+            }
+          }
+        },
+        {
+          "id": "amir",
+          "name": "אמיר פיש",
+          "nameEn": "Amir Fish",
+          "column": 1,
+          "referencePath": "/assets/games/heads/amir.png",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.25,
+                0.058594,
+                0.690104,
+                0.951172
+              ],
+              "centerNormalized": {
+                "x": 0.470052,
+                "y": 0.504883
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.951172
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.192708,
+                0.066406,
+                0.760417,
+                0.927734
+              ],
+              "centerNormalized": {
+                "x": 0.476562,
+                "y": 0.49707
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.927734
+              }
+            }
+          }
+        },
+        {
+          "id": "orit",
+          "name": "אורית בלום",
+          "nameEn": "Oritt Bloom",
+          "column": 2,
+          "referencePath": "/assets/games/heads/orit.png",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.302083,
+                0.080078,
+                0.666667,
+                0.953125
+              ],
+              "centerNormalized": {
+                "x": 0.484375,
+                "y": 0.516602
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.953125
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.192708,
+                0.083984,
+                0.75,
+                0.929688
+              ],
+              "centerNormalized": {
+                "x": 0.471354,
+                "y": 0.506836
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.929688
+              }
+            }
+          }
+        },
+        {
+          "id": "ariel-f",
+          "name": "אריאל פיש",
+          "nameEn": "Ariel Fish",
+          "column": 3,
+          "referencePath": "/assets/games/portraits/ariel-f.webp",
+          "frames": {
+            "idle": {
+              "row": 0,
+              "sourceRect": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.234375,
+                0.060547,
+                0.684896,
+                0.953125
+              ],
+              "centerNormalized": {
+                "x": 0.459635,
+                "y": 0.506836
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.953125
+              }
+            },
+            "walk": {
+              "row": 1,
+              "sourceRect": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "visibleBoundsNormalized": [
+                0.166667,
+                0.070312,
+                0.765625,
+                0.927734
+              ],
+              "centerNormalized": {
+                "x": 0.466146,
+                "y": 0.499023
+              },
+              "footAnchorNormalized": {
+                "x": 0.5,
+                "y": 0.927734
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

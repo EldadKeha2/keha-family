@@ -13,7 +13,8 @@ async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overr
   function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
   const summary=id=>({...family.people[id],...overrides[id]});
   const window={FAMILY_DATA:family,FamilyI18n:{isEnglish:english,language:english?'en-US':'he',error:String,fetch:async url=>{
-    requests.push(String(url));const id=decodeURIComponent(String(url).match(/api\/people\/([^/]+)\/page/)[1]);
+    requests.push(String(url));if(String(url).startsWith('api/media/'))return {ok:true,json:async()=>({item:{id:String(url).split('/')[2],kind:'photo',src:'/media/current'}})};
+    const id=decodeURIComponent(String(url).match(/api\/people\/([^/]+)\/page/)[1]);
     return {ok:true,status:200,json:async()=>({person:summary(id),revision:id,albums:Object.fromEntries(['photos','videos','documents'].map(key=>[key,{items:[],page:1,pages:1,total:0}]))})};
   }},scrollTo(){},addEventListener(event,callback){callbacks.set(event,callback);browser?.addEventListener(event,callback);}};
   window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
@@ -22,13 +23,19 @@ async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overr
   if(browser){vm.runInContext(navigationSource,context);browser.addEventListener('popstate',()=>{const next=location.hash.slice(1).split('/')[0];if(next!==view)window.FamilyApp.setView(next,false);});}
   vm.runInContext(relationsSource,context);vm.runInContext(peopleSource,context);callbacks.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
-  return {window,browser,get view(){return view;},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
+  return {window,browser,get view(){return view;},clickPortrait(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-portrait]'?{}:null}});},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
     let prevented=false,stopped=false;
     await listeners.get('personPageContent:click')({button:0,ctrlKey:modifier,preventDefault(){prevented=true;},stopPropagation(){stopped=true;},target:{closest:selector=>selector==='[data-person-relative]'?{dataset:{personRelative:id}}:null}});
     await flush();return {prevented,stopped};
   }};
 }
 const group=(html,key)=>html.match(new RegExp('<section class="person-family-group" data-relative-kind="'+key+'"[\\s\\S]*?<\\/section>'))[0];
+
+test('an edited profile photo opens the same original media ID despite its display revision',async()=>{
+ const id='a'.repeat(32),f=await fixture('eldad',{overrides:{eldad:{profile:'/media/'+id+'?v='+'b'.repeat(32)}}}),opened=[];
+ f.window.FamilyMedia={open:(...args)=>opened.push(args)};await f.clickPortrait();
+ assert.equal(f.requests.at(-1),'api/media/'+id+'/view');assert.equal(opened.length,1);assert.equal(opened[0][0][0].id,id);assert.equal(opened[0][2],'personal:eldad');
+});
 
 test('Back restores each relative page and then the actual source section; Forward renders the correct person',async()=>{
   for(const english of [false,true]){

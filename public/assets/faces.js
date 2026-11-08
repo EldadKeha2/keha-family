@@ -171,14 +171,14 @@
     const imageReady=()=>new Promise(resolve=>{if(image.complete&&image.naturalWidth)resolve();else on(image,'load',resolve,{once:true});});
     await imageReady();if(!live(c))return;setupZoom(c);place(c);stage.dataset.faceDetection='scanning';
     const detected=found=>{if(!live(c))return;const used=new Set();c.detected=found.map(face=>{const previous=c.detected.find(previous=>!used.has(previous.id)&&c.geom.sameRegion(previous.rect,face.rect)),id=previous?.id||uuid();used.add(id);return {id,rect:face.rect,score:face.score,revision:null};});stage.dataset.faceEngine=found.engine;paint(c);};
-    try{const detector=await import('./face-detector.mjs?v=6'),found=await detector.detectFaces(item.id,image,c.events.signal,detected);if(!live(c))return;detected(found);stage.dataset.faceDetection='ready';}
+    try{const detector=await import('./face-detector.mjs?v=6'),found=await detector.detectFaces(item.id+':'+(item.photoRevision||'original'),image,c.events.signal,detected);if(!live(c))return;detected(found);stage.dataset.faceDetection='ready';}
     catch(error){if(live(c)&&error.name!=='AbortError'){stage.dataset.faceDetection='manual';console.warn('Face detection unavailable:',error.message);announce(c,tr('אפשר ללחוץ על הפנים בתמונה ולתייג גם ידנית.','You can click a face to tag it manually.'));}}
   }
   function update(item){if(current?.item.id===item.id)current.item=item;}
   document.addEventListener('DOMContentLoaded',()=>{
     window.addEventListener('family-media-changed',event=>{
       const result=event.detail,id=result.item?.id;if(!id)return;
-      if(result.faces)remember(id,result.faces,result.item);else if(['tags','untag','retag','delete','restore'].includes(result.operation))labels.delete(id);
+      if(result.faces)remember(id,result.faces,result.item);else if(['tags','untag','retag','delete','restore','photo-edit'].includes(result.operation))labels.delete(id);
       const c=current;if(!c||c.item.id!==id)return;
       if(result.faces)apply(c,result.faces);else if(['tags','untag','retag','restore'].includes(result.operation))load(c,true).catch(()=>{});
     });

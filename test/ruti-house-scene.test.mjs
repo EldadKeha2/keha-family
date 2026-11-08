@@ -1,11 +1,39 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {RECIPES} from '../public/assets/ruti-house-engine.mjs';
+import {guestEatingPose} from '../public/assets/ruti-house-scene.mjs';
 import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse,getRutiWateringGeometry,drawRutiCelebration,getHouseGuestSeat,residentGuestPose,drawHouseGuest} from '../public/assets/ruti-house-scene.mjs';
 
 const sizes=[[1000,580],[390,570],[320,500]];
 const inside=(point,obstacle,margin=0)=>point.x>obstacle.x-margin&&point.x<obstacle.x+obstacle.w+margin&&point.y>obstacle.y-margin&&point.y<obstacle.y+obstacle.h+margin;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+test('Ora stays at her appearance position while Ruti has a reachable standing place beside every edge',()=>{
+ for(const [width,height] of sizes){
+  const layout=getHouseLayout(width,height);
+  for(const position of [{x:.08,y:.28},{x:.92,y:.28},{x:.08,y:.90},{x:.92,y:.90},{x:.6,y:.5}]){
+   const target=getTaskLocation({type:'ora',position},layout);
+   assert.equal(target.x,position.x);assert.equal(target.y,position.y);
+   assert.ok(distance(target,target.anchor)>.02,'Ruti stands beside Ora rather than covering her portrait');
+   checkWalk(layout,layout.spawn,target.anchor);
+  }
+ }
+});
+
+test('both windows are visible distinct cat entrances with reachable shoo positions on every display size',()=>{
+ for(const [width,height] of sizes){const l=getHouseLayout(width,height);assert.equal(l.windows.length,2);
+  for(const window of [0,1]){const cat=getTaskLocation({type:'cat',window,size:1},l);assert.equal(cat.kind,'window');assert.ok(cat.x>0&&cat.x<1&&cat.y>0&&cat.y<1);checkWalk(l,l.spawn,cat.anchor);assert.notDeepEqual(cat,l.doors[window]);}
+ }
+});
+
+test('seated guests lift food to their mouth, finish the meal once and keep a stable paused pose',()=>{
+ for(const [width,height] of sizes){const l=getHouseLayout(width,height),guest={guest:'hila',seat:0,door:0,servedAt:10};
+  const bites=[];for(let t=17;t<25;t+=.2)bites.push(guestEatingPose(guest,l,t).bite);
+  assert.ok(Math.max(...bites)>.8);assert.ok(Math.min(...bites)<.1);
+  assert.deepEqual(guestEatingPose(guest,l,20),guestEatingPose(guest,l,20));
+  assert.deepEqual(guestEatingPose(guest,l,100),{bite:0,remaining:0});
+ }
+});
 
 test('eight stable guest seats stay inside the room with reachable serving positions on desktop and mobile',()=>{
  for(const [width,height] of [...sizes,[1130,530]]){

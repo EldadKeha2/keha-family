@@ -9,7 +9,7 @@ Object.assign(family.people,{
   'keren-fish':{id:'keren-fish',name:'קרן פיש',nameEn:'Keren Fish',firstName:'קרן',lastName:'פיש',gender:'f',extended:true,birthday:'1.1.1111',parents:['natan-fish']},
   'sivan-fish':{id:'sivan-fish',name:'סיוון פיש',nameEn:'Sivan Fish',firstName:'סיוון',lastName:'פיש',gender:'f',extended:true,birthday:'1.1.1111',parents:['natan-fish']},
   'sharon-fish':{id:'sharon-fish',name:'שרון פיש',nameEn:'Sharon Fish',firstName:'שרון',lastName:'פיש',gender:'f',extended:true,birthday:'1.1.1111',parents:['natan-fish']},
-  'robin':{id:'robin',name:'רובין',nameEn:'Robin',firstName:'רובין',lastName:'',gender:'f',extended:true,birthday:'1.1.1111',parents:['mark'],siblings:['ilan','raya','orit']},
+  'robin':{id:'robin',name:'רובין בלום',nameEn:'Robin Blum',firstName:'רובין',lastName:'בלום',gender:'f',extended:true,birthday:'1.1.1111',parents:['mark'],siblings:['ilan','raya','orit']},
   'matthew-robin':{id:'matthew-robin',name:'מתיו',nameEn:'Matthew',firstName:'מתיו',lastName:'',gender:'',extended:true,birthday:'1.1.1111',parents:['robin']},
   'lily':{id:'lily',name:'לילי',nameEn:'Lily',firstName:'לילי',lastName:'',gender:'',extended:true,birthday:'1.1.1111',parents:['robin']}
 });

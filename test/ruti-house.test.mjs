@@ -1,3 +1,4 @@
+import {EXTRA_FAMILY_GUESTS} from '../public/assets/ruti-house-guests.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {RECIPES,TOOLS,POINTS,HOUSE_SLOTS,STAGES,firstStagePace,secondStagePace,createHouse,advanceHouse,advanceStage,selectTool,actHouse} from '../public/assets/ruti-house-engine.mjs';
@@ -79,7 +80,7 @@ test('one Food tool directly serves a random valid delicacy without picking up d
   assert.equal(selectTool(g,'peanuts'),false);assert.equal(g.stats.snacks,0);
 });
 
-test('served family and visitors keep separate seats across levels without duplicating people or scoring twice',()=>{
+test('served family and visitors keep separate seats without duplicating people or scoring twice',()=>{
  const g=atStage(11),ids=['roi','hila','rivi','lihi','visitor-man','visitor-hila','visitor-rivi','visitor-lihi'];
  for(const [index,guest] of ids.entries()){
   const task={id:`seat-${guest}`,type:'guest',guest,food:index<4?'serve':'peanuts',recipeId:index<4?'tahini':null,slot:0,door:index%2,total:28,remaining:28,createdAt:g.elapsed};
@@ -90,23 +91,42 @@ test('served family and visitors keep separate seats across levels without dupli
  }
  assert.equal(g.guestsInside.length,8);assert.equal(new Set(g.guestsInside.map(p=>p.guest)).size,8);assert.equal(new Set(g.guestsInside.map(p=>p.seat)).size,8);
  const seats=()=>g.guestsInside.map(({guest,seat,servedAt})=>({guest,seat,servedAt}));
- const seated=seats();finishStage(g);assert.equal(advanceStage(g),true);assert.deepEqual(seats(),seated);
+ const seated=seats();assert.equal(seated.length,8);finishStage(g);assert.deepEqual(seats(),[]);assert.equal(advanceStage(g),true);assert.deepEqual(seats(),[]);
  assert.deepEqual(game().guestsInside,[],'a fresh game starts with an empty house');
 });
 
-test('a repeat food request belongs to the already seated guest and missed requests leave that person inside',()=>{
- const g=atStage(6);
- function waitForGuest(id){
-  let guard=0;
-  while(g.phase==='playing'&&guard++<3000){
-   const wanted=g.tasks.find(t=>t.type==='guest'&&(!id||t.guest===id));if(wanted)return wanted;
-   if(g.tasks.length)clearTask(g);advanceHouse(g,.1);
-  }
-  assert.fail('a rare guest request should arrive during this level');
+test('only two random family guests can arrive per stage and a fed guest never asks again',()=>{
+ const g=atStage(6),selected=[...g.stageGuestChoices],seen=new Set();let guard=0;
+ assert.equal(selected.length,2);assert.equal(new Set(selected).size,2);
+ while(['playing','ora-bonus'].includes(g.phase)&&guard++<10000){
+  if(g.phase==='ora-bonus'){advanceHouse(g,5);continue;}
+  if(g.ora){selectTool(g,'argue');actHouse(g,g.ora.id);continue;}
+  for(const task of [...g.tasks]){if(task.type==='guest'){assert.ok(selected.includes(task.guest));assert.ok(!seen.has(task.guest));seen.add(task.guest);assert.ok(!task.resident);}clearTask(g,task);}
+  advanceHouse(g,.1);
  }
- const first=waitForGuest();clearTask(g,first);const person=g.guestsInside.find(p=>p.guest===first.guest),seat=person.seat,arrival=person.servedAt;
- const again=waitForGuest(first.guest);assert.equal(again.resident,true);assert.equal(again.seat,seat);assert.equal(g.guestsInside.filter(p=>p.guest===first.guest).length,1);
- again.remaining=.01;advanceHouse(g,.02);assert.ok(!g.tasks.includes(again));assert.ok(g.guestsInside.includes(person));assert.equal(person.servedAt,arrival);
+ assert.ok(seen.size>=1&&seen.size<=2);assert.equal(g.stats.meals,seen.size);assert.ok([...seen].every(id=>g.familyVisits.includes(id)));
+ assert.deepEqual(g.guestsInside,[]);assert.equal(advanceStage(g),true);assert.ok(g.stageGuestChoices.every(id=>!seen.has(id)));
+});
+
+test('the first four family visitors are followed by additional relatives without repeated admissions',()=>{
+ const g=game();while(g.level<6){finishStage(g);advanceStage(g);}const admitted=[];
+ while(g.level<=12){
+  const choices=[...g.stageGuestChoices];assert.ok(choices.length<=2);assert.equal(new Set(choices).size,choices.length);
+  for(const id of choices){assert.ok(!g.familyVisits.includes(id));if(admitted.length<4)assert.ok(['roi','hila','rivi','lihi'].includes(id));}
+  const before=new Set(g.familyVisits);finishStage(g);admitted.push(...g.familyVisits.filter(id=>!before.has(id)));assert.deepEqual(g.guestsInside,[]);
+  if(!advanceStage(g))break;
+ }
+ assert.ok(admitted.length>4);assert.equal(new Set(admitted).size,admitted.length);assert.ok(admitted.slice(4).every(id=>EXTRA_FAMILY_GUESTS.some(person=>person.id===id)));
+});
+
+test('cats use only doors before guests arrive and both windows become eligible from level six',()=>{
+ const entries=new Set();
+ for(let seed=1;seed<=8;seed++){
+  let n=seed;const g=createHouse({random:()=>((n=(n*1664525+1013904223)>>>0)/2**32)});
+  while(g.level<6){for(const t of g.tasks)if(t.type==='cat')assert.equal(t.window,undefined);finishStage(g);advanceStage(g);}
+  let guard=0;while(['playing','ora-bonus'].includes(g.phase)&&guard++<10000){if(g.phase==='ora-bonus'){advanceHouse(g,5);continue;}if(g.ora){selectTool(g,'argue');actHouse(g,g.ora.id);continue;}for(const task of [...g.tasks]){if(task.type==='cat')entries.add(Number.isInteger(task.window)?'window'+task.window:'door'+task.door);clearTask(g,task);}advanceHouse(g,.1);}
+ }
+ assert.deepEqual(entries,new Set(['door0','door1','window0','window1']));
 });
 
 test('all serving stages stay completable without cooking tools or inventory',()=>{
@@ -323,7 +343,7 @@ test('feeding is rare, randomly scheduled after fifteen seconds and distinguishe
   }
   assert.ok(seen.size>=1&&seen.size<=3,'guests are occasional, not part of the regular task sequence');assert.equal(g.stageResolved,30);
  }
- assert.ok(new Set(arrivals.map(n=>n.toFixed(1))).size>10,'arrival times vary between runs');assert.deepEqual(foods,new Set(['serve','peanuts']));assert.ok(identities.has('lihi'));assert.equal(identities.size,8);
+ assert.ok(new Set(arrivals.map(n=>n.toFixed(1))).size>10,'arrival times vary between runs');assert.deepEqual(foods,new Set(['serve','peanuts']));assert.ok([...identities].some(id=>EXTRA_FAMILY_GUESTS.some(p=>p.id===id)));assert.ok(identities.size>=8);
 });
 
 test('Ora expiry resolves one of the thirty tasks without adding a household success or cat strike',()=>{

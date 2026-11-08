@@ -26,7 +26,7 @@
     state.items=items;
     if(!items.length){$('mediaViewer').close();return;}
     if(index<0)show(Math.min(state.index,items.length-1));
-    else {state.index=index;metadata();}
+    else {state.index=index;if(active?.src!==items[index].src)show(index);else metadata();}
   }
   function metadata(){
     const item=current();if(!item)return;
@@ -52,6 +52,7 @@
     $('mediaViewerCounter').textContent=`${state.index+1} / ${state.items.length}`;
     $('mediaPrevious').hidden=$('mediaNext').hidden=state.items.length<2;
     const link=$('mediaOriginal');link.href=item.watchUrl||item.src;
+    const edit=$('editOpenedPhoto');if(edit){edit.hidden=!(item.id&&item.kind==='photo');edit.setAttribute('aria-label',tr('עריכת תמונה','Edit photo'));edit.title=tr('עריכת תמונה','Edit photo');}
     const downloadLabel=item.kind==='video'?tr('הורדת סרטון','Download video'):item.kind==='document'?tr('הורדת מסמך','Download document'):tr('הורדת תמונה','Download photo');
     link.querySelector('span').textContent=item.provider==='youtube'?I18n.t('צפייה ביוטיוב ↗'):downloadLabel;link.querySelector('svg').hidden=item.provider==='youtube';link.title=item.provider==='youtube'?I18n.t('צפייה ביוטיוב ↗'):downloadLabel;
     if(item.provider==='youtube'){link.removeAttribute('download');link.target='_blank';link.rel='noopener';}
@@ -194,6 +195,12 @@
     try{const response=await I18n.fetch('api/media/'+item.id+'/caption',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({caption:$('openedCaptionText').value,expectedCaption})});const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));captionEditing=false;$('openedCaptionForm').hidden=true;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));}catch(error){$('openedCaptionError').textContent=error.message;}finally{button.disabled=false;}
   }
   function init(){
+    $('editOpenedPhoto')?.addEventListener('click',async()=>{
+      const item=current();if(!item||item.kind!=='photo')return;
+      if(!app()?.apiEnabled||!window.FamilyPhotoEditor?.edit){notify(tr('העורך אינו זמין כרגע. נסו לרענן.','The editor is unavailable. Please refresh.'));return;}
+      try{const result=await window.FamilyPhotoEditor.edit({...item});if(!result)return;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));notify(tr('התמונה נשמרה. הגרסאות הקודמות זמינות בעורך ✓','Photo saved. Previous versions are available in the editor ✓'));}
+      catch(error){notify(error.message);}
+    });
     $('editOpenedCaption').addEventListener('click',()=>{const item=current();if(!item)return;captionEditing=true;expectedCaption=item.caption||'';$('openedCaptionText').value=expectedCaption;$('openedCaptionError').textContent='';$('openedCaptionForm').hidden=false;$('openedCaptionText').focus();});
     $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;$('openedCaptionForm').hidden=true;});
     $('openedCaptionForm').addEventListener('submit',saveOpenedCaption);
@@ -223,7 +230,7 @@
     $('mediaViewer').addEventListener('close',()=>{instagramPrepared={id:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     $('mediaViewer').addEventListener('click',event=>{if(event.target===$('mediaViewer'))$('mediaViewer').close();});
     document.addEventListener('keydown',event=>{
-      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||event.target.closest('input,textarea'))return;
+      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open]')||event.target.closest('input,textarea'))return;
       if(event.key===(I18n.isEnglish?'ArrowLeft':'ArrowRight')){event.preventDefault();show(state.index-1);}
       if(event.key===(I18n.isEnglish?'ArrowRight':'ArrowLeft')){event.preventDefault();show(state.index+1);}
     });

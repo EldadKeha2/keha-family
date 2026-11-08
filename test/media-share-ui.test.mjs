@@ -7,7 +7,7 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false}={}){
-  const nodes=new Map(),events=new Map(),shared=[],copied=[],requests=[],pending=[];
+  const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
     constructor(){this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.classList={toggle(){}};this.children=new Map();}
     addEventListener(type,callback){this.handlers.set(type,callback);}
@@ -27,17 +27,33 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
   const browser=navigation?browserHistory('https://family.test/?lang='+(english?'en-US':'he')+'#gallery'):null;
   const location=browser?.location||{origin:'https://family.test',href:'https://family.test/?lang='+(english?'en-US':'he')+'#gallery'};
-  const window={FamilyApp:{apiEnabled:true,toast(){}},FamilyTags:{taggable:item=>['photo','video'].includes(item.kind),mountInline(){},clearInline(){},controls:()=>'',labels:()=>''},addEventListener(){}};
+  const window={FamilyApp:{apiEnabled:true,toast(){}},FamilyTags:{taggable:item=>['photo','video'].includes(item.kind),mountInline(){},clearInline(){},controls:()=>'',labels:()=>''},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);},dispatchEvent(event){for(const fn of windowEvents.get(event.type)||[])fn(event);}};
   window.FamilyI18n={isEnglish:english,language:english?'en-US':'he',t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:p=>p.name||'',fetch:async(path,options)=>{requests.push({path,options});return{ok:true,blob:()=>defer?new Promise(resolve=>pending.push(resolve)):Promise.resolve(new Blob(['picture'],{type:'image/jpeg'}))};}};
   const navigator={userActivation:{isActive:true},clipboard:{async writeText(value){if(!clipboard)throw Error('Unavailable');copied.push(value);}}};
   if(native){navigator.canShare=()=>files;navigator.share=async data=>{shared.push(data);if(cancel)throw Object.assign(Error('Cancelled'),{name:'AbortError'});};}
-  const document={activeElement:null,getElementById:get,querySelectorAll:()=>[],createElement:()=>new Node(),addEventListener:(type,callback)=>events.set(type,callback)};
+  const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>new Node(),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
   if(browser)window.addEventListener=browser.addEventListener;
-  const context=vm.createContext({window,document,location,navigator,File,Blob,URL,history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
+  const context=vm.createContext({window,document,location,navigator,File,Blob,URL,CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
-  return {browser,photo,window,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
+  return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
+test('photo editing opens the selected gallery or profile photo and refreshes its download in place',async()=>{
+ for(const scope of ['gallery','personal:ruti']){
+  const f=fixture(),calls=[],photo=f.photo(),edited={...photo,src:'/media/a?v=new',photoRevision:'new'};
+  f.window.FamilyPhotoEditor={async edit(item){calls.push(item);return {operation:'photo-edit',scope:'gallery',item:edited};}};
+  f.window.FamilyMedia.open([photo],0,scope);assert.equal(f.get('editOpenedPhoto').hidden,false);
+  await f.get('editOpenedPhoto').handlers.get('click')();assert.equal(calls.length,1);assert.equal(calls[0].id,'a');assert.equal(f.get('mediaOriginal').href,edited.src);assert.equal(f.get('mediaViewer').open,true);
+  f.window.FamilyMedia.open([{id:'video',kind:'video',src:'/media/video'}],0,scope);assert.equal(f.get('editOpenedPhoto').hidden,true);
+  await f.get('editOpenedPhoto').handlers.get('click')();assert.equal(calls.length,1);
+ }
+});
+test('editor cancellation leaves the current photo unchanged and editing keys cannot move the underlying album',async()=>{
+ const f=fixture();f.window.FamilyPhotoEditor={edit:async()=>null};f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
+ await f.get('editOpenedPhoto').handlers.get('click')();assert.equal(f.get('mediaOriginal').href,'/media/a');
+ f.document.querySelector=()=>({open:true});f.events.get('keydown')({key:'ArrowRight',target:{closest:()=>null},preventDefault(){}});assert.equal(f.get('mediaOriginal').href,'/media/a');
+ f.document.querySelector=()=>null;f.events.get('keydown')({key:'ArrowRight',target:{closest:()=>null},preventDefault(){}});assert.equal(f.get('mediaOriginal').href,'/media/b');
+});
 test('Back closes a media viewer in its original album and Forward restores the cached photo once',async()=>{
   const f=fixture({navigation:true}),url=f.browser.location.href;
   f.open('a');assert.equal(f.browser.location.search,'?lang=he&media=a');assert.equal(f.get('mediaViewer').open,true);
