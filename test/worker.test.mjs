@@ -7,6 +7,7 @@ import {signedRequest} from '../src/hf.mjs';
 import {fail} from '../src/http.mjs';
 import family from '../src/family.mjs';
 import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
+import {photoUploadPayload,PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES} from '../public/assets/photo-upload-metadata.mjs';
 
 function fixture(){
   const database=new DatabaseSync(':memory:');
@@ -57,6 +58,38 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+
+async function uploadWithDetails(f,path,metadata,{bytes=photo,name='23_11_1986_P25_03.jpg',mime='image/jpeg',split=false}={}){
+ const payload=photoUploadPayload(new File([bytes],name,{type:mime}),metadata),body=new Uint8Array(await payload.body.arrayBuffer());
+ let offset=0;const stream=split?new ReadableStream({pull(controller){if(offset===body.length){controller.close();return;}const end=Math.min(body.length,offset+(offset<150?1:57));controller.enqueue(body.subarray(offset,end));offset=end;}}):body;
+ return f.call(path+'?filename='+encodeURIComponent(name),{method:'POST',body:stream,headers:{...payload.headers,'Content-Type':mime,'Content-Length':String(body.byteLength)}});
+}
+test('photo upload dates and descriptions save together in every album and retain the original file bytes',async()=>{
+ const f=fixture();try{
+  await f.connect();const ids=[],paths=['/api/collections/gallery/upload','/api/collections/photos/upload','/api/people/yona/photos','/api/nursery/yona/upload','/api/weddings/u-tomer/upload','/api/nostalgia/upload'];
+  for(const [index,path]of paths.entries()){
+   const caption='תמונה '+index+'\nמשפחה <♥>'+(index===0?' '+ 'ת'.repeat(4900):''),date={day:index%2?null:23,month:11,year:1986};
+   const response=await uploadWithDetails(f,path,{date,caption},{split:index===0});assert.equal(response.status,201,await response.clone().text());
+   const result=await response.json(),item=(result.collection?.items||result.person.gallery).find(photo=>photo.file===result.file);ids.push(item.id);
+   assert.deepEqual(item.takenDate,date);assert.equal(item.caption,caption);assert.equal(item.size,photo.length);assert.deepEqual(item.tags,[]);assert.notEqual(item.takenDateRevision,'empty');
+   assert.deepEqual(Buffer.from(await(await f.call(item.src)).arrayBuffer()),photo);
+  }
+  f.restart();for(const [index,id]of ids.entries()){const item=(await(await f.call('/api/media/'+id+'/view')).json()).item;assert.equal(item.takenDate.year,1986);assert.match(item.caption,new RegExp('תמונה '+index));}
+  const legacy=await taggedUpload(f);const item=(await(await f.call('/api/media/'+legacy.id+'/view')).json()).item;assert.deepEqual(item.takenDate,{day:null,month:null,year:null});assert.equal(item.caption,'');
+ }finally{await f.close();}
+});
+test('malformed upload metadata is rejected before creating a file or media record',async()=>{
+ const f=fixture();try{
+  await f.connect();const before=f.objects.size;
+  for(const content of ['not JSON','[]','{"date":{"day":31,"month":4}}',JSON.stringify({caption:'a'.repeat(5001)})]){
+   const prefix=Buffer.from(content),body=Buffer.concat([prefix,photo]);const r=await f.call('/api/collections/gallery/upload?filename=photo.jpg',{method:'POST',body,headers:{'Content-Type':'image/jpeg','Content-Length':String(body.length),[PHOTO_METADATA_HEADER]:String(prefix.length)}});assert.equal(r.status,400);
+  }
+  for(const length of ['0','-1','1.5',String(MAX_PHOTO_METADATA_BYTES+1)])assert.equal((await f.call('/api/collections/gallery/upload',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length),[PHOTO_METADATA_HEADER]:length}})).status,400);
+  assert.equal((await f.call('/api/collections/gallery/upload',{method:'POST',body:Buffer.from('{}'),headers:{'Content-Length':'500',[PHOTO_METADATA_HEADER]:'400'}})).status,400);
+  assert.equal((await uploadWithDetails(f,'/api/collections/videos/upload',{date:{year:1980},caption:'film'},{bytes:video,name:'film.mp4',mime:'video/mp4'})).status,400);
+  assert.equal(f.objects.size,before);assert.equal((await(await f.call('/api/collections/gallery')).json()).count,0);
+ }finally{await f.close();}
+});
 
 async function photoEdit(f,item,{expectedVersion='original',baseVersion=expectedVersion,rotation=1,crop={x:0,y:0,width:1,height:1},bytes=Buffer.concat([photo,Buffer.from('edited')]),clientHeaders=true}={}){
   const query=new URLSearchParams({expectedVersion,baseVersion,rotation,crop:JSON.stringify(crop),filename:'edited.jpg'});

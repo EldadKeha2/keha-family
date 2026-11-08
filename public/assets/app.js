@@ -493,8 +493,9 @@
           if (file.size > 50*1024*1024) throw Error(I18n.t('אפשר להעלות עד 50MB לתמונה.'));
           const date = new Date().toISOString().replace(/[:.]/g,'-');
           const filename = batch.clipboard ? I18n.t('צילום_מסך_') + date + (file.name.match(/\.[^.]+$/)?.[0]||'.png') : file.name;
+          const payload=window.FamilyPhotoEditor?.upload?.(file)||{body:file};
           const response = await I18n.fetch('api/people/' + encodeURIComponent(batch.personId) + '/photos?filename=' + encodeURIComponent(filename), {
-            method:'POST',headers:{'Content-Type':file.type || 'application/octet-stream','X-Family-Token':window.FAMILY_API_TOKEN},body:file
+            method:'POST',headers:{...payload.headers,'Content-Type':file.type || 'application/octet-stream','X-Family-Token':window.FAMILY_API_TOKEN},body:payload.body
           });
           const result = await response.json();
           if (!response.ok) throw Error(I18n.error(result.error) || I18n.t('התמונה לא נשמרה.'));

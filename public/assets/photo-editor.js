@@ -1,7 +1,9 @@
 import {fullCrop,turns,isPhoto,normalizeCrop,rotateCrop,rotatedSize,pixelCrop,moveCrop,changed,outputFormat,outputName,drawPhoto} from './photo-edit-core.mjs';
+import {filenamePhotoDate,normalizeUploadMetadata,photoUploadPayload} from './photo-upload-metadata.mjs?v=1';
 
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
 const jobs=[];
+const fileMetadata=new WeakMap();
 let session=null,dialog,source=null,sourceUrl=null,loadId=0,drag=null;
 const get=id=>document.getElementById('photoEdit'+id);
 const draft=()=>session?.drafts[session.index];
@@ -14,11 +16,12 @@ function mount(){
     <p id="photoEditHint" class="photo-edit-hint">${tr('אפשר לסובב ולחתוך כאן לפני ההעלאה.','Rotate and crop here before uploading.')}</p>
     <div id="photoEditHistory" class="photo-edit-history" hidden><label for="photoEditVersion">${tr('גרסאות התמונה','Photo versions')}</label><select id="photoEditVersion"></select><span id="photoEditVersionStatus" role="status"></span></div>
     <nav class="photo-edit-pager" aria-label="${tr('התמונות שנבחרו להעלאה','Photos selected for upload')}"><button type="button" id="photoEditPrevious" class="secondary-button">${tr('הקודמת','Previous')}</button><div><strong id="photoEditCounter" aria-live="polite"></strong><span id="photoEditFilename" dir="auto"></span></div><button type="button" id="photoEditNext" class="secondary-button">${tr('הבאה','Next')}</button></nav>
+    <section id="photoEditMetadata" class="photo-edit-metadata"><fieldset class="photo-edit-date"><legend>${tr('תאריך צילום','Photo date')}</legend><div class="photo-edit-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoEditDate${field}">${label}<input id="photoEditDate${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off"></label>`).join('')}</div><p id="photoEditDateSource" class="photo-edit-date-source" role="status" hidden></p></fieldset><label class="photo-edit-caption" for="photoEditCaption">${tr('תיאור התמונה','Photo description')}<textarea id="photoEditCaption" dir="auto" rows="2" maxlength="5000" placeholder="${tr('מי בתמונה? איפה ומה הסיפור?','Who is pictured? Where was it taken?')}" autocomplete="off"></textarea></label></section>
     <div id="photoEditViewport" class="photo-edit-viewport"><p id="photoEditLoading" role="status"></p><div id="photoEditImage" class="photo-edit-image" hidden><canvas id="photoEditCanvas" role="img" aria-label="${tr('תצוגה מקדימה של התמונה לפני ההעלאה','Photo preview before upload')}"></canvas><div id="photoEditCropLayer" class="photo-edit-crop-layer" hidden><div id="photoEditCrop" class="photo-edit-crop" data-handle="move" tabindex="0" role="group" aria-label="${tr('מסגרת החיתוך. גררו להזזה או השתמשו במקשי החצים.','Crop area. Drag to move or use the arrow keys.')}">${['nw','n','ne','e','se','s','sw','w'].map(handle=>`<button type="button" class="photo-edit-handle handle-${handle}" data-handle="${handle}" aria-label="${handleLabel(handle)}"></button>`).join('')}<span class="photo-edit-thirds" aria-hidden="true"></span></div></div></div></div>
     <div class="photo-edit-toolbar"><button type="button" id="photoEditLeft" class="secondary-button"><span aria-hidden="true">↶</span> ${tr('סיבוב שמאלה','Rotate left')}</button><button type="button" id="photoEditRight" class="secondary-button"><span aria-hidden="true">↷</span> ${tr('סיבוב ימינה','Rotate right')}</button><button type="button" id="photoEditCropToggle" class="secondary-button" aria-pressed="false">${tr('חיתוך','Crop')}</button><button type="button" id="photoEditReset" class="photo-edit-text-button">${tr('איפוס','Reset')}</button></div>
     <div id="photoEditCropHelp" class="photo-edit-crop-help" hidden><p>${tr('גררו את פינות המסגרת לחיתוך, או את המרכז להזזה. במקלדת: חצים; Shift לצעד גדול.','Drag the corners to crop, or the centre to move. Keyboard: arrows; Shift for a larger step.')}</p><button type="button" id="photoEditFull" class="photo-edit-text-button">${tr('החזרת התמונה המלאה','Use full photo')}</button></div>
     <div class="photo-edit-info"><span id="photoEditDimensions" dir="ltr" aria-live="polite"></span><span id="photoEditAnimation"></span></div><p id="photoEditError" class="photo-edit-error" role="alert"></p>
-    <footer class="photo-edit-footer"><button type="button" id="photoEditSave" class="primary-button"></button><button type="button" id="photoEditCancel" class="secondary-button">${tr('ביטול ההעלאה','Cancel upload')}</button><button type="button" id="photoEditRemove" class="photo-edit-text-button">${tr('הסרת התמונה מההעלאה','Remove this photo')}</button></footer>`;
+    <footer class="photo-edit-footer"><button type="button" id="photoEditSave" class="primary-button"></button><button type="button" id="photoEditCancel" class="secondary-button">${tr('ביטול ההעלאה','Cancel upload')}</button><button type="button" id="photoEditRemove" class="photo-edit-remove" aria-label="${tr('הסרת התמונה הנוכחית מההעלאה','Remove the current photo from this upload')}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/></svg><span>${tr('הסרת תמונה','Remove photo')}</span></button></footer>`;
   document.body.append(dialog);
   get('Close').addEventListener('click',cancel);get('Cancel').addEventListener('click',cancel);
   dialog.addEventListener('cancel',event=>{event.preventDefault();cancel();});
@@ -29,6 +32,10 @@ function mount(){
   get('Full').addEventListener('click',()=>{draft().crop=fullCrop();renderCrop();});
   get('Remove').addEventListener('click',remove);get('Save').addEventListener('click',save);
   get('Version').addEventListener('change',()=>loadVersion(get('Version').value));
+  for(const field of ['day','month','year'])get('Date'+field).addEventListener('input',event=>{const d=draft();if(!d?.metadata)return;d.metadata.date[field]=event.target.value===''?null:Number(event.target.value);d.dateEdited=true;get('DateSource').hidden=true;get('Error').textContent='';});
+  get('Caption').addEventListener('input',event=>{if(draft()?.metadata)draft().metadata.caption=event.target.value;});
+  get('Metadata').addEventListener('focusin',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
+  window.addEventListener('resize',fitEditor);window.visualViewport?.addEventListener('resize',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
   const layer=get('CropLayer');layer.addEventListener('pointerdown',pointerStart);layer.addEventListener('pointermove',pointerMove);
   layer.addEventListener('pointerup',pointerEnd);layer.addEventListener('pointercancel',pointerEnd);layer.addEventListener('lostpointercapture',()=>{drag=null;});
   layer.addEventListener('keydown',keyCrop);
@@ -46,11 +53,24 @@ async function decode(file){
 const dimensions=image=>({width:image.naturalWidth||image.width,height:image.naturalHeight||image.height});
 function setBusy(busy){
   session.loading=busy;
-  for(const el of dialog.querySelectorAll('button'))el.disabled=busy;
+  for(const el of dialog.querySelectorAll('button,input,textarea'))el.disabled=busy;
   // Cancellation is safe while decoding; saving pixels is kept atomic.
   if(!session.saving){get('Close').disabled=false;get('Cancel').disabled=false;}
   get('Previous').disabled=busy||session.index===0;get('Next').disabled=busy||session.index===session.drafts.length-1;
   get('Version').disabled=busy;
+}
+function fitEditor(){
+  if(!session||!dialog?.open||session.mode==='existing')return;
+  dialog.style.setProperty('--photo-editor-height',(window.visualViewport?.height||window.innerHeight)+'px');
+  dialog.style.setProperty('--photo-editor-top',(window.visualViewport?.offsetTop||0)+'px');
+}
+function revealMetadata(){if(session&&get('Metadata').contains(document.activeElement))document.activeElement.scrollIntoView?.({block:'nearest',behavior:'auto'});}
+function renderMetadata(){
+  const d=draft();get('Metadata').hidden=session.mode==='existing';if(!d?.metadata||session.mode==='existing')return;
+  for(const field of ['day','month','year'])get('Date'+field).value=d.metadata.date[field]??'';
+  get('Caption').value=d.metadata.caption;
+  const messages={full:tr('התאריך זוהה משם הקובץ. אפשר לערוך אותו.','Date filled from the filename. You can edit it.'),partial:tr('תאריך חלקי משם הקובץ. אפשר להשלים את מה שידוע.','Partial date from the filename. Add any other details you know.'),ambiguous:tr('בשם הקובץ יש כמה אפשרויות תאריך. מולאו רק החלקים המשותפים.','The filename contains alternative dates. Only shared parts were filled in.'),invalid:tr('התאריך בשם הקובץ אינו תקין. אפשר להזין תאריך ידנית.','The filename date is invalid. You can enter the date manually.')};
+  get('DateSource').textContent=d.dateEdited?'':messages[d.dateSource]||'';get('DateSource').hidden=!get('DateSource').textContent;
 }
 function saveLabel(){
   if(session.mode==='existing'){
@@ -64,6 +84,7 @@ async function load(){
   get('Loading').textContent=tr('טוען תצוגה מקדימה…','Loading preview…');setBusy(true);saveLabel();
   get('Counter').textContent=I.isEnglish?`Photo ${session.index+1} of ${session.drafts.length}`:`תמונה ${session.index+1} מתוך ${session.drafts.length}`;
   get('Filename').textContent=draft().file.name;
+  renderMetadata();
   try{
     const image=await decode(draft().file);if(id!==loadId){image.close?.();return;}
     source=image;const size=dimensions(image);if(!size.width||!size.height)throw Error();
@@ -99,10 +120,11 @@ function renderCrop(){
 function configure(){
   const existing=session.mode==='existing';dialog.dir=I.isEnglish?'ltr':'rtl';dialog.classList.toggle('is-existing',existing);
   dialog.querySelector('.photo-edit-eyebrow').textContent=existing?tr('המקור והגרסאות נשמרים','Original and previous versions are kept'):tr('רגע לפני ששומרים','Before you upload');
-  get('Title').textContent=existing?tr('עריכת תמונה','Edit photo'):tr('סיבוב וחיתוך תמונות','Rotate and crop photos');
-  get('Hint').textContent=existing?tr('כל שמירה יוצרת גרסה חדשה. בחרו גרסה קודמת לצפייה או לשחזור.','Each save creates a new version. Choose a previous version to view or restore it.'):tr('אפשר לסובב ולחתוך כאן לפני ההעלאה.','Rotate and crop here before uploading.');
+  get('Title').textContent=existing?tr('עריכת תמונה','Edit photo'):tr('עריכת תמונות לפני העלאה','Edit photos before uploading');
+  get('Hint').textContent=existing?tr('כל שמירה יוצרת גרסה חדשה. בחרו גרסה קודמת לצפייה או לשחזור.','Each save creates a new version. Choose a previous version to view or restore it.'):tr('אפשר להוסיף תאריך ותיאור, לסובב ולחתוך. כל השדות לבחירתכם.','Add a date and description, rotate or crop. All fields are optional.');
   for(const name of ['Close','Cancel']){get(name).setAttribute('aria-label',existing?tr('ביטול העריכה','Cancel editing'):tr('ביטול ההעלאה','Cancel upload'));if(name==='Cancel')get(name).textContent=tr('ביטול','Cancel');}
   get('History').hidden=!existing;dialog.querySelector('.photo-edit-pager').hidden=existing;get('Remove').hidden=existing;
+  get('Metadata').hidden=existing;
   get('Canvas').setAttribute('aria-label',tr('תצוגה מקדימה של התמונה','Photo preview'));
 }
 async function responseJSON(response){
@@ -186,16 +208,20 @@ async function encode(d,image){
 async function save(){
   if(!session||session.loading||session.saving)return;
   if(session.mode==='existing'){await saveExisting();return;}
+  for(const [index,d]of session.drafts.entries()){
+    try{normalizeUploadMetadata(d.metadata);}catch{session.index=index;await load();get('Error').textContent=tr('בדקו את תאריך הצילום. אפשר להשאיר כל שדה לא ידוע ריק. התיאור מוגבל ל־5,000 תווים.','Check the photo date. Leave any unknown field blank. Descriptions can be up to 5,000 characters.');get('Dateday').focus();return;}
+  }
   session.saving=true;setBusy(true);get('Error').textContent='';const prepared=new Map();
   try{
     for(const [index,d]of session.drafts.entries()){
       get('Save').textContent=tr('מכין תמונה ','Preparing photo ')+(index+1)+' / '+session.drafts.length+'…';
       if(d.file.size>50*1024*1024)throw Error(tr('אפשר להעלות תמונה עד 50MB.','Photos can be up to 50MB.'));
-      if(!changed(d.rotation,d.crop)){prepared.set(d.fileIndex,d.file);continue;}
+      if(!changed(d.rotation,d.crop)){prepared.set(d.fileIndex,new File([d.file],d.file.name,{type:d.file.type,lastModified:d.file.lastModified}));continue;}
       // Decode one file at a time; keep only the current preview in memory.
       release();const image=await decode(d.file);source=image;Object.assign(d,dimensions(image));
       prepared.set(d.fileIndex,await encode(d,image));
     }
+    for(const d of session.drafts)fileMetadata.set(prepared.get(d.fileIndex),normalizeUploadMetadata(d.metadata));
     finish(session.files.flatMap((file,index)=>isPhoto(file)?(prepared.has(index)?[prepared.get(index)]:[]):[file]));
   }catch(error){
     const failed=session;session.saving=false;await load();if(session!==failed)return;
@@ -226,10 +252,10 @@ function finish(files){
 }
 function run(){
   if(session||!jobs.length)return;mount();session=jobs.shift();session.focus=document.activeElement;session.index=0;session.loading=false;session.saving=false;
-  configure();dialog.showModal();if(session.mode==='existing')loadHistory();else load();
+  configure();dialog.showModal();fitEditor();if(session.mode==='existing')loadHistory();else load();
 }
 function prepare(input){
-  const files=[...input],drafts=files.flatMap((file,fileIndex)=>isPhoto(file)?[{file,fileIndex,rotation:0,crop:fullCrop(),cropping:false}]:[]);
+  const files=[...input],drafts=files.flatMap((file,fileIndex)=>{if(!isPhoto(file))return [];const inferred=filenamePhotoDate(file.name);return [{file,fileIndex,rotation:0,crop:fullCrop(),cropping:false,metadata:{date:inferred.date,caption:''},dateSource:inferred.status,dateEdited:false}];});
   if(!drafts.length)return Promise.resolve(files);
   return new Promise(resolve=>{jobs.push({files,drafts,resolve});run();});
 }
@@ -238,4 +264,4 @@ function edit(item){
   if(!item?.id||item.kind!=='photo')return Promise.resolve(null);
   return new Promise(resolve=>{jobs.push({mode:'existing',item,files:[],drafts:[],resolve});run();});
 }
-window.FamilyPhotoEditor={prepare,edit};
+window.FamilyPhotoEditor={prepare,edit,upload:file=>photoUploadPayload(file,fileMetadata.get(file))};

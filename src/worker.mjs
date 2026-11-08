@@ -7,6 +7,7 @@ import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {galleryRevision} from './gallery.mjs';
 import {zipStream} from './zip.mjs';
+import {PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES,decodeUploadMetadata} from '../public/assets/photo-upload-metadata.mjs';
 export {FamilyState} from './state.mjs';
 export {FamilyUpdates} from './updates.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
@@ -45,15 +46,19 @@ function archiveFormat(head,name){
   throw new HttpError(415,'בחרו תמונה, סרטון MP4, WebM או MOV, או מסמך PDF, Word, TXT או Markdown.');
 }
 function filename(value){return String(value||'family').split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g,'_').slice(0,200)||'family';}
-async function streamUpload(request,maximum){
-  const raw=request.headers.get('Content-Length'),size=Number(raw);
-  if(raw===null||!Number.isSafeInteger(size))throw new HttpError(411,'לא התקבל גודל הקובץ. בחרו את הקובץ מחדש ונסו שוב.');
+async function streamUpload(request,maximum,withPhotoMetadata=false){
+  const prefix=withPhotoMetadata?request.headers.get(PHOTO_METADATA_HEADER):null,metadataLength=prefix===null?0:Number(prefix);
+  if(prefix!==null&&(!/^[0-9]+$/.test(prefix)||!Number.isSafeInteger(metadataLength)||metadataLength<2||metadataLength>MAX_PHOTO_METADATA_BYTES))throw new HttpError(400,'פרטי התמונה אינם תקינים. בחרו את התמונה מחדש.');
+  const raw=request.headers.get('Content-Length'),declared=Number(raw),size=declared-metadataLength;
+  if(raw===null||!Number.isSafeInteger(declared))throw new HttpError(411,'לא התקבל גודל הקובץ. בחרו את הקובץ מחדש ונסו שוב.');
   if(size<=0)throw new HttpError(400,'הקובץ ריק.');if(size>maximum)throw new HttpError(413,'אפשר להעלות עד 50MB לתמונה ועד 90MB לסרטון.');
   const reader=request.body?.getReader();if(!reader)throw new HttpError(400,'הקובץ לא התקבל.');
-  const first=[];let firstLength=0;
+  const first=[],metadata=metadataLength?new Uint8Array(metadataLength):null;let firstLength=0,metadataRead=0;
   while(firstLength<Math.min(128,size)){
     const part=await reader.read();if(part.done){await reader.cancel();throw new HttpError(400,'ההעלאה הופסקה לפני סיומה.');}
-    first.push(part.value);firstLength+=part.value.byteLength;
+    let bytes=part.value;
+    if(metadataRead<metadataLength){const amount=Math.min(metadataLength-metadataRead,bytes.byteLength);metadata.set(bytes.subarray(0,amount),metadataRead);metadataRead+=amount;bytes=bytes.subarray(amount);}
+    if(bytes.byteLength){first.push(bytes);firstLength+=bytes.byteLength;}
     if(firstLength>size){await reader.cancel();throw new HttpError(400,'גודל הקובץ אינו מתאים לנתונים שהתקבלו.');}
   }
   const head=new Uint8Array(Math.min(128,firstLength));let offset=0;
@@ -68,24 +73,29 @@ async function streamUpload(request,maximum){
       }catch(error){await reader.cancel().catch(()=>{});controller.error(error);}
     },cancel(reason){return reader.cancel(reason);}
   });
-  return {size,head,body};
+  return {size,head,body,metadata};
 }
 async function upload(request,env,db,ctx,{category,personId=null,mixed=false,mediaType='photo'}){
   const videoCategory=new URL(request.url).searchParams.get('group')||'family';
   if(category==='videos'&&!['family','special-birthdays'].includes(videoCategory))throw new HttpError(400,'קטגוריית הסרטון אינה מוכרת.');
   if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני העלאת קבצים.');
   if(personId)await db('person',{id:personId});
-  const media=await streamUpload(request,mediaType==='document'?LIMITS.attachment:mixed||category==='videos'||mediaType==='video'?LIMITS.video:LIMITS.photo);
+  const media=await streamUpload(request,mediaType==='document'?LIMITS.attachment:mixed||category==='videos'||mediaType==='video'?LIMITS.video:LIMITS.photo,true);
   const id=uid(),original=filename(new URL(request.url).searchParams.get('filename'));
-  let format;
+  let format,metadata=null;
   try{
     format=mixed||mediaType==='document'?archiveFormat(media.head,original):sniff(media.head,category==='videos'||mediaType==='video');
     if(mediaType==='document'){if(!['document','photo'].includes(format.kind))throw new HttpError(415,'בחרו מסמך או צילום תעודה.');format={...format,kind:'document',maximum:LIMITS.attachment};}
     if(format.maximum&&media.size>format.maximum)throw new HttpError(413,format.kind==='document'?'אפשר להעלות מסמך עד 10MB.':'אפשר להעלות תמונה עד 50MB.');
+    if(media.metadata){
+      if(format.kind&&format.kind!=='photo'||!format.mime.startsWith('image/'))throw new HttpError(400,'אפשר לצרף תאריך ותיאור בהעלאה של תמונה בלבד.');
+      try{metadata=decodeUploadMetadata(media.metadata);metadata.caption=text(metadata.caption,'תיאור',5000);}catch{throw new HttpError(400,'תאריך הצילום או התיאור אינם תקינים. אפשר להשאיר שדות תאריך לא ידועים ריקים.');}
+    }
   }catch(error){await media.body.cancel();throw error;}
   const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:category.startsWith('nursery:')?['nursery',category.slice(8)]:[category,personId||'shared'];
   const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,id+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
   if(category==='videos')item.videoCategory=videoCategory;
+  if(metadata){item.caption=metadata.caption;item.takenDate=metadata.date;item.takenDateRevision=uid();}
   let transfer=Promise.resolve(),body=media.body;
   if(typeof FixedLengthStream!=='undefined'){
     const fixed=new FixedLengthStream(media.size);transfer=body.pipeTo(fixed.writable);body=fixed.readable;
