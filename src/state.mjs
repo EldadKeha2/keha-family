@@ -60,6 +60,7 @@ export class FamilyState {
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_tags_person ON media_tags(person_id,media_id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_faces(media_id TEXT NOT NULL,id TEXT NOT NULL,person_id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_face_scans(media_id TEXT PRIMARY KEY,photo_revision TEXT NOT NULL,version TEXT NOT NULL,data TEXT NOT NULL,face_count INTEGER NOT NULL,unmatched_count INTEGER NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS media_face_reviews(media_id TEXT PRIMARY KEY,photo_revision TEXT NOT NULL,tags_revision TEXT NOT NULL,completed_at TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS photo_versions(media_id TEXT NOT NULL,id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_trash(id TEXT PRIMARY KEY,data TEXT NOT NULL,deleted_at TEXT NOT NULL,profile_selected INTEGER NOT NULL DEFAULT 0)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
@@ -190,7 +191,18 @@ export class FamilyState {
     return row?{...JSON.parse(row.data),total:row.face_count,unmatched:row.unmatched_count}:null;
   }
   faceSummary(item){
-    const scan=this.faceScan(item);return scan?{total:scan.total,unmatched:scan.unmatched,partial:scan.unmatched>0&&scan.total>this.tagIds(item.id).length,scanned:true}:null;
+    const scan=this.faceScan(item),reviewed=Boolean(this.rows('SELECT media_id FROM media_face_reviews WHERE media_id=? AND photo_revision=? AND tags_revision=?',item.id,item.photoRevision||'original',this.tagsRevision(item.id))[0]);
+    if(reviewed)return {total:scan?.total??this.faces(item.id).length,unmatched:0,partial:false,scanned:Boolean(scan),reviewed:true};
+    return scan?{total:scan.total,unmatched:scan.unmatched,partial:scan.unmatched>0&&scan.total>this.tagIds(item.id).length,scanned:true,reviewed:false}:null;
+  }
+  reviewFaces(p){
+    const item=this.photo(p.id);
+    if(typeof p.complete!=='boolean')throw new HttpError(400,'יש לבחור אם כל הפרצופים תויגו.');
+    if(p.photoRevision!==(item.photoRevision||'original')||p.tagsRevision!==this.tagsRevision(item.id))throw new HttpError(409,'התמונה או התיוגים השתנו. פתחו אותה מחדש לפני האישור.');
+    if(p.complete)this.sql.exec('INSERT INTO media_face_reviews(media_id,photo_revision,tags_revision,completed_at) VALUES(?,?,?,?) ON CONFLICT(media_id) DO UPDATE SET photo_revision=excluded.photo_revision,tags_revision=excluded.tags_revision,completed_at=excluded.completed_at',item.id,p.photoRevision,p.tagsRevision,new Date().toISOString());
+    else this.sql.exec('DELETE FROM media_face_reviews WHERE media_id=?',item.id);
+    for(const kind of this.mediaCollections(item))this.touch(kind);
+    return {saved:true,operation:'face-review',scope:this.mediaScope(item),item:this.mediaPublic(item)};
   }
   recountFaces(id){
     const row=this.rows('SELECT data FROM media_face_scans WHERE media_id=?',id)[0];if(!row)return;
@@ -216,7 +228,8 @@ export class FamilyState {
   }
   galleryFaceScan(p){
     const after=Number(p.after||0);if(!Number.isSafeInteger(after)||after<0)throw new HttpError(400,'בחרו מיקום סריקה תקין.');
-    const pending="m.category='gallery' AND NOT EXISTS (SELECT 1 FROM media_face_scans s WHERE s.media_id=m.id AND s.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND s.version=?)";
+    const reviewed="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty'))";
+    const pending="m.category='gallery' AND "+reviewed+" AND NOT EXISTS (SELECT 1 FROM media_face_scans s WHERE s.media_id=m.id AND s.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND s.version=?)";
     const count=this.rows('SELECT count(*) AS n FROM media m WHERE '+pending,FACE_SCAN_VERSION)[0].n;
     const items=this.rows('SELECT m.rowid AS cursor,m.data FROM media m WHERE '+pending+' AND m.rowid>? ORDER BY m.rowid LIMIT 5',FACE_SCAN_VERSION,after).map(row=>({...this.mediaPublic(JSON.parse(row.data)),cursor:row.cursor}));
     return {items,pending:count,version:FACE_SCAN_VERSION};
@@ -315,7 +328,7 @@ export class FamilyState {
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
     if(filter==='untagged')where+=' AND NOT EXISTS (SELECT 1 FROM media_tags untagged WHERE untagged.media_id=m.id)';
-    const partial="EXISTS (SELECT 1 FROM media_face_scans s WHERE s.media_id=m.id AND s.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND s.version='"+FACE_SCAN_VERSION+"' AND s.unmatched_count>0 AND s.face_count>(SELECT count(*) FROM media_tags t WHERE t.media_id=m.id))";
+    const partial="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty')) AND EXISTS (SELECT 1 FROM media_face_scans s WHERE s.media_id=m.id AND s.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND s.version='"+FACE_SCAN_VERSION+"' AND s.unmatched_count>0 AND s.face_count>(SELECT count(*) FROM media_tags t WHERE t.media_id=m.id))";
     if(filter==='partial')where+=' AND '+partial;
     if(query){
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
@@ -491,6 +504,7 @@ export class FamilyState {
       }
       case 'gallery.face.scan':return this.galleryFaceScan(p);
       case 'media.face.scan.save':return this.saveFaceScan(p);
+      case 'media.face.review':return this.reviewFaces(p);
       case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:this.faceScan(item)?.faces||[]};}
       case 'media.face.save':return this.saveFace(p);
       case 'media.caption.id':{
@@ -654,7 +668,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:3,faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT media_id AS mediaId,data FROM media_faces').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
+      case 'export':return {schemaVersion:3,faceReviews:this.rows('SELECT media_id AS mediaId,photo_revision AS photoRevision,tags_revision AS tagsRevision,completed_at AS completedAt FROM media_face_reviews'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT media_id AS mediaId,data FROM media_faces').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

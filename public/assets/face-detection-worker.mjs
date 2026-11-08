@@ -1,7 +1,7 @@
 import {FaceDetector} from './vendor/mediapipe/vision_bundle.mjs';
 import {clampRect,sameRegion,unrotateRect,separateFaces} from './face-geometry.mjs?v=4';
 import {detectionRegions} from './face-scan.mjs?v=2';
-import {createYuNet,projectYuNet,confirmYuNet,sameDetection} from './face-yunet.mjs?v=2';
+import {createYuNet,projectYuNet,confirmYuNet,sameDetection} from './face-yunet.mjs?v=3';
 import pico from './vendor/pico/pico.mjs';
 
 // Model files are hosted with the site. Detection must not send photos or metrics elsewhere.
@@ -59,6 +59,26 @@ async function detailedFaces(bitmap,onProgress){
     return true;
   }finally{tile.width=tile.height=1;}
 }
+
+// PICO is a proposal generator, not proof of a face. Recheck its unmatched
+// regions at high local detail with the landmark model before showing them.
+async function verifiedCascadeFaces(bitmap,known,add){
+ const proposals=await cpuFaces(bitmap,()=>{},true);
+ let engine;try{engine=await createYuNet();}catch{return;}
+ const size={width:bitmap.width,height:bitmap.height},tile=new OffscreenCanvas(640,640),candidates=[];
+ const pending=proposals.filter(face=>!known.some(other=>sameRegion(other.rect,face.rect))).slice(0,32);
+ try{for(const [index,proposal]of pending.entries()){
+  const r=proposal.rect,edge=Math.max(80,Math.min(512,Math.max(r.width*size.width,r.height*size.height)*3.4));
+  const region={x:Math.max(0,Math.min(size.width-Math.min(edge,size.width),(r.x+r.width/2)*size.width-edge/2)),y:Math.max(0,Math.min(size.height-Math.min(edge,size.height),(r.y+r.height/2)*size.height-edge/2)),width:Math.min(edge,size.width),height:Math.min(edge,size.height)};
+  const scale=640/Math.max(region.width,region.height),drawn={width:Math.round(region.width*scale),height:Math.round(region.height*scale)};
+  for(const flipped of [false,true]){
+   const ctx=tile.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,640,640);ctx.save();if(flipped){ctx.translate(drawn.width,0);ctx.scale(-1,1);}ctx.drawImage(bitmap,region.x,region.y,region.width,region.height,0,0,drawn.width,drawn.height);ctx.restore();
+   const faces=(await engine.detect(tile)).map(face=>projectYuNet(face,region,size,drawn,flipped)).filter(Boolean);
+   add(confirmYuNet(candidates,faces,index*2+Number(flipped)));
+  }
+ }}finally{tile.width=tile.height=1;}
+}
+
 self.onmessage=async event=>{
   const {id,bitmap}=event.data;
   let galleryFaces=null;
@@ -69,7 +89,7 @@ self.onmessage=async event=>{
   try{
     // CPU/WASM works on phones and browsers without a graphics context too.
     try{let passes=0;detailed=await detailedFaces(bitmap,faces=>{add(faces);if(++passes%4===0||passes===1)publish('yunet');});galleryFaces=snapshotFaces();publish('yunet');}catch{}
-    if(!graphics()){await cpuFaces(bitmap,faces=>{add(faces);publish(detailed?'yunet+pico':'pico');},detailed&&found.length>0);publish(detailed?'yunet+pico':'pico',false);return;}
+    if(!graphics()){await verifiedCascadeFaces(bitmap,found,add);galleryFaces=detailed?snapshotFaces():null;publish(detailed?'yunet+verified-pico':'pico-manual',false);return;}
     const engine=await model(),width=bitmap.width,height=bitmap.height,regions=detectionRegions(width,height),tile=new OffscreenCanvas(1,1);
     let scanned=0;
     for(const region of regions){
@@ -87,8 +107,8 @@ self.onmessage=async event=>{
     tile.width=tile.height=1;galleryFaces=snapshotFaces();publish(detailed?'yunet+mediapipe':'mediapipe');
     // PICO also supplements successful model results: one large face must not
     // prevent a native-detail scan for smaller faces elsewhere in the photo.
-    try{await cpuFaces(bitmap,faces=>{add(faces.filter(face=>!found.some(other=>sameRegion(other.rect,face.rect))));publish(detailed?'yunet+mediapipe+pico':'mediapipe+pico');},found.length>0);}catch{}
-    publish(detailed?'yunet+mediapipe+pico':'mediapipe+pico',false);
-  }catch(error){hasGraphics=false;try{detector?.close();}catch{}detector=undefined;try{await cpuFaces(bitmap,faces=>{add(faces);publish('pico');});publish('pico',false);}catch{if(found.length)publish('mediapipe',false);else self.postMessage({id,error:String(error?.message||'Face detection is unavailable')});}}
+    try{await verifiedCascadeFaces(bitmap,found,add);}catch{}
+    galleryFaces=snapshotFaces();publish(detailed?'yunet+mediapipe+verified-pico':'mediapipe+verified-pico',false);
+  }catch(error){hasGraphics=false;try{detector?.close();}catch{}detector=undefined;try{await verifiedCascadeFaces(bitmap,found,add);if(detailed)galleryFaces=snapshotFaces();publish(detailed?'yunet+verified-pico':'manual',false);}catch{if(found.length)publish('mediapipe',false);else self.postMessage({id,error:String(error?.message||'Face detection is unavailable')});}}
   finally{bitmap.close();}
 };

@@ -1,11 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeYuNet,projectYuNet,sameDetection,suppressDetections,confirmYuNet} from '../public/assets/face-yunet.mjs';
+import {decodeYuNet,projectYuNet,sameDetection,suppressDetections,confirmYuNet,plausibleFaceLandmarks} from '../public/assets/face-yunet.mjs';
 import {sameRegion,mergeFaces} from '../public/assets/face-geometry.mjs';
 import {faceRect} from '../src/faces.mjs';
 import {detectionRegions} from '../public/assets/face-scan.mjs';
 
-const face=(x=.1,score=.7)=>({rect:{x,y:.2,width:.1,height:.1},score,landmarks:Array.from({length:5},(_,i)=>({x:x+.02+i*.012,y:.23+i*.008}))});
+const face=(x=.1,score=.7)=>({rect:{x,y:.2,width:.1,height:.1},score,landmarks:[[.25,.3],[.70,.3],[.48,.53],[.32,.75],[.65,.75]].map(([dx,dy])=>({x:x+dx*.1,y:.2+dy*.1}))});
 test('overlapping half-faces with distinct landmarks survive suppression while repeated detections merge',()=>{
  const front=face(),behind={...face(.13),rect:{...front.rect}},duplicate=structuredClone(front);duplicate.score=.6;
  assert.equal(sameRegion(front.rect,behind.rect),true);assert.equal(sameDetection(front,behind),false);
@@ -44,4 +44,13 @@ test('YuNet decoder uses the model BGR-grid output geometry and rejects invalid 
  outputs.bbox_8.data.set([.5,.5,Math.log(4),Math.log(5)],i*4);
  const [decoded]=decodeYuNet(outputs);assert.ok(Math.abs(decoded.rect.x-68)<1e-5);assert.ok(Math.abs(decoded.rect.y-80)<1e-5);assert.ok(Math.abs(decoded.rect.width-32)<1e-5);assert.equal(decoded.landmarks.length,5);
  outputs.bbox_8.data[i*4+2]=Infinity;assert.equal(decodeYuNet(outputs).length,0);
+});
+
+
+test('anatomical validation rejects collapsed or collinear hand and fabric proposals while retaining small profile faces',()=>{
+ const real=face(.1,.8);assert.equal(plausibleFaceLandmarks(real),true);
+ for(const landmarks of [Array(5).fill({x:.15,y:.25}),Array.from({length:5},(_,i)=>({x:.12+i*.01,y:.22+i*.01}))]){
+  const falsePositive={...real,landmarks};assert.equal(plausibleFaceLandmarks(falsePositive),false);const candidates=[];confirmYuNet(candidates,[falsePositive],1);assert.deepEqual(confirmYuNet(candidates,[falsePositive],2),[]);
+ }
+ const tiny={rect:{x:.4,y:.3,width:.002,height:.003},score:.8};tiny.landmarks=[[.34,.33],[.42,.34],[.55,.53],[.38,.75],[.55,.74]].map(([x,y])=>({x:tiny.rect.x+x*tiny.rect.width,y:tiny.rect.y+y*tiny.rect.height}));assert.equal(plausibleFaceLandmarks(tiny),true);
 });

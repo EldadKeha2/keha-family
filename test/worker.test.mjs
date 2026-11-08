@@ -1099,3 +1099,18 @@ test('face scans validate source revisions, stay durable, preserve concurrent re
   assert.equal((await(await f.call('/api/gallery/face-scan')).json()).pending,2);
  }finally{await f.close();}
 });
+
+test('manual all-faces confirmation persists, excludes partial and scan queues, supports undo and rejects stale tags',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await galleryPhoto(f,'Reviewed.jpg'),b=await galleryPhoto(f,'Unreviewed.jpg');await saveGalleryScan(f,a);await saveGalleryScan(f,b);
+  const review=(item,complete=true,extra={})=>f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{photoRevision:item.photoRevision||'original',tagsRevision:item.tagsRevision,complete,...extra}});
+  let response=await review(a);assert.equal(response.status,200);const done=await response.json();assert.equal(done.item.faceSummary.reviewed,true);assert.equal(done.item.faceSummary.partial,false);assert.equal(done.item.faceSummary.unmatched,0);assert.equal(done.item.tags.length,0,'confirmation never invents tags');
+  let partial=await(await f.call('/api/collections/gallery?filter=partial')).json();assert.deepEqual(partial.items.map(i=>i.id),[b.id]);assert.deepEqual(partial.filterCounts,{all:2,untagged:2,partial:1});
+  f.restart();assert.equal((await(await f.call('/api/media/'+a.id+'/faces')).json()).item.faceSummary.reviewed,true);
+  await saveGalleryScan(f,a,[...detectedGalleryFaces,{rect:{x:.3,y:.6,width:.1,height:.1},score:.99}]);assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,1,'a later automated scan cannot undo human confirmation');
+  f.database.prepare('DELETE FROM media_face_scans WHERE media_id=?').run(a.id);assert.ok(!(await(await f.call('/api/gallery/face-scan')).json()).items.some(i=>i.id===a.id),'confirmed photos stay out of rescanning even after model changes');
+  await saveGalleryScan(f,a);assert.equal((await review(a,false)).status,200);assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,2);
+  assert.equal((await review(a)).status,200);await f.call('/api/media/'+a.id+'/tag',{method:'POST',body:{personId:'yona',tagged:true}});assert.equal((await review(a)).status,409);assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,2,'changed tags require a new confirmation');
+  assert.equal((await review(b,true,{complete:'yes'})).status,400);assert.equal((await review(b,true,{photoRevision:'old'})).status,409);
+ }finally{await f.close();}
+});

@@ -17,7 +17,7 @@
   function start(){if(!eligible()||job||timer||finished)return;timer=setTimeout(()=>{timer=null;run();},250);}
   async function save(item,faces,signal){
     if(faces.complete===false||!Array.isArray(faces.galleryFaces))return null;
-    const {FACE_SCAN_VERSION}=await import('./face-coverage.mjs?v=2');
+    const {FACE_SCAN_VERSION}=await import('./face-coverage.mjs?v=3');
     const result=await request('api/media/'+item.id+'/faces/detection',{method:'POST',signal,body:JSON.stringify({photoRevision:item.photoRevision||'original',version:FACE_SCAN_VERSION,faces:faces.galleryFaces.map(({rect,score})=>({rect,score}))})});
     window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));return result;
   }
@@ -33,7 +33,7 @@
     try{
       const batch=await request('api/gallery/face-scan?after='+after,{signal:controller.signal});pending=batch.pending;
       if(!batch.items.length){finished=true;status();return;}
-      const {detectFaces}=await import('./face-detector.mjs?v=8');
+      const {detectFaces}=await import('./face-detector.mjs?v=9');
       for(const item of batch.items){
         if(!eligible()||controller.signal.aborted)break;
         try{

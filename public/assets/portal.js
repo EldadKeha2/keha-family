@@ -306,11 +306,11 @@
         return;
       }
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
-      if(!result.collection){if(result.item&&['tags','faces','face-detection'].includes(result.operation)){
+      if(!result.collection){if(result.item&&['tags','faces','face-detection','face-review'].includes(result.operation)){
         const collection=state.collections[kind],previous=collection.items.find(item=>item.id===result.item.id);
         if(kind==='gallery'&&collection.filterCounts&&previous){const delta=Number(!result.item.tags?.length)-Number(!previous.tags?.length);collection.filterCounts.untagged=Math.max(0,Math.min(collection.filterCounts.all,collection.filterCounts.untagged+delta));collection.filterCounts.partial=Math.max(0,(collection.filterCounts.partial||0)+Number(Boolean(result.item.faceSummary?.partial))-Number(Boolean(previous.faceSummary?.partial)));}
         collection.items=collection.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
-        if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&(galleryPage.filter!=='all'||result.operation==='face-detection')){revisions.gallery=null;refreshCollection('gallery',true);}
+        if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&(galleryPage.filter!=='all'||['face-detection','face-review'].includes(result.operation))){revisions.gallery=null;refreshCollection('gallery',true);}
       }return;}
       if(result.operation==='delete'){const key=captionKey(kind,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
       if(kind==='gallery'){

@@ -46,8 +46,22 @@ export function projectYuNet(face,region,size,drawn,flipped=false){
   const points=flipped?[1,0,2,4,3].map(i=>face.landmarks[i]):face.landmarks;
   return {rect:{x:x/size.width,y:y/size.height,width:(right-x)/size.width,height:(bottom-y)/size.height},score:face.score,landmarks:points.map(p=>({x:(region.x+(flipped?drawn.width-p.x:p.x)*sx)/size.width,y:(region.y+p.y*sy)/size.height}))};
 }
+export function plausibleFaceLandmarks(face){
+  const r=face.rect;if(!r||!Array.isArray(face.landmarks)||face.landmarks.length!==5||r.width<=0||r.height<=0)return false;
+  const p=face.landmarks.map(point=>({x:(point.x-r.x)/r.width,y:(point.y-r.y)/r.height}));
+  if(p.some(point=>!Number.isFinite(point.x)||!Number.isFinite(point.y)||point.x<-.4||point.x>1.4||point.y<-.4||point.y>1.4))return false;
+  const eye={x:p[1].x-p[0].x,y:p[1].y-p[0].y},eyeSpan=Math.hypot(eye.x,eye.y),mouthSpan=Math.hypot(p[4].x-p[3].x,p[4].y-p[3].y);
+  if(eyeSpan<.045||eyeSpan>1.25||mouthSpan<.025||mouthSpan>1.1)return false;
+  const eyes={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2},mouth={x:(p[3].x+p[4].x)/2,y:(p[3].y+p[4].y)/2};
+  const depth=point=>(eye.x*(point.y-eyes.y)-eye.y*(point.x-eyes.x))/eyeSpan;
+  const mouthDepth=depth(mouth),noseDepth=depth(p[2]);
+  // Use the eye axis, so tilted, profile, small and partly hidden faces remain
+  // valid. Collapsed or collinear "features" on hands and fabric do not.
+  return Math.abs(mouthDepth)>.10&&Math.abs(mouthDepth)<1.15&&noseDepth/mouthDepth>-.35&&noseDepth/mouthDepth<1.4;
+}
 export function confirmYuNet(candidates,faces,pass){
   for(const face of faces){
+    if(!plausibleFaceLandmarks(face))continue;
     let candidate=candidates.find(other=>sameDetection(other,face));
     if(!candidate){candidate={...face,passes:new Set()};candidates.push(candidate);}
     if(face.score>candidate.score)Object.assign(candidate,face);

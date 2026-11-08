@@ -43,7 +43,7 @@ function fixture(detected=[]){
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.find(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
- return {faces:window.FamilyFaces,stage,image,view,window,find,emit,get progress(){return progress;},async mount(id='photo',options={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[]},options);}};
+ return {faces:window.FamilyFaces,stage,image,view,window,find,emit,get progress(){return progress;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
 
@@ -92,4 +92,26 @@ test('only the partial gallery highlights missing faces and confirmed face label
  assert.equal(buttons.children.filter(button=>button.classList.contains('face-missing')).length,0);assert.ok(note.textContent.includes('✓'));
  f.faces.clear();assert.equal(f.find('face-missing-note'),undefined);await f.mount('ordinary-photo');
  assert.equal(f.find('face-missing-note'),undefined);assert.equal(f.find('face-hit-buttons').children.some(button=>button.classList.contains('face-missing')),false);f.faces.clear();
+});
+
+
+test('all-faces confirmation is available in ordinary and partial gallery photos, saves before hiding markers and supports undo',async()=>{
+ for(const highlightMissing of [false,true]){
+  const f=fixture([first,second]),requests=[];
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   requests.push({path,options});
+   if(path.endsWith('/review')){const body=JSON.parse(options.body);return Response.json({saved:true,operation:'face-review',item:{id:'reviewed',scope:'gallery',kind:'photo',tagsRevision:'tags-1',faceSummary:{reviewed:body.complete,partial:!body.complete}}});}
+   return Response.json({faces:[],item:{id:'reviewed',scope:'gallery',kind:'photo',tagsRevision:'tags-1'}});
+  };
+  await f.mount('reviewed',{highlightMissing},{scope:'gallery',tagsRevision:'tags-1'});
+  const button=f.find('face-review-button'),hits=f.find('face-hit-buttons');assert.ok(button);assert.equal(button.textContent,'כל הפרצופים תויגו');assert.equal(hits.children.length,2);
+  f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));
+  const review=requests.find(r=>r.path.endsWith('/review'));assert.deepEqual(JSON.parse(review.options.body),{complete:true,photoRevision:'original',tagsRevision:'tags-1'});assert.equal(hits.children.length,0);assert.match(button.textContent,/ביטול/);assert.equal(button.disabled,false);
+  f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(hits.children.length,2);assert.equal(button.textContent,'כל הפרצופים תויגו');
+ }
+});
+
+test('a failed completion confirmation leaves the photo markers and retry button intact',async()=>{
+ const f=fixture([first]);f.window.FamilyI18n.fetch=async(path)=>path.endsWith('/review')?Response.json({error:'Connection lost'},{status:503}):Response.json({faces:[]});
+ await f.mount('retry',{}, {scope:'gallery'});const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(button.disabled,false);assert.match(f.find('face-review-status').textContent,/Connection lost/);
 });

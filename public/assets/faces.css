@@ -54,3 +54,5 @@
 .media-stage.face-adjusting{touch-action:none;cursor:crosshair}
 .media-stage.face-adjusting .face-hit{pointer-events:none}
 @media(max-width:700px){.face-picker{width:264px;max-height:calc(100dvh - 16px)}.face-person-results{max-height:160px}.face-name{font-size:calc(14px * var(--a11y-text-scale,1));padding:5px 9px}#mediaViewer .face-picker-actions button{min-height:40px}.face-picker .face-current-name{font-size:calc(13px * var(--a11y-text-scale,1))}}
+
+.face-review{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin:6px 0;border:1px solid #d3c695;border-radius:12px;background:#fff8df;color:#463d30}.face-review-button{font:inherit;font-weight:700;padding:9px 15px;min-height:42px;border:1px solid #7c8d58;border-radius:10px;background:#f9fbf0;color:#38532e;cursor:pointer;touch-action:manipulation}.face-review-button[aria-pressed=true]{background:#dfead2}.face-review-button:disabled{opacity:.65;cursor:wait}.face-review-status{font-size:12px;line-height:1.4}.face-review-button:focus-visible{outline:3px solid #d89132;outline-offset:2px}
