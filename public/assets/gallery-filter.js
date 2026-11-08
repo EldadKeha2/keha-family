@@ -26,7 +26,7 @@ function fillPeople(){
 }
 function apply(){clearSelection();window.FamilyPortal.refineGallery(criteria());}
 function clearCriteria(){state.people.clear();state.families.clear();if(ready){$('galleryPersonSearch').value='';fillPeople();fillFamilies();}}
-function reset(){state.open=false;clearCriteria();clearSelection();}
+function reset(){state.open=false;for(const id of ['galleryPeopleChoices','galleryFamily2Choices','galleryFamily3Choices','galleryFamily4Choices'])$(id).open=false;clearCriteria();clearSelection();}
 function category(filter){if(filter!=='all')reset();render();}
 function render(){
   if(!ready)return;
@@ -34,6 +34,11 @@ function render(){
   const collection=window.FamilyPortal.getCollection('gallery'),q=window.FamilyPortal.galleryQuery(),p=collection.pagination;
   state.resultsReady=Boolean(p&&(p.person||'')===q.person&&(p.unit||'')===q.unit&&(p.query||'')===q.query.trim());
   toggle.hidden=!all;toggle.setAttribute('aria-expanded',String(open));$('galleryFilterPanel').hidden=!open;
+  $('galleryPeopleChoiceCount').textContent=state.people.size?'('+state.people.size+')':'';
+  for(const generation of [2,3,4]){
+    const count=[...state.families].filter(id=>window.FAMILY_DATA.units[id]?.generation===generation).length;
+    $('galleryFamily'+generation+'ChoiceCount').textContent=count?'('+count+')':'';
+  }
   for(const id of ['gallerySelectionTop','gallerySelectionBottom']){
     const bar=$(id);bar.hidden=!open;
     bar.querySelector('[data-gallery-selected-count]').textContent=tr('נבחרו ','Selected: ')+state.selected.size;

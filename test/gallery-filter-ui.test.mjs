@@ -31,13 +31,17 @@ for(const english of [false,true])test('checkboxes keep independent people and f
  f.change('person','yona',true);f.change('person','ruti',true);
  f.change('family','u-matan-g',true);f.change('family','u-moran',true);f.change('family','u-becker',true);
  assert.equal(f.query().person,'ruti,yona');assert.equal(f.query().unit,'u-becker,u-matan-g,u-moran');
+ assert.equal(f.get('galleryPeopleChoiceCount').textContent,'(2)');
+ for(const generation of [2,3,4])assert.equal(f.get('galleryFamily'+generation+'ChoiceCount').textContent,'(1)');
  f.search(english?'Eldad':'אלדד');
  const html=f.get('galleryPersonFilter').innerHTML;
  assert.match(html,/data-gallery-person="eldad"/);assert.match(html,/data-gallery-person="yona" checked/);assert.match(html,/data-gallery-person="ruti" checked/);
  f.change('person','eldad',true);f.change('person','yona',false);f.change('family','u-moran',false);
  assert.equal(f.query().person,'eldad,ruti');assert.equal(f.query().unit,'u-becker,u-matan-g');
+ assert.equal(f.get('galleryFamily3ChoiceCount').textContent,'');
  f.reset();assert.equal(f.query().person,'');assert.equal(f.query().unit,'');
  for(const id of ['galleryPersonFilter','galleryFamily2','galleryFamily3','galleryFamily4'])assert.doesNotMatch(f.get(id).innerHTML,/ checked/);
  assert.equal(f.get('galleryPersonSearch').value,'');
- f.change('person','ruti',true);await f.open();assert.equal(f.query().person,'');assert.equal(f.get('galleryFilterPanel').hidden,true);
+ f.change('person','ruti',true);f.get('galleryPeopleChoices').open=true;f.get('galleryFamily2Choices').open=true;await f.open();assert.equal(f.query().person,'');assert.equal(f.get('galleryFilterPanel').hidden,true);
+ assert.equal(f.get('galleryPeopleChoices').open,false);assert.equal(f.get('galleryFamily2Choices').open,false);assert.equal(f.get('galleryPeopleChoiceCount').textContent,'');
 });

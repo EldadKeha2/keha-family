@@ -41,7 +41,7 @@
   <link rel="stylesheet" href="assets/differences.css?v=a11y1">
   <link rel="stylesheet" href="assets/nursery.css?v=a11y1">
   <link rel="stylesheet" href="assets/faces.css?v=compact-filters-v1">
-  <link rel="stylesheet" href="assets/gallery-filter.css?v=2">
+  <link rel="stylesheet" href="assets/gallery-filter.css?v=3">
   <link rel="stylesheet" href="assets/photo-collections.css?v=1">
   <link rel="stylesheet" href="assets/navigation.css?v=a11y1">
   <link rel="stylesheet" href="assets/accessibility.css?v=a11y1">
@@ -63,7 +63,7 @@
   <script src="assets/photo-collections.js?v=1" defer></script>
   <script src="assets/media.js?v=photo-refresh-v1" defer></script>
   <script src="assets/portal.js?v=photo-refresh-v1" defer></script>
-  <script src="assets/gallery-filter.js?v=2" type="module"></script>
+  <script src="assets/gallery-filter.js?v=3" type="module"></script>
   <script src="assets/updates.js" defer></script>
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
   <script src="assets/people.js?v=friends-v1" defer></script>
@@ -130,14 +130,14 @@
         <section id="memorialView" class="portal-view remembrance-view" aria-label="לזכרם" hidden><div id="memorialContent"></div></section>
         <section id="updatesView" class="portal-view updates-view" aria-label="עדכונים" hidden><div id="updatesContent"></div></section>
         <section id="galleryView" class="portal-view compact-gallery-view" aria-label="הגלריה" hidden>
-          <div class="collection-heading"><div><span class="small-eyebrow">רגעים קטנים, זיכרונות גדולים</span><h3 class="compact-gallery-title">הגלריה המשפחתית</h3><span class="collection-count" id="sharedGalleryCount"></span></div><button class="primary-button" data-upload-collection="gallery">＋ הוספת תמונות</button></div>
+          <div class="collection-heading"><span class="collection-count" id="sharedGalleryCount"></span><button class="primary-button" data-upload-collection="gallery">＋ הוספת תמונות</button></div>
           <div class="gallery-category-row"><div class="archive-filters gallery-tag-filters" aria-label="סינון תמונות בגלריה"><button type="button" data-gallery-filter="all" aria-pressed="true">הכל</button><button type="button" data-gallery-filter="untagged" aria-pressed="false">ללא תיוג</button><button type="button" data-gallery-filter="partial" aria-pressed="false">תיוג חלקי</button><button type="button" data-gallery-filter="complete" aria-pressed="false">תיוג מלא</button></div><button type="button" class="gallery-refine-toggle" id="galleryFilterToggle" aria-label="סינון ובחירת תמונות" aria-expanded="false" aria-controls="galleryFilterPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8Z"/></svg><span>סינון</span></button></div>
           <section class="gallery-filter-panel" id="galleryFilterPanel" aria-label="סינון ובחירת תמונות" hidden>
             <div class="gallery-refine-fields">
-              <fieldset class="gallery-filter-field gallery-person-field"><legend>אנשים</legend><label class="visually-hidden" for="galleryPersonSearch">חיפוש לפי שם…</label><input type="search" id="galleryPersonSearch" placeholder="חיפוש לפי שם…" autocomplete="off"><div class="gallery-checkbox-list" id="galleryPersonFilter"></div></fieldset>
-              <fieldset class="gallery-filter-field"><legend>משפחה דור שני</legend><div class="gallery-checkbox-list" id="galleryFamily2"></div></fieldset>
-              <fieldset class="gallery-filter-field"><legend>משפחה דור שלישי</legend><div class="gallery-checkbox-list" id="galleryFamily3"></div></fieldset>
-              <fieldset class="gallery-filter-field"><legend>משפחה דור רביעי</legend><div class="gallery-checkbox-list" id="galleryFamily4"></div></fieldset>
+              <details class="gallery-filter-field gallery-person-field" id="galleryPeopleChoices" name="gallery-filter-choices"><summary><span>אנשים</span><span class="gallery-choice-count" id="galleryPeopleChoiceCount"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gallery-filter-options"><label class="visually-hidden" for="galleryPersonSearch">חיפוש לפי שם…</label><input type="search" id="galleryPersonSearch" placeholder="חיפוש לפי שם…" autocomplete="off"><div class="gallery-checkbox-list" id="galleryPersonFilter"></div></div></details>
+              <details class="gallery-filter-field" id="galleryFamily2Choices" name="gallery-filter-choices"><summary><span>משפחה דור שני</span><span class="gallery-choice-count" id="galleryFamily2ChoiceCount"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gallery-filter-options"><div class="gallery-checkbox-list" id="galleryFamily2"></div></div></details>
+              <details class="gallery-filter-field" id="galleryFamily3Choices" name="gallery-filter-choices"><summary><span>משפחה דור שלישי</span><span class="gallery-choice-count" id="galleryFamily3ChoiceCount"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gallery-filter-options"><div class="gallery-checkbox-list" id="galleryFamily3"></div></div></details>
+              <details class="gallery-filter-field" id="galleryFamily4Choices" name="gallery-filter-choices"><summary><span>משפחה דור רביעי</span><span class="gallery-choice-count" id="galleryFamily4ChoiceCount"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><div class="gallery-filter-options"><div class="gallery-checkbox-list" id="galleryFamily4"></div></div></details>
             </div>
             <div class="gallery-filter-note"><p>כל סימון מוסיף תמונות של האדם או המשפחה. משפחה כוללת בני זוג וצאצאים.</p><button type="button" id="clearGalleryFilter">איפוס הסינון</button></div>
             <p class="gallery-selection-hint">הקישו על תמונה לבחירה או לביטול. ״בחר הכל״ כולל גם את העמודים הבאים.</p>
