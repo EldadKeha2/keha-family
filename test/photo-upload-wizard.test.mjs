@@ -12,7 +12,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{}}={}){
  const nodes=new Map(),all=[],mounts=[],uploaded=[],closed=[];
  const people=[{id:'yona',name:'יונה',nameEn:'Yona'},{id:'shlomo',name:'שלמה',nameEn:'Shlomo'}];
  class Node extends EventTarget{
-  constructor(tag='div',id=''){super();this.tagName=tag;this.id=id;this.dataset={};this.hidden=false;this.disabled=false;this.checked=false;this.value='';this.style={setProperty:(k,v)=>{this.style[k]=v;}};this.classes=new Set();this.classList={toggle:(k,v)=>v?this.classes.add(k):this.classes.delete(k)};this.width=1000;this.height=800;all.push(this);}
+  constructor(tag='div',id=''){super();this.tagName=tag;this.id=id;this.dataset={};this.hidden=false;this.disabled=false;this.checked=false;this.value='';this.style={setProperty:(k,v)=>{this.style[k]=v;},removeProperty:k=>{delete this.style[k];}};this.classes=new Set();this.classList={toggle:(k,v)=>v?this.classes.add(k):this.classes.delete(k)};this.width=1000;this.height=800;all.push(this);}
   set innerHTML(value){this.html=value;for(const match of value.matchAll(/<([a-z0-9]+)[^>]*\bid="([^"]+)"/g))if(!nodes.has(match[2]))nodes.set(match[2],new Node(match[1],match[2]));}
   get innerHTML(){return this.html||'';}
   setAttribute(key,value){this[key]=value;}
@@ -40,6 +40,23 @@ function fixture({desktop=true,english=false,onUpload=async()=>{}}={}){
 }
 const image=name=>new File(['original pixels '+name],name,{type:'image/jpeg',lastModified:1234});
 async function details(entry){const bytes=new Uint8Array(await entry.payload.body.arrayBuffer()),n=Number(entry.payload.headers[metadata.PHOTO_METADATA_HEADER]);return {metadata:metadata.decodeUploadMetadata(bytes.subarray(0,n)),pixels:bytes.subarray(n)};}
+
+test('desktop faces can be tagged immediately and resume automatically after cropping or resetting',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ assert.equal(f.node('photoEditTaggingToggle').hidden,true);assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);assert.equal(f.node('photoUploadEditor').classes.has('is-face-tagging'),true);
+ await f.click('CropToggle');assert.equal(f.mounts.at(-1).options.adapter.enabled(),false);assert.equal(f.node('photoUploadEditor').classes.has('is-face-tagging'),false);
+ await f.click('Reset');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);assert.equal(f.node('photoUploadEditor').classes.has('is-face-tagging'),true);
+ await f.click('Next');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);await f.click('Cancel');assert.equal(await result,null);
+});
+test('desktop descriptions start on one line, expand for longer text and shrink when cleared; phones retain two rows',async()=>{
+ for(const desktop of [true,false]){
+  const f=fixture({desktop}),{result}=await f.begin([image('one.jpg')]),input=f.node('photoEditCaption');
+  Object.defineProperty(input,'scrollHeight',{get(){return this.value.length>80?116:36;}});
+  assert.equal(input.rows,desktop?1:2);input.value='A longer description. '.repeat(12);input.dispatchEvent(new Event('input'));
+  assert.equal(input.rows,desktop?1:2);assert.equal(input.style.height,desktop?'118px':undefined);
+  input.value='';input.dispatchEvent(new Event('input'));assert.equal(input.style.height,desktop?'38px':undefined);await f.click('Cancel');assert.equal(await result,null);
+ }
+});
 
 test('uploading only the current photo leaves other edits in the wizard and never uploads it twice with Upload all',async()=>{
  const f=fixture(),files=[image('one.jpg'),image('two.jpg'),image('three.jpg')],{result}=await f.begin(files);

@@ -93,7 +93,7 @@
     fitZoom(c);
   }
   function paint(c){
-    if(!live(c))return;c.faces=c.geom.mergeFaces(c.saved,c.reviewed?[]:c.detected.filter(face=>!c.ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));if(c.reviewButton){const label=c.reviewed?tr('כל הפרצופים תויגו · לחצו לביטול האישור','All faces tagged · Click to undo confirmation'):tr('אישור שכל הפרצופים תויגו','Confirm all faces are tagged');c.reviewButton.setAttribute('aria-label',label);c.reviewButton.title=label;c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));}c.buttons.replaceChildren();
+    if(!live(c))return;c.faces=c.geom.mergeFaces(c.saved,c.reviewed?[]:c.detected.filter(face=>!c.ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));if(c.reviewButton){const label=c.reviewed?tr('כל הפרצופים תויגו · לחצו לביטול האישור','All faces tagged · Click to undo confirmation'):tr('אישור שכל הפרצופים תויגו','Confirm all faces are tagged');c.reviewButton.setAttribute('aria-label',label);c.reviewButton.title=label;c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));if(c.reviewText)c.reviewText.textContent=c.reviewed?tr('כל הפרצופים תויגו','All faces tagged'):tr('אישור תיוג מלא','Confirm all tagged');}c.buttons.replaceChildren();
     for(const face of c.faces){
       const button=document.createElement('button');button.type='button';button.className='face-hit';if(c.highlightMissing&&!face.person)button.classList.add('face-missing');button.dataset.faceId=face.id;button.setAttribute('aria-label',face.person?tr('פנים בתמונה: ','Face in photo: ')+photoName(face):tr('תיוג הפנים האלה','Tag this face'));
       Object.assign(button.style,{left:face.rect.x*100+'%',top:face.rect.y*100+'%',width:face.rect.width*100+'%',height:face.rect.height*100+'%'});
@@ -204,7 +204,7 @@
     finally{c.saving=false;}
   }
   function point(c,event,clamp=false){if(!imageWidth(c.image))return null;const r=imageArea(c);if(!clamp&&(event.clientX<r.x||event.clientX>r.x+r.width||event.clientY<r.y||event.clientY>r.y+r.height))return null;return {x:Math.max(0,Math.min(1,(event.clientX-r.x)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.y)/r.height))};}
-  async function mount(stage,image,item,{highlightMissing=false,adapter=null,dialog:hostDialog,reviewHost=null,zoom=true,detectionImage=null}={}){
+  async function mount(stage,image,item,{highlightMissing=false,adapter=null,dialog:hostDialog,reviewHost=null,reviewLabel=false,zoom=true,detectionImage=null}={}){
     clear();if(item.kind!=='photo'||!item.id||!window.FamilyApp?.apiEnabled)return;
     const c={serial:++serial,stage,image,item,adapter,highlightMissing,reviewed:Boolean(item.faceSummary?.reviewed),dialog:hostDialog||document.getElementById('mediaViewer'),events:new AbortController(),saved:[],detected:[],ignored:[],adjusted:new Map(),faces:[],active:null,popup:null,ready:false,searchSequence:0,saving:false,adjust:false,drag:null,skipClick:false};current=c;window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:true}}));
     c.geom=await helpers();if(!live(c))return;
@@ -217,6 +217,7 @@
     if(adapter||item.scope==='gallery'||item.collections?.includes('gallery')){
       c.reviewButton=document.createElement('button');c.reviewButton.type='button';c.reviewButton.className='face-review-button';
       c.reviewButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5"/><path d="M7 8h.01M13 8h.01M7 11.5a3.3 3.3 0 0 0 5.5.7"/><circle class="face-review-badge" cx="18" cy="17.5" r="5.5"/><path class="face-review-check" d="m15.5 17.5 1.7 1.7 3.3-3.5"/></svg>';
+      if(reviewLabel){c.reviewText=document.createElement('span');c.reviewText.className='face-review-text';c.reviewButton.append(c.reviewText);}
       if(reviewHost)reviewHost.append(c.reviewButton);else document.getElementById('mediaViewerTitle').insertBefore(c.reviewButton,document.getElementById('editOpenedPhoto'));
       c.reviewStatus=document.createElement('span');c.reviewStatus.className='face-review-status';c.reviewStatus.hidden=true;c.reviewStatus.setAttribute('role','status');stage.before(c.reviewStatus);
       on(c.reviewButton,'click',async()=>{

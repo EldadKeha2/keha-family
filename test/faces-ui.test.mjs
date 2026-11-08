@@ -53,10 +53,10 @@ test('the upload wizard reuses face picking, frame editing and completion withou
  const snapshot=()=>({item:{id:'upload-local',kind:'photo',faceSummary:{reviewed}},faces:[face]});
  const adapter={enabled:()=>true,load:async()=>snapshot(),findPeople:async()=>[],mapDetections:found=>found,save:async p=>{requests.push(p);face={...face,rect:p.rect};return {...snapshot(),face};},review:async p=>{reviewed=p.complete;return snapshot();}};
  f.window.FamilyI18n.fetch=async()=>{throw Error('Drafts must never write to the media API');};f.window.FamilyTags.flush=async()=>{throw Error('Drafts have no server tags');};f.image.tagName='canvas';f.image.complete=false;
- await f.mount('upload-local',{adapter,reviewHost:f.title,zoom:false,detectionImage:originalBitmap});assert.equal(f.detectionImage,originalBitmap);assert.equal(f.find('face-zoom-toolbar'),undefined);
+ await f.mount('upload-local',{adapter,reviewHost:f.title,reviewLabel:true,zoom:false,detectionImage:originalBitmap});assert.equal(f.detectionImage,originalBitmap);assert.equal(f.find('face-zoom-toolbar'),undefined);assert.match(f.find('face-review-text').textContent,/אישור תיוג מלא/);
  const area=f.image.getBoundingClientRect(),selection=f.find('face-selection');f.emit(f.stage,'click',{detail:1,clientX:area.left+.506*area.width,clientY:area.top+.408*area.height});assert.ok(f.find('face-popover face-picker'));
  const handle=selection.children.find(node=>node.dataset.faceHandle==='se');f.emit(f.stage,'pointerdown',{target:handle,pointerId:1,clientX:area.left+.512*area.width,clientY:area.top+.416*area.height});f.emit(f.stage,'pointermove',{target:handle,pointerId:1,clientX:area.left+.52*area.width,clientY:area.top+.43*area.height});f.emit(f.stage,'pointerup',{target:handle,pointerId:1});await new Promise(resolve=>setImmediate(resolve));await f.faces.flush();assert.equal(requests.length,1);assert.equal(requests[0].personId,'yona');assert.ok(requests[0].rect.width>saved.rect.width);
- const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(button['aria-pressed'],'true');assert.equal(reviewed,true);f.faces.clear();
+ const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(button['aria-pressed'],'true');assert.equal(reviewed,true);assert.match(f.find('face-review-text').textContent,/כל הפרצופים תויגו/);f.faces.clear();
 });
 
 test('face names open real profiles on desktop and touch; free names and unknown people stay plain text',async()=>{
