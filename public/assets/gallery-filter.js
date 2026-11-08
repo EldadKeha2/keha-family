@@ -81,6 +81,12 @@ function download(){
 }
 function init(){
   if(!$('galleryFilterToggle'))return;
+  const filterButton=$('galleryFilterToggle'),filterHome=filterButton.parentElement,mobileDock=$('galleryMobileFilterDock');
+  if(filterHome&&mobileDock&&window.matchMedia){
+    const mobile=window.matchMedia('(max-width:700px)');
+    const placeFilter=()=>{(mobile.matches?mobileDock:filterHome).append(filterButton);};
+    placeFilter();mobile.addEventListener('change',placeFilter);
+  }
   const barHTML='<button type="button" data-gallery-select-all>'+tr('בחר הכל','Select all')+'</button><button type="button" data-gallery-clear-selection>'+tr('ביטול הבחירה','Clear selection')+'</button><span class="gallery-selection-count" data-gallery-selected-count></span><button type="button" class="gallery-download-selected" data-gallery-download>'+downloadIcon+'<span>'+tr('הורדת הנבחרות','Download selected')+'</span></button>';
   for(const id of ['gallerySelectionTop','gallerySelectionBottom'])$(id).innerHTML=barHTML;
   $('gallerySelectionTop').querySelector('[data-gallery-selected-count]').setAttribute('aria-live','polite');

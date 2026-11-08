@@ -1,4 +1,6 @@
 .gallery-header-upload{display:none}
+.gallery-pager-wrap{position:relative;display:flow-root}
+.gallery-mobile-filter-dock{display:none}
 .gallery-pager[data-gallery-pager]{display:grid;grid-template-columns:auto minmax(145px,220px) minmax(0,1fr) auto;align-items:center;gap:12px}
 .gallery-pager .gallery-page-size{display:flex;align-items:center;gap:7px;min-width:0}
 .gallery-page-size>span{display:flex;flex-direction:column;line-height:1.15;text-align:center}
@@ -31,4 +33,21 @@
   body[data-active-view=gallery] .workspace-actions,body[data-active-view=gallery] #galleryView>.collection-heading{display:none}
   body[data-active-view=gallery] .gallery-header-upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:49px;min-width:65px;padding:6px 8px;font-size:13px;line-height:1.25}
   body[data-active-view=gallery] #galleryView{padding-top:0}
+}
+@media(max-width:700px){
+  body[data-active-view=gallery] .gallery-category-row{grid-template-columns:1fr}
+  body[data-active-view=gallery] .gallery-tag-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  body[data-active-view=gallery] .gallery-tag-filters button{min-width:0;padding-inline:6px;gap:4px;font-size:calc(13px * var(--a11y-text-scale,1));white-space:nowrap}
+  .gallery-pager-wrap>.gallery-pager{margin-top:0}
+  .gallery-pager-wrap [data-gallery-page-label]{padding-inline-end:46px}
+  .gallery-mobile-filter-dock{display:block;position:absolute;inset-inline-end:0;bottom:15px}
+  .gallery-mobile-filter-dock .gallery-refine-toggle{box-sizing:border-box;width:40px;height:36px;min-height:36px;padding:7px}
+  .gallery-mobile-filter-dock .gallery-refine-toggle span{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+  .gallery-pager-wrap:has(>.gallery-pager[hidden]) .gallery-mobile-filter-dock{position:static;display:flex;justify-content:flex-end;padding-bottom:6px}
+  .gallery-pager-wrap:not(:has(.gallery-refine-toggle:not([hidden]))) [data-gallery-page-label]{padding-inline-end:0}
+  html[data-a11y-text] body[data-active-view=gallery] .gallery-tag-filters{grid-template-columns:1fr}
+}
+@media(max-width:360px){
+  body[data-active-view=gallery] .gallery-tag-filters button{font-size:calc(11.5px * var(--a11y-text-scale,1));padding-inline:4px}
+  body[data-active-view=gallery] .gallery-tag-filters button::before{width:14px;height:14px;flex-basis:14px}
 }

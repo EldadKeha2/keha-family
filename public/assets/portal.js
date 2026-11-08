@@ -90,7 +90,7 @@
       for(const button of document.querySelectorAll('[data-gallery-filter]')){
         const filter=button.dataset.galleryFilter,count=collection.filterCounts?.[filter];
         button.setAttribute('aria-pressed',String(filter===galleryPage.filter));
-        button.textContent=I18n.t(filter==='complete'?'תיוג מלא':filter==='partial'?'תיוג חלקי':filter==='untagged'?'ללא תיוג':'הכל')+(Number.isInteger(count)?' ('+count+')':'');
+        button.textContent=I18n.t(filter==='complete'?'תיוג מלא':filter==='partial'?'תיוג חלקי':filter==='untagged'?'ללא תיוג':'כל התמונות')+(Number.isInteger(count)?' ('+count+')':'');
       }
       const empty=$('sharedGalleryEmpty');
       empty.querySelector('h3').textContent=I18n.t(complete?'אין עדיין תמונות שסומנו כמתויגות מלא':partial?'לא נמצאו תמונות מתויגות חלקית':untagged?'לא נמצאו תמונות לא מתויגות':galleryPage.person||galleryPage.unit||galleryPage.labels?'לא נמצאו תמונות בסינון הזה':galleryPage.query?'לא נמצאו תמונות בחיפוש הזה':'כל רגע משפחתי מתחיל בתמונה');
