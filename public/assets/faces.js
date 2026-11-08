@@ -12,6 +12,18 @@
   const desktopResize=()=>!touchMode();
   const live=c=>current===c&&!c.events.signal.aborted;
   const photoName=face=>face.person?I.personName(face.person):'';
+  const profileFor=face=>{const person=window.FamilyApp?.getPerson?.(face.personId||face.person?.id);return person&&!person.extra&&!face.person?.extra?person:null;};
+  function nameHTML(face){
+    const profile=profileFor(face),name=safe(photoName(face));
+    return profile?`<a class="face-profile-link" data-face-profile href="#person/${encodeURIComponent(profile.id)}" dir="auto" aria-label="${safe(tr('פתיחת הפרופיל של ','Open the profile of ')+photoName(face))}">${name}</a>`:`<span dir="auto">${name}</span>`;
+  }
+  function bindProfile(c,host,face){
+    const profile=profileFor(face);if(!profile)return;
+    host.querySelector('[data-face-profile]').addEventListener('click',event=>{
+      if(event.button>0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+      event.preventDefault();event.stopPropagation();if(live(c)&&profileFor(face))window.FamilyApp.openPerson(profile.id);
+    });
+  }
   async function request(path,options={}){
     const response=await I.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
     let result;try{result=await response.json();}catch{throw Error(tr('לא התקבל אישור מהשרת. נסו שוב.','No confirmation was received. Please try again.'));}
@@ -20,6 +32,11 @@
   function announce(c,message){if(live(c))c.status.textContent=message;}
   function closePopup(c){
     clearTimeout(c.labelTimer);c.labelTimer=null;c.popup?.remove();c.popup=null;c.active=null;if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
+  }
+  function keepLabel(c){clearTimeout(c.labelTimer);c.labelTimer=null;}
+  function dismissLabelSoon(c){
+    if(c.labelTimer||!c.popup?.classList.contains('face-name'))return;const bubble=c.popup;
+    c.labelTimer=setTimeout(()=>{c.labelTimer=null;if(live(c)&&c.popup===bubble&&!bubble.contains(document.activeElement))closePopup(c);},250);
   }
   function clear(){
     const c=current;if(!c)return;current=null;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);c.popup?.remove();c.layer?.remove();c.guide?.remove();c.status?.remove();c.toolbar?.remove();c.missingNote?.remove();c.reviewButton?.remove();c.reviewStatus?.remove();c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom');window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
@@ -34,6 +51,10 @@
   function place(c){
     if(!live(c)||!c.image.naturalWidth)return;const image=imageArea(c),stage=(c.surface||c.stage).getBoundingClientRect();
     Object.assign(c.hits.style,{left:(image.x-stage.left)+'px',top:(image.y-stage.top)+'px',width:image.width+'px',height:image.height+'px'});
+    for(const {node,face}of c.annotationNodes||[]){
+      node.style.maxWidth=Math.min(200,image.width)+'px';const r=node.getBoundingClientRect();
+      Object.assign(node.style,{left:Math.max(0,Math.min(image.width-r.width,(face.rect.x+face.rect.width/2)*image.width-r.width/2))+'px',top:Math.max(0,face.rect.y*image.height-r.height-3)+'px'});
+    }
     if(c.active&&!c.selection.hidden)Object.assign(c.selection.style,{left:c.active.rect.x*100+'%',top:c.active.rect.y*100+'%',width:c.active.rect.width*100+'%',height:c.active.rect.height*100+'%'});
     if(c.popup&&c.active){
       const v=viewport(),r=c.popup.getBoundingClientRect(),p=c.geom.popoverPosition(screenFace(c,c.active),{width:r.width||270,height:r.height||180},v);
@@ -74,7 +95,7 @@
       const button=document.createElement('button');button.type='button';button.className='face-hit';if(c.highlightMissing&&!face.person)button.classList.add('face-missing');button.dataset.faceId=face.id;button.setAttribute('aria-label',face.person?tr('פנים בתמונה: ','Face in photo: ')+photoName(face):tr('תיוג הפנים האלה','Tag this face'));
       Object.assign(button.style,{left:face.rect.x*100+'%',top:face.rect.y*100+'%',width:face.rect.width*100+'%',height:face.rect.height*100+'%'});
       button.addEventListener('pointerenter',event=>{if(!touchMode(event)&&face.person&&!c.popup?.classList.contains('face-picker'))showLabel(c,face,false);},{signal:c.events.signal});
-      button.addEventListener('pointerleave',event=>{if(!touchMode(event)&&c.popup?.classList.contains('face-name'))closePopup(c);},{signal:c.events.signal});
+      button.addEventListener('pointerleave',event=>{if(!touchMode(event)&&c.popup?.classList.contains('face-name')&&!c.popup.contains(event.relatedTarget))dismissLabelSoon(c);},{signal:c.events.signal});
       button.addEventListener('focus',()=>{if(face.person&&!c.popup?.classList.contains('face-picker'))showLabel(c,face,touchMode());},{signal:c.events.signal});
       button.addEventListener('blur',event=>{if(!c.popup?.contains(event.relatedTarget)&&c.popup?.classList.contains('face-name'))closePopup(c);},{signal:c.events.signal});
       c.buttons.append(button);
@@ -82,7 +103,18 @@
     if(c.missingNote)c.missingNote.hidden=c.reviewed;
     if(c.missingNote&&c.reviewed)c.missingNote.textContent='';
     else if(c.missingNote){const count=c.faces.filter(face=>!face.person).length;c.missingNote.textContent=count?tr('פנים ללא תיוג: ','Faces without labels: ')+count+tr(' · לחצו על המסגרת והוסיפו שם.',' · Select a frame and add a name.'):c.faces.length?tr('כל הפנים שזוהו מתויגות ✓','All detected faces are labelled ✓'):tr('מזהים פנים בתמונה…','Finding faces in the photo…');}
-    if(c.ignoreUndo)c.ignoreUndo.hidden=!c.ignored.length;place(c);
+    if(c.ignoreUndo)c.ignoreUndo.hidden=!c.ignored.length;paintAnnotations(c);place(c);
+  }
+  function paintAnnotations(c){
+    if(!live(c)||!c.annotations)return;c.annotations.replaceChildren();c.annotationNodes=[];
+    const options=window.FamilyPhotoDate?.overlays?.(c.item.id);if(!options?.showNames&&!options?.showAges)return;
+    for(const face of c.faces){
+      if(!face.person)continue;const age=options.showAges?window.FamilyPhotoDate.ageFor(face.person,c.item):null;
+      if(!options.showNames&&!age)continue;
+      const node=document.createElement('div');node.className='face-visible-label';node.dataset.faceId=face.id;node.dir=I.isEnglish?'ltr':'rtl';
+      node.innerHTML=(options.showNames?nameHTML(face):'')+(age?`<span class="face-visible-age" dir="auto" title="${safe(age.title)}">${safe(age.text)}</span>`:'');
+      if(options.showNames)bindProfile(c,node,face);c.annotations.append(node);c.annotationNodes.push({node,face});
+    }
   }
   function apply(c,faces){
     c.saved=faces;if(c.active){const updated=faces.find(face=>face.id===c.active.id);if(updated)c.active=updated;else if(c.active.person&&!c.saving)closePopup(c);}
@@ -98,7 +130,11 @@
   function showLabel(c,face,touch){
     if(!live(c)||!face.person)return;closePopup(c);c.active=face;
     const bubble=document.createElement('div');bubble.className='face-popover face-name';bubble.setAttribute('role','group');bubble.setAttribute('aria-label',tr('מי בתמונה','Who is in the photo'));bubble.dir=I.isEnglish?'ltr':'rtl';
-    bubble.innerHTML=`<span dir="auto">${safe(photoName(face))}</span>${touch?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:''}`;
+    bubble.innerHTML=nameHTML(face)+(touch?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:'');bindProfile(c,bubble,face);
+    bubble.addEventListener('pointerenter',()=>keepLabel(c));
+    bubble.addEventListener('pointerleave',event=>{if(!touchMode(event))dismissLabelSoon(c);});
+    bubble.addEventListener('focusin',()=>keepLabel(c));
+    bubble.addEventListener('focusout',event=>{if(!bubble.contains(event.relatedTarget))closePopup(c);});
     if(touch)bubble.querySelector('[data-face-edit]').addEventListener('click',()=>openPicker(c,face));
     c.popup=bubble;c.dialog.append(bubble);place(c);if(touch)c.labelTimer=setTimeout(()=>{if(live(c)&&c.popup===bubble)closePopup(c);},3000);
   }
@@ -167,7 +203,7 @@
     clear();if(item.kind!=='photo'||!item.id||!window.FamilyApp?.apiEnabled)return;
     const c={serial:++serial,stage,image,item,highlightMissing,reviewed:Boolean(item.faceSummary?.reviewed),dialog:document.getElementById('mediaViewer'),events:new AbortController(),saved:[],detected:[],ignored:[],adjusted:new Map(),faces:[],active:null,popup:null,ready:false,searchSequence:0,saving:false,adjust:false,drag:null,skipClick:false};current=c;window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:true}}));
     c.geom=await helpers();if(!live(c))return;
-    c.layer=document.createElement('div');c.layer.className='face-layer';c.hits=document.createElement('div');c.hits.className='face-image-area';c.buttons=document.createElement('div');c.buttons.className='face-hit-buttons';c.selection=document.createElement('div');c.selection.className='face-selection';c.selection.hidden=true;c.hits.append(c.buttons,c.selection);c.layer.append(c.hits);
+    c.layer=document.createElement('div');c.layer.className='face-layer';c.hits=document.createElement('div');c.hits.className='face-image-area';c.buttons=document.createElement('div');c.buttons.className='face-hit-buttons';c.annotations=document.createElement('div');c.annotations.className='face-visible-labels';c.annotationNodes=[];c.selection=document.createElement('div');c.selection.className='face-selection';c.selection.hidden=true;c.hits.append(c.buttons,c.annotations,c.selection);c.layer.append(c.hits);
     if(desktopResize())for(const handle of ['nw','n','ne','e','se','s','sw','w']){const node=document.createElement('button');node.type='button';node.className='face-resize-handle face-handle-'+handle;node.dataset.faceHandle=handle;node.setAttribute('aria-label',tr('שינוי גודל מסגרת הפנים','Resize face frame'));node.addEventListener('keydown',event=>{if(!c.active||c.saving||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();event.stopPropagation();const r=c.active.rect,area=imageArea(c),step=event.shiftKey?10:1,p={x:handle.includes('w')?r.x:r.x+r.width,y:handle.includes('n')?r.y:r.y+r.height};p.x+=(event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0)/area.width;p.y+=(event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0)/area.height;resized(c,{...c.active,rect:c.geom.resizeFaceRect(r,handle,p)});});c.selection.append(node);}
     c.guide=document.createElement('div');c.guide.className='face-adjust-guide';c.guide.hidden=true;c.guide.innerHTML=`<span>${tr('סמנו מסביב לפנים בעזרת גרירה','Drag around the face')}</span><button type="button">${tr('ביטול','Cancel')}</button>`;c.guide.querySelector('button').addEventListener('click',()=>closePopup(c));c.layer.append(c.guide);
     c.status=document.createElement('p');c.status.className='visually-hidden';c.status.setAttribute('role','status');c.status.setAttribute('aria-live','polite');stage.append(c.layer,c.status);stage.classList.add('has-face-layer');
@@ -208,7 +244,7 @@
     on(stage,'pointerup',event=>{if(c.resizeDrag){event.preventDefault();resized(c,c.active);return;}if(!c.adjust||!c.drag)return;event.preventDefault();c.drag=null;c.adjust=false;c.skipClick=true;stage.classList.remove('face-adjusting');c.guide.hidden=true;const face=c.active;openPicker(c,face,{preserveRect:true});});
     on(stage,'pointercancel',()=>{if(c.adjust||c.resizeDrag){c.drag=null;closePopup(c);}});
     on(document,'pointerdown',event=>{if(c.popup&&!c.popup.contains(event.target)&&!stage.contains(event.target))closePopup(c);},{capture:true});
-    on(document,'pointermove',event=>{if(!c.active||!c.popup?.classList.contains('face-name')||touchMode(event))return;const r=screenFace(c,c.active);if(event.clientX<r.x||event.clientX>r.x+r.width||event.clientY<r.y||event.clientY>r.y+r.height)closePopup(c);},{passive:true});
+    on(document,'pointermove',event=>{if(!c.active||!c.popup?.classList.contains('face-name')||touchMode(event))return;const r=screenFace(c,c.active);if(c.popup.contains(event.target)||(event.clientX>=r.x&&event.clientX<=r.x+r.width&&event.clientY>=r.y&&event.clientY<=r.y+r.height))keepLabel(c);else dismissLabelSoon(c);},{passive:true});
     on(document,'keydown',event=>{if(event.key==='Escape'&&(c.popup||c.adjust)){event.preventDefault();closePopup(c);}},{capture:true});
     on(c.dialog,'scroll',()=>{if(c.popup?.classList.contains('face-name'))closePopup(c);else place(c);},{passive:true});
     on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>place(c));on(window.visualViewport,'scroll',()=>place(c));}
@@ -222,6 +258,7 @@
   }
   function update(item){if(current?.item.id===item.id){current.item=item;current.reviewed=Boolean(item.faceSummary?.reviewed);paint(current);}}
   document.addEventListener('DOMContentLoaded',()=>{
+    window.addEventListener('family-photo-overlays-changed',event=>{const c=current;if(c?.item.id===event.detail.id){paintAnnotations(c);if(c.hits)place(c);}});
     window.addEventListener('family-media-changed',event=>{
       const result=event.detail,id=result.item?.id;if(!id)return;
       if(result.faces)remember(id,result.faces,result.item,result.detectedFaces,result.ignoredFaces);else if(['tags','untag','retag','delete','restore','photo-edit'].includes(result.operation))labels.delete(id);

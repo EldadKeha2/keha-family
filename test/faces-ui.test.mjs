@@ -21,7 +21,7 @@ function fixture(detected=[],{desktop=false}={}){
   setAttribute(name,value){this[name]=value;}
   querySelector(selector){if(!this.queries.has(selector)){const node=new Node();node.selector=selector;this.queries.set(selector,node);}return this.queries.get(selector);}
   querySelectorAll(){return [];}
-  contains(node){return node===this||this.children.some(child=>child.contains(node));}
+  contains(node){return node===this||[...this.children,...this.queries.values()].some(child=>child.contains(node));}
   closest(selector){return this.matches(selector)?this:this.parent?.closest(selector)||null;}
   matches(selector){return selector==='[data-face-handle]'?Boolean(this.dataset.faceHandle):selector==='.'+this.className;}
   focus(){}
@@ -44,9 +44,53 @@ function fixture(detected=[],{desktop=false}={}){
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
- return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,find,emit,get progress(){return progress;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
+ return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,find,emit,get progress(){return progress;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+
+test('face names open real profiles on desktop and touch; free names and unknown people stay plain text',async()=>{
+ for(const desktop of [false,true])for(const kind of ['family','extra','unknown']){
+  const f=fixture([],{desktop}),opened=[],person={id:kind==='family'?'yona':'extra-name',name:'יונה <קהא>',extra:kind==='extra'},face={...first,id:'named',personId:person.id,person};
+  f.window.FamilyApp.getPerson=id=>kind==='unknown'?null:person;f.window.FamilyApp.openPerson=id=>opened.push(id);
+  f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});await f.mount();
+  const hit=f.find('face-hit-buttons').children[0];f.emit(hit,'focus');const bubble=f.find('face-popover face-name');
+  assert.match(bubble.innerHTML,/יונה &lt;קהא&gt;/);
+  if(kind==='family'){
+   assert.match(bubble.innerHTML,/href="#person\/yona"/);f.emit(bubble.querySelector('[data-face-profile]'),'click',{button:0});assert.deepEqual(opened,['yona']);
+   if(!desktop){f.emit(bubble.querySelector('[data-face-edit]'),'click');assert.ok(f.find('face-popover face-picker'));assert.deepEqual(opened,['yona']);}
+  }else{assert.doesNotMatch(bubble.innerHTML,/data-face-profile|<a /);assert.deepEqual(opened,[]);}
+  f.faces.clear();
+ }
+});
+
+test('moving from a face to its name keeps the link usable, keyboard focus retains it, and leaving dismisses it',async()=>{
+ const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'},face={...first,id:'named',personId:'yona',person};
+ f.window.FamilyApp.getPerson=()=>person;f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});await f.mount();
+ const hit=f.find('face-hit-buttons').children[0];f.emit(hit,'pointerenter',{pointerType:'mouse'});let bubble=f.find('face-popover face-name');
+ f.emit(hit,'pointerleave',{pointerType:'mouse',relatedTarget:null});f.emit(bubble,'pointerenter');
+ f.emit(f.document,'pointermove',{target:bubble.querySelector('[data-face-profile]'),clientX:0,clientY:0});
+ await new Promise(resolve=>setTimeout(resolve,280));assert.equal(f.find('face-popover face-name'),bubble);
+ const link=bubble.querySelector('[data-face-profile]');f.document.activeElement=link;f.emit(hit,'blur',{relatedTarget:link});
+ f.emit(f.document,'pointermove',{target:f.stage,clientX:9999,clientY:9999});await new Promise(resolve=>setTimeout(resolve,280));assert.equal(f.find('face-popover face-name'),bubble);
+ f.document.activeElement=null;f.emit(bubble,'focusout',{relatedTarget:null});assert.equal(f.find('face-popover face-name'),undefined);
+ f.emit(hit,'pointerenter',{pointerType:'mouse'});bubble=f.find('face-popover face-name');f.emit(hit,'pointerleave',{pointerType:'mouse',relatedTarget:null});
+ await new Promise(resolve=>setTimeout(resolve,280));assert.equal(f.find('face-popover face-name'),undefined);f.faces.clear();
+});
+
+test('all-name and age overlays follow labelled faces, hide unknown ages, reposition on zoom and clear between photos',async()=>{
+ const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'},guest={id:'extra-guest',name:'אורח',extra:true},faces=[{...first,id:'known',personId:person.id,person},{...second,id:'guest',personId:guest.id,person:guest}];
+ let state={showNames:false,showAges:false};const opened=[];
+ f.window.FamilyApp.getPerson=id=>id==='yona'?person:guest;f.window.FamilyApp.openPerson=id=>opened.push(id);
+ f.window.FamilyPhotoDate={overlays:()=>state,ageFor:p=>p.id==='yona'?{text:'≈ 58',title:'גיל משוער'}:null};
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces});await f.mount('all-labels');const host=f.find('face-visible-labels');assert.equal(host.children.length,0);
+ const toggle=next=>{state=next;f.window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:'all-labels'}}));};
+ toggle({showNames:true,showAges:false});assert.equal(host.children.length,2);assert.match(host.children[0].innerHTML,/href="#person\/yona"/);assert.doesNotMatch(host.children[1].innerHTML,/<a /);
+ f.emit(host.children[0].querySelector('[data-face-profile]'),'click',{button:0});assert.deepEqual(opened,['yona']);
+ toggle({showNames:false,showAges:true});assert.equal(host.children.length,1);assert.match(host.children[0].innerHTML,/≈ 58/);assert.doesNotMatch(host.children[0].innerHTML,/יונה/);
+ const before=parseFloat(host.children[0].style.left);f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.ok(parseFloat(host.children[0].style.left)>before);
+ toggle({showNames:true,showAges:true});assert.equal(host.children.length,2);assert.match(host.children[0].innerHTML,/יונה.*≈ 58/);assert.doesNotMatch(host.children[1].innerHTML,/face-visible-age/);
+ toggle({showNames:false,showAges:false});assert.equal(host.children.length,0);f.faces.clear();assert.equal(f.find('face-layer'),undefined);
+});
 
 test('zoomed and scrolled image coordinates still select each of two tiny neighbouring faces',async()=>{
  const f=fixture([first,second]);await f.mount();

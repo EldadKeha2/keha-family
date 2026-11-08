@@ -1,5 +1,7 @@
 # Face tags in family photos
 
+The viewer's name icon toggles all saved face names above their tagged regions. The age icon independently shows ages beside those regions using the capture date and known birthday; unknown ages are omitted and partial capture dates are marked approximate. These display choices reset for another photo and follow zoom, scrolling and tag changes. Names in both the hover bubble and the all-name display link to an existing family profile. Free-name acquaintances and unknown IDs remain plain text. Hover bubbles allow pointer movement onto the name and stay open during keyboard focus. The optional capture-date editor sits near the top of the visual viewport, shrinks above the phone keyboard and scrolls when necessary.
+
 The existing shared photo viewer now supports face positions. Every uploaded photo opened from the Family Gallery, shared photos, personal albums, weddings, nostalgia, nursery albums, home slideshow or a shared media link uses the same viewer. Thumbnail grids, image dimensions and ordinary tagging controls retain their existing layout.
 
 Detection finds regions containing faces. Names are assigned only by an explicit visitor selection from the existing family-name picker. No identity recognition, face embeddings, age or gender estimates are created. Existing whole-image tags are offered first as choices, never assigned automatically to a face.

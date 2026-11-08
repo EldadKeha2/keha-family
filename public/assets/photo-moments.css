@@ -5,12 +5,12 @@
 #mediaViewer .photo-moment-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;min-width:36px;padding:5px 9px;border:1px solid #d6c9aa;background:#f8f3e6;color:#776c51;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);white-space:nowrap}
 .photo-moment-button svg{width:21px;height:21px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 #mediaViewer .photo-moment-button.has-date{color:#536d3e;border-color:#c4d0ae;background:#eef2e5}
-#mediaViewer .photo-age-toggle[aria-pressed=true]{color:#455d32;border-color:#9aaf7f;background:#e1eace;box-shadow:inset 0 2px 4px #53674026}
+#mediaViewer .photo-age-toggle[aria-pressed=true],#mediaViewer .photo-name-toggle[aria-pressed=true]{color:#455d32;border-color:#9aaf7f;background:#e1eace;box-shadow:inset 0 2px 4px #53674026}
 #mediaViewer .photo-age-toggle:disabled{color:#aaa69c;border-color:#dedbd4;background:#eeede9;cursor:default}
 .photo-moment-button:focus-visible{outline:2px solid #81965e;outline-offset:2px}
 .photo-taken-date{color:#81704c;font:calc(13px * var(--a11y-text-scale,1))/1.4 var(--sans);white-space:nowrap}
 .selected-person-tag .photo-person-age{font:inherit;font-size:.92em;white-space:nowrap;color:#66754e;direction:inherit}
-.photo-date-dialog{width:min(420px,calc(100vw - 28px));box-sizing:border-box}
+.photo-date-dialog{position:fixed;inset:var(--photo-date-top,36px) 0 auto;margin:0 auto;width:min(420px,calc(100vw - 28px));max-height:var(--photo-date-height,calc(100dvh - 48px));overflow:auto;box-sizing:border-box;scroll-padding-block:12px}
 .photo-date-dialog h2{font-size:calc(29px * var(--a11y-text-scale,1));margin-bottom:9px;padding:0}
 .photo-date-dialog>p{font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.65;color:#8b7958;margin:0 0 18px}
 .photo-date-fields{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:12px}
