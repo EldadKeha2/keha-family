@@ -1,11 +1,13 @@
 /* Keep the phone's family-home masthead quiet and in one physical row. */
 .header-preferences{display:contents}
 .site-header .home-install{display:none}
+.site-header [data-desktop-install-action],.site-header [data-desktop-refresh]{display:none}
 @media(min-width:701px){
-  .site-header .home-install:not([hidden]){display:flex;align-items:center;flex:0 0 auto;margin:0;padding:0;border:0;background:none}
-  .site-header .home-install-actions{display:flex;align-items:center}
+  .site-header .home-install:not([hidden]){display:flex;align-items:center;flex:0 0 auto;max-width:100%;margin:0;padding:0;border:0;background:none}
+  .site-header .home-install-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;max-width:100%}
   .site-header .home-install-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:9px 11px;border:1px solid #c7b894;border-radius:8px;background:transparent;color:#736548;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);white-space:nowrap;cursor:pointer}
   .site-header .home-install-actions button svg{width:20px;height:20px;stroke-width:1.5}
+  .site-header .desktop-shortcut-logo{width:24px;height:24px;flex:0 0 24px;object-fit:contain}
   .site-header .home-install-actions button:hover{background:#eee8d8;color:#566a43}
   .site-header .home-install-actions button:disabled{opacity:.55}
   .site-header .home-install [data-home-install-action]{display:none!important}

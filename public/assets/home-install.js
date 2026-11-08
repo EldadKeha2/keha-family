@@ -7,7 +7,7 @@
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;update();});
   // Chromium may emit appinstalled before Android finishes creating the package.
   // Wait for an installed-app check, standalone launch, or the visitor's confirmation.
-  window.addEventListener('appinstalled',()=>{installPrompt=null;if(attemptActive&&!hasInstalledShortcut())waitForInstallation();void checkInstalledShortcut();update();});
+  window.addEventListener('appinstalled',()=>{installPrompt=null;if(!mobileDevice){installed=true;if(dialogKind==='desktop-install')closeDialog();announce(status,tr('ההתקנה הושלמה. קיצור האתר מוכן במחשב.','Installation complete. Your site shortcut is ready on this computer.'));update();return;}if(attemptActive&&!hasInstalledShortcut())waitForInstallation();void checkInstalledShortcut();update();});
 
   const card=document.getElementById('homeInstall'),dialog=document.getElementById('homeInstallDialog');
   if(!card||!dialog)return;
@@ -22,10 +22,14 @@
   const installationInvitation=new URLSearchParams(location.search).get('install')==='1';
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const shortcutIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="2" width="12" height="20" rx="2"/><path d="M8 18h4M19 5v8m-4-4h8"/></svg>';
+  const desktopIcon='<img class="desktop-shortcut-logo" src="assets/app-icons/icon-192.png" width="24" height="24" alt="" aria-hidden="true">';
+  const refreshIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5M19.1 9a7.5 7.5 0 0 0-12.4-3L4 9m16 6-2.7 3A7.5 7.5 0 0 1 4.9 15"/></svg>';
   const shareIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.7 10.5 6.6-4m-6.6 7 6.6 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>';
-  card.innerHTML='<div class="home-install-actions" data-home-install-actions><button type="button" data-home-install-action aria-label="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" title="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" aria-haspopup="dialog" aria-controls="homeInstallDialog">'+shortcutIcon+'<span>'+tr('התקן','Install')+'</span></button><button type="button" data-home-install-share aria-label="'+tr('שיתוף האתר','Share website')+'" title="'+tr('שיתוף האתר','Share website')+'">'+shareIcon+'<span>'+tr('שיתוף','Share')+'</span></button></div><p class="home-install-status" data-home-install-status role="status" aria-live="polite"></p><p class="home-install-status" data-home-install-share-status role="status" aria-live="polite"></p>';
+  card.innerHTML='<div class="home-install-actions" data-home-install-actions><button type="button" data-home-install-action aria-label="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" title="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" aria-haspopup="dialog" aria-controls="homeInstallDialog">'+shortcutIcon+'<span>'+tr('התקן','Install')+'</span></button><button type="button" data-desktop-install-action hidden aria-haspopup="dialog" aria-controls="homeInstallDialog" aria-label="'+tr('הוספת קיצור דרך למחשב עם לוגו האתר','Add a desktop shortcut with the website logo')+'" title="'+tr('הוסף קיצור דרך','Add shortcut')+'">'+desktopIcon+'<span>'+tr('הוסף קיצור דרך','Add shortcut')+'</span></button><button type="button" data-home-install-share aria-label="'+tr('שיתוף האתר','Share website')+'" title="'+tr('שיתוף האתר','Share website')+'">'+shareIcon+'<span>'+tr('שיתוף','Share')+'</span></button><button type="button" data-desktop-refresh hidden aria-label="'+tr('רענון העמוד הנוכחי','Refresh current page')+'" title="'+tr('רענון','Refresh')+'">'+refreshIcon+'<span>'+tr('רענון','Refresh')+'</span></button></div><p class="home-install-status" data-home-install-status role="status" aria-live="polite"></p><p class="home-install-status" data-home-install-share-status role="status" aria-live="polite"></p>';
   const button=card.querySelector('[data-home-install-action]'),status=card.querySelector('[data-home-install-status]');
   const shareButton=card.querySelector('[data-home-install-share]'),shareStatus=card.querySelector('[data-home-install-share-status]');
+  const desktopButton=card.querySelector('[data-desktop-install-action]'),refreshButton=card.querySelector('[data-desktop-refresh]');
+  const desktopView=()=>!mobileDevice&&!phoneQuery.matches;
   function announce(target,message){
     clearTimeout(feedbackTimer);status.textContent='';shareStatus.textContent='';target.textContent=message;
     const inline=dialog.open?dialog.querySelector('[data-home-install-invite-status]')||dialog.querySelector('[data-home-install-help-status]'):null;if(target===status&&inline)inline.textContent=message;
@@ -51,7 +55,7 @@
     dialog.querySelector('[data-home-install-language]')?.addEventListener('click',()=>{
       const currentKind=dialogKind,currentFocus=dialogReturnFocus;english=!english;
       invitationURL.searchParams.set('lang',english?'en-US':'he');
-      if(currentKind==='invite')openInvitation(currentFocus);else if(currentKind==='install')openHelp(currentFocus);else if(currentKind==='success')openSuccess(currentFocus);
+      if(currentKind==='invite')openInvitation(currentFocus);else if(currentKind==='install')openHelp(currentFocus);else if(currentKind==='desktop-install')openDesktopHelp(currentFocus);else if(currentKind==='success')openSuccess(currentFocus);
     });
     dialog.querySelector('[data-home-install-check-icon]')?.addEventListener('click',()=>completeInstallation(true));
     if(!dialog.open){
@@ -125,9 +129,10 @@
     if(!card)return;
     const isInstalled=hasInstalledShortcut();
     if(isInstalled&&attemptActive){completeInstallation();return;}
-    // Share the same invitation from computers and phones; installation stays on phones.
+    // Keep the phone invitation and desktop actions together in the shared header.
     card.hidden=false;
     button.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);status.hidden=false;
+    desktopButton.hidden=refreshButton.hidden=!desktopView();desktopButton.disabled=busy;
     button.setAttribute('aria-haspopup',isInstalled?'false':'dialog');
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
     button.disabled=busy;
@@ -142,6 +147,11 @@
       if(action){action.hidden=!installPrompt&&!busy;action.disabled=busy||installState==='pending';}
       if(instructions)instructions.hidden=Boolean(installPrompt)||busy||installState==='pending';
     }
+    if(dialog.open&&dialogKind==='desktop-install'){
+      const action=dialog.querySelector('[data-desktop-native-start]'),instructions=dialog.querySelector('[data-desktop-install-instructions]');
+      if(action){action.hidden=!installPrompt;action.disabled=busy;}
+      if(instructions)instructions.hidden=Boolean(installPrompt);
+    }
     const waiting=installState==='requesting'||installState==='pending',message=installMessage();
     if(dialog.open&&['invite','install'].includes(dialogKind)){
       const progress=dialog.querySelector('[data-home-install-progress]'),confirmation=dialog.querySelector('[data-home-install-check-icon]'),inline=dialog.querySelector('[data-home-install-invite-status]')||dialog.querySelector('[data-home-install-help-status]');
@@ -152,6 +162,40 @@
     if(message)status.textContent=message;
   }
   function steps(items){return '<ol>'+items.map(item=>'<li>'+item+'</li>').join('')+'</ol>';}
+  function openDesktopHelp(returnFocus=desktopButton){
+    let help;
+    if(/Edg\//.test(ua))help=steps([
+      tr('ב־Edge פתחו ⋯ ← כלים נוספים ← אפליקציות ← התקנת אתר זה כאפליקציה.','In Edge, open ⋯ → More tools → Apps → Install this site as an app.'),
+      tr('אשרו את ההתקנה. ליצירת הסמל בשולחן העבודה: פתחו את דף האפליקציות של Edge, בחרו ״פרטים״ ליד בית משפחת קהא ואז ״יצירת קיצור דרך בשולחן העבודה״.','Confirm installation. For a desktop icon, open Edge’s Apps page, select Details for Keha Family Home, then Create Desktop shortcut.')
+    ]);
+    else if(/Chrome|Chromium/.test(ua))help=steps([
+      tr('ב־Chrome פתחו ⋮ ← העברה, שמירה ושיתוף ← יצירת קיצור דרך, או לחצו על סמל ההתקנה בשורת הכתובת.','In Chrome, open ⋮ → Cast, save, and share → Create shortcut, or use the install icon in the address bar.'),
+      tr('השאירו את שם האתר ואשרו ״יצירה״ או ״התקנה״. הסמל יתווסף עם לוגו האתר.','Keep the website name and confirm Create or Install. The shortcut uses the website’s logo.')
+    ]);
+    else if(/Macintosh|Mac OS X/.test(ua)&&/Safari/.test(ua))help=steps([
+      tr('ב־Safari במק פתחו ״קובץ״ ← ״הוספה ל־Dock״.','In Safari on Mac, open File → Add to Dock.'),
+      tr('אשרו ״הוסף״. לוגו האתר יופיע ב־Dock ובתיקיית היישומים.','Confirm Add. The website’s logo appears in the Dock and Applications folder.')
+    ]);
+    else help='<p>'+tr('להוספת קיצור עם לוגו האתר, פתחו את האתר ב־Chrome או ב־Edge במחשב ובחרו באפשרות ההתקנה בתפריט הדפדפן.','To add a shortcut with the website’s logo, open this site in Chrome or Edge on your computer and choose the browser’s install option.')+'</p>';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('קיצור דרך למחשב','Add a desktop shortcut')+'</h2><button type="button" class="home-install-invite-primary" data-desktop-native-start hidden>'+tr('הוסף קיצור דרך','Add shortcut')+'</button><div data-desktop-install-instructions>'+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>';
+    dialog.querySelector('[data-desktop-native-start]').addEventListener('click',requestDesktopInstallation);showDialog('desktop-install',returnFocus);update();
+  }
+  async function requestDesktopInstallation(){
+    if(!desktopView()||busy)return;
+    if(hasInstalledShortcut()){announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));return;}
+    if(!installPrompt){
+      await checkInstalledShortcut();
+      if(hasInstalledShortcut())announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));else openDesktopHelp();return;
+    }
+    const prompt=installPrompt;installPrompt=null;busy=true;update();
+    try{
+      // Use the retained event synchronously within this click's user activation.
+      await prompt.prompt();const choice=await prompt.userChoice;
+      if(choice?.outcome==='accepted'&&!hasInstalledShortcut())announce(status,tr('הבקשה אושרה. הדפדפן משלים את ההתקנה.','Request approved. Your browser is finishing the installation.'));
+    }catch{openDesktopHelp();}finally{busy=false;update();}
+  }
+  desktopButton.addEventListener('click',requestDesktopInstallation);
+  refreshButton.addEventListener('click',()=>{if(desktopView())location.reload();});
   function appleHelp(){return '<div class="home-install-apple-steps" data-home-install-apple-steps>'+steps([
     '<strong><span class="home-install-share" aria-hidden="true">↑</span> '+tr('שיתוף','Share')+'</strong><span>'+tr('בסרגל של Safari. אם הסמל מוסתר, פתחו את תפריט ⋯ ואז ״שיתוף״.','Use Safari’s toolbar. If the icon is hidden, open the ⋯ page menu, then “Share”.')+'</span>',
     '<strong>'+tr('הוספה למסך הבית','Add to Home Screen')+'</strong><span>'+tr('בוחרים ברשימת הפעולות של Safari. ייתכן שצריך לגלול ברשימה.','Choose it in Safari’s actions. You may need to scroll down the list.')+'</span>',
@@ -219,7 +263,7 @@
     const rect=dialog.getBoundingClientRect();
     if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeDialog();
   });
-  dialog.addEventListener('close',()=>{if(!card.hidden)(dialogReturnFocus===button&&button.hidden?shareButton:dialogReturnFocus||shareButton).focus();dialogKind=null;});
+  dialog.addEventListener('close',()=>{const focus=dialogReturnFocus||shareButton;if(!card.hidden)(focus.hidden?shareButton:focus).focus();dialogKind=null;});
   for(const query of [phoneQuery,standaloneQuery])query.addEventListener?.('change',update);
   window.addEventListener('pageshow',()=>{update();void checkInstalledShortcut();});
   window.addEventListener('focus',()=>{update();void checkInstalledShortcut();});

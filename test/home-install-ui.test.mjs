@@ -26,7 +26,7 @@ const assertSuccess=f=>{
 // Only controller-facing DOM APIs are modeled. Native dialog focus containment,
 // operating-system install prompts and phone layout are checked in the browser.
 function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false}={}){
-  const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[];
+  const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[],reloads=[];
   const timers=new Map();let clock=0,nextTimer=0;
   const schedule=(fn,delay=0)=>{const id=++nextTimer;timers.set(id,{fn,at:clock+Math.max(0,Number(delay)||0)});return id;};
   const advanceTime=async milliseconds=>{
@@ -90,12 +90,13 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   if(share!=='missing')navigator.share=async payload=>{shared.push(payload);if(share!=='works'){const error=Error('Share unavailable');error.name=share;throw error;}};
   if(clipboard!=='missing')navigator.clipboard={writeText:async value=>{if(clipboard==='blocked')throw Error('Clipboard denied');copied.push(value);}};
   const location=new URL(entryUrl||'https://family.example/?game=neto-tetris&lang='+window.FamilyI18n.language+'#games');window.location=location;
+  location.reload=()=>reloads.push(location.href);
   if(recordNavigation)location.assign=value=>assignments.push(String(value));
   const context=vm.createContext({window,document,navigator,location,matchMedia,URL,URLSearchParams,Event,console,setTimeout:schedule,clearTimeout:id=>timers.delete(id)});
   const ready=()=>{document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';};
   vm.runInContext(source,context);if(autoReady)ready();
   const button=()=>card.querySelector('[data-home-install-action]');
-  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,
+  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,reloads,
     click(element){element.dispatchEvent(new Event('click',{cancelable:true}));},
     resize(value){const media=matchMedia('(max-width: 700px)');media.matches=value;media.dispatchEvent(new Event('change'));},
     standalone(value){const media=matchMedia('(display-mode: standalone)');media.matches=value;media.dispatchEvent(new Event('change'));},
@@ -483,5 +484,66 @@ test('phone shortcut and share toolbar has one header location rather than a dup
   const header=html.match(/<header class="site-header">([\s\S]*?)<\/header>/)?.[1];assert.ok(header);
   assert.equal([...html.matchAll(/id="homeInstall"/g)].length,1);assert.match(header,/id="homeInstall"/);
   const home=html.match(/<section id="homeView"[\s\S]*?<\/section>/)?.[0];assert.ok(home);assert.doesNotMatch(home,/id="homeInstall"/);
-  const f=fixture();assert.doesNotMatch(f.card.innerHTML,/<img|data-home-install-heading|data-home-install-description/);
+  const f=fixture(),phoneMarkup=f.card.innerHTML.replace(/<button[^>]*data-desktop-install-action[^>]*>[\s\S]*?<\/button>/g,'');
+  assert.doesNotMatch(phoneMarkup,/<img|data-home-install-heading|data-home-install-description/);
+  assert.equal(f.card.querySelector('[data-desktop-install-action]').hidden,true);
+});
+
+const desktopUA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36';
+const desktopFixture=options=>fixture({userAgent:desktopUA,mobile:false,...options});
+
+test('desktop shortcut and refresh controls use the site logo and remain absent from phone and tablet layouts',()=>{
+  for(const english of [false,true]){
+    const f=desktopFixture({english}),install=f.card.querySelector('[data-desktop-install-action]'),refresh=f.card.querySelector('[data-desktop-refresh]');
+    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Add shortcut/:/הוסף קיצור דרך/);
+    assert.equal(f.card.querySelector('.desktop-shortcut-logo').getAttribute('src'),'assets/app-icons/icon-192.png');
+    f.resize(true);assert.equal(install.hidden,true);assert.equal(refresh.hidden,true);
+    f.resize(false);assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);
+  }
+  for(const options of [{},{mobile:false},{mobile:false,userAgentMobile:true},{mobile:false,userAgent:'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) Safari/604.1'}]){
+    const f=fixture(options);assert.equal(f.card.querySelector('[data-desktop-install-action]').hidden,true);assert.equal(f.card.querySelector('[data-desktop-refresh]').hidden,true);
+  }
+});
+
+test('desktop native installation uses one user click and one retained offer without claiming completion on acceptance',async()=>{
+  const f=desktopFixture(),offer=f.offer({outcome:'accepted',choicePending:true}),button=f.card.querySelector('[data-desktop-install-action]');
+  assert.equal(offer.calls,0);f.click(button);f.click(button);assert.equal(offer.calls,1);assert.equal(button.disabled,true);
+  offer.choose();await tick();assert.equal(button.disabled,false);assert.match(f.card.querySelector('[data-home-install-status]').textContent,/הדפדפן משלים/);
+  assert.doesNotMatch(f.card.querySelector('[data-home-install-status]').textContent,/ההתקנה הושלמה/);
+  f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.match(f.card.querySelector('[data-home-install-status]').textContent,/ההתקנה הושלמה/);
+  f.click(button);assert.equal(offer.calls,1);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+});
+
+test('desktop dismissal and an unavailable native prompt leave useful computer instructions in both languages',async()=>{
+  for(const english of [false,true]){
+    const f=desktopFixture({english}),offer=f.offer(),button=f.card.querySelector('[data-desktop-install-action]');
+    f.click(button);await tick();assert.equal(offer.calls,1);f.click(button);await tick();assert.equal(f.dialog.open,true);
+    assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));assert.match(f.dialog.innerHTML,/Chrome/);
+    assert.doesNotMatch(f.dialog.innerHTML,/Android|iPhone|iPad/);if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
+    f.click(f.dialog.querySelector('[data-home-install-close]'));assert.equal(f.document.activeElement,button);
+  }
+});
+
+test('a late desktop install offer is available directly inside the open instructions',async()=>{
+  const f=desktopFixture();f.click(f.card.querySelector('[data-desktop-install-action]'));await tick();
+  assert.equal(f.dialog.open,true);const offer=f.offer({outcome:'accepted'}),action=f.dialog.querySelector('[data-desktop-native-start]');
+  assert.equal(action.hidden,false);assert.equal(offer.calls,0);f.click(action);await tick();assert.equal(offer.calls,1);
+  f.window.dispatchEvent(new Event('appinstalled'));assert.equal(f.dialog.open,false);
+});
+
+test('desktop help follows Edge and Safari and installed-app detection never prompts for another install',async()=>{
+  for(const [userAgent,expected,absent]of [[desktopUA+' Edg/141.0',/Edge/,/Safari|Android/],['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Safari/605.1.15',/Dock/,/Chrome|Android/]]){
+    const f=desktopFixture({userAgent});f.click(f.card.querySelector('[data-desktop-install-action]'));await tick();assert.match(f.dialog.innerHTML,expected);assert.doesNotMatch(f.dialog.innerHTML,absent);
+  }
+  const installed=desktopFixture({installedRelated:[{platform:'webapp',id:'https://family.example/'}]});await tick();const offer=installed.offer();
+  installed.click(installed.card.querySelector('[data-desktop-install-action]'));await tick();assert.equal(offer.calls,0);assert.equal(installed.dialog.open,false);
+});
+
+test('desktop refresh reloads the current game, person or album URL and cannot be invoked from mobile',()=>{
+  for(const hash of ['#games/ruti-house','#person/eldad','#weddings/u-eldad','#nursery/yona','#gallery']){
+    const entryUrl='https://family.example/?lang=en-US&media=photo'+hash,f=desktopFixture({entryUrl});
+    f.click(f.card.querySelector('[data-desktop-refresh]'));assert.deepEqual(f.reloads,[entryUrl]);assert.equal(f.location.href,entryUrl);
+    f.resize(true);f.click(f.card.querySelector('[data-desktop-refresh]'));assert.equal(f.reloads.length,1);
+  }
+  const phone=fixture();phone.click(phone.card.querySelector('[data-desktop-refresh]'));assert.equal(phone.reloads.length,0);
 });
