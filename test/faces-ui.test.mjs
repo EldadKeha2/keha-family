@@ -104,6 +104,42 @@ test('face names open real profiles on desktop and touch; free names and unknown
  }
 });
 
+test('editing an existing face survives focus leaving its former name bubble on desktop and touch',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const desktop of [false,true]){
+  const f=fixture([],{desktop}),person={id:'yona',name:'יונה'},face={...first,id:'named',personId:person.id,person,revision:'face-1'};
+  f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});await f.mount();
+  const hit=f.find('face-hit-buttons').children[0];f.emit(hit,'focus');const bubble=f.find('face-popover face-name');
+  if(desktop)f.emit(f.stage,'click',{detail:0,target:hit});else{
+   const edit=bubble.querySelector('[data-face-edit]');f.emit(edit,'pointerdown',{pointerType:'touch'});t.mock.timers.tick(2500);assert.equal(f.find('face-popover face-name'),bubble,'A pressed pencil must survive the name timeout until its click');f.emit(edit,'click');
+  }
+  const panel=f.find('face-popover face-picker');assert.ok(panel);assert.match(panel.innerHTML,/הסרת התיוג הזה/);
+  // Removing a focused label can deliver its focusout after the editor opens.
+  f.emit(bubble,'focusout',{relatedTarget:panel.querySelector('input')});f.emit(hit,'blur',{relatedTarget:panel.querySelector('input')});
+  assert.equal(f.find('face-popover face-picker'),panel,'The previous label must not dismiss the new editor');
+  t.mock.timers.tick(2500);assert.equal(f.find('face-popover face-picker'),panel,'The name timer must not close the editor');
+  f.emit(panel.querySelector('[data-face-close]'),'click');assert.equal(f.find('face-popover face-picker'),undefined);
+  f.faces.clear();
+ }
+});
+
+test('existing face names can be changed and reopened with the same face identity in every shared viewer',async()=>{
+ for(const desktop of [false,true])for(const scope of ['photos','gallery','personal:yona','wedding:parents','nostalgia']){
+  const f=fixture([],{desktop}),before={id:'yona',name:'יונה'},after={id:'shlomo',name:'שלמה'},requests=[];let face={...first,id:'saved-face',personId:before.id,person:before,revision:'face-1'};
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(path.endsWith('/save')){const payload=JSON.parse(options.body);requests.push(payload);face={...face,personId:payload.personId,person:after,revision:'face-2'};return Response.json({operation:'faces',scope,item:{id:'retag',kind:'photo',scope,tags:[after],tagsRevision:'t2'},faces:[face],face});}
+   return Response.json({faces:[face]});
+  };
+  f.window.FamilyTags.findPeople=async()=>[after];await f.mount('retag',{}, {scope,tags:[before]});
+  const open=()=>{const hit=f.find('face-hit-buttons').children[0];if(desktop)f.emit(f.stage,'click',{detail:0,target:hit});else{f.emit(hit,'focus');f.emit(f.find('face-popover face-name').querySelector('[data-face-edit]'),'click');}};
+  open();let panel=f.find('face-popover face-picker');const host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=after.id;
+  host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];
+  await new Promise(resolve=>setImmediate(resolve));assert.match(host.innerHTML,/שלמה/);f.emit(option,'click');await f.faces.flush();
+  assert.equal(requests.length,1);assert.equal(requests[0].faceId,'saved-face');assert.equal(requests[0].expectedRevision,'face-1');assert.equal(requests[0].personId,'shlomo');
+  f.faces.dismiss();open();panel=f.find('face-popover face-picker');assert.match(panel.innerHTML,/שלמה/);assert.match(panel.innerHTML,/הסרת התיוג הזה/);f.faces.clear();
+ }
+});
+
 test('moving from a face to its name keeps the link usable, keyboard focus retains it, and leaving dismisses it',async()=>{
  const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'},face={...first,id:'named',personId:'yona',person};
  f.window.FamilyApp.getPerson=()=>person;f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});await f.mount();

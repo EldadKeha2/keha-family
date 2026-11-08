@@ -34,7 +34,7 @@
   function announce(c,message){if(live(c))c.status.textContent=message;}
   function changed(c,result){if(c.adapter){c.item={...c.item,...result.item};c.reviewed=Boolean(c.item.faceSummary?.reviewed);}else window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));}
   function closePopup(c){
-    clearTimeout(c.labelTimer);c.labelTimer=null;c.popup?.remove();c.popup=null;c.active=null;if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
+    clearTimeout(c.labelTimer);c.labelTimer=null;const popup=c.popup;c.popup=null;c.active=null;popup?.remove();if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
   }
   function keepLabel(c){if(c.popup?.dataset.timedLabel)return;clearTimeout(c.labelTimer);c.labelTimer=null;}
   function dismissLabelSoon(c){
@@ -186,8 +186,14 @@
     bubble.addEventListener('pointerenter',()=>keepLabel(c));
     bubble.addEventListener('pointerleave',event=>{if(!touchMode(event))dismissLabelSoon(c);});
     bubble.addEventListener('focusin',()=>keepLabel(c));
-    bubble.addEventListener('focusout',event=>{if(!bubble.contains(event.relatedTarget))closePopup(c);});
-    if(touch&&!feedback)bubble.querySelector('[data-face-edit]').addEventListener('click',()=>openPicker(c,face));
+    bubble.addEventListener('focusout',event=>{if(c.popup===bubble&&!bubble.contains(event.relatedTarget))closePopup(c);});
+    if(touch&&!feedback){
+      const edit=bubble.querySelector('[data-face-edit]');
+      // Keep the label mounted from pointer press through click, including when
+      // a touch browser does not transfer focus to the pencil button.
+      edit.addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();if(c.popup===bubble){clearTimeout(c.labelTimer);c.labelTimer=null;}});
+      edit.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();if(live(c)&&c.popup===bubble)openPicker(c,face);});
+    }
     c.popup=bubble;c.dialog.append(bubble);place(c);if(feedback||touch)c.labelTimer=setTimeout(()=>{if(live(c)&&c.popup===bubble)closePopup(c);},feedback?500:2000);
   }
   async function results(c,query){

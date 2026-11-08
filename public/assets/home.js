@@ -8,6 +8,9 @@
   const TRANSITION_MS=650,CAPTION_DELAY_MS=1300,HOLD_MS=3500;
   const state={view:'tree',ready:false,items:[],index:0,target:0,current:null,paused:false,loading:false,loadedAt:0,serial:0,advanceTimer:null,captionTimer:null,transitionTimer:null};
   const prepared=new Map();
+  // The slideshow has its own cache; it must never replace the Family Photos
+  // grid's viewer list, especially before the home screen has been loaded.
+  const viewerScope='home:photos';
   const tiles=()=>destinations.map(([view,title,description],index)=>`<button class="home-tile home-tile-${view}" data-view="${view}" style="--tile-delay:${index*35}ms"><span class="home-tile-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><use href="assets/home-icons.svg#${view}"></use></svg></span><span><strong>${title}</strong><small>${description}</small></span><span class="home-tile-arrow" aria-hidden="true">←</span></button>`).join('');
   const canAdvance=()=>state.view==='home'&&!state.paused&&!reducedMotion()&&state.items.length>1&&document.visibilityState==='visible'&&!$('mediaViewer')?.open;
   function stopAdvance(){clearTimeout(state.advanceTimer);state.advanceTimer=null;}
@@ -85,7 +88,7 @@
   }
   async function load(){
     if(state.loading)return;state.loading=true;
-    try{const response=await I18n.fetch('api/collections/photos',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json(),old=state.items[state.index]?.id;state.items=data.items;state.loadedAt=Date.now();window.FamilyMedia.register('photos',state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));}
+    try{const response=await I18n.fetch('api/collections/photos',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json(),old=state.items[state.index]?.id;state.items=data.items;state.loadedAt=Date.now();window.FamilyMedia.register(viewerScope,state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));}
     catch{if(!state.items.length)slide(0);}finally{state.loading=false;}
   }
   function activate(view){state.view=view;$('homeView').hidden=view!=='home';if(!state.ready)return;if(view!=='home'){suspend();return;}slide(state.index);load();}
@@ -102,10 +105,10 @@
     state.ready=true;updatePauseControl();$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
     $('mobileMenuToggle').addEventListener('click',()=>$('mobileNavDialog').showModal());$('closeMobileMenu').addEventListener('click',()=>$('mobileNavDialog').close());
     $('homeSlidePrevious').addEventListener('click',()=>slide(state.target-1,-1));$('homeSlideNext').addEventListener('click',()=>slide(state.target+1,1));$('homeSlidePause').addEventListener('click',togglePause);
-    $('homeSlideOpen').addEventListener('click',()=>{const index=state.items.findIndex(item=>item.id===state.current?.id);if(index<0)return;stopAdvance();window.FamilyMedia.open(state.items,index,'photos');});
+    $('homeSlideOpen').addEventListener('click',()=>{const index=state.items.findIndex(item=>item.id===state.current?.id);if(index<0)return;stopAdvance();window.FamilyMedia.open(state.items,index,viewerScope);});
     $('mediaViewer')?.addEventListener('close',scheduleAdvance);
     window.addEventListener('family-accessibility-changed',motionChanged);motionQuery.addEventListener?.('change',motionChanged);
-    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.scope!=='photos')return;const old=state.items[state.index]?.id;state.items=result.collection?.items||state.items.map(item=>item.id===result.item?.id?{...item,...result.item}:item);window.FamilyMedia.register('photos',state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));});
+    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.scope!=='photos')return;const old=state.items[state.index]?.id;state.items=result.collection?.items||state.items.map(item=>item.id===result.item?.id?{...item,...result.item}:item);window.FamilyMedia.register(viewerScope,state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible'){suspend();return;}if(state.view==='home'){slide(state.index);if(Date.now()-state.loadedAt>30000)load();}});window.addEventListener('pagehide',suspend);activate(app().getView());
   }
   window.FamilyHome={activate};document.addEventListener('DOMContentLoaded',init);

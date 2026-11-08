@@ -57,7 +57,7 @@ test('a slow new photo never receives its caption over the preceding photo; the 
 test('automatic changes are faster than six seconds, preloaded, and pause while the opened photo is being viewed',async()=>{
  const f=fixture();await f.ready();await f.resolve('/a.jpg');await f.advance(650);await f.resolve('/b.jpg');
  await f.advance(3499);assert.equal(f.get('homeSlideImage').src,'/a.jpg');await f.advance(1);assert.equal(f.get('homeSlideImage').src,'/b.jpg');
- f.get('homeSlideOpen').click();assert.deepEqual(f.opened,[{id:'b',scope:'photos'}]);await f.advance(10000);assert.equal(f.get('homeSlideImage').src,'/b.jpg');
+ f.get('homeSlideOpen').click();assert.deepEqual(f.opened,[{id:'b',scope:'home:photos'}]);await f.advance(10000);assert.equal(f.get('homeSlideImage').src,'/b.jpg');
  f.get('mediaViewer').close();await f.resolve('/c.jpg');await f.advance(3500);assert.equal(f.get('homeSlideImage').src,'/c.jpg');
 });
 test('rapid browsing discards out-of-order downloads and their captions, and opening still follows the visible image',async()=>{

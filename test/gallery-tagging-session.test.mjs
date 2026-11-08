@@ -7,8 +7,9 @@ import{browserHistory,navigationSource}from'./helpers/browser-history.mjs';
 const mediaSource=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 const portalSource=await readFile(new URL('../public/assets/portal.js',import.meta.url),'utf8');
 const appSource=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
+const homeSource=await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8');
 const photo=(id='a',tags=[])=>({id,file:id+'.jpg',filename:id+'.jpg',scope:'gallery',kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Photo '+id,caption:'',tags,tagsRevision:'initial',faceSummary:{total:2,unmatched:2,partial:tags.length>0,reviewed:false}});
-function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=false,phone=false}={}){
+function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=false,phone=false,home=false,initialView='gallery'}={}){
  const nodes=new Map(),documentHandlers=new Map(),windowHandlers=new Map(),intervals=[],requests=[],pending=[];let nextDeferred=false,revision=1;
  const server=structuredClone(items),mounted=[];
  class Node{
@@ -34,15 +35,15 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
   return{items:structuredClone(selected.slice((page-1)*size,page*size)),count:selected.length,revision:'gallery-'+revision+'-'+page,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length,complete:server.filter(i=>i.faceSummary.reviewed).length},pagination:{page,size,pages,total:selected.length,filter}};
  };
  const browser=routing?browserHistory('https://test/?lang=he#gallery'):null;
- const window={FamilyApp:{apiEnabled:true,toast(){}},FAMILY_DATA:{people:{},branches:[],units:{}},scrollTo(){},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>{listen(windowHandlers,name,fn);browser?.addEventListener(name,fn);},dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
+ const window={FamilyApp:{apiEnabled:true,getView:()=>initialView,toast(){}},FAMILY_DATA:{people:{},branches:[],units:{}},scrollTo(){},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>{listen(windowHandlers,name,fn);browser?.addEventListener(name,fn);},dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
  window.FamilyI18n={isEnglish:false,language:'he',t:String,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:item=>item.name,error:String,searchNames:item=>item.name,fetch:async path=>{
   requests.push(path);const result=collection(path);
   if(nextDeferred){nextDeferred=false;return new Promise(resolve=>pending.push(()=>resolve(Response.json(result))));}return Response.json(result);
  }};
  const context=vm.createContext({window,document,location:browser?.location||{href:'https://test/?lang=he#gallery',origin:'https://test'},history:browser?.history||{replaceState(){}},navigator:{},URL,URLSearchParams,Response,CustomEvent,console,setInterval:fn=>intervals.push(fn),setTimeout,clearTimeout,requestAnimationFrame:()=>0,cancelAnimationFrame(){},innerWidth:phone?390:1280,innerHeight:900,matchMedia:q=>({matches:q.includes('700px')&&phone})});
  if(routing)vm.runInContext(navigationSource,context);
- vm.runInContext(mediaSource,context);vm.runInContext(portalSource,context);if(routing){vm.runInContext(appSource,context);window.FamilyApp.apiEnabled=true;}
- for(const fn of documentHandlers.get('DOMContentLoaded'))fn();window.FamilyPortal.activate('gallery');
+ vm.runInContext(mediaSource,context);vm.runInContext(portalSource,context);if(home)vm.runInContext(homeSource,context);if(routing){vm.runInContext(appSource,context);window.FamilyApp.apiEnabled=true;}
+ for(const fn of documentHandlers.get('DOMContentLoaded'))fn();window.FamilyPortal.activate(initialView);
  const flush=async()=>{await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
  return{window,get,requests,pending,mounted,filters,flush,server,browser,
   filter(name){for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-filter]'?{dataset:{galleryFilter:name}}:null}});},
@@ -53,6 +54,18 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
   get cards(){return get('sharedGalleryGrid').children.map(card=>card.dataset.mediaFile);}
  };
 }
+
+test('editing Family Photos cannot be closed or emptied by the inactive home slideshow',async()=>{
+ for(const phone of [false,true]){
+  const items=[{...photo('a',[{id:'yona'}]),scope:'photos'},{...photo('b'),scope:'photos'}],f=fixture(items,{phone,home:true,initialView:'photos'});await f.flush();
+  f.window.FamilyMedia.openFrom('photos','a');const image=f.get('mediaStage').children[0];assert.equal(f.get('mediaViewer').open,true);
+  for(const operation of ['faces','face-detection','face-ignore','tags']){
+   const item={...items[0],tagsRevision:operation};f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'photos',item}}));await f.flush();
+   assert.equal(f.get('mediaViewer').open,true,operation+' must not replace the album with the unloaded home list');assert.equal(f.get('mediaStage').children[0],image);
+  }
+  f.close();f.window.FamilyMedia.openFrom('photos','b');assert.equal(f.get('mediaViewer').open,true,'Grid photos must still open after editing');assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+ }
+});
 
 test('Family photo membership updates cached gallery metadata without changing filters or the open image',async()=>{
  const f=fixture([photo('a',[{id:'yona'}])]);await f.flush();f.filter('partial');await f.flush();await f.window.FamilyPortal.sortGallery('taken-asc');f.open('a');
