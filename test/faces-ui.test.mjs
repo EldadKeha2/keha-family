@@ -11,7 +11,8 @@ function fixture(detected=[],{desktop=false}={}){
  const view={width:desktop?1200:360,height:800},created=[];
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
-  get classList(){return {contains:value=>this.className.split(' ').includes(value),add:(...values)=>{this.className=[...new Set([...this.className.split(' '),...values])].join(' ');},remove:(...values)=>{this.className=this.className.split(' ').filter(x=>!values.includes(x)).join(' ');}};}
+  get parentNode(){return this.parent;}
+  get classList(){return {toggle:(value,force)=>{const enabled=force??!this.className.split(' ').includes(value);this.classList[enabled?'add':'remove'](value);return enabled;},contains:value=>this.className.split(' ').includes(value),add:(...values)=>{this.className=[...new Set([...this.className.split(' '),...values])].join(' ');},remove:(...values)=>{this.className=this.className.split(' ').filter(x=>!values.includes(x)).join(' ');}};}
   append(...nodes){for(const node of nodes){node.remove();node.parent=this;this.children.push(node);}}
   remove(){if(this.parent)this.parent.children=this.parent.children.filter(node=>node!==this);this.parent=null;}
   before(node){this.parent?.append(node);}
@@ -31,6 +32,7 @@ function fixture(detected=[],{desktop=false}={}){
    if(this===stage||this.className==='face-photo-scroll')return {x:0,y:100,left:0,top:100,width:view.width,height:this===stage?270:this.clientHeight};
    if(this.className==='face-photo-surface'){const width=parseFloat(this.style.width),height=parseFloat(this.style.height),left=Math.max(0,(view.width-width)/2)-this.parent.scrollLeft,top=100-this.parent.scrollTop;return {x:left,y:top,left,top,width,height};}
    if(this===image)return this.parent?.className==='face-photo-surface'?this.parent.getBoundingClientRect():{x:0,y:100,left:0,top:100,width:360,height:270};
+   if(this.classList.contains('face-visible-label'))return {x:0,y:0,left:0,top:0,width:90,height:24};
    return {x:0,y:0,left:0,top:0,width:280,height:240};
   }
  }
@@ -93,14 +95,14 @@ test('all-name and age overlays follow labelled faces, hide unknown ages, reposi
  let state={showNames:false,showAges:false};const opened=[];
  f.window.FamilyApp.getPerson=id=>id==='yona'?person:guest;f.window.FamilyApp.openPerson=id=>opened.push(id);
  f.window.FamilyPhotoDate={overlays:()=>state,ageFor:p=>p.id==='yona'?{text:'58',title:'גיל משוער'}:null};
- f.window.FamilyI18n.fetch=async()=>Response.json({faces});await f.mount('all-labels');const host=f.find('face-visible-labels');assert.equal(host.children.length,0);
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces});await f.mount('all-labels');const host=f.find('face-visible-labels'),visible=()=>host.children.filter(node=>node.classList.contains('face-visible-label'));assert.equal(visible().length,0);
  const toggle=next=>{state=next;f.window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:'all-labels'}}));};
- toggle({showNames:true,showAges:false});assert.equal(host.children.length,2);assert.match(host.children[0].innerHTML,/href="#person\/yona"/);assert.doesNotMatch(host.children[1].innerHTML,/<a /);
- f.emit(host.children[0].querySelector('[data-face-profile]'),'click',{button:0});assert.deepEqual(opened,['yona']);
- toggle({showNames:false,showAges:true});assert.equal(host.children.length,1);assert.match(host.children[0].innerHTML,/58/);assert.doesNotMatch(host.children[0].innerHTML,/יונה/);
- const before=parseFloat(host.children[0].style.left);f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.ok(parseFloat(host.children[0].style.left)>before);
- toggle({showNames:true,showAges:true});assert.equal(host.children.length,2);assert.match(host.children[0].innerHTML,/יונה.*58/);assert.doesNotMatch(host.children[1].innerHTML,/face-visible-age/);
- toggle({showNames:false,showAges:false});assert.equal(host.children.length,0);f.faces.clear();assert.equal(f.find('face-layer'),undefined);
+ toggle({showNames:true,showAges:false});assert.equal(visible().length,2);assert.match(visible()[0].innerHTML,/href="#person\/yona"/);assert.doesNotMatch(visible()[1].innerHTML,/<a /);
+ f.emit(visible()[0].querySelector('[data-face-profile]'),'click',{button:0});assert.deepEqual(opened,['yona']);
+ toggle({showNames:false,showAges:true});assert.equal(visible().length,1);assert.match(visible()[0].innerHTML,/58/);assert.doesNotMatch(visible()[0].innerHTML,/יונה/);
+ const before=parseFloat(visible()[0].style.left);f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.ok(parseFloat(visible()[0].style.left)>before);
+ toggle({showNames:true,showAges:true});assert.equal(visible().length,2);assert.match(visible()[0].innerHTML,/יונה.*58/);assert.doesNotMatch(visible()[1].innerHTML,/face-visible-age/);
+ toggle({showNames:false,showAges:false});assert.equal(visible().length,0);f.faces.clear();assert.equal(f.find('face-layer'),undefined);
 });
 
 test('zoomed and scrolled image coordinates still select each of two tiny neighbouring faces',async()=>{
@@ -210,4 +212,17 @@ test('ignoring one false detection is photo-specific, survives reopening, and Un
  f.faces.clear();await f.mount('ignored-photo');assert.equal(f.find('face-hit-buttons').children.length,1);
  f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-ignore-undo]'),'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.at(-1).ignored,false);assert.equal(f.find('face-hit-buttons').children.length,2);
  f.faces.clear();await f.mount('other-photo');assert.equal(f.find('face-hit-buttons').children.length,2);f.faces.clear();
+});
+
+test('touching a saved face shows its name for two seconds, and another face replaces the previous label immediately',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const faces=[{id:'one',rect:{x:.1,y:.2,width:.1,height:.1},personId:'one',person:{id:'one',name:'אחד'}},{id:'two',rect:{x:.7,y:.2,width:.1,height:.1},personId:'two',person:{id:'two',name:'שתיים'}}],f=fixture();f.window.FamilyI18n.fetch=async()=>Response.json({faces});await f.mount();
+ const tap=x=>{const area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,pointerType:'touch',clientX:area.left+x*area.width,clientY:area.top+.25*area.height});};
+ tap(.15);let bubble=f.find('face-popover face-name');assert.match(bubble.innerHTML,/אחד/);f.emit(bubble,'pointerenter');f.emit(bubble,'focusin');t.mock.timers.tick(1999);assert.equal(f.find('face-popover face-name'),bubble);t.mock.timers.tick(1);assert.equal(f.find('face-popover face-name'),undefined);
+ tap(.15);const previous=f.find('face-popover face-name');t.mock.timers.tick(400);tap(.75);bubble=f.find('face-popover face-name');assert.notEqual(bubble,previous);assert.equal(previous.parent,null);assert.match(bubble.innerHTML,/שתיים/);t.mock.timers.tick(1600);assert.equal(f.find('face-popover face-name'),bubble);t.mock.timers.tick(400);assert.equal(f.find('face-popover face-name'),undefined);f.faces.clear();
+});
+test('dense all-name overlays fall back to a numbered legend and return to the photo when zoom makes room',async()=>{
+ const faces=Array.from({length:60},(_,i)=>({id:String(i),rect:{x:.1+(i%6)*.12,y:.15+Math.floor(i/6)*.25,width:.06,height:.09},personId:'person-'+i,person:{id:'person-'+i,name:'בן משפחה '+i}})),f=fixture();f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();
+ const legend=f.find('face-label-list');assert.equal(legend.hidden,false);assert.equal(legend.children.length,60);assert.ok(legend.children.every(node=>node.innerHTML.includes('face-label-number')));
+ for(let i=0;i<6;i++)f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.equal(legend.hidden,true);assert.equal(legend.children.length,0);assert.equal(f.find('face-visible-labels').children.filter(node=>node.classList.contains('face-visible-label')).length,60);f.faces.clear();assert.equal(f.find('face-label-list'),undefined);
 });

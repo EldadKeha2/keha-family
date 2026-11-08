@@ -64,3 +64,21 @@ export function popoverPosition(face,panel,viewport){
   if(x+width>right-pad){if(face.x-gap-width>=left+pad)x=face.x-gap-width;else{x=face.x+face.width/2-width/2;y=face.y+face.height+gap;}}
   return {x:Math.max(left+pad,Math.min(right-width-pad,x)),y:Math.max(top+pad,Math.min(bottom-height-pad,y)),width,maxHeight:viewport.height-2*pad};
 }
+
+// Place readable labels near their own faces. Dense photos use a separate
+// numbered legend when the image cannot contain every label without overlap.
+export function layoutFaceLabels(labels,{width,height},gap=4){
+  if(!(width>0&&height>0))return null;
+  const placed=[],result=Array(labels.length);
+  const ordered=labels.map((label,index)=>({...label,index})).sort((a,b)=>a.face.y-b.face.y||a.face.x-b.face.x||a.index-b.index);
+  for(const label of ordered){
+    const w=Math.min(label.width,width),h=label.height;if(h>height)return null;
+    const face=label.face,cx=face.x+face.width/2,cy=face.y+face.height/2;
+    const xs=[cx-w/2,face.x-w-gap,face.x+face.width+gap,0,width-w].map(x=>Math.max(0,Math.min(width-w,x)));
+    const ys=[face.y-h-gap,face.y+face.height+gap,0,height-h,...placed.flatMap(r=>[r.y-h-gap,r.y+r.height+gap])];
+    const candidates=xs.flatMap(x=>ys.filter(y=>y>=0&&y+h<=height).map(y=>({x,y,width:w,height:h,score:Math.hypot(x+w/2-cx,y+h/2-cy)}))).sort((a,b)=>a.score-b.score);
+    const box=candidates.find(a=>placed.every(b=>a.x+a.width+gap<=b.x||b.x+b.width+gap<=a.x||a.y+a.height+gap<=b.y||b.y+b.height+gap<=a.y));
+    if(!box)return null;placed.push(box);result[label.index]=box;
+  }
+  return result;
+}

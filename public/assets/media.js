@@ -3,8 +3,8 @@
   const I18n=window.FamilyI18n;
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const albums=new Map();
-  const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null};
+  const albums=new Map(),albumPages=new Map();
+  const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null,paging:false,pageTarget:null,pageDirection:1,navigation:0};
   const identity=item=>item.id||item.file;
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
@@ -18,9 +18,11 @@
   function controls(item,scope){
     return I18n.html`<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?I18n.t('הסרת'):I18n.t('מחיקת')} ${safe(I18n.mediaName(item))}${linked(item,scope)?I18n.t(' מהאלבום'):''}">${I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט')}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
   }
-  function register(scope,items,{retainCurrent=false}={}){
+  function register(scope,items,{retainCurrent=false,pagination}={}){
     albums.set(scope,items);
+    if(pagination)albumPages.set(scope,{...pagination});
     if(!$('mediaViewer')?.open||state.scope!==scope)return;
+    if(state.paging&&pagination?.page===state.pageTarget){state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1);else $('mediaViewer').close();return;}
     const id=state.activeId,active=current();let index=items.findIndex(item=>identity(item)===id);
     // Keep the photo being tagged open even after it leaves the untagged filter.
     if(retainCurrent&&!state.deleting&&index<0&&active){items=[...items];index=Math.min(state.index,items.length);items.splice(index,0,active);}
@@ -55,8 +57,10 @@
     profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
-    $('mediaViewerCounter').textContent=`${state.index+1} / ${state.items.length}`;
-    $('mediaPrevious').hidden=$('mediaNext').hidden=state.items.length<2;
+    const page=albumPages.get(state.scope),total=page?.total??state.items.length,offset=page?(page.page-1)*page.size:0;
+    $('mediaViewerCounter').textContent=`${offset+state.index+1} / ${total}`;
+    $('mediaPrevious').hidden=$('mediaNext').hidden=total<2;
+    $('mediaPrevious').disabled=$('mediaNext').disabled=state.paging;
     const link=$('mediaOriginal');link.href=item.watchUrl||item.src;
     const edit=$('editOpenedPhoto');if(edit){edit.hidden=!(item.id&&item.kind==='photo');edit.setAttribute('aria-label',tr('עריכת תמונה','Edit photo'));edit.title=tr('עריכת תמונה','Edit photo');}
     const downloadLabel=item.kind==='video'?tr('הורדת סרטון','Download video'):item.kind==='document'?tr('הורדת מסמך','Download document'):tr('הורדת תמונה','Download photo');
@@ -134,7 +138,7 @@
   }
   function open(items,index=0,scope){
     if(!items?.length||index<0)return;
-    state.scope=scope||items[index]?.scope||'shared';state.items=items;albums.set(state.scope,items);
+    state.navigation++;state.paging=false;state.pageTarget=null;state.scope=scope||items[index]?.scope||'shared';state.items=items;albums.set(state.scope,items);
     state.opener=document.activeElement;
     document.querySelectorAll('video').forEach(video=>video.pause());
     show(index);if(!$('mediaViewer').open){syncMediaRoute(current());$('mediaViewer').showModal();}
@@ -144,6 +148,12 @@
     const url=new URL(location.href);url.searchParams.set('media',item.id);window.FamilyNavigation.go(url.href,{replace});
   }
   function openFrom(scope,id){const items=albums.get(scope)||[];open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
+  async function step(direction){
+    if(state.paging||!current())return;const next=state.index+direction,page=albumPages.get(state.scope);
+    if(next>=0&&next<state.items.length||state.scope!=='gallery'||!(page?.pages>1)||!window.FamilyPortal?.pageGallery){show(next);return;}
+    const navigation=++state.navigation;state.paging=true;state.pageDirection=direction;state.pageTarget=(page.page-1+direction+page.pages)%page.pages+1;metadata();
+    try{await window.FamilyPortal.pageGallery(state.pageTarget);}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;if($('mediaViewer').open)metadata();}}
+  }
   function requestDelete(scope,id){
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
     const item=(albums.get(scope)||[]).find(item=>item.id===id)||(state.scope===scope&&current()?.id===id?current():null);if(!item)return;
@@ -246,17 +256,17 @@
       const remove=event.target.closest('[data-media-delete]');if(remove)requestDelete(remove.dataset.mediaScope,remove.dataset.mediaDelete);
     });
     $('closeMediaViewer').addEventListener('click',()=>$('mediaViewer').close());
-    $('mediaPrevious').addEventListener('click',()=>show(state.index-1));$('mediaNext').addEventListener('click',()=>show(state.index+1));
+    $('mediaPrevious').addEventListener('click',()=>step(-1));$('mediaNext').addEventListener('click',()=>step(1));
     $('mediaViewerDelete').addEventListener('click',()=>requestDelete(state.scope,current()?.id));
     $('confirmMediaDelete').addEventListener('click',confirmDelete);
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
-    $('mediaViewer').addEventListener('close',()=>{instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
+    $('mediaViewer').addEventListener('close',()=>{state.navigation++;state.paging=false;state.pageTarget=null;instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open]')||event.target.closest('input,textarea'))return;
-      if(event.key===(I18n.isEnglish?'ArrowLeft':'ArrowRight')){event.preventDefault();show(state.index-1);}
-      if(event.key===(I18n.isEnglish?'ArrowRight':'ArrowLeft')){event.preventDefault();show(state.index+1);}
+      if(event.key===(I18n.isEnglish?'ArrowLeft':'ArrowRight')){event.preventDefault();step(-1);}
+      if(event.key===(I18n.isEnglish?'ArrowRight':'ArrowLeft')){event.preventDefault();step(1);}
     });
   }
   window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify,current,isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};

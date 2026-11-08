@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces,labelledRegion,resizeFaceRect} from '../public/assets/face-geometry.mjs';
+import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces,labelledRegion,resizeFaceRect,layoutFaceLabels} from '../public/assets/face-geometry.mjs';
 import {faceCoverage} from '../public/assets/face-coverage.mjs';
 import {detectionSize,detectionRegions} from '../public/assets/face-scan.mjs';
 import {faceRect} from '../src/faces.mjs';
@@ -100,4 +100,12 @@ test('sideways and upside-down detection rectangles map back onto the unchanged 
  for(const [turn,rect]of [[90,{x:1-original.y-original.height,y:original.x,width:original.height,height:original.width}],[180,{x:1-original.x-original.width,y:1-original.y-original.height,width:original.width,height:original.height}],[270,{x:original.y,y:1-original.x-original.width,width:original.height,height:original.width}]]){
   const restored=unrotateRect(rect,turn);for(const key of Object.keys(original))assert.ok(Math.abs(restored[key]-original[key])<1e-12);assert.doesNotThrow(()=>faceRect(restored));
  }
+});
+
+test('simultaneous face labels never overlap, stay within the photo and have a safe dense-photo fallback',()=>{
+ for(const bounds of [{width:360,height:270},{width:1280,height:900},{width:270,height:360}]){
+  const labels=Array.from({length:8},(_,i)=>({width:100,height:24,face:{x:bounds.width*(.1+(i%4)*.22),y:bounds.height*(.2+Math.floor(i/4)*.35),width:30,height:40}})),placed=layoutFaceLabels(labels,bounds);assert.ok(placed);
+  for(let i=0;i<placed.length;i++){const a=placed[i];assert.ok(a.x>=0&&a.y>=0&&a.x+a.width<=bounds.width&&a.y+a.height<=bounds.height);for(const b of placed.slice(i+1))assert.ok(a.x+a.width+4<=b.x||b.x+b.width+4<=a.x||a.y+a.height+4<=b.y||b.y+b.height+4<=a.y);}
+ }
+ assert.equal(layoutFaceLabels(Array.from({length:150},()=>({width:200,height:40,face:{x:100,y:100,width:20,height:25}})),{width:320,height:200}),null);
 });
