@@ -92,14 +92,14 @@ test('all-name and age overlays follow labelled faces, hide unknown ages, reposi
  const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'},guest={id:'extra-guest',name:'אורח',extra:true},faces=[{...first,id:'known',personId:person.id,person},{...second,id:'guest',personId:guest.id,person:guest}];
  let state={showNames:false,showAges:false};const opened=[];
  f.window.FamilyApp.getPerson=id=>id==='yona'?person:guest;f.window.FamilyApp.openPerson=id=>opened.push(id);
- f.window.FamilyPhotoDate={overlays:()=>state,ageFor:p=>p.id==='yona'?{text:'≈ 58',title:'גיל משוער'}:null};
+ f.window.FamilyPhotoDate={overlays:()=>state,ageFor:p=>p.id==='yona'?{text:'58',title:'גיל משוער'}:null};
  f.window.FamilyI18n.fetch=async()=>Response.json({faces});await f.mount('all-labels');const host=f.find('face-visible-labels');assert.equal(host.children.length,0);
  const toggle=next=>{state=next;f.window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:'all-labels'}}));};
  toggle({showNames:true,showAges:false});assert.equal(host.children.length,2);assert.match(host.children[0].innerHTML,/href="#person\/yona"/);assert.doesNotMatch(host.children[1].innerHTML,/<a /);
  f.emit(host.children[0].querySelector('[data-face-profile]'),'click',{button:0});assert.deepEqual(opened,['yona']);
- toggle({showNames:false,showAges:true});assert.equal(host.children.length,1);assert.match(host.children[0].innerHTML,/≈ 58/);assert.doesNotMatch(host.children[0].innerHTML,/יונה/);
+ toggle({showNames:false,showAges:true});assert.equal(host.children.length,1);assert.match(host.children[0].innerHTML,/58/);assert.doesNotMatch(host.children[0].innerHTML,/יונה/);
  const before=parseFloat(host.children[0].style.left);f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.ok(parseFloat(host.children[0].style.left)>before);
- toggle({showNames:true,showAges:true});assert.equal(host.children.length,2);assert.match(host.children[0].innerHTML,/יונה.*≈ 58/);assert.doesNotMatch(host.children[1].innerHTML,/face-visible-age/);
+ toggle({showNames:true,showAges:true});assert.equal(host.children.length,2);assert.match(host.children[0].innerHTML,/יונה.*58/);assert.doesNotMatch(host.children[1].innerHTML,/face-visible-age/);
  toggle({showNames:false,showAges:false});assert.equal(host.children.length,0);f.faces.clear();assert.equal(f.find('face-layer'),undefined);
 });
 

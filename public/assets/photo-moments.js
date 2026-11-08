@@ -10,7 +10,7 @@ function ageFor(person,photo){
   const birthday=person?.birthday??photo.tags?.find(tag=>tag.id===person?.id)?.birthday??window.FamilyApp?.getPersonSummary?.(person?.id)?.birthday??window.FamilyApp?.getPerson?.(person?.id)?.birthday;
   const age=photoAge(birthday,photo.takenDate);if(!age)return null;
   const value=age.years===0?tr('פחות משנה','Under 1'):String(age.years);
-  return {text:(age.approximate?'≈ ':'')+value,title:tr('גיל בזמן הצילום: ','Age in this photo: ')+(age.approximate?tr('לפחות ','At least '):'')+value};
+  return {text:value,title:tr('גיל בזמן הצילום: ','Age in this photo: ')+value};
 }
 const overlays=id=>item?.id===id?{showNames,showAges:showAges&&Boolean(item.takenDate?.year)}:{showNames:false,showAges:false};
 

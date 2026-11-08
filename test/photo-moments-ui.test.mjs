@@ -36,9 +36,9 @@ test('name and age toggles are independent, retain state on metadata changes, an
   f.click('togglePhotoAges');assert.equal(f.api.overlays('a').showAges,false);f.mount({id:'b',takenDate:{year:2000}});assert.equal(f.api.overlays('b').showNames,false);assert.equal(f.api.overlays('b').showAges,false);
  }
 });
-test('overlay ages use photo metadata or the current profile, mark estimates and skip unknown birthdays',()=>{
+test('overlay ages use the lower whole year for partial dates without symbols and skip unknown birthdays',()=>{
  const f=fixture(),photo={id:'a',takenDate:{year:1980},tags:[{id:'yona',birthday:'16.10.1921'}]};
- assert.equal(f.api.ageFor({id:'yona'},photo).text,'≈ 58');assert.equal(f.api.ageFor({id:'unknown'},photo),null);
+ assert.equal(f.api.ageFor({id:'yona'},photo).text,'58');assert.equal(fixture(true).api.ageFor({id:'yona'},photo).text,'58');assert.equal(f.api.ageFor({id:'unknown'},photo),null);
  f.window.FamilyApp.getPersonSummary=()=>({birthday:'16.10.1921'});assert.equal(f.api.ageFor({id:'yona'},{...photo,tags:[],takenDate:{day:16,month:10,year:1980}}).text,'59');
  assert.equal(f.api.ageFor({id:'unknown',birthday:'1.1.1111'},photo),null);assert.equal(f.api.ageFor({id:'future',birthday:'1.1.2000'},photo),null);
 });
