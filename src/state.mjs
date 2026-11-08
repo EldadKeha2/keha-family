@@ -20,7 +20,7 @@ import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './p
 import {galleryRefinement,galleryRevision,galleryLabels,galleryOrdering} from './gallery.mjs';
 import {PHOTO_LABELS,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
 import {photoDate} from '../public/assets/photo-date.mjs';
-const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
+import {nameCorrectionKey,normalizedName,matchingPeople,correctPersonName,correctNamedContent} from './name-corrections.mjs';
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
 // One SQLite-backed object serializes updates for this family. Binary files live in HF.
@@ -79,9 +79,10 @@ export class FamilyState {
         this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
-        const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn;
+        const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn||(p.id==='roi'&&(person.firstName!==p.firstName||person.lastName!==p.lastName));
         if(nameChanged||Boolean(person.extended)!==Boolean(p.extended)||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)||(p.aliyahMonth&&person.aliyahMonth!==p.aliyahMonth)){
           person.name=p.name;person.nameEn=p.nameEn;person.extended=Boolean(p.extended);person.deceased=Boolean(p.deceased);
+          if(p.id==='roi'){person.firstName=p.firstName;person.lastName=p.lastName;}
           if(person.deathDate===undefined)person.deathDate=p.deathDate||null;
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
           if(p.aliyahMonth)person.aliyahMonth=p.aliyahMonth;
@@ -119,9 +120,34 @@ export class FamilyState {
       if(labelsChanged){
         // Invalidate each person's cache once. Never visit or retag every photo on startup.
         for(const row of this.rows('SELECT data FROM people')){const person=JSON.parse(row.data);if(!revised.has(person.id))this.savePerson(person);}
-        for(const kind of ['gallery','photos','videos','nostalgia',...couples.map(pair=>weddingCollection(pair.id))])this.touch(kind);
+        const collections=new Set(['gallery','photos','videos','nostalgia',...couples.map(pair=>weddingCollection(pair.id)),...this.rows("SELECT id FROM meta WHERE id LIKE 'collection:%'").map(row=>row.id.slice(11))]);
+        for(const kind of collections)this.touch(kind);
       }
+      this.correctStoredNames();
     });
+  }
+  correctStoredNames(){
+    if(this.rows('SELECT value FROM meta WHERE id=?',nameCorrectionKey).length)return;
+    // This one-time pass updates authored text, including deleted photos and history,
+    // without retagging, copying or rewriting any binary photo.
+    for(const table of ['people','media','media_trash','photo_versions','stories','weddings','greetings','trivia_questions']){
+      for(const row of this.rows('SELECT rowid AS row_id,data FROM '+table+' WHERE data LIKE ? OR data LIKE ?','%חריזי%','%Harizi%')){
+        const previous=JSON.parse(row.data),item=correctNamedContent(previous);
+        if(JSON.stringify(item)===JSON.stringify(previous))continue;
+        if(table==='people'){this.savePerson(item);continue;}
+        if(table==='stories')item.updatedAt=new Date(Math.max(Date.now(),Date.parse(item.updatedAt)||0)+1).toISOString();
+        if(table==='weddings')item.revision=uid();
+        this.sql.exec('UPDATE '+table+' SET data=? WHERE rowid=?',JSON.stringify(item),row.row_id);
+        if(table==='media')this.touchMedia(item);
+        if(table==='stories')this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
+      }
+    }
+    for(const table of ['jachnun_scores','rex_scores','neto_tetris_scores','ruti_house_scores']){
+      for(const row of this.rows('SELECT id,name FROM '+table+' WHERE name LIKE ? OR name LIKE ?','%חריזי%','%Harizi%')){
+        const name=correctPersonName(row.name);if(name!==row.name)this.sql.exec('UPDATE '+table+' SET name=? WHERE id=?',name,row.id);
+      }
+    }
+    this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',nameCorrectionKey,'applied');
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
   person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');return JSON.parse(row.data);}
@@ -297,7 +323,7 @@ export class FamilyState {
         const name=text(change.name,'שם',120,true).replace(/\s+/g,' '),key=normalizedName(name);
         if(!key)throw new HttpError(400,'יש להזין שם מלא.');
         roster??=this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data));
-        const matches=roster.filter(p=>[p.name,p.nameEn].filter(Boolean).some(alias=>normalizedName(alias)===key));
+        const matches=matchingPeople(roster,name);
         if(matches.length>1)throw new HttpError(409,'יש כמה אנשים בשם '+name+'. בחרו את האדם המתאים מהרשימה.');
         person=matches[0];
         if(!person){person={id:'extra-'+uid().slice(0,24),name,extra:true,birthday:'1.1.1111',profileId:null,revision:uid(),createdAt:new Date().toISOString()};this.sql.exec('INSERT INTO people(id,data) VALUES(?,?)',person.id,JSON.stringify(person));roster.push(person);}
@@ -633,7 +659,7 @@ export class FamilyState {
         if(p.personId){if(typeof p.personId!=='string')throw new HttpError(400,'האדם לא נמצא.');this.person(p.personId);if(p.tagged)ids.add(p.personId);else ids.delete(p.personId);}
         else if(!p.tagged)throw new HttpError(400,'יש לבחור את האדם שאת התיוג שלו רוצים להסיר.');
         const result=this.run('media.tags.save',{id:item.id,personIds:[...ids],newNames:p.name?[p.name]:[],expectedRevision:this.tagsRevision(item.id)});
-        const person=p.personId?this.person(p.personId):result.item.tags.find(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalizedName(alias)===normalizedName(p.name.trim().replace(/\s+/g,' '))));
+        const person=p.personId?this.person(p.personId):matchingPeople(result.item.tags,p.name)[0];
         return {...result,tagged:p.tagged,taggedPerson:{id:person.id,name:person.name,nameEn:person.nameEn||null,extra:Boolean(person.extra)}};
       }
       case 'media.tags.save':{
@@ -646,7 +672,7 @@ export class FamilyState {
         for(const value of p.newNames){
           const name=text(value,'שם',120,true).replace(/\s+/g,' '),normalized=normalizedName(name);
           if(!normalized)throw new HttpError(400,'יש להזין שם מלא.');
-          const matching=roster.filter(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalizedName(alias)===normalized));
+          const matching=matchingPeople(roster,name);
           if(matching.length>1)throw new HttpError(409,'יש כמה אנשים בשם '+name+'. בחרו את האדם המתאים מהרשימה.');
           let person=matching[0];
           if(!person){person={id:'extra-'+uid().slice(0,24),name,extra:true,birthday:'1.1.1111',profileId:null,revision:uid(),createdAt:new Date().toISOString()};this.sql.exec('INSERT INTO people(id,data) VALUES(?,?)',person.id,JSON.stringify(person));roster.push(person);}

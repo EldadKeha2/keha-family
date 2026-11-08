@@ -8,6 +8,7 @@ import {fail} from '../src/http.mjs';
 import family from '../src/family.mjs';
 import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
 import {photoUploadPayload,PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES} from '../public/assets/photo-upload-metadata.mjs';
+import {nameCorrectionKey} from '../src/name-corrections.mjs';
 
 function fixture(){
   const database=new DatabaseSync(':memory:');
@@ -84,6 +85,56 @@ async function uploadWithDetails(f,path,metadata,{bytes=photo,name='23_11_1986_P
  let offset=0;const stream=split?new ReadableStream({pull(controller){if(offset===body.length){controller.close();return;}const end=Math.min(body.length,offset+(offset<150?1:57));controller.enqueue(body.subarray(offset,end));offset=end;}}):body;
  return f.call(path+'?filename='+encodeURIComponent(name),{method:'POST',body:stream,headers:{...payload.headers,'Content-Type':mime,'Content-Length':String(body.byteLength)}});
 }
+test('Roei Elharizi reaches existing photo tags, faces and saved text while keeping files, profiles and full-tag review intact',async()=>{
+ const f=fixture();try{
+  await f.connect();const response=await uploadWithDetails(f,'/api/collections/gallery/upload',{date:{year:1986},caption:'רועי חריזי / Roei Harizi'},{name:'Roei_Harizi.jpg'});assert.equal(response.status,201);
+  const item=(await response.json()).collection.items[0],faceId='b'.repeat(32),rect={x:.1,y:.2,width:.3,height:.4};
+  assert.equal((await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId,personId:'roi',rect,expectedRevision:null}})).status,200);
+  const tagged=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;
+  assert.equal((await f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{photoRevision:'original',tagsRevision:tagged.tagsRevision,complete:true}})).status,200);
+  const before=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data),oldPerson=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('roi').data);
+  Object.assign(oldPerson,{name:'רועי חריזי',nameEn:'Roei Harizi',lastName:'חריזי',profileId:item.id,about:'רועי חריזי עם המשפחה',aboutEn:'Roei Harizi with family'});
+  f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(oldPerson),'roi');
+  f.database.prepare('INSERT INTO photo_versions(media_id,id,data) VALUES(?,?,?)').run(item.id,'c'.repeat(32),JSON.stringify({id:'c'.repeat(32),key:before.key,filename:'Roei_Harizi.jpg',mime:'image/jpeg',size:photo.length,createdAt:before.createdAt,faces:[{id:faceId,personId:'roi',rect}]}));
+  const story={id:'story-roi',year:1986,title:'רועי חריזי',author:'Roei Harizi',body:'רועי חריזי ורותי חריזי',attachments:[item.id],createdAt:'2020-01-01T00:00:00.000Z',updatedAt:'2020-01-01T00:00:00.000Z'};
+  f.database.prepare('INSERT INTO stories(id,data) VALUES(?,?)').run(story.id,JSON.stringify(story));
+  f.database.prepare('INSERT INTO greetings(id,wedding_id,data) VALUES(?,?,?)').run('greeting-roi','u-tomer',JSON.stringify({id:'greeting-roi',author:'רועי חריזי',body:'Roei Harizi'}));
+  f.database.prepare('INSERT INTO trivia_questions(id,language,data,created_at) VALUES(?,?,?,?)').run('question-roi','en',JSON.stringify({language:'en',question:'Who is Roei Harizi?',options:['Roei Harizi','Ruth Harizi','Yona Nakash','Shlomo Keha'],correctIndex:0}),story.createdAt);
+  f.database.prepare('INSERT INTO jachnun_scores(id,name,score,head_id,created_at) VALUES(?,?,?,?,?)').run('score-roi','רועי חריזי',10,'roi',story.createdAt);
+  const trashed=await taggedUpload(f,'/api/collections/gallery',photo,'Roei_Harizi.jpg');assert.equal((await f.call('/api/media/'+trashed.id+'/delete',{method:'POST',body:{scope:'gallery'}})).status,200);
+  const objectsBefore=[...f.objects].map(([key,value])=>[key,Buffer.from(value.bytes)]),galleryBefore=await f.call('/api/collections/gallery');
+  f.database.prepare('DELETE FROM meta WHERE id=?').run(nameCorrectionKey);f.restart();
+  const view=(await(await f.call('/api/media/'+item.id+'/faces')).json());
+  assert.deepEqual(view.item.tags.map(person=>[person.id,person.name,person.nameEn]),[['roi','רועי אלחריזי','Roei Elharizi']]);
+  assert.equal(view.faces[0].person.nameEn,'Roei Elharizi');assert.deepEqual(view.faces[0].rect,rect);assert.equal(view.faces[0].id,faceId);assert.equal(view.item.faceSummary.reviewed,true);assert.equal(view.item.tagsRevision,tagged.tagsRevision);
+  assert.equal(view.item.caption,'רועי אלחריזי / Roei Elharizi');assert.equal(view.item.filename,'Roei_Elharizi.jpg');assert.deepEqual(view.item.takenDate,{day:null,month:null,year:1986});
+  const after=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data);
+  for(const key of ['id','key','file','createdAt','photoRevision','takenDateRevision'])assert.deepEqual(after[key],before[key]);
+  assert.deepEqual(Buffer.from(await(await f.call(view.item.src)).arrayBuffer()),photo);assert.deepEqual([...f.objects].map(([key,value])=>[key,Buffer.from(value.bytes)]),objectsBefore);
+  const person=(await(await f.call('/api/people/roi/page')).json()).person;assert.equal(person.profileId,item.id);assert.equal(person.lastName,'אלחריזי');assert.equal(person.about,'רועי אלחריזי עם המשפחה');assert.equal(person.aboutEn,'Roei Elharizi with family');assert.equal(person.deathDate,oldPerson.deathDate);
+  const history=JSON.parse(f.database.prepare('SELECT data FROM photo_versions WHERE media_id=?').get(item.id).data);assert.equal(history.filename,'Roei_Elharizi.jpg');assert.equal(history.key,before.key);assert.equal(history.faces[0].personId,'roi');
+  const savedStory=JSON.parse(f.database.prepare('SELECT data FROM stories WHERE id=?').get(story.id).data);assert.equal(savedStory.body,'רועי אלחריזי ורותי חריזי');assert.notEqual(savedStory.updatedAt,story.updatedAt);assert.deepEqual(savedStory.attachments,story.attachments);
+  assert.equal(JSON.parse(f.database.prepare('SELECT data FROM greetings WHERE id=?').get('greeting-roi').data).body,'Roei Elharizi');
+  assert.equal(JSON.parse(f.database.prepare('SELECT data FROM trivia_questions WHERE id=?').get('question-roi').data).options[0],'Roei Elharizi');assert.equal(f.database.prepare('SELECT name FROM jachnun_scores WHERE id=?').get('score-roi').name,'רועי אלחריזי');
+  assert.equal(JSON.parse(f.database.prepare('SELECT data FROM media_trash WHERE id=?').get(trashed.id).data).filename,'Roei_Elharizi.jpg');
+  assert.equal((await f.call('/api/media/'+trashed.id+'/restore',{method:'POST',body:{scope:'gallery'}})).status,200);assert.equal((await(await f.call('/api/media/'+trashed.id+'/view')).json()).item.filename,'Roei_Elharizi.jpg');
+  assert.equal((await f.call('/api/collections/gallery',{headers:{'If-None-Match':galleryBefore.headers.get('ETag')}})).status,200);
+  const unchanged=f.database.prepare('SELECT data FROM people WHERE id=?').get('roi').data;f.restart();assert.equal(f.database.prepare('SELECT data FROM people WHERE id=?').get('roi').data,unchanged);assert.equal(f.database.prepare('SELECT value FROM meta WHERE id=?').get(nameCorrectionKey).value,'applied');
+ }finally{await f.close();}
+});
+test('all tagging APIs accept legacy Roei names as aliases without creating a second person',async()=>{
+ const f=fixture();try{
+  await f.connect();const initial=f.database.prepare('SELECT count(*) AS n FROM people').get().n;
+  for(const [index,name]of ['רועי חריזי','Roei Harizi','Roi Harizi','רועי אלחריזי','Roei Elharizi'].entries()){
+   const item=await taggedUpload(f,'/api/collections/gallery');
+   const bulk=await setTags(f,item,[],[name]);assert.equal(bulk.status,200,await bulk.clone().text());assert.deepEqual((await bulk.json()).item.tags.map(person=>person.id),['roi']);
+   const patch=await f.call('/api/media/'+item.id+'/tags/patch',{method:'POST',body:{changes:[{name,tagged:true}]}});assert.equal(patch.status,200,await patch.clone().text());assert.equal((await patch.json()).taggedPeople[0].id,'roi');
+   const single=await f.call('/api/media/'+item.id+'/tag',{method:'POST',body:{name,tagged:true}});assert.equal(single.status,200,await single.clone().text());assert.equal((await single.json()).taggedPerson.id,'roi');
+   const face=await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:String(index+1).repeat(32),name,rect:{x:.1,y:.1,width:.2,height:.2},expectedRevision:null}});assert.equal(face.status,200,await face.clone().text());assert.equal((await face.json()).face.personId,'roi');
+  }
+  assert.equal(f.database.prepare('SELECT count(*) AS n FROM people').get().n,initial);
+ }finally{await f.close();}
+});
 test('photo upload dates and descriptions save together in every album and retain the original file bytes',async()=>{
  const f=fixture();try{
   await f.connect();const ids=[],paths=['/api/collections/gallery/upload','/api/collections/photos/upload','/api/people/yona/photos','/api/nursery/yona/upload','/api/weddings/u-tomer/upload','/api/nostalgia/upload'];

@@ -68,7 +68,7 @@ function fixture({english=false}={}){
 
 test('both memorial intros retain Roi’s tribute and timer while removing the instruction sidebar and fictional family art',()=>{
   for(const english of [false,true]){
-    const f=fixture({english});f.mount();assert.match(f.html,english?/Heading North/:/נוסעים לצפון/);assert.match(f.html,english?/In loving memory of Roei Harizi/:/לזכרו של רועי חריזי/);
+    const f=fixture({english});f.mount();assert.match(f.html,english?/Heading North/:/נוסעים לצפון/);assert.match(f.html,english?/In loving memory of Roei Elharizi/:/לזכרו של רועי אלחריזי/);
     assert.match(f.html,/data-north-time[^>]*>3:00/);assert.doesNotMatch(f.html,/north-guide|north-tip|north-route-card|north-rules|Two collisions|Three collisions|שתי התנגשויות|שלוש התנגשויות/);
     assert.equal(f.frames.size,0);assert.equal(f.audioCreated,0);assert.equal(f.requests.length,0);
     for(const file of ['roi-profile.webp','cruze-roi-v2.webp','roi-stop-v2.webp'])assert.ok(f.imageRequests.includes('assets/games/north/'+file),file+' must load');

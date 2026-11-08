@@ -17,7 +17,7 @@ const $=selector=>host?.querySelector(selector);
 const clock=value=>{const seconds=Math.max(0,Math.ceil(value-1e-6));return Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');};
 const reduced=()=>document.documentElement.hasAttribute('data-a11y-motion')||window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const title=()=>tr('נוסעים לצפון','Heading North');
-const tribute=()=>tr('לזכרו של רועי חריזי ז״ל','In loving memory of Roei Harizi');
+const tribute=()=>tr('לזכרו של רועי אלחריזי ז״ל','In loving memory of Roei Elharizi');
 function stopFrame(){if(frame!==null)cancelAnimationFrame(frame);frame=null;lastFrame=0;keys.clear();held=0;dragging=false;}
 function stopAudio(){for(const node of audioNodes){try{node.stop();}catch{}}audioNodes=[];}
 export function pauseNorth(){if(state.phase==='playing')state.phase='paused';stopFrame();stopAudio();events?.abort();events=null;host?.classList.remove('has-family-north');host=null;}
@@ -38,7 +38,7 @@ function loadImages(){
     const img=new Image();images.set(key,img);img.onload=()=>{if(host)draw();};img.onerror=()=>{img.failed=true;};img.src=ART+file;
   }
 }
-function memory(){return `<aside class="north-story"><div class="north-memory"><img class="north-portrait" src="${ART}roi-profile.webp" width="251" height="358" alt="${tr('רועי חריזי מחייך','Roei Harizi smiling')}"><p>${tr('כל מי שהכיר את רועי ידע: הוא היה חולה הגה אמיתי. השברולט קרוז המיתולוגית שלו הייתה חלק בלתי נפרד ממנו, וכשהוא היה מאחורי ההגה — תמיד הרגשנו שאנחנו בידיים טובות.','Everyone who knew Roei knew how much he loved to drive. His legendary Chevrolet Cruze was part of who he was, and with him behind the wheel, we always felt we were in good hands.')}</p><p>${tr('רועי אהב לעבוד, ולמפגשים המשפחתיים הגדולים בצפון הוא היה מגיע לא פעם באיחור. הפעם כולנו כבר מחכים לו. היכנסו לקרוז, עזרו לו לעקוף את המכשולים והביאו אותו למפגש בזמן.','Roei loved his work, and he often arrived late to our big family gatherings in the north. This time, everyone is already waiting. Get into the Cruze, weave past the obstacles, and help him reach the family in time.')}</p><span class="north-memory-signature">${tr('עוד נסיעה אחת, יחד איתך ♡','One more drive, together with you ♡')}</span></div></aside>`;}
+function memory(){return `<aside class="north-story"><div class="north-memory"><img class="north-portrait" src="${ART}roi-profile.webp" width="251" height="358" alt="${tr('רועי אלחריזי מחייך','Roei Elharizi smiling')}"><p>${tr('כל מי שהכיר את רועי ידע: הוא היה חולה הגה אמיתי. השברולט קרוז המיתולוגית שלו הייתה חלק בלתי נפרד ממנו, וכשהוא היה מאחורי ההגה — תמיד הרגשנו שאנחנו בידיים טובות.','Everyone who knew Roei knew how much he loved to drive. His legendary Chevrolet Cruze was part of who he was, and with him behind the wheel, we always felt we were in good hands.')}</p><p>${tr('רועי אהב לעבוד, ולמפגשים המשפחתיים הגדולים בצפון הוא היה מגיע לא פעם באיחור. הפעם כולנו כבר מחכים לו. היכנסו לקרוז, עזרו לו לעקוף את המכשולים והביאו אותו למפגש בזמן.','Roei loved his work, and he often arrived late to our big family gatherings in the north. This time, everyone is already waiting. Get into the Cruze, weave past the obstacles, and help him reach the family in time.')}</p><span class="north-memory-signature">${tr('עוד נסיעה אחת, יחד איתך ♡','One more drive, together with you ♡')}</span></div></aside>`;}
 function loadFamilyImages(){
   for(const head of familyHeads()){
     if(images.has(head.id))continue;

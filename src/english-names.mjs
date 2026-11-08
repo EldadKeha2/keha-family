@@ -19,7 +19,7 @@ export const englishNames={
   "sharon": "Sharon Dayan",
   "yonatan-d": "Yonatan Dayan",
   "lihi": "Lihi Dayan",
-  "roi": "Roei Harizi",
+  "roi": "Roei Elharizi",
   "becker-parent": "Elisheva Becker",
   "israel-becker": "Israel Becker",
   "yuval": "Yuval Becker",
