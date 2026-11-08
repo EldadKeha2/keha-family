@@ -40,7 +40,7 @@
   <link rel="stylesheet" href="assets/soup.css?v=a11y1">
   <link rel="stylesheet" href="assets/differences.css?v=a11y1">
   <link rel="stylesheet" href="assets/nursery.css?v=a11y1">
-  <link rel="stylesheet" href="assets/faces.css?v=review-icon-v6">
+  <link rel="stylesheet" href="assets/faces.css?v=compact-filters-v1">
   <link rel="stylesheet" href="assets/photo-collections.css?v=1">
   <link rel="stylesheet" href="assets/navigation.css?v=a11y1">
   <link rel="stylesheet" href="assets/accessibility.css?v=a11y1">
@@ -49,7 +49,7 @@
   <script src="assets/maintenance.js" defer></script>
   <script src="assets/family-fallback.js" defer></script>
   <script src="family-data.js" defer></script>
-  <script src="assets/translations.js?v=complete-tagging-v4" defer></script>
+  <script src="assets/translations.js?v=compact-filters-v1" defer></script>
   <script src="assets/i18n.js?v=compat1" defer></script>
   <script src="assets/photo-editor.js?v=photo-history-v1" type="module"></script>
   <script src="assets/navigation.js?v=1" defer></script>
@@ -58,10 +58,10 @@
   <script src="assets/dates.js" defer></script>
   <script src="assets/tags.js?v=photo-face-only-v2" defer></script>
   <script src="assets/faces.js?v=review-icon-v8" defer></script>
-  <script src="assets/gallery-faces.js?v=5" defer></script>
+  <script src="assets/gallery-faces.js?v=compact-filters-v1" defer></script>
   <script src="assets/photo-collections.js?v=1" defer></script>
   <script src="assets/media.js?v=album-covers-v2" defer></script>
-  <script src="assets/portal.js?v=review-icon-v5" defer></script>
+  <script src="assets/portal.js?v=compact-filters-v1" defer></script>
   <script src="assets/updates.js" defer></script>
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
   <script src="assets/people.js?v=friends-v1" defer></script>
@@ -129,8 +129,8 @@
         <section id="updatesView" class="portal-view updates-view" aria-label="עדכונים" hidden><div id="updatesContent"></div></section>
         <section id="galleryView" class="portal-view compact-gallery-view" aria-label="הגלריה" hidden>
           <div class="collection-heading"><div><span class="small-eyebrow">רגעים קטנים, זיכרונות גדולים</span><h3 class="compact-gallery-title">הגלריה המשפחתית</h3><span class="collection-count" id="sharedGalleryCount"></span></div><button class="primary-button" data-upload-collection="gallery">＋ הוספת תמונות</button></div>
-          <div class="archive-filters gallery-tag-filters" aria-label="סינון תמונות בגלריה"><button type="button" data-gallery-filter="all" aria-pressed="true">כל התמונות</button><button type="button" data-gallery-filter="untagged" aria-pressed="false">תמונות לא מתויגות</button><button type="button" data-gallery-filter="partial" aria-pressed="false">תמונות מתויגות חלקית</button><button type="button" data-gallery-filter="complete" aria-pressed="false">מתויגות מלא</button></div>
-          <div class="gallery-face-scan"><span id="galleryFaceScanStatus" role="status"></span><button id="retryGalleryFaceScan" type="button" hidden>ניסיון נוסף לסריקת התמונות</button></div>
+          <div class="archive-filters gallery-tag-filters" aria-label="סינון תמונות בגלריה"><button type="button" data-gallery-filter="all" aria-pressed="true">הכל</button><button type="button" data-gallery-filter="untagged" aria-pressed="false">ללא תיוג</button><button type="button" data-gallery-filter="partial" aria-pressed="false">תיוג חלקי</button><button type="button" data-gallery-filter="complete" aria-pressed="false">תיוג מלא</button></div>
+          <div class="gallery-face-scan" hidden><span id="galleryFaceScanStatus" role="status"></span><button id="retryGalleryFaceScan" type="button" hidden>ניסיון נוסף לסריקת התמונות</button></div>
           <nav class="gallery-pager" data-gallery-pager aria-label="דפדוף בתמונות" hidden><label>תמונות בעמוד<select data-gallery-size><option value="100">100</option><option value="200">200</option><option value="300">300</option><option value="400">400</option><option value="500">500</option></select></label><span data-gallery-page-label role="status"></span><div><button class="secondary-button" data-gallery-prev>הקודם</button><button class="primary-button" data-gallery-next>הבא</button></div></nav>
           <div class="compact-gallery-grid" id="sharedGalleryGrid"></div><nav class="gallery-pager" data-gallery-pager aria-label="דפדוף בתמונות" hidden><label>תמונות בעמוד<select data-gallery-size><option value="100">100</option><option value="200">200</option><option value="300">300</option><option value="400">400</option><option value="500">500</option></select></label><span data-gallery-page-label role="status"></span><div><button class="secondary-button" data-gallery-prev>הקודם</button><button class="primary-button" data-gallery-next>הבא</button></div></nav><div class="portal-empty" id="sharedGalleryEmpty"><span class="empty-emblem" aria-hidden="true">▧</span><h3>כל רגע משפחתי מתחיל בתמונה</h3><p>אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.</p></div>
           <div class="collection-upload" id="galleryDropzone"><div><span class="small-eyebrow">עוד מקום לזיכרונות שלנו</span><h3>מוסיפים תמונות לגלריה</h3><p>בחרו כמה תמונות יחד או גררו אותן לכאן · עד 50MB לתמונה.</p></div><button class="primary-button" data-upload-collection="gallery">＋ בחירת תמונות</button><div id="galleryUploadState" class="collection-upload-state" role="status"></div><progress id="galleryProgress" max="100" value="0" hidden aria-label="התקדמות העלאת התמונות"></progress></div>

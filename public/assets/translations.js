@@ -697,6 +697,10 @@ Object.assign(window.FAMILY_TRANSLATIONS,{'הורדת תמונה':'Download phot
 
 Object.assign(window.FAMILY_TRANSLATIONS,{
   'סינון תמונות בגלריה':'Filter gallery photos',
+  'הכל':'All',
+  'ללא תיוג':'Untagged',
+  'תיוג חלקי':'Partial',
+  'תיוג מלא':'Fully tagged',
   'כל התמונות':'All photos',
   'תמונות לא מתויגות':'Untagged photos',
   'לא נמצאו תמונות לא מתויגות':'No untagged photos found',

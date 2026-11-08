@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
-  let active=false,viewer=false,job=null,timer=null,after=0,finished=false,failed=0,pending=0;
+  let active=false,viewer=false,job=null,timer=null,after=0,finished=false,failed=0;
   const eligible=()=>active&&!viewer&&document.visibilityState!=='hidden'&&window.FamilyApp?.apiEnabled;
   async function request(path,options={}){
     const response=await I.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
@@ -9,9 +9,10 @@
   }
   function status(){
     const host=document.getElementById('galleryFaceScanStatus');if(!host)return;
-    host.textContent=finished?(failed?tr('סריקת הפנים הסתיימה; חלק מהתמונות לא נסרקו.','Face scan finished; some photos could not be scanned.'):tr('סריקת הפנים מעודכנת.','Face scanning is up to date.')):
-      tr('סורקים את התמונות לאיתור פנים…','Scanning photos for faces…')+(pending?' '+tr('נותרו ','Remaining: ')+pending:'')+(viewer?tr(' · הסריקה תמשיך בסגירת התמונה',' · Scanning resumes when the photo closes'):'');
-    const retry=document.getElementById('retryGalleryFaceScan');if(retry)retry.hidden=!(finished&&failed);
+    const retryable=finished&&failed>0;
+    host.textContent=retryable?tr('חלק מהתמונות לא נסרקו.','Some photos could not be scanned.'):'';
+    host.parentElement.hidden=!retryable;
+    const retry=document.getElementById('retryGalleryFaceScan');if(retry)retry.hidden=!retryable;
   }
   function pause(){clearTimeout(timer);timer=null;job?.abort();}
   function start(){if(!eligible()||job||timer||finished)return;timer=setTimeout(()=>{timer=null;run();},250);}
@@ -31,7 +32,7 @@
   async function run(){
     if(!eligible()||job||finished)return;const controller=new AbortController();job=controller;status();
     try{
-      const batch=await request('api/gallery/face-scan?after='+after,{signal:controller.signal});pending=batch.pending;
+      const batch=await request('api/gallery/face-scan?after='+after,{signal:controller.signal});
       if(!batch.items.length){finished=true;status();return;}
       const {detectFaces}=await import('./face-detector.mjs?v=11');
       for(const item of batch.items){
@@ -39,7 +40,7 @@
         try{
           const image=await imageFor(item,controller.signal),faces=await detectFaces(item.id+':'+(item.photoRevision||'original'),image,controller.signal);
           if(faces.complete===false||!Array.isArray(faces.galleryFaces))throw Error('Face scan incomplete');
-          await save(item,faces,controller.signal);pending=Math.max(0,pending-1);
+          await save(item,faces,controller.signal);
         }catch(error){if(controller.signal.aborted)break;failed++;}
         after=item.cursor;status();
       }
