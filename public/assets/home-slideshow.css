@@ -1,4 +1,5 @@
 .home-slide-open{position:relative;isolation:isolate;overflow:hidden}
+body[data-active-view=home] .workspace-header{display:none}
 .home-slide-open img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .home-slide-incoming{z-index:2;animation:homePhotoIn var(--home-slide-duration,650ms) cubic-bezier(.22,.7,.25,1) both;will-change:opacity,transform}
 .home-slide-outgoing{z-index:1;animation:homePhotoOut var(--home-slide-duration,650ms) cubic-bezier(.4,0,.6,1) both;will-change:opacity,transform}
