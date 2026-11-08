@@ -80,3 +80,14 @@
   html[data-a11y-text] body:not([data-active-view=home]) .site-header{grid-template-columns:minmax(0,1fr);grid-template-areas:"brand" "preferences" "navigation";row-gap:6px}
   html[data-a11y-text] body:not([data-active-view=home]) .site-header .header-preferences{width:auto}
 }
+
+/* Keep desktop shortcuts centered between the family title and preferences. */
+@media(min-width:1200px){
+  html:not([data-a11y-text]) .site-header{display:grid;grid-template-columns:minmax(0,1fr) max-content minmax(0,1fr);column-gap:22px}
+  html:not([data-a11y-text]) .site-header .brand{grid-column:1;grid-row:1;justify-self:start;width:max-content;max-width:100%;min-width:0;flex:none}
+  html:not([data-a11y-text]) .site-header .home-install{grid-column:2;grid-row:1;justify-self:center}
+  html:not([data-a11y-text]) .site-header .home-install-actions{flex-wrap:nowrap}
+  html:not([data-a11y-text]) .site-header .header-preferences{grid-column:3;grid-row:1;display:flex;align-items:center;justify-self:end;gap:16px}
+  html:not([data-a11y-text]) .site-header .language-selector{margin:0}
+  html:not([data-a11y-text]) .site-header .main-nav{grid-column:1/-1;grid-row:2;width:100%;min-width:0;margin:0}
+}
