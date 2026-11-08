@@ -1,4 +1,4 @@
-# Heading North — Roei Harizi memorial game
+# Heading North — Roei Elharizi memorial game
 
 Open `?game=north#games`, or choose the first game in the family lobby. The game is available in Hebrew and English. It retains Roi’s memorial story and his actual profile photograph, with a black Chevrolet Cruze and an illustrated roadside stop. See `north-art.md` for artwork sources. The interface keeps the trip timer and short control hints beside the road; the former instruction sidebar and collision-formula warnings have been removed.
 
