@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createHouseActor,createHouseMotion} from '../public/assets/ruti-house-motion.mjs';
+import {createHouseActor,createHouseMotion,houseWalkingSpeed} from '../public/assets/ruti-house-motion.mjs';
+import {getHouseLayout,findHousePath} from '../public/assets/ruti-house-scene.mjs';
 
 function finish(motion,step=1/60){
   for(let i=0;i<2000;i++){const result=motion.tick(step);if(result)return result;}
@@ -90,4 +91,30 @@ test('pausing by omitting ticks preserves movement and action progress',()=>{
   assert.equal(motion.tick(-1),null);assert.equal(motion.tick(Infinity),null);
   assert.deepEqual(actor,before);
   motion.tick(.25);assert.ok(Math.abs(actor.actionProgress-.5)<1e-8);
+});
+
+test('desktop movement removes the long cross-screen wait while phone pacing and action duration remain unchanged',()=>{
+  const times=[];
+  for(const [width,height]of [[390,570],[960,600],[1130,530],[1440,750]]){
+    const layout=getHouseLayout(width,height);
+    const elapsed=layout.plants.map(plant=>{
+      const actor=createHouseActor({x:.51,y:.83}),controller=createHouseMotion(actor,(from,to)=>findHousePath(layout,from,to),{speed:()=>houseWalkingSpeed(width),aspect:()=>width/height});
+      controller.walkTo(plant.anchor,{action:'water',duration:1.05});let time=0,actingTime=0;
+      while(controller.busy&&time<30){const wasActing=controller.state==='acting';controller.tick(1/120);time+=1/120;if(wasActing)actingTime+=1/120;}
+      assert.ok(actingTime>=1.03&&actingTime<=1.06,'watering itself retains its real duration');
+      assert.equal(actor.x,plant.anchor.x);assert.equal(actor.y,plant.anchor.y);return time;
+    });
+    times.push(elapsed);
+  }
+  assert.equal(houseWalkingSpeed(390),.68);assert.equal(houseWalkingSpeed(700),.68);
+  for(const desktop of times.slice(1))for(let i=0;i<4;i++)assert.ok(desktop[i]<=times[0][i]+.08,'a corresponding desktop plant no longer takes longer to reach');
+});
+
+test('responsive speed changes keep the current route and pending action instead of resetting or duplicating it',()=>{
+  const actor=createHouseActor({x:.1,y:.5});let width=390;
+  const controller=createHouseMotion(actor,undefined,{speed:()=>houseWalkingSpeed(width)});
+  controller.walkTo({x:.9,y:.5},{action:'water',duration:.5,payload:'one'});controller.tick(.1);
+  const before=actor.x;width=1130;controller.tick(.1);assert.ok(actor.x>before);
+  assert.equal(actor.action,null);assert.deepEqual(finish(controller),{action:'water',payload:'one'});
+  assert.equal(controller.tick(2),null);
 });

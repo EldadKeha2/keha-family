@@ -342,8 +342,8 @@ export function guestEatingPose(resident,layout,elapsed,{reduced=false}={}){
  const age=Math.max(0,elapsed-(resident.servedAt||0)-(route?.duration||0)-.5);
  return {bite:seated.sitting>.9&&age<18?(reduced?.5:Math.max(0,Math.sin(age*Math.PI/1.15))):0,remaining:Math.max(0,1-age/18)};
 }
-const RUTI_BODY_WIDTH=.91;
-function drawRutiFrame(ctx,atlas,frame,height,pose){
+const RUTI_BODY_WIDTH=.62;
+export function drawRutiFrame(ctx,atlas,frame,height,pose={}){
  const cw=atlas.naturalWidth/RUTI_ATLAS.columns,ch=atlas.naturalHeight/RUTI_ATLAS.rows;
  const sx=(frame%4)*cw+.5,sy=Math.floor(frame/4)*ch+.5,scale=height/345;
  const neck=RUTI_NECKLINES[frame],pivot=RUTI_PIVOTS[frame];
@@ -358,11 +358,21 @@ function drawRutiFrame(ctx,atlas,frame,height,pose){
   };
   if(pose.sitting>0&&from<230&&to>230){draw(from,230.5);draw(230,to);}else draw(from,to);
  }
+ function body(bottom=362){
+  ctx.save();
+  if(frame!==4){const neckY=(neck-355)*scale;ctx.translate(0,neckY);ctx.rotate(pose.headTilt||0);ctx.translate(0,-neckY+(pose.headLift||0)*height);}
+  strip(0,neck,1);ctx.restore();
+  // Fine overlapping bands keep the original face, jaw and neck uncompressed
+  // while smoothly tapering the shoulders into a consistently slender body.
+  for(let i=0;i<18;i++){const t=(i+.5)/18,blend=t*t*(3-2*t);strip(neck+i*2,neck+(i+1)*2,1-(1-RUTI_BODY_WIDTH)*blend);}
+  const bodyTop=neck+36;
+  if(frame===3){strip(bodyTop,190,RUTI_BODY_WIDTH);strip(190,bottom,RUTI_BODY_WIDTH);}
+  else strip(bodyTop,bottom,RUTI_BODY_WIDTH);
+ }
  if(frame===4){
-  // One original image contains the head, neck, collar, shoulders and hands.
-  // They share both scale and motion: singing never swaps in another head or
-  // places a seam through the neck. Only the grounded feet take separate steps.
-  strip(0,310,1);
+  // Singing, sweeping and dancing use the same original connected pose. Only
+  // its body is reshaped; the face never changes width or swaps to another head.
+  body(310);
   if(pose.mouthOpen>.12){
    // Animate only the mouth inside the original face; hair, jaw and neckline
    // remain the same unbroken artwork throughout the song.
@@ -373,21 +383,14 @@ function drawRutiFrame(ctx,atlas,frame,height,pose){
    ctx.fillStyle='#f4e7cb';ctx.fillRect(-7,-4,14,3.3);
    ctx.beginPath();ctx.ellipse(0,3.2,4.5,1.7,0,0,Math.PI*2);ctx.fillStyle='#b97061';ctx.fill();ctx.restore();
   }
-  ctx.save();ctx.translate((pose.footLeftX||0)*height,-(pose.footLeftLift||0)*height);
-  strip(309.25,362,1,{left:0,right:130});ctx.restore();
-  ctx.save();ctx.translate((pose.footRightX||0)*height,-(pose.footRightLift||0)*height);
-  strip(309.25,362,1,{left:130,right:205});ctx.restore();
-  strip(309.25,362,1,{left:205,right:362});
+  ctx.save();ctx.translate((pose.footLeftX||0)*height*RUTI_BODY_WIDTH,-(pose.footLeftLift||0)*height);
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:0,right:130});ctx.restore();
+  ctx.save();ctx.translate((pose.footRightX||0)*height*RUTI_BODY_WIDTH,-(pose.footRightLift||0)*height);
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:130,right:205});ctx.restore();
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:205,right:362});
   return;
  }
- ctx.save();const neckY=(neck-355)*scale;
- ctx.translate(0,neckY);ctx.rotate(pose.headTilt||0);ctx.translate(0,-neckY+(pose.headLift||0)*height);
- strip(0,neck,1);
- ctx.restore();
- for(let i=0;i<6;i++){const top=neck+i*6;strip(top,top+6,1-(1-RUTI_BODY_WIDTH)*(i+.5)/6);}
- const bodyTop=neck+36;
- if(frame===3){strip(bodyTop,190,RUTI_BODY_WIDTH);strip(190,362,RUTI_BODY_WIDTH);}
- else strip(bodyTop,362,RUTI_BODY_WIDTH);
+ body();
 }
 
 /** World-pixel geometry keeps the nozzle and stream aimed at the actual pot. */
@@ -422,7 +425,7 @@ function drawRuti(ctx,x,y,height,actor,images,time,reduced,waterTarget=null){
  // Action frames already hold their real object. While idle or walking the
  // selected object stays in hand, including immediately after a tool switch.
  if(![3,4,5,6,9,10].includes(pose.frame)&&actor.tool){
-  const walking=pose.frame===1||pose.frame===2,hx=height*(walking?.20:-.16),hy=-height*.57;
+  const walking=pose.frame===1||pose.frame===2,hx=height*(walking?.20:-.16)*RUTI_BODY_WIDTH,hy=-height*.57;
   if(actor.tool==='broom'){
    line(ctx,hx,hy-height*.13,hx,hy+height*.43,'#9e6d41',height*.026);
    polygon(ctx,[[hx-height*.04,hy+height*.32],[hx+height*.04,hy+height*.32],[hx+height*.09,hy+height*.46],[hx-height*.09,hy+height*.46]],'#d3ae62','#8b6943');
@@ -543,7 +546,9 @@ function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=
  if(!guest&&imageReady(images?.rutiAtlas)){drawRuti(ctx,x,y,height,actor||{facing,walking,action,tool,carryDish},images,time,reduced,waterTarget);return;}
  ctx.save();ctx.translate(x,y);const s=height/100;ctx.scale(s,s);ctx.lineCap='round';ctx.lineJoin='round';
  const cycle=walking?Math.sin(time*13):0,bob=walking?Math.abs(cycle)*2:Math.sin(time*1.8)*.4;
- ellipse(ctx,0,0,22,5,'#4c382c35');ctx.translate(0,-bob);
+ const bodyWidth=guest?1:RUTI_BODY_WIDTH;
+ ellipse(ctx,0,0,22*bodyWidth,5,'#4c382c35');ctx.translate(0,-bob);
+ ctx.save();ctx.scale(bodyWidth,1);
  // Alternating feet and hem make movement visible even without a portrait.
  line(ctx,-9,-26,-11+cycle*8,-5,'#81573d',8);line(ctx,9,-26,11-cycle*8,-5,'#81573d',8);
  ellipse(ctx,-12+cycle*8,-3,8,3.5,'#584c3c');ellipse(ctx,12-cycle*8,-3,8,3.5,'#584c3c');
@@ -559,11 +564,12 @@ function drawHuman(ctx,x,y,height,{portrait=null,guest=false,guestId=null,index=
  else if(action){handX=direction*27;handY=-48+Math.sin(time*17)*4;}
  const armSwing=walking?cycle*7:0;
  line(ctx,-13,-60,-23-armSwing,-39,'#bc8a69',7);line(ctx,13*direction,-60,handX,handY,'#bc8a69',7);ellipse(ctx,handX,handY,4.5,4.5,'#d8a983');
+ ctx.restore();handX*=bodyWidth;
  // Ruti uses a transparent head sprite, with her natural hair contour instead
  // of a circular portrait frame. The neck joins the apron body's shoulders.
  if(!guest&&imageReady(portrait)){
   polygon(ctx,[[-7,-77],[7,-77],[7,-62],[-7,-62]],'#d5a27c');
-  polygon(ctx,[[-13,-66],[-5,-59],[0,-62],[5,-59],[13,-66]],'#f1dfb7','#c4aa85');
+  polygon(ctx,[[-13*bodyWidth,-66],[-5*bodyWidth,-59],[0,-62],[5*bodyWidth,-59],[13*bodyWidth,-66]],'#f1dfb7','#c4aa85');
   const iw=portrait.naturalWidth,ih=portrait.naturalHeight,headScale=Math.min(56/iw,62/ih);
   const headW=iw*headScale,headH=ih*headScale;
   ctx.drawImage(portrait,-headW/2,-62-headH,headW,headH);

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {RECIPES} from '../public/assets/ruti-house-engine.mjs';
 import {guestEatingPose} from '../public/assets/ruti-house-scene.mjs';
-import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse,getRutiWateringGeometry,drawRutiCelebration,getHouseGuestSeat,residentGuestPose,drawHouseGuest} from '../public/assets/ruti-house-scene.mjs';
+import {PLANT_VARIETIES,getHouseLayout,getTaskLocation,findHousePath,renderHouse,getRutiWateringGeometry,drawRutiCelebration,drawRutiFrame,getHouseGuestSeat,residentGuestPose,drawHouseGuest} from '../public/assets/ruti-house-scene.mjs';
 
 const sizes=[[1000,580],[390,570],[320,500]];
 const inside=(point,obstacle,margin=0)=>point.x>obstacle.x-margin&&point.x<obstacle.x+obstacle.w+margin&&point.y>obstacle.y-margin&&point.y<obstacle.y+obstacle.h+margin;
@@ -308,15 +308,17 @@ test('watering faces and lands on every physical pot even if the last walking st
  }
 });
 
-test('the dancer draws her head, neck and shoulders in one continuous original pose at every size',()=>{
+test('the dancer keeps her original face and a gap-free narrow body at every size',()=>{
  const atlas={complete:true,naturalWidth:1448,naturalHeight:1086},calls=[],numbers=[],gradient={addColorStop(){}};
  const ctx=new Proxy({createRadialGradient(){return gradient;},drawImage(...args){calls.push(args);}}, {get:(target,key)=>key in target?target[key]:(...args)=>numbers.push(...args.filter(x=>typeof x==='number'))});
  for(const [width,height] of sizes)for(const reduced of [false,true])for(const time of [.02,.11,.20,3.43]){
   calls.length=0;drawRutiCelebration(ctx,{width,height,time,progress:.6,reduced,images:{rutiAtlas:atlas},actor:{}});
-  assert.equal(calls.length,4,'one continuous upper body and three strips for stepping feet and grounded broom');
-  const body=calls[0];assert.equal(body[1],.5);assert.equal(body[2],362.5);
-  assert.ok(body[3]>360&&body[4]>309,'the entire head, neck, collar, shoulders, hands and upper body come from the same image');
-  for(const call of calls){assert.equal(call[0],atlas);assert.ok(Math.abs(call[7]/call[3]-call[8]/call[4])<1e-10,'head and body share their natural scale');}
+  const head=calls[0];assert.equal(head[1],.5);assert.equal(head[2],362.5);
+  assert.ok(Math.abs(head[7]/head[3]-head[8]/head[4])<1e-10,'the face keeps its natural proportions');
+  const narrow=calls.filter(call=>(call[7]/call[3])/(call[8]/call[4])<.7);assert.ok(narrow.length>=4,'the torso and both stepping feet are visibly narrow');
+  for(const call of calls)assert.equal(call[0],atlas,'all body parts remain in the connected original pose');
+  const spans=calls.map(call=>[call[6],call[6]+call[8]]).sort((a,b)=>a[0]-b[0]);let bottom=spans[0][1];
+  for(const [top,end]of spans){assert.ok(top<=bottom+1e-8,'neck, torso and feet must not acquire a raster gap');bottom=Math.max(bottom,end);}
   assert.ok(numbers.every(Number.isFinite));
  }
 });
@@ -362,6 +364,19 @@ test('singing never substitutes a detached speech head or changes the neck and s
   assert.ok(calls.every(call=>call[2]>=362&&call[2]+call[4]<=725),'every body pixel stays in the original broom pose');
  }
  assert.ok(upperBodies.every(body=>JSON.stringify(body)===JSON.stringify(upperBodies[0])));
+});
+
+test('every idle, walking and action pose has a slender torso while its original face stays undistorted',()=>{
+ const atlas={complete:true,naturalWidth:1448,naturalHeight:1086},calls=[];
+ const ctx=new Proxy({drawImage(...args){calls.push(args);}},{get:(target,key)=>key in target?target[key]:(()=>{})});
+ for(let frame=0;frame<12;frame++)for(const height of [94,140,350]){
+  calls.length=0;drawRutiFrame(ctx,atlas,frame,height);
+  const proportions=calls.map(c=>(c[7]/c[3])/(c[8]/c[4]));
+  assert.ok(Math.abs(proportions[0]-1)<1e-10,'the complete face retains its original width');
+  assert.ok(proportions.at(-1)<.65&&proportions.at(-1)>.55,'even the broom and celebration pose have a substantially narrower body');
+  assert.ok(proportions.every(scale=>scale>=.55&&scale<=1.001),'the neck tapers continuously between the unchanged face and narrow torso');
+  for(const c of calls)assert.ok(c.slice(1).every(Number.isFinite));
+ }
 });
 
 test('learned plant and dust words stop at half of stage one without relying on caller flags',()=>{

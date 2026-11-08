@@ -11,9 +11,12 @@ const EPSILON=1e-7;
 const coordinate=(value,fallback)=>Number.isFinite(value)?Math.max(0,Math.min(1,value)):fallback;
 const validPoint=point=>point&&Number.isFinite(point.x)&&Number.isFinite(point.y);
 
+// A wide board needs much longer pointer travel. Keep phone pacing and give
+// desktop walking a separate boost; action and household clocks stay real time.
+export function houseWalkingSpeed(width=390){return .68*(Number.isFinite(width)&&width>700?3.5:1);}
+
 export function createHouseMotion(actor,findPath=(from,to)=>[to],{speed=.65,aspect=()=>1}={}){
-  const maximumSpeed=Number.isFinite(speed)&&speed>0?speed:.65;
-  const acceleration=maximumSpeed*6;
+  function maximumSpeed(){const value=typeof speed==='function'?speed():speed;return Number.isFinite(value)&&value>0?value:.65;}
   let route=[],cursor=0,velocity=0,phase='idle',command=null,actionTime=0;
 
   function ratio(){
@@ -87,12 +90,12 @@ export function createHouseMotion(actor,findPath=(from,to)=>[to],{speed=.65,aspe
         return null;
       }
       if(time<=EPSILON)return null;
-      const scale=ratio(),left=remainingDistance(scale);
+      const scale=ratio(),left=remainingDistance(scale),limit=maximumSpeed(),acceleration=limit*6;
       if(left<EPSILON){arrive();continue;}
       // Short integration steps make acceleration and braking independent of
       // display refresh rate, and keep every corner on the pathfinder's route.
       const step=Math.min(time,1/90);
-      const desired=Math.min(maximumSpeed,Math.sqrt(2*acceleration*left));
+      const desired=Math.min(limit,Math.sqrt(2*acceleration*left));
       const next=velocity+Math.max(-acceleration*step,Math.min(acceleration*step,desired-velocity));
       const travel=(velocity+next)*.5*step;
       const used=travel>=left?step*(left/travel):step;

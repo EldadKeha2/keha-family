@@ -27,7 +27,7 @@ function gameAt(level){
 }
 
 function fixture({english=false,startLevel=1,failSave=false,initialScores=[],width=960,height=600,speech=false}={}){
-  let now=100000,sequence=0,backs=0,game=null,actor=null,html='',saveStatus=failSave?503:200;
+  let now=100000,sequence=0,backs=0,game=null,actor=null,html='',saveStatus=failSave?503:200,runs=0;
   const nodes=new Map(),listeners=new Map(),frames=new Map(),requests=[],writes=[],sounds=[],audioEvents=[],spoken=[],draws=[];let audioStops=0;
   const register=(target,type,fn,{signal}={})=>{const key=`${target}.${type}`;if(!listeners.has(key))listeners.set(key,new Set());listeners.get(key).add(fn);signal?.addEventListener('abort',()=>listeners.get(key)?.delete(fn),{once:true});};
   const emit=(target,type,event={})=>{for(const fn of [...listeners.get(`${target}.${type}`)||[]])fn(event);};
@@ -52,7 +52,7 @@ function fixture({english=false,startLevel=1,failSave=false,initialScores=[],wid
   const audio={unlock(){return Promise.resolve(true);},setEnabled(){},stop(){audioStops++;},play(kind){sounds.push(kind);audioEvents.push({kind,action:actor?.action,walking:!!actor?.walking,progress:actor?.actionProgress,plants:game?.stats.plants,dust:game?.stats.dust});}};
   vm.runInNewContext(source+'\nwindow.test={mountRutiHouse,pauseRutiHouse,state,render,processEvents,tutorialGuide:typeof tutorialGuide==="function"?tutorialGuide:null};',{
     ...engine,...motion,...character,...bridge,EXTRA_FAMILY_GUESTS,HOUSE_LESSONS,window,document,Image,Response,AbortController,crypto:webcrypto,performance:{now:()=>now},
-    createRutiPerformance:options=>character.createRutiPerformance({...options,synthesis,Utterance:speech?Utterance:null}),createHouse(){game=gameAt(startLevel);return game;},createHouseActor(start){actor=motion.createHouseActor(start);return actor;},
+    createRutiPerformance:options=>character.createRutiPerformance({...options,synthesis,Utterance:speech?Utterance:null}),createHouse(){game=gameAt(runs++?1:startLevel);return game;},createHouseActor(start){actor=motion.createHouseActor(start);return actor;},
     PLANT_VARIETIES,getHouseLayout,getTaskLocation,getHouseGuestSeat,findHousePath,renderHouse(_ctx,g,visual){draws.push({level:g.level,phase:g.phase,actor:{...visual.actor},quiet:visual.quiet,showTaskLabels:visual.showTaskLabels?{...visual.showTaskLabels}:null});},
     drawRutiCelebration(_ctx,visual){draws.push({celebration:true,progress:visual.progress,actor:{...visual.actor}});},createSceneAssets:()=>({family:{},icons:{},ready:Promise.resolve()}),houseArtwork:()=>'<svg></svg>',iconArtwork:id=>`<svg data-icon="${id}"></svg>`,createHouseSound:()=>audio,createRutiSong:()=>({mount(){},stop(){},pause(){},setEnabled(){}}),
     requestAnimationFrame(fn){const id=++sequence;frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id)
@@ -157,6 +157,57 @@ test('selecting a tool changes it in hand instantly without moving Ruti, then ta
   await f.choose('water');assert.equal(f.actor.tool,'water');assert.equal(f.game.selected,'water');assert.equal(f.state.motion.busy,false);assert.deepEqual({x:f.actor.x,y:f.actor.y},start);await f.act(plant.id);
   assert.equal(f.game.stats.plants,0);assert.equal(f.state.pendingTarget,null);assert.equal(f.state.motion.busy,true);f.advance(100);assert.equal(f.game.stats.plants,0);assert.notDeepEqual({x:f.actor.x,y:f.actor.y},start);
   const elapsed=f.until(()=>f.game.stats.plants===1);assert.ok(elapsed>1000);assert.equal(f.game.score,76);assert.equal(f.game.level,1);assert.equal(f.game.phase,'playing');assert.equal(f.game.stageCompleted,1);assert.equal(f.frames.size,1);assert.ok(f.draws.some(d=>d.actor.tool==='water'&&d.actor.walking));assert.ok(f.draws.some(d=>d.actor.action==='water'&&d.actor.actionProgress>0&&d.actor.actionProgress<1));f.until(()=>f.game.tasks.length===1);assert.notEqual(f.game.tasks[0].slot,plant.slot);
+});
+
+test('restart beside pause freezes the pending task, can be cancelled and resets a fresh first-level run in both layouts',async()=>{
+ for(const english of [false,true])for(const [width,height]of [[390,570],[1130,530]]){
+  const f=fixture({english,width,height,startLevel:6});await f.start();
+  assert.match(f.html,/data-rh-pause[\s\S]*data-rh-restart/);assert.match(f.html,english?/Restart game/:/התחלת המשחק מחדש/);
+  const task=f.game.tasks.find(t=>t.type==='plant')||f.game.tasks[0];assert.ok(task);await performTask(f,task);
+  const oldGame=f.game,oldRun=f.state.run,oldMotion=f.state.motion,oldActor=f.actor;
+  f.game.score=900;f.game.strikes=1;f.state.particles.push({x:.5,y:.5,points:20,age:0});f.state.departures.push({type:'cat',age:0,duration:1});
+  f.game.catsInside.push({door:0,enteredAt:0,pathSeed:.4});f.game.guestsInside.push({guest:'hila',seat:0,door:0,servedAt:0});
+  await f.click('[data-rh-restart]');assert.equal(f.state.restartRequested,true);assert.equal(f.frames.size,0);
+  assert.match(f.nodes.get('[data-rh-overlay]').innerHTML,english?/Restart the game\?/:/להתחיל את המשחק מחדש/);
+  const elapsed=f.game.elapsed,position={x:f.actor.x,y:f.actor.y};f.advance(60000);
+  assert.equal(f.game.elapsed,elapsed);assert.deepEqual({x:f.actor.x,y:f.actor.y},position);assert.equal(f.game.score,900);
+  await f.click('[data-rh-restart-cancel]');assert.equal(f.state.restartRequested,false);assert.equal(f.game,oldGame);assert.equal(f.state.run,oldRun);assert.equal(f.state.paused,false);assert.equal(f.frames.size,1);
+  await f.click('[data-rh-restart]');await f.click('[data-rh-restart-confirm]');
+  assert.notEqual(f.game,oldGame);assert.notEqual(f.actor,oldActor);assert.notEqual(f.state.run.id,oldRun.id);
+  assert.equal(f.game.level,1);assert.equal(f.game.score,0);assert.equal(f.game.strikes,0);assert.equal(f.game.elapsed,0);
+  assert.ok(f.game.stageScores.every(score=>score===0));assert.equal(f.game.catsInside.length,0);assert.equal(f.game.guestsInside.length,0);
+  assert.equal(f.state.particles.length,0);assert.equal(f.state.departures.length,0);assert.equal(f.state.focusTarget,null);assert.equal(f.actor.tool,null);assert.equal(f.state.celebrating,false);
+  assert.equal(oldMotion.tick(60),null,'the discarded run cannot complete its old task');
+  assert.equal(f.state.briefing,true);assert.equal(f.frames.size,0);f.advance(60000);assert.equal(f.game.elapsed,0);
+  await f.acknowledge();assert.equal(f.frames.size,1);f.advance(500);assert.ok(f.game.elapsed>0);assert.equal(f.writes.length,0,'restart never submits a score');
+ }
+});
+
+test('cancelling restart preserves an already paused run and Escape cancels without resetting progress',async()=>{
+ const f=fixture();await f.start();f.advance(1000);await f.click('[data-rh-pause]');const game=f.game,elapsed=game.elapsed;
+ await f.click('[data-rh-restart]');assert.equal(f.key('KeyP'),true);assert.equal(f.state.paused,true);
+ assert.equal(f.key('Escape'),true);assert.equal(f.state.restartRequested,false);assert.equal(f.state.paused,true);assert.equal(f.frames.size,0);
+ f.advance(60000);assert.equal(game.elapsed,elapsed);assert.equal(f.game,game);
+ await f.click('[data-rh-pause]');assert.equal(f.state.paused,false);assert.equal(f.frames.size,1);
+});
+
+test('restart also clears celebration and Ora bonus overlays and retains the chosen sound preference',async()=>{
+ for(const phase of ['celebration','ora-bonus']){
+  const f=fixture({startLevel:4});await f.start();await f.click('[data-rh-sound]');assert.equal(f.state.sound,false);
+  if(phase==='celebration'){f.state.celebrating=true;f.actor.celebrating=true;f.game.phase='stage-complete';}else{f.game.phase='ora-bonus';f.game.oraBonusRemaining=10;}
+  await f.click('[data-rh-restart]');await f.click('[data-rh-restart-confirm]');
+  assert.equal(f.game.level,1);assert.equal(f.game.phase,'playing');assert.equal(f.state.celebrating,false);assert.equal(f.actor.celebrating,undefined);assert.equal(f.state.sound,false);assert.equal(f.state.restartRequested,false);
+  assert.doesNotMatch(f.nodes.get('[data-rh-overlay]').innerHTML,/rh-stage-finished|rh-ora-bonus/);
+ }
+});
+
+test('restart cancels the middle-of-stage bridge break and clears the pending Ora interaction for the new run',async()=>{
+ const f=fixture({startLevel:7});await f.start();f.game.stageResolved=15;f.advance(100);assert.ok(f.state.bridge);
+ const bridge=f.state.bridge,elapsed=f.game.elapsed;
+ await f.click('[data-rh-restart]');f.advance(60000);assert.equal(f.state.bridge,bridge);assert.equal(f.game.elapsed,elapsed);
+ await f.click('[data-rh-restart-confirm]');
+ assert.equal(f.game.level,1);assert.equal(f.game.score,0);assert.equal(f.state.bridge,null);assert.equal(f.state.bridgePlayed,false);assert.equal(f.state.oraInteraction,null);assert.equal(f.actor.sitting,undefined);
+ await f.acknowledge();f.advance(500);assert.equal(f.state.bridge,null);assert.equal(f.frames.size,1);
 });
 
 test('switching tools during a walk or watering cancels the old task without teleporting or awarding a stale completion',async()=>{
@@ -317,7 +368,7 @@ test('identical player reactions earn identical points despite different walks, 
   }
   assert.equal(results[0].points,76);assert.equal(results[1].points,76);
   assert.equal(results[0].responseSeconds,results[1].responseSeconds);
-  assert.ok(results[0].walkingMs>results[1].walkingMs+500);
+  assert.ok(results[0].walkingMs>results[1].walkingMs+100,'the accelerated desktop still distinguishes a long and short walk');
 });
 
 test('only the physical plant has a tutorial outline, never the water word hit area',async()=>{
