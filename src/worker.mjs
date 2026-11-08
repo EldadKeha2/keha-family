@@ -254,14 +254,14 @@ export default {
       }
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){
-        const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all',person=url.searchParams.get('person'),unit=url.searchParams.get('unit'),labels=url.searchParams.get('labels');
+        const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all',person=url.searchParams.get('person'),unit=url.searchParams.get('unit'),labels=url.searchParams.get('labels'),sort=url.searchParams.get('sort'),seed=url.searchParams.get('seed');
         if(kind==='gallery'&&!['all','untagged','partial','complete'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
         if(request.headers.has('If-None-Match')){
           const current=await db('collection.revision',{kind});
-          const revision=kind==='gallery'?galleryRevision(current.revision,{page,size,query,filter,person,unit,labels}):current.revision;
+          const revision=kind==='gallery'?galleryRevision(current.revision,{page,size,query,filter,person,unit,labels,sort,seed}):current.revision;
           if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});
         }
-        return snapshot(request,await db('collection',{kind,page,size,query,filter,person,unit,labels}));
+        return snapshot(request,await db('collection',{kind,page,size,query,filter,person,unit,labels,sort,seed}));
       }
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));

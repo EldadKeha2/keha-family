@@ -967,6 +967,33 @@ test('new gallery uploads stay first after tagging, caption edits and a durable 
  }finally{await f.close();}
 });
 
+test('gallery sort requests cover all pages, keep random pages disjoint and invalidate cached ordering correctly',async()=>{
+ const f=fixture();try{
+  await f.connect();const insert=f.database.prepare('INSERT INTO media(id,category,data) VALUES(?,?,?)'),tag=f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)');
+  for(let n=0;n<205;n++){
+   const id=n.toString(16).padStart(32,'0'),item={id,category:'gallery',file:id+'.jpg',name:'Photo '+n,mime:'image/jpeg',kind:'photo',createdAt:new Date(Date.UTC(2026,0,1,0,0,n)).toISOString(),takenDate:n%4===0?{month:7}:{year:1950+n%70,month:n%12+1,day:n%28+1}};
+   insert.run(id,'gallery',JSON.stringify(item));for(const person of ['yona','shlomo','yehiel'].slice(0,n%4))tag.run(id,person);
+  }
+  const get=async query=>{const response=await f.call('/api/collections/gallery?'+query);assert.equal(response.status,200,await response.clone().text());return response.json();};
+  const first=await get('sort=random&seed=123&page=1'),second=await get('sort=random&seed=123&page=2'),last=await get('sort=random&seed=123&page=3');
+  const ids=[...first.items,...second.items,...last.items].map(item=>item.id);assert.equal(ids.length,205);assert.equal(new Set(ids).size,205);assert.deepEqual((await get('sort=random&seed=123')).items.map(item=>item.id),first.items.map(item=>item.id));assert.notDeepEqual((await get('sort=random&seed=124')).items.map(item=>item.id),first.items.map(item=>item.id));
+  assert.equal((await get('sort=uploaded-asc')).items[0].name,'Photo 0');assert.equal((await get('sort=uploaded-desc')).items[0].name,'Photo 204');
+  for(const sort of ['tags-asc','tags-desc']){const items=(await get('size=500&sort='+sort)).items,counts=items.map(item=>item.tags.length);assert.deepEqual(counts,[...counts].sort((a,b)=>sort.endsWith('asc')?a-b:b-a));}
+  for(const sort of ['taken-asc','taken-desc']){
+   const items=(await get('size=500&sort='+sort)).items,known=items.filter(item=>item.takenDate.year),dates=known.map(item=>item.takenDate.year*10000+item.takenDate.month*100+item.takenDate.day);
+   assert.deepEqual(dates,[...dates].sort((a,b)=>sort.endsWith('asc')?a-b:b-a));assert.ok(items.slice(known.length).every(item=>item.takenDate.year===null));
+  }
+  const response=await f.call('/api/collections/gallery?sort=random&seed=123'),etag=response.headers.get('ETag');
+  assert.equal((await f.call('/api/collections/gallery?sort=random&seed=123',{headers:{'If-None-Match':etag}})).status,304);
+  for(const query of ['sort=random&seed=124','sort=tags-asc','sort=taken-desc'])assert.equal((await f.call('/api/collections/gallery?'+query,{headers:{'If-None-Match':etag}})).status,200);
+  const untagged=await get('sort=tags-desc&filter=untagged');assert.equal(untagged.count,52);assert.ok(untagged.items.every(item=>item.tags.length===0));
+  for(const query of ['sort=bad','sort=random&seed=-1','sort=random&seed=4294967296'])assert.equal((await f.call('/api/collections/gallery?'+query)).status,400);
+  const changedId=(0).toString(16).padStart(32,'0');
+  assert.equal((await f.call('/api/media/'+changedId+'/tags/patch',{method:'POST',body:{changes:['yona','shlomo','yehiel','ruti'].map(personId=>({personId,tagged:true}))}})).status,200);
+  assert.equal((await f.call('/api/media/'+changedId+'/photo-date',{method:'POST',body:{date:{year:1900},expectedRevision:'empty'}})).status,200);
+  f.restart();assert.equal((await get('sort=tags-desc')).items[0].id,changedId);assert.equal((await get('sort=taken-asc')).items[0].id,changedId);
+ }finally{await f.close();}
+});
 test('gallery pagination defaults to 100, caps at 500, searches all pages and keeps new uploads first',async()=>{
  const f=fixture();try{
   for(let i=0;i<623;i++){

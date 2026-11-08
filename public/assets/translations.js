@@ -1,5 +1,17 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "סדר לפי":"Order by",
+  "אקראי":"Random",
+  "בעמוד":"per page",
+  "העלאה: חדש לישן":"Upload date: newest first",
+  "העלאה: ישן לחדש":"Upload date: oldest first",
+  "צילום: חדש לישן":"Photo date: newest first",
+  "צילום: ישן לחדש":"Photo date: oldest first",
+  "מתויגים: הרבה למעט":"Tagged people: most first",
+  "מתויגים: מעט להרבה":"Tagged people: fewest first",
+  "+ הוספת":"+ Add",
+  "הוספת תמונות לגלריה":"Add photos to the gallery",
+  "בחרו סדר תמונות תקין":"Choose a valid photo order",
   "מכרים וחברי משפחה":"Family friends and acquaintances",
   "לחיצה על כרטיס פותחת את התמונות שבהן תויגו":"Open a card to see the photos in which they are tagged",
   "פתיחת האלבום של ":"Open the album of ",
