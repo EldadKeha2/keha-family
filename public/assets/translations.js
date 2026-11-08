@@ -765,3 +765,24 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
  "פתחו תמונה והוסיפו את השמות החסרים בלחיצה על הפנים. בסיום לחצו על ״כל הפרצופים תויגו״.":"Open a photo and select faces to add missing names. When finished, choose All faces tagged.",
  "המתויגים בתמונה":"Tagged in this photo"
 });
+
+Object.assign(window.FAMILY_TRANSLATIONS,{
+ 'סינון ובחירת תמונות':'Filter and select photos',
+ 'סינון':'Filter',
+ 'של אדם מסוים':'Person',
+ 'חיפוש לפי שם…':'Search by name…',
+ 'בחירת אדם':'Choose a person',
+ 'כל האנשים':'Everyone',
+ 'משפחה דור שני':'Second generation family',
+ 'משפחה דור שלישי':'Third generation family',
+ 'משפחה דור רביעי':'Fourth generation family',
+ 'כל המשפחות':'All families',
+ 'הסינון לפי התיוגים בתמונה. בחירת משפחה כוללת בני זוג וצאצאים.':'Filters use photo tags. A family includes partners and descendants.',
+ 'איפוס הסינון':'Reset filters',
+ 'הקישו על תמונה לבחירה או לביטול. ״בחר הכל״ כולל גם את העמודים הבאים.':'Tap a photo to select or deselect it. Select all includes every page.',
+ 'בחרו אדם מהרשימה.':'Choose a person from the list.',
+ 'בחרו משפחה מהרשימה.':'Choose a family from the list.',
+ 'בחרו תמונות להורדה.':'Select photos to download.',
+ 'חלק מהתמונות אינן זמינות. רעננו את הבחירה ונסו שוב.':'Some photos are unavailable. Refresh your selection and try again.',
+ 'יש לרענן את הדף לפני ההורדה.':'Refresh the page before downloading.'
+});

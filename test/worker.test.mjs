@@ -1210,3 +1210,40 @@ test('correcting a face removes the mistaken name and album link only after its 
   f.restart();assert.deepEqual((await(await f.call('/api/media/'+a.id+'/tags')).json()).item.tags.map(p=>p.id),['ruti']);assert.deepEqual((await(await f.call('/api/media/'+b.id+'/tags')).json()).item.tags.map(p=>p.id),['yona']);
  }finally{await f.close();}
 });
+
+test('family filters include partners and descendants across every gallery page, and select-all returns the same complete result',async()=>{
+ const f=fixture();try{
+  const insert=f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)'),tag=f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)'),id=n=>n.toString(16).padStart(32,'0');
+  for(let n=1;n<=209;n++){
+   const item={id:id(n),category:'gallery',file:id(n)+'.jpg',mime:'image/jpeg',kind:'photo',name:n<=205?'Memory '+n:'Other'};insert.run(item.id,'gallery',null,JSON.stringify(item));
+   tag.run(item.id,n<=100?'matan-g':n<=160?'camille':n<=205?'shay':n===206?'rivi':n===207?'moran':n===208?'maya':'yona');
+  }
+  const path='/api/collections/gallery?unit=u-matan-g';let r=await f.call(path),etag=r.headers.get('ETag'),result=await r.json();assert.equal(result.count,205);assert.equal(result.items.length,100);assert.equal(result.pagination.pages,3);
+  result=await(await f.call(path+'&page=3')).json();assert.equal(result.items.length,5);
+  const selection=await(await f.call('/api/gallery/selection?unit=u-matan-g')).json();assert.equal(selection.ids.length,205);assert.equal(new Set(selection.ids).size,205);assert.deepEqual(selection.ids.slice(-5),result.items.map(p=>p.id));
+  assert.equal((await f.call(path,{headers:{'If-None-Match':etag}})).status,304);
+  assert.equal((await f.call('/api/collections/gallery?unit=u-moran',{headers:{'If-None-Match':etag}})).status,200);
+  for(const unit of ['u-rivi','u-harizi'])assert.equal((await(await f.call('/api/collections/gallery?unit='+unit)).json()).count,206);
+  assert.equal((await(await f.call('/api/collections/gallery?unit=u-moran')).json()).count,2);
+  assert.equal((await(await f.call(path+'&person=shay')).json()).count,45);
+  assert.equal((await(await f.call(path+'&person=yona')).json()).count,0);
+  assert.equal((await(await f.call(path+'&q=Memory%20205')).json()).count,1);
+  assert.deepEqual((await(await f.call('/api/gallery/selection?unit=u-matan-g&q=Memory%20205')).json()).ids,[id(205)]);
+  for(const query of ['unit=u-root','unit=u-shay','unit=unknown','person=missing','person=%27%20OR%201%3D1'])assert.equal((await f.call('/api/collections/gallery?'+query)).status,400);
+  await f.connect();const zip=await f.call('/api/gallery/download',{method:'POST',body:new URLSearchParams({ids:JSON.stringify(selection.ids),token:'family-public-v1'}).toString()});assert.equal(zip.status,200);await zip.body.cancel();
+ }finally{await f.close();}
+});
+
+test('ZIP downloads stream exactly the selected gallery photos, deduplicate names and protect other albums and invalid selections',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await galleryPhoto(f,'family.jpg'),b=await galleryPhoto(f,'family.jpg'),other=await taggedUpload(f);
+  const download=(ids,token='family-public-v1',origin='https://family.example')=>f.call('/api/gallery/download',{method:'POST',body:new URLSearchParams({ids:JSON.stringify(ids),token}).toString(),headers:{'Content-Type':'application/x-www-form-urlencoded','Origin':origin}});
+  const response=await download([b.id,a.id,b.id]);assert.equal(response.status,200);assert.equal(response.headers.get('Content-Type'),'application/zip');assert.match(response.headers.get('Content-Disposition'),/attachment; filename="Keha-Family-Photos-/);
+  const bytes=Buffer.from(await response.arrayBuffer());assert.equal(bytes.readUInt32LE(0),0x04034b50);const names=[];let start=0;
+  while((start=bytes.indexOf(Buffer.from([0x50,0x4b,0x01,0x02]),start))>=0){const length=bytes.readUInt16LE(start+28);names.push(bytes.subarray(start+46,start+46+length).toString('utf8'));start+=46+length;}
+  assert.deepEqual(names,['0001-family.jpg','0002-family.jpg']);assert.equal(f.objects.size,3,'Downloading never creates stored ZIP copies');
+  assert.equal((await download([])).status,400);assert.equal((await download(['invalid'])).status,400);
+  assert.equal((await download([other.id])).status,409);assert.equal((await download([a.id],'wrong')).status,403);assert.equal((await download([a.id],'family-public-v1','https://unrelated.example')).status,403);
+  await f.call('/api/media/'+a.id+'/delete',{method:'POST',body:{scope:'gallery'}});assert.equal((await download([a.id,b.id])).status,409);
+ }finally{await f.close();}
+});

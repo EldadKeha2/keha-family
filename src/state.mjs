@@ -17,6 +17,7 @@ import {nurseryCollection} from './nursery.mjs';
 import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
+import {galleryRefinement,galleryRevision} from './gallery.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -352,6 +353,12 @@ export class FamilyState {
     if(![100,200,300,400,500].includes(size)||!Number.isSafeInteger(requestedPage)||requestedPage<1)throw new HttpError(400,'בחרו עמוד תקין ועד 500 תמונות בעמוד.');
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
+    const refinement=galleryRefinement(options);
+    if(refinement.person){
+      if(!this.rows('SELECT id FROM people WHERE id=?',refinement.person).length)throw new HttpError(400,'בחרו אדם מהרשימה.');
+      where+=' AND EXISTS (SELECT 1 FROM media_tags p WHERE p.media_id=m.id AND p.person_id=?)';args.push(refinement.person);
+    }
+    if(refinement.unit){where+=' AND EXISTS (SELECT 1 FROM media_tags f WHERE f.media_id=m.id AND f.person_id IN ('+refinement.members.map(()=>'?').join(',')+'))';args.push(...refinement.members);}
     const unfinished="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty'))";
     const tagged="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id)",untagged='NOT '+tagged+' AND '+unfinished;
     if(filter==='untagged')where+=' AND '+untagged;
@@ -362,12 +369,13 @@ export class FamilyState {
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
       args.push(like,like,like,like);
     }
+    if(options.selection)return {ids:this.rows('SELECT m.id FROM media m WHERE '+where+' ORDER BY m.rowid DESC',...args).map(row=>row.id)};
     const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+untagged+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
     const filterCounts={all:counts.all_count,untagged:counts.untagged_count,complete:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND NOT ('+unfinished+')',kind)[0].n,partial:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND '+partial,kind)[0].n};
-    const total=query?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
+    const total=query||refinement.person||refinement.unit?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
-    return {kind,items,count:total,filterCounts,revision:revision+':'+FACE_SCAN_VERSION+':'+GALLERY_FILTER_VERSION+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='all'?'':':'+filter),pagination:{page,size,total,pages,query,filter}};
+    return {kind,items,count:total,filterCounts,revision:galleryRevision(revision,{page,size,query,filter,...refinement}),pagination:{page,size,total,pages,query,filter,person:refinement.person,unit:refinement.unit}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   albumCover(kind,fallback){
@@ -668,6 +676,14 @@ export class FamilyState {
         const person=this.person(p.id),photos=this.personPhotos(p.id),item=photos.find(item=>item.file===p.file);
         if(!item)throw new HttpError(404,'בחרו תמונה מהאלבום של האדם הזה.');
         person.profileId=item.id;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
+      }
+      case 'gallery.selection':return this.collection('gallery',{...p,filter:'all',selection:true});
+      case 'gallery.download':{
+        if(!Array.isArray(p.ids)||!p.ids.length||p.ids.length>50000||p.ids.some(id=>typeof id!=='string'||!/^([a-f0-9]{32})$/.test(id)))throw new HttpError(400,'בחרו תמונות להורדה.');
+        const ids=[...new Set(p.ids)],found=new Map();
+        for(let i=0;i<ids.length;i+=80){const batch=ids.slice(i,i+80);for(const row of this.rows("SELECT id,data FROM media WHERE category='gallery' AND id IN ("+batch.map(()=>'?').join(',')+")",...batch)){const item=JSON.parse(row.data);if(mediaKind(item)==='photo')found.set(row.id,item);}}
+        if(found.size!==ids.length)throw new HttpError(409,'חלק מהתמונות אינן זמינות. רעננו את הבחירה ונסו שוב.');
+        return {items:ids.map(id=>found.get(id))};
       }
       case 'collection':return this.collection(p.kind,p);
       case 'collection.cover':{
