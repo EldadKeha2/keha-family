@@ -9,7 +9,7 @@
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
   const validViews=new Set(['home','tree','directory','gallery','calendar','videos','photos','stories','weddings','nostalgia','updates','memorial','person','games','nursery']);
   const requestedView=location.hash.slice(1).split('/')[0];
-  const state = {view:validViews.has(requestedView)?(requestedView==='home'&&!isPhone()?'tree':requestedView):(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
+  const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
   let motionFrame=0,suppressClickUntil=0,treeRenderVersion=0,treeCameraApplied=false;
   const treeTextScale=()=>Math.max(1,Math.min(2,(Number(window.FamilyAccessibility?.getSettings?.().text)||100)/100));
@@ -91,7 +91,7 @@
     renderBranches(); renderView();
   }
   function setView(view,syncRoute=true) {
-    if(!validViews.has(view))return;if(view==='home'&&!isPhone())view='tree';
+    if(!validViews.has(view))return;
     const previous = state.view;
     stopTreeMotion();
     if(syncRoute){const target='#'+view;if(window.FamilyNavigation)window.FamilyNavigation.go(target);else if(location.hash!==target)history.pushState(null,'',target);}
@@ -563,7 +563,7 @@
   window.visualViewport?.addEventListener('scroll',fitSearchResults);
   window.addEventListener('resize',fitSearchResults);
   $('searchInput').addEventListener('keydown',e=>{if(e.key==='Escape')$('searchResults').hidden=true;if(e.key==='Enter'){const first=$('searchResults').querySelector('[data-search-person]');if(first&&!$('searchResults').hidden)first.click();}});
-  $('homeLink').addEventListener('click',e=>{e.preventDefault();state.branch='all';state.mode='overview';state.query='';$('searchInput').value='';renderBranches();setView(isPhone()?'home':'tree');});
+  $('homeLink').addEventListener('click',e=>{e.preventDefault();state.branch='all';state.mode='overview';state.query='';$('searchInput').value='';renderBranches();setView('home');});
   $('overviewButton').addEventListener('click',()=>{state.branch='all';state.mode='overview';renderBranches();renderTree();});
   $('fullTreeButton').addEventListener('click',()=>{state.mode=state.branch==='all'?'full':'branch';renderTree();});
   $('zoomIn').addEventListener('click',()=>zoom(1.2));$('zoomOut').addEventListener('click',()=>zoom(1/1.2));$('fitButton').addEventListener('click',fitTree);
@@ -610,7 +610,7 @@
     if(e.key==='+'||e.key==='='){e.preventDefault();zoom(1.2);}else if(e.key==='-'){e.preventDefault();zoom(1/1.2);}else if(e.key==='0'){e.preventDefault();fitTree();}
     else if(e.key.startsWith('Arrow')){e.preventDefault();if(e.key==='ArrowLeft')camera.x+=50;if(e.key==='ArrowRight')camera.x-=50;if(e.key==='ArrowUp')camera.y+=50;if(e.key==='ArrowDown')camera.y-=50;applyCamera();}
   });
-  let resizeTimer,lastWidth=innerWidth,lastHeight=innerHeight;window.addEventListener('resize',()=>{if(innerWidth===lastWidth&&innerHeight===lastHeight)return;lastWidth=innerWidth;lastHeight=innerHeight;clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.view==='tree')renderTree();if(!isPhone()&&state.view==='home')setView('tree');},120);});
+  let resizeTimer,lastWidth=innerWidth,lastHeight=innerHeight;window.addEventListener('resize',()=>{if(innerWidth===lastWidth&&innerHeight===lastHeight)return;lastWidth=innerWidth;lastHeight=innerHeight;clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.view==='tree')renderTree();},120);});
   window.addEventListener('family-media-changed',event=>{
     const result=event.detail,affected=result.people|| (result.person?{[result.person.id]:result.person}:{});
     if(result.affectedPersonIds){mediaDirty=true;for(const person of result.taggedPeople||[])if(person.extra&&!data.people[person.id])updatePersonUI(person.id,{...person,birthday:'1.1.1111'});}

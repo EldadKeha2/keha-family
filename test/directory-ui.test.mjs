@@ -4,7 +4,7 @@ import vm from'node:vm';
 import{readFile}from'node:fs/promises';
 import family from'../src/family.mjs';
 const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
-function fixture({phone=false,english=false}={}){
+function fixture({phone=false,english=false,hash='#directory'}={}){
  const nodes=new Map(),handlers=new Map(),opened=[];
  class Node extends EventTarget{
   constructor(){super();this.dataset={};this.style={};this.hidden=false;this.value='';this.innerHTML='';this.open=false;this.classList={add(){},remove(){},toggle(){}};}
@@ -12,9 +12,9 @@ function fixture({phone=false,english=false}={}){
  }
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
  const document={getElementById:node,body:new Node(),documentElement:new Node(),querySelectorAll:()=>[],querySelector:()=>null,addEventListener:(name,fn)=>{if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(fn);}};
- const window=new Node();window.FAMILY_DATA=structuredClone(family);window.FamilyDates={parse:()=>null,age:()=>null};window.FamilyPeople={activate(){},open:id=>opened.push(id)};
+ const window=new Node();window.scrollTo=()=>{};window.FAMILY_DATA=structuredClone(family);window.FamilyDates={parse:()=>null,age:()=>null};window.FamilyPeople={activate(){},open:id=>opened.push(id)};
  window.FamilyI18n={isEnglish:english,locale:english?'en-US':'he-IL',t:s=>s,html:(p,...v)=>p.reduce((s,a,i)=>s+a+(v[i]??''),''),word:(n,a,b)=>n===1?a:b,personName:p=>english?p.nameEn||p.name:p.name,branchName:b=>b?.title||'',searchNames:p=>[p.name,p.nameEn].filter(Boolean).join(' '),date:s=>s};
- const location={hash:'#directory'};
+ const location={hash};
  vm.runInNewContext(source,{window,document,location,history:{pushState(){}},matchMedia:q=>({matches:q.includes('700px')&&phone}),innerWidth:phone?390:1280,innerHeight:900,console,setTimeout,clearTimeout,setInterval:()=>0,requestAnimationFrame:()=>0,cancelAnimationFrame(){},CustomEvent});
  const click=(selector,dataset)=>{for(const fn of handlers.get('click')||[])fn({target:{closest:s=>s===selector?{dataset}:null},preventDefault(){}});};
  return{window,node,opened,group:g=>click('[data-directory-group]',{directoryGroup:g}),card:id=>click('[data-person]',{person:id}),search:q=>{node('searchInput').value=q;node('searchInput').dispatchEvent(new Event('input'));},render(){window.FamilyApp.setView('directory',false);},get html(){return node('directoryGrid').innerHTML;}};
@@ -28,5 +28,13 @@ test('the third directory group contains every active manual-only name, has no b
   assert.ok(!f.html.includes('data-person="yona"'));f.card(extra.id);assert.deepEqual(f.opened,[extra.id]);
   f.search(english?'New guest':'אורח');assert.match(f.html,/extra-new/);f.search('not-a-name');assert.equal(f.html,'');
   f.window.FamilyApp.updatePerson(extra.id,{...extra,photoCount:0,mediaCount:0});f.group('friends');assert.equal(f.html,'');
+ }
+});
+
+test('desktop and phone honor the home route and the logo returns to that home screen',()=>{
+ for(const phone of [false,true]){
+  const f=fixture({phone,hash:'#home'});assert.equal(f.window.FamilyApp.getView(),'home');assert.equal(f.node('treeView').hidden,true);
+  f.render();assert.equal(f.window.FamilyApp.getView(),'directory');f.window.FamilyApp.setView('home',false);assert.equal(f.window.FamilyApp.getView(),'home');
+  f.render();f.node('homeLink').dispatchEvent(new Event('click',{cancelable:true}));assert.equal(f.window.FamilyApp.getView(),'home');
  }
 });

@@ -49,8 +49,8 @@ test('a face saved during an ordinary tag request cannot be removed by its older
 });
 test('switching images removes old checkbox and remove-button listeners from the reused tagging panel',async()=>{
  const f=fixture(),host=new NodeStub(),calls=[];
- f.tags.mountInline(host,photo('image-a'));const a=host._tagWidget.store;a.enqueue=(person,tagged)=>calls.push(['a',person.id,tagged]);
- f.tags.mountInline(host,photo('image-b'));const b=host._tagWidget.store;b.enqueue=(person,tagged)=>calls.push(['b',person.id,tagged]);
+ f.tags.mountInline(host,{...photo('image-a'),kind:'video'});const a=host._tagWidget.store;a.enqueue=(person,tagged)=>calls.push(['a',person.id,tagged]);
+ f.tags.mountInline(host,{...photo('image-b'),kind:'video'});const b=host._tagWidget.store;b.enqueue=(person,tagged)=>calls.push(['b',person.id,tagged]);
  const change=new Event('change');Object.defineProperty(change,'target',{value:{matches:s=>s==='[data-tag-person]',dataset:{tagPerson:'yona'},checked:true}});host.dispatchEvent(change);
  assert.deepEqual(calls,[['b','yona',true]],'A click in B must never write to closed image A');
  b.saved.set('yona',family.people.yona);const click=new Event('click');Object.defineProperty(click,'target',{value:{closest:s=>s==='[data-remove-person-tag]'?{dataset:{removePersonTag:'yona'}}:null}});host.dispatchEvent(click);
@@ -64,13 +64,13 @@ test('rapid selections batch by image and collapse repeated changes to the same 
  assert.deepEqual(f.requests[0].body.changes.map(c=>[c.personId,c.tagged]),[['shlomo',true],['yona',false]]);f.tags.clearInline(host);
 });
 test('exact first names rank before embedded matches, reset search scroll, and show family context',()=>{
-  const f=fixture(),host=new NodeStub();f.tags.mountInline(host,photo('search-image'));const widget=host._tagWidget;
+  const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('search-image'),kind:'video'});const widget=host._tagWidget;
   widget.results.scrollTop=500;widget.query='שי';widget.renderResults(true);
   assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="shay"')<html.indexOf('data-tag-person="avishai"'));assert.match(html,/הורים:/);
   widget.query='מתן';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="matan-g"/);assert.match(widget.results.innerHTML,/data-tag-person="matan-f"/);assert.match(widget.results.innerHTML,/גבי/);assert.match(widget.results.innerHTML,/תומר/);f.tags.clearInline(host);
 });
-test('tagging starts with one instruction and the search field, without empty or repeated help text',()=>{
-  const f=fixture(),host=new NodeStub();f.tags.mountInline(host,photo('compact-image'));const widget=host._tagWidget;
+test('video tagging retains its compact search field without repeated help text',()=>{
+  const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('compact-image'),kind:'video'});const widget=host._tagWidget;
   assert.match(host.innerHTML,/תייגו מי מופיע כאן/);assert.match(host.innerHTML,/class="tag-heading-icon"/);assert.ok(host.innerHTML.indexOf('data-tag-search-area')<host.innerHTML.indexOf('data-selected-people'));assert.ok(host.innerHTML.indexOf('data-tag-save-status')<host.innerHTML.indexOf('data-selected-people'));assert.doesNotMatch(host.innerHTML,/tag-add-help|התיוגים נשמרים אוטומטית|בחרו את האנשים/);assert.equal(widget.selectedHost.innerHTML,'');assert.equal(widget.status.textContent,'');assert.equal(host.querySelector('[data-tag-count]').textContent,'');
   widget.store.saved.set('yona',family.people.yona);widget.render();assert.match(widget.selectedHost.innerHTML,/יונה/);assert.match(widget.selectedHost.innerHTML,/data-remove-person-tag/);assert.equal(host.querySelector('[data-tag-count]').textContent,'אדם אחד תויג');f.tags.clearInline(host);
 });
@@ -89,4 +89,12 @@ test('newest tags stay first while saving, after the response and when reopening
   assert.ok(widget.selectedHost.innerHTML.indexOf('data-remove-person-tag="camille"')<widget.selectedHost.innerHTML.indexOf('data-remove-person-tag="roi"'));
   f.tags.clearInline(host);f.tags.mountInline(host,photo('ordered-image'));
   assert.deepEqual([...host._tagWidget.store.selected().keys()],['camille','roi','shlomo','yona']);f.tags.clearInline(host);
+});
+
+test('photos keep existing and new face names without a separate search box; videos retain name tagging',()=>{
+ const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('face-only'),tags:[family.people.yona]});
+ assert.match(host._tagWidget.selectedHost.innerHTML,/יונה/);assert.match(host.innerHTML,/המתויגים בתמונה/);assert.doesNotMatch(host.innerHTML,/<input|data-tag-search|data-tag-add/);assert.equal(host._tagWidget.input,null);assert.equal(f.tags.controls(photo('face-only')),'');
+ f.emit({operation:'faces',item:{...photo('face-only'),tags:[family.people.shlomo,family.people.yona],tagsRevision:'face-r2'}});assert.match(host._tagWidget.selectedHost.innerHTML,/שלמה/);assert.match(host._tagWidget.selectedHost.innerHTML,/יונה/);
+ const removed=[];host._tagWidget.store.enqueue=(person,tagged)=>removed.push([person.id,tagged]);const click=new Event('click');Object.defineProperty(click,'target',{value:{closest:selector=>selector==='[data-remove-person-tag]'?{dataset:{removePersonTag:'yona'}}:null}});host.dispatchEvent(click);assert.deepEqual(removed,[['yona',false]]);
+ f.tags.clearInline(host);const video={...photo('video'),kind:'video'};f.tags.mountInline(host,video);assert.match(host.innerHTML,/<input[^>]+type="search"/);assert.match(f.tags.controls(video),/data-edit-media-tags/);f.tags.clearInline(host);
 });

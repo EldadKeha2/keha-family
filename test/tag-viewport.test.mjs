@@ -25,7 +25,7 @@ function fixture({mobile=true}={}){
   const window={FAMILY_DATA:family,visualViewport:viewport,innerHeight:720,matchMedia:()=>({matches:mobile}),FamilyApp:{apiEnabled:true,toast(){}},addEventListener(){},dispatchEvent(){}};
   window.FamilyI18n={t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),isEnglish:false,locale:'he-IL',personName:p=>p.name,searchNames:p=>p.name,branchName:p=>p?.title||'',error:String,fetch:async(path)=>{requests.push(path);throw Error('No network needed');}};
   vm.runInNewContext(source,{window,document,AbortController,CustomEvent,clearTimeout,setTimeout,requestAnimationFrame:callback=>{const id=++frameId;frames.set(id,callback);return id;},cancelAnimationFrame:id=>frames.delete(id)});
-  window.FamilyTags.mountInline(host,{id:'viewport-photo',kind:'photo',name:'Memory',tags:[],tagsRevision:'known'});
+  window.FamilyTags.mountInline(host,{id:'viewport-video',kind:'video',name:'Memory',tags:[],tagsRevision:'known'});
   const flush=()=>{for(const [id,callback]of [...frames]){frames.delete(id);callback();}};
   return {window,dialog,host,input,area,label,header,widget,viewport,frames,requests,scrolls,flush,
     focus(){input.dispatchEvent(new Event('focus'));flush();},
@@ -34,7 +34,7 @@ function fixture({mobile=true}={}){
     firstResultBottom(){return area.bounds.top+label.bounds.height+4+62;}
   };
 }
-test('mobile search keeps the first matching name above the keyboard as the visual viewport shrinks',()=>{
+test('mobile video search keeps the first matching name above the keyboard as the visual viewport shrinks',()=>{
   const f=fixture();f.focus();f.type('שי');f.resize(330);
   assert.ok(f.widget.classList.contains('is-searching'));assert.ok(f.dialog.classList.contains('tag-search-active'));
   assert.ok(f.firstResultBottom()<f.viewport.height-8,'The first matching row must fit above the keyboard');

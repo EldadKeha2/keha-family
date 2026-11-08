@@ -6,7 +6,7 @@ import{readFile}from'node:fs/promises';
 const mediaSource=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 const portalSource=await readFile(new URL('../public/assets/portal.js',import.meta.url),'utf8');
 const photo=(id='a',tags=[])=>({id,file:id+'.jpg',filename:id+'.jpg',scope:'gallery',kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Photo '+id,caption:'',tags,tagsRevision:'initial',faceSummary:{total:2,unmatched:2,partial:tags.length>0,reviewed:false}});
-function fixture(items=[photo('a'),photo('b')]){
+function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity}={}){
  const nodes=new Map(),documentHandlers=new Map(),windowHandlers=new Map(),intervals=[],requests=[],pending=[];let nextDeferred=false,revision=1;
  const server=structuredClone(items),mounted=[];
  class Node{
@@ -23,12 +23,12 @@ function fixture(items=[photo('a'),photo('b')]){
   showModal(){this.open=true;}close(){if(!this.open)return;this.open=false;this.emit('close');}
  }
  const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
- const filters=['all','untagged','partial'].map(filter=>{const n=new Node();n.dataset.galleryFilter=filter;return n;});
+ const filters=['all','untagged','partial','complete'].map(filter=>{const n=new Node();n.dataset.galleryFilter=filter;return n;});
  const listen=(map,name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);};
  const document={activeElement:null,visibilityState:'visible',getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
  const collection=path=>{
-  const filter=new URL(path,'https://test/').searchParams.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length&&!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:true);
-  return{items:structuredClone(selected),count:selected.length,revision:'gallery-'+revision,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length},pagination:{page:1,size:100,pages:1,total:selected.length,filter}};
+  const filter=new URL(path,'https://test/').searchParams.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length&&!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:filter==='complete'?item.faceSummary.reviewed:true);
+  return{items:structuredClone(filter==='all'?selected.slice(0,allPageSize):selected),count:selected.length,revision:'gallery-'+revision,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length,complete:server.filter(i=>i.faceSummary.reviewed).length},pagination:{page:1,size:100,pages:1,total:selected.length,filter}};
  };
  const window={FamilyApp:{apiEnabled:true,toast(){}},FAMILY_DATA:{people:{}},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>listen(windowHandlers,name,fn),dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
  window.FamilyI18n={isEnglish:false,language:'he',t:String,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:item=>item.name,error:String,searchNames:item=>item.name,fetch:async path=>{
@@ -54,16 +54,22 @@ test('a first tag moves a photo exclusively to partial after X, where it waits f
  assert.equal(f.requests.length,before,'Do not reload or recategorize a filtered gallery during its open tagging session');assert.equal(f.mounted.at(-1).tags.length,1,'The visible tagging metadata still updates immediately');
  f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);assert.equal(f.requests.length,before+1);assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.match(f.filters[2].textContent,/\(1\)/);
  f.filter('partial');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
- f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,[]);
+ f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);f.filter('complete');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
  f.filter('untagged');await f.flush();assert.deepEqual(f.cards,['b.jpg']);f.filter('all');await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);
 });
 test('tagging the final detected face stays partial until completion, which does not close the viewer',async()=>{
  const f=fixture([photo('a',[{id:'person-0'}])]);await f.flush();f.filter('partial');await f.flush();f.open('a');f.change('a','faces',2);await f.flush();
  assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg']);
- f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,[]);assert.equal(f.get('sharedGalleryEmpty').hidden,false);
+ f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg']);f.filter('complete');await f.flush();assert.deepEqual(f.cards,['a.jpg']);f.filter('partial');await f.flush();assert.deepEqual(f.cards,[]);assert.equal(f.get('sharedGalleryEmpty').hidden,false);
 });
 test('a gallery response requested before opening the photo cannot apply midway through tagging',async()=>{
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.defer();f.poll();assert.equal(f.pending.length,1);f.open('a');f.change('a');f.change('a','face-detection');f.pending.shift()();await f.flush();
  assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.deepEqual(f.cards,['a.jpg','b.jpg']);
- f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);
+ f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);f.filter('untagged');await f.flush();assert.deepEqual(f.cards,['b.jpg']);
+});
+
+test('completion returns to All photos without replacing an older open photo that is absent from its first page',async()=>{
+ const f=fixture([photo('newer'),photo('older',[{id:'person-0'}])],{allPageSize:1});await f.flush();f.filter('partial');await f.flush();f.open('older');f.review('older');await f.flush();
+ assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/older');assert.deepEqual(f.cards,['newer.jpg']);
+ f.close();await f.flush();f.filter('complete');await f.flush();assert.deepEqual(f.cards,['older.jpg']);f.window.FamilyPortal.activate('home');f.window.FamilyPortal.activate('gallery');await f.flush();assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');
 });

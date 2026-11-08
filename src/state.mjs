@@ -163,6 +163,11 @@ export class FamilyState {
     // Ordinary tag removal hides matching face labels. Undo can restore the same coordinates.
     return this.rows('SELECT f.data,p.data AS person FROM media_faces f JOIN people p ON p.id=f.person_id WHERE f.media_id=?'+(includeHidden?'':' AND EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=f.media_id AND t.person_id=f.person_id)')+' ORDER BY f.rowid',id).map(row=>{const face=JSON.parse(row.data),person=JSON.parse(row.person);return {...face,person:{id:person.id,name:person.name,nameEn:person.nameEn||null,extra:Boolean(person.extra)}};});
   }
+  removeUnusedFaceTag(item,personId){
+    if(!personId||this.rows('SELECT id FROM media_faces WHERE media_id=? AND person_id=? LIMIT 1',item.id,personId).length)return null;
+    if(!this.rows('SELECT person_id FROM media_tags WHERE media_id=? AND person_id=?',item.id,personId).length)return null;
+    return this.patchTags(item.id,[{personId,tagged:false}]);
+  }
   saveFace(p){
     const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');
     if(typeof p.faceId!=='string'||!/^[a-f0-9]{32}$/.test(p.faceId))throw new HttpError(400,'אזור הפנים אינו תקין.');
@@ -170,8 +175,9 @@ export class FamilyState {
     if((previous?.revision||null)!==p.expectedRevision)throw new HttpError(409,'תיוג הפנים עודכן בינתיים. פתחו אותו מחדש לפני שמירה.');
     if(p.personId===null&&p.name===undefined){
       if(previous)this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,p.faceId);
+      const removed=this.removeUnusedFaceTag(item,previous?.personId);
       this.touchTags(item.id);for(const kind of this.mediaCollections(item))this.touch(kind);
-      return {saved:true,operation:'faces',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),face:null};
+      return {...removed,saved:true,operation:'faces',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),face:null};
     }
     if(p.name!==undefined?(p.personId!==undefined||typeof p.name!=='string'):typeof p.personId!=='string')throw new HttpError(400,'בחרו אדם מהרשימה או הזינו שם חדש.');
     const selection=p.name===undefined?{personId:p.personId}:{name:p.name},rect=faceRect(p.rect);
@@ -181,12 +187,15 @@ export class FamilyState {
     // A face label and its ordinary photo tag are saved in the same transaction.
     // Resolve free names through the same roster as ordinary tags, so existing
     // names are reused and an invalid or conflicting face cannot leave an orphan.
-    const result=this.patchTags(item.id,[{...selection,tagged:true}]),personId=result.taggedPeople[0].id;
+    const replaceLast=previous&&!faces.some(other=>other.id!==previous.id&&other.personId===previous.personId);
+    // Remove then add in one patch, including when a photo already has 150 tags.
+    // Choosing the same name (or its alias) leaves that ordinary tag intact.
+    const result=this.patchTags(item.id,[...(replaceLast?[{personId:previous.personId,tagged:false}]:[]),{...selection,tagged:true}]),personId=result.taggedPeople.at(-1).id;
     const now=new Date().toISOString(),face={id:p.faceId,rect,personId,revision:uid(),createdAt:previous?.createdAt||now,updatedAt:now};
     for(const old of replaced)this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,old.id);
     this.sql.exec('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?) ON CONFLICT(media_id,id) DO UPDATE SET person_id=excluded.person_id,data=excluded.data',item.id,face.id,face.personId,JSON.stringify(face));
     this.touchTags(item.id);for(const kind of this.mediaCollections(item))this.touch(kind);
-    const saved=this.faces(item.id);return {...result,item:this.mediaPublic(item),operation:'faces',faces:saved,face:saved.find(item=>item.id===face.id)};
+    const saved=this.faces(item.id);return {...result,taggedPeople:[result.taggedPeople.at(-1)],item:this.mediaPublic(item),operation:'faces',faces:saved,face:saved.find(item=>item.id===face.id)};
   }
   faceScan(item){
     const row=this.rows('SELECT * FROM media_face_scans WHERE media_id=? AND photo_revision=? AND version=?',item.id,item.photoRevision||'original',FACE_SCAN_VERSION)[0];
@@ -339,7 +348,7 @@ export class FamilyState {
       return {kind,items,count:items.length,revision,...(kind.startsWith('wedding:')?{cover:this.albumCover(kind,items.find(item=>item.kind==='photo')?.src||null)}:{})};
     }
     const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120),filter=options.filter||'all';
-    if(!['all','untagged','partial'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
+    if(!['all','untagged','partial','complete'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
     if(![100,200,300,400,500].includes(size)||!Number.isSafeInteger(requestedPage)||requestedPage<1)throw new HttpError(400,'בחרו עמוד תקין ועד 500 תמונות בעמוד.');
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
@@ -348,12 +357,13 @@ export class FamilyState {
     if(filter==='untagged')where+=' AND '+untagged;
     const partial=tagged+' AND '+unfinished;
     if(filter==='partial')where+=' AND '+partial;
+    if(filter==='complete')where+=' AND NOT ('+unfinished+')';
     if(query){
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
       args.push(like,like,like,like);
     }
     const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+untagged+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
-    const filterCounts={all:counts.all_count,untagged:counts.untagged_count,partial:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND '+partial,kind)[0].n};
+    const filterCounts={all:counts.all_count,untagged:counts.untagged_count,complete:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND NOT ('+unfinished+')',kind)[0].n,partial:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND '+partial,kind)[0].n};
     const total=query?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));

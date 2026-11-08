@@ -234,7 +234,7 @@ export default {
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){
         const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all';
-        if(kind==='gallery'&&!['all','untagged','partial'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
+        if(kind==='gallery'&&!['all','untagged','partial','complete'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
         if(request.headers.has('If-None-Match')){
           const current=await db('collection.revision',{kind});
           const revision=current.revision+(kind==='gallery'?':'+FACE_SCAN_VERSION+':'+GALLERY_FILTER_VERSION+':'+Number(page||1)+':'+Number(size||100)+':'+encodeURIComponent((query||'').trim())+(filter==='all'?'':':'+filter):'');

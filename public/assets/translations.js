@@ -753,3 +753,11 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   "התמונה השתנתה. יש לסרוק את הגרסה הנוכחית.":"This photo has changed. Scan its current version.",
   "תוצאת סריקת הפנים אינה תקינה.":"This face scan result is invalid."
 });
+
+Object.assign(window.FAMILY_TRANSLATIONS,{
+ "מתויגות מלא":"Fully tagged",
+ "אין עדיין תמונות שסומנו כמתויגות מלא":"No photos have been marked fully tagged yet",
+ "תמונות שאישרתם בהן ״כל הפרצופים תויגו״ יופיעו כאן.":"Photos you confirm with All faces tagged will appear here.",
+ "פתחו תמונה והוסיפו את השמות החסרים בלחיצה על הפנים. בסיום לחצו על ״כל הפרצופים תויגו״.":"Open a photo and select faces to add missing names. When finished, choose All faces tagged.",
+ "המתויגים בתמונה":"Tagged in this photo"
+});

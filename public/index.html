@@ -49,19 +49,19 @@
   <script src="assets/maintenance.js" defer></script>
   <script src="assets/family-fallback.js" defer></script>
   <script src="family-data.js" defer></script>
-  <script src="assets/translations.js?v=exclusive-tagging-v3" defer></script>
+  <script src="assets/translations.js?v=complete-tagging-v4" defer></script>
   <script src="assets/i18n.js?v=compat1" defer></script>
   <script src="assets/photo-editor.js?v=photo-history-v1" type="module"></script>
   <script src="assets/navigation.js?v=1" defer></script>
   <script src="assets/home-install.js?v=desktop1" defer></script>
   <script src="assets/accessibility.js?v=1" defer></script>
   <script src="assets/dates.js" defer></script>
-  <script src="assets/tags.js?v=face-free-names-v1" defer></script>
-  <script src="assets/faces.js?v=resize-v5" defer></script>
+  <script src="assets/tags.js?v=photo-face-only-v2" defer></script>
+  <script src="assets/faces.js?v=face-correction-v7" defer></script>
   <script src="assets/gallery-faces.js?v=5" defer></script>
   <script src="assets/photo-collections.js?v=1" defer></script>
   <script src="assets/media.js?v=album-covers-v2" defer></script>
-  <script src="assets/portal.js?v=exclusive-tagging-v3" defer></script>
+  <script src="assets/portal.js?v=complete-tagging-v4" defer></script>
   <script src="assets/updates.js" defer></script>
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
   <script src="assets/people.js?v=friends-v1" defer></script>
@@ -74,7 +74,7 @@
   <script src="assets/nursery.js?v=album-covers-v2" defer></script>
   <script src="assets/tree-guide.js" defer></script>
   <script src="assets/games.js?v=ruti-20-levels-circle-v2" type="module"></script>
-  <script src="assets/app.js?v=friends-v1" defer></script>
+  <script src="assets/app.js?v=desktop-home-v2" defer></script>
   <script src="assets/cloud.js" defer></script>
 </head>
 <body>
@@ -83,7 +83,7 @@
   <div class="edge-ornament edge-left" aria-hidden="true"></div>
   <div class="page-shell">
     <header class="site-header">
-      <a class="brand" href="#" id="homeLink" aria-label="חזרה לעץ המשפחה"><img src="assets/medallion.svg" alt="" width="40" height="40"><span>בית משפחת קהא</span></a>
+      <a class="brand" href="#home" id="homeLink" aria-label="מסך הבית"><img src="assets/medallion.svg" alt="" width="40" height="40"><span>בית משפחת קהא</span></a>
       <section id="homeInstall" class="home-install" data-i18n-skip hidden></section>
       <div class="header-preferences">
       <div class="language-selector"><span class="language-switcher-label" data-i18n-skip dir="ltr"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg><bdi>Language/שפה</bdi></span><div class="language-switcher" role="group" aria-label="בחירת שפה" data-i18n-skip><button type="button" data-language="he" aria-label="עברית" title="עברית" aria-pressed="true"><img src="assets/flag-il.svg" alt="" width="28" height="20"><span class="visually-hidden">עברית</span></button><button type="button" data-language="en-US" aria-label="English (United States)" title="English (United States)" aria-pressed="false"><img src="assets/flag-us.svg" alt="" width="28" height="20"><span class="visually-hidden">English (US)</span></button><button type="button" data-language="en-GB" aria-label="English (United Kingdom)" title="English (United Kingdom)" aria-pressed="false"><img src="assets/flag-gb.svg" alt="" width="28" height="20"><span class="visually-hidden">English (UK)</span></button></div></div>
@@ -129,7 +129,7 @@
         <section id="updatesView" class="portal-view updates-view" aria-label="עדכונים" hidden><div id="updatesContent"></div></section>
         <section id="galleryView" class="portal-view compact-gallery-view" aria-label="הגלריה" hidden>
           <div class="collection-heading"><div><span class="small-eyebrow">רגעים קטנים, זיכרונות גדולים</span><h3 class="compact-gallery-title">הגלריה המשפחתית</h3><span class="collection-count" id="sharedGalleryCount"></span></div><button class="primary-button" data-upload-collection="gallery">＋ הוספת תמונות</button></div>
-          <div class="archive-filters gallery-tag-filters" aria-label="סינון תמונות בגלריה"><button type="button" data-gallery-filter="all" aria-pressed="true">כל התמונות</button><button type="button" data-gallery-filter="untagged" aria-pressed="false">תמונות לא מתויגות</button><button type="button" data-gallery-filter="partial" aria-pressed="false">תמונות מתויגות חלקית</button></div>
+          <div class="archive-filters gallery-tag-filters" aria-label="סינון תמונות בגלריה"><button type="button" data-gallery-filter="all" aria-pressed="true">כל התמונות</button><button type="button" data-gallery-filter="untagged" aria-pressed="false">תמונות לא מתויגות</button><button type="button" data-gallery-filter="partial" aria-pressed="false">תמונות מתויגות חלקית</button><button type="button" data-gallery-filter="complete" aria-pressed="false">מתויגות מלא</button></div>
           <div class="gallery-face-scan"><span id="galleryFaceScanStatus" role="status"></span><button id="retryGalleryFaceScan" type="button" hidden>ניסיון נוסף לסריקת התמונות</button></div>
           <nav class="gallery-pager" data-gallery-pager aria-label="דפדוף בתמונות" hidden><label>תמונות בעמוד<select data-gallery-size><option value="100">100</option><option value="200">200</option><option value="300">300</option><option value="400">400</option><option value="500">500</option></select></label><span data-gallery-page-label role="status"></span><div><button class="secondary-button" data-gallery-prev>הקודם</button><button class="primary-button" data-gallery-next>הבא</button></div></nav>
           <div class="compact-gallery-grid" id="sharedGalleryGrid"></div><nav class="gallery-pager" data-gallery-pager aria-label="דפדוף בתמונות" hidden><label>תמונות בעמוד<select data-gallery-size><option value="100">100</option><option value="200">200</option><option value="300">300</option><option value="400">400</option><option value="500">500</option></select></label><span data-gallery-page-label role="status"></span><div><button class="secondary-button" data-gallery-prev>הקודם</button><button class="primary-button" data-gallery-next>הבא</button></div></nav><div class="portal-empty" id="sharedGalleryEmpty"><span class="empty-emblem" aria-hidden="true">▧</span><h3>כל רגע משפחתי מתחיל בתמונה</h3><p>אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.</p></div>
