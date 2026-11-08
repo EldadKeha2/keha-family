@@ -154,9 +154,9 @@ test('three cat entries end the run and prior strikes survive a completed stage'
   finishStage(g);advanceStage(g);assert.equal(g.level,4);assert.equal(g.strikes,2);g.tasks=[{id:'last-cat',type:'cat',slot:0,door:0,waiting:0,state:'approaching',total:.1,remaining:.1}];advanceHouse(g,.1);assert.equal(g.phase,'finished');assert.equal(g.strikes,3);assert.equal(g.won,false);assert.equal(g.completedLevels,3);const frozen=JSON.stringify(g);advanceHouse(g,60);advanceStage(g);actHouse(g,'cook-tahini');assert.equal(JSON.stringify(g),frozen);
 });
 
-test('all twelve stages retain exact score accounting, paused transition clocks and one win event',()=>{
-  const g=game();for(let n=1;n<=12;n++){finishStage(g);assert.equal(g.completedLevels,n);assert.equal(g.stageCompleted,STAGES[n-1].goal);assert.ok(g.stageScores[n-1]>0);assert.equal(g.requiredDishComplete,true);if(n<12){assert.equal(g.phase,'stage-complete');const frozen=JSON.stringify(g);advanceHouse(g,60);assert.equal(JSON.stringify(g),frozen);assert.equal(advanceStage(g),true);}}
-  assert.equal(g.phase,'finished');assert.equal(g.won,true);assert.equal(g.level,12);assert.equal(g.stageScores.reduce((a,b)=>a+b,0),g.score);assert.equal(g.events.filter(e=>e.type==='finished').length,1);assert.equal(advanceStage(g),false);
+test('all twenty stages retain exact score accounting, paused transition clocks and one win event',()=>{
+  const g=game();for(let n=1;n<=STAGES.length;n++){finishStage(g);assert.equal(g.completedLevels,n);assert.equal(g.stageCompleted,STAGES[n-1].goal);assert.ok(g.stageScores[n-1]>0);assert.equal(g.requiredDishComplete,true);if(n<STAGES.length){assert.equal(g.phase,'stage-complete');const frozen=JSON.stringify(g);advanceHouse(g,60);assert.equal(JSON.stringify(g),frozen);assert.equal(advanceStage(g),true);}}
+  assert.equal(g.phase,'finished');assert.equal(g.won,true);assert.equal(g.level,20);assert.equal(g.stageScores.reduce((a,b)=>a+b,0),g.score);assert.equal(g.events.filter(e=>e.type==='finished').length,1);assert.equal(advanceStage(g),false);
 });
 
 test('invalid deltas preserve clocks and split frames produce the same tutorial task',()=>{
@@ -234,19 +234,19 @@ test('dust, cats and guests all receive speed bonuses, including the cat waiting
   }
 });
 
-test('every level caps issued tasks at thirty and resets its per-type success counts',()=>{
+test('every level caps issued tasks at its planned goal and resets its per-type success counts',()=>{
  const g=game();
- for(let level=1;level<=12;level++){
-  const total=()=>['plants','dust','cats','meals','snacks','oraWins'].reduce((n,k)=>n+g.stats[k],0),initial=total();assert.equal(g.stage.goal,30);assert.ok(Object.values(g.stageStats).every(n=>n===0));let guard=0;
+ for(let level=1;level<=STAGES.length;level++){
+  const total=()=>['plants','dust','cats','meals','snacks','oraWins'].reduce((n,k)=>n+g.stats[k],0),initial=total(),goal=STAGES[level-1].goal;assert.equal(g.stage.goal,goal);assert.ok(Object.values(g.stageStats).every(n=>n===0));let guard=0;
   while(['playing','ora-bonus'].includes(g.phase)&&guard++<15000){
    if(g.phase==='ora-bonus'){advanceHouse(g,5);continue;}if(g.ora){selectTool(g,'argue');actHouse(g,g.ora.id);continue;}
    if(g.tasks.length){const task=g.tasks[0],before=g.stageCompleted;clearTask(g,task);assert.equal(g.stageCompleted,before+1);}
    else advanceHouse(g,.2);
   }
-  assert.ok(guard<15000);assert.equal(g.stageCompleted,30);assert.equal(total()-initial,30);assert.equal(Object.values(g.stageStats).reduce((a,b)=>a+b,0),30);
-  if(level<12)assert.equal(advanceStage(g),true);
+  assert.ok(guard<15000);assert.equal(g.stageCompleted,goal);assert.equal(total()-initial,goal);assert.equal(Object.values(g.stageStats).reduce((a,b)=>a+b,0),goal);
+  if(level<STAGES.length)assert.equal(advanceStage(g),true);
  }
- assert.equal(['plants','dust','cats','meals','snacks','oraWins'].reduce((n,k)=>n+g.stats[k],0),360);assert.ok(g.stats.plants<360);assert.equal(g.won,true);
+ assert.equal(['plants','dust','cats','meals','snacks','oraWins'].reduce((n,k)=>n+g.stats[k],0),770);assert.ok(g.stats.plants<770);assert.equal(g.won,true);
 });
 
 function findOra(g){let guard=0;while(!g.ora&&g.phase==='playing'&&guard++<15000){if(g.tasks.length)clearTask(g);else advanceHouse(g,.1);}assert.ok(g.ora,'Ora appears before level completion');return g.ora;}
@@ -304,7 +304,7 @@ test('thirty resolved tasks include misses, never issue a thirty-first task and 
 });
 
 test('stage five repeats stage four faster, without meals, and Ora favors the visible periphery',()=>{
- assert.equal(STAGES.length,12);const [four,five]=STAGES.slice(3,5);
+ assert.equal(STAGES.length,20);const [four,five]=STAGES.slice(3,5);
  assert.deepEqual(five.unlockedTools,four.unlockedTools);assert.ok(!five.types.includes('guest'));assert.equal(five.guestMode,null);
  assert.ok(five.spawnDelay<four.spawnDelay);for(const type of ['plant','dust','cat'])assert.ok(five.deadlines[type]<four.deadlines[type]);
  const fourth=findOra(atStage(4)),fifth=findOra(atStage(5));assert.ok(fifth.total<fourth.total);

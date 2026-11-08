@@ -13,7 +13,7 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
  const blinkTime=((time%19.8)+19.8)%19.8;
  const blinking=!reduced&&[3.4,7.6,12.9,13.15,18.1].some(start=>blinkTime>=start&&blinkTime<start+.12);
  let frame=0;
- if(celebrating)frame=4;
+ if(celebrating)frame=actor.circleDance?0:4;
  else if(action==='water')frame=3;
  else if(action==='broom')frame=4;
  else if(action==='hand')frame=5;
@@ -46,7 +46,7 @@ export function rutiPose(actor={},time=0,{reduced=false}={}){
  const heldNote=songBeat%8===7&&songPart<.4;
  const singing=celebrating&&(songBeat%8!==7||heldNote);
  const headFrame=!celebrating?frame:reduced?0:blinking?11:!singing?0:heldNote?8:songPart<.09||songPart>.82?0:songPart<.53?7:8;
- return {frame,headFrame,singing,danceStep,danceSide,sitting:Math.max(0,Math.min(1,actor.sitting||0)),
+ return {frame,headFrame,singing,danceStep,danceSide,circleDance:!!actor.circleDance,sitting:Math.max(0,Math.min(1,actor.sitting||0)),
   mouthOpen:dancing&&singing&&headFrame!==11?Math.sin(Math.PI*Math.min(1,songPart/.86)):0,
   danceX:dancing?blend(weight):0,danceDepth:dancing?blend(depth):0,
   footLeftX:dancing&&!activeRight?footShift:0,footRightX:dancing&&activeRight?footShift:0,

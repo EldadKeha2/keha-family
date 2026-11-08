@@ -163,3 +163,18 @@ test('v6 saves cumulative stage bonuses with verified task summaries, legacy ent
   assert.equal((await f.call(entry(602))).status,200);assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_completion_bonuses').get().n,2);
  }finally{f.close();}
 });
+
+test('v7 persists longer stage goals, completion bonuses and missed counts across retry and restart',async()=>{
+ const f=fixture();try{
+  const first={plants:30,dust:0,missedPlants:0,missedDust:0,completed:30},long={plants:34,dust:6,missedPlants:0,missedDust:0,completed:40};
+  const body={...entry(701,0),version:7,score:55380,level:14,completedLevels:13,plants:394,dust:6,missed:0,oraWins:0,bestCombo:400,elapsed:2000,
+   stageScores:[...Array(12).fill(4200),4980,...Array(7).fill(0)],stageResults:[...Array.from({length:12},()=>({...first})),long,...Array(7).fill(null)]};
+  assert.equal((await f.call(body)).status,200);f.restart();assert.equal((await f.call(body)).status,200);
+  const saved=(await (await f.call()).json()).scores[0];assert.equal(saved.version,7);assert.equal(saved.missed,0);assert.equal(saved.oraWins,0);
+  assert.deepEqual(saved.stageScores,body.stageScores);assert.deepEqual(saved.stageResults,body.stageResults);
+  assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_run_metrics').get().n,1);
+  assert.equal(f.db.prepare('SELECT count(*) n FROM ruti_house_completion_bonuses').get().n,1);
+  const changed={...body,stageScores:[...Array(12).fill(4200),5480,...Array(7).fill(0)],score:55880,oraWins:0};
+  assert.equal((await f.call(changed)).status,409);
+ }finally{f.close();}
+});

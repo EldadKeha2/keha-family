@@ -414,9 +414,9 @@ export class FamilyState {
         if(previous&&priorResults!==(entry.stageResults===null?null:JSON.stringify(entry.stageResults)))throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
         if(!previous)this.sql.exec('INSERT INTO ruti_house_scores(id,name,score,level,meals,snacks,plants,dust,cats,dishes,bestCombo,elapsed,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',entry.id,entry.name,...RUTI_HOUSE_SCORE_FIELDS.map(key=>entry[key]),new Date().toISOString());
         if(!previous&&entry.version!==null)this.sql.exec('INSERT INTO ruti_house_score_details(id,version,completed_levels,stage_scores) VALUES(?,?,?,?)',entry.id,entry.version,entry.completedLevels,JSON.stringify(entry.stageScores));
-        if(!previous&&[4,5,6].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_ora_bonuses(id,wins) VALUES(?,?)',entry.id,entry.oraWins);
-        if(!previous&&[5,6].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_run_metrics(id,missed) VALUES(?,?)',entry.id,entry.missed);
-        if(!previous&&entry.version===6)this.sql.exec('INSERT INTO ruti_house_completion_bonuses(id,stage_results) VALUES(?,?)',entry.id,JSON.stringify(entry.stageResults));
+        if(!previous&&[4,5,6,7].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_ora_bonuses(id,wins) VALUES(?,?)',entry.id,entry.oraWins);
+        if(!previous&&[5,6,7].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_run_metrics(id,missed) VALUES(?,?)',entry.id,entry.missed);
+        if(!previous&&[6,7].includes(entry.version))this.sql.exec('INSERT INTO ruti_house_completion_bonuses(id,stage_results) VALUES(?,?)',entry.id,JSON.stringify(entry.stageResults));
         const rank=this.rows('SELECT count(*) AS n FROM ruti_house_scores s JOIN ruti_house_scores own ON own.id=? WHERE s.score>own.score OR (s.score=own.score AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id)))',entry.id)[0].n+1;
         return {saved:true,id:entry.id,rank,...this.run('game.ruti-house.scores')};
       }

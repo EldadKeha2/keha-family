@@ -184,7 +184,7 @@ test('served guests still render long after departure timers end and cats keep f
  for(const [width,height] of sizes)for(const elapsed of [20,200]){
   calls.length=0;game.elapsed=elapsed;
   renderHouse(ctx,game,{actor:{x:.4,y:.5},departures},{width,height,time:elapsed,images:{familyAtlas:atlas}});
-  assert.equal(calls.filter(c=>c[0]===atlas).length,2,'the seated guest never fades out');
+  assert.equal(calls.filter(c=>c[0]===atlas).length,4,'the seated guest and original articulated arm never fade out');
  }
  assert.ok(numbers.length>0&&numbers.every(Number.isFinite));
 });

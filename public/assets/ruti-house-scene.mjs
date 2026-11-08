@@ -1,8 +1,10 @@
 import {GUEST_ART} from './ruti-house-guests.mjs?v=1';
+import {GUEST_ARM_RIGS,guestArmOutline,guestArmPose,drawGuestOriginalArm} from './ruti-house-guest-rig.mjs?v=1';
+import {yemeniteCircleDancers} from './ruti-house-dance.mjs?v=1';
 import {iconArtwork} from './ruti-house-art.mjs?v=4';
-import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=6';
+import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=circle-v1';
 import {drawDustSignal} from './ruti-house-dust.mjs?v=5';
-import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS} from './ruti-house-engine.mjs?v=13';
+import {CAT_COATS,HOUSE_GUESTS,HOUSE_VISITORS,HOUSE_FAMILY_GUESTS} from './ruti-house-engine.mjs?v=20-levels-v1';
 
 const FOOD_IDS=['tahini','carrot','kubaneh','eggplant','lasagna'];
 export const PLANT_VARIETIES=Object.freeze([
@@ -377,11 +379,11 @@ export function drawRutiFrame(ctx,atlas,frame,height,pose={}){
   if(frame===3){strip(bodyTop,190,RUTI_BODY_WIDTH);strip(190,bottom,RUTI_BODY_WIDTH);}
   else strip(bodyTop,bottom,RUTI_BODY_WIDTH);
  }
- if(frame===4){
+ if(frame===4||pose.circleDance){
   // Singing, sweeping and dancing use the same original connected pose. Only
   // its body is reshaped; the face never changes width or swaps to another head.
   body(310);
-  if(pose.mouthOpen>.12){
+  if(frame===4&&pose.mouthOpen>.12){
    // Animate only the mouth inside the original face; hair, jaw and neckline
    // remain the same unbroken artwork throughout the song.
    const openness=pose.mouthOpen,round=pose.headFrame===8;
@@ -392,10 +394,11 @@ export function drawRutiFrame(ctx,atlas,frame,height,pose={}){
    ctx.beginPath();ctx.ellipse(0,3.2,4.5,1.7,0,0,Math.PI*2);ctx.fillStyle='#b97061';ctx.fill();ctx.restore();
   }
   ctx.save();ctx.translate((pose.footLeftX||0)*height*RUTI_BODY_WIDTH,-(pose.footLeftLift||0)*height);
-  strip(309.25,362,RUTI_BODY_WIDTH,{left:0,right:130});ctx.restore();
+  const split=pose.circleDance?200:130,right=pose.circleDance?285:205;
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:0,right:split});ctx.restore();
   ctx.save();ctx.translate((pose.footRightX||0)*height*RUTI_BODY_WIDTH,-(pose.footRightLift||0)*height);
-  strip(309.25,362,RUTI_BODY_WIDTH,{left:130,right:205});ctx.restore();
-  strip(309.25,362,RUTI_BODY_WIDTH,{left:205,right:362});
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:split,right});ctx.restore();
+  strip(309.25,362,RUTI_BODY_WIDTH,{left:right,right:362});
   return;
  }
  body();
@@ -467,6 +470,40 @@ export function drawRutiCelebration(ctx,{width,height,time=0,reduced=false,image
  ctx.restore();
 }
 
+export const HOUSE_FINALE_DANCERS=Object.freeze(['ruti',...HOUSE_FAMILY_GUESTS,...HOUSE_VISITORS]);
+/** All existing people share the same circle, step sequence and held beat. */
+export function drawHouseFinale(ctx,{width,height,time=0,reduced=false,images={},actor={},progress=1}={}){
+ const elapsed=Math.max(0,time-(actor.celebrationStartedAt??0)),beatSeconds=actor.celebrationBeatSeconds||.4;
+ const dancers=yemeniteCircleDancers(HOUSE_FINALE_DANCERS,{width,height,elapsed,beatSeconds,reduced});
+ ctx.save();ctx.fillStyle='#fff8e6f5';ctx.fillRect(0,0,width,height);
+ const cy=height*.70,rx=width*.4,ry=height*(width<600?.16:.135);
+ ellipse(ctx,width*.5,cy,rx+12,ry+12,'#eeddbb44','#c3a46e');
+ ellipse(ctx,width*.5,cy,rx*.82,ry*.77,'#e8cda955','#d2b583');
+ for(let n=0;n<18;n++){
+  const a=n/18*Math.PI*2,px=width*.5+Math.cos(a)*rx*.9,py=cy+Math.sin(a)*ry*.86;
+  ellipse(ctx,px,py,2.5,1.5,'#b89552');
+ }
+ const entrance=reduced?1:.78+.22*easeOut(progress);
+ for(const p of dancers){
+  ctx.save();ctx.translate(p.x,p.y-p.lift);ctx.rotate(p.lean);ctx.scale(entrance,entrance);
+  if(p.id==='ruti'){
+   const dancer={...actor,celebrating:true,circleDance:true,walking:false,action:null,tool:null,carryDish:null,facing:p.facing,sitting:0};
+   if(imageReady(images.rutiAtlas)){
+    ellipse(ctx,0,1,p.height*.17,p.height*.025,'#4c382c25');
+    ctx.save();ctx.scale(p.facing*RUTI_ORIENTATIONS[0],1);
+    drawRutiFrame(ctx,images.rutiAtlas,0,p.height,{...p,circleDance:true});ctx.restore();
+   }
+   else drawHuman(ctx,0,0,p.height,{portrait:images.ruti,images,time,reduced,actor:dancer});
+  }else{
+   if(!drawHouseGuest(ctx,0,0,p.height,p.id,images,time,{facing:p.facing,reduced,dance:p}))
+    drawHuman(ctx,0,0,p.height,{guest:true,guestId:p.id,portrait:images.family?.[p.id],images,time,reduced});
+  }
+  ctx.restore();
+ }
+ ctx.restore();
+}
+function easeOut(value){return 1-Math.pow(1-clamp(value,0,1),3);}
+
 function drawRutiSpeech(ctx,x,y,height,actor,time,width){
  if(!actor.speechText||time>=(actor.speechUntil||0))return;
  const fontSize=clamp(width*.025,11,14),padding=11,maxWidth=Math.min(210,width-18);
@@ -487,11 +524,12 @@ function drawRutiSpeech(ctx,x,y,height,actor,time,width){
 // Two full-body poses retain the actual family likeness, neck and clothing.
 // Both atlases share the same cell geometry and scale, so silhouettes do not
 // disclose whether a guest should receive a meal or peanuts.
-export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,facing=1,reduced=false,sitting=0,food=null,eating=null}={}){
+export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,facing=1,reduced=false,sitting=0,food=null,eating=null,dance=null}={}){
  const extra=GUEST_ART[id],familyIndex=HOUSE_GUESTS.indexOf(id),column=extra?extra.column:familyIndex>=0?familyIndex:HOUSE_VISITORS.indexOf(id);
  const atlas=extra?images?.familyExtraAtlases?.[extra.atlas]:familyIndex>=0?images?.familyAtlas:images?.visitorAtlas;
  if(column<0||!imageReady(atlas))return false;
- const cw=atlas.naturalWidth/4,ch=atlas.naturalHeight/2,row=walking&&!reduced?Math.floor(time*4)%2:0;
+ const mealRig=food&&sitting>.8?GUEST_ARM_RIGS[id]:null;
+ const cw=atlas.naturalWidth/4,ch=atlas.naturalHeight/2,row=food&&sitting>0?1:walking&&!reduced?Math.floor(time*4)%2:0;
  const scale=height/(ch*(extra?.bodySpan||.91)),w=cw*scale,h=ch*scale;
  const center=extra?extra.center:familyIndex>=0?[[203,186,175,158],[214,193,184,169]][row][column]/384:.5;
  const foot=extra?extra.footByRow[row]:familyIndex>=0?(row===0?482:490)/512:.98;
@@ -499,17 +537,37 @@ export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,faci
  ctx.save();ctx.translate(x,y-bob);ellipse(ctx,0,1,height*.15,height*.025,'#4c382c25');
  if(sitting>.8&&eating?.active)ctx.rotate(eating.lean||0);
  if(facing<0)ctx.scale(-1,1);
+ const bend=clamp(sitting,0,1),hip=ch*.60,top=-h*foot+(h*foot-height*.23-hip*scale)*bend;
+ // Remove the very same original arm pixels before articulating them. Clip
+ // each seated body slice in source coordinates, including the original hand.
+ const bodySlice=(from,to,dy,dh)=>{
+  ctx.save();
+  if(mealRig){
+   ctx.beginPath();ctx.rect(-w*center,dy,w,dh);
+   const outline=guestArmOutline(mealRig),map=p=>[(p[0]/384-center)*w,dy+(p[1]/512*ch-from)/(to-from)*dh];
+   ctx.moveTo(...map(outline[0]));for(const point of outline.slice(1))ctx.lineTo(...map(point));ctx.closePath();ctx.clip('evenodd');
+  }
+  ctx.drawImage(atlas,column*cw+.5,row*ch+from+.5,cw-1,to-from-1,-w*center,dy,w,dh);ctx.restore();
+ };
  if(sitting>0){
   // The face, neck, hands and torso keep their original pixels and scale.
   // Foreshortened legs and a lap plate give the front-facing seated pose.
-  const bend=clamp(sitting,0,1),hip=ch*.60,top=-h*foot+(h*foot-height*.23-hip*scale)*bend;
   const lower=(ch-hip)*scale*(1-bend)+height*.27*bend;
-  ctx.drawImage(atlas,column*cw+.5,.5,cw-1,hip,-w*center,top,w,hip*scale);
-  ctx.drawImage(atlas,column*cw+.5,hip+.5,cw-1,ch-hip-1,-w*center,top+hip*scale-.3,w,lower);
-  if(bend>.75){
+  bodySlice(0,hip,top,hip*scale);
+  bodySlice(hip,ch,top+hip*scale-.3,lower);
+  if(bend>.75&&!food){
    const lap=top+hip*scale-height*.025;
    ellipse(ctx,0,lap,height*.12,height*.035,'#f3e7c9','#aa9975');
    ellipse(ctx,0,lap-height*.008,height*.09,height*.016,'#d9c39a');
+  }
+ }else if(dance){
+  // Feet and hems come from the same connected person, with independent
+  // weight transfers instead of swapping to a walking photo on every beat.
+  const knee=ch*.79,lower=ch-knee,split=cw*center;
+  ctx.drawImage(atlas,column*cw+.5,.5,cw-1,knee,-w*center,-h*foot,w,knee*scale);
+  for(const [side,left,right] of [['Left',0,split],['Right',split,cw]]){
+   ctx.save();ctx.translate((dance['foot'+side+'X']||0)*height,-(dance['foot'+side+'Lift']||0)*height);
+   ctx.drawImage(atlas,column*cw+left+.5,knee+.5,right-left-1,lower-1,(left-cw*center)*scale,(knee-ch*foot)*scale,(right-left)*scale,lower*scale);ctx.restore();
   }
  }else ctx.drawImage(atlas,column*cw+.5,row*ch+.5,cw-1,ch-1,-w*center,-h*foot,w,h);
  if(food){
@@ -520,27 +578,22 @@ export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,faci
   const portionColor={peanuts:'#c18b4f',tahini:'#dcc691',carrot:'#df8b36',kubaneh:'#bb783b',eggplant:'#946749',lasagna:'#cb703e'}[food]||'#c99154';
   const portions=Math.ceil(remaining*7);
   for(let n=0;n<portions;n++){const a=n*2.4,r=height*(.018+n*.005);ellipse(ctx,plateX+Math.cos(a)*r,lap-height*.012+Math.sin(a)*r*.34,height*(food==='peanuts'?.011:.018),height*.010,portionColor);}
-  if(sitting>.8&&eating?.active){
-   // Calibrated atlas mouth positions, rather than a generic point above the face.
-   const face=familyIndex>=0?[[218/384,90/512],[176/384,103/512],[172/384,97/512],[160/384,108/512]][column]:[.53,.185];
-   const top=-height*.23-ch*.60*scale,mouth={x:(face[0]-center)*w,y:top+face[1]*h};
-   const lift=eating.bite,tip={x:plateX+(mouth.x-plateX)*lift,y:lap-height*.018+(mouth.y-lap+height*.018)*lift};
-   const hand={x:tip.x-height*.047,y:tip.y+height*.016};
-   const shoulder={x:-height*.13,y:top+height*.30},elbow={x:-height*(.20-lift*.035),y:lap-height*(.035+lift*.16)};
-   const sleeve=familyIndex>=0?['#43596b','#494845','#3d4551','#e3d4b9'][column]:extra?'#697267':['#536679','#484647','#3e4755','#eadfca'][column];
-   ctx.lineCap='round';ctx.lineJoin='round';
-   line(ctx,shoulder.x,shoulder.y,elbow.x,elbow.y,sleeve,height*.060);
-   line(ctx,elbow.x,elbow.y,hand.x,hand.y,'#b98365',height*.039);
-   line(ctx,elbow.x,elbow.y,hand.x,hand.y,'#d6a17f',height*.030);
-   ellipse(ctx,hand.x,hand.y,height*.022,height*.018,'#e4b18b','#b78365');
+  if(mealRig){
+   const unit=w/384,mouth={x:(mealRig.mouth[0]/384-center)*w,y:top+mealRig.mouth[1]*unit};
+   const lift=eating?.active?eating.bite:0,spoon=food!=='peanuts';
+   const desiredTip={x:plateX+(mouth.x-plateX)*lift,y:lap-height*.018+(mouth.y-lap+height*.018)*lift};
+   const target=[(desiredTip.x+(spoon?height*.035:0))/unit+center*384,(desiredTip.y+height*.012-top)/unit];
+   const pose=guestArmPose(mealRig,target),hand={x:(pose.hand[0]-center*384)*unit,y:top+pose.hand[1]*unit};
+   const tip={x:hand.x-(spoon?height*.035:0),y:hand.y-height*.012};
+   ctx.save();ctx.translate(-w*center,top);ctx.scale(unit,unit);drawGuestOriginalArm(ctx,atlas,column,mealRig,pose);ctx.restore();
    if(food!=='peanuts'){
     line(ctx,hand.x,hand.y,tip.x,tip.y,'#7d817d',height*.014);
     line(ctx,hand.x-height*.002,hand.y-height*.003,tip.x,tip.y-height*.003,'#f6f4df',height*.006);
     ellipse(ctx,tip.x,tip.y,height*.018,height*.009,'#c5c6b7');
    }
-   if(eating.scoop&&remaining>0)ellipse(ctx,tip.x,tip.y-height*.007,height*.014,height*.010,portionColor);
-   if(eating.mouth>.05){ellipse(ctx,mouth.x,mouth.y,height*.022,height*(.007+eating.mouth*.010),'#673c32');ellipse(ctx,mouth.x,mouth.y-height*.003,height*.015,height*.004,'#f5e9da');}
-   else if(eating.chew>.05){line(ctx,mouth.x-height*.018,mouth.y,mouth.x+height*.018,mouth.y+eating.chew*height*.005,'#9b5e4d',height*.009);}
+   if(eating?.scoop&&remaining>0)ellipse(ctx,tip.x,tip.y-height*.007,height*.014,height*.010,portionColor);
+   if(eating?.mouth>.05){ellipse(ctx,mouth.x,mouth.y,height*.022,height*(.007+eating.mouth*.010),'#673c32');ellipse(ctx,mouth.x,mouth.y-height*.003,height*.015,height*.004,'#f5e9da');}
+   else if(eating?.chew>.05){line(ctx,mouth.x-height*.018,mouth.y,mouth.x+height*.018,mouth.y+eating.chew*height*.005,'#9b5e4d',height*.009);}
   }
  }
  ctx.restore();return true;

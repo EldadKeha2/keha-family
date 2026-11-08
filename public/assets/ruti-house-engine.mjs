@@ -1,5 +1,6 @@
 import {EXTRA_FAMILY_GUESTS} from './ruti-house-guests.mjs?v=1';
-import {houseStageBonuses} from './ruti-house-bonuses.mjs?v=1';
+import {houseStageBonuses} from './ruti-house-bonuses.mjs?v=20-levels-v1';
+import {HOUSE_STAGE_GOALS} from './ruti-house-levels.mjs?v=1';
 // Ruti's bustling home: all clocks are game time, so pausing needs no catch-up.
 const step=(tool,he,en)=>Object.freeze({tool,he,en});
 export const RECIPES=Object.freeze([
@@ -54,7 +55,18 @@ export const STAGES=Object.freeze([
   stage(9,'כל המשפחה בדרך','The whole family is on the way',null,30,5,['cat','plant','dust','plant','cat','plant'],{plant:21,dust:17,cat:17,guest:36},3.5,1.2),
   stage(10,'עוד כיסא לשולחן','One more chair at the table',null,30,5,['cat','plant','dust','plant','cat','dust','plant'],{plant:19,dust:15,cat:13,guest:31},3,1.1),
   stage(11,'בוטנים ופינוקים','Peanuts and little treats','peanuts',30,5,['cat','plant','dust','plant','cat','dust','plant'],{plant:18,dust:14,cat:12,guest:28},2.5,1),
-  stage(12,'הלב של הבית','The heart of the home',null,30,6,['cat','plant','dust','plant','cat','dust','plant'],{plant:16,dust:12,cat:10,guest:24},2,.9)
+  stage(12,'הלב של הבית','The heart of the home',null,30,6,['cat','plant','dust','plant','cat','dust','plant'],{plant:16,dust:12,cat:10,guest:24},2,.9),
+  ...[
+   ['עוד סיבוב באהבה','Another round with love',15.5,11.6,9.7,23,1.9,.87],
+   ['כולם מרגישים בבית','Everyone feels at home',15,11.2,9.4,22,1.8,.84],
+   ['הבית על הרגליים','The house is on its feet',14.5,10.8,9.1,21,1.7,.81],
+   ['יש מקום לכולם','There is room for everyone',14,10.4,8.8,20,1.6,.78],
+   ['רותי לא עוצרת','Ruti keeps going',13.5,10,8.5,19,1.5,.75],
+   ['שמחה מקיר לקיר','Joy in every corner',13,9.6,8.2,18,1.4,.72],
+   ['עוד קצת והכול מבריק','Almost shining everywhere',12.5,9.2,7.9,17,1.3,.69],
+   ['ככה עושים בית','This is how you make a home',12,8.8,7.6,16,1.2,.66]
+  ].map(([he,en,plant,dust,cat,guest,catWait,delay],index)=>stage(index+13,he,en,null,HOUSE_STAGE_GOALS[index+12],6,
+   ['cat','plant','dust','plant','cat','dust','plant'],{plant,dust,cat,guest},catWait,delay))
 ]);
 // One extended opening lesson: six relaxed waterings, then progressively
 // shorter response windows that still allow Ruti to fetch a tool and walk.
@@ -119,7 +131,10 @@ function startStage(g,index){
   g.stageMisses={plant:0,dust:0};
   g.ora=null;g.oraAttempted=false;g.oraAt=plan.level>=4?10+Math.floor(random(g)*13):Infinity;g.oraBonusRemaining=0;g.nextGuestAt=plan.guestMode?15.4+random(g)*7.6:Infinity;
   g.unlockedTools=[...plan.unlockedTools];g.unlockedRecipes=[...plan.unlockedRecipes];
-  const first=HOUSE_GUESTS.filter(id=>!g.familyVisits.includes(id)),candidates=(first.length?first:EXTRA_FAMILY_GUESTS.map(person=>person.id)).filter(id=>!g.familyVisits.includes(id));g.stageGuestChoices=[];g.stageGuestsInvited=[];
+  const first=HOUSE_GUESTS.filter(id=>!g.familyVisits.includes(id));
+  const unvisited=(first.length?first:EXTRA_FAMILY_GUESTS.map(person=>person.id)).filter(id=>!g.familyVisits.includes(id));
+  // Once everyone has visited, the longer final rounds can welcome family again.
+  const candidates=unvisited.length?unvisited:[...HOUSE_FAMILY_GUESTS];g.stageGuestChoices=[];g.stageGuestsInvited=[];
   if(plan.guestMode)while(candidates.length&&g.stageGuestChoices.length<2)g.stageGuestChoices.push(candidates.splice(Math.floor(random(g)*candidates.length),1)[0]);
   g.requiredDishComplete=!plan.requiredDish;g.requiredMealComplete=!plan.requiredMeal;g.cookingFocus=plan.requiredDish;
   g.lessonObjective=plan.requiredDish?{kind:'dish',recipeId:plan.requiredDish,complete:false}:plan.requiredMeal?{kind:'meal',complete:false}:null;
@@ -135,7 +150,7 @@ function finishStage(g){
   if(g.stageResults[g.level-1])return;
   const result={plants:g.stageStats.plants,dust:g.stageStats.dust,missedPlants:g.stageMisses.plant,missedDust:g.stageMisses.dust,completed:g.stageCompleted};
   g.stageResults[g.level-1]=result;
-  const bonus=houseStageBonuses(result);g.score+=bonus.total;g.stageScores[g.level-1]+=bonus.total;
+  const bonus=houseStageBonuses(result,g.stage.goal);g.score+=bonus.total;g.stageScores[g.level-1]+=bonus.total;
   g.completedLevels=g.level;g.tasks=[];g.ora=null;g.spawnRemaining=0;g.guestsInside=[];
   if(g.level===STAGES.length){g.phase='finished';g.won=true;}else g.phase='stage-complete';
   emit(g,{type:'stage-clear',level:g.level,stageScore:g.stageScores[g.level-1],bonus,won:g.won});if(g.won)emit(g,{type:'finished',score:g.score,won:true});
