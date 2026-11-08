@@ -1,4 +1,5 @@
 import {fullCrop,rotateCrop,pixelCrop,rotatedSize} from './photo-edit-core.mjs';
+import {labelledRegion} from './face-geometry.mjs';
 const key=name=>String(name||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
 const id=()=>crypto.randomUUID().replaceAll('-','');
 const turnRect=(rect,rotation)=>{let result={...rect};for(let i=0;i<((rotation%4)+4)%4;i++)result=rotateCrop(result,1);return result;};
@@ -28,7 +29,7 @@ export function createUploadFaceAdapter(d,{findPeople,getPerson,onChange=()=>{},
   return {load:async()=>snapshot(),findPeople:search,mapDetections:found=>found.map(face=>({...face,rect:turnRect(face.rect,d.rotation)})),
     async save(input){
       const previous=d.faceTags.find(face=>face.id===input.faceId);
-      if(input.personId===null){d.faceTags=d.faceTags.filter(face=>face.id!==input.faceId);d.facesComplete=false;return changed(null);}
+      if(input.personId===null){if(previous&&!d.ignoredFaces.some(rect=>labelledRegion(rect,previous.rect)))d.ignoredFaces.push(previous.rect);d.faceTags=d.faceTags.filter(face=>face.id!==input.faceId);d.facesComplete=false;return changed(null);}
       let person;
       if(input.name!==undefined){
         const name=String(input.name).trim().replace(/\s+/g,' ');if(!name||name.length>120)throw Error(tr('יש להזין שם באורך של עד 120 תווים.','Enter a name (up to 120 characters).'));
@@ -39,9 +40,10 @@ export function createUploadFaceAdapter(d,{findPeople,getPerson,onChange=()=>{},
       if(!person)throw Error(tr('בחרו אדם מהרשימה.','Choose a person from the list.'));
       if(!previous&&d.faceTags.length>=150)throw Error(tr('אפשר לתייג עד 150 אזורי פנים בתמונה.','A photo can have up to 150 face tags.'));
       roster.set(person.id,person);const face={id:input.faceId,person,rect:turnRect(input.rect,-d.rotation),revision:id()};
+      d.ignoredFaces=d.ignoredFaces.filter(rect=>!labelledRegion(rect,face.rect));
       d.faceTags=d.faceTags.filter(saved=>saved.id!==face.id);d.faceTags.push(face);d.facesComplete=false;return changed(face);
     },
-    async ignore({rect,ignored}){const original=turnRect(rect,-d.rotation);if(ignored)d.ignoredFaces.push(original);else d.ignoredFaces=d.ignoredFaces.filter(other=>JSON.stringify(other)!==JSON.stringify(original));return changed(null);},
+    async ignore({rect,ignored,faceId}){const original=turnRect(rect,-d.rotation);if(ignored){if(!d.ignoredFaces.some(other=>labelledRegion(other,original)))d.ignoredFaces.push(original);d.faceTags=d.faceTags.filter(face=>faceId?face.id!==faceId:!labelledRegion(original,face.rect));d.facesComplete=false;}else d.ignoredFaces=d.ignoredFaces.filter(other=>!labelledRegion(other,original));return changed(null);},
     async review({complete}){d.facesComplete=Boolean(complete);return changed(null);}
   };
 }

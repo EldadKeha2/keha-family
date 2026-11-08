@@ -235,17 +235,36 @@ test('desktop resizing works after zoom and late detections keep the adjusted bo
  const width=parseFloat(selection.style.width);assert.ok(Math.abs(width-1.5)<1e-8);f.progress([first,second]);assert.ok(Math.abs(parseFloat(f.find('face-hit-buttons').children[0].style.width)-1.5)<1e-8);
  f.faces.clear();const phone=fixture([first]);await phone.mount();assert.equal(phone.find('face-selection').children.length,0);phone.faces.clear();
 });
-test('ignoring one false detection is photo-specific, survives reopening, and Undo restores the region',async()=>{
+test('ignoring one false detection disappears immediately, stays hidden after reopening and has no Undo control',async()=>{
  const f=fixture([first,second]),requests=[];let ignored=[];
  f.window.FamilyI18n.fetch=async(path,options)=>{
   if(path.endsWith('/ignore')){const body=JSON.parse(options.body);requests.push(body);ignored=body.ignored?[body.rect]:[];return Response.json({saved:true,operation:'face-ignore',item:{id:'ignored-photo',kind:'photo'},faces:[],detectedFaces:body.ignored?[second]:[first,second],ignoredFaces:ignored});}
-  return Response.json({faces:[],ignoredFaces:ignored,detectedFaces:[first,second]});
+  return Response.json({faces:[],ignoredFaces:path.includes('ignored-photo')?ignored:[],detectedFaces:[first,second]});
  };
  await f.mount('ignored-photo');let area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,clientX:area.left+.506*area.width,clientY:area.top+.408*area.height});
- f.emit(f.find('face-popover face-picker').querySelector('[data-face-ignore]'),'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(requests[0].ignored,true);assert.equal(requests[0].photoRevision,'original');assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(f.find('face-zoom-toolbar').querySelector('[data-face-ignore-undo]').hidden,false);
+ f.emit(f.find('face-popover face-picker').querySelector('[data-face-ignore]'),'click');assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(f.find('face-popover face-picker'),undefined);await f.faces.flush();assert.equal(requests[0].ignored,true);assert.equal(requests[0].photoRevision,'original');assert.equal(f.find('face-hit-buttons').children.length,1);assert.doesNotMatch(f.find('face-zoom-toolbar').innerHTML,/data-face-ignore-undo/);
  f.faces.clear();await f.mount('ignored-photo');assert.equal(f.find('face-hit-buttons').children.length,1);
- f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-ignore-undo]'),'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.at(-1).ignored,false);assert.equal(f.find('face-hit-buttons').children.length,2);
+ assert.doesNotMatch(f.find('face-zoom-toolbar').innerHTML,/data-face-ignore-undo/);assert.equal(requests.length,1);
  f.faces.clear();await f.mount('other-photo');assert.equal(f.find('face-hit-buttons').children.length,2);f.faces.clear();
+});
+
+test('removing one duplicate face immediately renumbers the legend and markers, retains the other occurrence and survives late scans',async()=>{
+ const faces=Array.from({length:26},(_,i)=>({id:String(i+1).padStart(32,'0'),revision:'r'+i,rect:{x:.05+(i%6)*.15,y:.05+Math.floor(i/6)*.18,width:.05,height:.06},personId:i===20?'maya':'person-'+i,person:{id:i===20?'maya':'person-'+i,name:i===17||i===20?'מאיה':'אדם '+i}}));faces[17].personId='maya';faces[17].person.id='maya';
+ const f=fixture(faces.map(face=>({rect:face.rect,score:.95}))),requests=[],removed=faces[20];let saved=faces,ignored=[],finish;
+ f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};
+ f.window.FamilyI18n.fetch=async(path,options)=>{if(path.endsWith('/ignore')){requests.push(JSON.parse(options.body));await new Promise(resolve=>finish=resolve);saved=faces.filter(face=>face!==removed);ignored=[removed.rect];return Response.json({operation:'face-ignore',item:{id:'duplicates',kind:'photo'},faces:saved,detectedFaces:saved.map(face=>({rect:face.rect})),ignoredFaces:ignored});}return Response.json({faces:saved,ignoredFaces:ignored});};
+ await f.mount('duplicates');const legend=f.find('face-label-list'),annotations=f.find('face-visible-labels');assert.equal(legend.children.length,26);
+ const area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,clientX:area.left+(removed.rect.x+.025)*area.width,clientY:area.top+(removed.rect.y+.03)*area.height});f.emit(f.find('face-popover face-name').querySelector('[data-face-edit]'),'click');
+ f.emit(f.find('face-popover face-picker').querySelector('[data-face-remove]'),'click');assert.equal(legend.children.length,25);assert.equal(f.find('face-hit-buttons').children.length,25);assert.equal(f.find('face-popover face-picker'),undefined);
+ const checkNumbers=()=>{assert.deepEqual(legend.children.map(node=>Number(/face-label-number[^>]*>(\d+)/.exec(node.innerHTML)[1])),Array.from({length:25},(_,i)=>i+1));assert.deepEqual(annotations.children.filter(node=>node.className==='face-label-marker').map(node=>node.textContent),Array.from({length:25},(_,i)=>i+1));assert.equal(legend.children.filter(node=>node.innerHTML.includes('מאיה')).length,1);};checkNumbers();
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(requests[0].faceId,removed.id);assert.equal(requests[0].expectedRevision,removed.revision);f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',item:{id:'duplicates',kind:'photo'},faces,ignoredFaces:[]}}));checkNumbers();assert.equal(f.find('face-hit-buttons').children.length,25);finish();await f.faces.flush();checkNumbers();
+ f.progress(faces.map(face=>({rect:face.rect,score:.95})));assert.equal(f.find('face-hit-buttons').children.length,25);checkNumbers();f.faces.clear();await f.mount('duplicates');assert.equal(f.find('face-label-list').children.length,25);assert.doesNotMatch(f.find('face-zoom-toolbar').innerHTML,/data-face-ignore-undo/);f.faces.clear();
+});
+
+test('a failed removal restores the face and label without confirming or offering Undo',async()=>{
+ const person={id:'maya',name:'מאיה'},face={...first,id:'a'.repeat(32),revision:'current',personId:person.id,person},f=fixture([first]);
+ f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};f.window.FamilyI18n.fetch=async path=>path.endsWith('/ignore')?Response.json({error:'Connection lost'},{status:503}):Response.json({faces:[face]});await f.mount();
+ const area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,clientX:area.left+.506*area.width,clientY:area.top+.408*area.height});f.emit(f.find('face-popover face-name').querySelector('[data-face-edit]'),'click');f.emit(f.find('face-popover face-picker').querySelector('[data-face-remove]'),'click');assert.equal(f.find('face-hit-buttons').children.length,0);await f.faces.flush();assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(f.find('face-visible-labels').children.filter(node=>node.className==='face-visible-label').length,1);assert.doesNotMatch(f.find('face-zoom-toolbar').innerHTML,/data-face-ignore-undo/);f.faces.clear();
 });
 
 test('touching a saved face shows its name for two seconds, and another face replaces the previous label immediately',async t=>{

@@ -73,8 +73,12 @@
       Object.assign(c.popup.style,{left:p.x+'px',top:p.y+'px',maxHeight:p.maxHeight+'px',maxWidth:p.width+'px'});
     }
   }
+  function visibleFaces(c,reviewed=false){
+    const dismissed=c.pendingDismiss,saved=dismissed?c.saved.filter(face=>dismissed.person?face.id!==dismissed.id:!c.geom.labelledRegion(dismissed.rect,face.rect)):c.saved,ignored=dismissed?[...c.ignored,dismissed.rect]:c.ignored;
+    return c.geom.mergeFaces(saved,(reviewed?[]:c.detected).filter(face=>!ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));
+  }
   function annotationFaces(c,image){
-    return c.geom.mergeFaces(c.saved,c.detected.filter(face=>!c.ignored.some(rect=>c.geom.labelledRegion(rect,face.rect)))).map(face=>({x:face.rect.x*image.width,y:face.rect.y*image.height,width:face.rect.width*image.width,height:face.rect.height*image.height}));
+    return visibleFaces(c).map(face=>({x:face.rect.x*image.width,y:face.rect.y*image.height,width:face.rect.width*image.width,height:face.rect.height*image.height}));
   }
   function placeAnnotations(c,image){
     const entries=c.annotationNodes||[];if(!entries.length){c.labelList.hidden=true;c.stage.classList.remove('face-label-list-active');return;}
@@ -124,18 +128,17 @@
     c.zoom=1;c.scroller=document.createElement('div');c.scroller.className='face-photo-scroll';c.scroller.dir='ltr';c.scroller.tabIndex=0;c.scroller.setAttribute('aria-label',tr('התמונה לתיוג. בהגדלה אפשר לגלול לכל אזור.','Photo for tagging. Scroll to any area when enlarged.'));
     c.surface=document.createElement('div');c.surface.className='face-photo-surface';c.surface.append(c.image,c.layer);c.scroller.append(c.surface);c.stage.append(c.scroller,c.guide,c.labelList);c.stage.classList.add('has-face-zoom');
     c.toolbar=document.createElement('div');c.toolbar.className='face-zoom-toolbar';c.toolbar.setAttribute('role','group');c.toolbar.setAttribute('aria-label',tr('הגדלה לדיוק תיוג פנים','Zoom for precise face tagging'));
-    c.toolbar.innerHTML=`<span>${tr('פנים קטנות? הגדילו לתּיוג מדויק','Small faces? Zoom in to tag precisely')}</span><div><button type="button" data-face-zoom-out disabled aria-label="${tr('הקטנת התמונה','Zoom out')}">−</button><output data-face-zoom-level aria-live="polite">100%</output><button type="button" data-face-zoom-in aria-label="${tr('הגדלת התמונה','Zoom in')}">＋</button><button type="button" data-face-zoom-reset disabled>${tr('התאמה למסך','Fit photo')}</button><button type="button" data-face-ignore-undo hidden>${tr('ביטול התעלמות מזיהוי','Undo ignored detection')}</button></div>`;
+    c.toolbar.innerHTML=`<span>${tr('פנים קטנות? הגדילו לתּיוג מדויק','Small faces? Zoom in to tag precisely')}</span><div><button type="button" data-face-zoom-out disabled aria-label="${tr('הקטנת התמונה','Zoom out')}">−</button><output data-face-zoom-level aria-live="polite">100%</output><button type="button" data-face-zoom-in aria-label="${tr('הגדלת התמונה','Zoom in')}">＋</button><button type="button" data-face-zoom-reset disabled>${tr('התאמה למסך','Fit photo')}</button></div>`;
     c.stage.before(c.toolbar);const levels=[1,1.5,2,3,4,6,8];
     c.toolbar.querySelector('[data-face-zoom-in]').addEventListener('click',()=>setZoom(c,levels[Math.min(levels.length-1,levels.indexOf(c.zoom)+1)]));
     c.toolbar.querySelector('[data-face-zoom-out]').addEventListener('click',()=>setZoom(c,levels[Math.max(0,levels.indexOf(c.zoom)-1)]));
     c.toolbar.querySelector('[data-face-zoom-reset]').addEventListener('click',()=>setZoom(c,1));
-    c.ignoreUndo=c.toolbar.querySelector('[data-face-ignore-undo]');c.ignoreUndo.hidden=!c.ignored.length;c.ignoreUndo.addEventListener('click',()=>ignore(c,c.ignored.at(-1),false));
     c.scroller.addEventListener('scroll',()=>place(c),{passive:true,signal:c.events.signal});
     c.scroller.addEventListener('pointerdown',event=>{c.scrollStart={x:c.scroller.scrollLeft,y:c.scroller.scrollTop};},{passive:true,signal:c.events.signal});
     fitZoom(c);
   }
   function paint(c){
-    if(!live(c)||!c.buttons)return;reconcileControls(c);c.faces=c.geom.mergeFaces(c.saved,c.reviewed?[]:c.detected.filter(face=>!c.ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));if(c.reviewButton){const label=c.reviewed?tr('כל הפרצופים תויגו · לחצו לביטול האישור','All faces tagged · Click to undo confirmation'):tr('אישור שכל הפרצופים תויגו','Confirm all faces are tagged');c.reviewButton.setAttribute('aria-label',label);c.reviewButton.title=label;c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));if(c.reviewText)c.reviewText.textContent=c.reviewed?tr('כל הפרצופים תויגו','All faces tagged'):tr('אישור תיוג מלא','Confirm all tagged');}c.buttons.replaceChildren();
+    if(!live(c)||!c.buttons)return;reconcileControls(c);c.faces=visibleFaces(c,c.reviewed);if(c.reviewButton){const label=c.reviewed?tr('כל הפרצופים תויגו · לחצו לביטול האישור','All faces tagged · Click to undo confirmation'):tr('אישור שכל הפרצופים תויגו','Confirm all faces are tagged');c.reviewButton.setAttribute('aria-label',label);c.reviewButton.title=label;c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));if(c.reviewText)c.reviewText.textContent=c.reviewed?tr('כל הפרצופים תויגו','All faces tagged'):tr('אישור תיוג מלא','Confirm all tagged');}c.buttons.replaceChildren();
     for(const face of c.faces){
       const button=document.createElement('button');button.type='button';button.className='face-hit';if(c.highlightMissing&&!face.person)button.classList.add('face-missing');button.dataset.faceId=face.id;button.setAttribute('aria-label',face.person?tr('פנים בתמונה: ','Face in photo: ')+photoName(face):tr('תיוג הפנים האלה','Tag this face'));
       Object.assign(button.style,{left:face.rect.x*100+'%',top:face.rect.y*100+'%',width:face.rect.width*100+'%',height:face.rect.height*100+'%'});
@@ -148,7 +151,7 @@
     if(c.missingNote)c.missingNote.hidden=c.reviewed;
     if(c.missingNote&&c.reviewed)c.missingNote.textContent='';
     else if(c.missingNote){const count=c.faces.filter(face=>!face.person).length;c.missingNote.textContent=count?tr('פנים ללא תיוג: ','Faces without labels: ')+count+tr(' · לחצו על המסגרת והוסיפו שם.',' · Select a frame and add a name.'):c.faces.length?tr('כל הפנים שזוהו מתויגות ✓','All detected faces are labelled ✓'):tr('מזהים פנים בתמונה…','Finding faces in the photo…');}
-    if(c.ignoreUndo)c.ignoreUndo.hidden=!c.ignored.length;paintAnnotations(c);place(c);
+    paintAnnotations(c);place(c);
   }
   function paintAnnotations(c){
     if(!live(c)||!c.annotations)return;c.annotations.replaceChildren();c.labelList.replaceChildren();c.annotationNodes=[];c.annotationMeasurements=null;c.annotationLayout=null;
@@ -211,23 +214,26 @@
     panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closePopup(c);}else if(['ArrowDown','ArrowUp'].includes(event.key)&&event.target.matches(choices)){event.preventDefault();const buttons=[...panel.querySelectorAll(choices)],index=buttons.indexOf(event.target);buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}});
     panel.querySelector('[data-face-close]').addEventListener('click',()=>closePopup(c));
     panel.querySelector('[data-face-adjust]').addEventListener('click',()=>{panel.remove();c.popup=null;c.active={...c.active,rect:{...c.active.rect}};c.adjust=true;c.guide.hidden=false;c.stage.classList.add('face-adjusting');place(c);});
-    panel.querySelector('[data-face-remove]')?.addEventListener('click',()=>save(c,{personId:null}));
-    panel.querySelector('[data-face-ignore]')?.addEventListener('click',()=>ignore(c,face.rect,true));
+    panel.querySelector('[data-face-remove]')?.addEventListener('click',()=>dismissFace(c));
+    panel.querySelector('[data-face-ignore]')?.addEventListener('click',()=>dismissFace(c));
     input.focus({preventScroll:true});results(c,'');
     try{
       await c.loading;if(!live(c)||c.popup!==panel)return;
       const stored=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));if(stored){c.active=preserveRect?{...stored,rect:face.rect}:stored;place(c);}
     }catch(error){if(live(c)&&c.popup===panel)panel.querySelector('[data-face-status]').textContent=tr('לא ניתן לקרוא את תיוגי הפנים כרגע. סגרו ונסו שוב.','Face labels are currently unavailable. Close and try again.');}
   }
-  async function ignore(c,rect,ignored){
-    if(!live(c)||c.saving||!rect)return;const panel=c.popup;c.saving=true;if(c.ignoreUndo)c.ignoreUndo.disabled=true;
+  function dismissFace(c){const pending=ignore(c);c.pendingSave=pending;return pending;}
+  async function ignore(c){
+    if(!live(c)||c.saving||!c.active)return;const face={...c.active};c.saving=true;
+    // Remove the selected region and rebuild both number sets in this frame.
+    c.pendingDismiss=face;closePopup(c);paint(c);
     try{
-      await c.loading;if(!live(c))return;
-      const payload={rect,ignored,photoRevision:c.item.photoRevision||'original'},result=c.adapter?await c.adapter.ignore(payload):await request('api/media/'+c.item.id+'/faces/ignore',{method:'POST',body:JSON.stringify(payload)});
+      await c.loading;if(!c.adapter)await window.FamilyTags.flush(c.item.id);if(!live(c))return;
+      const payload={rect:face.rect,ignored:true,photoRevision:c.item.photoRevision||'original',...(face.person?{faceId:face.id,expectedRevision:face.revision}: {})},result=c.adapter?await c.adapter.ignore(payload):await request('api/media/'+c.item.id+'/faces/ignore',{method:'POST',body:JSON.stringify(payload)});
       changed(c,result);
-      if(live(c)){c.ignored=result.ignoredFaces;closePopup(c);paint(c);window.FamilyApp?.toast?.(ignored?tr('הזיהוי הוסתר בתמונה הזו. אפשר לבטל בסרגל ההגדלה.','Detection ignored in this photo. Undo is available in the zoom toolbar.'):tr('ההתעלמות מהזיהוי בוטלה.','Ignored detection restored.'));}
-    }catch(error){if(live(c)){if(panel?.querySelector('[data-face-status]'))panel.querySelector('[data-face-status]').textContent=error.message;else announce(c,error.message);}}
-    finally{c.saving=false;if(c.ignoreUndo)c.ignoreUndo.disabled=false;}
+      if(live(c)){c.pendingDismiss=null;c.ignored=result.ignoredFaces||[];apply(c,result.faces);announce(c,tr('הסימון והתיוג הוסרו.','Face marker and label removed.'));}
+    }catch(error){if(live(c)){c.pendingDismiss=null;paint(c);announce(c,error.message);window.FamilyApp?.toast?.(error.message);}}
+    finally{c.saving=false;}
   }
   async function resized(c,face){
     if(!live(c))return;c.resizeDrag=null;c.stage.classList.remove('face-resizing');c.skipClick=true;setTimeout(()=>{if(live(c))c.skipClick=false;},0);
@@ -244,7 +250,7 @@
       const known=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));
       const payload={faceId:known?.id||face.id,...selection,rect:face.rect,expectedRevision:known?.revision||null},result=c.adapter?await c.adapter.save(payload):await request('api/media/'+c.item.id+'/faces/save',{method:'POST',body:JSON.stringify(payload)});
       if(!c.adapter)remember(c.item.id,result.faces,result.item);changed(c,result);
-      if(live(c)){c.saving=false;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face)showLabel(c,result.face,touchMode(),true);}
+      if(live(c)){c.saving=false;if(result.ignoredFaces)c.ignored=result.ignoredFaces;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face)showLabel(c,result.face,touchMode(),true);}
     }catch(error){if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const control of panel.querySelectorAll('button,input'))control.disabled=false;}}
     finally{c.saving=false;}
   }

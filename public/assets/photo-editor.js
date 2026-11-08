@@ -1,7 +1,7 @@
 import {fullCrop,turns,isPhoto,normalizeCrop,rotateCrop,rotatedSize,pixelCrop,moveCrop,changed,outputFormat,outputName,drawPhoto} from './photo-edit-core.mjs';
 import {filenamePhotoDate,normalizeUploadMetadata,photoUploadPayload} from './photo-upload-metadata.mjs?v=3';
 
-import {createUploadFaceAdapter,faceDraftPeople,transformedUploadFaces} from './photo-upload-faces.mjs?v=1';
+import {createUploadFaceAdapter,faceDraftPeople,transformedUploadFaces} from './photo-upload-faces.mjs?v=2';
 import {PHOTO_LABELS,photoLabelName} from './photo-labels-catalog.mjs';
 
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;

@@ -1446,7 +1446,7 @@ test('photo subject labels persist independently of people and completion, filte
  }finally{await f.close();}
 });
 
-test('ignored false detections persist only for that photo revision, survive rescanning and support Undo without removing names',async()=>{
+test('dismissed detections and linked names persist only for that photo revision and survive rescanning',async()=>{
  const f=fixture();try{
   await f.connect();const item=await galleryPhoto(f,'Ignore.jpg'),other=await galleryPhoto(f,'Unaffected.jpg');await saveGalleryScan(f,item);await saveGalleryScan(f,other);
   const saved=await(await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:'a'.repeat(32),personId:'yona',rect:detectedGalleryFaces[0].rect,expectedRevision:null}})).json();
@@ -1459,8 +1459,22 @@ test('ignored false detections persist only for that photo revision, survive res
   await saveGalleryScan(f,item);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.detectedFaces.length,2,'The next scan cannot reintroduce the ignored region');assert.equal((await(await f.call('/api/media/'+other.id+'/faces')).json()).detectedFaces.length,3);
   const backup=await(await f.call('/api/export')).json();assert.deepEqual(backup.faceIgnores,[{mediaId:item.id,photoRevision:'original',rects:[detectedGalleryFaces[1].rect]}]);
   result=await(await ignore(detectedGalleryFaces[1].rect,false)).json();assert.equal(result.detectedFaces.length,3);assert.equal(result.ignoredFaces.length,0);
-  await ignore(detectedGalleryFaces[0].rect);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.faces[0].personId,'yona','Ignore never removes an existing named face');assert.equal(result.item.tags.length,1);
+  await ignore(detectedGalleryFaces[0].rect);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(result.faces,[],'Dismissal removes the label attached to the selected region');assert.equal(result.item.tags.length,0);assert.equal(result.item.faceSummary.total,2);assert.equal((await(await f.call('/api/people/yona/page')).json()).albums.photos.total,0);
   assert.equal((await photoEdit(f,item)).status,201);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(result.ignoredFaces,[],'Coordinates from old pixels cannot hide a face in an edited photo');assert.equal((await ignore(detectedGalleryFaces[1].rect)).status,409);
+ }finally{await f.close();}
+});
+
+test('removing a duplicate face preserves the other occurrence, rejects stale removal and allows an explicit new label',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await galleryPhoto(f,'Duplicate.jpg'),other=await galleryPhoto(f,'Other-duplicate.jpg');await saveGalleryScan(f,item);
+  const save=(id,personId,rect,expectedRevision=null)=>f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:id,personId,rect,expectedRevision}});
+  const first=(await(await save('1'.repeat(32),'maya',detectedGalleryFaces[0].rect)).json()).face,second=(await(await save('2'.repeat(32),'maya',detectedGalleryFaces[1].rect)).json()).face;
+  const remove=expectedRevision=>f.call('/api/media/'+item.id+'/faces/ignore',{method:'POST',body:{faceId:second.id,rect:second.rect,ignored:true,photoRevision:'original',expectedRevision}});
+  assert.equal((await remove('stale')).status,409);let result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.faces.length,2);assert.deepEqual(result.ignoredFaces,[]);
+  result=await(await remove(second.revision)).json();assert.deepEqual(result.faces.map(face=>face.id),[first.id]);assert.deepEqual(result.item.tags.map(person=>person.id),['maya']);assert.equal(result.item.faceSummary.total,2);assert.equal(result.item.faceSummary.unmatched,1);
+  await saveGalleryScan(f,item);f.restart();result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.faces.length,1);assert.equal(result.detectedFaces.length,2);assert.deepEqual((await(await f.call('/api/media/'+other.id+'/faces')).json()).ignoredFaces,[]);
+  result=await(await save('3'.repeat(32),'shlomo',second.rect)).json();assert.deepEqual(result.ignoredFaces,[]);assert.deepEqual(new Set(result.item.tags.map(person=>person.id)),new Set(['maya','shlomo']));assert.equal(result.item.faceSummary.total,3);
+  const replacement=result.face;result=await(await save(replacement.id,null,replacement.rect,replacement.revision)).json();assert.equal(result.ignoredFaces.length,1);assert.deepEqual(result.item.tags.map(person=>person.id),['maya']);assert.equal(result.item.faceSummary.total,2);assert.deepEqual(result.faces.map(face=>face.id),[first.id]);
  }finally{await f.close();}
 });
 
