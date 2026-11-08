@@ -5,16 +5,21 @@
 .home-slide-caption{z-index:3}
 .home-slide-caption.is-visible{animation:homeCaptionIn 420ms cubic-bezier(.2,.8,.3,1) both}
 @keyframes homePhotoIn{
- from{opacity:0;transform:translate3d(var(--home-slide-shift,24px),0,0) scale(1.045)}
+ from{opacity:0;transform:translate3d(var(--home-slide-edge-shift,var(--home-slide-shift,24px)),0,0) scale(var(--home-slide-in-scale,1.045))}
  to{opacity:1;transform:translate3d(0,0,0) scale(1)}
 }
 @keyframes homePhotoOut{
  from{opacity:1;transform:translate3d(0,0,0) scale(1)}
- to{opacity:0;transform:translate3d(calc(var(--home-slide-shift,24px) * -1),0,0) scale(1.025)}
+ to{opacity:0;transform:translate3d(calc(var(--home-slide-edge-shift,var(--home-slide-shift,24px)) * -1),0,0) scale(var(--home-slide-out-scale,1.025))}
 }
 @keyframes homeCaptionIn{
  from{opacity:0;transform:translate3d(0,10px,0)}
  to{opacity:1;transform:translate3d(0,0,0)}
+}
+@media(min-width:701px){
+ .phone-home-view{max-width:1160px}
+ .home-slide-open{height:clamp(420px,65vh,760px);--home-slide-edge-shift:0px;--home-slide-in-scale:1;--home-slide-out-scale:1}
+ .home-slide-open img{object-fit:contain}
 }
 @media(prefers-reduced-motion:reduce){
  .home-slide-incoming,.home-slide-outgoing,.home-slide-caption.is-visible{animation:none;transform:none}
