@@ -43,5 +43,5 @@ export function galleryRevision(revision,options={}){
   const {person,unit}=galleryRefinement(options),filter=options.filter||'all';
   const labels=galleryLabels(options.labels).join(',');
   const order=galleryOrdering(options);
-  return revision+':'+FACE_SCAN_VERSION+':'+GALLERY_FILTER_VERSION+':'+Number(options.page||1)+':'+Number(options.size||100)+':'+encodeURIComponent((options.query||'').trim())+(filter==='all'?'':':'+filter)+(person||unit?':refine2:'+encodeURIComponent(person)+':'+encodeURIComponent(unit):'')+(labels?':labels:'+labels:'')+':order1:'+order.sort+(order.seed===null?'':':'+order.seed);
+  return revision+':'+FACE_SCAN_VERSION+':'+GALLERY_FILTER_VERSION+':'+Number(options.page||1)+':'+Number(options.size||100)+':'+encodeURIComponent((options.query||'').trim())+(filter==='all'?'':':'+filter)+(person||unit?':refine2:'+encodeURIComponent(person)+':'+encodeURIComponent(unit):'')+(labels?':labels:'+labels:'')+':order2:'+order.sort+(order.seed===null?'':':'+order.seed);
 }
