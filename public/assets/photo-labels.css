@@ -17,7 +17,7 @@
   #mediaViewer.has-photo-labels{max-height:calc(100dvh - 12px);margin:6px auto}
   #mediaViewer.has-photo-labels .media-viewer-footer{padding:7px 12px 9px}
   #mediaViewer.has-photo-labels #mediaStage{min-height:0}
-  #mediaViewer.has-photo-labels #mediaStage .face-photo-scroll{max-height:var(--photo-fit-height,38dvh)}
+  #mediaViewer.has-photo-labels #mediaStage .face-photo-scroll{max-height:var(--photo-fit-height,68dvh)}
   #mediaViewer.has-photo-labels .inline-tag-widget{padding-top:7px;margin-top:6px}
   #mediaViewer.has-photo-labels .tag-widget-heading{margin-bottom:4px}
   #mediaViewer.has-photo-labels .tag-widget-heading h3{font-size:calc(16px * var(--a11y-text-scale,1))}

@@ -15,8 +15,9 @@ function selected(entry){
 }
 function fit(){
   fitFrame=null;const viewer=$('mediaViewer');if(!viewer?.open||!viewer.classList.contains('has-photo-labels')||!matchMedia('(max-width:700px)').matches)return;
-  const height=window.visualViewport?.height||window.innerHeight,header=viewer.querySelector('.media-viewer-header'),footer=viewer.querySelector('.media-viewer-footer'),toolbar=viewer.querySelector('.face-zoom-toolbar');
-  const available=Math.max(80,Math.min(height*.43,height-header.getBoundingClientRect().height-footer.getBoundingClientRect().height-(toolbar?.getBoundingClientRect().height||0)-30));
+  const height=window.visualViewport?.height||window.innerHeight,header=viewer.querySelector('.media-viewer-header'),toolbar=viewer.querySelector('.face-zoom-toolbar');
+  // Reserve room for the photo and its controls; names and actions scroll below.
+  const available=Math.max(80,Math.min(height*.68,height-header.getBoundingClientRect().height-(toolbar?.getBoundingClientRect().height||0)-24));
   const value=Math.floor(available)+'px';if(viewer.style.getPropertyValue('--photo-fit-height')===value)return;
   viewer.style.setProperty('--photo-fit-height',value);window.FamilyFaces?.fit?.();
 }
