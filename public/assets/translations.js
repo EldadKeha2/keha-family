@@ -694,6 +694,10 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   'כל התמונות':'All photos',
   'תמונות לא מתויגות':'Untagged photos',
   'לא נמצאו תמונות לא מתויגות':'No untagged photos found',
+  'תמונות מתויגות חלקית':'Partially tagged photos',
+  'לא נמצאו תמונות מתויגות חלקית':'No partially tagged photos found',
+  'התמונות מתווספות לכאן בהדרגה עם סריקת הגלריה. פתחו תמונה ולחצו על הפנים המסומנות כדי להוסיף שם.':'Photos appear here as the gallery is scanned. Open a photo and select a marked face to add a name.',
+  'ניסיון נוסף לסריקת התמונות':'Retry photo scan',
   'לא נמצאו תמונות בחיפוש הזה':'No photos match this search',
   'אפשר להציג את כל התמונות או לשנות את החיפוש.':'Show all photos or change your search.',
   'בחרו סינון תמונות תקין.':'Choose a valid photo filter.'

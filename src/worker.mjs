@@ -219,6 +219,7 @@ export default {
       }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
+      if(path==='/api/gallery/face-scan'&&request.method==='GET')return json(await db('gallery.face.scan',{after:url.searchParams.get('after')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/versions$/.exec(path))&&request.method==='GET')return json(await db('photo.versions',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/faces$/.exec(path))&&request.method==='GET')return json(await db('media.faces',{id:match[1]}));
       if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page')}));
@@ -232,10 +233,10 @@ export default {
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){
         const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all';
-        if(kind==='gallery'&&!['all','untagged'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
+        if(kind==='gallery'&&!['all','untagged','partial'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
         if(request.headers.has('If-None-Match')){
           const current=await db('collection.revision',{kind});
-          const revision=current.revision+(kind==='gallery'?':'+Number(page||1)+':'+Number(size||100)+':'+encodeURIComponent((query||'').trim())+(filter==='untagged'?':untagged':''):'');
+          const revision=current.revision+(kind==='gallery'?':'+Number(page||1)+':'+Number(size||100)+':'+encodeURIComponent((query||'').trim())+(filter==='all'?'':':'+filter):'');
           if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});
         }
         return snapshot(request,await db('collection',{kind,page,size,query,filter}));
@@ -250,6 +251,7 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/detection$/.exec(path))){const body=await readJSON(request,32000);return json(await db('media.face.scan.save',{id:match[1],photoRevision:body.photoRevision,version:body.version,faces:body.faces}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/edit$/.exec(path)))return await editPhoto(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/versions\/(original|[a-f0-9]{32})\/restore$/.exec(path))){const body=await readJSON(request,2000);return json(await db('photo.restore',{id:match[1],versionId:match[2],expectedVersion:body.expectedVersion}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/collections$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.collection.add',{id:match[1],collection:body.collection,scope:body.scope}));}

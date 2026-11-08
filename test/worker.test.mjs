@@ -6,6 +6,7 @@ import worker,{FamilyState,LIMITS,sniff} from '../src/worker.mjs';
 import {signedRequest} from '../src/hf.mjs';
 import {fail} from '../src/http.mjs';
 import family from '../src/family.mjs';
+import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
 
 function fixture(){
   const database=new DatabaseSync(':memory:');
@@ -877,14 +878,14 @@ test('untagged gallery filtering covers every page, combines with search and sta
   }
   const all=await f.call('/api/collections/gallery'),allEtag=all.headers.get('ETag');
   const response=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':allEtag}});assert.equal(response.status,200,'All-photo and untagged snapshots use different cache keys');const etag=response.headers.get('ETag'),first=await response.json();
-  assert.equal(first.count,103);assert.deepEqual(first.filterCounts,{all:205,untagged:103});assert.equal(first.pagination.pages,2);assert.equal(first.pagination.filter,'untagged');assert.equal(first.items.length,100);assert.equal(first.items[0].id,id(204));assert.ok(first.items.every(item=>item.tags.length===0));
+  assert.equal(first.count,103);assert.deepEqual(first.filterCounts,{all:205,untagged:103,partial:0});assert.equal(first.pagination.pages,2);assert.equal(first.pagination.filter,'untagged');assert.equal(first.items.length,100);assert.equal(first.items[0].id,id(204));assert.ok(first.items.every(item=>item.tags.length===0));
   const last=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.deepEqual(last.items.map(item=>item.id),[id(4),id(2),id(0)]);
-  const search='/api/collections/gallery?filter=untagged&q=Distant',searched=await(await f.call(search)).json();assert.equal(searched.items[0].id,id(2));assert.deepEqual(searched.filterCounts,{all:205,untagged:103});
+  const search='/api/collections/gallery?filter=untagged&q=Distant',searched=await(await f.call(search)).json();assert.equal(searched.items[0].id,id(2));assert.deepEqual(searched.filterCounts,{all:205,untagged:103,partial:0});
   assert.equal((await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}})).status,304);
   const patch=tagged=>f.call('/api/media/'+id(2)+'/tags/patch',{method:'POST',body:{changes:[{personId:'yona',tagged}]}});
   assert.equal((await patch(true)).status,200);const changed=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.equal((await changed.json()).count,102);assert.equal((await(await f.call(search)).json()).count,0);
   assert.equal((await patch(false)).status,200);f.restart();assert.equal((await(await f.call(search)).json()).count,1);assert.equal((await(await f.call('/api/collections/gallery')).json()).count,205);
-  for(let n=0;n<205;n+=2)tag.run(id(n),'yona');const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.deepEqual(empty.filterCounts,{all:205,untagged:0});assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
+  for(let n=0;n<205;n+=2)tag.run(id(n),'yona');const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.deepEqual(empty.filterCounts,{all:205,untagged:0,partial:0});assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
   assert.equal((await f.call('/api/collections/gallery?filter=other')).status,400);
  }finally{await f.close();}
 });
@@ -1022,5 +1023,79 @@ test('Mila birthday correction keeps the stored year, applies once and does not 
   f.restart();let result=await(await f.call('/api/people/mila/page')).json();assert.equal(result.person.birthday,'9.7.2022');assert.equal(result.person.about,'A saved biography');
   const revision=result.person.revision;f.restart();result=await(await f.call('/api/people/mila/page')).json();assert.equal(result.person.revision,revision);
   await f.connect();assert.equal((await f.ownerBirthday('/api/people/mila/birthday',{method:'POST',body:{birthday:'10.7.2022',expectedBirthday:'9.7.2022'}})).status,200);f.restart();assert.equal((await(await f.call('/api/people/mila/page')).json()).person.birthday,'10.7.2022');
+ }finally{await f.close();}
+});
+
+
+const detectedGalleryFaces=[{rect:{x:.1,y:.1,width:.1,height:.15},score:.9},{rect:{x:.4,y:.1,width:.1,height:.15},score:.9},{rect:{x:.7,y:.1,width:.1,height:.15},score:.9}];
+async function saveGalleryScan(f,item,faces=detectedGalleryFaces,extra={}){
+ return f.call('/api/media/'+item.id+'/faces/detection',{method:'POST',body:{photoRevision:item.photoRevision||'original',version:FACE_SCAN_VERSION,faces,...extra}});
+}
+async function galleryPhoto(f,name='Faces.jpg'){
+ const response=await f.call('/api/collections/gallery/upload?filename='+name,{method:'POST',body:photo,headers:{'Content-Type':'image/jpeg','Content-Length':String(photo.length)}});assert.equal(response.status,201);const result=await response.json();return result.collection.items.find(item=>item.file===result.file);
+}
+test('partial photos overlap all and untagged, then leave automatically when all faces have labels',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await galleryPhoto(f),path='/api/collections/gallery?filter=partial';
+  assert.equal((await(await f.call(path)).json()).count,0,'Unscanned is unknown, never a completed zero-face scan');
+  const before=(await f.call(path)).headers.get('ETag');assert.equal((await saveGalleryScan(f,item)).status,200);
+  let response=await f.call(path,{headers:{'If-None-Match':before}}),result=await response.json();assert.equal(response.status,200);assert.equal(result.count,1);assert.deepEqual(result.filterCounts,{all:1,untagged:1,partial:1});assert.equal(result.items[0].faceSummary.total,3);
+  assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,1);
+  let saved;
+  for(const [index,personId] of ['yona','shlomo','ruti'].entries()){
+   response=await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:String(index+1).repeat(32),personId,rect:detectedGalleryFaces[index].rect,expectedRevision:null}});assert.equal(response.status,200,await response.clone().text());saved=await response.json();
+   assert.equal(saved.item.faceSummary.unmatched,2-index);assert.equal(saved.item.faceSummary.partial,index<2);
+   result=await(await f.call(path)).json();assert.equal(result.count,index<2?1:0);assert.equal(result.filterCounts.all,1);
+  }
+  assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,0);f.restart();assert.equal((await(await f.call(path)).json()).count,0);
+  await f.call('/api/media/'+item.id+'/tag',{method:'POST',body:{personId:'shlomo',tagged:false}});
+  result=await(await f.call(path)).json();assert.equal(result.count,1);assert.equal(result.items[0].faceSummary.unmatched,1);
+  await f.call('/api/media/'+item.id+'/retag',{method:'POST',body:{scope:'personal:shlomo'}});assert.equal((await(await f.call(path)).json()).count,0);
+ }finally{await f.close();}
+});
+test('legacy whole-photo tags count for classification but are never guessed onto faces',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await galleryPhoto(f);await saveGalleryScan(f,item);
+  for(const personId of ['yona','shlomo','ruti'])await f.call('/api/media/'+item.id+'/tag',{method:'POST',body:{personId,tagged:true}});
+  assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,0);
+  const faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(faces.faces,[]);assert.equal(faces.detectedFaces.length,3,'Old ordinary tags have no invented coordinates');
+  const other=await galleryPhoto(f,'Repeated-person.jpg');await saveGalleryScan(f,other,detectedGalleryFaces.slice(0,2));
+  for(const [index,face] of detectedGalleryFaces.slice(0,2).entries())assert.equal((await f.call('/api/media/'+other.id+'/faces/save',{method:'POST',body:{faceId:String(index+4).repeat(32),personId:'yona',rect:face.rect,expectedRevision:null}})).status,200);
+  assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,0,'The same person can occupy two fully labelled regions');
+ }finally{await f.close();}
+});
+test('face scan queue covers the entire gallery and partial pagination combines with name and caption search',async()=>{
+ const f=fixture();try{
+  await f.connect();const insert=f.database.prepare('INSERT INTO media(id,category,data) VALUES(?,?,?)'),scan=f.database.prepare('INSERT INTO media_face_scans(media_id,photo_revision,version,data,face_count,unmatched_count) VALUES(?,?,?,?,?,?)');
+  const id=n=>n.toString(16).padStart(32,'0');for(let n=1;n<=207;n++){
+   const item={id:id(n),category:'gallery',file:id(n)+'.jpg',name:'Group '+n,caption:n===2?'An old celebration':'',mime:'image/jpeg',kind:'photo'};insert.run(item.id,'gallery',JSON.stringify(item));
+   if(n<=205)scan.run(item.id,'original',FACE_SCAN_VERSION,JSON.stringify({faces:detectedGalleryFaces}),3,3);
+  }
+  let result=await(await f.call('/api/collections/gallery?filter=partial&page=3')).json();assert.equal(result.count,205);assert.equal(result.pagination.pages,3);assert.deepEqual(result.items.map(item=>item.id),[5,4,3,2,1].map(id));
+  result=await(await f.call('/api/collections/gallery?filter=partial&q=celebration')).json();assert.equal(result.count,1);assert.equal(result.items[0].id,id(2));
+  let queue=await(await f.call('/api/gallery/face-scan')).json();assert.equal(queue.pending,2);assert.deepEqual(queue.items.map(item=>item.id),[id(206),id(207)]);
+  assert.equal((await saveGalleryScan(f,queue.items[0],[])).status,200);queue=await(await f.call('/api/gallery/face-scan?after='+queue.items[0].cursor)).json();assert.equal(queue.pending,1);assert.equal(queue.items[0].id,id(207));
+  const zero=await(await f.call('/api/media/'+id(206)+'/faces')).json();assert.equal(zero.item.faceSummary.scanned,true);assert.equal(zero.item.faceSummary.total,0);
+  assert.equal((await f.call('/api/gallery/face-scan?after=-1')).status,400);
+ }finally{await f.close();}
+});
+test('face scans validate source revisions, stay durable, preserve concurrent results and invalidate after cropping',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await galleryPhoto(f),other=await galleryPhoto(f,'Other.jpg');
+  assert.equal((await saveGalleryScan(f,item,detectedGalleryFaces,{photoRevision:'old'})).status,409);
+  assert.equal((await saveGalleryScan(f,item,detectedGalleryFaces,{version:'old'})).status,409);
+  assert.equal((await saveGalleryScan(f,item,[{rect:{x:2},score:.9}])).status,400);
+  assert.equal((await saveGalleryScan(f,item,[{rect:detectedGalleryFaces[0].rect,score:2}])).status,400);
+  assert.equal((await saveGalleryScan(f,item,Array.from({length:151},()=>detectedGalleryFaces[0]))).status,400);
+  assert.equal((await f.call('/api/media/'+item.id+'/faces/detection',{method:'POST',body:{photoRevision:'original',version:FACE_SCAN_VERSION,faces:detectedGalleryFaces},clientHeaders:false})).status,403);
+  assert.equal((await saveGalleryScan(f,item)).status,200);
+  await saveGalleryScan(f,item,detectedGalleryFaces.slice(0,1));f.restart();let faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(faces.detectedFaces.length,3);
+  const etag=(await f.call('/api/collections/gallery?filter=partial')).headers.get('ETag');assert.equal((await f.call('/api/collections/gallery?filter=partial',{headers:{'If-None-Match':etag}})).status,304);assert.equal((await f.call('/api/collections/gallery',{headers:{'If-None-Match':etag}})).status,200);
+  assert.equal((await(await f.call('/api/media/'+other.id+'/faces')).json()).detectedFaces.length,0);
+  await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'gallery'}});assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,0);
+  await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:'gallery'}});assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,1);
+  assert.equal((await photoEdit(f,item)).status,201);faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(faces.item.faceSummary,null);assert.deepEqual(faces.detectedFaces,[]);
+  assert.equal((await saveGalleryScan(f,item)).status,409,'Late old pixels cannot repopulate the edited photo index');
+  assert.equal((await(await f.call('/api/gallery/face-scan')).json()).pending,2);
  }finally{await f.close();}
 });

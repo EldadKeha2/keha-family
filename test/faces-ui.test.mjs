@@ -43,7 +43,7 @@ function fixture(detected=[]){
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.find(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
- return {faces:window.FamilyFaces,stage,image,view,window,find,emit,get progress(){return progress;},async mount(id='photo'){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[]});}};
+ return {faces:window.FamilyFaces,stage,image,view,window,find,emit,get progress(){return progress;},async mount(id='photo',options={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[]},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
 
@@ -78,4 +78,18 @@ test('incremental overlapping detections never give two face buttons the same se
  const f=fixture([first]);await f.mount();const buttons=f.find('face-hit-buttons'),previous=buttons.children[0].dataset.faceId;
  f.progress([first,{rect:{...first.rect,x:first.rect.x+.001},score:.8}]);
  const ids=buttons.children.map(button=>button.dataset.faceId);assert.equal(ids[0],previous);assert.equal(new Set(ids).size,2);f.faces.clear();
+});
+
+
+test('only the partial gallery highlights missing faces and confirmed face labels remove individual markers',async()=>{
+ const f=fixture([first,second]);await f.mount('partial-photo',{highlightMissing:true});
+ const buttons=f.find('face-hit-buttons'),note=f.find('face-missing-note');assert.equal(buttons.children.filter(button=>button.classList.contains('face-missing')).length,2);assert.ok(note.textContent.includes('2'));
+ const firstLabel={id:'a'.repeat(32),rect:first.rect,personId:'yona',person:{id:'yona',name:'יונה'}};
+ f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',item:{id:'partial-photo',tagsRevision:'new'},faces:[firstLabel]}}));
+ assert.equal(buttons.children.filter(button=>button.classList.contains('face-missing')).length,1);assert.equal(buttons.children.find(button=>button.classList.contains('face-missing')).style.left,second.rect.x*100+'%');
+ const secondLabel={id:'b'.repeat(32),rect:second.rect,personId:'shlomo',person:{id:'shlomo',name:'שלמה'}};
+ f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',item:{id:'partial-photo',tagsRevision:'last'},faces:[firstLabel,secondLabel]}}));
+ assert.equal(buttons.children.filter(button=>button.classList.contains('face-missing')).length,0);assert.ok(note.textContent.includes('✓'));
+ f.faces.clear();assert.equal(f.find('face-missing-note'),undefined);await f.mount('ordinary-photo');
+ assert.equal(f.find('face-missing-note'),undefined);assert.equal(f.find('face-hit-buttons').children.some(button=>button.classList.contains('face-missing')),false);f.faces.clear();
 });

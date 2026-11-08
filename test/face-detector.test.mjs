@@ -50,7 +50,8 @@ test('abandoned queued photos do not run and a worker failure preserves already 
  const queued=f.detect('queued',image),dropped=assert.rejects(queued,{name:'AbortError'}),latest=f.detect('latest',image);await dropped;
  f.workers[0].reply({faces:[]});await first;await tick();assert.equal(f.bitmaps.length,2);
  f.workers[0].reply({faces:[{rect:{x:.2,y:.1,width:.03,height:.04},score:.9}],partial:true});f.workers[0].onerror();
- assert.equal((await latest).length,1);
+ const incomplete=await latest;assert.equal(incomplete.length,1);assert.equal(incomplete.complete,false);
+ const retry=f.detect('latest',image);await tick();assert.equal(f.workers.length,2,'An incomplete scan must not poison the completed cache');f.workers[1].reply({faces:[]});await retry;
 });
 
 test('the worker finds close small faces through fine crops, projects coordinates correctly and supplements a successful model pass',async()=>{
