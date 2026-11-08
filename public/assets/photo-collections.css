@@ -3,6 +3,7 @@
 .photo-collections .photo-collection-button svg{display:block;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
 .photo-collections .photo-collection-button.is-linked,#mediaViewer .photo-collections .photo-collection-button.is-linked{background:#e8efdc;border-color:#91a570;color:#4f6839;box-shadow:inset 0 1px 3px #52613a24}
 .photo-collection-name{display:none}
+#mediaViewer .photo-collections .photo-collection-family.is-linked{background:var(--olive);border-color:var(--olive);color:#fffdf6;box-shadow:inset 0 0 0 1px #ffffff1c}
 @media(min-width:701px){
   #mediaViewer .photo-collections .photo-collection-family{display:inline-flex;align-items:center;gap:7px;width:auto;flex:0 0 auto;min-height:38px;padding:7px 11px;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans)}
   #mediaViewer .photo-collection-family .photo-collection-name{display:inline}
