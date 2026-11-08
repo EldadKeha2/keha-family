@@ -908,8 +908,8 @@ test('unfinished gallery filtering covers every page, combines with search and w
   const search='/api/collections/gallery?filter=untagged&q=Distant',searched=await(await f.call(search)).json();assert.equal(searched.items[0].id,id(2));assert.deepEqual(searched.filterCounts,{all:205,untagged:103,partial:0});
   assert.equal((await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}})).status,304);
   const patch=tagged=>f.call('/api/media/'+id(2)+'/tags/patch',{method:'POST',body:{changes:[{personId:'yona',tagged}]}});
-  assert.equal((await patch(true)).status,200);const changed=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.equal((await changed.json()).count,103,'A name alone does not complete a photo');assert.equal((await(await f.call(search)).json()).count,1);
-  const current=(await(await f.call(search)).json()).items[0];assert.equal((await f.call('/api/media/'+current.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:current.tagsRevision}})).status,200);assert.equal((await(await f.call(search)).json()).count,0);
+  assert.equal((await patch(true)).status,200);const changed=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.equal((await changed.json()).count,102,'A name moves this photo exclusively to partial');assert.equal((await(await f.call(search)).json()).count,0);
+  const current=(await(await f.call('/api/media/'+id(2)+'/faces')).json()).item;assert.equal((await f.call('/api/media/'+current.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:current.tagsRevision}})).status,200);assert.equal((await(await f.call(search)).json()).count,0);
   assert.equal((await patch(false)).status,200);f.restart();assert.equal((await(await f.call(search)).json()).count,1);assert.equal((await(await f.call('/api/collections/gallery')).json()).count,205);
   for(let n=0;n<205;n+=2){tag.run(id(n),'yona');const revision=f.database.prepare('SELECT value FROM meta WHERE id=?').get('tags:'+id(n))?.value||'empty';f.database.prepare('INSERT INTO media_face_reviews(media_id,photo_revision,tags_revision,completed_at) VALUES(?,?,?,?) ON CONFLICT(media_id) DO UPDATE SET tags_revision=excluded.tags_revision').run(id(n),'original',revision,'2026-11-08');}const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.deepEqual(empty.filterCounts,{all:205,untagged:0,partial:0});assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
   assert.equal((await f.call('/api/collections/gallery?filter=other')).status,400);
@@ -1086,7 +1086,7 @@ test('zero-tag photos never become partial; tagged photos stay unfinished until 
    assert.equal(saved.item.faceSummary.unmatched,2-index);assert.equal(saved.item.faceSummary.partial,true);
    result=await(await f.call(path)).json();assert.equal(result.count,1);assert.equal(result.filterCounts.all,1);
   }
-  assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,1);f.restart();assert.equal((await(await f.call(path)).json()).count,1);
+  assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,0);f.restart();assert.equal((await(await f.call(path)).json()).count,1);
   assert.equal((await f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:saved.item.tagsRevision}})).status,200);assert.equal((await(await f.call(path)).json()).count,0);assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,0);
   await f.call('/api/media/'+item.id+'/tag',{method:'POST',body:{personId:'shlomo',tagged:false}});
   result=await(await f.call(path)).json();assert.equal(result.count,1);assert.equal(result.items[0].faceSummary.unmatched,1);
@@ -1150,7 +1150,7 @@ test('manual all-faces confirmation persists, excludes partial and scan queues, 
   const taggedB=await(await f.call('/api/media/'+b.id+'/tag',{method:'POST',body:{personId:'yona',tagged:true}})).json();b.tagsRevision=taggedB.item.tagsRevision;
   const review=(item,complete=true,extra={})=>f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{photoRevision:item.photoRevision||'original',tagsRevision:item.tagsRevision,complete,...extra}});
   let response=await review(a);assert.equal(response.status,200);const done=await response.json();assert.equal(done.item.faceSummary.reviewed,true);assert.equal(done.item.faceSummary.partial,false);assert.equal(done.item.faceSummary.unmatched,0);assert.equal(done.item.tags.length,0,'confirmation never invents tags');
-  let partial=await(await f.call('/api/collections/gallery?filter=partial')).json();assert.deepEqual(partial.items.map(i=>i.id),[b.id]);assert.deepEqual(partial.filterCounts,{all:2,untagged:1,partial:1});
+  let partial=await(await f.call('/api/collections/gallery?filter=partial')).json();assert.deepEqual(partial.items.map(i=>i.id),[b.id]);assert.deepEqual(partial.filterCounts,{all:2,untagged:0,partial:1});
   f.restart();assert.equal((await(await f.call('/api/media/'+a.id+'/faces')).json()).item.faceSummary.reviewed,true);
   await saveGalleryScan(f,a,[...detectedGalleryFaces,{rect:{x:.3,y:.6,width:.1,height:.1},score:.99}]);assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,1,'a later automated scan cannot undo human confirmation');
   f.database.prepare('DELETE FROM media_face_scans WHERE media_id=?').run(a.id);assert.ok(!(await(await f.call('/api/gallery/face-scan')).json()).items.some(i=>i.id===a.id),'confirmed photos stay out of rescanning even after model changes');
@@ -1175,5 +1175,21 @@ test('ignored false detections persist only for that photo revision, survive res
   result=await(await ignore(detectedGalleryFaces[1].rect,false)).json();assert.equal(result.detectedFaces.length,3);assert.equal(result.ignoredFaces.length,0);
   await ignore(detectedGalleryFaces[0].rect);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.faces[0].personId,'yona','Ignore never removes an existing named face');assert.equal(result.item.tags.length,1);
   assert.equal((await photoEdit(f,item)).status,201);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(result.ignoredFaces,[],'Coordinates from old pixels cannot hide a face in an edited photo');assert.equal((await ignore(detectedGalleryFaces[1].rect)).status,409);
+ }finally{await f.close();}
+});
+
+test('untagged and partial are disjoint before any scan; ordinary names await confirmation and old filter caches refresh',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await galleryPhoto(f,'Ordinary-tag.jpg'),b=await galleryPhoto(f,'No-tags.jpg');
+  const untagged=()=>f.call('/api/collections/gallery?filter=untagged'),partial=()=>f.call('/api/collections/gallery?filter=partial');
+  const first=await untagged(),etag=first.headers.get('ETag');assert.equal((await first.json()).count,2);
+  assert.equal((await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag.replace(':tagging-v2','')}})).status,200,'A cached overlapping-filter response must never return 304');
+  const tagged=await(await f.call('/api/media/'+a.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'yona',tagged:true}]}})).json();
+  let left=await(await untagged()).json(),right=await(await partial()).json();assert.deepEqual(left.items.map(i=>i.id),[b.id]);assert.deepEqual(right.items.map(i=>i.id),[a.id]);assert.deepEqual(right.filterCounts,{all:2,untagged:1,partial:1});assert.ok(left.items.every(i=>!right.items.some(j=>j.id===i.id)));
+  assert.equal(right.items[0].faceSummary.scanned,false,'No face scan is needed to classify an ordinary tag');assert.deepEqual((await(await f.call('/api/media/'+a.id+'/faces')).json()).faces,[]);
+  const review=complete=>f.call('/api/media/'+a.id+'/faces/review',{method:'POST',body:{complete,photoRevision:'original',tagsRevision:tagged.item.tagsRevision}});
+  assert.equal((await review(true)).status,200);assert.equal((await(await partial()).json()).count,0);assert.equal((await(await untagged()).json()).count,1);
+  await review(false);assert.equal((await(await partial()).json()).count,1);await f.call('/api/media/'+a.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'yona',tagged:false}]}});
+  left=await(await untagged()).json();right=await(await partial()).json();assert.equal(left.count,2);assert.equal(right.count,0);f.restart();assert.equal((await(await untagged()).json()).count,2);
  }finally{await f.close();}
 });

@@ -27,8 +27,8 @@ function fixture(items=[photo('a'),photo('b')]){
  const listen=(map,name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);};
  const document={activeElement:null,visibilityState:'visible',getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
  const collection=path=>{
-  const filter=new URL(path,'https://test/').searchParams.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:true);
-  return{items:structuredClone(selected),count:selected.length,revision:'gallery-'+revision,filterCounts:{all:server.length,untagged:server.filter(i=>!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length},pagination:{page:1,size:100,pages:1,total:selected.length,filter}};
+  const filter=new URL(path,'https://test/').searchParams.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length&&!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:true);
+  return{items:structuredClone(selected),count:selected.length,revision:'gallery-'+revision,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length},pagination:{page:1,size:100,pages:1,total:selected.length,filter}};
  };
  const window={FamilyApp:{apiEnabled:true,toast(){}},FAMILY_DATA:{people:{}},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>listen(windowHandlers,name,fn),dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
  window.FamilyI18n={isEnglish:false,language:'he',t:String,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:item=>item.name,error:String,searchNames:item=>item.name,fetch:async path=>{
@@ -47,12 +47,12 @@ function fixture(items=[photo('a'),photo('b')]){
  };
 }
 
-test('a photo stays untagged until explicit completion and also becomes partial after a tag; updates wait for X',async()=>{
+test('a first tag moves a photo exclusively to partial after X, where it waits for explicit completion',async()=>{
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.open('a');
  const before=f.requests.length,counts=f.filters.map(button=>button.textContent);assert.equal(f.get('mediaViewer').open,true);
  for(const operation of['tags','faces','face-detection','face-review','tags']){f.change('a',operation);f.poll();await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.deepEqual(f.filters.map(button=>button.textContent),counts);}
  assert.equal(f.requests.length,before,'Do not reload or recategorize a filtered gallery during its open tagging session');assert.equal(f.mounted.at(-1).tags.length,1,'The visible tagging metadata still updates immediately');
- f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.equal(f.requests.length,before+1);assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.match(f.filters[2].textContent,/\(1\)/);
+ f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);assert.equal(f.requests.length,before+1);assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.match(f.filters[2].textContent,/\(1\)/);
  f.filter('partial');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
  f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,[]);
  f.filter('untagged');await f.flush();assert.deepEqual(f.cards,['b.jpg']);f.filter('all');await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);

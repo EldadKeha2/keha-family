@@ -15,7 +15,7 @@ import {netoTetrisScore,NETO_TETRIS_SCORE_LIMIT} from './neto-tetris-scores.mjs'
 import {rutiHouseScore,RUTI_HOUSE_SCORE_LIMIT,RUTI_HOUSE_SCORE_FIELDS} from './ruti-house-scores.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
-import {FACE_SCAN_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
+import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
@@ -344,19 +344,20 @@ export class FamilyState {
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
     const unfinished="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty'))";
-    if(filter==='untagged')where+=' AND '+unfinished;
-    const partial="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id) AND "+unfinished;
+    const tagged="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id)",untagged='NOT '+tagged+' AND '+unfinished;
+    if(filter==='untagged')where+=' AND '+untagged;
+    const partial=tagged+' AND '+unfinished;
     if(filter==='partial')where+=' AND '+partial;
     if(query){
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
       args.push(like,like,like,like);
     }
-    const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+unfinished+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
+    const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+untagged+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
     const filterCounts={all:counts.all_count,untagged:counts.untagged_count,partial:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND '+partial,kind)[0].n};
     const total=query?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
-    return {kind,items,count:total,filterCounts,revision:revision+':'+FACE_SCAN_VERSION+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='all'?'':':'+filter),pagination:{page,size,total,pages,query,filter}};
+    return {kind,items,count:total,filterCounts,revision:revision+':'+FACE_SCAN_VERSION+':'+GALLERY_FILTER_VERSION+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='all'?'':':'+filter),pagination:{page,size,total,pages,query,filter}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   albumCover(kind,fallback){

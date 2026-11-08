@@ -742,7 +742,7 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
 });
 
 Object.assign(window.FAMILY_TRANSLATIONS,{
-  "תמונה נשארת ב״לא מתויגות״ עד לאישור ״כל הפרצופים תויגו״. אחרי הוספת שם היא תופיע גם ב״מתויגות חלקית״.":"Photos stay in Untagged until you confirm All faces tagged. After adding a name, they also appear in Partially tagged.",
+  "תמונות ללא תיוגים מופיעות ב״לא מתויגות״. תמונות עם תיוג כלשהו ממתינות ב״מתויגות חלקית״ עד לאישור ״כל הפרצופים תויגו״.":"Photos without tags appear in Untagged. Photos with any tag wait in Partially tagged until you confirm All faces tagged.",
   "בחרו אלבום חתונה או אלבום תינוקייה.":"Choose a wedding or baby album.",
   "בחרו תמונה מתוך האלבום הזה.":"Choose a photo from this album.",
   "התמונה השתנתה. פתחו אותה מחדש לפני שינוי הזיהוי.":"This photo has changed. Reopen it before changing this detection.",

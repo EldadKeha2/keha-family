@@ -52,7 +52,7 @@
   function renderCollection(kind) {
     if(kind==='gallery'&&holdGallery()){galleryDeferred=true;return;}
     const collection = state.collections[kind], query = normalize(state.query);
-    const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter==='untagged'?!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:true):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
+    const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:true):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
     const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged',partial=compact&&galleryPage.filter==='partial';
     window.FamilyMedia.register(kind,filtered,{retainCurrent:untagged||partial});
     if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.videoCategory===state.videoCategory)));
@@ -318,13 +318,13 @@
       }
       if(!result.collection){if(result.item&&['tags','faces','face-detection','face-review','face-ignore'].includes(result.operation)){
         const collection=state.collections[kind],previous=collection.items.find(item=>item.id===result.item.id);
-        if(kind==='gallery'&&collection.filterCounts&&previous){const delta=Number(!result.item.faceSummary?.reviewed)-Number(!previous.faceSummary?.reviewed);collection.filterCounts.untagged=Math.max(0,Math.min(collection.filterCounts.all,collection.filterCounts.untagged+delta));collection.filterCounts.partial=Math.max(0,(collection.filterCounts.partial||0)+Number(Boolean(result.item.faceSummary?.partial))-Number(Boolean(previous.faceSummary?.partial)));}
+        if(kind==='gallery'&&collection.filterCounts&&previous){const delta=Number(!result.item.tags?.length&&!result.item.faceSummary?.reviewed)-Number(!previous.tags?.length&&!previous.faceSummary?.reviewed);collection.filterCounts.untagged=Math.max(0,Math.min(collection.filterCounts.all,collection.filterCounts.untagged+delta));collection.filterCounts.partial=Math.max(0,(collection.filterCounts.partial||0)+Number(Boolean(result.item.faceSummary?.partial))-Number(Boolean(previous.faceSummary?.partial)));}
         collection.items=collection.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
         if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&(galleryPage.filter!=='all'||['face-detection','face-review'].includes(result.operation))){revisions.gallery=null;refreshCollection('gallery',true);}
       }return;}
       if(result.operation==='delete'){const key=captionKey(kind,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
       if(kind==='gallery'){
-        if(result.operation==='delete')window.FamilyMedia.register(kind,state.collections.gallery.items.filter(item=>item.id!==result.item.id&&(galleryPage.filter==='untagged'?!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:true)));
+        if(result.operation==='delete')window.FamilyMedia.register(kind,state.collections.gallery.items.filter(item=>item.id!==result.item.id&&(galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:true)));
         const page=state.collections.gallery.pagination||galleryPage;
         if(page.page!==1||page.size!==100||page.query||galleryPage.filter!=='all'){revisions.gallery=null;refreshCollection('gallery',true);return;}
       }
