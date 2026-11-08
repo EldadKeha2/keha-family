@@ -105,6 +105,28 @@ test('tagging can keep the current photo open while the untagged album updates b
   f.window.FamilyMedia.register('gallery',[]);assert.equal(f.get('mediaViewer').open,false,'An actual deletion can still close the last photo');
   f.window.FamilyMedia.openFrom('gallery','b');assert.equal(f.get('mediaViewer').open,false,'The retained photo must not leak into the filtered album on reopening');
 });
+test('repeated tag, face and detector events cannot close or replace a photo already omitted from a filtered album',()=>{
+ for(const onlyPhoto of[false,true]){
+  const f=fixture(),photo=f.photo('a'),next=f.photo('b');f.window.FamilyMedia.open(onlyPhoto?[photo]:[photo,next],0,'gallery');
+  f.window.FamilyMedia.register('gallery',onlyPhoto?[]:[next],{retainCurrent:true});
+  for(const[index,operation]of['tags','faces','face-detection','face-review','tags'].entries()){
+   f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'gallery',item:{...photo,tags:[{id:'yona'}],tagsRevision:'revision-'+index}}}));
+   assert.equal(f.get('mediaViewer').open,true,operation+' must keep the viewer open');assert.equal(f.get('mediaOriginal').href,'/media/a',operation+' must not advance to another photo');
+   assert.equal(f.get('mediaTagPanel').hidden,false);
+  }
+  f.get('closeMediaViewer').handlers.get('click')();assert.equal(f.get('mediaViewer').open,false);
+  f.window.FamilyMedia.openFrom('gallery','a');assert.equal(f.get('mediaViewer').open,false,'A retained photo must not be reinserted into the actual filtered collection');
+ }
+});
+test('a click retargeted to the viewer after a tag option disappears cannot dismiss the photo',()=>{
+ const f=fixture();f.open('a');f.get('mediaViewer').handlers.get('click')?.({target:f.get('mediaViewer')});assert.equal(f.get('mediaViewer').open,true);
+ f.get('closeMediaViewer').handlers.get('click')();assert.equal(f.get('mediaViewer').open,false);
+});
+test('an unrelated deletion cannot evict a pinned photo, while deleting that photo still closes it',()=>{
+ const f=fixture();f.open('a');f.window.FamilyMedia.register('gallery',[],{retainCurrent:true});
+ f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'delete',scope:'gallery',item:f.photo('b')}}));assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');
+ f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'delete',scope:'gallery',item:f.photo('a')}}));assert.equal(f.get('mediaViewer').open,false);
+});
 test('the profile action follows the album owner gender when switching between personal albums',()=>{
   const f=fixture(),owners={rachel:{gender:'f'},avishai:{gender:'m'}};
   f.window.FamilyApp.getPerson=id=>owners[id];

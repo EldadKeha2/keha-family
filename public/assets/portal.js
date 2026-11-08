@@ -8,7 +8,8 @@
   const normalize = value => String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g, '').toLowerCase().trim();
   const state = {view:'tree', query:'', videoCategory:'all', collections:{photos:{items:[]},videos:{items:[]},gallery:{items:[]}}, stories:[], storyRevision:null, editingStory:null, birthdayId:null};
   const collectionId=(kind,suffix)=>kind==='gallery'&&['Grid','Count','Empty'].includes(suffix)?'sharedGallery'+suffix:kind+suffix;
-  const galleryPage={page:1,size:100,query:'',filter:'all'};let gallerySearchTimer;
+  const galleryPage={page:1,size:100,query:'',filter:'all'};let gallerySearchTimer,galleryDeferred=false;
+  const holdGallery=()=>galleryPage.filter!=='all'&&window.FamilyMedia.isOpen?.('gallery')===true;
   const revisions = {}, signatures = {}, loading = {}, queues = {photos:[], videos:[],gallery:[]}, running = {}, drafts = new Map();
   let ready = false;
   function canSave() {if (app()?.apiEnabled) return true;notify(I18n.t('כדי לשמור שינויים, פתחו את האתר באמצעות קובץ ההפעלה.'));return false;}
@@ -49,6 +50,7 @@
     status.textContent = message;status.classList.toggle('save-error',failed);
   }
   function renderCollection(kind) {
+    if(kind==='gallery'&&holdGallery()){galleryDeferred=true;return;}
     const collection = state.collections[kind], query = normalize(state.query);
     const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length:galleryPage.filter==='partial'?item.faceSummary?.partial:true):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
     const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged',partial=compact&&galleryPage.filter==='partial';
@@ -120,12 +122,14 @@
   }
   async function refreshCollection(kind,force=false) {
     if (!app()?.apiEnabled) return;
+    if(kind==='gallery'&&holdGallery()){galleryDeferred=true;return;}
     if(loading[kind]){if(kind==='gallery'&&force)loading.galleryQueued=true;return;}
     loading[kind] = true;
     const requestedRevision=revisions[kind],requestedGallery=JSON.stringify(galleryPage);
     const pageQuery=kind==='gallery'?'?'+new URLSearchParams({page:galleryPage.page,size:galleryPage.size,q:galleryPage.query,filter:galleryPage.filter}):'';
     try {
       const result = await request('api/collections/'+kind+pageQuery,{headers:!force&&revisions[kind]?{'If-None-Match':'"'+revisions[kind]+'"'}:{}});
+      if(kind==='gallery'&&holdGallery()){galleryDeferred=true;return;}
       if (!result || revisions[kind]!==requestedRevision||(kind==='gallery'&&JSON.stringify(galleryPage)!==requestedGallery)) return;
       if(kind==='gallery'&&result.pagination)galleryPage.page=result.pagination.page;
       state.collections[kind]=result;revisions[kind]=result.revision;
@@ -306,6 +310,12 @@
         return;
       }
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
+      if(kind==='gallery'&&holdGallery()&&result.item&&['tags','faces','face-detection','face-review'].includes(result.operation)){
+        // Tags are saved immediately. Keep this gallery session's cards and
+        // category counts stable until the visitor closes the photo viewer.
+        state.collections.gallery.items=state.collections.gallery.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
+        revisions.gallery=null;galleryDeferred=true;return;
+      }
       if(!result.collection){if(result.item&&['tags','faces','face-detection','face-review'].includes(result.operation)){
         const collection=state.collections[kind],previous=collection.items.find(item=>item.id===result.item.id);
         if(kind==='gallery'&&collection.filterCounts&&previous){const delta=Number(!result.item.tags?.length)-Number(!previous.tags?.length);collection.filterCounts.untagged=Math.max(0,Math.min(collection.filterCounts.all,collection.filterCounts.untagged+delta));collection.filterCounts.partial=Math.max(0,(collection.filterCounts.partial||0)+Number(Boolean(result.item.faceSummary?.partial))-Number(Boolean(previous.faceSummary?.partial)));}
@@ -321,6 +331,7 @@
       state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
       if(state.view===kind)renderCollection(kind);else window.FamilyMedia.register(kind,result.collection.items);
     });
+    $('mediaViewer').addEventListener('close',()=>{if(!galleryDeferred)return;galleryDeferred=false;revisions.gallery=null;refreshCollection('gallery',true);});
     $('storyYearFilter').addEventListener('change',renderStories);$('storySort').addEventListener('change',renderStories);
     for(const id of ['birthdayDialog','storyEditor','storyReader'])$(id).addEventListener('click',event=>{if(event.target!==$(id))return;const rect=$(id).getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)$(id).close();});
     // Returning from the phone's gallery/camera refreshes the current shared view.

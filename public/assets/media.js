@@ -213,7 +213,13 @@
     });
     $('copyMediaLink').addEventListener('click',async()=>{if(!current())return;const url=shareURL(current());try{await navigator.clipboard.writeText(url);$('mediaShareStatus').textContent=tr('הקישור הועתק ✓','Link copied ✓');}catch{$('mediaLinkFallback').value=url;$('mediaLinkFallback').hidden=false;$('mediaLinkFallback').focus();$('mediaLinkFallback').select();$('mediaShareStatus').textContent=tr('אפשר להעתיק את הקישור מהשדה','Copy the link from the field');}});
     $('openedProfilePhoto').addEventListener('click',async()=>{if(!current()||!state.scope?.startsWith('personal:'))return;const id=state.scope.slice(9),button=$('openedProfilePhoto');button.disabled=true;try{const response=await I18n.fetch('api/people/'+encodeURIComponent(id)+'/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({file:current().file})});const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));app().updatePerson(id,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id}}));notify(tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));}catch(error){notify(error.message);}finally{button.disabled=false;}});
-    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(!result.item)return;for(const [scope,items]of [...albums]){const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope),updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);register(scope,updated);}});
+    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(!result.item)return;for(const [scope,items]of [...albums]){
+      const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope),updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);
+      // The visible photo may already be absent from the filtered album. Keep
+      // its latest metadata, and pin it through every subsequent tag/scan event.
+      if(!remove&&state.scope===scope&&state.activeId===result.item.id)state.items=state.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
+      register(scope,updated,{retainCurrent:!(remove&&state.scope===scope&&state.activeId===result.item.id)});
+    }});
     openSharedLink();
     window.addEventListener('popstate',openSharedLink);window.addEventListener('hashchange',openSharedLink);
     document.addEventListener('click',event=>{
@@ -228,13 +234,12 @@
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
     $('mediaViewer').addEventListener('close',()=>{instagramPrepared={id:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
-    $('mediaViewer').addEventListener('click',event=>{if(event.target===$('mediaViewer'))$('mediaViewer').close();});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open]')||event.target.closest('input,textarea'))return;
       if(event.key===(I18n.isEnglish?'ArrowLeft':'ArrowRight')){event.preventDefault();show(state.index-1);}
       if(event.key===(I18n.isEnglish?'ArrowRight':'ArrowLeft')){event.preventDefault();show(state.index+1);}
     });
   }
-  window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify};
+  window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify,isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
   document.addEventListener('DOMContentLoaded',init);
 })();
