@@ -72,6 +72,7 @@
         for(const person of result.taggedPeople){if(person.key.startsWith('new:'))this.aliases.set(person.key,person.id);addPerson(person);}
         if(this.refreshPending){const latest=await request('api/media/'+this.id+'/tags');result.item=latest.item;this.refreshPending=false;}
         this.item=result.item;this.saved=new Map(result.item.tags.map(person=>[person.id,person]));this.active=[];this.status=this.queue.length?'saving':'saved';
+        clearTimeout(this.feedbackTimer);if(this.status==='saved')this.feedbackTimer=setTimeout(()=>{if(this.status==='saved'){this.status='';this.emit();}},500);
         window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));this.emit();if(this.queue.length)this.schedule();
       }catch(error){this.active=[];this.queue=[...batch,...this.queue];this.error=error.message;this.status='error';this.emit();if(![...this.listeners].length)app()?.toast(I18n.t('תיוג לא נשמר: ')+error.message);}
     }

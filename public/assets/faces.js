@@ -36,7 +36,7 @@
   function closePopup(c){
     clearTimeout(c.labelTimer);c.labelTimer=null;c.popup?.remove();c.popup=null;c.active=null;if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
   }
-  function keepLabel(c){clearTimeout(c.labelTimer);c.labelTimer=null;}
+  function keepLabel(c){if(c.popup?.dataset.tagFeedback)return;clearTimeout(c.labelTimer);c.labelTimer=null;}
   function dismissLabelSoon(c){
     if(c.labelTimer||!c.popup?.classList.contains('face-name'))return;const bubble=c.popup;
     c.labelTimer=setTimeout(()=>{c.labelTimer=null;if(live(c)&&c.popup===bubble&&!bubble.contains(document.activeElement))closePopup(c);},250);
@@ -131,16 +131,17 @@
     if(!live(c))return;const priorRevision=c.item.tagsRevision,priorReview=c.reviewed;if(result.item){c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);}c.ignored=result.ignoredFaces||[];remember(c.item.id,result.faces,result.item,result.detectedFaces,c.ignored);if(!c.detected.length)c.detected=(result.detectedFaces||[]).map(face=>({...face,id:uuid()}));c.ready=true;c.loadError=false;apply(c,result.faces);
     if(result.item&&(result.item.tagsRevision!==priorRevision||c.reviewed!==priorReview))window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',scope:result.item.scope,item:result.item,faces:result.faces}}));
   }
-  function showLabel(c,face,touch){
-    if(!live(c)||!face.person)return;closePopup(c);c.active=face;
+  function showLabel(c,face,touch,feedback=false){
+    if(!live(c)||!face.person||(!feedback&&c.popup?.dataset.tagFeedback&&c.active?.id===face.id))return;closePopup(c);c.active=face;
     const bubble=document.createElement('div');bubble.className='face-popover face-name';bubble.setAttribute('role','group');bubble.setAttribute('aria-label',tr('מי בתמונה','Who is in the photo'));bubble.dir=I.isEnglish?'ltr':'rtl';
-    bubble.innerHTML=nameHTML(face,!c.adapter)+(touch?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:'');bindProfile(c,bubble,face);
+    bubble.innerHTML=nameHTML(face,!c.adapter&&!feedback)+(touch&&!feedback?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:'');if(!feedback)bindProfile(c,bubble,face);
+    if(feedback){bubble.dataset.tagFeedback='true';bubble.style.pointerEvents='none';}
     bubble.addEventListener('pointerenter',()=>keepLabel(c));
     bubble.addEventListener('pointerleave',event=>{if(!touchMode(event))dismissLabelSoon(c);});
     bubble.addEventListener('focusin',()=>keepLabel(c));
     bubble.addEventListener('focusout',event=>{if(!bubble.contains(event.relatedTarget))closePopup(c);});
-    if(touch)bubble.querySelector('[data-face-edit]').addEventListener('click',()=>openPicker(c,face));
-    c.popup=bubble;c.dialog.append(bubble);place(c);if(touch)c.labelTimer=setTimeout(()=>{if(live(c)&&c.popup===bubble)closePopup(c);},3000);
+    if(touch&&!feedback)bubble.querySelector('[data-face-edit]').addEventListener('click',()=>openPicker(c,face));
+    c.popup=bubble;c.dialog.append(bubble);place(c);if(feedback||touch)c.labelTimer=setTimeout(()=>{if(live(c)&&c.popup===bubble)closePopup(c);},feedback?500:3000);
   }
   async function results(c,query){
     const panel=c.popup;if(c.saving||!panel?.classList.contains('face-picker'))return;const sequence=++c.searchSequence,host=panel.querySelector('[data-face-results]');
@@ -199,7 +200,7 @@
       const known=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));
       const payload={faceId:known?.id||face.id,...selection,rect:face.rect,expectedRevision:known?.revision||null},result=c.adapter?await c.adapter.save(payload):await request('api/media/'+c.item.id+'/faces/save',{method:'POST',body:JSON.stringify(payload)});
       if(!c.adapter)remember(c.item.id,result.faces,result.item);changed(c,result);
-      if(live(c)){c.saving=false;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face)showLabel(c,result.face,touchMode());}
+      if(live(c)){c.saving=false;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face)showLabel(c,result.face,touchMode(),true);}
     }catch(error){if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const control of panel.querySelectorAll('button,input'))control.disabled=false;}}
     finally{c.saving=false;}
   }
