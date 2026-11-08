@@ -81,7 +81,7 @@
     if(!member(id)||!app().apiEnabled)return;
     let selected=[...files].filter(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name));
     if(!selected.length){app().toast(tr('בחרו תמונות מהגלריה או מהמצלמה.','Choose photos from your gallery or camera.'));return;}
-    try{selected=await window.FamilyPhotoEditor.prepare(selected);}catch{app().toast(tr('מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.','The photo editor could not open. Refresh the page and try again.'));return;}
+    try{selected=await window.FamilyPhotoEditor.prepare(selected,{scope:'nursery:'+id,onUpload:async(file,progress)=>{const result=await uploadFile(id,file,progress);applyAlbum(id,result.collection,true);if(state.id===id)state.page=1;render();}});}catch{app().toast(tr('מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.','The photo editor could not open. Refresh the page and try again.'));return;}
     if(!selected?.length)return;
     errors.delete(id);queue.push({id,files:selected});runUploads();
   }

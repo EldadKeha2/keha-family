@@ -59,6 +59,26 @@ function fixture(){
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
 
+test('uploaded face tags, event labels, family membership and completion save atomically in every photo album',async()=>{
+ const f=fixture();try{
+  await f.connect();const paths=['/api/collections/gallery/upload','/api/collections/photos/upload','/api/people/yona/photos','/api/nursery/yona/upload','/api/weddings/u-tomer/upload','/api/nostalgia/upload'];
+  for(const [index,path]of paths.entries()){
+   const metadata={caption:'בתמונה יחד',date:{year:1980},familyPhoto:true,labels:['birthdays','holidays'],complete:true,faces:[{personId:'yona',rect:{x:.1,y:.1,width:.1,height:.2}},{name:'מכר מהאשף',rect:{x:.5,y:.2,width:.1,height:.2}}]};
+   const response=await uploadWithDetails(f,path,metadata);assert.equal(response.status,201,await response.clone().text());const result=await response.json(),item=(result.collection?.items||result.person.gallery).find(item=>item.file===result.file);
+   const saved=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(saved.faces.length,2);assert.equal(saved.faces[0].personId,'yona');assert.equal(saved.faces[1].person.name,'מכר מהאשף');assert.equal(saved.item.faceSummary.reviewed,true);assert.deepEqual(saved.item.labels,['birthdays','holidays']);assert.equal(saved.item.tags.length,2);
+   const album=await(await f.call('/api/people/yona/page')).json();assert.ok(album.albums.photos.total>=index+1);assert.ok(saved.item.collections.includes('photos'));
+  }
+  f.restart();const gallery=await(await f.call('/api/collections/gallery?filter=complete')).json();assert.equal(gallery.items.length,1);assert.equal(gallery.items[0].faceSummary.reviewed,true);
+ }finally{await f.close();}
+});
+test('an invalid uploaded person rolls back the image, free names and album links, and removes stored bytes',async()=>{
+ const f=fixture();try{
+  await f.connect();const before=f.database.prepare('SELECT count(*) AS n FROM people').get().n,mediaBefore=f.database.prepare('SELECT count(*) AS n FROM media').get().n,linksBefore=f.database.prepare('SELECT count(*) AS n FROM media_collections').get().n;
+  const result=await uploadWithDetails(f,'/api/collections/gallery/upload',{familyPhoto:true,faces:[{name:'Must roll back',rect:{x:.1,y:.1,width:.1,height:.1}},{personId:'missing-person',rect:{x:.5,y:.5,width:.1,height:.1}}]});
+  assert.equal(result.status,404);await f.flush();assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,mediaBefore);assert.equal(f.database.prepare('SELECT count(*) AS n FROM people').get().n,before);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections').get().n,linksBefore);assert.equal(f.objects.size,0);
+ }finally{await f.close();}
+});
+
 async function uploadWithDetails(f,path,metadata,{bytes=photo,name='23_11_1986_P25_03.jpg',mime='image/jpeg',split=false}={}){
  const payload=photoUploadPayload(new File([bytes],name,{type:mime}),metadata),body=new Uint8Array(await payload.body.arrayBuffer());
  let offset=0;const stream=split?new ReadableStream({pull(controller){if(offset===body.length){controller.close();return;}const end=Math.min(body.length,offset+(offset<150?1:57));controller.enqueue(body.subarray(offset,end));offset=end;}}):body;

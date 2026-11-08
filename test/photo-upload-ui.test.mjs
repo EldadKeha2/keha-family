@@ -51,6 +51,12 @@ test('photo editor receives the selected destination even if the visitor changes
     assert.equal(context.scope,kind);assert.equal(f.sent.length,0);
   }
 });
+test('individual approval uploads just that image to the original destination while the wizard keeps the batch open',async()=>{
+ let context,approve;const f=fixture((files,options)=>{context=options;return new Promise(resolve=>{approve=resolve;});});
+ f.select('gallery',[original,edited]);await f.flush();assert.equal(f.sent.length,0);f.window.FamilyPortal.activate('photos');
+ const saving=context.onUpload(edited,()=>{});assert.equal(f.sent.length,1);assert.match(f.sent[0].url,/collections\/gallery\/upload/);assert.equal(f.sent[0].file,edited);f.sent[0].complete();await saving;
+ assert.equal(f.sent.length,1);approve([original]);await f.flush();assert.equal(f.sent.length,2);assert.equal(f.sent[1].file,original);f.sent[1].complete();await f.flush();
+});
 test('videos retain the normal upload flow and never enter the photo editor',async()=>{
   let calls=0;const f=fixture(async files=>{calls++;return files;}),video={name:'family.mp4',type:'video/mp4',size:50};
   f.select('videos',[video]);assert.equal(calls,0);assert.equal(f.sent.length,1);assert.equal(f.sent[0].file,video);f.sent[0].complete();await f.flush();

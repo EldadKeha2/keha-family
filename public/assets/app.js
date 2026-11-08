@@ -471,7 +471,7 @@
     let selected = Array.from(files).filter(file => /^image\/(jpeg|png|webp|gif|avif)$/i.test(file.type) || imageTypes.test(file.name));
     if (!selected.length) {toast(I18n.t('בחרו תמונת JPG, PNG, WEBP, GIF או AVIF.'));return;}
     if (selected.length < files.length) toast(I18n.t('חלק מהקבצים אינם בפורמט נתמך. יתר התמונות יישמרו.'));
-    try{selected=await window.FamilyPhotoEditor.prepare(selected);}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+    try{selected=await window.FamilyPhotoEditor.prepare(selected,{scope:'personal:'+personId,onUpload:async(file)=>{const payload=window.FamilyPhotoEditor.upload(file),response=await I18n.fetch('api/people/'+encodeURIComponent(personId)+'/photos?filename='+encodeURIComponent(file.name),{method:'POST',headers:{...payload.headers,'Content-Type':file.type||'application/octet-stream','X-Family-Token':window.FAMILY_API_TOKEN},body:payload.body}),result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));updatePersonUI(personId,result.person);if(state.currentPerson===personId&&$('personDialog').open)renderGallery(result.person);}});}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
     if(!selected?.length)return;
     uploads.push({personId,files:selected,clipboard:fromClipboard});
     runUploads();

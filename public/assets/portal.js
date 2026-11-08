@@ -201,7 +201,7 @@
         try{approved=await window.FamilyPhotoDrop.prepare(approved);}catch(error){notify(error.message);return;}
         if(!approved?.length)return;
       }
-      try{approved=await window.FamilyPhotoEditor.prepare(approved,{scope:kind});}catch{notify(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+      try{approved=await window.FamilyPhotoEditor.prepare(approved,{scope:kind,onUpload:async(file,progress)=>{const result=await uploadFile(kind,file,file.name,progress,group);applyUploaded(kind,result);}});}catch{notify(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
       if(!approved?.length)return;
     }
     // Only approved files enter the upload queue; saved media has no edit action.
@@ -216,6 +216,10 @@
       xhr.onerror=()=>reject(Error(I18n.t('ההעלאה נקטעה. בדקו את החיבור ונסו שוב.')));
       xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));const payload=window.FamilyPhotoEditor?.upload?.(file)||{body:file};for(const [name,value]of Object.entries(payload.headers||{}))xhr.setRequestHeader(name,value);xhr.send(payload.body);
     });
+  }
+  function applyUploaded(kind,result){
+    if(kind==='gallery'){window.FamilyGalleryFaces?.changed();galleryPage.page=1;galleryPage.size=100;galleryPage.query='';galleryPage.filter='all';galleryPage.person=galleryPage.unit=galleryPage.labels='';galleryPage.sort='uploaded-desc';window.FamilyGalleryFilter?.reset();state.query='';$('searchInput').value='';}state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
+        if(state.view===kind)renderCollection(kind);
   }
   function revealGalleryUploads(files) {
     if(state.view!=='gallery'||!files.length||document.querySelector('dialog[open]'))return;
@@ -242,8 +246,7 @@
         const filename=clipboard?I18n.t('צילום_מסך_')+new Date().toISOString().replace(/[:.]/g,'-')+(file.name.match(/\.[^.]+$/)?.[0]||'.png'):file.name;
         progress.hidden=false;progress.value=0;status.textContent=I18n.t('מעלה ')+filename+'…';
         const result=await uploadFile(kind,file,filename,percent=>{progress.value=percent;status.textContent=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הקובץ…'):I18n.html`מעלה ${filename} · ${percent}%`;},group);
-        saved++;savedFiles.push(result.file);if(kind==='gallery'){window.FamilyGalleryFaces?.changed();galleryPage.page=1;galleryPage.size=100;galleryPage.query='';galleryPage.filter='all';galleryPage.person=galleryPage.unit=galleryPage.labels='';galleryPage.sort='uploaded-desc';window.FamilyGalleryFilter?.reset();state.query='';$('searchInput').value='';}state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
-        if(state.view===kind)renderCollection(kind);
+        saved++;savedFiles.push(result.file);applyUploaded(kind,result);
       }catch(error){notify(file.name+': '+error.message);}
     }
     status.textContent=saved?I18n.html`${saved} ${kind==='videos'?I18n.t('סרטונים'):I18n.t('תמונות')} נשמרו ✓`:I18n.t('לא נשמרו קבצים. אפשר לנסות שוב.');

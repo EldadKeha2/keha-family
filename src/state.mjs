@@ -597,6 +597,16 @@ export class FamilyState {
         else validCollection(item.category);
         this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,JSON.stringify(item));
         if(p.familyPhoto===true&&item.category!=='photos')this.sql.exec('INSERT INTO media_collections(media_id,collection,added_at) VALUES(?,?,?)',item.id,'photos',item.createdAt);
+        if(p.faces?.length){
+          const faces=p.faces.map(face=>({...face,rect:faceRect(face.rect)}));
+          if(faces.length>FACE_LIMIT||faces.some((face,index)=>faces.slice(0,index).some(other=>sameFaceRegion(face.rect,other.rect))))throw new HttpError(400,'אזור הפנים הזה כבר תויג.');
+          const result=this.patchTags(item.id,faces.map((face,index)=>({key:String(index),tagged:true,...(face.personId?{personId:face.personId}:{name:face.name})})));
+          for(const [index,input]of faces.entries()){
+            const person=result.taggedPeople.find(person=>person.key===String(index)),face={id:uid(),rect:input.rect,personId:person.id,revision:uid(),createdAt:item.createdAt,updatedAt:item.createdAt};
+            this.sql.exec('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?)',item.id,face.id,person.id,JSON.stringify(face));
+          }
+        }
+        if(p.complete===true)this.sql.exec('INSERT INTO media_face_reviews(media_id,photo_revision,tags_revision,completed_at) VALUES(?,?,?,?)',item.id,item.photoRevision||'original',this.tagsRevision(item.id),item.createdAt);
         this.touchMedia(item);
         return {saved:true};
       }

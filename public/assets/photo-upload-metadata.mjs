@@ -1,7 +1,8 @@
 import {photoDate} from './photo-date.mjs';
+import {PHOTO_LABELS,photoLabels} from './photo-labels-catalog.mjs';
 
 export const PHOTO_METADATA_HEADER='X-Family-Photo-Metadata-Length';
-export const MAX_PHOTO_METADATA_BYTES=32768;
+export const MAX_PHOTO_METADATA_BYTES=98304;
 
 export function filenamePhotoDate(filename){
   const stem=String(filename||'').split(/[\\/]/).pop().replace(/\.[a-z0-9]+$/i,''),found=[];
@@ -28,7 +29,20 @@ export function normalizeUploadMetadata(value){
   const caption=value.caption??'';
   if(typeof caption!=='string'||caption.length>5000)throw new RangeError('Invalid photo caption');
   if(value.familyPhoto!==undefined&&typeof value.familyPhoto!=='boolean')throw new RangeError('Invalid family photo choice');
-  return {date:photoDate(value.date),caption,...(value.familyPhoto===undefined?{}:{familyPhoto:value.familyPhoto})};
+  const result={date:photoDate(value.date),caption,...(value.familyPhoto===undefined?{}:{familyPhoto:value.familyPhoto})};
+  if(value.labels!==undefined){if(!Array.isArray(value.labels)||value.labels.length>PHOTO_LABELS.length||value.labels.some(id=>!PHOTO_LABELS.some(label=>label.id===id)))throw new RangeError('Invalid photo labels');result.labels=photoLabels(value.labels);}
+  if(value.complete!==undefined){if(typeof value.complete!=='boolean')throw new RangeError('Invalid face confirmation');result.complete=value.complete;}
+  if(value.faces!==undefined){
+    if(!Array.isArray(value.faces)||value.faces.length>150)throw new RangeError('Invalid face tags');
+    result.faces=value.faces.map(face=>{
+      if(!face||typeof face!=='object'||Boolean(face.personId)===Boolean(face.name))throw new RangeError('Invalid face person');
+      const selection=face.personId?{personId:face.personId}:{name:face.name};
+      if(Object.values(selection).some(value=>typeof value!=='string'||!value.trim()||value.length>120))throw new RangeError('Invalid face person');
+      const r=face.rect;if(!r||['x','y','width','height'].some(k=>typeof r[k]!=='number'||!Number.isFinite(r[k])||r[k]<0||r[k]>1)||r.width<.0005||r.height<.0005||r.x+r.width>1.000001||r.y+r.height>1.000001)throw new RangeError('Invalid face rectangle');
+      return {...selection,rect:{x:r.x,y:r.y,width:r.width,height:r.height}};
+    });
+  }
+  return result;
 }
 
 export function photoUploadPayload(file,metadata){

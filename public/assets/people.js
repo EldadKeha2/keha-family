@@ -91,10 +91,12 @@
       xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Please try again.')));return;}if(xhr.status>=200&&xhr.status<300)resolve(result);else reject(Error(I.error(result.error)));};xhr.onerror=()=>reject(Error(tr('ההעלאה נקטעה. נסו שוב.','The upload was interrupted. Please try again.')));const payload=window.FamilyPhotoEditor?.upload?.(file)||{body:file};for(const [name,value]of Object.entries(payload.headers||{}))xhr.setRequestHeader(name,value);xhr.send(payload.body);
     });
   }
+  function applyUploaded(id,result){app().updatePerson(id,result.person);
+        if(id===state.id){state.data=result;state.revision=null;for(const key of keys)state.pages[key]=result.albums[key].page;state.status=tr('נשמר ✓ ','Saved ✓ ')+file.name;render();}}
   async function queue(id,kind,files){
     if(!app().apiEnabled)return;let approved=[...files];
     if(kind==='photos'){
-      try{approved=await window.FamilyPhotoEditor.prepare(approved);}catch{app().toast(tr('מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.','The photo editor could not open. Refresh the page and try again.'));return;}
+      try{approved=await window.FamilyPhotoEditor.prepare(approved,{scope:'personal:'+id,onUpload:async(file,progress)=>{const result=await uploadOne(id,kind,file,progress);applyUploaded(id,result);}});}catch{app().toast(tr('מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.','The photo editor could not open. Refresh the page and try again.'));return;}
       if(!approved?.length)return;
     }
     state.queue.push(...approved.map(file=>({id,kind,file})));runUploads();
@@ -104,8 +106,7 @@
     while(state.queue.length){const {id,kind,file}=state.queue.shift(),max=kind==='videos'?90:kind==='documents'?10:50;
       try{if(file.size>max*1024*1024)throw Error(tr('הקובץ גדול מדי. המגבלה: ','The file is too large. Limit: ')+max+'MB');
         const progress=percent=>{if(id!==state.id)return;state.status=tr('מעלה ','Uploading ')+file.name+' · '+percent+'%';if($('personPageStatus'))$('personPageStatus').textContent=state.status;};progress(0);
-        const result=await uploadOne(id,kind,file,progress);saved++;app().updatePerson(id,result.person);
-        if(id===state.id){state.data=result;state.revision=null;for(const key of keys)state.pages[key]=result.albums[key].page;state.status=tr('נשמר ✓ ','Saved ✓ ')+file.name;render();}
+        const result=await uploadOne(id,kind,file,progress);saved++;applyUploaded(id,result);
       }catch(error){app().toast(file.name+': '+error.message);}
     }
     state.running=false;state.status=saved?tr('הקבצים נשמרו ✓','Files saved ✓'):tr('לא נשמרו קבצים. אפשר לנסות שוב.','No files were saved. Please try again.');if($('personPageStatus'))$('personPageStatus').textContent=state.status;

@@ -38,15 +38,26 @@ function fixture(detected=[],{desktop=false}={}){
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
  const document=new Node();document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
  const window=new Node();window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
- let progress;
- const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{progress=onProgress;return detected;}};
+ let progress,detectionImage;
+ const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{progress=onProgress;detectionImage=img;return detected;}};
  vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
- return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,find,emit,get progress(){return progress;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
+ return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+
+test('the upload wizard reuses face picking, frame editing and completion without a media write or gallery scan',async()=>{
+ const f=fixture([first],{desktop:true}),requests=[],person={id:'yona',name:'יונה'},originalBitmap={width:6000,height:4000},saved={...first,id:'a'.repeat(32),personId:'yona',person};let reviewed=false,face=saved;
+ const snapshot=()=>({item:{id:'upload-local',kind:'photo',faceSummary:{reviewed}},faces:[face]});
+ const adapter={enabled:()=>true,load:async()=>snapshot(),findPeople:async()=>[],mapDetections:found=>found,save:async p=>{requests.push(p);face={...face,rect:p.rect};return {...snapshot(),face};},review:async p=>{reviewed=p.complete;return snapshot();}};
+ f.window.FamilyI18n.fetch=async()=>{throw Error('Drafts must never write to the media API');};f.window.FamilyTags.flush=async()=>{throw Error('Drafts have no server tags');};f.image.tagName='canvas';f.image.complete=false;
+ await f.mount('upload-local',{adapter,reviewHost:f.title,zoom:false,detectionImage:originalBitmap});assert.equal(f.detectionImage,originalBitmap);assert.equal(f.find('face-zoom-toolbar'),undefined);
+ const area=f.image.getBoundingClientRect(),selection=f.find('face-selection');f.emit(f.stage,'click',{detail:1,clientX:area.left+.506*area.width,clientY:area.top+.408*area.height});assert.ok(f.find('face-popover face-picker'));
+ const handle=selection.children.find(node=>node.dataset.faceHandle==='se');f.emit(f.stage,'pointerdown',{target:handle,pointerId:1,clientX:area.left+.512*area.width,clientY:area.top+.416*area.height});f.emit(f.stage,'pointermove',{target:handle,pointerId:1,clientX:area.left+.52*area.width,clientY:area.top+.43*area.height});f.emit(f.stage,'pointerup',{target:handle,pointerId:1});await new Promise(resolve=>setImmediate(resolve));await f.faces.flush();assert.equal(requests.length,1);assert.equal(requests[0].personId,'yona');assert.ok(requests[0].rect.width>saved.rect.width);
+ const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(button['aria-pressed'],'true');assert.equal(reviewed,true);f.faces.clear();
+});
 
 test('face names open real profiles on desktop and touch; free names and unknown people stay plain text',async()=>{
  for(const desktop of [false,true])for(const kind of ['family','extra','unknown']){

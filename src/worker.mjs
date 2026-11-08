@@ -95,7 +95,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
   const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:category.startsWith('nursery:')?['nursery',category.slice(8)]:[category,personId||'shared'];
   const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,id+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
   if(category==='videos')item.videoCategory=videoCategory;
-  if(metadata){item.caption=metadata.caption;item.takenDate=metadata.date;item.takenDateRevision=uid();}
+  if(metadata){item.caption=metadata.caption;item.takenDate=metadata.date;item.takenDateRevision=uid();if(metadata.labels)item.labels=metadata.labels;}
   let transfer=Promise.resolve(),body=media.body;
   if(typeof FixedLengthStream!=='undefined'){
     const fixed=new FixedLengthStream(media.size);transfer=body.pipeTo(fixed.writable);body=fixed.readable;
@@ -103,7 +103,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
     transfer.catch(()=>{});
   }
   await Promise.all([putObject(env,item.key,body,item.size,item.mime),transfer]);
-  try{await db('media.add',{item,familyPhoto:metadata?.familyPhoto===true});}
+  try{await db('media.add',{item,familyPhoto:metadata?.familyPhoto===true,faces:metadata?.faces,complete:metadata?.complete===true});}
   catch(error){ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));throw error;}
   if(personId){const url=new URL(request.url);if(url.searchParams.get('layout')==='page')return json({saved:true,file:item.file,...await db('person.page',{id:personId,photos:url.searchParams.get('photos'),videos:url.searchParams.get('videos'),documents:url.searchParams.get('documents')})},201);return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);}
   return json({saved:true,file:item.file,collection:await db('collection',{kind:category})},201);

@@ -185,11 +185,14 @@
       xhr.onerror=()=>reject(Error(I18n.t('ההעלאה נקטעה. בדקו את החיבור ונסו שוב.')));xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));const payload=window.FamilyPhotoEditor?.upload?.(file)||{body:file};for(const [name,value]of Object.entries(payload.headers||{}))xhr.setRequestHeader(name,value);xhr.send(payload.body);
     });
   }
+  function applyUploaded(key,result){collections.set(key,result.collection);
+        if(key!=='nostalgia'){const id=key.slice(8),record=details.get(id);if(record){record.collection=result.collection;record.mediaCount=result.collection.count;record.cover=result.collection.items.find(item=>item.kind==='photo')?.src||null;summaries.set(id,record);}}
+        if(scope()===key)renderCollection(key);}
   async function addFiles(key,input){
     if(!key||!canSave())return;
     let files=[...input];if(!files.length)return;
     if(files.some(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name))){
-      try{files=await window.FamilyPhotoEditor.prepare(files);}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+      try{files=await window.FamilyPhotoEditor.prepare(files,{scope:key,onUpload:async(file,progress)=>{const result=await sendFile(key,file,progress);applyUploaded(key,result);}});}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
       if(!files?.length)return;
     }
     const item=uploadStates.get(key);
@@ -204,9 +207,7 @@
         const video=/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name),photo=/^image\//i.test(file.type)||/\.(jpe?g|png|gif|webp|avif)$/i.test(file.name);
         const maximum=video?90:photo?50:10;if(file.size>maximum*1024*1024)throw Error(I18n.html`אפשר להעלות ${video?I18n.t('סרטון'):photo?I18n.t('תמונה'):I18n.t('מסמך')} עד ${maximum}MB.`);
         const result=await sendFile(key,file,percent=>{status.percent=percent;status.message=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הזיכרון…'):I18n.html`מעלה ${file.name} · ${percent}%`;updateUploadUI(key);});
-        collections.set(key,result.collection);status.saved++;
-        if(key!=='nostalgia'){const id=key.slice(8),record=details.get(id);if(record){record.collection=result.collection;record.mediaCount=result.collection.count;record.cover=result.collection.items.find(item=>item.kind==='photo')?.src||null;summaries.set(id,record);}}
-        if(scope()===key)renderCollection(key);
+        applyUploaded(key,result);status.saved++;
       }catch(error){status.failed++;toast(file.name+': '+error.message);status.lastError=error.message;}
       finally{status.pending--;status.active=false;status.message=I18n.html`${status.saved} קבצים נשמרו${status.saved?' ✓':''}${status.failed?' · '+status.failed+I18n.t(' לא נשמרו: ')+status.lastError:''}`;updateUploadUI(key);}
     }}finally{state.uploading=false;}
