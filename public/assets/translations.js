@@ -740,3 +740,16 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   "אפשר לתייג עד 150 אזורי פנים בתמונה.":"You can label up to 150 face areas in a photo.",
   "אזור הפנים הזה כבר תויג. פתחו אותו מחדש כדי לשנות את השם.":"This face area is already labelled. Reopen it to change the name."
 });
+
+Object.assign(window.FAMILY_TRANSLATIONS,{
+  "תמונה נשארת ב״לא מתויגות״ עד לאישור ״כל הפרצופים תויגו״. אחרי הוספת שם היא תופיע גם ב״מתויגות חלקית״.":"Photos stay in Untagged until you confirm All faces tagged. After adding a name, they also appear in Partially tagged.",
+  "בחרו אלבום חתונה או אלבום תינוקייה.":"Choose a wedding or baby album.",
+  "בחרו תמונה מתוך האלבום הזה.":"Choose a photo from this album.",
+  "התמונה השתנתה. פתחו אותה מחדש לפני שינוי הזיהוי.":"This photo has changed. Reopen it before changing this detection.",
+  "יש לבחור אם להתעלם מהזיהוי.":"Choose whether to ignore this detection.",
+  "אפשר לשמור עד 150 זיהויים מוסתרים בתמונה.":"You can ignore up to 150 detections in one photo.",
+  "יש לבחור אם כל הפרצופים תויגו.":"Choose whether all faces have been tagged.",
+  "התמונה או התיוגים השתנו. פתחו אותה מחדש לפני האישור.":"The photo or its tags have changed. Reopen it before confirming.",
+  "התמונה השתנתה. יש לסרוק את הגרסה הנוכחית.":"This photo has changed. Scan its current version.",
+  "תוצאת סריקת הפנים אינה תקינה.":"This face scan result is invalid."
+});

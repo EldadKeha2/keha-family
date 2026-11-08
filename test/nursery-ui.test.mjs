@@ -32,6 +32,10 @@ test('nursery cards follow new core members automatically and exclude extended a
  f.people.push({id:'new-relative',name:'New relative'});f.window.FamilyNursery.search('');assert.match(f.html,/#nursery\/new-relative/);
  f.window.FamilyNursery.search('new relative');assert.match(f.html,/#nursery\/new-relative/);assert.doesNotMatch(f.html,/#nursery\/yona/);
 });
+test('a selected baby cover stays on the index even when the newest photo is different',async()=>{
+ const f=fixture();await f.flush();f.window.FamilyI18n.fetch=async path=>Response.json(path==='api/nursery'?{albums:{yona:{count:2,cover:'/media/chosen'}}}:{...empty('yona'),cover:'/media/chosen',items:[{id:'newest',src:'/media/newest',name:'Newest'}],count:2});
+ f.open('yona');await f.flush();f.click('[data-nursery-back]');await f.flush();assert.match(f.html,/src="\/media\/chosen"/);assert.doesNotMatch(f.html,/src="\/media\/newest"/);
+});
 test('an upload retains the selected album owner when the visitor moves to another member',async()=>{
  const f=fixture();await f.flush();f.open('yona');await f.flush();f.click('[data-nursery-upload]');assert.equal(f.node('nurseryUploadInput').dataset.personId,'yona');
  f.open('shlomo');await f.flush();f.select([{name:'first-smile.jpg',type:'image/jpeg',size:100}]);await f.flush();assert.equal(f.sent.length,1);assert.match(f.sent[0].url,/api\/nursery\/yona\/upload/);

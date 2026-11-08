@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces,labelledRegion} from '../public/assets/face-geometry.mjs';
+import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces,labelledRegion,resizeFaceRect} from '../public/assets/face-geometry.mjs';
 import {faceCoverage} from '../public/assets/face-coverage.mjs';
 import {detectionSize,detectionRegions} from '../public/assets/face-scan.mjs';
 import {faceRect} from '../src/faces.mjs';
@@ -23,10 +23,26 @@ test('a narrow saved face suppresses its broad duplicate in both the viewer and 
  const neighbour={id:'neighbour',rect:{x:.453,y:.30,width:.05,height:.065},score:.93};
  assert.equal(sameRegion(saved.rect,broad.rect),false);assert.equal(labelledRegion(saved.rect,broad.rect),true);
  assert.deepEqual(mergeFaces([saved],[broad]).map(face=>face.id),['label']);
- assert.deepEqual(faceCoverage([saved],[broad],1),{total:1,unmatched:0,partial:false});
+ assert.deepEqual(faceCoverage([saved],[broad],1),{total:1,unmatched:0,partial:true});
+ assert.deepEqual(faceCoverage([saved],[broad],1,{reviewed:true}),{total:1,unmatched:0,partial:false});
  assert.deepEqual(mergeFaces([saved],[broad,neighbour]).map(face=>face.id),['label','neighbour']);
  assert.deepEqual(faceCoverage([saved],[broad,neighbour],1),{total:2,unmatched:1,partial:true});
  assert.equal(faceCoverage([],[broad,neighbour],0).partial,false);
+});
+test('frame handles resize the selected sides, preserve opposite edges and stay inside the photo',()=>{
+ const rect={x:.2,y:.3,width:.25,height:.3};
+ for(const handle of ['nw','n','ne','e','se','s','sw','w']){
+  const resized=resizeFaceRect(rect,handle,{x:handle.includes('w')?.1:.6,y:handle.includes('n')?.2:.7});
+  assert.doesNotThrow(()=>faceRect(resized));
+  if(!handle.includes('w'))assert.equal(resized.x,rect.x);
+  if(!handle.includes('n'))assert.equal(resized.y,rect.y);
+  if(!handle.includes('e'))assert.ok(Math.abs(resized.x+resized.width-(rect.x+rect.width))<1e-12);
+  if(!handle.includes('s'))assert.ok(Math.abs(resized.y+resized.height-(rect.y+rect.height))<1e-12);
+ }
+ for(const handle of ['nw','se'])for(const point of [{x:-1,y:-1},{x:2,y:2}]){
+  const resized=resizeFaceRect(rect,handle,point);assert.doesNotThrow(()=>faceRect(resized));assert.ok(resized.x>=0&&resized.y>=0&&resized.x+resized.width<=1&&resized.y+resized.height<=1);
+ }
+ assert.deepEqual(rect,{x:.2,y:.3,width:.25,height:.3},'Dragging does not mutate the saved rectangle before a successful save');
 });
 test('touching small nearby faces picks the closest centre instead of a neighbouring overlapping hit target',()=>{
  const faces=[{id:'left',rect:{x:.1,y:.1,width:.03,height:.03}},{id:'right',rect:{x:.15,y:.1,width:.03,height:.03}}],size={width:320,height:320};

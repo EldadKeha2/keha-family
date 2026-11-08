@@ -46,7 +46,10 @@
     $('downloadForInstagram').textContent=item.kind==='video'?tr('הורדת הסרטון','Download video'):tr('הורדת התמונה','Download photo');
     $('mediaShareStatus').textContent='';$('mediaLinkFallback').hidden=true;
     const ownerId=state.scope?.startsWith('personal:')?state.scope.slice(9):null,owner=ownerId&&(app()?.getPerson?.(ownerId)||window.FAMILY_DATA?.people?.[ownerId]),gender=['m','f'].includes(owner?.gender)?owner.gender:'unknown',profileButton=$('openedProfilePhoto');
-    profileButton.hidden=!(ownerId&&item.kind==='photo');profileButton.setAttribute('data-gender',gender);
+    const albumCover=/^(wedding|nursery):/.test(state.scope||'');
+    profileButton.hidden=!((ownerId||albumCover)&&item.kind==='photo');profileButton.setAttribute('data-gender',gender);
+    const profileLabel=state.scope?.startsWith('wedding:')?tr('קביעה כתמונת פרופיל לחתונה','Set wedding cover photo'):state.scope?.startsWith('nursery:')?tr('קביעה כתמונת פרופיל לתינוקייה','Set baby album cover photo'):tr('קביעה כתמונת פרופיל','Set profile photo');
+    profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
     $('mediaViewerCounter').textContent=`${state.index+1} / ${state.items.length}`;
@@ -212,7 +215,17 @@
       catch{$('mediaLinkFallback').value=url;$('mediaLinkFallback').hidden=false;$('mediaShareStatus').textContent=tr('העתיקו את הקישור מהשדה והדביקו בשיחה ב-Messenger.','Copy the link from the field and paste it in Messenger.');}
     });
     $('copyMediaLink').addEventListener('click',async()=>{if(!current())return;const url=shareURL(current());try{await navigator.clipboard.writeText(url);$('mediaShareStatus').textContent=tr('הקישור הועתק ✓','Link copied ✓');}catch{$('mediaLinkFallback').value=url;$('mediaLinkFallback').hidden=false;$('mediaLinkFallback').focus();$('mediaLinkFallback').select();$('mediaShareStatus').textContent=tr('אפשר להעתיק את הקישור מהשדה','Copy the link from the field');}});
-    $('openedProfilePhoto').addEventListener('click',async()=>{if(!current()||!state.scope?.startsWith('personal:'))return;const id=state.scope.slice(9),button=$('openedProfilePhoto');button.disabled=true;try{const response=await I18n.fetch('api/people/'+encodeURIComponent(id)+'/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({file:current().file})});const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));app().updatePerson(id,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id}}));notify(tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));}catch(error){notify(error.message);}finally{button.disabled=false;}});
+    $('openedProfilePhoto').addEventListener('click',async()=>{
+      const item=current(),scope=state.scope;if(!item||item.kind!=='photo'||!scope||!(/^(personal|wedding|nursery):/.test(scope)))return;
+      const albumCover=!scope.startsWith('personal:'),id=scope.slice(9),button=$('openedProfilePhoto');button.disabled=true;
+      try{
+        const response=await I18n.fetch(albumCover?'api/collections/cover':'api/people/'+encodeURIComponent(id)+'/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify(albumCover?{collection:scope,mediaId:item.id}:{file:item.file})});
+        const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));
+        if(albumCover)window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+        else{app().updatePerson(id,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id}}));}
+        notify(albumCover?tr('תמונת הפרופיל של האלבום עודכנה ✓','Album cover photo updated ✓'):tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));
+      }catch(error){notify(error.message);}finally{button.disabled=false;}
+    });
     window.addEventListener('family-media-changed',event=>{const result=event.detail;if(!result.item)return;for(const [scope,items]of [...albums]){
       const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope),updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);
       // The visible photo may already be absent from the filtered album. Keep

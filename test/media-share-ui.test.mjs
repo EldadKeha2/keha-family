@@ -137,6 +137,14 @@ test('the profile action follows the album owner gender when switching between p
   f.window.FamilyMedia.open([photo],0,'personal:guest');assert.equal(button.getAttribute('data-gender'),'unknown');
   f.window.FamilyMedia.open([photo],0,'gallery');assert.equal(button.hidden,true,'Only a personal album offers profile selection');
 });
+test('wedding and baby albums offer their own cover selection without replacing a person profile',async()=>{
+ for(const english of[false,true])for(const scope of['wedding:u-root','nursery:yona']){
+  const f=fixture({english}),item={...f.photo('a'),file:'a.jpg'};let profileUpdates=0;f.window.FamilyApp.updatePerson=()=>profileUpdates++;
+  f.window.FamilyI18n.fetch=async(path,options)=>{f.requests.push({path,options});return{ok:true,json:async()=>({saved:true,operation:'album-cover',scope,item,collection:{items:[item],count:1,cover:item.src}})};};
+  f.window.FamilyMedia.open([item],0,scope);const button=f.get('openedProfilePhoto');assert.equal(button.hidden,false);assert.match(button.querySelector('span').textContent,scope.startsWith('wedding:')?(english?/wedding/:/חתונה/):(english?/baby/:/תינוקייה/));
+  await button.handlers.get('click')();assert.equal(f.requests[0].path,'api/collections/cover');assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection:scope,mediaId:'a'});assert.equal(profileUpdates,0);assert.equal(f.get('mediaViewer').open,true);assert.equal(button.disabled,false);
+ }
+});
 test('desktop header captions follow photo navigation and both screen sizes retain their own description labels',()=>{
   for(const english of [false,true]){
     const f=fixture({english}),photos=[{id:'a',kind:'photo',src:'/media/a',caption:'A family memory',tags:[]},{id:'b',kind:'photo',src:'/media/b',caption:'',tags:[]}];

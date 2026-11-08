@@ -1,8 +1,8 @@
 import {FaceDetector} from './vendor/mediapipe/vision_bundle.mjs';
-import {clampRect,sameRegion,unrotateRect,separateFaces} from './face-geometry.mjs?v=5';
+import {clampRect,sameRegion,unrotateRect,separateFaces} from './face-geometry.mjs?v=6';
 import {detectionRegions} from './face-scan.mjs?v=2';
-import {createYuNet,projectYuNet,confirmYuNet,sameDetection,unrotateYuNet} from './face-yunet.mjs?v=4';
-import {STRONG_FACE_SCORE,proposalMatches,verifiedEvidence} from './face-verification.mjs?v=1';
+import {createYuNet,projectYuNet,confirmYuNet,sameDetection,unrotateYuNet} from './face-yunet.mjs?v=5';
+import {STRONG_FACE_SCORE,proposalMatches,verifiedEvidence} from './face-verification.mjs?v=2';
 import pico from './vendor/pico/pico.mjs';
 
 // Model files are hosted with the site. Detection must not send photos or metrics elsewhere.
@@ -76,7 +76,7 @@ async function verifiedFaces(bitmap,proposals,known,add){
   const r=proposal.rect,pixels=Math.max(r.width*size.width,r.height*size.height),scores=[];let best=null;
   const tilt=proposal.landmarks?Math.atan2((proposal.landmarks[1].y-proposal.landmarks[0].y)*size.height,(proposal.landmarks[1].x-proposal.landmarks[0].x)*size.width):-(proposal.turn||0)*Math.PI/180;
   const angles=Math.abs(tilt)>.2?[0,-tilt]:[0];
-  for(const context of [2.4,3.4,5]){
+  for(const context of [2.4,3.4,5,...(proposal.score>=.75&&pixels>12&&pixels<=32?[6,8,12]:[])]){
    const edge=Math.max(24,pixels*context),width=Math.min(edge,size.width),height=Math.min(edge,size.height);
    const region={x:Math.max(0,Math.min(size.width-width,(r.x+r.width/2)*size.width-width/2)),y:Math.max(0,Math.min(size.height-height,(r.y+r.height/2)*size.height-height/2)),width,height};
    const scale=640/Math.max(width,height),drawn={width:Math.round(width*scale),height:Math.round(height*scale)};
@@ -87,10 +87,10 @@ async function verifiedFaces(bitmap,proposals,known,add){
     const winner=faces.toSorted((a,b)=>b.score-a.score)[0];score=Math.max(score,winner?.score||0);if(winner&&(!best||winner.score>best.score))best=winner;
    }
    scores.push(score);
-   if(verifiedEvidence(scores,-1,pixels))break;
+   if(verifiedEvidence(scores,-1,pixels,proposal))break;
   }
   let support=-1;
-  if(best&&cascade&&!verifiedEvidence(scores,-1,pixels)&&scores.filter(score=>score>=.7).length>=2){
+  if(best&&cascade&&!verifiedEvidence(scores,-1,pixels,proposal)&&scores.filter(score=>score>=.7).length>=2){
    // Test native pixels around the candidate, rather than treating a proposal
    // elsewhere in the same crop as confirmation of this face.
    const edge=Math.max(24,Math.ceil(pixels*3)),w=Math.min(edge,size.width),h=Math.min(edge,size.height),x=Math.max(0,Math.min(size.width-w,Math.floor((r.x+r.width/2)*size.width-w/2))),y=Math.max(0,Math.min(size.height-h,Math.floor((r.y+r.height/2)*size.height-h/2)));
@@ -102,7 +102,7 @@ async function verifiedFaces(bitmap,proposals,known,add){
    }
    local.width=local.height=1;
   }
-  if(best&&verifiedEvidence(scores,support,pixels))add([best]);
+  if(best&&verifiedEvidence(scores,support,pixels,proposal))add([best]);
  }return true;}finally{tile.width=tile.height=1;}
 }
 

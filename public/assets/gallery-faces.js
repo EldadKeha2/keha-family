@@ -9,15 +9,15 @@
   }
   function status(){
     const host=document.getElementById('galleryFaceScanStatus');if(!host)return;
-    host.textContent=finished?(failed?tr('סריקת הפנים הסתיימה; חלק מהתמונות לא נסרקו.','Face scan finished; some photos could not be scanned.'):tr('סיווג התמונות לפי תיוגי הפנים מעודכן.','Photo categories are up to date.')):
-      tr('בודקים את התמונות לזיהוי תיוג חלקי…','Checking photos for missing tags…')+(pending?' '+tr('נותרו ','Remaining: ')+pending:'')+(viewer?tr(' · הסריקה תמשיך בסגירת התמונה',' · Scanning resumes when the photo closes'):'');
+    host.textContent=finished?(failed?tr('סריקת הפנים הסתיימה; חלק מהתמונות לא נסרקו.','Face scan finished; some photos could not be scanned.'):tr('סריקת הפנים מעודכנת.','Face scanning is up to date.')):
+      tr('סורקים את התמונות לאיתור פנים…','Scanning photos for faces…')+(pending?' '+tr('נותרו ','Remaining: ')+pending:'')+(viewer?tr(' · הסריקה תמשיך בסגירת התמונה',' · Scanning resumes when the photo closes'):'');
     const retry=document.getElementById('retryGalleryFaceScan');if(retry)retry.hidden=!(finished&&failed);
   }
   function pause(){clearTimeout(timer);timer=null;job?.abort();}
   function start(){if(!eligible()||job||timer||finished)return;timer=setTimeout(()=>{timer=null;run();},250);}
   async function save(item,faces,signal){
     if(faces.complete===false||!Array.isArray(faces.galleryFaces))return null;
-    const {FACE_SCAN_VERSION}=await import('./face-coverage.mjs?v=4');
+    const {FACE_SCAN_VERSION}=await import('./face-coverage.mjs?v=5');
     const result=await request('api/media/'+item.id+'/faces/detection',{method:'POST',signal,body:JSON.stringify({photoRevision:item.photoRevision||'original',version:FACE_SCAN_VERSION,faces:faces.galleryFaces.map(({rect,score})=>({rect,score}))})});
     window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));return result;
   }
@@ -33,7 +33,7 @@
     try{
       const batch=await request('api/gallery/face-scan?after='+after,{signal:controller.signal});pending=batch.pending;
       if(!batch.items.length){finished=true;status();return;}
-      const {detectFaces}=await import('./face-detector.mjs?v=10');
+      const {detectFaces}=await import('./face-detector.mjs?v=11');
       for(const item of batch.items){
         if(!eligible()||controller.signal.aborted)break;
         try{

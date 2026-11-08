@@ -5,7 +5,7 @@ import{readFile}from'node:fs/promises';
 
 const mediaSource=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 const portalSource=await readFile(new URL('../public/assets/portal.js',import.meta.url),'utf8');
-const photo=(id='a',tags=[])=>({id,file:id+'.jpg',filename:id+'.jpg',scope:'gallery',kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Photo '+id,caption:'',tags,tagsRevision:'initial',faceSummary:{total:2,unmatched:2,partial:tags.length>0&&tags.length<2}});
+const photo=(id='a',tags=[])=>({id,file:id+'.jpg',filename:id+'.jpg',scope:'gallery',kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Photo '+id,caption:'',tags,tagsRevision:'initial',faceSummary:{total:2,unmatched:2,partial:tags.length>0,reviewed:false}});
 function fixture(items=[photo('a'),photo('b')]){
  const nodes=new Map(),documentHandlers=new Map(),windowHandlers=new Map(),intervals=[],requests=[],pending=[];let nextDeferred=false,revision=1;
  const server=structuredClone(items),mounted=[];
@@ -27,8 +27,8 @@ function fixture(items=[photo('a'),photo('b')]){
  const listen=(map,name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);};
  const document={activeElement:null,visibilityState:'visible',getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
  const collection=path=>{
-  const filter=new URL(path,'https://test/').searchParams.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length:filter==='partial'?item.faceSummary.partial:true);
-  return{items:structuredClone(selected),count:selected.length,revision:'gallery-'+revision,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length).length,partial:server.filter(i=>i.faceSummary.partial).length},pagination:{page:1,size:100,pages:1,total:selected.length,filter}};
+  const filter=new URL(path,'https://test/').searchParams.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:true);
+  return{items:structuredClone(selected),count:selected.length,revision:'gallery-'+revision,filterCounts:{all:server.length,untagged:server.filter(i=>!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length},pagination:{page:1,size:100,pages:1,total:selected.length,filter}};
  };
  const window={FamilyApp:{apiEnabled:true,toast(){}},FAMILY_DATA:{people:{}},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>listen(windowHandlers,name,fn),dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
  window.FamilyI18n={isEnglish:false,language:'he',t:String,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:item=>item.name,error:String,searchNames:item=>item.name,fetch:async path=>{
@@ -41,25 +41,29 @@ function fixture(items=[photo('a'),photo('b')]){
  return{window,get,requests,pending,mounted,filters,flush,server,
   filter(name){for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-filter]'?{dataset:{galleryFilter:name}}:null}});},
   open:id=>window.FamilyMedia.openFrom('gallery',id),close:()=>get('closeMediaViewer').click(),poll:()=>intervals.forEach(fn=>fn()),defer(){nextDeferred=true;},
-  change(id,operation='tags',tagCount=1){const item=server.find(i=>i.id===id);item.tags=Array.from({length:tagCount},(_,i)=>({id:'person-'+i,name:'Person '+i}));item.tagsRevision='tags-'+(++revision);item.faceSummary={total:2,unmatched:2-tagCount,partial:tagCount>0&&tagCount<2};window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'gallery',item:structuredClone(item)}}));},
+  change(id,operation='tags',tagCount=1){const item=server.find(i=>i.id===id);item.tags=Array.from({length:tagCount},(_,i)=>({id:'person-'+i,name:'Person '+i}));item.tagsRevision='tags-'+(++revision);item.faceSummary={total:2,unmatched:2-tagCount,partial:tagCount>0,reviewed:false};window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'gallery',item:structuredClone(item)}}));},
+  review(id,complete=true){const item=server.find(i=>i.id===id);item.faceSummary={...item.faceSummary,reviewed:complete,partial:!complete&&item.tags.length>0};revision++;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'face-review',scope:'gallery',item:structuredClone(item)}}));},
   get cards(){return get('sharedGalleryGrid').children.map(card=>card.dataset.mediaFile);}
  };
 }
 
-test('an untagged photo stays open through multiple saves and scans; category membership changes after X',async()=>{
+test('a photo stays untagged until explicit completion and also becomes partial after a tag; updates wait for X',async()=>{
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.open('a');
  const before=f.requests.length,counts=f.filters.map(button=>button.textContent);assert.equal(f.get('mediaViewer').open,true);
  for(const operation of['tags','faces','face-detection','face-review','tags']){f.change('a',operation);f.poll();await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.deepEqual(f.filters.map(button=>button.textContent),counts);}
  assert.equal(f.requests.length,before,'Do not reload or recategorize a filtered gallery during its open tagging session');assert.equal(f.mounted.at(-1).tags.length,1,'The visible tagging metadata still updates immediately');
- f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);assert.equal(f.requests.length,before+1);assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.match(f.filters[2].textContent,/\(1\)/);
+ f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.equal(f.requests.length,before+1);assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.match(f.filters[2].textContent,/\(1\)/);
  f.filter('partial');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
+ f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,[]);
+ f.filter('untagged');await f.flush();assert.deepEqual(f.cards,['b.jpg']);f.filter('all');await f.flush();assert.deepEqual(f.cards,['a.jpg','b.jpg']);
 });
-test('tagging the last missing face in the last partial photo does not close its viewer or clear the list before X',async()=>{
+test('tagging the final detected face stays partial until completion, which does not close the viewer',async()=>{
  const f=fixture([photo('a',[{id:'person-0'}])]);await f.flush();f.filter('partial');await f.flush();f.open('a');f.change('a','faces',2);await f.flush();
- assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,[]);assert.equal(f.get('sharedGalleryEmpty').hidden,false);
+ assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,['a.jpg']);
+ f.open('a');f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.deepEqual(f.cards,['a.jpg']);f.close();await f.flush();assert.deepEqual(f.cards,[]);assert.equal(f.get('sharedGalleryEmpty').hidden,false);
 });
 test('a gallery response requested before opening the photo cannot apply midway through tagging',async()=>{
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.defer();f.poll();assert.equal(f.pending.length,1);f.open('a');f.change('a');f.change('a','face-detection');f.pending.shift()();await f.flush();
  assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.deepEqual(f.cards,['a.jpg','b.jpg']);
- f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);
+ f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);
 });

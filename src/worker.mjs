@@ -252,6 +252,8 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/ignore$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.ignore',{id:match[1],photoRevision:body.photoRevision,rect:body.rect,ignored:body.ignored}));}
+        if(path==='/api/collections/cover'){const body=await readJSON(request,2000);return json(await db('collection.cover',{kind:body.collection,mediaId:body.mediaId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/review$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.review',{id:match[1],photoRevision:body.photoRevision,tagsRevision:body.tagsRevision,complete:body.complete}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/detection$/.exec(path))){const body=await readJSON(request,32000);return json(await db('media.face.scan.save',{id:match[1],photoRevision:body.photoRevision,version:body.version,faces:body.faces}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/edit$/.exec(path)))return await editPhoto(request,env,db,ctx,match[1]);

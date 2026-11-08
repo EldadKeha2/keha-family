@@ -15,7 +15,7 @@ import {netoTetrisScore,NETO_TETRIS_SCORE_LIMIT} from './neto-tetris-scores.mjs'
 import {rutiHouseScore,RUTI_HOUSE_SCORE_LIMIT,RUTI_HOUSE_SCORE_FIELDS} from './ruti-house-scores.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
-import {FACE_SCAN_VERSION,faceCoverage,detectionRegions} from '../public/assets/face-coverage.mjs';
+import {FACE_SCAN_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
@@ -61,6 +61,8 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_faces(media_id TEXT NOT NULL,id TEXT NOT NULL,person_id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_face_scans(media_id TEXT PRIMARY KEY,photo_revision TEXT NOT NULL,version TEXT NOT NULL,data TEXT NOT NULL,face_count INTEGER NOT NULL,unmatched_count INTEGER NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_face_reviews(media_id TEXT PRIMARY KEY,photo_revision TEXT NOT NULL,tags_revision TEXT NOT NULL,completed_at TEXT NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS album_covers(collection TEXT PRIMARY KEY,media_id TEXT NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS media_face_ignores(media_id TEXT NOT NULL,photo_revision TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,photo_revision))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS photo_versions(media_id TEXT NOT NULL,id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_trash(id TEXT PRIMARY KEY,data TEXT NOT NULL,deleted_at TEXT NOT NULL,profile_selected INTEGER NOT NULL DEFAULT 0)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
@@ -190,12 +192,24 @@ export class FamilyState {
     const row=this.rows('SELECT * FROM media_face_scans WHERE media_id=? AND photo_revision=? AND version=?',item.id,item.photoRevision||'original',FACE_SCAN_VERSION)[0];
     return row?{...JSON.parse(row.data),total:row.face_count,unmatched:row.unmatched_count}:null;
   }
+  ignoredFaces(item){const row=this.rows('SELECT data FROM media_face_ignores WHERE media_id=? AND photo_revision=?',item.id,item.photoRevision||'original')[0];return row?JSON.parse(row.data):[];}
+  ignoreFace(p){
+    const item=this.photo(p.id);
+    if(p.photoRevision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה. פתחו אותה מחדש לפני שינוי הזיהוי.');
+    if(typeof p.ignored!=='boolean')throw new HttpError(400,'יש לבחור אם להתעלם מהזיהוי.');
+    const rect=faceRect(p.rect),previous=this.ignoredFaces(item),matching=previous.filter(other=>withoutIgnored([{rect}], [other]).length===0);
+    const ignored=p.ignored?(matching.length?previous:[...previous,rect]):previous.filter(other=>!matching.includes(other));
+    if(ignored.length>FACE_LIMIT)throw new HttpError(400,'אפשר לשמור עד 150 זיהויים מוסתרים בתמונה.');
+    this.sql.exec('INSERT INTO media_face_ignores(media_id,photo_revision,data) VALUES(?,?,?) ON CONFLICT(media_id,photo_revision) DO UPDATE SET data=excluded.data',item.id,p.photoRevision,JSON.stringify(ignored));
+    this.recountFaces(item.id);for(const kind of this.mediaCollections(item))this.touch(kind);
+    return {saved:true,operation:'face-ignore',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:withoutIgnored(this.faceScan(item)?.faces||[],ignored),ignoredFaces:ignored};
+  }
   faceSummary(item){
     const scan=this.faceScan(item),reviewed=Boolean(this.rows('SELECT media_id FROM media_face_reviews WHERE media_id=? AND photo_revision=? AND tags_revision=?',item.id,item.photoRevision||'original',this.tagsRevision(item.id))[0]);
     if(reviewed)return {total:scan?.total??this.faces(item.id).length,unmatched:0,partial:false,scanned:Boolean(scan),reviewed:true};
-    if(!scan)return null;
     const tagged=this.tagIds(item.id).length;
-    return {total:scan.total,unmatched:scan.unmatched,partial:tagged>0&&scan.unmatched>0&&scan.total>tagged,scanned:true,reviewed:false};
+    if(!scan&&!tagged)return null;
+    return {total:scan?.total??null,unmatched:scan?.unmatched??null,partial:tagged>0,scanned:Boolean(scan),reviewed:false};
   }
   reviewFaces(p){
     const item=this.photo(p.id);
@@ -208,7 +222,7 @@ export class FamilyState {
   }
   recountFaces(id){
     const row=this.rows('SELECT data FROM media_face_scans WHERE media_id=?',id)[0];if(!row)return;
-    const coverage=faceCoverage(this.faces(id),JSON.parse(row.data).faces,this.tagIds(id).length);
+    const coverage=faceCoverage(this.faces(id),withoutIgnored(JSON.parse(row.data).faces,this.ignoredFaces(this.media(id))),this.tagIds(id).length);
     this.sql.exec('UPDATE media_face_scans SET face_count=?,unmatched_count=? WHERE media_id=?',coverage.total,coverage.unmatched,id);
   }
   saveFaceScan(p){
@@ -221,12 +235,12 @@ export class FamilyState {
     })),previous=this.faceScan(item);
     // Concurrent visitors must not replace a complete index with a smaller scan.
     const combined=previous?detectionRegions([...previous.faces,...faces]):faces;
-    const data={faces:combined,scannedAt:new Date().toISOString()},coverage=faceCoverage(this.faces(item.id),combined,this.tagIds(item.id).length);
+    const visible=withoutIgnored(combined,this.ignoredFaces(item)),data={faces:combined,scannedAt:new Date().toISOString()},coverage=faceCoverage(this.faces(item.id),visible,this.tagIds(item.id).length);
     if(!previous||JSON.stringify(previous.faces)!==JSON.stringify(combined)){
       this.sql.exec('INSERT INTO media_face_scans(media_id,photo_revision,version,data,face_count,unmatched_count) VALUES(?,?,?,?,?,?) ON CONFLICT(media_id) DO UPDATE SET photo_revision=excluded.photo_revision,version=excluded.version,data=excluded.data,face_count=excluded.face_count,unmatched_count=excluded.unmatched_count',item.id,p.photoRevision,FACE_SCAN_VERSION,JSON.stringify(data),coverage.total,coverage.unmatched);
       for(const kind of this.mediaCollections(item))this.touch(kind);
     }
-    return {saved:true,operation:'face-detection',scope:this.mediaScope(item),item:this.mediaPublic(item),detectedFaces:combined};
+    return {saved:true,operation:'face-detection',scope:this.mediaScope(item),item:this.mediaPublic(item),detectedFaces:visible};
   }
   galleryFaceScan(p){
     const after=Number(p.after||0);if(!Number.isSafeInteger(after)||after<0)throw new HttpError(400,'בחרו מיקום סריקה תקין.');
@@ -318,25 +332,26 @@ export class FamilyState {
       if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
       const total=this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?)',kind,kind)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
       const items=this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?) ORDER BY m.rowid DESC LIMIT ? OFFSET ?',kind,kind,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
-      return {kind,items,count:total,revision:revision+':'+page,pagination:{page,pages,size,total}};
+      return {kind,items,count:total,cover:this.albumCover(kind),revision:revision+':'+page,pagination:{page,pages,size,total}};
     }
     if(kind!=='gallery'){
       const items=this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?) ORDER BY m.rowid DESC',kind,kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
-      return {kind,items,count:items.length,revision};
+      return {kind,items,count:items.length,revision,...(kind.startsWith('wedding:')?{cover:this.albumCover(kind,items.find(item=>item.kind==='photo')?.src||null)}:{})};
     }
     const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120),filter=options.filter||'all';
     if(!['all','untagged','partial'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
     if(![100,200,300,400,500].includes(size)||!Number.isSafeInteger(requestedPage)||requestedPage<1)throw new HttpError(400,'בחרו עמוד תקין ועד 500 תמונות בעמוד.');
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
-    if(filter==='untagged')where+=' AND NOT EXISTS (SELECT 1 FROM media_tags untagged WHERE untagged.media_id=m.id)';
-    const partial="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id) AND NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty')) AND EXISTS (SELECT 1 FROM media_face_scans s WHERE s.media_id=m.id AND s.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND s.version='"+FACE_SCAN_VERSION+"' AND s.unmatched_count>0 AND s.face_count>(SELECT count(*) FROM media_tags t WHERE t.media_id=m.id))";
+    const unfinished="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty'))";
+    if(filter==='untagged')where+=' AND '+unfinished;
+    const partial="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id) AND "+unfinished;
     if(filter==='partial')where+=' AND '+partial;
     if(query){
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
       args.push(like,like,like,like);
     }
-    const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN NOT EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=m.id) THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
+    const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+unfinished+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
     const filterCounts={all:counts.all_count,untagged:counts.untagged_count,partial:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND '+partial,kind)[0].n};
     const total=query?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
@@ -344,11 +359,18 @@ export class FamilyState {
     return {kind,items,count:total,filterCounts,revision:revision+':'+FACE_SCAN_VERSION+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='all'?'':':'+filter),pagination:{page,size,total,pages,query,filter}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
+  albumCover(kind,fallback){
+    const selected=this.rows("SELECT m.data FROM album_covers c JOIN media m ON m.id=c.media_id WHERE c.collection=? AND (m.category=c.collection OR EXISTS (SELECT 1 FROM media_collections x WHERE x.media_id=m.id AND x.collection=c.collection)) AND COALESCE(json_extract(m.data,'$.kind'),'photo')='photo'",kind)[0];
+    if(selected)return photoSource(JSON.parse(selected.data));
+    if(fallback!==undefined)return fallback;
+    const latest=this.rows("SELECT m.data FROM media m WHERE (m.category=? OR EXISTS (SELECT 1 FROM media_collections x WHERE x.media_id=m.id AND x.collection=?)) AND COALESCE(json_extract(m.data,'$.kind'),'photo')='photo' ORDER BY m.rowid DESC LIMIT 1",kind,kind)[0];
+    return latest?photoSource(JSON.parse(latest.data)):null;
+  }
   wedding(id,details=false){
     const pair=couple(id),record=JSON.parse(this.rows('SELECT data FROM weddings WHERE id=?',id)[0].data);
     const collection=this.collection(weddingCollection(id));
     const greetings=this.rows('SELECT data FROM greetings WHERE wedding_id=? ORDER BY rowid DESC',id).map(row=>JSON.parse(row.data));
-    return {...pair,...record,mediaCount:collection.count,greetingCount:greetings.length,cover:collection.items.find(item=>item.kind==='photo')?.src||null,
+    return {...pair,...record,mediaCount:collection.count,greetingCount:greetings.length,cover:collection.cover,
       ...(details?{collection,greetings}:{})};
   }
   candleState(person,visitorId){
@@ -364,6 +386,9 @@ export class FamilyState {
         for(const row of this.rows("SELECT latest.category,latest.n,m.data FROM (SELECT category,count(*) AS n,max(media_row) AS newest FROM (SELECT category,rowid AS media_row,id FROM media WHERE category>='nursery:' AND category<'nursery;' UNION SELECT c.collection AS category,m.rowid AS media_row,m.id FROM media_collections c JOIN media m ON m.id=c.media_id WHERE c.collection>='nursery:' AND c.collection<'nursery;') GROUP BY category) latest JOIN media m ON m.rowid=latest.newest")){
           const id=row.category.slice(8);try{nurseryCollection(id);}catch{continue;}
           const item=JSON.parse(row.data);albums[id]={count:row.n,cover:photoSource(item)};
+        }
+        for(const row of this.rows("SELECT c.collection,m.data FROM album_covers c JOIN media m ON m.id=c.media_id WHERE c.collection>='nursery:' AND c.collection<'nursery;' AND (m.category=c.collection OR EXISTS (SELECT 1 FROM media_collections x WHERE x.media_id=m.id AND x.collection=c.collection))")){
+          const id=row.collection.slice(8);if(albums[id])albums[id].cover=photoSource(JSON.parse(row.data));
         }
         return {albums};
       }
@@ -507,7 +532,8 @@ export class FamilyState {
       case 'gallery.face.scan':return this.galleryFaceScan(p);
       case 'media.face.scan.save':return this.saveFaceScan(p);
       case 'media.face.review':return this.reviewFaces(p);
-      case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:this.faceScan(item)?.faces||[]};}
+      case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');const ignoredFaces=this.ignoredFaces(item);return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:withoutIgnored(this.faceScan(item)?.faces||[],ignoredFaces),ignoredFaces};}
+      case 'media.face.ignore':return this.ignoreFace(p);
       case 'media.face.save':return this.saveFace(p);
       case 'media.caption.id':{
         const item=this.media(p.id),caption=text(p.caption,'כיתוב',5000);
@@ -633,6 +659,16 @@ export class FamilyState {
         person.profileId=item.id;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
       }
       case 'collection':return this.collection(p.kind,p);
+      case 'collection.cover':{
+        const kind=validCollection(p.kind);
+        if(!kind.startsWith('wedding:')&&!kind.startsWith('nursery:'))throw new HttpError(400,'בחרו אלבום חתונה או אלבום תינוקייה.');
+        if(typeof p.mediaId!=='string'||!/^[a-f0-9]{32}$/.test(p.mediaId))throw new HttpError(400,'בחרו תמונה מתוך האלבום הזה.');
+        const item=this.photo(p.mediaId);
+        if(!this.mediaCollections(item).includes(kind))throw new HttpError(404,'בחרו תמונה מתוך האלבום הזה.');
+        const previous=this.rows('SELECT media_id FROM album_covers WHERE collection=?',kind)[0];
+        if(previous?.media_id!==item.id){this.sql.exec('INSERT INTO album_covers(collection,media_id) VALUES(?,?) ON CONFLICT(collection) DO UPDATE SET media_id=excluded.media_id',kind,item.id);this.touch(kind);}
+        return {saved:true,operation:'album-cover',scope:kind,item:this.mediaPublic(item),collection:this.collection(kind),...(kind.startsWith('wedding:')?{wedding:this.wedding(kind.slice(8))}:{})};
+      }
       case 'collection.revision':validCollection(p.kind);return {revision:this.rows('SELECT value FROM meta WHERE id=?','collection:'+p.kind)[0]?.value||'empty'};
       case 'dates':return {people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data))};
       case 'weddings':return {weddings:couples.map(item=>this.wedding(item.id))};
@@ -670,7 +706,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:3,faceReviews:this.rows('SELECT media_id AS mediaId,photo_revision AS photoRevision,tags_revision AS tagsRevision,completed_at AS completedAt FROM media_face_reviews'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT media_id AS mediaId,data FROM media_faces').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
+      case 'export':return {schemaVersion:3,faceIgnores:this.rows('SELECT media_id AS mediaId,photo_revision AS photoRevision,data FROM media_face_ignores').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,rects:JSON.parse(row.data)})),albumCovers:this.rows('SELECT collection,media_id AS mediaId FROM album_covers'),faceReviews:this.rows('SELECT media_id AS mediaId,photo_revision AS photoRevision,tags_revision AS tagsRevision,completed_at AS completedAt FROM media_face_reviews'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT media_id AS mediaId,data FROM media_faces').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

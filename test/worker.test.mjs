@@ -287,6 +287,31 @@ test('nursery accepts newly added core relatives automatically, rejects extended
   assert.equal((await f.call('/api/nursery/yona/upload?filename=video.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).status,415);
  }finally{delete family.people[id];await f.close();}
 });
+test('wedding and nursery cover photos are selected from their own albums and survive uploads, edits, deletion and restore',async()=>{
+ const f=fixture();try{
+  await f.connect();const weddingId=family.root,scopes=['wedding:'+weddingId,'nursery:yona'];
+  const upload=async(scope,n)=>{
+   const base=scope.startsWith('wedding:')?'/api/weddings/'+scope.slice(8):'/api/nursery/'+scope.slice(8);
+   const response=await f.call(base+'/upload?filename=cover-'+n+'.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(response.status,201);return(await response.json()).collection.items[0];
+  };
+  const covers=[];
+  for(const scope of scopes){
+   const first=await upload(scope,1);await upload(scope,2);
+   const response=await f.call('/api/collections/cover',{method:'POST',body:{collection:scope,mediaId:first.id}});assert.equal(response.status,200);const result=await response.json();assert.equal(result.operation,'album-cover');assert.equal(result.collection.cover,first.src);covers.push(first);
+   await upload(scope,3);
+  }
+  f.restart();assert.equal((await(await f.call('/api/weddings/'+weddingId)).json()).cover,covers[0].src);assert.equal((await(await f.call('/api/nursery')).json()).albums.yona.cover,covers[1].src);
+  assert.equal((await(await f.call('/api/people/yona/page')).json()).person.profile,null,'Baby covers never replace the ordinary person profile');
+  assert.equal((await f.call('/api/collections/cover',{method:'POST',body:{collection:scopes[0],mediaId:covers[1].id}})).status,404);
+  assert.equal((await f.call('/api/collections/cover',{method:'POST',body:{collection:'gallery',mediaId:covers[0].id}})).status,400);
+  assert.equal((await f.call('/api/collections/cover',{method:'POST',body:{collection:scopes[0],mediaId:covers[0].id},clientHeaders:false})).status,403);
+  assert.equal((await photoEdit(f,covers[0])).status,201);let wedding=await(await f.call('/api/weddings/'+weddingId)).json();assert.match(wedding.cover,new RegExp('^'+covers[0].src+'\\?v='));
+  const date=wedding.date;assert.equal((await f.call('/api/weddings/'+weddingId+'/date',{method:'POST',body:{date,expectedRevision:wedding.revision}})).status,200);assert.equal((await(await f.call('/api/weddings/'+weddingId)).json()).cover,wedding.cover);
+  await f.call('/api/media/'+covers[1].id+'/delete',{method:'POST',body:{scope:scopes[1]}});assert.notEqual((await(await f.call('/api/nursery')).json()).albums.yona.cover,covers[1].src);
+  await f.call('/api/media/'+covers[1].id+'/restore',{method:'POST',body:{scope:scopes[1]}});assert.equal((await(await f.call('/api/nursery')).json()).albums.yona.cover,covers[1].src);
+  assert.equal((await(await f.call('/api/export')).json()).albumCovers.length,2);
+ }finally{await f.close();}
+});
 test('nursery galleries paginate ten photos at a time and keep other family members separate',async()=>{
  const f=fixture();try{
   await f.connect();const files=[];
@@ -870,11 +895,11 @@ test('gallery pagination defaults to 100, caps at 500, searches all pages and ke
   assert.equal((await (await f.call('/api/collections/gallery?page=999')).json()).pagination.page,7);
  }finally{await f.close();}
 });
-test('untagged gallery filtering covers every page, combines with search and stays current after tag changes',async()=>{
+test('unfinished gallery filtering covers every page, combines with search and waits for explicit completion',async()=>{
  const f=fixture();try{
   await f.connect();const insert=f.database.prepare('INSERT INTO media(id,category,data) VALUES(?,?,?)'),tag=f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)'),id=n=>n.toString(16).padStart(32,'0');
   for(let n=0;n<205;n++){
-   const item={id:id(n),category:'gallery',file:id(n)+'.jpg',name:'Photo '+n,caption:n===2?'Distant untagged memory':'',mime:'image/jpeg',kind:'photo'};insert.run(item.id,'gallery',JSON.stringify(item));if(n%2)tag.run(item.id,'yona');
+   const item={id:id(n),category:'gallery',file:id(n)+'.jpg',name:'Photo '+n,caption:n===2?'Distant untagged memory':'',mime:'image/jpeg',kind:'photo'};insert.run(item.id,'gallery',JSON.stringify(item));if(n%2){tag.run(item.id,'yona');f.database.prepare('INSERT INTO media_face_reviews(media_id,photo_revision,tags_revision,completed_at) VALUES(?,?,?,?)').run(item.id,'original','empty','2026-11-08');}
   }
   const all=await f.call('/api/collections/gallery'),allEtag=all.headers.get('ETag');
   const response=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':allEtag}});assert.equal(response.status,200,'All-photo and untagged snapshots use different cache keys');const etag=response.headers.get('ETag'),first=await response.json();
@@ -883,9 +908,10 @@ test('untagged gallery filtering covers every page, combines with search and sta
   const search='/api/collections/gallery?filter=untagged&q=Distant',searched=await(await f.call(search)).json();assert.equal(searched.items[0].id,id(2));assert.deepEqual(searched.filterCounts,{all:205,untagged:103,partial:0});
   assert.equal((await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}})).status,304);
   const patch=tagged=>f.call('/api/media/'+id(2)+'/tags/patch',{method:'POST',body:{changes:[{personId:'yona',tagged}]}});
-  assert.equal((await patch(true)).status,200);const changed=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.equal((await changed.json()).count,102);assert.equal((await(await f.call(search)).json()).count,0);
+  assert.equal((await patch(true)).status,200);const changed=await f.call('/api/collections/gallery?filter=untagged',{headers:{'If-None-Match':etag}});assert.equal(changed.status,200);assert.equal((await changed.json()).count,103,'A name alone does not complete a photo');assert.equal((await(await f.call(search)).json()).count,1);
+  const current=(await(await f.call(search)).json()).items[0];assert.equal((await f.call('/api/media/'+current.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:current.tagsRevision}})).status,200);assert.equal((await(await f.call(search)).json()).count,0);
   assert.equal((await patch(false)).status,200);f.restart();assert.equal((await(await f.call(search)).json()).count,1);assert.equal((await(await f.call('/api/collections/gallery')).json()).count,205);
-  for(let n=0;n<205;n+=2)tag.run(id(n),'yona');const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.deepEqual(empty.filterCounts,{all:205,untagged:0,partial:0});assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
+  for(let n=0;n<205;n+=2){tag.run(id(n),'yona');const revision=f.database.prepare('SELECT value FROM meta WHERE id=?').get('tags:'+id(n))?.value||'empty';f.database.prepare('INSERT INTO media_face_reviews(media_id,photo_revision,tags_revision,completed_at) VALUES(?,?,?,?) ON CONFLICT(media_id) DO UPDATE SET tags_revision=excluded.tags_revision').run(id(n),'original',revision,'2026-11-08');}const empty=await(await f.call('/api/collections/gallery?filter=untagged&page=2')).json();assert.equal(empty.count,0);assert.deepEqual(empty.filterCounts,{all:205,untagged:0,partial:0});assert.equal(empty.pagination.page,1);assert.deepEqual(empty.items,[]);
   assert.equal((await f.call('/api/collections/gallery?filter=other')).status,400);
  }finally{await f.close();}
 });
@@ -1046,7 +1072,7 @@ test('manual names populate their own tagged albums and follow face tags, untagg
   await f.call('/api/media/'+b.id+'/restore',{method:'POST',body:{scope:'gallery'}});f.restart();roster=await(await f.call('/api/media')).json();assert.equal(roster.people[id].photoCount,1);
  }finally{await f.close();}
 });
-test('zero-tag photos stay untagged; partial requires a tag and ends when all faces have labels',async()=>{
+test('zero-tag photos never become partial; tagged photos stay unfinished until manual completion',async()=>{
  const f=fixture();try{
   await f.connect();const item=await galleryPhoto(f),path='/api/collections/gallery?filter=partial';
   assert.equal((await(await f.call(path)).json()).count,0,'Unscanned is unknown, never a completed zero-face scan');
@@ -1057,24 +1083,27 @@ test('zero-tag photos stay untagged; partial requires a tag and ends when all fa
   let saved;
   for(const [index,personId] of ['yona','shlomo','ruti'].entries()){
    response=await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:String(index+1).repeat(32),personId,rect:detectedGalleryFaces[index].rect,expectedRevision:null}});assert.equal(response.status,200,await response.clone().text());saved=await response.json();
-   assert.equal(saved.item.faceSummary.unmatched,2-index);assert.equal(saved.item.faceSummary.partial,index<2);
-   result=await(await f.call(path)).json();assert.equal(result.count,index<2?1:0);assert.equal(result.filterCounts.all,1);
+   assert.equal(saved.item.faceSummary.unmatched,2-index);assert.equal(saved.item.faceSummary.partial,true);
+   result=await(await f.call(path)).json();assert.equal(result.count,1);assert.equal(result.filterCounts.all,1);
   }
-  assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,0);f.restart();assert.equal((await(await f.call(path)).json()).count,0);
+  assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,1);f.restart();assert.equal((await(await f.call(path)).json()).count,1);
+  assert.equal((await f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:saved.item.tagsRevision}})).status,200);assert.equal((await(await f.call(path)).json()).count,0);assert.equal((await(await f.call('/api/collections/gallery?filter=untagged')).json()).count,0);
   await f.call('/api/media/'+item.id+'/tag',{method:'POST',body:{personId:'shlomo',tagged:false}});
   result=await(await f.call(path)).json();assert.equal(result.count,1);assert.equal(result.items[0].faceSummary.unmatched,1);
-  await f.call('/api/media/'+item.id+'/retag',{method:'POST',body:{scope:'personal:shlomo'}});assert.equal((await(await f.call(path)).json()).count,0);
+  await f.call('/api/media/'+item.id+'/retag',{method:'POST',body:{scope:'personal:shlomo'}});assert.equal((await(await f.call(path)).json()).count,1,'Retagging still requires explicit completion');
  }finally{await f.close();}
 });
 test('legacy whole-photo tags count for classification but are never guessed onto faces',async()=>{
  const f=fixture();try{
   await f.connect();const item=await galleryPhoto(f);await saveGalleryScan(f,item);
   for(const personId of ['yona','shlomo','ruti'])await f.call('/api/media/'+item.id+'/tag',{method:'POST',body:{personId,tagged:true}});
-  assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,0);
+  assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,1);
   const faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(faces.faces,[]);assert.equal(faces.detectedFaces.length,3,'Old ordinary tags have no invented coordinates');
+  assert.equal((await f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:faces.item.tagsRevision}})).status,200);
   const other=await galleryPhoto(f,'Repeated-person.jpg');await saveGalleryScan(f,other,detectedGalleryFaces.slice(0,2));
   for(const [index,face] of detectedGalleryFaces.slice(0,2).entries())assert.equal((await f.call('/api/media/'+other.id+'/faces/save',{method:'POST',body:{faceId:String(index+4).repeat(32),personId:'yona',rect:face.rect,expectedRevision:null}})).status,200);
-  assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,0,'The same person can occupy two fully labelled regions');
+  assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,1,'Even two fully labelled regions wait for manual completion');
+  const repeated=await(await f.call('/api/media/'+other.id+'/faces')).json();assert.equal(repeated.faces.length,2);assert.equal((await f.call('/api/media/'+other.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:repeated.item.tagsRevision}})).status,200);assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,0);
  }finally{await f.close();}
 });
 test('face scan queue covers the entire gallery and partial pagination combines with name and caption search',async()=>{
@@ -1109,7 +1138,7 @@ test('face scans validate source revisions, stay durable, preserve concurrent re
   assert.equal((await(await f.call('/api/media/'+other.id+'/faces')).json()).detectedFaces.length,0);
   await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'gallery'}});assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,0);
   await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:'gallery'}});assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,1);
-  assert.equal((await photoEdit(f,item)).status,201);faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(faces.item.faceSummary,null);assert.deepEqual(faces.detectedFaces,[]);
+  assert.equal((await photoEdit(f,item)).status,201);faces=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(faces.item.faceSummary,{partial:true,reviewed:false,scanned:false,total:null,unmatched:null});assert.deepEqual(faces.detectedFaces,[]);
   assert.equal((await saveGalleryScan(f,item)).status,409,'Late old pixels cannot repopulate the edited photo index');
   assert.equal((await(await f.call('/api/gallery/face-scan')).json()).pending,2);
  }finally{await f.close();}
@@ -1128,5 +1157,23 @@ test('manual all-faces confirmation persists, excludes partial and scan queues, 
   await saveGalleryScan(f,a);assert.equal((await review(a,false)).status,200);assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,1,'An unreviewed zero-tag photo is still untagged, not partially tagged');
   assert.equal((await review(a)).status,200);await f.call('/api/media/'+a.id+'/tag',{method:'POST',body:{personId:'yona',tagged:true}});assert.equal((await review(a)).status,409);assert.equal((await(await f.call('/api/collections/gallery?filter=partial')).json()).count,2,'changed tags require a new confirmation');
   assert.equal((await review(b,true,{complete:'yes'})).status,400);assert.equal((await review(b,true,{photoRevision:'old'})).status,409);
+ }finally{await f.close();}
+});
+
+test('ignored false detections persist only for that photo revision, survive rescanning and support Undo without removing names',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await galleryPhoto(f,'Ignore.jpg'),other=await galleryPhoto(f,'Unaffected.jpg');await saveGalleryScan(f,item);await saveGalleryScan(f,other);
+  const saved=await(await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId:'a'.repeat(32),personId:'yona',rect:detectedGalleryFaces[0].rect,expectedRevision:null}})).json();
+  const ignore=(rect,ignored=true,extra={})=>f.call('/api/media/'+item.id+'/faces/ignore',{method:'POST',body:{rect,ignored,photoRevision:'original',...extra}});
+  assert.equal((await ignore(detectedGalleryFaces[1].rect,true,{photoRevision:'stale'})).status,409);assert.equal((await ignore(detectedGalleryFaces[1].rect,'yes')).status,400);assert.equal((await ignore({x:2})).status,400);
+  assert.equal((await f.call('/api/media/'+item.id+'/faces/ignore',{method:'POST',body:{rect:detectedGalleryFaces[1].rect,ignored:true,photoRevision:'original'},clientHeaders:false})).status,403);
+  const before=(await f.call('/api/collections/gallery')).headers.get('ETag');let result=await(await ignore(detectedGalleryFaces[1].rect)).json();assert.equal(result.operation,'face-ignore');assert.equal(result.detectedFaces.length,2);assert.equal(result.item.faceSummary.total,2);assert.deepEqual(result.faces,saved.faces);assert.equal(result.item.tags[0].id,'yona');
+  assert.equal((await f.call('/api/collections/gallery',{headers:{'If-None-Match':before}})).status,200);
+  await ignore(detectedGalleryFaces[1].rect);f.restart();result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.ignoredFaces.length,1,'Repeated Ignore is idempotent');assert.equal(result.detectedFaces.length,2);
+  await saveGalleryScan(f,item);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.detectedFaces.length,2,'The next scan cannot reintroduce the ignored region');assert.equal((await(await f.call('/api/media/'+other.id+'/faces')).json()).detectedFaces.length,3);
+  const backup=await(await f.call('/api/export')).json();assert.deepEqual(backup.faceIgnores,[{mediaId:item.id,photoRevision:'original',rects:[detectedGalleryFaces[1].rect]}]);
+  result=await(await ignore(detectedGalleryFaces[1].rect,false)).json();assert.equal(result.detectedFaces.length,3);assert.equal(result.ignoredFaces.length,0);
+  await ignore(detectedGalleryFaces[0].rect);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.faces[0].personId,'yona','Ignore never removes an existing named face');assert.equal(result.item.tags.length,1);
+  assert.equal((await photoEdit(f,item)).status,201);result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(result.ignoredFaces,[],'Coordinates from old pixels cannot hide a face in an edited photo');assert.equal((await ignore(detectedGalleryFaces[1].rect)).status,409);
  }finally{await f.close();}
 });

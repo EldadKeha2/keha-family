@@ -16,6 +16,14 @@ export function clampRect(rect){
   const x=Math.max(0,Math.min(.9995,rect.x)),y=Math.max(0,Math.min(.9995,rect.y));
   return {x,y,width:Math.max(.0005,Math.min(1-x,rect.width)),height:Math.max(.0005,Math.min(1-y,rect.height))};
 }
+export function resizeFaceRect(rect,handle,point){
+  const minimum=.0005;let left=rect.x,top=rect.y,right=rect.x+rect.width,bottom=rect.y+rect.height;
+  if(handle.includes('w'))left=Math.max(0,Math.min(right-minimum,point.x));
+  if(handle.includes('e'))right=Math.min(1,Math.max(left+minimum,point.x));
+  if(handle.includes('n'))top=Math.max(0,Math.min(bottom-minimum,point.y));
+  if(handle.includes('s'))bottom=Math.min(1,Math.max(top+minimum,point.y));
+  return {x:left,y:top,width:right-left,height:bottom-top};
+}
 export function separateFaces(faces){
   // Coarse cascades sometimes see a pair of heads as one very large face.
   // Independent, well-supported small regions are stronger evidence than that box.

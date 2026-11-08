@@ -7,8 +7,8 @@ import * as geometryModule from '../public/assets/face-geometry.mjs';
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
  .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
-function fixture(detected=[]){
- const view={width:360,height:800},created=[];
+function fixture(detected=[],{desktop=false}={}){
+ const view={width:desktop?1200:360,height:800},created=[];
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
   get classList(){return {contains:value=>this.className.split(' ').includes(value),add:(...values)=>{this.className=[...new Set([...this.className.split(' '),...values])].join(' ');},remove:(...values)=>{this.className=this.className.split(' ').filter(x=>!values.includes(x)).join(' ');}};}
@@ -22,7 +22,7 @@ function fixture(detected=[]){
   querySelectorAll(){return [];}
   contains(node){return node===this||this.children.some(child=>child.contains(node));}
   closest(selector){return this.matches(selector)?this:this.parent?.closest(selector)||null;}
-  matches(selector){return selector==='.'+this.className;}
+  matches(selector){return selector==='[data-face-handle]'?Boolean(this.dataset.faceHandle):selector==='.'+this.className;}
   focus(){}
   get clientWidth(){return this.className==='face-photo-scroll'?view.width:this.getBoundingClientRect().width;}
   get clientHeight(){return this.className==='face-photo-scroll'?Math.min(view.height*.43,parseFloat(this.children[0]?.style.height)||0):this.getBoundingClientRect().height;}
@@ -39,9 +39,9 @@ function fixture(detected=[]){
  const window=new Node();window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
  let progress;
  const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{progress=onProgress;return detected;}};
- vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:true}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});
+ vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});
  document.dispatchEvent(new Event('DOMContentLoaded'));
- const find=className=>created.find(node=>node.className===className&&node.parent);
+ const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
  return {faces:window.FamilyFaces,stage,image,view,window,find,emit,get progress(){return progress;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
@@ -114,4 +114,43 @@ test('all-faces confirmation is available in ordinary and partial gallery photos
 test('a failed completion confirmation leaves the photo markers and retry button intact',async()=>{
  const f=fixture([first]);f.window.FamilyI18n.fetch=async(path)=>path.endsWith('/review')?Response.json({error:'Connection lost'},{status:503}):Response.json({faces:[]});
  await f.mount('retry',{}, {scope:'gallery'});const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(button.disabled,false);assert.match(f.find('face-review-status').textContent,/Connection lost/);
+});
+
+test('desktop frame handles save new geometry with the same person, face identity and concurrency revision',async()=>{
+ const original={id:'a'.repeat(32),rect:{x:.3,y:.2,width:.1,height:.15},personId:'yona',person:{id:'yona',name:'יונה'},revision:'face-r1'},requests=[];
+ const f=fixture([],{desktop:true});
+ f.window.FamilyI18n.fetch=async(path,options)=>{
+  if(path.endsWith('/save')){const body=JSON.parse(options.body);requests.push(body);const face={...original,rect:body.rect,revision:'face-r2'};return Response.json({operation:'faces',scope:'gallery',item:{id:'resizable',kind:'photo',tagsRevision:'t2'},faces:[face],face});}
+  return Response.json({faces:[original]});
+ };
+ await f.mount('resizable');const area=f.image.getBoundingClientRect(),selection=f.find('face-selection');assert.equal(selection.children.length,8);
+ f.emit(f.stage,'click',{detail:1,clientX:area.left+.35*area.width,clientY:area.top+.25*area.height});
+ const handle=selection.children.find(node=>node.dataset.faceHandle==='se');
+ f.emit(f.stage,'pointerdown',{target:handle,pointerId:1,clientX:area.left+.4*area.width,clientY:area.top+.35*area.height});
+ f.emit(f.stage,'pointermove',{target:handle,pointerId:1,clientX:area.left+.43*area.width,clientY:area.top+.39*area.height});
+ f.emit(f.stage,'pointerup',{target:handle,pointerId:1});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(requests.length,1);assert.equal(requests[0].personId,'yona');assert.equal(requests[0].faceId,original.id);assert.equal(requests[0].expectedRevision,'face-r1');
+ assert.ok(Math.abs(requests[0].rect.width-.13)<1e-10);assert.ok(Math.abs(requests[0].rect.height-.19)<1e-10);assert.deepEqual(original.rect,{x:.3,y:.2,width:.1,height:.15});
+ assert.equal(f.find('face-hit-buttons').children.length,1);f.faces.clear();
+});
+test('desktop resizing works after zoom and late detections keep the adjusted box; phones have no resize handles',async()=>{
+ const f=fixture([first,second],{desktop:true});await f.mount();const toolbar=f.find('face-zoom-toolbar');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
+ const area=f.image.getBoundingClientRect(),selection=f.find('face-selection');f.emit(f.stage,'click',{detail:1,clientX:area.left+.506*area.width,clientY:area.top+.408*area.height});
+ const handle=selection.children.find(node=>node.dataset.faceHandle==='nw');
+ f.emit(f.stage,'pointerdown',{target:handle,pointerId:1,clientX:area.left+.5*area.width,clientY:area.top+.4*area.height});
+ f.emit(f.stage,'pointermove',{target:handle,pointerId:1,clientX:area.left+.497*area.width,clientY:area.top+.395*area.height});f.emit(f.stage,'pointerup',{target:handle,pointerId:1});await new Promise(resolve=>setImmediate(resolve));
+ const width=parseFloat(selection.style.width);assert.ok(Math.abs(width-1.5)<1e-8);f.progress([first,second]);assert.ok(Math.abs(parseFloat(f.find('face-hit-buttons').children[0].style.width)-1.5)<1e-8);
+ f.faces.clear();const phone=fixture([first]);await phone.mount();assert.equal(phone.find('face-selection').children.length,0);phone.faces.clear();
+});
+test('ignoring one false detection is photo-specific, survives reopening, and Undo restores the region',async()=>{
+ const f=fixture([first,second]),requests=[];let ignored=[];
+ f.window.FamilyI18n.fetch=async(path,options)=>{
+  if(path.endsWith('/ignore')){const body=JSON.parse(options.body);requests.push(body);ignored=body.ignored?[body.rect]:[];return Response.json({saved:true,operation:'face-ignore',item:{id:'ignored-photo',kind:'photo'},faces:[],detectedFaces:body.ignored?[second]:[first,second],ignoredFaces:ignored});}
+  return Response.json({faces:[],ignoredFaces:ignored,detectedFaces:[first,second]});
+ };
+ await f.mount('ignored-photo');let area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,clientX:area.left+.506*area.width,clientY:area.top+.408*area.height});
+ f.emit(f.find('face-popover face-picker').querySelector('[data-face-ignore]'),'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(requests[0].ignored,true);assert.equal(requests[0].photoRevision,'original');assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(f.find('face-zoom-toolbar').querySelector('[data-face-ignore-undo]').hidden,false);
+ f.faces.clear();await f.mount('ignored-photo');assert.equal(f.find('face-hit-buttons').children.length,1);
+ f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-ignore-undo]'),'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.at(-1).ignored,false);assert.equal(f.find('face-hit-buttons').children.length,2);
+ f.faces.clear();await f.mount('other-photo');assert.equal(f.find('face-hit-buttons').children.length,2);f.faces.clear();
 });

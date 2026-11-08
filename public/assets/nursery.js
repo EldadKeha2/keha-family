@@ -42,7 +42,7 @@
   }
   function applyAlbum(id,album,mutation=false){
     if(mutation)albumVersions.set(id,(albumVersions.get(id)||0)+1);
-    albums.set(id,album);state.summaries[id]={count:album.count,cover:album.pagination?.page>1?(state.summaries[id]?.cover||album.items[0]?.src||null):(album.items[0]?.src||null)};
+    albums.set(id,album);state.summaries[id]={count:album.count,cover:'cover' in album?album.cover:album.pagination?.page>1?(state.summaries[id]?.cover||album.items[0]?.src||null):(album.items[0]?.src||null)};
   }
   async function loadAlbum(id,page=state.page){
     const key=id+':'+page;if(loading.has(key)||!app().apiEnabled)return;loading.add(key);errors.delete(id);
