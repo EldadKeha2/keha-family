@@ -26,6 +26,7 @@ export const GUEST_ARM_RIGS=Object.freeze({
 });
 const distance=(a,b)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
 const angle=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0]);
+const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 function outline(points,widths){
  const sides=points.map((p,i)=>{const before=points[Math.max(0,i-1)],after=points[Math.min(points.length-1,i+1)],a=angle(before,after)+Math.PI/2;
   return [[p[0]+Math.cos(a)*widths[i],p[1]+Math.sin(a)*widths[i]],[p[0]-Math.cos(a)*widths[i],p[1]-Math.sin(a)*widths[i]]];});
@@ -43,23 +44,31 @@ function armPieces(rig){
  };
 }
 export function guestArmOutline(rig){return armPieces(rig).outline;}
-export function guestArmPose(rig,target){
- const shoulder=rig.shoulder,upper=distance(shoulder,rig.elbow),lower=distance(rig.elbow,rig.grip);
- const dx=target[0]-shoulder[0],dy=target[1]-shoulder[1],d=Math.max(Math.abs(upper-lower)+.1,Math.min(upper+lower-.1,Math.hypot(dx,dy)));
- const a=Math.atan2(dy,dx),bend=Math.acos(Math.max(-1,Math.min(1,(upper*upper+d*d-lower*lower)/(2*upper*d))));
- const elbow=[shoulder[0]+Math.cos(a+bend)*upper,shoulder[1]+Math.sin(a+bend)*upper];
- const hand=[shoulder[0]+Math.cos(a)*d,shoulder[1]+Math.sin(a)*d];
- return {shoulder,elbow,hand,upperAngle:angle(shoulder,elbow)-angle(shoulder,rig.elbow),lowerAngle:angle(elbow,hand)-angle(rig.elbow,rig.grip)};
+export function guestArmPose(rig,target,{lift}={}){
+ const progress=clamp(lift??(rig.grip[1]-target[1])/(rig.grip[1]-rig.mouth[1]),0,1);
+ const shoulder=rig.shoulder,hand=[...target];
+ // A seated person brings the elbow slightly forward and keeps it below the
+ // shoulder. Its projected upper arm foreshortens as the forearm lifts. A
+ // rigid two-circle IK solution instead flips the sleeve up beside the head.
+ const elbow=[shoulder[0]+10-4*progress+(rig.mouth[0]-shoulder[0])*.18*progress,shoulder[1]+63-40*progress];
+ return {shoulder,elbow,hand,
+  upperScale:distance(shoulder,elbow)/distance(rig.shoulder,rig.elbow),
+  lowerScale:distance(elbow,hand)/distance(rig.elbow,rig.grip),
+  upperAngle:angle(shoulder,elbow)-angle(shoulder,rig.elbow),
+  lowerAngle:angle(elbow,hand)-angle(rig.elbow,rig.grip)};
 }
 function path(ctx,points){ctx.beginPath();ctx.moveTo(...points[0]);for(const p of points.slice(1))ctx.lineTo(...p);ctx.closePath();}
 /** Draw the two original image pieces, with their shared elbow kept joined. */
 export function drawGuestOriginalArm(ctx,atlas,column,rig,pose){
  const cw=atlas.naturalWidth/4,ch=atlas.naturalHeight/2;
- const piece=(points,pivot,placed,rotation)=>{
-  ctx.save();ctx.translate(...placed);ctx.rotate(rotation);ctx.translate(-pivot[0],-pivot[1]);path(ctx,points);ctx.clip();
+ const piece=(points,pivot,end,placed,targetEnd)=>{
+  const sourceAngle=angle(pivot,end),targetAngle=angle(placed,targetEnd),scale=distance(placed,targetEnd)/distance(pivot,end);
+  ctx.save();ctx.translate(...placed);ctx.rotate(targetAngle);ctx.scale(scale,1);ctx.rotate(-sourceAngle);ctx.translate(-pivot[0],-pivot[1]);path(ctx,points);ctx.clip();
   ctx.drawImage(atlas,column*cw+.5,ch+.5,cw-1,ch-1,0,0,384,512);ctx.restore();
  };
- const pieces=armPieces(rig);
- piece(outline([rig.shoulder,rig.elbow],[rig.width,rig.width+1]),rig.shoulder,pose.shoulder,pose.upperAngle);
- piece(pieces.lower,rig.elbow,pose.elbow,pose.lowerAngle);
+ const palmDirection=angle(rig.wrist,rig.grip),tip=[rig.grip[0]+Math.cos(palmDirection)*18,rig.grip[1]+Math.sin(palmDirection)*18];
+ const upper=outline([rig.shoulder,rig.elbow],[rig.width+2,rig.width*.82+2]);
+ const forearm=outline([rig.elbow,rig.wrist,rig.grip,tip],[rig.width*.82+2,12,17,8]);
+ piece(upper,rig.shoulder,rig.elbow,pose.shoulder,pose.elbow);
+ piece(forearm,rig.elbow,rig.grip,pose.elbow,pose.hand);
 }

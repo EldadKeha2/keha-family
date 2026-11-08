@@ -83,11 +83,43 @@ test('every guest reuses two pieces from its original arm, keeps its elbow joine
  for(const id of [...HOUSE_FAMILY_GUESTS,...HOUSE_VISITORS]){
   const rig=GUEST_ARM_RIGS[id];assert.ok(rig,id);const pose=guestArmPose(rig,rig.mouth);
   assert.ok(Math.hypot(pose.hand[0]-rig.mouth[0],pose.hand[1]-rig.mouth[1])<.1,id+' reaches its own mouth');
-  assert.ok(Math.abs(Math.hypot(pose.shoulder[0]-pose.elbow[0],pose.shoulder[1]-pose.elbow[1])-Math.hypot(rig.shoulder[0]-rig.elbow[0],rig.shoulder[1]-rig.elbow[1]))<.001);
+  assert.ok(pose.elbow[1]>pose.shoulder[1],'the eating elbow stays below the shoulder');
+  assert.ok(Math.abs(pose.upperAngle)<Math.PI/4,'the sleeve never flips up beside the face');
   calls.length=0;clips.length=0;
   assert.equal(drawHouseGuest(ctx,100,200,140,id,images,10,{sitting:1,food:'tahini',eating:{active:true,bite:1,remaining:1}}),true);
   assert.equal(calls.length,4);assert.ok(calls.every(c=>c[0]===atlas));
   assert.equal(clips.filter(c=>c==='evenodd').length,2,'both body slices exclude the original stationary arm');
+ }
+});
+
+test('eating stays connected through every intermediate pose without folding or stretching the sleeve sideways',()=>{
+ const atlas={complete:true,naturalWidth:1536,naturalHeight:1024},images={familyAtlas:atlas,visitorAtlas:atlas,familyExtraAtlases:{a:atlas,b:atlas,c:atlas}};
+ const point=(m,p)=>[m[0]*p[0]+m[2]*p[1]+m[4],m[1]*p[0]+m[3]*p[1]+m[5]];
+ const near=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1])<.001;
+ function recorder(){
+  let m=[1,0,0,1,0,0];const stack=[],draws=[];
+  const multiply=n=>{const [a,b,c,d,e,f]=m,[g,h,i,j,k,l]=n;m=[a*g+c*h,b*g+d*h,a*i+c*j,b*i+d*j,a*k+c*l+e,b*k+d*l+f];};
+  const ctx=new Proxy({save(){stack.push([...m]);},restore(){m=stack.pop();},translate(x,y){multiply([1,0,0,1,x,y]);},scale(x,y){multiply([x,0,0,y,0,0]);},rotate(a){multiply([Math.cos(a),Math.sin(a),-Math.sin(a),Math.cos(a),0,0]);},drawImage(){draws.push([...m]);}},
+   {get:(target,key)=>key in target?target[key]:()=>{}});
+  return {ctx,draws};
+ }
+ for(const id of [...HOUSE_FAMILY_GUESTS,...HOUSE_VISITORS])for(const facing of [-1,1])for(const food of ['tahini','peanuts']){
+  let previousHand=null;const rig=GUEST_ARM_RIGS[id];
+  for(let index=0;index<=100;index++){
+   const lift=index/100,{ctx,draws}=recorder();
+   drawHouseGuest(ctx,100,220,140,id,images,10,{sitting:1,facing,food,eating:{active:true,bite:lift,remaining:1}});
+   assert.equal(draws.length,4);const upper=draws[2],forearm=draws[3];
+   assert.ok(near(point(upper,rig.elbow),point(forearm,rig.elbow)),id+' has a joined elbow throughout the bite');
+   // The transform must retain the original sleeve width. Only its projected
+   // length changes as the elbow moves forward, never a sideways shear.
+   const axis=[rig.elbow[0]-rig.shoulder[0],rig.elbow[1]-rig.shoulder[1]],length=Math.hypot(...axis),normal=[-axis[1]/length,axis[0]/length];
+   const width=Math.hypot(upper[0]*normal[0]+upper[2]*normal[1],upper[1]*normal[0]+upper[3]*normal[1]);
+   assert.ok(width>.25&&width<.35,id+' keeps its original sleeve width');
+   const shoulder=point(upper,rig.shoulder),elbow=point(upper,rig.elbow);
+   assert.ok(elbow[1]>shoulder[1],id+' does not raise the elbow above its shoulder');
+   const hand=point(forearm,rig.grip);
+   if(previousHand)assert.ok(Math.hypot(hand[0]-previousHand[0],hand[1]-previousHand[1])<1.6,id+' moves continuously');previousHand=hand;
+  }
  }
 });
 

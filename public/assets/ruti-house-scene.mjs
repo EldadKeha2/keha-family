@@ -1,5 +1,5 @@
 import {GUEST_ART} from './ruti-house-guests.mjs?v=1';
-import {GUEST_ARM_RIGS,guestArmOutline,guestArmPose,drawGuestOriginalArm} from './ruti-house-guest-rig.mjs?v=1';
+import {GUEST_ARM_RIGS,guestArmOutline,guestArmPose,drawGuestOriginalArm} from './ruti-house-guest-rig.mjs?v=2';
 import {yemeniteCircleDancers} from './ruti-house-dance.mjs?v=1';
 import {iconArtwork} from './ruti-house-art.mjs?v=4';
 import {RUTI_ATLAS,rutiPose} from './ruti-house-character.mjs?v=circle-v1';
@@ -581,9 +581,12 @@ export function drawHouseGuest(ctx,x,y,height,id,images,time,{walking=false,faci
   if(mealRig){
    const unit=w/384,mouth={x:(mealRig.mouth[0]/384-center)*w,y:top+mealRig.mouth[1]*unit};
    const lift=eating?.active?eating.bite:0,spoon=food!=='peanuts';
-   const desiredTip={x:plateX+(mouth.x-plateX)*lift,y:lap-height*.018+(mouth.y-lap+height*.018)*lift};
+   // A gentle inward arc keeps the hand clear of the elbow on its way up.
+   // A straight plate-to-mouth line collapses the forearm at mid-bite.
+   const desiredTip={x:plateX+(mouth.x-plateX)*lift-Math.sin(lift*Math.PI)*height*.075,
+    y:lap-height*.018+(mouth.y-lap+height*.018)*lift};
    const target=[(desiredTip.x+(spoon?height*.035:0))/unit+center*384,(desiredTip.y+height*.012-top)/unit];
-   const pose=guestArmPose(mealRig,target),hand={x:(pose.hand[0]-center*384)*unit,y:top+pose.hand[1]*unit};
+   const pose=guestArmPose(mealRig,target,{lift}),hand={x:(pose.hand[0]-center*384)*unit,y:top+pose.hand[1]*unit};
    const tip={x:hand.x-(spoon?height*.035:0),y:hand.y-height*.012};
    ctx.save();ctx.translate(-w*center,top);ctx.scale(unit,unit);drawGuestOriginalArm(ctx,atlas,column,mealRig,pose);ctx.restore();
    if(food!=='peanuts'){
