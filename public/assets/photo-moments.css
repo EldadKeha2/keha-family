@@ -1,0 +1,31 @@
+.photo-moment-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px 12px;margin-bottom:5px}
+.photo-moment-row>#mediaViewerCollections>.photo-collections{padding:0}
+.photo-moment-tools{display:flex;align-items:center;gap:7px;min-width:0;margin-inline-start:auto}
+.photo-moment-tools[hidden],.photo-moment-tools [hidden]{display:none}
+#mediaViewer .photo-moment-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;min-width:36px;padding:5px 9px;border:1px solid #d6c9aa;background:#f8f3e6;color:#776c51;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);white-space:nowrap}
+.photo-moment-button svg{width:21px;height:21px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#mediaViewer .photo-moment-button.has-date{color:#536d3e;border-color:#c4d0ae;background:#eef2e5}
+#mediaViewer .photo-age-toggle[aria-pressed=true]{color:#455d32;border-color:#9aaf7f;background:#e1eace;box-shadow:inset 0 2px 4px #53674026}
+#mediaViewer .photo-age-toggle:disabled{color:#aaa69c;border-color:#dedbd4;background:#eeede9;cursor:default}
+.photo-moment-button:focus-visible{outline:2px solid #81965e;outline-offset:2px}
+.photo-taken-date{color:#81704c;font:calc(13px * var(--a11y-text-scale,1))/1.4 var(--sans);white-space:nowrap}
+.selected-person-tag .photo-person-age{font:inherit;font-size:.92em;white-space:nowrap;color:#66754e;direction:inherit}
+.photo-date-dialog{width:min(420px,calc(100vw - 28px));box-sizing:border-box}
+.photo-date-dialog h2{font-size:calc(29px * var(--a11y-text-scale,1));margin-bottom:9px;padding:0}
+.photo-date-dialog>p{font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.65;color:#8b7958;margin:0 0 18px}
+.photo-date-fields{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:12px}
+.photo-date-fields label{display:flex;flex-direction:column;gap:6px;font-size:calc(16px * var(--a11y-text-scale,1));color:#6f7650}
+.photo-date-fields input{box-sizing:border-box;min-width:0;width:100%;min-height:46px;padding:7px;border:1px solid #d5c9ad;border-radius:6px;background:#fffdf7;color:#554c39;font:calc(19px * var(--a11y-text-scale,1))/1.4 var(--sans);text-align:center}
+.photo-date-fields input:focus-visible{outline:2px solid #81965e;outline-offset:2px}
+.photo-date-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.photo-date-actions button{min-height:44px;font:calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+#clearPhotoDate{margin-inline-start:auto;color:#8e7b59;text-decoration:underline;text-underline-offset:3px}
+.photo-date-dialog .form-error:empty{margin:12px 0}
+@media(max-width:700px){
+  .photo-moment-row{gap:4px 8px;margin-bottom:4px}
+  .photo-moment-tools{gap:5px}
+  #mediaViewer .photo-moment-button{width:36px;height:36px;padding:6px}
+  .photo-moment-label{display:none}
+  .photo-taken-date{font-size:calc(12px * var(--a11y-text-scale,1))}
+  .photo-date-dialog{padding:24px 20px}
+}

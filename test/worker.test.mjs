@@ -62,6 +62,40 @@ async function photoEdit(f,item,{expectedVersion='original',baseVersion=expected
   const query=new URLSearchParams({expectedVersion,baseVersion,rotation,crop:JSON.stringify(crop),filename:'edited.jpg'});
   return f.call('/api/media/'+item.id+'/edit?'+query,{method:'POST',body:bytes,clientHeaders,headers:{'Content-Type':'image/jpeg','Content-Length':String(bytes.length)}});
 }
+test('photo capture dates save independently, survive restart and editing, and reach every album and export',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/collections/gallery'),other=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['yona']);
+  await f.call('/api/media/'+item.id+'/faces/review',{method:'POST',body:{photoRevision:'original',tagsRevision:(await(await f.call('/api/media/'+item.id+'/view')).json()).item.tagsRevision,complete:true}});
+  const before=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;
+  const save=(date,expectedRevision)=>f.call('/api/media/'+item.id+'/photo-date',{method:'POST',body:{date,expectedRevision}});
+  const response=await save({year:1980},'empty');assert.equal(response.status,200,await response.clone().text());let saved=(await response.json()).item;
+  assert.deepEqual(saved.takenDate,{day:null,month:null,year:1980});assert.notEqual(saved.takenDateRevision,'empty');assert.equal(saved.tagsRevision,before.tagsRevision);assert.equal(saved.faceSummary.reviewed,true);assert.equal(saved.tags[0].birthday,'16.10.1921');
+  assert.equal((await save({year:1981},'empty')).status,409);
+  const noOp=(await(await save({year:1980},saved.takenDateRevision)).json()).item;assert.equal(noOp.takenDateRevision,saved.takenDateRevision);
+  saved=(await(await save({day:16,month:10},saved.takenDateRevision)).json()).item;assert.deepEqual(saved.takenDate,{day:16,month:10,year:null});
+  saved=(await(await save({day:16,month:10,year:1980},saved.takenDateRevision)).json()).item;
+  const edited=await photoEdit(f,item);assert.equal(edited.status,201);assert.deepEqual((await edited.json()).item.takenDate,saved.takenDate);
+  f.restart();
+  for(const path of ['/api/media/'+item.id+'/view','/api/people/yona/page','/api/collections/gallery']){
+   const data=await(await f.call(path)).json(),photo=data.item||data.albums?.photos.items.find(photo=>photo.id===item.id)||data.items.find(photo=>photo.id===item.id);
+   assert.deepEqual(photo.takenDate,saved.takenDate);assert.equal(photo.takenDateRevision,saved.takenDateRevision);
+  }
+  assert.deepEqual((await(await f.call('/api/export')).json()).media.find(photo=>photo.id===item.id).takenDate,saved.takenDate);
+  assert.deepEqual((await(await f.call('/api/media/'+other.id+'/view')).json()).item.takenDate,{day:null,month:null,year:null});
+  saved=(await(await save({},saved.takenDateRevision)).json()).item;assert.deepEqual(saved.takenDate,{day:null,month:null,year:null});
+ }finally{await f.close();}
+});
+test('photo capture dates validate partial dates and reject unauthorized, stale, missing and non-photo writes',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),clip=await taggedUpload(f,'/api/collections/videos',video,'film.mp4');
+  const save=(id,date,extra={})=>f.call('/api/media/'+id+'/photo-date',{method:'POST',body:{date,expectedRevision:'empty'},...extra});
+  for(const date of [{day:31,month:4},{day:29,month:2,year:1900},{month:0},{year:'1980'},undefined,null])assert.equal((await save(item.id,date)).status,400);
+  assert.equal((await save(item.id,{year:1980},{clientHeaders:false})).status,403);
+  assert.equal((await save(clip.id,{year:1980})).status,400);
+  assert.equal((await save('f'.repeat(32),{year:1980})).status,404);
+  assert.equal((await save(item.id,{day:29,month:2})).status,200);
+ }finally{await f.close();}
+});
 test('editing one photo keeps its original bytes, profile, tags, captions and album membership',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer']);

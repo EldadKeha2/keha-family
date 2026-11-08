@@ -275,6 +275,7 @@ export default {
         if((match=/^\/api\/memorial\/([^/]+)\/candles$/.exec(path))){const body=await readJSON(request,1000);return json(await db('candle.light',{id:decodeURIComponent(match[1]),visitorId:body.visitorId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/tags\/patch$/.exec(path))){const body=await readJSON(request,64000);return json(await db('media.tags.patch',{id:match[1],changes:body.changes}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/labels$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.labels.patch',{id:match[1],label:body.label,tagged:body.tagged}));}
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/photo-date$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.photo-date',{id:match[1],date:body.date,expectedRevision:body.expectedRevision}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/caption$/.exec(path))){const body=await readJSON(request,40000);return json(await db('media.caption.id',{id:match[1],caption:body.caption,expectedCaption:body.expectedCaption}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(delete|restore|tags|tag|untag|retag)$/.exec(path))){
           const body=await readJSON(request,match[2]==='tags'?64000:2000);

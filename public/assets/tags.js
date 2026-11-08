@@ -154,6 +154,7 @@
       if(!this.host.isConnected)return;
       const selected=this.store.selected(),signature=JSON.stringify([...selected].map(([key,person])=>[key,person.name]));
       if(this.lastSelection!==signature){this.selectedHost.innerHTML=[...selected].map(([key,person])=>I18n.html`<button type="button" class="selected-person-tag" data-remove-person-tag="${safe(key)}" aria-label="הסרת התיוג של ${safe(I18n.personName(person))}">${safe(I18n.personName(person))}${person.isNew?I18n.t('<small>שומר…</small>'):''}<span aria-hidden="true">×</span></button>`).join('')||'';this.lastSelection=signature;}
+      if(this.photoOnly)window.FamilyPhotoDate?.decorate(this.selectedHost,this.store.item,[...selected.values()]);
       this.host.querySelector('[data-tag-count]').textContent=selected.size===0?'':selected.size===1?I18n.t('אדם אחד תויג'):selected.size+I18n.t(' מתויגים');
       const state=this.store;if(this.input)this.input.disabled=!state.ready;this.status.className='tag-autosave-status '+(state.error?'failed':state.status);
       this.status.textContent=state.error?I18n.t('התיוג לא נשמר: ')+state.error:state.status==='loading'?I18n.t('טוען את רשימת האנשים…'):state.busy?I18n.t('שומר את התיוג…'):state.status==='saved'?I18n.t('✓ התיוג נשמר בהצלחה'):'';

@@ -68,6 +68,7 @@
     $('mediaViewerDelete').querySelector('span').textContent=deleteLabel;$('mediaViewerDelete').title=deleteLabel;
     window.FamilyTags.mountInline($('mediaTagPanel'),item);
     window.FamilyPhotoLabels?.mount(item);
+    window.FamilyPhotoDate?.mount(item);
     window.FamilyFaces?.update(item);
   }
   async function instagramFallback(item){
@@ -253,11 +254,11 @@
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
     $('mediaViewer').addEventListener('close',()=>{instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
-      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open]')||event.target.closest('input,textarea'))return;
+      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open]')||event.target.closest('input,textarea'))return;
       if(event.key===(I18n.isEnglish?'ArrowLeft':'ArrowRight')){event.preventDefault();show(state.index-1);}
       if(event.key===(I18n.isEnglish?'ArrowRight':'ArrowLeft')){event.preventDefault();show(state.index+1);}
     });
   }
-  window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify,isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
+  window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify,current,isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
   document.addEventListener('DOMContentLoaded',init);
 })();

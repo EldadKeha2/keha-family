@@ -19,6 +19,7 @@ import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,w
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
 import {galleryRefinement,galleryRevision,galleryLabels} from './gallery.mjs';
 import {PHOTO_LABELS,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
+import {photoDate} from '../public/assets/photo-date.mjs';
 const normalizedName=value=>value.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
@@ -163,7 +164,7 @@ export class FamilyState {
   personMedia(id){return this.rows("SELECT m.data FROM media m WHERE m.id IN (SELECT id FROM media WHERE person_id=? AND category='personal' UNION SELECT media_id FROM media_tags WHERE person_id=?) ORDER BY m.rowid",id,id).map(row=>JSON.parse(row.data));}
   personPhotos(id){return this.personMedia(id).filter(item=>mediaKind(item)==='photo');}
   tagIds(id){return this.rows('SELECT person_id FROM media_tags WHERE media_id=? ORDER BY rowid',id).map(row=>row.person_id);}
-  tags(id){return this.rows('SELECT p.id,p.data FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=? ORDER BY t.rowid DESC',id).map(row=>{const person=JSON.parse(row.data);return {id:person.id,name:person.name,nameEn:person.nameEn||null,extra:Boolean(person.extra)};});}
+  tags(id){return this.rows('SELECT p.id,p.data FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=? ORDER BY t.rowid DESC',id).map(row=>{const person=JSON.parse(row.data);return {id:person.id,name:person.name,nameEn:person.nameEn||null,birthday:person.birthday||null,extra:Boolean(person.extra)};});}
   tagsRevision(id){return this.rows('SELECT value FROM meta WHERE id=?','tags:'+id)[0]?.value||'empty';}
   faces(id,includeHidden=false){
     // Ordinary tag removal hides matching face labels. Undo can restore the same coordinates.
@@ -272,7 +273,7 @@ export class FamilyState {
   mediaCollections(item){return [...new Set([...(item.category==='personal'?[]:[item.category]),...this.rows('SELECT collection FROM media_collections WHERE media_id=?',item.id).map(row=>row.collection)])];}
   mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,nameEn:item.nameEn||null,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:photoSource(item),...(item.photoRevision?{photoRevision:item.photoRevision}:{}),uploadedAt:item.createdAt,tags:this.tags(item.id),tagsRevision:this.tagsRevision(item.id),
     collections:this.mediaCollections(item),
-    ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels)}:{}),
+    ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
   mediaChanged(item,operation,ids=this.relatedPeople(item)){
@@ -601,6 +602,16 @@ export class FamilyState {
       case 'media.tags':{
         const item=this.media(p.id);if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר לתייג אנשים בתמונות ובסרטונים.');
         return {item:this.mediaPublic(item)};
+      }
+      case 'media.photo-date':{
+        const item=this.photo(p.id);
+        if(p.expectedRevision!==(item.takenDateRevision||'empty'))throw new HttpError(409,'תאריך הצילום עודכן בינתיים. סגרו ופתחו את העריכה מחדש.');
+        let date;try{if(!p.date)throw Error();date=photoDate(p.date);}catch{throw new HttpError(400,'תאריך הצילום אינו תקין. אפשר להשאיר שדות לא ידועים ריקים.');}
+        if(JSON.stringify(date)!==JSON.stringify(photoDate(item.takenDate))){
+          item.takenDate=date;item.takenDateRevision=uid();
+          this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchMedia(item);
+        }
+        return {saved:true,operation:'photo-date',scope:this.mediaScope(item),item:this.mediaPublic(item),affectedPersonIds:this.relatedPeople(item)};
       }
       case 'media.tags.patch':return this.patchTags(p.id,p.changes);
       case 'media.tag':{
