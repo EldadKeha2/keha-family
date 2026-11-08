@@ -228,6 +228,7 @@ export default {
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/collections$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.collection.add',{id:match[1],collection:body.collection,scope:body.scope}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/save$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.save',{id:match[1],faceId:body.faceId,personId:body.personId,name:body.name,rect:body.rect,expectedRevision:body.expectedRevision}));}
         if((match=/^\/api\/nursery\/([^/]+)\/upload$/.exec(path)))return await upload(request,env,db,ctx,{category:nurseryCollection(decodeURIComponent(match[1]))});
         if((match=/^\/api\/memorial\/([^/]+)\/candles$/.exec(path))){const body=await readJSON(request,1000);return json(await db('candle.light',{id:decodeURIComponent(match[1]),visitorId:body.visitorId}));}

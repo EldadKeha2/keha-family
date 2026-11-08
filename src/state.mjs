@@ -51,6 +51,8 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS media_collections(media_id TEXT NOT NULL,collection TEXT NOT NULL,added_at TEXT NOT NULL,PRIMARY KEY(media_id,collection))');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS media_collections_album ON media_collections(collection,media_id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_tags(media_id TEXT NOT NULL,person_id TEXT NOT NULL,PRIMARY KEY(media_id,person_id))');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_tags_person ON media_tags(person_id,media_id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_faces(media_id TEXT NOT NULL,id TEXT NOT NULL,person_id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,id))');
@@ -150,7 +152,9 @@ export class FamilyState {
   relatedPeople(item,tagIds=this.tagIds(item.id)){return [...new Set([...(item.category==='personal'?[item.personId]:[]),...tagIds])];}
   touchPeople(ids,clearProfile=null){for(const id of new Set(ids)){const person=this.person(id);if(clearProfile&&person.profileId===clearProfile)person.profileId=null;this.savePerson(person);}}
   mediaScope(item){return item.category==='personal'?'personal:'+item.personId:item.category;}
+  mediaCollections(item){return [...new Set([...(item.category==='personal'?[]:[item.category]),...this.rows('SELECT collection FROM media_collections WHERE media_id=?',item.id).map(row=>row.collection)])];}
   mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,nameEn:item.nameEn||null,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:'/media/'+item.id,uploadedAt:item.createdAt,tags:this.tags(item.id),tagsRevision:this.tagsRevision(item.id),
+    collections:this.mediaCollections(item),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
   mediaChanged(item,operation,ids=this.relatedPeople(item)){
@@ -195,7 +199,7 @@ export class FamilyState {
     // The changed image is sufficient. Never rebuild the gallery or tagged albums on a tag click.
     return {saved:true,operation:'tags',scope:this.mediaScope(item),item:this.mediaPublic(item),affectedPersonIds:affected,taggedPeople:resolved};
   }
-  touchMedia(item,ids=this.relatedPeople(item)){this.touchPeople(ids);if(item.category!=='personal')this.touch(item.category);}
+  touchMedia(item,ids=this.relatedPeople(item)){this.touchPeople(ids);for(const kind of this.mediaCollections(item))this.touch(kind);}
   snapshot(person,items,includeGallery=true){
     const photos=items.filter(item=>mediaKind(item)==='photo'),videos=items.filter(item=>mediaKind(item)==='video');
     const selected=photos.find(photo=>photo.id===person.profileId),profile=selected||photos.find(photo=>photo.category==='personal'&&photo.personId===person.id)||photos[0];
@@ -223,12 +227,12 @@ export class FamilyState {
     if(kind.startsWith('nursery:')){
       const requested=Number(options.page||1),size=10;
       if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
-      const total=this.rows('SELECT count(*) AS n FROM media WHERE category=?',kind)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
-      const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC LIMIT ? OFFSET ?',kind,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
+      const total=this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?)',kind,kind)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
+      const items=this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?) ORDER BY m.rowid DESC LIMIT ? OFFSET ?',kind,kind,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
       return {kind,items,count:total,revision:revision+':'+page,pagination:{page,pages,size,total}};
     }
     if(kind!=='gallery'){
-      const items=this.rows('SELECT data FROM media WHERE category=? ORDER BY rowid DESC',kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
+      const items=this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?) ORDER BY m.rowid DESC',kind,kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
       return {kind,items,count:items.length,revision};
     }
     const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120),filter=options.filter||'all';
@@ -266,7 +270,7 @@ export class FamilyState {
       case 'nursery':{
         const albums={};
         // One bounded index query supplies covers and counts, without reading other galleries.
-        for(const row of this.rows("SELECT latest.category,latest.n,m.data FROM (SELECT category,count(*) AS n,max(rowid) AS newest FROM media WHERE category>='nursery:' AND category<'nursery;' GROUP BY category) latest JOIN media m ON m.rowid=latest.newest")){
+        for(const row of this.rows("SELECT latest.category,latest.n,m.data FROM (SELECT category,count(*) AS n,max(media_row) AS newest FROM (SELECT category,rowid AS media_row,id FROM media WHERE category>='nursery:' AND category<'nursery;' UNION SELECT c.collection AS category,m.rowid AS media_row,m.id FROM media_collections c JOIN media m ON m.id=c.media_id WHERE c.collection>='nursery:' AND c.collection<'nursery;') GROUP BY category) latest JOIN media m ON m.rowid=latest.newest")){
           const id=row.category.slice(8);try{nurseryCollection(id);}catch{continue;}
           const item=JSON.parse(row.data);albums[id]={count:row.n,cover:'/media/'+item.id};
         }
@@ -375,6 +379,24 @@ export class FamilyState {
         return {saved:true,person:{...person}};
       }
       case 'media.public':return {item:this.mediaPublic(this.media(p.id))};
+      case 'media.collection.add':{
+        const item=this.media(p.id),kind=validCollection(p.collection);
+        if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר להוסיף לאלבומים האלה תמונות בלבד.');
+        if(kind!=='photos'){
+          const personId=typeof p.scope==='string'&&p.scope.startsWith('personal:')?p.scope.slice(9):null;
+          if(!personId||!this.relatedPeople(item).includes(personId))throw new HttpError(400,'בחרו תמונה מתוך הפרופיל של האדם המתאים.');
+          if(kind.startsWith('nursery:')){
+            if(nurseryCollection(personId)!==kind)throw new HttpError(400,'בחרו את אלבום התינוקייה של האדם בפרופיל.');
+          }else if(kind.startsWith('wedding:')){
+            if(!couple(kind.slice(8)).people.includes(personId))throw new HttpError(400,'בחרו את החתונה של האדם בפרופיל.');
+          }else throw new HttpError(400,'בחרו תמונות משפחתיות, תינוקייה או חתונה.');
+        }
+        if(!this.mediaCollections(item).includes(kind)){
+          this.sql.exec('INSERT OR IGNORE INTO media_collections(media_id,collection,added_at) VALUES(?,?,?)',item.id,kind,new Date().toISOString());
+          this.touchMedia(item);
+        }
+        return {saved:true,operation:'collection',scope:kind,item:this.mediaPublic(item),collection:this.collection(kind),affectedPersonIds:this.relatedPeople(item),...(kind.startsWith('wedding:')?{wedding:this.wedding(kind.slice(8))}:{})};
+      }
       case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id)};}
       case 'media.face.save':return this.saveFace(p);
       case 'media.caption.id':{
@@ -490,7 +512,7 @@ export class FamilyState {
       }
       case 'media.caption':{
         const caption=text(p.caption,'תיאור',5000),category=p.personId?'personal':p.kind;
-        const candidates=p.personId?this.personMedia(p.personId):this.rows('SELECT data FROM media WHERE category=?',category).map(row=>JSON.parse(row.data));
+        const candidates=p.personId?this.personMedia(p.personId):this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?)',category,category).map(row=>JSON.parse(row.data));
         const item=candidates.find(item=>item.file===p.file);if(!item)throw new HttpError(404,'הקובץ לא נמצא באלבום הזה.');
         item.caption=caption;item.updatedAt=new Date().toISOString();this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);
         this.touchMedia(item);return this.mediaChanged(item,'caption');
@@ -538,7 +560,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:2,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT media_id AS mediaId,data FROM media_faces').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
+      case 'export':return {schemaVersion:2,exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT media_id AS mediaId,data FROM media_faces').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

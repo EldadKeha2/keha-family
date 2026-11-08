@@ -6,7 +6,7 @@
   const choices='[data-face-person],[data-face-add]';
   const labels=new Map();let current=null,serial=0,geometry=null;
   const remember=(id,faces,item)=>{labels.set(id,{faces,time:Date.now(),tagsRevision:item?.tagsRevision});if(labels.size>128)labels.delete(labels.keys().next().value);};
-  const helpers=()=>geometry||=import('./face-geometry.mjs?v=3');
+  const helpers=()=>geometry||=import('./face-geometry.mjs?v=4');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   const touchMode=event=>event?.pointerType==='touch'||matchMedia('(hover:none), (max-width:700px)').matches;
   const live=c=>current===c&&!c.events.signal.aborted;
@@ -171,7 +171,7 @@
     const imageReady=()=>new Promise(resolve=>{if(image.complete&&image.naturalWidth)resolve();else on(image,'load',resolve,{once:true});});
     await imageReady();if(!live(c))return;setupZoom(c);place(c);stage.dataset.faceDetection='scanning';
     const detected=found=>{if(!live(c))return;const used=new Set();c.detected=found.map(face=>{const previous=c.detected.find(previous=>!used.has(previous.id)&&c.geom.sameRegion(previous.rect,face.rect)),id=previous?.id||uuid();used.add(id);return {id,rect:face.rect,score:face.score,revision:null};});stage.dataset.faceEngine=found.engine;paint(c);};
-    try{const detector=await import('./face-detector.mjs?v=5'),found=await detector.detectFaces(item.id,image,c.events.signal,detected);if(!live(c))return;detected(found);stage.dataset.faceDetection='ready';}
+    try{const detector=await import('./face-detector.mjs?v=6'),found=await detector.detectFaces(item.id,image,c.events.signal,detected);if(!live(c))return;detected(found);stage.dataset.faceDetection='ready';}
     catch(error){if(live(c)&&error.name!=='AbortError'){stage.dataset.faceDetection='manual';console.warn('Face detection unavailable:',error.message);announce(c,tr('אפשר ללחוץ על הפנים בתמונה ולתייג גם ידנית.','You can click a face to tag it manually.'));}}
   }
   function update(item){if(current?.item.id===item.id)current.item=item;}

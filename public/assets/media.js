@@ -30,6 +30,7 @@
   }
   function metadata(){
     const item=current();if(!item)return;
+    const albumControls=$('mediaViewerCollections');if(albumControls)albumControls.innerHTML=window.FamilyPhotoCollections?.controls(item,state.scope)||'';
     $('mediaViewerCaption').textContent=$('mediaHeaderCaption').textContent=item.caption||'';
     const descriptionLabel=item.kind==='video'?tr('הוסף תיאור לסרטון','Add a video description'):item.kind==='document'?tr('הוסף תיאור למסמך','Add a document description'):tr('הוסף תיאור לתמונה','Add a photo description');
     const desktopDescriptionLabel=item.kind==='video'?tr('להוספת תיאור לסרטון','Add a video description'):item.kind==='document'?tr('להוספת תיאור למסמך','Add a document description'):tr('להוספת תיאור לתמונה','Add a photo description');
@@ -137,7 +138,7 @@
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
     const item=(albums.get(scope)||[]).find(item=>item.id===id)||(state.scope===scope&&current()?.id===id?current():null);if(!item)return;
     const isLinked=linked(item,scope),personName=isLinked?app().nameOf(scope.slice(9)):'';
-    state.pending={scope:scope.startsWith('link:')?item.scope:scope,item,isLinked};$('deleteMediaName').textContent=item.name||item.filename;
+    state.pending={scope:scope.startsWith('personal:')?scope:item.scope,item,isLinked};$('deleteMediaName').textContent=item.name||item.filename;
     $('deleteMediaTitle').textContent=isLinked?I18n.t('להסיר את הפריט מהאלבום של ')+personName+'?':I18n.t('האם אתה בטוח שאתה רוצה למחוק פריט זה?');
     $('deleteMediaHint').textContent=isLinked?I18n.t('התיוג של ')+personName+I18n.t(' יוסר. הפריט ימשיך להופיע באלבום המקורי ובאלבומים של שאר המתויגים.'):I18n.t('הפריט יוסר מכל האלבומים שבהם הוא מופיע. מיד לאחר המחיקה אפשר לבחור ״ביטול מחיקה״.');
     $('confirmMediaDelete').textContent=isLinked?I18n.t('כן, הסר מהאלבום'):I18n.t('כן, מחק');

@@ -21,7 +21,8 @@
     if(key==='photos')content=`<img src="${safe(item.src)}" alt="${safe(item.caption||I.mediaName(item))}" loading="lazy">`;
     else if(key==='videos')content=(item.poster?`<img src="${safe(item.poster)}" alt="" loading="lazy">`:`<span class="person-video-ornament" aria-hidden="true">❖</span>`)+`<span class="person-video-play" aria-hidden="true">▶</span><span class="person-file-title">${safe(item.caption||I.mediaName(item))}</span>`;
     else content=(item.mime.startsWith('image/')?`<img src="${safe(item.src)}?inline=1" alt="" loading="lazy">`:`<span class="person-document-icon" aria-hidden="true">▤</span>`)+`<span class="person-file-title">${safe(I.mediaName(item))}</span><small>${safe(item.filename?.split('.').pop()?.toUpperCase()||'')}</small>`;
-    return `<button type="button" class="person-media-tile person-media-${key}" data-person-item="${safe(item.id)}" data-person-kind="${key}" aria-label="${tr('פתיחת','Open')} ${safe(item.caption||I.mediaName(item))}">${content}</button>`;
+    const tile=`<button type="button" class="person-media-tile person-media-${key}" data-person-item="${safe(item.id)}" data-person-kind="${key}" aria-label="${tr('פתיחת','Open')} ${safe(item.caption||I.mediaName(item))}">${content}</button>`;
+    return key==='photos'?`<div class="photo-album-tile">${tile}${window.FamilyPhotoCollections?.controls(item,'personal:'+state.id)||''}</div>`:tile;
   }
   function album(key){
     const a=state.data.albums[key],title={photos:tr('תמונות','Photos'),videos:tr('סרטונים','Videos'),documents:tr('מסמכים ותעודות','Documents and certificates')}[key];

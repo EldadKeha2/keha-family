@@ -57,6 +57,62 @@ function fixture(){
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
 
+test('photo album shortcuts link the original to family photos, its own nursery and its own wedding exactly once',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer','shani']);
+  const add=collection=>f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection,scope:'personal:tomer'}});
+  for(const collection of ['photos','nursery:tomer','wedding:u-tomer']){
+   const response=await add(collection);assert.equal(response.status,200,await response.clone().text());
+   const result=await response.json();assert.ok(result.item.collections.includes(collection));assert.equal(result.collection.items[0].id,item.id);
+   const revision=result.collection.revision;assert.equal((await(await add(collection)).json()).collection.revision,revision,'Repeated taps must not write duplicates or refresh the album revision');
+  }
+  f.restart();
+  const personal=await(await f.call('/api/people/tomer/page')).json(),saved=personal.albums.photos.items[0];
+  assert.deepEqual(new Set(saved.collections),new Set(['gallery','photos','nursery:tomer','wedding:u-tomer']));
+  assert.equal((await(await f.call('/api/collections/gallery')).json()).count,1);
+  assert.equal((await(await f.call('/api/nursery')).json()).albums.tomer.count,1);
+  assert.equal((await(await f.call('/api/nursery/tomer')).json()).count,1);
+  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,1);
+  assert.equal(f.objects.size,1);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,7,'Memberships never duplicate a media record');
+  assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections').get().n,3);
+  assert.equal((await(await f.call('/api/export')).json()).mediaCollections.length,3);
+  const caption=await f.call('/api/weddings/u-tomer/caption',{method:'POST',body:{file:item.file,caption:'One original, shared description'}});assert.equal(caption.status,200);
+  assert.equal((await(await f.call('/api/nursery/tomer')).json()).items[0].caption,'One original, shared description');
+ }finally{await f.close();}
+});
+test('album shortcuts reject wrong people, unrelated weddings, nonphotos and forged writes',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer']);
+  const add=(collection,scope='personal:tomer',extra={})=>f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection,scope},...extra});
+  assert.equal((await add('nursery:shani')).status,400);
+  assert.equal((await add('wedding:u-root')).status,400);
+  assert.equal((await add('nursery:tomer','personal:shani')).status,400);
+  assert.equal((await add('nursery:tomer','gallery')).status,400);
+  assert.equal((await add('videos')).status,400);
+  assert.equal((await add('photos','gallery',{clientHeaders:false})).status,403);
+  const clip=await taggedUpload(f,'/api/collections/videos',video,'memory.mp4');
+  assert.equal((await f.call('/api/media/'+clip.id+'/collections',{method:'POST',body:{collection:'photos',scope:'gallery'}})).status,400);
+  assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections').get().n,0);
+ }finally{await f.close();}
+});
+test('album membership survives deletion and undo while native album photos are already selected',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);assert.deepEqual(item.collections,['photos']);
+  await setTags(f,item,['tomer']);
+  for(const collection of ['nursery:tomer','wedding:u-tomer'])assert.equal((await f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection,scope:'personal:tomer'}})).status,200);
+  const before=await f.call('/api/nursery/tomer');
+  assert.equal((await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'photos'}})).status,200);
+  assert.equal((await(await f.call('/api/nursery/tomer')).json()).count,0);
+  assert.equal((await(await f.call('/api/nursery')).json()).albums.tomer,undefined);
+  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,0);
+  assert.equal((await f.call('/api/nursery/tomer',{headers:{'If-None-Match':before.headers.get('ETag')}})).status,200);
+  assert.equal((await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:'photos'}})).status,200);
+  assert.equal((await(await f.call('/api/nursery/tomer')).json()).count,1);
+  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,1);
+  assert.equal(f.objects.size,1);
+ }finally{await f.close();}
+});
+
 test('a face label atomically adds an ordinary tag, preserves other people, and follows the same photo across albums',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f),faceId='a'.repeat(32),rect={x:.2,y:.1,width:.17,height:.22};await setTags(f,item,['shlomo']);

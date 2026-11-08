@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion} from '../public/assets/face-geometry.mjs';
+import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces} from '../public/assets/face-geometry.mjs';
 import {detectionSize,detectionRegions} from '../public/assets/face-scan.mjs';
 import {faceRect} from '../src/faces.mjs';
 
@@ -33,6 +33,20 @@ test('manual selection shrinks with photo zoom so adjacent small faces can be ta
  const size={width:3200,height:2400},left=manualRect({x:.5,y:.5},size),right=manualRect({x:.516,y:.5},size);
  assert.equal(left.width*size.width,32);assert.equal(left.height*size.height,32);assert.equal(sameRegion(left,right),false);
  assert.doesNotThrow(()=>faceRect(left));assert.doesNotThrow(()=>faceRect(right));
+});
+test('a coarse detection around the two highest back-row heads cannot capture taps meant for either person',()=>{
+ const left={id:'left',score:.95,rect:{x:.304729,y:.250508,width:.05159,height:.051676}},right={id:'right',score:.94,rect:{x:.378132,y:.259356,width:.047379,height:.047457}};
+ const pair={id:'pair',score:.99,rect:{x:.258793,y:.18957,width:.227447,height:.227825}};
+ assert.deepEqual(separateFaces([pair,left,right]).map(f=>f.id),['left','right']);
+ assert.deepEqual(mergeFaces([],[pair,left,right]).map(f=>f.id),['left','right']);
+ for(const width of [300,360,720,1800]){
+   assert.equal(chooseFace([pair,left,right],{x:.33,y:.275},{width,height:width}).id,'left');
+   assert.equal(chooseFace([pair,left,right],{x:.401,y:.283},{width,height:width}).id,'right');
+ }
+ assert.equal(chooseFace([pair,left,right],{x:.33,y:.245},{width:300,height:300}).id,'left');
+ assert.equal(chooseFace([pair,left,right],{x:.401,y:.255},{width:300,height:300}).id,'right');
+ assert.deepEqual(mergeFaces([{...pair,personId:'existing'}],[left,right]).map(f=>f.id),['pair','left','right'],'Never delete an existing face label');
+ assert.equal(separateFaces([pair,{...left,score:.5},{...right,score:.5}]).length,3,'Weak guesses cannot remove a coarse face');
 });
 test('large photos retain detail within a bounded bitmap budget and every small face fits inside an overlapping fine tile',()=>{
  for(const [w,h] of [[6000,4000],[4000,6000],[8000,8000],[12000,1000],[320,240]]){

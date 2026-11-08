@@ -1,7 +1,7 @@
 import {FaceDetector} from './vendor/mediapipe/vision_bundle.mjs';
-import {clampRect,sameRegion,unrotateRect} from './face-geometry.mjs?v=3';
+import {clampRect,sameRegion,unrotateRect,separateFaces} from './face-geometry.mjs?v=4';
 import {detectionRegions} from './face-scan.mjs?v=2';
-import {createYuNet,projectYuNet,confirmYuNet,sameDetection} from './face-yunet.mjs?v=1';
+import {createYuNet,projectYuNet,confirmYuNet,sameDetection} from './face-yunet.mjs?v=2';
 import pico from './vendor/pico/pico.mjs';
 
 // Model files are hosted with the site. Detection must not send photos or metrics elsewhere.
@@ -61,7 +61,7 @@ async function detailedFaces(bitmap,onProgress){
 }
 self.onmessage=async event=>{
   const {id,bitmap}=event.data;
-  const found=[],publish=(engine,partial=true)=>self.postMessage({id,faces:found.toSorted((a,b)=>b.score-a.score).slice(0,150).map(({rect,score})=>({rect,score})),engine,partial});
+  const found=[],publish=(engine,partial=true)=>self.postMessage({id,faces:separateFaces(found).toSorted((a,b)=>b.score-a.score).slice(0,150).map(({rect,score})=>({rect,score})),engine,partial});
   const add=faces=>{for(const face of faces){const previous=found.findIndex(other=>sameDetection(other,face));if(previous<0)found.push(face);else if(found[previous].score<face.score)found[previous]=face;}};
   let detailed=false;
   try{

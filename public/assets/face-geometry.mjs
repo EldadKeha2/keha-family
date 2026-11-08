@@ -16,8 +16,23 @@ export function clampRect(rect){
   const x=Math.max(0,Math.min(.9995,rect.x)),y=Math.max(0,Math.min(.9995,rect.y));
   return {x,y,width:Math.max(.0005,Math.min(1-x,rect.width)),height:Math.max(.0005,Math.min(1-y,rect.height))};
 }
-export function mergeFaces(saved,detected){return [...saved,...detected.filter(face=>!saved.some(label=>sameRegion(label.rect,face.rect)))].slice(0,150);}
+export function separateFaces(faces){
+  // Coarse cascades sometimes see a pair of heads as one very large face.
+  // Independent, well-supported small regions are stronger evidence than that box.
+  return faces.filter(face=>{
+    const r=face.rect,area=r.width*r.height;
+    const contained=faces.filter(other=>{
+      if(other===face||other.score!==undefined&&other.score<.65)return false;
+      const b=other.rect,x=b.x+b.width/2,y=b.y+b.height/2;
+      return b.width*b.height<area*.38&&x>r.x&&x<r.x+r.width&&y>r.y&&y<r.y+r.height;
+    });
+    return !contained.some((a,i)=>contained.slice(i+1).some(b=>
+      Math.hypot((a.rect.x+a.rect.width/2-b.rect.x-b.rect.width/2)/Math.max(a.rect.width,b.rect.width),(a.rect.y+a.rect.height/2-b.rect.y-b.rect.height/2)/Math.max(a.rect.height,b.rect.height))>.7));
+  });
+}
+export function mergeFaces(saved,detected){const independent=separateFaces([...saved,...detected]);return [...saved,...detected.filter(face=>independent.includes(face)&&!saved.some(label=>sameRegion(label.rect,face.rect)))].slice(0,150);}
 export function chooseFace(faces,point,size){
+  faces=separateFaces(faces);
   const inside=faces.filter(({rect:r})=>point.x>=r.x&&point.x<=r.x+r.width&&point.y>=r.y&&point.y<=r.y+r.height);
   const candidates=inside.length?inside:faces.filter(face=>{const r=face.rect,dx=Math.max(0,(28/size.width-r.width)/2),dy=Math.max(0,(28/size.height-r.height)/2);return point.x>=r.x-dx&&point.x<=r.x+r.width+dx&&point.y>=r.y-dy&&point.y<=r.y+r.height+dy;});
   if(inside.length>1){const smallest=Math.min(...inside.map(face=>face.rect.width*face.rect.height));for(let i=candidates.length-1;i>=0;i--)if(candidates[i].rect.width*candidates[i].rect.height>smallest*2)candidates.splice(i,1);}

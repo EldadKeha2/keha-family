@@ -1,0 +1,24 @@
+.photo-collections{display:flex;align-items:center;justify-content:center;gap:5px;padding:3px 0;min-width:0}
+.photo-collections .photo-collection-button,#mediaViewer .photo-collections .photo-collection-button{position:relative;display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;min-width:34px;min-height:34px;box-sizing:border-box;padding:6px;border:1px solid #d8cfb9;border-radius:7px;background:#faf7ee;color:#92866a;line-height:1;cursor:pointer}
+.photo-collections .photo-collection-button svg{display:block;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+.photo-collections .photo-collection-button.is-linked{background:#e8efdc;border-color:#91a570;color:#4f6839}
+.photo-collection-button.is-linked::after{content:'✓';position:absolute;inset-inline-end:-3px;bottom:-2px;display:grid;place-items:center;width:12px;height:12px;border-radius:50%;background:#607b46;color:#fff;font:10px/1 Arial,sans-serif}
+.photo-collection-button:focus-visible{outline:2px solid #7b905e;outline-offset:2px}
+.photo-collection-button:disabled{opacity:.35;cursor:default}.photo-collection-button[aria-busy=true]{opacity:.55;cursor:progress}
+.photo-album-tile{min-width:0}.photo-album-tile>.person-media-tile{width:100%}
+.person-album-grid .photo-collections{gap:3px}.person-album-grid .photo-collection-button{flex-basis:28px;min-width:28px;width:28px;height:30px;min-height:30px;padding:4px}
+.shared-media-card>.photo-collections{padding:3px 8px;justify-content:flex-end}
+#mediaViewerCollections:empty{display:none}
+#mediaViewerCollections>.photo-collections{justify-content:flex-start;padding:0 0 7px}
+@media(max-width:700px){
+  #mediaViewerCollections>.photo-collections{padding-bottom:4px}
+  #mediaViewer:has(#mediaViewerCollections:not(:empty)) .face-photo-scroll{max-height:min(calc(43dvh - 48px),calc(100dvh - 350px))}
+  #mediaViewer:has(#mediaViewerCollections:not(:empty)) .media-viewer-footer{padding:8px 12px}
+  #mediaViewer:has(#mediaViewerCollections:not(:empty)) #mediaViewerCaption{margin:6px 0;font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.5}
+  #mediaViewer:has(#mediaViewerCollections:not(:empty)) #mediaShareActions{gap:4px;padding:6px 0 8px;margin-bottom:8px}
+  #mediaViewer:has(#mediaViewerCollections:not(:empty)) #mediaShareActions>a[id],#mediaViewer:has(#mediaViewerCollections:not(:empty)) #mediaShareActions>button[id]{width:36px;height:36px;min-width:36px;min-height:36px;flex-basis:36px;padding:4px}
+  #mediaViewer:has(#mediaViewerCollections:not(:empty)) .inline-tag-widget{margin-top:6px;padding-top:8px}
+  #mediaViewer:has(#mediaViewerCollections:not(:empty)) .tag-widget-heading{margin-bottom:6px}
+}
+@media(max-width:700px) and (max-height:760px){#mediaViewer:has(#mediaViewerCollections:not(:empty)) .face-photo-scroll{max-height:min(calc(43dvh - 80px),calc(100dvh - 350px))}}
+@media(max-width:370px){.person-album-grid .photo-collections{gap:1px}.person-album-grid .photo-collection-button{flex-basis:25px;min-width:25px;width:25px;padding:3px}}

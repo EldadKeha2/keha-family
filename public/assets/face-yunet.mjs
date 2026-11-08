@@ -1,4 +1,4 @@
-import {sameRegion,intersection} from './face-geometry.mjs?v=3';
+import {sameRegion,intersection} from './face-geometry.mjs?v=4';
 
 // YuNet predicts five landmark locations as well as a box. Two partly hidden
 // people can have overlapping boxes but distinct eyes/noses; keep both.
