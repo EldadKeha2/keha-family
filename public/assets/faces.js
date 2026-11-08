@@ -22,7 +22,7 @@
     clearTimeout(c.labelTimer);c.labelTimer=null;c.popup?.remove();c.popup=null;c.active=null;if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
   }
   function clear(){
-    const c=current;if(!c)return;current=null;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);c.popup?.remove();c.layer?.remove();c.guide?.remove();c.status?.remove();c.toolbar?.remove();c.missingNote?.remove();c.reviewBar?.remove();c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom');window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
+    const c=current;if(!c)return;current=null;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);c.popup?.remove();c.layer?.remove();c.guide?.remove();c.status?.remove();c.toolbar?.remove();c.missingNote?.remove();c.reviewButton?.remove();c.reviewStatus?.remove();c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom');window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
   }
   function viewport(){const v=window.visualViewport;return {left:v?.offsetLeft||0,top:v?.offsetTop||0,width:Math.min(v?.width||innerWidth,document.documentElement.clientWidth||innerWidth),height:v?.height||innerHeight};}
   function imageArea(c){
@@ -69,7 +69,7 @@
     fitZoom(c);
   }
   function paint(c){
-    if(!live(c))return;c.faces=c.geom.mergeFaces(c.saved,c.reviewed?[]:c.detected.filter(face=>!c.ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));if(c.reviewButton){c.reviewButton.textContent=c.reviewed?tr('✓ כל הפרצופים תויגו · ביטול','✓ All faces tagged · Undo'):tr('כל הפרצופים תויגו','All faces tagged');c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));}c.buttons.replaceChildren();
+    if(!live(c))return;c.faces=c.geom.mergeFaces(c.saved,c.reviewed?[]:c.detected.filter(face=>!c.ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));if(c.reviewButton){const label=c.reviewed?tr('כל הפרצופים תויגו · לחצו לביטול האישור','All faces tagged · Click to undo confirmation'):tr('אישור שכל הפרצופים תויגו','Confirm all faces are tagged');c.reviewButton.setAttribute('aria-label',label);c.reviewButton.title=label;c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));}c.buttons.replaceChildren();
     for(const face of c.faces){
       const button=document.createElement('button');button.type='button';button.className='face-hit';if(c.highlightMissing&&!face.person)button.classList.add('face-missing');button.dataset.faceId=face.id;button.setAttribute('aria-label',face.person?tr('פנים בתמונה: ','Face in photo: ')+photoName(face):tr('תיוג הפנים האלה','Tag this face'));
       Object.assign(button.style,{left:face.rect.x*100+'%',top:face.rect.y*100+'%',width:face.rect.width*100+'%',height:face.rect.height*100+'%'});
@@ -79,7 +79,8 @@
       button.addEventListener('blur',event=>{if(!c.popup?.contains(event.relatedTarget)&&c.popup?.classList.contains('face-name'))closePopup(c);},{signal:c.events.signal});
       c.buttons.append(button);
     }
-    if(c.missingNote&&c.reviewed)c.missingNote.textContent=tr('אישרתם שכל הפרצופים תויגו ✓','You confirmed that all faces are tagged ✓');
+    if(c.missingNote)c.missingNote.hidden=c.reviewed;
+    if(c.missingNote&&c.reviewed)c.missingNote.textContent='';
     else if(c.missingNote){const count=c.faces.filter(face=>!face.person).length;c.missingNote.textContent=count?tr('פנים ללא תיוג: ','Faces without labels: ')+count+tr(' · לחצו על המסגרת והוסיפו שם.',' · Select a frame and add a name.'):c.faces.length?tr('כל הפנים שזוהו מתויגות ✓','All detected faces are labelled ✓'):tr('מזהים פנים בתמונה…','Finding faces in the photo…');}
     if(c.ignoreUndo)c.ignoreUndo.hidden=!c.ignored.length;place(c);
   }
@@ -173,19 +174,19 @@
     if(highlightMissing){c.missingNote=document.createElement('p');c.missingNote.className='face-missing-note';c.missingNote.setAttribute('role','status');stage.before(c.missingNote);}
     const on=(target,type,callback,options={})=>target.addEventListener(type,callback,{...options,signal:c.events.signal});
     if(item.scope==='gallery'||item.collections?.includes('gallery')){
-      c.reviewBar=document.createElement('div');c.reviewBar.className='face-review';
       c.reviewButton=document.createElement('button');c.reviewButton.type='button';c.reviewButton.className='face-review-button';
-      c.reviewStatus=document.createElement('span');c.reviewStatus.className='face-review-status';c.reviewStatus.setAttribute('role','status');
-      c.reviewBar.append(c.reviewButton,c.reviewStatus);stage.before(c.reviewBar);
+      c.reviewButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5"/><path d="M7 8h.01M13 8h.01M7 11.5a3.3 3.3 0 0 0 5.5.7"/><circle class="face-review-badge" cx="18" cy="17.5" r="5.5"/><path class="face-review-check" d="m15.5 17.5 1.7 1.7 3.3-3.5"/></svg>';
+      document.getElementById('mediaViewerTitle').insertBefore(c.reviewButton,document.getElementById('editOpenedPhoto'));
+      c.reviewStatus=document.createElement('span');c.reviewStatus.className='face-review-status';c.reviewStatus.hidden=true;c.reviewStatus.setAttribute('role','status');stage.before(c.reviewStatus);
       on(c.reviewButton,'click',async()=>{
-        if(!live(c)||c.reviewSaving)return;c.reviewSaving=true;c.reviewButton.disabled=true;c.reviewStatus.textContent='';
+        if(!live(c)||c.reviewSaving||c.saving)return;c.reviewSaving=true;c.reviewButton.disabled=true;c.reviewButton.setAttribute('aria-busy','true');c.reviewStatus.hidden=true;c.reviewStatus.textContent='';
         try{
-          await window.FamilyTags?.flush?.();if(!live(c))return;
+          await c.loading;await window.FamilyTags?.flush?.(c.item.id);if(!live(c))return;
           const result=await request('api/media/'+item.id+'/faces/review',{method:'POST',body:JSON.stringify({complete:!c.reviewed,photoRevision:c.item.photoRevision||'original',tagsRevision:c.item.tagsRevision||'empty'})});
           window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
-          if(live(c)){c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);closePopup(c);paint(c);c.reviewStatus.textContent=c.reviewed?tr('נשמר. התמונה מסומנת כמלאה והגלריה חזרה לכל התמונות.','Saved. This photo is fully tagged and the gallery has returned to All photos.'):tr('האישור בוטל. התמונה תחזור לרשימות הממתינות לתיוג.','Confirmation undone. This photo will return to the lists awaiting tagging.');}
-        }catch(error){if(live(c))c.reviewStatus.textContent=error.message;}
-        finally{c.reviewSaving=false;if(live(c))c.reviewButton.disabled=false;}
+          if(live(c)){c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);closePopup(c);paint(c);announce(c,c.reviewed?tr('כל הפרצופים תויגו.','All faces tagged.'):tr('אישור התיוג בוטל.','Tagging confirmation removed.'));}
+        }catch(error){if(live(c)){c.reviewStatus.hidden=false;c.reviewStatus.textContent=error.message;}}
+        finally{c.reviewSaving=false;if(live(c)){c.reviewButton.disabled=false;c.reviewButton.setAttribute('aria-busy','false');}}
       });
       paint(c);
     }

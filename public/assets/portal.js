@@ -49,8 +49,8 @@
     const status = area.closest('.shared-media-card').querySelector('[data-shared-status]');
     status.textContent = message;status.classList.toggle('save-error',failed);
   }
-  function renderCollection(kind) {
-    if(kind==='gallery'&&holdGallery()){galleryDeferred=true;return;}
+  function renderCollection(kind,{reviewNavigation=false}={}) {
+    if(kind==='gallery'&&holdGallery()&&!reviewNavigation){galleryDeferred=true;return;}
     const collection = state.collections[kind], query = normalize(state.query);
     const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:galleryPage.filter==='complete'?item.faceSummary?.reviewed:true):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
     const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged',partial=compact&&galleryPage.filter==='partial',complete=compact&&galleryPage.filter==='complete';
@@ -120,22 +120,22 @@
       if(item && area.value!==item.caption)area.value=item.caption;
     }
   }
-  async function refreshCollection(kind,force=false) {
+  async function refreshCollection(kind,force=false,{reviewNavigation=false}={}) {
     if (!app()?.apiEnabled) return;
-    if(kind==='gallery'&&holdGallery()){galleryDeferred=true;return;}
-    if(loading[kind]){if(kind==='gallery'&&force)loading.galleryQueued=true;return;}
+    if(kind==='gallery'&&holdGallery()&&!reviewNavigation){galleryDeferred=true;return;}
+    if(loading[kind]){if(kind==='gallery'&&force){loading.galleryQueued=true;loading.galleryReviewQueued||=reviewNavigation;}return;}
     loading[kind] = true;
     const requestedRevision=revisions[kind],requestedGallery=JSON.stringify(galleryPage);
     const pageQuery=kind==='gallery'?'?'+new URLSearchParams({page:galleryPage.page,size:galleryPage.size,q:galleryPage.query,filter:galleryPage.filter}):'';
     try {
       const result = await request('api/collections/'+kind+pageQuery,{headers:!force&&revisions[kind]?{'If-None-Match':'"'+revisions[kind]+'"'}:{}});
-      if(kind==='gallery'&&holdGallery()){galleryDeferred=true;return;}
+      if(kind==='gallery'&&holdGallery()&&!reviewNavigation){galleryDeferred=true;return;}
       if (!result || revisions[kind]!==requestedRevision||(kind==='gallery'&&JSON.stringify(galleryPage)!==requestedGallery)) return;
       if(kind==='gallery'&&result.pagination)galleryPage.page=result.pagination.page;
       state.collections[kind]=result;revisions[kind]=result.revision;
       if(kind==='gallery')window.FamilyGalleryFaces?.check();
-      if(state.view===kind)renderCollection(kind);
-    }catch(error){if(force)notify(error.message);}finally{loading[kind]=false;if(kind==='gallery'&&loading.galleryQueued){loading.galleryQueued=false;refreshCollection('gallery',true);}}
+      if(state.view===kind)renderCollection(kind,{reviewNavigation});
+    }catch(error){if(force)notify(error.message);}finally{loading[kind]=false;if(kind==='gallery'&&loading.galleryQueued){const reviewNavigation=Boolean(loading.galleryReviewQueued);loading.galleryQueued=loading.galleryReviewQueued=false;refreshCollection('gallery',true,{reviewNavigation});}}
   }
   function editCaption(area) {
     const kind=area.dataset.sharedKind,file=area.dataset.sharedFile,key=captionKey(kind,file);
@@ -310,11 +310,12 @@
         return;
       }
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
-      if(kind==='gallery'&&result.operation==='face-review'&&result.item?.faceSummary?.reviewed){
-        galleryPage.filter='all';galleryPage.page=1;galleryPage.query='';state.query='';$('searchInput').value='';clearTimeout(gallerySearchTimer);galleryDeferred=false;
+      if(kind==='gallery'&&result.operation==='face-review'&&result.item){
+        const filter=result.item.faceSummary?.reviewed?'all':result.item.faceSummary?.partial?'partial':'untagged';
+        galleryPage.filter=filter;galleryPage.page=1;galleryPage.query='';state.query='';$('searchInput').value='';clearTimeout(gallerySearchTimer);galleryDeferred=false;
         state.collections.gallery.items=state.collections.gallery.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
-        for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter==='all'));
-        revisions.gallery=null;refreshCollection('gallery',true);return;
+        for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter===filter));
+        revisions.gallery=null;refreshCollection('gallery',true,{reviewNavigation:true});return;
       }
       if(kind==='gallery'&&holdGallery()&&result.item&&['tags','faces','face-detection','face-review','face-ignore'].includes(result.operation)){
         // Tags are saved immediately. Keep this gallery session's cards and

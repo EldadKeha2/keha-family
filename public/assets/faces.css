@@ -56,7 +56,19 @@
 .media-stage.face-adjusting .face-hit{pointer-events:none}
 @media(max-width:700px){.face-picker{width:264px;max-height:calc(100dvh - 16px)}.face-person-results{max-height:160px}.face-name{font-size:calc(14px * var(--a11y-text-scale,1));padding:5px 9px}#mediaViewer .face-picker-actions button{min-height:40px}.face-picker .face-current-name{font-size:calc(13px * var(--a11y-text-scale,1))}}
 
-.face-review{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;margin:6px 0;border:1px solid #d3c695;border-radius:12px;background:#fff8df;color:#463d30}.face-review-button{font:inherit;font-weight:700;padding:9px 15px;min-height:42px;border:1px solid #7c8d58;border-radius:10px;background:#f9fbf0;color:#38532e;cursor:pointer;touch-action:manipulation}.face-review-button[aria-pressed=true]{background:#dfead2}.face-review-button:disabled{opacity:.65;cursor:wait}.face-review-status{font-size:12px;line-height:1.4}.face-review-button:focus-visible{outline:3px solid #d89132;outline-offset:2px}
+.media-viewer-header .face-review-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;min-width:40px;min-height:40px;padding:7px;border:1px solid #d0c8af;border-radius:7px;background:#f8f3e6;color:#6d7053;box-shadow:0 2px 0 #8c81542e,inset 0 1px 0 #fff;cursor:pointer;touch-action:manipulation;transition:background-color .16s,color .16s,box-shadow .16s,transform .16s}
+.face-review-button svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+.face-review-badge{fill:#f8f3e6}.face-review-check{stroke-width:2.2}
+.media-viewer-header .face-review-button:hover{background:#eaeedc;border-color:#a5b48b}
+.media-viewer-header .face-review-button[aria-pressed=true]{background:#5d743e;color:#fffdf5;border-color:#435a2e;box-shadow:inset 0 2px 5px #24381666,inset 0 1px 0 #fff2;transform:translateY(1px)}
+.face-review-button[aria-pressed=true] .face-review-badge{fill:#5d743e}
+.media-viewer-header .face-review-button:active{transform:translateY(2px);box-shadow:inset 0 2px 5px #24381655}
+.media-viewer-header .face-review-button:disabled{opacity:.65;cursor:wait;box-shadow:inset 0 2px 4px #24381633}
+.face-review-button:focus-visible{outline:3px solid #d89132;outline-offset:3px}
+.face-review-status{display:block;padding:7px 12px;background:#fff2ce;color:#87492f;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans)}.face-review-status[hidden]{display:none}
+@media(max-width:600px){.media-viewer-header .media-viewer-download{width:40px;min-width:40px;height:40px;min-height:40px;padding:8px;justify-content:center;flex-shrink:0}.media-viewer-download>span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.media-viewer-header h2{gap:4px}.media-viewer-header{gap:6px}}
+@media(max-width:380px){.media-viewer-header{padding:8px}.media-viewer-header .face-review-button,.media-viewer-header .media-viewer-edit,.media-viewer-header .media-viewer-download{flex-basis:36px;width:36px;min-width:36px;padding:6px}.media-viewer-header .media-viewer-paging button{width:29px;min-width:29px}.media-viewer-header .media-viewer-counter{font-size:11px}.media-viewer-header>button{width:32px}}
+@media(prefers-reduced-motion:reduce){.media-viewer-header .face-review-button{transition:none}}
 .face-resize-handle{display:none}
 @media(min-width:701px) and (hover:hover) and (pointer:fine){
  .face-selection:has(.face-resize-handle){pointer-events:auto;overflow:visible}

@@ -15,6 +15,7 @@ function fixture(detected=[],{desktop=false}={}){
   append(...nodes){for(const node of nodes){node.remove();node.parent=this;this.children.push(node);}}
   remove(){if(this.parent)this.parent.children=this.parent.children.filter(node=>node!==this);this.parent=null;}
   before(node){this.parent?.append(node);}
+  insertBefore(node,anchor){node.remove();node.parent=this;const index=anchor?this.children.indexOf(anchor):this.children.length;this.children.splice(index,0,node);}
   replaceWith(node){const parent=this.parent;this.remove();parent?.append(node);}
   replaceChildren(...nodes){for(const node of [...this.children])node.remove();this.append(...nodes);}
   setAttribute(name,value){this[name]=value;}
@@ -33,9 +34,9 @@ function fixture(detected=[],{desktop=false}={}){
    return {x:0,y:0,left:0,top:0,width:280,height:240};
   }
  }
- const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node();root.append(stage);stage.append(image);
+ const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node(),title=new Node('h2'),download=new Node('a'),edit=new Node('button');root.append(title,stage);title.append(download,edit);stage.append(image);
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
- const document=new Node();document.documentElement={get clientWidth(){return view.width;}};document.getElementById=()=>dialog;document.createElement=tag=>new Node(tag);
+ const document=new Node();document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
  const window=new Node();window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
  let progress;
  const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{progress=onProgress;return detected;}};
@@ -43,7 +44,7 @@ function fixture(detected=[],{desktop=false}={}){
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
- return {faces:window.FamilyFaces,stage,image,view,window,find,emit,get progress(){return progress;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
+ return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,find,emit,get progress(){return progress;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
 
@@ -104,16 +105,17 @@ test('all-faces confirmation is available in ordinary and partial gallery photos
    return Response.json({faces:[],item:{id:'reviewed',scope:'gallery',kind:'photo',tagsRevision:'tags-1'}});
   };
   await f.mount('reviewed',{highlightMissing},{scope:'gallery',tagsRevision:'tags-1'});
-  const button=f.find('face-review-button'),hits=f.find('face-hit-buttons');assert.ok(button);assert.equal(button.textContent,'כל הפרצופים תויגו');assert.equal(hits.children.length,2);
+  const button=f.find('face-review-button'),hits=f.find('face-hit-buttons');assert.ok(button);assert.equal(button['aria-pressed'],'false');assert.match(button['aria-label'],/אישור/);assert.deepEqual(f.title.children,[f.download,button,f.edit]);assert.equal(hits.children.length,2);
   f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));
-  const review=requests.find(r=>r.path.endsWith('/review'));assert.deepEqual(JSON.parse(review.options.body),{complete:true,photoRevision:'original',tagsRevision:'tags-1'});assert.equal(hits.children.length,0);assert.match(button.textContent,/ביטול/);assert.equal(button.disabled,false);
-  f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(hits.children.length,2);assert.equal(button.textContent,'כל הפרצופים תויגו');
+  const review=requests.find(r=>r.path.endsWith('/review'));assert.deepEqual(JSON.parse(review.options.body),{complete:true,photoRevision:'original',tagsRevision:'tags-1'});assert.equal(hits.children.length,0);assert.equal(button['aria-pressed'],'true');assert.match(button['aria-label'],/ביטול/);assert.equal(f.find('face-review-status').hidden,true);assert.equal(button.disabled,false);
+  f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(hits.children.length,2);assert.equal(button['aria-pressed'],'false');assert.match(button['aria-label'],/אישור/);assert.deepEqual(f.title.children,[f.download,button,f.edit]);
+  f.faces.clear();assert.deepEqual(f.title.children,[f.download,f.edit]);f.window.FamilyI18n.fetch=async()=>Response.json({faces:[],item:{id:'next-photo',faceSummary:{reviewed:true}}});await f.mount('next-photo',{}, {scope:'gallery',faceSummary:{reviewed:true}});assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(f.title.children.length,3);f.faces.clear();
  }
 });
 
 test('a failed completion confirmation leaves the photo markers and retry button intact',async()=>{
  const f=fixture([first]);f.window.FamilyI18n.fetch=async(path)=>path.endsWith('/review')?Response.json({error:'Connection lost'},{status:503}):Response.json({faces:[]});
- await f.mount('retry',{}, {scope:'gallery'});const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(button.disabled,false);assert.match(f.find('face-review-status').textContent,/Connection lost/);
+ await f.mount('retry',{}, {scope:'gallery'});const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(button.disabled,false);assert.match(f.find('face-review-status').textContent,/Connection lost/);assert.equal(f.find('face-review-status').hidden,false);assert.equal(button['aria-pressed'],'false');
 });
 
 test('desktop frame handles save new geometry with the same person, face identity and concurrency revision',async()=>{

@@ -50,7 +50,7 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity}={}){
 test('a first tag moves a photo exclusively to partial after X, where it waits for explicit completion',async()=>{
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.open('a');
  const before=f.requests.length,counts=f.filters.map(button=>button.textContent);assert.equal(f.get('mediaViewer').open,true);
- for(const operation of['tags','faces','face-detection','face-review','tags']){f.change('a',operation);f.poll();await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.deepEqual(f.filters.map(button=>button.textContent),counts);}
+ for(const operation of['tags','faces','face-detection','tags']){f.change('a',operation);f.poll();await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.deepEqual(f.filters.map(button=>button.textContent),counts);}
  assert.equal(f.requests.length,before,'Do not reload or recategorize a filtered gallery during its open tagging session');assert.equal(f.mounted.at(-1).tags.length,1,'The visible tagging metadata still updates immediately');
  f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);assert.equal(f.requests.length,before+1);assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.match(f.filters[2].textContent,/\(1\)/);
  f.filter('partial');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
@@ -72,4 +72,15 @@ test('completion returns to All photos without replacing an older open photo tha
  const f=fixture([photo('newer'),photo('older',[{id:'person-0'}])],{allPageSize:1});await f.flush();f.filter('partial');await f.flush();f.open('older');f.review('older');await f.flush();
  assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/older');assert.deepEqual(f.cards,['newer.jpg']);
  f.close();await f.flush();f.filter('complete');await f.flush();assert.deepEqual(f.cards,['older.jpg']);f.window.FamilyPortal.activate('home');f.window.FamilyPortal.activate('gallery');await f.flush();assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');
+});
+
+test('undo switches to partial immediately, keeps the same photo open, and allows confirmation again',async()=>{
+ const f=fixture([photo('newer'),photo('older',[{id:'person-0'}])],{allPageSize:1});await f.flush();f.filter('partial');await f.flush();f.open('older');
+ f.review('older');await f.flush();assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');assert.deepEqual(f.cards,['newer.jpg']);
+ f.review('older',false);await f.flush();assert.equal(f.filters[2].getAttribute('aria-pressed'),'true');assert.deepEqual(f.cards,['older.jpg']);assert.equal(f.get('mediaOriginal').href,'/media/older');assert.equal(f.get('mediaViewer').open,true);assert.match(f.filters[3].textContent,/\(0\)/);
+ f.review('older');await f.flush();assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');assert.deepEqual(f.cards,['newer.jpg']);assert.equal(f.get('mediaOriginal').href,'/media/older');f.close();
+});
+test('undo without any names restores the untagged category and queued review requests retain the final choice',async()=>{
+ const f=fixture();await f.flush();f.open('a');f.defer();f.review('a');assert.equal(f.pending.length,1);
+ f.review('a',false);f.pending.shift()();await f.flush();assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.equal(f.get('mediaViewer').open,true);assert.match(f.requests.at(-1),/filter=untagged/);f.close();
 });
