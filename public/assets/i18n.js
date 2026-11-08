@@ -50,8 +50,8 @@
       for(const attribute of ['aria-label','title','placeholder','alt'])if(element.hasAttribute(attribute))element.setAttribute(attribute,t(element.getAttribute(attribute)));
       if(element.matches('meta[name=description]'))element.content=t(element.content);
     }
-    for(const id of ['mediaPrevious','homeSlidePrevious']){const button=document.getElementById(id);if(button)button.textContent='←';}
-    for(const id of ['mediaNext','homeSlideNext']){const button=document.getElementById(id);if(button)button.textContent='→';}
+    for(const id of ['mediaPrevious','homeSlidePrevious']){const button=document.getElementById(id);if(button)(button.querySelector('[data-paging-arrow]')||button).textContent='←';}
+    for(const id of ['mediaNext','homeSlideNext']){const button=document.getElementById(id);if(button)(button.querySelector('[data-paging-arrow]')||button).textContent='→';}
     for(const id of ['calendarPrevious']){const button=document.getElementById(id);if(button)button.textContent='←';}
     for(const id of ['calendarNext']){const button=document.getElementById(id);if(button)button.textContent='→';}
   }
