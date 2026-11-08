@@ -71,7 +71,7 @@
   .photo-upload-editor:not(.is-existing) .photo-edit-footer{bottom:-16px;padding-bottom:5px}
 }
 @media(max-width:600px){.photo-upload-editor.is-existing[open]{height:calc(100dvh - 16px)}.is-existing .photo-edit-eyebrow{display:none}.is-existing .photo-edit-header h2{font-size:21px}.is-existing .photo-edit-hint{font-size:12px;line-height:1.35}.is-existing .photo-edit-history{font-size:12px;gap:3px 7px;margin-bottom:7px}.is-existing .photo-edit-history select{height:36px}.is-existing .photo-edit-viewport{height:30dvh}.is-existing .photo-edit-toolbar{padding-top:7px}.is-existing .photo-edit-footer{margin-top:6px;padding-top:7px}}
-.photo-edit-desktop-icon{display:none}
+.photo-edit-desktop-icon,.photo-edit-close-icon{display:none}
 @media(min-width:701px){
   #photoUploadEditor:not(.is-existing)[open]{display:flex;flex-direction:column;padding:18px 20px}
   #photoUploadEditor:not(.is-existing)>*{order:3;flex-shrink:0}
@@ -80,6 +80,8 @@
   #photoUploadEditor:not(.is-existing) .photo-edit-eyebrow{font-size:calc(11px * var(--a11y-text-scale,1))}
   #photoUploadEditor:not(.is-existing) .photo-edit-close{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;min-width:32px;min-height:32px;padding:0;font-size:26px;line-height:1;border:1px solid #b69a68;border-radius:6px;background:#fff9ee;color:#65563c}
   #photoUploadEditor:not(.is-existing) .photo-edit-close:hover{background:#f1e5d0;border-color:#927342}
+  #photoUploadEditor:not(.is-existing) .photo-edit-close-text{display:none}
+  #photoUploadEditor:not(.is-existing) .photo-edit-close-icon{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
   #photoUploadEditor:not(.is-existing)>.photo-edit-pager{order:1;gap:10px;margin:10px 0 12px}
   #photoUploadEditor:not(.is-existing) .photo-edit-pager button{min-height:32px;padding:5px 11px;font-size:calc(13px * var(--a11y-text-scale,1));line-height:1.4;background:var(--olive);border-color:var(--olive);color:#fffdf6}
   #photoUploadEditor:not(.is-existing) .photo-edit-pager button:hover:not(:disabled){background:#48583d}
