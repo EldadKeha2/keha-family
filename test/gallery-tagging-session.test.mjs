@@ -84,3 +84,9 @@ test('undo without any names restores the untagged category and queued review re
  const f=fixture();await f.flush();f.open('a');f.defer();f.review('a');assert.equal(f.pending.length,1);
  f.review('a',false);f.pending.shift()();await f.flush();assert.equal(f.filters[1].getAttribute('aria-pressed'),'true');assert.deepEqual(f.cards,['a.jpg','b.jpg']);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.equal(f.get('mediaViewer').open,true);assert.match(f.requests.at(-1),/filter=untagged/);f.close();
 });
+test('an empty people or family filter explains how to change the criteria and reset restores the normal empty gallery',async()=>{
+ const f=fixture([]);await f.flush();await f.window.FamilyPortal.refineGallery({person:'yona'});await f.flush();
+ assert.equal(f.get('sharedGalleryEmpty').querySelector('h3').textContent,'לא נמצאו תמונות בסינון הזה');assert.match(f.get('sharedGalleryEmpty').querySelector('p').textContent,/לאפס את הסינון/);
+ await f.window.FamilyPortal.refineGallery({unit:'u-matan-g'});await f.flush();assert.equal(f.get('sharedGalleryEmpty').querySelector('h3').textContent,'לא נמצאו תמונות בסינון הזה');
+ await f.window.FamilyPortal.refineGallery({});await f.flush();assert.equal(f.get('sharedGalleryEmpty').querySelector('h3').textContent,'כל רגע משפחתי מתחיל בתמונה');
+});

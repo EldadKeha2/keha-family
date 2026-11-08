@@ -786,3 +786,4 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
  'חלק מהתמונות אינן זמינות. רעננו את הבחירה ונסו שוב.':'Some photos are unavailable. Refresh your selection and try again.',
  'יש לרענן את הדף לפני ההורדה.':'Refresh the page before downloading.'
 });
+Object.assign(window.FAMILY_TRANSLATIONS,{'לא נמצאו תמונות בסינון הזה':'No photos match these filters','אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':'Choose another person or family, or reset the filters.'});
