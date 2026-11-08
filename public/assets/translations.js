@@ -5,6 +5,8 @@ window.FAMILY_TRANSLATIONS={
   "בעמוד":"per page",
   "העלאה: חדש לישן":"Upload date: newest first",
   "העלאה: ישן לחדש":"Upload date: oldest first",
+  "שינוי אחרון: חדש לישן":"Last modified: newest first",
+  "שינוי אחרון: ישן לחדש":"Last modified: oldest first",
   "צילום: חדש לישן":"Photo date: newest first",
   "צילום: ישן לחדש":"Photo date: oldest first",
   "מתויגים: הרבה למעט":"Tagged people: most first",

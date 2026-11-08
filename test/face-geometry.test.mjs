@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces,labelledRegion,resizeFaceRect,layoutFaceLabels} from '../public/assets/face-geometry.mjs';
+import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces,labelledRegion,resizeFaceRect,layoutFaceLabels,intersection} from '../public/assets/face-geometry.mjs';
 import {faceCoverage} from '../public/assets/face-coverage.mjs';
 import {detectionSize,detectionRegions} from '../public/assets/face-scan.mjs';
 import {faceRect} from '../src/faces.mjs';
@@ -108,4 +108,28 @@ test('simultaneous face labels never overlap, stay within the photo and have a s
   for(let i=0;i<placed.length;i++){const a=placed[i];assert.ok(a.x>=0&&a.y>=0&&a.x+a.width<=bounds.width&&a.y+a.height<=bounds.height);for(const b of placed.slice(i+1))assert.ok(a.x+a.width+4<=b.x||b.x+b.width+4<=a.x||a.y+a.height+4<=b.y||b.y+b.height+4<=a.y);}
  }
  assert.equal(layoutFaceLabels(Array.from({length:150},()=>({width:200,height:40,face:{x:100,y:100,width:20,height:25}})),{width:320,height:200}),null);
+});
+
+test('labels prefer free space above a head and use measured wrapping to fit between neighbouring faces',()=>{
+ const face={x:125,y:100,width:40,height:50},faces=[{x:20,y:25,width:75,height:100},{x:205,y:25,width:75,height:100}],labels=[{width:150,height:24,variants:[{width:150,height:24},{width:70,height:42}],face}];
+ const [box]=layoutFaceLabels(labels,{width:300,height:180,faces});assert.equal(box.variant,1);assert.ok(box.y+box.height<face.y);
+ for(const other of [face,...faces])assert.equal(intersection(box,other),0);
+ const [roomy]=layoutFaceLabels([{width:110,height:24,face:{x:140,y:160,width:45,height:50}}],{width:400,height:300});assert.ok(roomy.y+roomy.height<160);
+});
+test('both small age labels and names go below a face when another head blocks the space above',()=>{
+ const face={x:140,y:160,width:40,height:50},obstacle={x:105,y:65,width:110,height:78};
+ for(const width of [36,96]){
+  const [box]=layoutFaceLabels([{width,height:24,face}],{width:320,height:280,faces:[obstacle]});assert.ok(box.y>=face.y+face.height);assert.equal(intersection(box,obstacle),0);
+  assert.ok(box.leader.to.y>=face.y+face.height,'Connectors stop outside the chin, not in the middle of the face');
+ }
+});
+test('a multi-row family photo protects all faces, including unlabelled people, at desktop and phone sizes',()=>{
+ const scene=[[15,112,70,115],[140,149,73,91],[226,143,55,91],[288,177,58,85],[379,182,81,91],[537,144,71,93],[668,208,63,86],[756,201,65,91],[804,294,56,70],[934,127,70,94],[1023,183,71,80],[1032,292,70,85],[115,315,74,91],[211,408,62,75],[609,491,72,90],[819,472,69,85]];
+ for(const width of [1120,560,360]){
+  const scale=width/1120,faces=scene.map(([x,y,w,h])=>({x:x*scale,y:y*scale,width:w*scale,height:h*scale})),labels=faces.slice(0,12).map(face=>({width:132,height:24,variants:[{width:132,height:24},{width:88,height:40},{width:64,height:56}],face})),bounds={width,height:794*scale,faces};
+  const layout=layoutFaceLabels(labels,bounds);
+  if(!layout){assert.equal(width,360,'Only a dense phone photo should need the external legend');const markers=layoutFaceLabels(labels.map(label=>({...label,variants:undefined,width:18,height:18})),bounds);if(markers)for(const box of markers)for(const face of faces)assert.equal(intersection(box,face),0);continue;}
+  assert.deepEqual(layoutFaceLabels(labels,bounds),layout,'Placement stays stable when nothing moved');
+  for(let i=0;i<layout.length;i++){const box=layout[i];for(const face of faces)assert.equal(intersection(box,face),0);for(const other of layout.slice(i+1))assert.equal(intersection(box,other),0);}
+ }
 });

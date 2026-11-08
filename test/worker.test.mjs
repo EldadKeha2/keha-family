@@ -333,6 +333,35 @@ test('family membership changes validate booleans and retain normal write protec
   assert.equal((await(await f.call('/api/collections/photos')).json()).count,1);
  }finally{await f.close();}
 });
+test('last-modified gallery order follows tags, face positions, reviews, labels, edits and album moves, while background scans leave it alone',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await taggedUpload(f,'/api/collections/gallery'),b=await taggedUpload(f,'/api/collections/gallery',photo,'other.jpg'),path='/api/media/'+a.id,faceId='c'.repeat(32);
+  const current=async()=>((await(await f.call(path+'/faces')).json()).item);
+  const face=async()=>((await(await f.call(path+'/faces')).json()).faces[0]);
+  const post=(suffix,body)=>f.call(path+suffix,{method:'POST',body});
+  const actions=[
+   ()=>post('/tags/patch',{changes:[{personId:'yona',tagged:true}]}),
+   ()=>post('/faces/save',{faceId,personId:'yona',expectedRevision:null,rect:{x:.2,y:.2,width:.1,height:.12}}),
+   async()=>post('/faces/save',{faceId,personId:'yona',expectedRevision:(await face()).revision,rect:{x:.3,y:.2,width:.1,height:.12}}),
+   async()=>post('/faces/save',{faceId,personId:null,expectedRevision:(await face()).revision}),
+   async()=>{const item=await current();return post('/faces/review',{complete:true,photoRevision:item.photoRevision||'original',tagsRevision:item.tagsRevision});},
+   ()=>post('/labels',{label:'holidays',tagged:true}),
+   async()=>{const item=await current();return post('/caption',{caption:'Updated description',expectedCaption:item.caption});},
+   async()=>{const item=await current();return post('/photo-date',{date:{year:1980},expectedRevision:item.takenDateRevision});},
+   async()=>photoEdit(f,await current()),
+   ()=>post('/collections',{collection:'photos',scope:'gallery',included:true}),
+   ()=>post('/collections',{collection:'photos',scope:'gallery',included:false}),
+   async()=>{const item=await current();return post('/faces/ignore',{photoRevision:item.photoRevision,rect:{x:.7,y:.2,width:.1,height:.12},ignored:true});}
+  ];
+  for(const [index,change]of actions.entries()){
+   for(const [item,date]of [[a,'2000-01-01T00:00:00.000Z'],[b,'2010-01-01T00:00:00.000Z']]){const row=f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id);f.database.prepare('UPDATE media SET data=? WHERE id=?').run(JSON.stringify({...JSON.parse(row.data),modifiedAt:date}),item.id);}
+   const response=await change();assert.ok(response.ok,'Mutation '+index+': '+await response.clone().text());const saved=await response.json();assert.ok(saved.item.modifiedAt>'2020-01-01',String(index));
+   for(const [sort,expected]of [['modified-desc',a.id],['modified-asc',b.id]]){const list=await(await f.call('/api/collections/gallery?sort='+sort)).json();assert.equal(list.items[0].id,expected,'Mutation '+index+' and '+sort);}
+  }
+  const before=await current(),scan=await post('/faces/detection',{photoRevision:before.photoRevision,version:FACE_SCAN_VERSION,faces:[]});assert.equal(scan.status,200);assert.equal((await current()).modifiedAt,before.modifiedAt);
+  f.restart();assert.equal((await current()).modifiedAt,before.modifiedAt);
+ }finally{await f.close();}
+});
 test('album shortcuts reject wrong people, unrelated weddings, nonphotos and forged writes',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer']);

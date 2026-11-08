@@ -25,6 +25,15 @@ test('seeded random ordering is stable across every page and metadata edits, and
     db.prepare('UPDATE media SET data=? WHERE id=?').run('{"caption":"changed"}','7');assert.deepEqual(page(101),first);assert.notDeepEqual(page(102),first);
   }finally{db.close();}
 });
+test('last-modified ordering includes legacy edits and falls back to upload dates with a stable tie break',()=>{
+ const db=new DatabaseSync(':memory:');try{
+  db.exec('CREATE TABLE media(id TEXT PRIMARY KEY,data TEXT)');
+  for(const [id,data]of [['uploaded',{createdAt:'2020-01-01'}],['edited',{createdAt:'2010-01-01',updatedAt:'2022-01-01'}],['tagged',{createdAt:'2005-01-01',modifiedAt:'2025-01-01'}],['same',{createdAt:'2000-01-01',modifiedAt:'2025-01-01'}]])db.prepare('INSERT INTO media VALUES(?,?)').run(id,JSON.stringify(data));
+  const ordered=sort=>db.prepare('SELECT m.id FROM media m ORDER BY '+galleryOrdering({sort}).sql).all().map(row=>row.id);
+  assert.deepEqual(ordered('modified-asc'),['uploaded','edited','same','tagged']);assert.deepEqual(ordered('modified-desc'),['same','tagged','edited','uploaded']);
+  assert.notEqual(galleryRevision('v',{sort:'modified-desc'}),galleryRevision('v',{sort:'modified-asc'}));
+ }finally{db.close();}
+});
 test('cache keys include order and random seed and reject invalid sort inputs before using SQL',()=>{
   const random={sort:'random',seed:123,page:2,size:100};
   assert.equal(galleryRevision('v',random),galleryRevision('v',{...random,seed:'123'}));

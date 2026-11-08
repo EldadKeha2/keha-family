@@ -65,20 +65,71 @@ export function popoverPosition(face,panel,viewport){
   return {x:Math.max(left+pad,Math.min(right-width-pad,x)),y:Math.max(top+pad,Math.min(bottom-height-pad,y)),width,maxHeight:viewport.height-2*pad};
 }
 
-// Place readable labels near their own faces. Dense photos use a separate
-// numbered legend when the image cannot contain every label without overlap.
-export function layoutFaceLabels(labels,{width,height},gap=4){
-  if(!(width>0&&height>0))return null;
-  const placed=[],result=Array(labels.length);
-  const ordered=labels.map((label,index)=>({...label,index})).sort((a,b)=>a.face.y-b.face.y||a.face.x-b.face.x||a.index-b.index);
-  for(const label of ordered){
-    const w=Math.min(label.width,width),h=label.height;if(h>height)return null;
-    const face=label.face,cx=face.x+face.width/2,cy=face.y+face.height/2;
-    const xs=[cx-w/2,face.x-w-gap,face.x+face.width+gap,0,width-w].map(x=>Math.max(0,Math.min(width-w,x)));
-    const ys=[face.y-h-gap,face.y+face.height+gap,0,height-h,...placed.flatMap(r=>[r.y-h-gap,r.y+r.height+gap])];
-    const candidates=xs.flatMap(x=>ys.filter(y=>y>=0&&y+h<=height).map(y=>({x,y,width:w,height:h,score:Math.hypot(x+w/2-cx,y+h/2-cy)}))).sort((a,b)=>a.score-b.score);
-    const box=candidates.find(a=>placed.every(b=>a.x+a.width+gap<=b.x||b.x+b.width+gap<=a.x||a.y+a.height+gap<=b.y||b.y+b.height+gap<=a.y));
-    if(!box)return null;placed.push(box);result[label.index]=box;
+// Protect the whole head, with extra room above the model's face rectangle.
+export function labelFaceBounds(face){
+  const x=Math.min(10,Math.max(2,face.width*.12)),top=Math.min(18,Math.max(3,face.height*.22)),bottom=Math.min(6,Math.max(2,face.height*.08));
+  return {x:face.x-x,y:face.y-top,width:face.width+2*x,height:face.height+top+bottom};
+}
+export function labelLeader(box,face){
+  const head=labelFaceBounds(face),cx=box.x+box.width/2,cy=box.y+box.height/2,fx=head.x+head.width/2,fy=head.y+head.height/2;
+  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  return {from:{x:clamp(fx,box.x,box.x+box.width),y:clamp(fy,box.y,box.y+box.height)},to:{x:clamp(cx,head.x,head.x+head.width),y:clamp(cy,head.y,head.y+head.height)}};
+}
+function labelGrid(rects=[],gap=0){
+  const cells=new Map(),size=64;
+  const visit=(r,fn)=>{for(let x=Math.floor((r.x-gap)/size);x<=Math.floor((r.x+r.width+gap)/size);x++)for(let y=Math.floor((r.y-gap)/size);y<=Math.floor((r.y+r.height+gap)/size);y++)fn(x+':'+y);};
+  const add=r=>visit(r,key=>{if(!cells.has(key))cells.set(key,[]);cells.get(key).push(r);});
+  rects.forEach(add);
+  return {add,near(r){const result=new Set();visit(r,key=>{for(const other of cells.get(key)||[])result.add(other);});return [...result];}};
+}
+const labelCollision=(a,b,gap=0)=>a.x<b.x+b.width+gap&&a.x+a.width+gap>b.x&&a.y<b.y+b.height+gap&&a.y+a.height+gap>b.y;
+function lineCrossesFace(line,rect){
+  let lo=0,hi=1;const dx=line.to.x-line.from.x,dy=line.to.y-line.from.y;
+  for(const [p,q] of [[-dx,line.from.x-rect.x],[dx,rect.x+rect.width-line.from.x],[-dy,line.from.y-rect.y],[dy,rect.y+rect.height-line.from.y]]){
+    if(Math.abs(p)<1e-9){if(q<0)return false;continue;}
+    const t=q/p;if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t);if(lo>hi)return false;
   }
-  return result;
+  return true;
+}
+// Try measured one-, two- and three-line labels in the free space around every
+// head. A separate legend is safer than covering faces in an impossible crowd.
+export function layoutFaceLabels(labels,{width,height,faces=[]},gap=4){
+  if(!(width>0&&height>0))return null;if(!labels.length)return [];
+  const variants=labels.map(label=>(label.variants||[label]).map((v,index)=>({width:Math.min(v.width,width),height:v.height,variant:index})).filter(v=>v.width>0&&v.height>0&&v.height<=height));
+  if(variants.some(v=>!v.length)||variants.reduce((sum,v)=>sum+Math.min(...v.map(r=>r.width*r.height)),0)>width*height)return null;
+  const uniqueFaces=new Map([...labels.map(l=>l.face),...faces].filter(r=>r&&r.width>0&&r.height>0&&r.x<width&&r.y<height&&r.x+r.width>0&&r.y+r.height>0).map(r=>[[r.x,r.y,r.width,r.height].join(','),r]));
+  const heads=[...uniqueFaces.values()].map(labelFaceBounds),faceGrid=labelGrid(heads,gap),pad=1;
+  const options=labels.map((label,index)=>{
+    const head=labelFaceBounds(label.face),cx=head.x+head.width/2,cy=head.y+head.height/2,candidates=[];
+    const neighbours=heads.map(r=>({r,d:Math.hypot(r.x+r.width/2-cx,r.y+r.height/2-cy)})).sort((a,b)=>a.d-b.d).slice(0,10).map(o=>o.r);
+    for(const v of variants[index]){
+      const w=v.width,h=v.height,maxX=width-w-pad,maxY=height-h-pad;if(maxX<pad||maxY<pad)continue;
+      const xs=[pad,maxX,cx-w/2,head.x-w-gap,head.x+head.width+gap,head.x,head.x+head.width-w],ys=[pad,maxY,head.y-h-gap,head.y+head.height+gap,cy-h/2];
+      for(let n=1;n<=5;n++){xs.push(cx-w/2-n*(w+gap)/2,cx-w/2+n*(w+gap)/2);ys.push(head.y-h-gap-n*(h+gap),head.y+head.height+gap+n*(h+gap));}
+      for(const r of neighbours){xs.push(r.x-w-gap,r.x+r.width+gap);ys.push(r.y-h-gap,r.y+r.height+gap);}
+      const unique=(values,max)=>[...new Set(values.map(n=>Math.max(pad,Math.min(max,Math.round(n*10)/10))))];
+      for(const x of unique(xs,maxX))for(const y of unique(ys,maxY)){
+        const box={x,y,...v};if(faceGrid.near(box).some(r=>labelCollision(box,r,gap)))continue;
+        const leader=labelLeader(box,label.face),distance=Math.hypot(leader.to.x-leader.from.x,leader.to.y-leader.from.y),above=y+h<=head.y,below=y>=head.y+head.height;
+        const wrap=Math.max(0,h-variants[index][0].height)*.35;
+        const score=distance+(above?0:below?10+head.height*.2:18+head.height*.35)+wrap+Math.abs(x+w/2-cx)*.08;
+        candidates.push({...box,leader,score});
+      }
+    }
+    candidates.sort((a,b)=>a.score-b.score||a.variant-b.variant||a.y-b.y||a.x-b.x);
+    // Never route a connector through another person's face.
+    const safe=[];for(const box of candidates){
+      const line=box.leader,extent={x:Math.min(line.from.x,line.to.x),y:Math.min(line.from.y,line.to.y),width:Math.abs(line.to.x-line.from.x),height:Math.abs(line.to.y-line.from.y)};
+      if(!faceGrid.near(extent).some(r=>!(r.x===head.x&&r.y===head.y&&r.width===head.width&&r.height===head.height)&&lineCrossesFace(line,r)))safe.push(box);
+      if(safe.length===180)break;
+    }
+    return {index,face:label.face,candidates:safe.length?safe:candidates.slice(0,180).map(box=>({...box,leader:null})),nearby:safe.filter(c=>c.score<60).length};
+  });
+  const orders=[options.slice().sort((a,b)=>a.nearby-b.nearby||a.face.y-b.face.y||a.face.x-b.face.x),options.slice().sort((a,b)=>a.face.y-b.face.y||a.face.x-b.face.x),options.slice().sort((a,b)=>a.candidates.length-b.candidates.length||b.face.y-a.face.y)];
+  for(const ordered of orders){
+    const occupied=labelGrid([],gap),result=Array(labels.length);let complete=true;
+    for(const label of ordered){const box=label.candidates.find(box=>!occupied.near(box).some(r=>labelCollision(box,r,gap)));if(!box){complete=false;break;}occupied.add(box);result[label.index]=box;}
+    if(complete)return result;
+  }
+  return null;
 }

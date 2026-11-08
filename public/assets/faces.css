@@ -24,7 +24,7 @@
 .face-label-list .face-visible-label{position:static;box-shadow:none;pointer-events:auto;max-width:100%}
 .media-stage.face-label-list-active{flex-direction:column}
 .face-visible-label{position:absolute;z-index:3;display:flex;align-items:center;gap:5px;width:max-content;box-sizing:border-box;padding:2px 5px;border:1px solid #a6b58d;border-radius:5px;background:#f2f5e8f5;color:#314520;box-shadow:0 1px 4px #26351b40;font:600 calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans);pointer-events:none}
-.face-visible-label>span,.face-visible-label>a{min-width:0;overflow-wrap:anywhere}
+.face-visible-label>span,.face-visible-label>a{min-width:0;overflow-wrap:anywhere;white-space:normal;text-align:center}
 .face-visible-label .face-profile-link{pointer-events:auto}
 .face-visible-age{white-space:nowrap;border-inline-start:1px solid #b9c5a6;padding-inline-start:5px;font-variant-numeric:tabular-nums}
 .face-visible-age:only-child,.face-age-only .face-visible-age{border:0;padding:0}

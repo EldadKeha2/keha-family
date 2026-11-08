@@ -209,7 +209,7 @@ export class FamilyState {
     if(p.personId===null&&p.name===undefined){
       if(previous)this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,p.faceId);
       const removed=this.removeUnusedFaceTag(item,previous?.personId);
-      this.touchTags(item.id);for(const kind of this.mediaCollections(item))this.touch(kind);
+      this.touchTags(item.id);this.touchMedia(item);
       return {...removed,saved:true,operation:'faces',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),face:null};
     }
     if(p.name!==undefined?(p.personId!==undefined||typeof p.name!=='string'):typeof p.personId!=='string')throw new HttpError(400,'בחרו אדם מהרשימה או הזינו שם חדש.');
@@ -227,7 +227,7 @@ export class FamilyState {
     const now=new Date().toISOString(),face={id:p.faceId,rect,personId,revision:uid(),createdAt:previous?.createdAt||now,updatedAt:now};
     for(const old of replaced)this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,old.id);
     this.sql.exec('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?) ON CONFLICT(media_id,id) DO UPDATE SET person_id=excluded.person_id,data=excluded.data',item.id,face.id,face.personId,JSON.stringify(face));
-    this.touchTags(item.id);for(const kind of this.mediaCollections(item))this.touch(kind);
+    this.touchTags(item.id);this.touchMedia(item);
     const saved=this.faces(item.id);return {...result,taggedPeople:[result.taggedPeople.at(-1)],item:this.mediaPublic(item),operation:'faces',faces:saved,face:saved.find(item=>item.id===face.id)};
   }
   faceScan(item){
@@ -243,7 +243,7 @@ export class FamilyState {
     const ignored=p.ignored?(matching.length?previous:[...previous,rect]):previous.filter(other=>!matching.includes(other));
     if(ignored.length>FACE_LIMIT)throw new HttpError(400,'אפשר לשמור עד 150 זיהויים מוסתרים בתמונה.');
     this.sql.exec('INSERT INTO media_face_ignores(media_id,photo_revision,data) VALUES(?,?,?) ON CONFLICT(media_id,photo_revision) DO UPDATE SET data=excluded.data',item.id,p.photoRevision,JSON.stringify(ignored));
-    this.recountFaces(item.id);for(const kind of this.mediaCollections(item))this.touch(kind);
+    this.recountFaces(item.id);this.touchMedia(item);
     return {saved:true,operation:'face-ignore',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:withoutIgnored(this.faceScan(item)?.faces||[],ignored),ignoredFaces:ignored};
   }
   faceSummary(item){
@@ -259,7 +259,7 @@ export class FamilyState {
     if(p.photoRevision!==(item.photoRevision||'original')||p.tagsRevision!==this.tagsRevision(item.id))throw new HttpError(409,'התמונה או התיוגים השתנו. פתחו אותה מחדש לפני האישור.');
     if(p.complete)this.sql.exec('INSERT INTO media_face_reviews(media_id,photo_revision,tags_revision,completed_at) VALUES(?,?,?,?) ON CONFLICT(media_id) DO UPDATE SET photo_revision=excluded.photo_revision,tags_revision=excluded.tags_revision,completed_at=excluded.completed_at',item.id,p.photoRevision,p.tagsRevision,new Date().toISOString());
     else this.sql.exec('DELETE FROM media_face_reviews WHERE media_id=?',item.id);
-    for(const kind of this.mediaCollections(item))this.touch(kind);
+    this.touchMedia(item);
     return {saved:true,operation:'face-review',scope:this.mediaScope(item),item:this.mediaPublic(item)};
   }
   recountFaces(id){
@@ -298,7 +298,7 @@ export class FamilyState {
   mediaScope(item){return item.category==='personal'?'personal:'+item.personId:item.category;}
   mediaCollections(item){return [...new Set([...(item.category==='personal'?[]:[item.category]),...this.rows('SELECT collection FROM media_collections WHERE media_id=?',item.id).map(row=>row.collection)])];}
   mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,nameEn:item.nameEn||null,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:photoSource(item),...(item.photoRevision?{photoRevision:item.photoRevision}:{}),uploadedAt:item.createdAt,tags:this.tags(item.id),tagsRevision:this.tagsRevision(item.id),
-    collections:this.mediaCollections(item),
+    collections:this.mediaCollections(item),modifiedAt:item.modifiedAt||item.updatedAt||item.photoEditedAt||item.createdAt,
     ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
@@ -344,7 +344,11 @@ export class FamilyState {
     // The changed image is sufficient. Never rebuild the gallery or tagged albums on a tag click.
     return {saved:true,operation:'tags',scope:this.mediaScope(item),item:this.mediaPublic(item),affectedPersonIds:affected,taggedPeople:resolved};
   }
-  touchMedia(item,ids=this.relatedPeople(item)){this.touchPeople(ids);for(const kind of this.mediaCollections(item))this.touch(kind);}
+  touchMedia(item,ids=this.relatedPeople(item)){
+    item.modifiedAt=new Date(Math.max(Date.now(),(Date.parse(item.modifiedAt)||0)+1)).toISOString();
+    this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);
+    this.touchPeople(ids);for(const kind of this.mediaCollections(item))this.touch(kind);
+  }
   snapshot(person,items,includeGallery=true){
     const photos=items.filter(item=>mediaKind(item)==='photo'),videos=items.filter(item=>mediaKind(item)==='video');
     const selected=photos.find(photo=>photo.id===person.profileId),profile=selected||photos.find(photo=>photo.category==='personal'&&photo.personId===person.id)||photos[0];

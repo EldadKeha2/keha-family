@@ -6,7 +6,7 @@
   const choices='[data-face-person],[data-face-add]';
   const labels=new Map();let current=null,serial=0,geometry=null;
   const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,time:Date.now(),tagsRevision:item?.tagsRevision,reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
-  const helpers=()=>geometry||=import('./face-geometry.mjs?v=7');
+  const helpers=()=>geometry||=import('./face-geometry.mjs?v=8');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   const touchMode=event=>event?.pointerType==='touch'||matchMedia('(hover:none), (max-width:700px)').matches;
   const desktopResize=()=>!touchMode();
@@ -58,23 +58,44 @@
     if(c.active&&!c.selection.hidden)Object.assign(c.selection.style,{left:c.active.rect.x*100+'%',top:c.active.rect.y*100+'%',width:c.active.rect.width*100+'%',height:c.active.rect.height*100+'%'});
     if(c.popup&&c.active){
       const v=viewport(),r=c.popup.getBoundingClientRect(),p=c.geom.popoverPosition(screenFace(c,c.active),{width:r.width||270,height:r.height||180},v);
+      if(c.popup.classList.contains('face-name')){
+        const face=screenFace(c,c.active),left=v.left||0,top=v.top||0,faces=annotationFaces(c,image).map(rect=>({...rect,x:rect.x+image.x-left,y:rect.y+image.y-top}));
+        const placed=c.geom.layoutFaceLabels([{width:r.width||130,height:r.height||30,face:{...face,x:face.x-left,y:face.y-top}}],{width:v.width,height:v.height,faces});
+        if(placed){p.x=placed[0].x+left;p.y=placed[0].y+top;}
+      }
       Object.assign(c.popup.style,{left:p.x+'px',top:p.y+'px',maxHeight:p.maxHeight+'px',maxWidth:p.width+'px'});
     }
   }
+  function annotationFaces(c,image){
+    return c.geom.mergeFaces(c.saved,c.detected.filter(face=>!c.ignored.some(rect=>c.geom.labelledRegion(rect,face.rect)))).map(face=>({x:face.rect.x*image.width,y:face.rect.y*image.height,width:face.rect.width*image.width,height:face.rect.height*image.height}));
+  }
   function placeAnnotations(c,image){
-    const entries=c.annotationNodes||[],boxes=entries.map(({node,face})=>{node.style.maxWidth=Math.min(200,image.width)+'px';const r=node.getBoundingClientRect();return {width:r.width,height:r.height,face:{x:face.rect.x*image.width,y:face.rect.y*image.height,width:face.rect.width*image.width,height:face.rect.height*image.height}};});
-    const key=JSON.stringify([image.width,image.height,boxes]);
-    if(c.annotationLayout?.key!==key){const layout=c.geom.layoutFaceLabels(boxes,image),legend=entries.length>0&&!layout;c.annotationLayout={key,layout,legend,markers:legend?c.geom.layoutFaceLabels(boxes.map(box=>({...box,width:18,height:18})),image):null};}
+    const entries=c.annotationNodes||[];if(!entries.length){c.labelList.hidden=true;c.stage.classList.remove('face-label-list-active');return;}
+    const measureKey=JSON.stringify([image.width,getComputedStyle(entries[0].node).fontSize]);
+    if(c.annotationMeasurements?.key!==measureKey){
+      const sizes=entries.map(()=>[]),limit=Math.max(1,Math.min(200,image.width-2));
+      for(const {node} of entries){node.style.width='max-content';node.style.maxWidth=limit+'px';}
+      entries.forEach(({node},i)=>{const r=node.getBoundingClientRect();sizes[i].push({width:r.width,height:r.height});});
+      for(const ratio of [.72,.52]){
+        entries.forEach(({node},i)=>{node.style.width=Math.min(limit,sizes[i][0].width,Math.max(58,sizes[i][0].width*ratio))+'px';});
+        entries.forEach(({node},i)=>{const r=node.getBoundingClientRect();if(!sizes[i].some(size=>size.width===r.width&&size.height===r.height))sizes[i].push({width:r.width,height:r.height});});
+      }
+      c.annotationMeasurements={key:measureKey,sizes};
+    }
+    const boxes=entries.map(({face},i)=>({...c.annotationMeasurements.sizes[i][0],variants:c.annotationMeasurements.sizes[i],face:{x:face.rect.x*image.width,y:face.rect.y*image.height,width:face.rect.width*image.width,height:face.rect.height*image.height}})),faces=annotationFaces(c,image);
+    const key=JSON.stringify([image.width,image.height,boxes,faces]);
+    if(c.annotationLayout?.key!==key){const bounds={...image,faces},layout=c.geom.layoutFaceLabels(boxes,bounds),legend=entries.length>0&&!layout;c.annotationLayout={key,layout,legend,markers:legend?c.geom.layoutFaceLabels(boxes.map(box=>({width:18,height:18,face:box.face})),bounds):null};}
     const {layout,legend,markers}=c.annotationLayout;
     c.labelList.hidden=!legend;c.stage.classList.toggle('face-label-list-active',legend);
     for(let i=0;i<entries.length;i++){
-      const {node,marker,line}=entries[i],box=legend?markers?.[i]:layout?.[i],face=boxes[i].face;
+      const {node,marker,line}=entries[i],box=legend?markers?.[i]:layout?.[i];
       if(node.parentNode!==(legend?c.labelList:c.annotations))(legend?c.labelList:c.annotations).append(node);
       node.style.left=legend?'':box.x+'px';node.style.top=legend?'':box.y+'px';
+      node.style.width=legend?'max-content':box.width+'px';node.style.maxWidth=legend?Math.min(240,image.width)+'px':box.width+'px';
       marker.hidden=!legend||!box;
       if(legend&&box)Object.assign(marker.style,{left:box.x+'px',top:box.y+'px'});
-      line.hidden=!box;if(!box)continue;
-      const x=box.x+box.width/2,y=box.y+box.height/2,dx=face.x+face.width/2-x,dy=face.y+face.height/2-y;
+      line.hidden=!box?.leader;if(!box?.leader)continue;
+      const {from,to}=box.leader,x=from.x,y=from.y,dx=to.x-x,dy=to.y-y;
       Object.assign(line.style,{left:x+'px',top:y+'px',width:Math.hypot(dx,dy)+'px',transform:'rotate('+Math.atan2(dy,dx)+'rad)'});
     }
   }
@@ -123,7 +144,7 @@
     if(c.ignoreUndo)c.ignoreUndo.hidden=!c.ignored.length;paintAnnotations(c);place(c);
   }
   function paintAnnotations(c){
-    if(!live(c)||!c.annotations)return;c.annotations.replaceChildren();c.labelList.replaceChildren();c.annotationNodes=[];
+    if(!live(c)||!c.annotations)return;c.annotations.replaceChildren();c.labelList.replaceChildren();c.annotationNodes=[];c.annotationMeasurements=null;c.annotationLayout=null;
     const options=window.FamilyPhotoDate?.overlays?.(c.item.id);if(!options?.showNames&&!options?.showAges)return;
     for(const face of c.faces){
       if(!face.person)continue;const age=options.showAges?window.FamilyPhotoDate.ageFor(face.person,c.item):null;

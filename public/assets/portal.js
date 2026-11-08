@@ -365,10 +365,13 @@
         }
         // A native Family photo can become a gallery photo when unlinked.
         revisions.gallery=null;
+        if(state.view==='gallery'&&galleryPage.sort.startsWith('modified-')){if(holdGallery())galleryDeferred=true;else refreshCollection('gallery',true);}
       }
       if(['photo-edit','caption','labels','photo-date'].includes(event.detail.operation)&&event.detail.item){
         const item=event.detail.item;for(const [kind,collection] of Object.entries(state.collections))if(collection.items?.some(photo=>photo.id===item.id)){collection.items=collection.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);itemVersions[kind]=(itemVersions[kind]||0)+1;revisions[kind]=null;if(state.view===kind)renderCollection(kind);}
-        if(event.detail.operation==='photo-date'&&item.scope==='gallery'&&galleryPage.sort.startsWith('taken-')){revisions.gallery=null;refreshCollection('gallery',true);}
+        if((item.scope==='gallery'||item.collections?.includes('gallery'))&&(galleryPage.sort.startsWith('modified-')||(event.detail.operation==='photo-date'&&galleryPage.sort.startsWith('taken-')))){
+          revisions.gallery=null;if(holdGallery())galleryDeferred=true;else if(state.view==='gallery')refreshCollection('gallery',true);
+        }
         return;
       }
       const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
@@ -387,7 +390,7 @@
         const collection=state.collections[kind],previous=collection.items.find(item=>item.id===result.item.id);
         if(kind==='gallery'&&collection.filterCounts&&previous){const delta=Number(!result.item.tags?.length&&!result.item.faceSummary?.reviewed)-Number(!previous.tags?.length&&!previous.faceSummary?.reviewed);collection.filterCounts.untagged=Math.max(0,Math.min(collection.filterCounts.all,collection.filterCounts.untagged+delta));collection.filterCounts.partial=Math.max(0,(collection.filterCounts.partial||0)+Number(Boolean(result.item.faceSummary?.partial))-Number(Boolean(previous.faceSummary?.partial)));collection.filterCounts.complete=Math.max(0,(collection.filterCounts.complete||0)+Number(Boolean(result.item.faceSummary?.reviewed))-Number(Boolean(previous.faceSummary?.reviewed)));}
         collection.items=collection.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
-        if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&(galleryPage.sort.startsWith('tags-')||galleryPage.filter!=='all'||galleryPage.person||galleryPage.unit||galleryPage.labels||['face-detection','face-review'].includes(result.operation))){revisions.gallery=null;refreshCollection('gallery',true);}
+        if(state.view===kind)renderCollection(kind);if(kind==='gallery'&&(galleryPage.sort.startsWith('tags-')||galleryPage.sort.startsWith('modified-')||galleryPage.filter!=='all'||galleryPage.person||galleryPage.unit||galleryPage.labels||['face-detection','face-review'].includes(result.operation))){revisions.gallery=null;refreshCollection('gallery',true);}
       }return;}
       if(result.operation==='delete'){const key=captionKey(kind,result.item.file);clearTimeout(drafts.get(key)?.timer);drafts.delete(key);}
       if(kind==='gallery'){
@@ -410,7 +413,7 @@
   }
   function refineGallery({person='',unit='',labels=''}){galleryPage.person=person;galleryPage.unit=unit;galleryPage.labels=labels;galleryPage.page=1;window.FamilyGalleryFilter?.render();clearTimeout(gallerySearchTimer);revisions.gallery=null;return refreshCollection('gallery',true);}
   function sortGallery(sort){
-    if(!['random','uploaded-asc','uploaded-desc','taken-asc','taken-desc','tags-asc','tags-desc'].includes(sort))return;
+    if(!['random','uploaded-asc','uploaded-desc','modified-asc','modified-desc','taken-asc','taken-desc','tags-asc','tags-desc'].includes(sort))return;
     galleryPage.sort=sort;if(sort==='random')galleryPage.seed=gallerySeed();galleryPage.page=1;revisions.gallery=null;
     for(const control of document.querySelectorAll('[data-gallery-sort]'))control.value=sort;
     return refreshCollection('gallery',true);

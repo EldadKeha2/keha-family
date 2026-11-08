@@ -66,6 +66,13 @@ test('Family photo membership updates cached gallery metadata without changing f
  }
  f.close();f.open('a');assert.equal(f.window.FamilyMedia.current().collections.includes('photos'),false);f.close();
 });
+test('last-modified sorting keeps the current photo and filter stable until the viewer is closed',async()=>{
+ for(const sort of ['modified-desc','modified-asc']){
+  const f=fixture([photo('a',[{id:'yona'}]),photo('b',[{id:'yona'}])]);await f.flush();f.filter('partial');await f.flush();await f.window.FamilyPortal.sortGallery(sort);f.open('a');
+  const before=f.requests.length;f.edit('a');await f.flush();assert.equal(f.requests.length,before);assert.equal(f.get('mediaViewer').open,true);
+  f.close();await f.flush();assert.match(f.requests.at(-1),new RegExp('sort='+sort));assert.equal(f.window.FamilyPortal.galleryQuery().filter,'partial');assert.equal(f.window.FamilyPortal.galleryQuery().sort,sort);
+ }
+});
 test('X, photo paging and browser returns keep the selected tagging category on desktop and phones',async()=>{
  for(const phone of [false,true])for(const filter of ['partial','untagged','complete']){
   const items=[photo('a',filter==='untagged'?[]:[{id:'person-0'}]),photo('b',filter==='untagged'?[]:[{id:'person-0'}])];

@@ -105,6 +105,12 @@ test('all-name and age overlays follow labelled faces, hide unknown ages, reposi
  toggle({showNames:false,showAges:false});assert.equal(visible().length,0);f.faces.clear();assert.equal(f.find('face-layer'),undefined);
 });
 
+test('age-only overlays also avoid an unlabelled face above their person',async()=>{
+ const obstacle={rect:{x:.3,y:.1,width:.35,height:.3},score:.95},person={id:'one',name:'אדם'},face={id:'named',rect:{x:.4,y:.5,width:.15,height:.15},personId:'one',person},f=fixture([obstacle]);
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});f.window.FamilyPhotoDate={overlays:()=>({showNames:false,showAges:true}),ageFor:()=>({text:'25',title:'גיל'})};await f.mount();
+ const host=f.find('face-visible-labels'),label=host.children.find(node=>node.classList.contains('face-visible-label'));
+ assert.ok(parseFloat(label.style.top)>=(face.rect.y+face.rect.height)*270);assert.match(label.innerHTML,/25/);assert.doesNotMatch(label.innerHTML,/אדם/);f.faces.clear();
+});
 test('zoomed and scrolled image coordinates still select each of two tiny neighbouring faces',async()=>{
  const f=fixture([first,second]);await f.mount();
  const toolbar=f.find('face-zoom-toolbar'),scroll=f.find('face-photo-scroll'),surface=f.find('face-photo-surface'),selection=f.find('face-selection');
@@ -222,7 +228,7 @@ test('touching a saved face shows its name for two seconds, and another face rep
  tap(.15);const previous=f.find('face-popover face-name');t.mock.timers.tick(400);tap(.75);bubble=f.find('face-popover face-name');assert.notEqual(bubble,previous);assert.equal(previous.parent,null);assert.match(bubble.innerHTML,/שתיים/);t.mock.timers.tick(1600);assert.equal(f.find('face-popover face-name'),bubble);t.mock.timers.tick(400);assert.equal(f.find('face-popover face-name'),undefined);f.faces.clear();
 });
 test('dense all-name overlays fall back to a numbered legend and return to the photo when zoom makes room',async()=>{
- const faces=Array.from({length:60},(_,i)=>({id:String(i),rect:{x:.1+(i%6)*.12,y:.15+Math.floor(i/6)*.25,width:.06,height:.09},personId:'person-'+i,person:{id:'person-'+i,name:'בן משפחה '+i}})),f=fixture();f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();
+ const faces=Array.from({length:60},(_,i)=>({id:String(i),rect:{x:.08+(i%6)*.15,y:.06+Math.floor(i/6)*.09,width:.055,height:.05},personId:'person-'+i,person:{id:'person-'+i,name:'בן משפחה '+i}})),f=fixture();f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();
  const legend=f.find('face-label-list');assert.equal(legend.hidden,false);assert.equal(legend.children.length,60);assert.ok(legend.children.every(node=>node.innerHTML.includes('face-label-number')));
  for(let i=0;i<6;i++)f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.equal(legend.hidden,true);assert.equal(legend.children.length,0);assert.equal(f.find('face-visible-labels').children.filter(node=>node.classList.contains('face-visible-label')).length,60);f.faces.clear();assert.equal(f.find('face-label-list'),undefined);
 });
