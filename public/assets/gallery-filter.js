@@ -1,31 +1,32 @@
-import {familyOptions} from './gallery-family.mjs';
+import {familyOptions,familyLabel} from './gallery-family.mjs?v=2';
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
-const state={open:false,person:'',family2:'',family3:'',family4:'',selected:new Set(),version:0,busy:false,resultsReady:false};
+const state={open:false,people:new Set(),families:new Set(),selected:new Set(),version:0,busy:false,resultsReady:false};
 const downloadIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>';
 const previewIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
 let roster=[],ready=false;
 function status(message='',error=false){const host=$('gallerySelectionStatus');if(!host)return;host.textContent=message;host.hidden=!message;host.classList.toggle('is-error',error);}
 function clearSelection(){state.selected.clear();state.version++;state.busy=false;status();render();}
-function unit(){return state.family4||state.family3||state.family2;}
-function options(select,items,value,empty){select.innerHTML='<option value="">'+safe(empty)+'</option>'+items.map(item=>'<option value="'+safe(item.id)+'">'+safe(item.label)+'</option>').join('');select.value=value;}
+function criteria(){return {person:[...state.people].sort().join(','),unit:[...state.families].sort().join(',')};}
+function checkboxes(host,items,selected,kind){
+  host.innerHTML=items.map(item=>'<label class="gallery-check-option"><input type="checkbox" data-gallery-'+kind+'="'+safe(item.id)+'"'+(selected.has(item.id)?' checked':'')+'><span>'+safe(item.label)+'</span></label>').join('')||'<p class="gallery-filter-empty">'+tr('לא נמצאו התאמות','No matches found')+'</p>';
+}
 function fillFamilies(){
-  const data=window.FAMILY_DATA,name=id=>I.personName(data.people[id]);
+  const data=window.FAMILY_DATA;
   for(const generation of [2,3,4]){
-    const parent=generation===3?state.family2:generation===4?state.family3||state.family2:'';
-    const items=familyOptions(data,generation,parent).map(u=>({id:u.id,label:generation===2?I.branchName(data.branches.find(b=>b.unit===u.id)):tr('המשפחה של ','Family of ')+u.people.map(name).join(tr(' ו',' & '))}));
-    if(generation!==2)items.sort((a,b)=>a.label.localeCompare(b.label,I.locale));
-    options($('galleryFamily'+generation),items,state['family'+generation],tr('כל המשפחות','All families'));
+    const items=familyOptions(data,generation).map(u=>({id:u.id,label:familyLabel(data,u,p=>I.personName(p),I.isEnglish)}));
+    items.sort((a,b)=>a.label.localeCompare(b.label,I.locale));
+    checkboxes($('galleryFamily'+generation),items,state.families,'family');
   }
 }
 function fillPeople(){
-  const query=normalize($('galleryPersonSearch').value),people=roster.filter(p=>p.id===state.person||!query||normalize(p.name+' '+(p.nameEn||'')).includes(query)).map(p=>({id:p.id,label:I.personName(p)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale));
-  options($('galleryPersonFilter'),people,state.person,tr('כל האנשים','Everyone'));
+  const query=normalize($('galleryPersonSearch').value),people=roster.filter(p=>state.people.has(p.id)||!query||normalize(p.name+' '+(p.nameEn||'')).includes(query)).map(p=>({id:p.id,label:I.personName(p)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale));
+  checkboxes($('galleryPersonFilter'),people,state.people,'person');
 }
-function ancestors(id){const data=window.FAMILY_DATA,seen=new Set();while(id&&!seen.has(id)){seen.add(id);const u=data.units[id];if(!u)break;if([2,3,4].includes(u.generation))state['family'+u.generation]=u.id;id=u.parent;}}
-function apply(){clearSelection();fillFamilies();window.FamilyPortal.refineGallery({person:state.person,unit:unit()});}
-function reset(){state.open=false;state.person=state.family2=state.family3=state.family4='';if(ready){$('galleryPersonSearch').value='';fillPeople();fillFamilies();}clearSelection();}
+function apply(){clearSelection();window.FamilyPortal.refineGallery(criteria());}
+function clearCriteria(){state.people.clear();state.families.clear();if(ready){$('galleryPersonSearch').value='';fillPeople();fillFamilies();}}
+function reset(){state.open=false;clearCriteria();clearSelection();}
 function category(filter){if(filter!=='all')reset();render();}
 function render(){
   if(!ready)return;
@@ -81,13 +82,15 @@ function init(){
     try{const response=await I.fetch('api/tag-people',{cache:'no-store'});if(response.ok){const result=await response.json();roster=result.people;fillPeople();}}catch{}
   });
   $('galleryPersonSearch').addEventListener('input',fillPeople);
-  $('galleryPersonFilter').addEventListener('change',()=>{state.person=$('galleryPersonFilter').value;apply();});
-  for(const generation of [2,3,4])$('galleryFamily'+generation).addEventListener('change',()=>{
-    state['family'+generation]=$('galleryFamily'+generation).value;
-    for(let next=generation+1;next<=4;next++)state['family'+next]='';
-    if(state['family'+generation])ancestors(state['family'+generation]);apply();
+  $('galleryFilterPanel').addEventListener('change',event=>{
+    const input=event.target;
+    const person=input.dataset.galleryPerson,family=input.dataset.galleryFamily;
+    if(!person&&!family)return;
+    const selected=person?state.people:state.families,id=person||family;
+    if(input.checked)selected.add(id);else selected.delete(id);
+    apply();
   });
-  $('clearGalleryFilter').addEventListener('click',()=>{state.person=state.family2=state.family3=state.family4='';$('galleryPersonSearch').value='';fillPeople();apply();});
+  $('clearGalleryFilter').addEventListener('click',()=>{clearCriteria();apply();});
   document.addEventListener('click',event=>{
     if(event.target.closest('[data-gallery-select-all]'))selectAll();
     else if(event.target.closest('[data-gallery-clear-selection]'))clearSelection();

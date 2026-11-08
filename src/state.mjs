@@ -354,11 +354,10 @@ export class FamilyState {
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
     const refinement=galleryRefinement(options);
-    if(refinement.person){
-      if(!this.rows('SELECT id FROM people WHERE id=?',refinement.person).length)throw new HttpError(400,'בחרו אדם מהרשימה.');
-      where+=' AND EXISTS (SELECT 1 FROM media_tags p WHERE p.media_id=m.id AND p.person_id=?)';args.push(refinement.person);
+    if(refinement.people.length){
+      if(this.rows('SELECT id FROM people WHERE id IN (SELECT value FROM json_each(?))',JSON.stringify(refinement.people)).length!==refinement.people.length)throw new HttpError(400,'בחרו אדם מהרשימה.');
     }
-    if(refinement.unit){where+=' AND EXISTS (SELECT 1 FROM media_tags f WHERE f.media_id=m.id AND f.person_id IN ('+refinement.members.map(()=>'?').join(',')+'))';args.push(...refinement.members);}
+    if(refinement.members.length){where+=' AND EXISTS (SELECT 1 FROM media_tags f WHERE f.media_id=m.id AND f.person_id IN (SELECT value FROM json_each(?)))';args.push(JSON.stringify(refinement.members));}
     const unfinished="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty'))";
     const tagged="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id)",untagged='NOT '+tagged+' AND '+unfinished;
     if(filter==='untagged')where+=' AND '+untagged;

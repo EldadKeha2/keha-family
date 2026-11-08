@@ -16,5 +16,13 @@ export function familyMemberIds(family,root){
 }
 export function familyOptions(family,generation,parent=''){
   const allowed=parent?descendantUnits(family,parent):null;
-  return Object.values(family.units||{}).filter(unit=>unit.generation===generation&&unit.people?.length&&(!allowed||allowed.has(unit.id)));
+  return Object.values(family.units||{}).filter(unit=>unit.generation===generation&&hasFamily(family,unit)&&(!allowed||allowed.has(unit.id)));
+}
+export function hasFamily(family,unit){
+  const people=(unit?.people||[]).filter(id=>family.people?.[id]&&!family.people[id].placeholder);
+  return people.length>1||Boolean(people.length&&((unit.children||[]).some(id=>family.units?.[id]?.people?.some(personId=>family.people?.[personId]&&!family.people[personId].placeholder))||Object.values(family.people||{}).some(person=>!person.placeholder&&person.parents?.some(id=>people.includes(id)))));
+}
+export function familyLabel(family,unit,name=person=>person.name,english=false){
+  const person=(unit.people||[]).map(id=>family.people?.[id]).find(person=>person&&!person.placeholder);
+  return (english?'Family of ':'המשפחה של ')+(person?name(person):'');
 }

@@ -6,9 +6,18 @@
 .gallery-refine-toggle[aria-expanded=true]{background:#586d45;color:#fffdf5;border-color:#586d45;box-shadow:inset 0 2px 4px #26381633}
 .gallery-filter-panel{margin:0 0 10px;padding:16px;border:1px solid #d9d3bc;border-radius:9px;background:#f7f5eb;color:#566143}
 .gallery-refine-fields{display:grid;grid-template-columns:1.25fr repeat(3,1fr);align-items:start;gap:14px}
-.gallery-refine-fields label{display:flex;flex-direction:column;gap:7px;font:calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans)}
-.gallery-refine-fields input,.gallery-refine-fields select{width:100%;min-width:0;min-height:42px;box-sizing:border-box;border:1px solid #cfc6ae;border-radius:6px;padding:7px 9px;background:#fffdf7;color:#4c583e;font:calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans)}
-.gallery-person-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.gallery-filter-field{min-width:0;margin:0;padding:0;border:0;font:calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.gallery-filter-field legend{padding:0;margin-bottom:7px;font:inherit;color:#566143}
+.gallery-person-field input[type=search]{width:100%;min-width:0;min-height:42px;box-sizing:border-box;border:1px solid #cfc6ae;border-radius:6px;padding:7px 9px;background:#fffdf7;color:#4c583e;font:inherit;margin-bottom:7px}
+.gallery-person-field .visually-hidden{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}
+.gallery-checkbox-list{max-height:267px;overflow:auto;scrollbar-gutter:stable;border:1px solid #d5ccb6;border-radius:6px;background:#fffdf7;padding:4px;box-sizing:border-box}
+.gallery-person-field .gallery-checkbox-list{max-height:218px}
+.gallery-check-option{display:flex;align-items:center;gap:8px;min-height:42px;box-sizing:border-box;padding:6px;border-radius:4px;cursor:pointer;color:#4c583e;font:inherit}
+.gallery-check-option input[type=checkbox]{flex:0 0 auto;width:18px;height:18px;margin:0;accent-color:#586d45;cursor:pointer}
+.gallery-check-option span{min-width:0;overflow-wrap:anywhere}
+.gallery-check-option:has(input:checked){background:#e8efdc;color:#3d542e}
+.gallery-check-option:has(input:focus-visible){outline:2px solid #586d45;outline-offset:-2px}
+.gallery-filter-empty{margin:8px;color:#777058;font:inherit}
 .gallery-filter-note{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px}
 .gallery-filter-note p,.gallery-selection-hint{margin:0;color:#777058;font:calc(13px * var(--a11y-text-scale,1))/1.6 var(--sans)}
 .gallery-filter-note button{padding:7px 0;min-height:36px;flex-shrink:0;color:#5c6c48;text-decoration:underline;text-underline-offset:3px;font:calc(13px * var(--a11y-text-scale,1))/1.4 var(--sans)}
@@ -28,5 +37,6 @@
 .gallery-selectable[aria-pressed=true]{outline:3px solid #54723b;outline-offset:-3px}
 .gallery-selection-preview{position:absolute;bottom:42px;inset-inline-end:8px;z-index:1;display:grid;place-items:center;width:34px;height:34px;padding:5px;border:1px solid #d0c8af;border-radius:6px;background:#fffdf4f0;color:#566943;box-shadow:0 1px 4px #27321c33}
 .gallery-filter-panel[hidden],.gallery-selection-bar[hidden],.gallery-refine-toggle[hidden],.gallery-selection-status[hidden]{display:none}
-@media(max-width:760px){.gallery-refine-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.gallery-person-field{grid-column:1/-1}.gallery-refine-fields>label{align-self:stretch;justify-content:space-between}.gallery-filter-panel{padding:12px}.gallery-filter-note{align-items:flex-start}.gallery-selection-bar{gap:6px}.gallery-selection-bar button{font-size:calc(13px * var(--a11y-text-scale,1));padding:7px 9px}.gallery-refine-fields label:last-child{grid-column:1/-1}}
+@media(max-width:1000px){.gallery-refine-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.gallery-refine-fields{gap:12px}.gallery-person-field,.gallery-filter-field:last-child{grid-column:1/-1}.gallery-filter-panel{padding:12px}.gallery-filter-note{align-items:flex-start}.gallery-selection-bar{gap:6px}.gallery-selection-bar button{font-size:calc(13px * var(--a11y-text-scale,1));padding:7px 9px}}
 @media(max-width:420px){.gallery-refine-toggle span{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}.gallery-refine-toggle{width:40px;padding:8px}.gallery-selection-count{font-size:calc(13px * var(--a11y-text-scale,1))}}

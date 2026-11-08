@@ -770,6 +770,8 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
  'סינון ובחירת תמונות':'Filter and select photos',
  'סינון':'Filter',
  'של אדם מסוים':'Person',
+ 'אנשים':'People',
+ 'כל סימון מוסיף תמונות של האדם או המשפחה. משפחה כוללת בני זוג וצאצאים.':'Each selection adds photos of that person or family. Families include partners and descendants.',
  'חיפוש לפי שם…':'Search by name…',
  'בחירת אדם':'Choose a person',
  'כל האנשים':'Everyone',

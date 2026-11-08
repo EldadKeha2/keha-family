@@ -1225,11 +1225,22 @@ test('family filters include partners and descendants across every gallery page,
   assert.equal((await f.call('/api/collections/gallery?unit=u-moran',{headers:{'If-None-Match':etag}})).status,200);
   for(const unit of ['u-rivi','u-harizi'])assert.equal((await(await f.call('/api/collections/gallery?unit='+unit)).json()).count,206);
   assert.equal((await(await f.call('/api/collections/gallery?unit=u-moran')).json()).count,2);
-  assert.equal((await(await f.call(path+'&person=shay')).json()).count,45);
-  assert.equal((await(await f.call(path+'&person=yona')).json()).count,0);
+  assert.equal((await(await f.call(path+'&person=shay')).json()).count,205,'An overlapping person does not narrow or duplicate a family');
+  assert.equal((await(await f.call(path+'&person=yona')).json()).count,206,'An additional person adds their photos');
+  tag.run(id(209),'shay');
+  const combined='unit=u-matan-g,u-moran,u-rivi&person=yona,rivi,yona';
+  r=await f.call('/api/collections/gallery?'+combined);result=await r.json();const combinedTag=r.headers.get('ETag');
+  assert.equal(result.count,209);assert.equal(result.items.length,100);assert.equal(result.pagination.pages,3);
+  const combinedSelection=await(await f.call('/api/gallery/selection?'+combined)).json();
+  assert.equal(combinedSelection.ids.length,209);assert.equal(new Set(combinedSelection.ids).size,209);
+  const lastPage=await(await f.call('/api/collections/gallery?'+combined+'&page=3')).json();assert.equal(lastPage.items.length,9);assert.deepEqual(lastPage.items.map(p=>p.id),combinedSelection.ids.slice(200));
+  assert.equal((await f.call('/api/collections/gallery?unit=u-rivi,u-moran,u-matan-g&person=rivi,yona',{headers:{'If-None-Match':combinedTag}})).status,304);
+  assert.equal((await(await f.call('/api/collections/gallery?person=moran,maya')).json()).count,2);
+  const personId='extra-gallery-person';f.database.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(personId,JSON.stringify({id:personId,name:'Additional guest'}));tag.run(id(206),personId);
+  assert.equal((await(await f.call('/api/collections/gallery?person=moran,'+personId)).json()).count,2,'People added through tagging remain selectable');
   assert.equal((await(await f.call(path+'&q=Memory%20205')).json()).count,1);
   assert.deepEqual((await(await f.call('/api/gallery/selection?unit=u-matan-g&q=Memory%20205')).json()).ids,[id(205)]);
-  for(const query of ['unit=u-root','unit=u-shay','unit=unknown','person=missing','person=%27%20OR%201%3D1'])assert.equal((await f.call('/api/collections/gallery?'+query)).status,400);
+  for(const query of ['unit=u-root','unit=u-shay','unit=unknown','unit=u-roi','unit=u-matan-g,unknown','person=missing','person=yona,missing','person=%27%20OR%201%3D1'])assert.equal((await f.call('/api/collections/gallery?'+query)).status,400);
   await f.connect();const zip=await f.call('/api/gallery/download',{method:'POST',body:new URLSearchParams({ids:JSON.stringify(selection.ids),token:'family-public-v1'}).toString()});assert.equal(zip.status,200);await zip.body.cancel();
  }finally{await f.close();}
 });
