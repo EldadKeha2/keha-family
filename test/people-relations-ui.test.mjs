@@ -108,3 +108,11 @@ test('About displays the active language without falling back to text in the oth
   }
   const empty=await fixture('eldad',{english:true,overrides:{eldad:{about:'סיפור בעברית בלבד'}}});assert.ok(!empty.html.includes('סיפור בעברית בלבד'));
 });
+test('a manually added acquaintance opens a tagged-media album without invented family or biography sections',async()=>{
+ for(const english of[false,true]){
+  const f=await fixture('eldad',{english,overrides:{eldad:{extra:true}}});
+  assert.match(f.html,english?/Family friends and acquaintances/:/מכרים וחברי משפחה/);
+  assert.match(f.html,/id="personAlbum-photos"/);assert.match(f.html,/data-person-back/);
+  assert.doesNotMatch(f.html,/class="person-about"|class="person-family"|id="personPageBirthday"/);
+ }
+});

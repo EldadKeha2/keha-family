@@ -19,7 +19,7 @@
   const nameOf = p => I18n.personName({...p,...getMedia(p)});
   const birthdayOf = p => getMedia(p).birthday || p.birthday;
   const isPlaceholder = p => p.placeholder && (getMedia(p).name||p.name) === p.name;
-  const branchTitle = p => p.extended?(I18n.isEnglish?'Extended family':'בני משפחה נוספים'):p.extra?I18n.t('שם נוסף באלבומים'):I18n.branchName(branchFor(p.branch)) || I18n.t('השורשים של כולנו');
+  const branchTitle = p => p.extra?I18n.t('מכרים וחברי משפחה'):p.extended?(I18n.isEnglish?'Extended family':'בני משפחה נוספים'):I18n.branchName(branchFor(p.branch)) || I18n.t('השורשים של כולנו');
   const generationName = n => ['',I18n.t('הדור הראשון'),I18n.t('הדור השני'),I18n.t('הדור השלישי'),I18n.t('הדור הרביעי'),I18n.t('הדור החמישי')][n] || I18n.html`דור ${n}`;
   const escapeHTML = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safe = escapeHTML;
@@ -111,7 +111,7 @@
     const global = !isTree && !isDirectory;
     $('treeView').hidden = !isTree;
     $('directoryView').hidden = !isDirectory;
-    $('branchBar').hidden = global||(isDirectory&&state.directoryGroup==='extended');
+    $('branchBar').hidden = global||(isDirectory&&state.directoryGroup!=='main');
     const titles = {nursery:[I18n.t('התינוקייה'),I18n.t('ההתחלה של כולנו')],games:[I18n.isEnglish?'Family Games':'משחקי משפחה',I18n.isEnglish?'The faces that make us a family':'מכירים את הפנים שמרכיבות את המשפחה'],memorial:[I18n.t('לזכרם'),I18n.t('הזיכרונות נשארים איתנו')],person:[I18n.t('עמוד אישי'),I18n.t('סיפור חיים, תמונות וזיכרונות')],updates:[I18n.t('הרשמה לעדכונים'),I18n.t('תזכורות משפחתיות, ישר למייל')],home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה המשפחתית'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('השנה המשפחתית שלנו')],tree:[I18n.t('האילן המשפחתי'),I18n.t('משורש משותף, שישה ענפים של אהבה')],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
     const [title,subtitle] = titles[state.view] || titles.tree;
     $('workspaceTitle').textContent = title;
@@ -132,15 +132,17 @@
     if (isTree) renderTree(); else if (isDirectory) renderDirectory();
   }
   function directoryMatches(query) {
-    return people.filter(p => (state.directoryGroup==='extended'?p.extended:!p.extended) && (state.directoryGroup==='extended'||state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
+    return people.filter(p => (state.directoryGroup==='friends'?p.extra&&getMedia(p).mediaCount>0:state.directoryGroup==='extended'?p.extended&&!p.extra:!p.extended&&!p.extra) && (state.directoryGroup!=='main'||state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
   }
   function renderDirectory() {
     const query = normalize(state.query);
     document.querySelectorAll('[data-directory-group]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.directoryGroup===state.directoryGroup)));
-    $('branchBar').hidden=state.directoryGroup==='extended';
+    $('branchBar').hidden=state.directoryGroup!=='main';
+    $('directoryHelp').textContent=I18n.t(state.directoryGroup==='friends'?'לחיצה על כרטיס פותחת את התמונות שבהן תויגו':'לחיצה על כרטיס פותחת את העמוד האישי');
     const selected = directoryMatches(query);
-    $('directoryCount').textContent = I18n.html`${selected.length} ${I18n.isEnglish?I18n.word(selected.length,'card','cards'):I18n.t('כרטיסים')}${state.directoryGroup!=='extended'&&state.branch!=='all'?' · '+I18n.branchName(branchFor(state.branch)):''}`;
-    $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date" data-birthday-for="${p.id}">${birthdayHTML(p)}</div></article>`).join('');
+    $('directoryCount').textContent = I18n.html`${selected.length} ${I18n.isEnglish?I18n.word(selected.length,'card','cards'):I18n.t('כרטיסים')}${state.directoryGroup==='main'&&state.branch!=='all'?' · '+I18n.branchName(branchFor(state.branch)):''}`;
+    $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="${p.extra?I18n.t('פתיחת האלבום של '):I18n.t('פתיחת העמוד האישי של ')}${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date"${p.extra?'':` data-birthday-for="${p.id}"`}>${p.extra?I18n.html`${getMedia(p).photoCount||0} ${I18n.t((getMedia(p).photoCount||0)===1?'תמונה מתויגת':'תמונות מתויגות')}`:birthdayHTML(p)}</div></article>`).join('');
+    $('emptySearch').textContent=I18n.t(state.directoryGroup==='friends'&&!query?'מכרים וחברי משפחה יופיעו כאן אוטומטית אחרי תיוג בשם חדש.':'לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.');
     $('emptySearch').hidden = selected.length > 0;
   }
 
@@ -244,7 +246,7 @@
 
   function updatePersonUI(personId, item) {
     let p = data.people[personId];
-    if(!p&&item.extra){p={id:personId,name:item.name,firstName:item.name,lastName:'',extra:true,birthday:item.birthday||'1.1.1111',branch:null,generation:null,placeholder:false};data.people[personId]=p;people.push(p);if(state.view==='directory')renderDirectory();}
+    if(!p&&item.extra){p={id:personId,name:item.name,firstName:item.name,lastName:'',extra:true,birthday:item.birthday||'1.1.1111',branch:null,generation:null,placeholder:false};data.people[personId]=p;people.push(p);}
     if(!p)return;
     const previous = getMedia(p);
     media.set(personId, {...previous, ...item});
@@ -436,7 +438,7 @@
     if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);window.FamilyNursery?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory')renderDirectory();
     if(!query&&state.view!=='directory'){$('searchResults').hidden=true;return;}
-    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
+    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
     $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button type="button" class="search-result" data-search-person="${p.id}"><span>${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
     $('searchResults').hidden=false;
     fitSearchResults();
@@ -453,6 +455,7 @@
       const result = await response.json();
       mediaRevision=result.revision;mediaDirty=false;
       Object.entries(result.people).forEach(([personId,item])=>updatePersonUI(personId,item));
+      if(state.view==='directory')renderDirectory();
       window.dispatchEvent(new CustomEvent('family-people-loaded'));
       $('runtimeNotice').hidden = true;
     } catch(error) {
@@ -617,7 +620,7 @@
       if(state.currentPerson===personId&&$('personDialog').open)renderGallery(item);
     }
   });
-  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],getPersonSummary:id=>({...data.people[id],...media.get(id)}),getPeople:()=>people.filter(person=>!person.extended).map(person=>({...person,name:nameOf(person)})),nameOf:id=>data.people[id]?nameOf(data.people[id]):id,birthdayOf:id=>birthdayOf(data.people[id]),openPerson,birthdayHTML:id=>birthdayHTML(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
+  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],getPersonSummary:id=>({...data.people[id],...media.get(id)}),getPeople:()=>people.filter(person=>!person.extended&&!person.extra).map(person=>({...person,name:nameOf(person)})),nameOf:id=>data.people[id]?nameOf(data.people[id]):id,birthdayOf:id=>birthdayOf(data.people[id]),openPerson,birthdayHTML:id=>birthdayHTML(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
   function simpleRoute(){const view=location.hash.slice(1).split('/')[0];if(['weddings','nostalgia'].includes(view))return;const target=validViews.has(view)?view:(!view?(isPhone()?'home':'tree'):null);if(target&&target!==state.view)setView(target,false);}
   window.addEventListener('hashchange',simpleRoute);window.addEventListener('popstate',simpleRoute);
   renderBranches();renderView();

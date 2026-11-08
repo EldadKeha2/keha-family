@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeYuNet,projectYuNet,sameDetection,suppressDetections,confirmYuNet,plausibleFaceLandmarks} from '../public/assets/face-yunet.mjs';
+import {decodeYuNet,projectYuNet,sameDetection,suppressDetections,confirmYuNet,plausibleFaceLandmarks,unrotateYuNet} from '../public/assets/face-yunet.mjs';
 import {sameRegion,mergeFaces} from '../public/assets/face-geometry.mjs';
 import {faceRect} from '../src/faces.mjs';
 import {detectionRegions} from '../public/assets/face-scan.mjs';
@@ -27,6 +27,12 @@ test('mirrored padded crops project boxes and landmark ordering onto the origina
  assert.doesNotThrow(()=>faceRect(projected.rect));
  assert.equal(projectYuNet({...pixels,rect:{x:590,y:60,width:45,height:70}},region,size,drawn),null,'Discard a sliver of one face cut by an internal tile seam');
  assert.ok(projectYuNet({...pixels,rect:{x:590,y:60,width:45,height:70}},{x:0,y:0,width:384,height:192},{width:384,height:192},drawn),'Faces at a real photograph edge remain detectable');
+});
+test('aligned local verification maps a tilted face back to its original photo without mirroring landmarks',()=>{
+ const drawn={width:640,height:640},angle=Math.PI/4,original={rect:{x:240,y:220,width:100,height:130},score:.9,landmarks:[{x:260,y:250},{x:310,y:250},{x:285,y:280},{x:265,y:320},{x:305,y:320}]};
+ const aligned={...original,landmarks:original.landmarks.map(p=>({x:320+Math.cos(angle)*(p.x-320)-Math.sin(angle)*(p.y-320),y:320+Math.sin(angle)*(p.x-320)+Math.cos(angle)*(p.y-320)}))};
+ const restored=unrotateYuNet(aligned,angle,drawn);
+ for(const[i,point]of original.landmarks.entries()){assert.ok(Math.abs(point.x-restored.landmarks[i].x)<1e-8);assert.ok(Math.abs(point.y-restored.landmarks[i].y)<1e-8);}
 });
 test('tiny distant faces can be saved precisely and do not duplicate at subpixel normalized areas',()=>{
  const a={id:'a',rect:{x:.1,y:.2,width:6/4096,height:8/3072}},b={id:'b',rect:{x:.103,y:.2,width:6/4096,height:8/3072}};

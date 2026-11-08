@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces} from '../public/assets/face-geometry.mjs';
+import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,sameRegion,separateFaces,labelledRegion} from '../public/assets/face-geometry.mjs';
+import {faceCoverage} from '../public/assets/face-coverage.mjs';
 import {detectionSize,detectionRegions} from '../public/assets/face-scan.mjs';
 import {faceRect} from '../src/faces.mjs';
 
@@ -15,6 +16,17 @@ test('normalized face positions survive portrait, landscape and phone display si
 test('saved names stay attached to their own rectangles and detections never assign a name by array order',()=>{
  const saved=[{id:'known',rect:{x:.1,y:.2,width:.2,height:.2},personId:'one'}],detected=[{id:'other',rect:{x:.6,y:.2,width:.2,height:.2}},{id:'duplicate',rect:{x:.11,y:.2,width:.19,height:.2}}];
  const merged=mergeFaces(saved,detected);assert.deepEqual(merged.map(face=>face.id),['known','other']);assert.equal(merged[0].personId,'one');assert.equal(merged[1].personId,undefined);
+});
+test('a narrow saved face suppresses its broad duplicate in both the viewer and partial counts, while nearby people stay distinct',()=>{
+ const saved={id:'label',personId:'one',rect:{x:.40,y:.30,width:.05,height:.065}};
+ const broad={id:'broad',rect:{x:.38,y:.27,width:.09,height:.12},score:.95};
+ const neighbour={id:'neighbour',rect:{x:.453,y:.30,width:.05,height:.065},score:.93};
+ assert.equal(sameRegion(saved.rect,broad.rect),false);assert.equal(labelledRegion(saved.rect,broad.rect),true);
+ assert.deepEqual(mergeFaces([saved],[broad]).map(face=>face.id),['label']);
+ assert.deepEqual(faceCoverage([saved],[broad],1),{total:1,unmatched:0,partial:false});
+ assert.deepEqual(mergeFaces([saved],[broad,neighbour]).map(face=>face.id),['label','neighbour']);
+ assert.deepEqual(faceCoverage([saved],[broad,neighbour],1),{total:2,unmatched:1,partial:true});
+ assert.equal(faceCoverage([],[broad,neighbour],0).partial,false);
 });
 test('touching small nearby faces picks the closest centre instead of a neighbouring overlapping hit target',()=>{
  const faces=[{id:'left',rect:{x:.1,y:.1,width:.03,height:.03}},{id:'right',rect:{x:.15,y:.1,width:.03,height:.03}}],size={width:320,height:320};

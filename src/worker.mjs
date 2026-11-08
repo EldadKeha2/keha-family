@@ -5,6 +5,7 @@ import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
 import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
 import {nurseryCollection} from './nursery.mjs';
+import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
 export {FamilyState} from './state.mjs';
 export {FamilyUpdates} from './updates.mjs';
 export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
@@ -236,7 +237,7 @@ export default {
         if(kind==='gallery'&&!['all','untagged','partial'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
         if(request.headers.has('If-None-Match')){
           const current=await db('collection.revision',{kind});
-          const revision=current.revision+(kind==='gallery'?':'+Number(page||1)+':'+Number(size||100)+':'+encodeURIComponent((query||'').trim())+(filter==='all'?'':':'+filter):'');
+          const revision=current.revision+(kind==='gallery'?':'+FACE_SCAN_VERSION+':'+Number(page||1)+':'+Number(size||100)+':'+encodeURIComponent((query||'').trim())+(filter==='all'?'':':'+filter):'');
           if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});
         }
         return snapshot(request,await db('collection',{kind,page,size,query,filter}));

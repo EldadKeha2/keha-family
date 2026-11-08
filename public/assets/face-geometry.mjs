@@ -30,7 +30,17 @@ export function separateFaces(faces){
       Math.hypot((a.rect.x+a.rect.width/2-b.rect.x-b.rect.width/2)/Math.max(a.rect.width,b.rect.width),(a.rect.y+a.rect.height/2-b.rect.y-b.rect.height/2)/Math.max(a.rect.height,b.rect.height))>.7));
   });
 }
-export function mergeFaces(saved,detected){const independent=separateFaces([...saved,...detected]);return [...saved,...detected.filter(face=>independent.includes(face)&&!saved.some(label=>sameRegion(label.rect,face.rect)))].slice(0,150);}
+// A carefully positioned label may cover only the inner face while a model
+// includes the hair or neck. It still describes one person. Require both
+// containment and aligned centres; overlap with a neighbouring head is not enough.
+export function labelledRegion(label,detected){
+  if(sameRegion(label,detected))return true;
+  const aa=label.width*label.height,bb=detected.width*detected.height,overlap=intersection(label,detected);
+  return Math.min(aa,bb)/Math.max(aa,bb)>=.12&&overlap/Math.min(aa,bb)>=.88&&
+    Math.abs(label.x+label.width/2-detected.x-detected.width/2)<=Math.max(label.width,detected.width)*.24&&
+    Math.abs(label.y+label.height/2-detected.y-detected.height/2)<=Math.max(label.height,detected.height)*.28;
+}
+export function mergeFaces(saved,detected){const independent=separateFaces([...saved,...detected]);return [...saved,...detected.filter(face=>independent.includes(face)&&!saved.some(label=>labelledRegion(label.rect,face.rect)))].slice(0,150);}
 export function chooseFace(faces,point,size){
   faces=separateFaces(faces);
   const inside=faces.filter(({rect:r})=>point.x>=r.x&&point.x<=r.x+r.width&&point.y>=r.y&&point.y<=r.y+r.height);

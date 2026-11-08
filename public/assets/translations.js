@@ -1,5 +1,11 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "מכרים וחברי משפחה":"Family friends and acquaintances",
+  "לחיצה על כרטיס פותחת את התמונות שבהן תויגו":"Open a card to see the photos in which they are tagged",
+  "פתיחת האלבום של ":"Open the album of ",
+  "תמונות מתויגות":"tagged photos",
+  "תמונה מתויגת":"tagged photo",
+  "מכרים וחברי משפחה יופיעו כאן אוטומטית אחרי תיוג בשם חדש.":"Family friends and acquaintances appear here automatically after tagging a new name.",
   "החיבור לאחסון המדיה עדיין בהגדרה. אפשר לעדכן תאריכים ולכתוב סיפורים; העלאת קבצים תתאפשר לאחר השלמת החיבור": "Media storage is still being connected. You can edit dates and write stories; file uploads will be available once the connection is complete",
   "אילן היוחסין של משפחת קהא, שישה ענפים וחמישה דורות של סיפורים וזיכרונות": "The Keha family tree: six branches and five generations of stories and memories",
   "אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה": "Upload several photos together. Open a photo, browse your memories and tag the people in it",

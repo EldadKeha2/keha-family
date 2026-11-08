@@ -1,4 +1,4 @@
-import {sameRegion,intersection} from './face-geometry.mjs?v=4';
+import {sameRegion,intersection} from './face-geometry.mjs?v=5';
 
 // YuNet predicts five landmark locations as well as a box. Two partly hidden
 // people can have overlapping boxes but distinct eyes/noses; keep both.
@@ -8,7 +8,8 @@ export function sameDetection(a,b){
   if(area/Math.max(Number.EPSILON,aa+bb-area)<.25)return false;
   const w=Math.min(a.rect.width,b.rect.width),h=Math.min(a.rect.height,b.rect.height);
   const distance=a.landmarks.reduce((sum,p,i)=>sum+Math.hypot((p.x-b.landmarks[i].x)/w,(p.y-b.landmarks[i].y)/h),0)/5;
-  return distance<.18;
+  const nose=Math.hypot((a.landmarks[2].x-b.landmarks[2].x)/w,(a.landmarks[2].y-b.landmarks[2].y)/h);
+  return distance<.26&&nose<.32;
 }
 export function suppressDetections(faces){
   const kept=[];
@@ -45,6 +46,14 @@ export function projectYuNet(face,region,size,drawn,flipped=false){
   if(right-x<3||bottom-y<3)return null;
   const points=flipped?[1,0,2,4,3].map(i=>face.landmarks[i]):face.landmarks;
   return {rect:{x:x/size.width,y:y/size.height,width:(right-x)/size.width,height:(bottom-y)/size.height},score:face.score,landmarks:points.map(p=>({x:(region.x+(flipped?drawn.width-p.x:p.x)*sx)/size.width,y:(region.y+p.y*sy)/size.height}))};
+}
+export function unrotateYuNet(face,angle,drawn){
+  if(!angle)return face;
+  const cx=drawn.width/2,cy=drawn.height/2,c=Math.cos(angle),s=Math.sin(angle);
+  const point=p=>({x:cx+c*(p.x-cx)+s*(p.y-cy),y:cy-s*(p.x-cx)+c*(p.y-cy)});
+  const r=face.rect,corners=[[r.x,r.y],[r.x+r.width,r.y],[r.x,r.y+r.height],[r.x+r.width,r.y+r.height]].map(([x,y])=>point({x,y}));
+  const x=Math.min(...corners.map(p=>p.x)),y=Math.min(...corners.map(p=>p.y));
+  return {...face,rect:{x,y,width:Math.max(...corners.map(p=>p.x))-x,height:Math.max(...corners.map(p=>p.y))-y},landmarks:face.landmarks.map(point)};
 }
 export function plausibleFaceLandmarks(face){
   const r=face.rect;if(!r||!Array.isArray(face.landmarks)||face.landmarks.length!==5||r.width<=0||r.height<=0)return false;

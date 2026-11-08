@@ -193,7 +193,9 @@ export class FamilyState {
   faceSummary(item){
     const scan=this.faceScan(item),reviewed=Boolean(this.rows('SELECT media_id FROM media_face_reviews WHERE media_id=? AND photo_revision=? AND tags_revision=?',item.id,item.photoRevision||'original',this.tagsRevision(item.id))[0]);
     if(reviewed)return {total:scan?.total??this.faces(item.id).length,unmatched:0,partial:false,scanned:Boolean(scan),reviewed:true};
-    return scan?{total:scan.total,unmatched:scan.unmatched,partial:scan.unmatched>0&&scan.total>this.tagIds(item.id).length,scanned:true,reviewed:false}:null;
+    if(!scan)return null;
+    const tagged=this.tagIds(item.id).length;
+    return {total:scan.total,unmatched:scan.unmatched,partial:tagged>0&&scan.unmatched>0&&scan.total>tagged,scanned:true,reviewed:false};
   }
   reviewFaces(p){
     const item=this.photo(p.id);
@@ -328,7 +330,7 @@ export class FamilyState {
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
     if(filter==='untagged')where+=' AND NOT EXISTS (SELECT 1 FROM media_tags untagged WHERE untagged.media_id=m.id)';
-    const partial="NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty')) AND EXISTS (SELECT 1 FROM media_face_scans s WHERE s.media_id=m.id AND s.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND s.version='"+FACE_SCAN_VERSION+"' AND s.unmatched_count>0 AND s.face_count>(SELECT count(*) FROM media_tags t WHERE t.media_id=m.id))";
+    const partial="EXISTS (SELECT 1 FROM media_tags tagged WHERE tagged.media_id=m.id) AND NOT EXISTS (SELECT 1 FROM media_face_reviews r WHERE r.media_id=m.id AND r.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND r.tags_revision=coalesce((SELECT value FROM meta WHERE id='tags:'||m.id),'empty')) AND EXISTS (SELECT 1 FROM media_face_scans s WHERE s.media_id=m.id AND s.photo_revision=coalesce(json_extract(m.data,'$.photoRevision'),'original') AND s.version='"+FACE_SCAN_VERSION+"' AND s.unmatched_count>0 AND s.face_count>(SELECT count(*) FROM media_tags t WHERE t.media_id=m.id))";
     if(filter==='partial')where+=' AND '+partial;
     if(query){
       where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
@@ -339,7 +341,7 @@ export class FamilyState {
     const total=query?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
     const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...args,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
-    return {kind,items,count:total,filterCounts,revision:revision+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='all'?'':':'+filter),pagination:{page,size,total,pages,query,filter}};
+    return {kind,items,count:total,filterCounts,revision:revision+':'+FACE_SCAN_VERSION+':'+page+':'+size+':'+encodeURIComponent(query)+(filter==='all'?'':':'+filter),pagination:{page,size,total,pages,query,filter}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   wedding(id,details=false){

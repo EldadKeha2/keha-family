@@ -1,10 +1,10 @@
-import {mergeFaces,sameRegion} from './face-geometry.mjs?v=4';
+import {mergeFaces,sameRegion} from './face-geometry.mjs?v=5';
 
 // Bump when the detector changes so existing photos are indexed again once.
-export const FACE_SCAN_VERSION='gallery-faces-v3';
+export const FACE_SCAN_VERSION='gallery-faces-v4';
 export function faceCoverage(saved,detected,tagCount){
   const faces=mergeFaces(saved,detected),unmatched=faces.filter(face=>!saved.includes(face));
-  return {total:faces.length,unmatched:unmatched.length,partial:unmatched.length>0&&faces.length>tagCount};
+  return {total:faces.length,unmatched:unmatched.length,partial:tagCount>0&&unmatched.length>0&&faces.length>tagCount};
 }
 export function detectionRegions(faces){
   const regions=[];
