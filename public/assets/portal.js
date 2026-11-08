@@ -23,8 +23,8 @@
     return result;
   }
   const jsonPost = (path, body) => request(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  function activate(view) {
-    if(view==='gallery'&&state.view!==view){galleryPage.query='';galleryPage.filter='all';galleryPage.person=galleryPage.unit=galleryPage.labels='';galleryPage.page=1;window.FamilyGalleryFilter?.reset();}
+  function activate(view,{preserveGalleryState=false}={}) {
+    if(view==='gallery'&&state.view!==view&&!preserveGalleryState){galleryPage.query='';galleryPage.filter='all';galleryPage.person=galleryPage.unit=galleryPage.labels='';galleryPage.page=1;window.FamilyGalleryFilter?.reset();}
     state.view = view;
     window.FamilyGalleryFaces?.setActive(view==='gallery');
     state.query = '';

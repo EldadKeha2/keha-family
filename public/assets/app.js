@@ -99,10 +99,10 @@
     state.view = view;
     if (previous !== view) {state.query='';$('searchInput').value='';}
     $('searchResults').hidden = true;
-    renderView();
+    renderView({preserveGalleryState:!syncRoute});
     if(previous!==view&&isPhone())window.scrollTo({top:0,behavior:'instant'});
   }
-  function renderView() {
+  function renderView({preserveGalleryState=false}={}) {
     document.body.dataset.activeView=state.view;
     document.querySelectorAll('[data-view]').forEach(el => {el.classList.toggle('active',el.dataset.view === state.view);el.setAttribute('aria-pressed',String(el.dataset.view === state.view));});
     if(state.view!=='tree')window.FamilyTreeGuide?.hide();
@@ -120,7 +120,7 @@
     const workspaceDetail=$('workspaceDetail');workspaceDetail.hidden=state.view!=='calendar';workspaceDetail.textContent=state.view==='calendar'?I18n.t('ימי הולדת, חגים ומועדים בלוח עברי ולועזי'):'';
     $('searchInput').placeholder = state.view==='nursery' ? I18n.t('חיפוש בן או בת משפחה') : global ? state.view==='stories'?I18n.t('חיפוש בסיפורים ובשנים'):I18n.t('חיפוש לפי כיתוב, שם קובץ או אדם') : I18n.t('חיפוש בן או בת משפחה');
     $('searchInput').setAttribute('aria-label', state.view==='nursery'?I18n.t('חיפוש בני משפחה'):global?I18n.t('חיפוש בתוכן המשפחתי'):I18n.t('חיפוש בני משפחה'));
-    window.FamilyPortal?.activate(state.view);
+    window.FamilyPortal?.activate(state.view,{preserveGalleryState});
     window.FamilyArchive?.activate(state.view);
     window.FamilyCalendar?.activate(state.view);
     window.FamilyHome?.activate(state.view);

@@ -2,11 +2,13 @@ import{test}from'node:test';
 import assert from'node:assert/strict';
 import vm from'node:vm';
 import{readFile}from'node:fs/promises';
+import{browserHistory,navigationSource}from'./helpers/browser-history.mjs';
 
 const mediaSource=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 const portalSource=await readFile(new URL('../public/assets/portal.js',import.meta.url),'utf8');
+const appSource=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
 const photo=(id='a',tags=[])=>({id,file:id+'.jpg',filename:id+'.jpg',scope:'gallery',kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Photo '+id,caption:'',tags,tagsRevision:'initial',faceSummary:{total:2,unmatched:2,partial:tags.length>0,reviewed:false}});
-function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity}={}){
+function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=false,phone=false}={}){
  const nodes=new Map(),documentHandlers=new Map(),windowHandlers=new Map(),intervals=[],requests=[],pending=[];let nextDeferred=false,revision=1;
  const server=structuredClone(items),mounted=[];
  class Node{
@@ -16,7 +18,7 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity}={}){
   click(){this.emit('click');}setAttribute(k,v){this[k]=String(v);}getAttribute(k){return this[k]??null;}removeAttribute(k){delete this[k];}
   querySelector(selector){if(selector==='video'&&!this.innerHTML?.includes('<video'))return null;if(!this.widgets.has(selector))this.widgets.set(selector,new Node());return this.widgets.get(selector);}
   querySelectorAll(selector){return selector==='.shared-media-card'?this.children:[];}
-  replaceChildren(...nodes){this.children=nodes;}append(...nodes){this.children.push(...nodes);}focus(){}pause(){}load(){}scrollIntoView(){}
+  replaceChildren(...nodes){this.children=nodes;}append(...nodes){this.children.push(...nodes);}focus(){}blur(){}pause(){}load(){}scrollIntoView(){}
   get firstElementChild(){return this.children[0]||null;}get nextElementSibling(){return this.parent?.children[this.parent.children.indexOf(this)+1]||null;}
   insertBefore(node,anchor){node.remove();const index=anchor?this.children.indexOf(anchor):this.children.length;this.children.splice(index,0,node);node.parent=this;}
   remove(){if(this.parent){this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null;}}
@@ -25,20 +27,23 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity}={}){
  const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
  const filters=['all','untagged','partial','complete'].map(filter=>{const n=new Node();n.dataset.galleryFilter=filter;return n;});
  const listen=(map,name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);};
- const document={activeElement:null,visibilityState:'visible',getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
+ const document={activeElement:null,visibilityState:'visible',body:new Node(),documentElement:new Node(),getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
  const collection=path=>{
   const filter=new URL(path,'https://test/').searchParams.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length&&!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:filter==='complete'?item.faceSummary.reviewed:true);
   return{items:structuredClone(filter==='all'?selected.slice(0,allPageSize):selected),count:selected.length,revision:'gallery-'+revision,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length,complete:server.filter(i=>i.faceSummary.reviewed).length},pagination:{page:1,size:100,pages:1,total:selected.length,filter}};
  };
- const window={FamilyApp:{apiEnabled:true,toast(){}},FAMILY_DATA:{people:{}},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>listen(windowHandlers,name,fn),dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
+ const browser=routing?browserHistory('https://test/?lang=he#gallery'):null;
+ const window={FamilyApp:{apiEnabled:true,toast(){}},FAMILY_DATA:{people:{},branches:[],units:{}},scrollTo(){},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>{listen(windowHandlers,name,fn);browser?.addEventListener(name,fn);},dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
  window.FamilyI18n={isEnglish:false,language:'he',t:String,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:item=>item.name,error:String,searchNames:item=>item.name,fetch:async path=>{
   requests.push(path);const result=collection(path);
   if(nextDeferred){nextDeferred=false;return new Promise(resolve=>pending.push(()=>resolve(Response.json(result))));}return Response.json(result);
  }};
- const context=vm.createContext({window,document,location:{href:'https://test/?lang=he#gallery',origin:'https://test'},history:{replaceState(){}},navigator:{},URL,URLSearchParams,Response,CustomEvent,console,setInterval:fn=>intervals.push(fn),setTimeout,clearTimeout,matchMedia:()=>({matches:false})});
- vm.runInContext(mediaSource,context);vm.runInContext(portalSource,context);for(const fn of documentHandlers.get('DOMContentLoaded'))fn();window.FamilyPortal.activate('gallery');
+ const context=vm.createContext({window,document,location:browser?.location||{href:'https://test/?lang=he#gallery',origin:'https://test'},history:browser?.history||{replaceState(){}},navigator:{},URL,URLSearchParams,Response,CustomEvent,console,setInterval:fn=>intervals.push(fn),setTimeout,clearTimeout,requestAnimationFrame:()=>0,cancelAnimationFrame(){},innerWidth:phone?390:1280,innerHeight:900,matchMedia:q=>({matches:q.includes('700px')&&phone})});
+ if(routing)vm.runInContext(navigationSource,context);
+ vm.runInContext(mediaSource,context);vm.runInContext(portalSource,context);if(routing){vm.runInContext(appSource,context);window.FamilyApp.apiEnabled=true;}
+ for(const fn of documentHandlers.get('DOMContentLoaded'))fn();window.FamilyPortal.activate('gallery');
  const flush=async()=>{await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
- return{window,get,requests,pending,mounted,filters,flush,server,
+ return{window,get,requests,pending,mounted,filters,flush,server,browser,
   filter(name){for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-filter]'?{dataset:{galleryFilter:name}}:null}});},
   open:id=>window.FamilyMedia.openFrom('gallery',id),close:()=>get('closeMediaViewer').click(),poll:()=>intervals.forEach(fn=>fn()),defer(){nextDeferred=true;},
   change(id,operation='tags',tagCount=1){const item=server.find(i=>i.id===id);item.tags=Array.from({length:tagCount},(_,i)=>({id:'person-'+i,name:'Person '+i}));item.tagsRevision='tags-'+(++revision);item.faceSummary={total:2,unmatched:2-tagCount,partial:tagCount>0,reviewed:false};window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'gallery',item:structuredClone(item)}}));},
@@ -47,6 +52,19 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity}={}){
   get cards(){return get('sharedGalleryGrid').children.map(card=>card.dataset.mediaFile);}
  };
 }
+
+test('X, photo paging and browser returns keep the selected tagging category on desktop and phones',async()=>{
+ for(const phone of [false,true])for(const filter of ['partial','untagged','complete']){
+  const items=[photo('a',filter==='untagged'?[]:[{id:'person-0'}]),photo('b',filter==='untagged'?[]:[{id:'person-0'}])];
+  if(filter==='complete')for(const item of items){item.faceSummary.reviewed=true;item.faceSummary.partial=false;}
+  const f=fixture(items,{routing:true,phone});await f.flush();f.filter(filter);await f.flush();await f.window.FamilyPortal.sortGallery('taken-asc');await f.flush();
+  f.open('a');f.get('mediaNext').click();f.close();await f.flush();assert.equal(f.get('mediaViewer').open,false);assert.equal(f.window.FamilyPortal.galleryQuery().filter,filter);assert.equal(f.window.FamilyPortal.galleryQuery().sort,'taken-asc');assert.equal(f.filters.find(button=>button.dataset.galleryFilter===filter).getAttribute('aria-pressed'),'true');
+  f.open('a');f.browser.history.back();await f.flush();assert.equal(f.get('mediaViewer').open,false);assert.equal(f.window.FamilyPortal.galleryQuery().filter,filter);
+  f.browser.history.forward();await f.flush();assert.equal(f.get('mediaViewer').open,true);f.close();await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().filter,filter);
+  f.window.FamilyApp.setView('home');f.browser.history.back();await f.flush();assert.equal(f.window.FamilyApp.getView(),'gallery');assert.equal(f.window.FamilyPortal.galleryQuery().filter,filter,'History restoration must not reset the category');
+  f.window.FamilyApp.setView('home');f.window.FamilyApp.setView('gallery');await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().filter,'all','An explicit new gallery visit still starts at All photos');
+ }
+});
 
 test('a first tag moves a photo exclusively to partial after X, where it waits for explicit completion',async()=>{
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.open('a');
