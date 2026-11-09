@@ -582,7 +582,7 @@ export class FamilyState {
         const item=this.media(p.id),kind=validCollection(p.collection);
         if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר להוסיף לאלבומים האלה תמונות בלבד.');
         const included=p.included===undefined?true:p.included;
-        if(typeof included!=='boolean'||(!included&&kind!=='photos'))throw new HttpError(400,'אפשר להסיר כאן שיוך לתמונות משפחתיות בלבד.');
+        if(typeof included!=='boolean')throw new HttpError(400,'בחרו אם להוסיף את התמונה לאלבום או להסיר את השיוך אליו.');
         if(kind!=='photos'){
           const personId=typeof p.scope==='string'&&p.scope.startsWith('personal:')?p.scope.slice(9):null;
           if(!personId||!this.relatedPeople(item).includes(personId))throw new HttpError(400,'בחרו תמונה מתוך הפרופיל של האדם המתאים.');
@@ -599,7 +599,7 @@ export class FamilyState {
         }
         if(!included&&present){
           this.sql.exec('DELETE FROM media_collections WHERE media_id=? AND collection=?',item.id,kind);
-          if(item.category==='photos'){
+          if(item.category===kind){
             item.category='gallery';item.updatedAt=new Date().toISOString();
             this.sql.exec('UPDATE media SET category=?,data=? WHERE id=?',item.category,JSON.stringify(item),item.id);
           }

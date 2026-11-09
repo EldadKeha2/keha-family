@@ -329,8 +329,25 @@ test('family membership changes validate booleans and retain normal write protec
   const change=(body,extra={})=>f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection:'photos',scope:'photos',...body},...extra});
   for(const included of ['false',null,0])assert.equal((await change({included})).status,400);
   assert.equal((await change({included:false},{clientHeaders:false})).status,403);
-  assert.equal((await change({included:false,collection:'nursery:tomer',scope:'personal:tomer'})).status,400);
+  assert.equal((await change({included:false,collection:'nursery:tomer',scope:'personal:shani'})).status,400);
   assert.equal((await(await f.call('/api/collections/photos')).json()).count,1);
+ }finally{await f.close();}
+});
+for(const target of ['nursery:tomer','wedding:u-tomer'])for(const origin of ['gallery','photos',target])test('removing '+target+' from a '+origin+' original preserves its photo, other memberships, tags and versions',async()=>{
+ const f=fixture();try{
+  await f.connect();const path=origin.startsWith('nursery:')?'/api/nursery/tomer':origin.startsWith('wedding:')?'/api/weddings/u-tomer':'/api/collections/'+origin;
+  const original=await taggedUpload(f,path);await setTags(f,original,['tomer']);const edit=await photoEdit(f,original);assert.equal(edit.status,201);const item=(await edit.json()).item;
+  const other=target.startsWith('nursery:')?'wedding:u-tomer':'nursery:tomer',change=(collection,included,scope='personal:tomer',extra={})=>f.call('/api/media/'+item.id+'/collections',{method:'POST',body:{collection,included,scope},...extra});
+  assert.equal((await change(target,true)).status,200);assert.equal((await change(other,true)).status,200);
+  assert.equal((await change(target,false,'personal:shani')).status,400);assert.equal((await change(target,false,'personal:tomer',{clientHeaders:false})).status,403);
+  const versions=(await(await f.call('/api/media/'+item.id+'/versions')).json()).versions.length,objects=f.objects.size;
+  const response=await change(target,false);assert.equal(response.status,200,await response.clone().text());const removed=await response.json();
+  assert.equal(removed.included,false);assert.equal(removed.collection.count,0);assert.equal(removed.item.collections.includes(target),false);assert.equal(removed.item.collections.includes(other),true);
+  assert.equal(removed.item.collections.includes('photos'),origin==='photos');assert.equal(removed.item.id,item.id);assert.equal(removed.item.src,item.src);assert.deepEqual(removed.item.tags,item.tags);
+  assert.equal((await(await change(target,false)).json()).collection.revision,removed.collection.revision);
+  f.restart();const current=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;assert.equal(current.collections.includes(target),false);assert.equal(current.collections.includes(other),true);
+  assert.equal((await f.call('/media/'+item.id)).status,200);assert.equal((await(await f.call('/api/media/'+item.id+'/versions')).json()).versions.length,versions);assert.equal(f.objects.size,objects);
+  assert.equal((await change(target,true)).status,200);assert.equal((await(await f.call('/api/people/tomer/page')).json()).albums.photos.items[0].id,item.id);assert.equal(f.objects.size,objects);
  }finally{await f.close();}
 });
 test('last-modified gallery order follows tags, face positions, reviews, labels, edits and album moves, while background scans leave it alone',async()=>{

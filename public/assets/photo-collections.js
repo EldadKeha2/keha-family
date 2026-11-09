@@ -18,10 +18,10 @@
     ]:[])];
   }
   function remember(item,change=null){
-    const previous=items.get(item.id),collections=new Set([...(previous?.collections||[]),...(item.collections||[item.scope])]);
-    const familyPhoto=change?.scope==='photos'&&typeof change.included==='boolean'?change.included:previous?.familyPhoto??collections.has('photos');
-    if(familyPhoto)collections.add('photos');else collections.delete('photos');
-    items.set(item.id,{...item,collections:[...collections],familyPhoto});
+    const previous=items.get(item.id),collections=new Set([...(previous?.collections||[]),...(item.collections||[item.scope])]),confirmed=new Map(previous?.confirmed||[]);
+    if(change?.scope&&typeof change.included==='boolean')confirmed.set(change.scope,change.included);
+    for(const [kind,included]of confirmed)if(included)collections.add(kind);else collections.delete(kind);
+    items.set(item.id,{...item,collections:[...collections],confirmed});
     if(items.size>512)items.delete(items.keys().next().value);
   }
   function buttons(item,scope,viewer=false){
@@ -29,8 +29,8 @@
     return targets(scope,viewer).map(target=>{
       const active=memberships.includes(target.collection),busy=pending.has(item.id+':'+target.collection);
       const family=target.collection==='photos';
-      const label=target.collection?(active?(family?tr('הסרה מ','Remove from '):tr('מופיע ב','Included in ')):tr('הוספה ל','Add to '))+target.label:tr('אין לאדם זה אלבום מתאים: ','No album is available for this person: ')+target.label;
-      return `<button type="button" class="photo-collection-button${family?' photo-collection-family':''}${active?' is-linked':''}" data-photo-collection="${safe(target.collection||'')}" aria-label="${safe(label)}" title="${safe(label)}" aria-pressed="${active}" ${busy?'aria-busy="true" ':''}${!target.collection||busy?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true">${icons[target.icon]}</svg>${family?`<span class="photo-collection-name">${target.label}</span>`:''}</button>`;
+      const label=target.collection?(active?tr('הסרה מ','Remove from '):tr('הוספה ל','Add to '))+target.label:tr('אין לאדם זה אלבום מתאים: ','No album is available for this person: ')+target.label;
+      return `<button type="button" class="photo-collection-button${family?' photo-collection-family':''}${active?' is-linked':''}" data-photo-collection="${safe(target.collection||'')}" data-photo-album-kind="${target.icon}" aria-label="${safe(label)}" title="${safe(label)}" aria-pressed="${active}" ${busy?'aria-busy="true" ':''}${!target.collection||busy?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true">${icons[target.icon]}</svg>${family?`<span class="photo-collection-name">${target.label}</span>`:''}</button>`;
     }).join('');
   }
   function controls(item,scope,{viewer=false}={}){
@@ -42,18 +42,19 @@
     for(const group of document.querySelectorAll('[data-collection-photo]')){
       const item=items.get(group.dataset.collectionPhoto);if(item)group.innerHTML=buttons(item,group.dataset.collectionScope,group.dataset.collectionViewer==='true');
     }
+    window.FamilyPhotoViewerLayout?.sync();
   }
   async function add(button){
     const group=button.closest('[data-collection-photo]'),id=group?.dataset.collectionPhoto,collection=button.dataset.photoCollection,scope=group?.dataset.collectionScope;
     const active=button.getAttribute('aria-pressed')==='true';
-    if(!id||!collection||button.disabled||(active&&collection!=='photos'))return;
+    if(!id||!collection||button.disabled)return;
     if(!window.FamilyApp?.apiEnabled){window.FamilyApp?.toast(tr('השמירה אינה זמינה כרגע. נסו לרענן.','Saving is currently unavailable. Please refresh.'));return;}
     const key=id+':'+collection;if(pending.has(key))return;pending.add(key);button.disabled=true;button.setAttribute('aria-busy','true');
     try{
-      const response=await I.fetch('api/media/'+id+'/collections',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({collection,scope,...(collection==='photos'?{included:!active}:{})})});
+      const response=await I.fetch('api/media/'+id+'/collections',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({collection,scope,included:!active})});
       const result=await response.json();if(!response.ok)throw Error(I.error(result.error));
       window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
-      window.FamilyApp.toast(collection==='photos'&&active?tr('התמונה הוסרה מתמונות משפחתיות ✓','Photo removed from Family photos ✓'):tr('התמונה נוספה לאלבום ✓','Photo added to the album ✓'));
+      window.FamilyApp.toast(active?tr('התמונה הוסרה מהאלבום ✓','Photo removed from the album ✓'):tr('התמונה נוספה לאלבום ✓','Photo added to the album ✓'));
     }catch(error){window.FamilyApp?.toast(error.message||tr('השינוי לא נשמר. נסו שוב.','The change was not saved. Please try again.'));}
     finally{pending.delete(key);button.disabled=false;button.removeAttribute('aria-busy');refresh();}
   }

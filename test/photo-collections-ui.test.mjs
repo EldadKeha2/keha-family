@@ -55,7 +55,7 @@ test('one tap saves the exact photo and owner, blocks repeated taps and keeps co
  const f=fixture(),g=f.group(),baby=f.button(g,'nursery:tomer'),wedding=f.button(g,'wedding:u-tomer');
  f.click(baby);f.click(baby);assert.equal(f.requests.length,1);assert.equal(baby.disabled,true);
  assert.equal(f.requests[0].path,'api/media/one/collections');assert.equal(f.requests[0].options.headers['X-Family-Token'],'test-csrf');
- assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection:'nursery:tomer',scope:'personal:tomer'});
+ assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection:'nursery:tomer',scope:'personal:tomer',included:true});
  f.click(wedding);assert.equal(f.requests.length,2);
  await f.respond(1,f.item('one',['gallery','nursery:tomer','wedding:u-tomer']));
  await f.respond(0,f.item('one',['gallery','nursery:tomer']));
@@ -70,4 +70,14 @@ test('a failed album save leaves the icon unmarked and ready to retry',async()=>
 test('a save finishing after a photo change never marks the next photo',async()=>{
  const f=fixture(),first=f.group(),b=f.button(first,'nursery:tomer');f.click(b);f.groups.length=0;const second=f.group(f.item('two'));
  await f.respond(0,f.item('one',['gallery','nursery:tomer']));assert.equal(f.selected(second,'nursery:tomer'),false);
+});
+
+for(const collection of ['nursery:tomer','wedding:u-tomer'])test(collection+' can be removed on a second tap, stays removed through stale responses and can be added again',async()=>{
+ const f=fixture(),g=f.group(f.item('one',['gallery',collection]));
+ f.click(f.button(g,collection,true));assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection,scope:'personal:tomer',included:false});
+ await f.respond(0,f.item());assert.equal(f.selected(g,collection),false);
+ const stale=f.group(f.item('one',['gallery',collection]));assert.equal(f.selected(stale,collection),false);
+ f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'collection',scope:'photos',included:true,item:f.item('one',['gallery','photos',collection])}}));assert.equal(f.selected(g,collection),false);
+ f.click(f.button(g,collection));await f.respond(1,f.item('one',['gallery','photos',collection]));assert.equal(f.selected(g,collection),true);
+ f.click(f.button(g,collection,true));await f.respond(2,null,false);assert.equal(f.selected(g,collection),true);
 });
