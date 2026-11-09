@@ -324,7 +324,7 @@ test('crowd numbers locate and highlight their own face on hover, keyboard focus
  f.emit(legend.children[10],'pointerenter');assert.equal(target.hidden,false);assert.equal(target.style.left,faces[10].rect.x*100+'%');assert.equal(markers[10].classList.contains('face-annotation-active'),true);
  f.emit(legend.children[10],'pointerleave');assert.equal(target.hidden,true);
  f.emit(legend.children[20],'focusin');assert.equal(target.style.top,faces[20].rect.y*100+'%');f.emit(legend.children[20],'focusout',{relatedTarget:null});assert.equal(target.hidden,true);
- f.emit(markers[10],'click');t.mock.timers.tick(1999);assert.equal(target.hidden,false);assert.equal(f.find('face-popover face-picker'),undefined);t.mock.timers.tick(1);assert.equal(target.hidden,true);
+ f.emit(markers[10],'click');t.mock.timers.tick(1000);f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',item:{id:'photo',kind:'photo'},faces}}));assert.equal(target.hidden,false,'Background detections must preserve the highlight');t.mock.timers.tick(999);assert.equal(target.hidden,false);assert.equal(f.find('face-popover face-picker'),undefined);t.mock.timers.tick(1);assert.equal(target.hidden,true,'Refreshing labels must not extend the two-second highlight');
  f.emit(legend.children[20].querySelector('[data-face-locate]'),'click');assert.equal(target.style.left,faces[20].rect.x*100+'%');f.faces.clear();t.mock.timers.tick(2000);assert.equal(target.hidden,true);assert.equal(f.find('face-layer'),undefined);
 });
 

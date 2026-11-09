@@ -83,10 +83,15 @@
     if(c.annotationTimer&&!force)return;clearTimeout(c.annotationTimer);c.annotationTimer=null;c.annotationFace=null;if(c.annotationTarget)c.annotationTarget.hidden=true;
     for(const entry of c.annotationNodes||[])for(const node of [entry.node,entry.marker,entry.line])node.classList.remove('face-annotation-active');
   }
-  function highlightAnnotation(c,face,timed=false){
-    if(!live(c)||!c.annotationNodes?.some(entry=>entry.face.id===face.id))return;clearAnnotation(c,true);c.annotationFace=face;c.annotationTarget.hidden=false;
+  function renderAnnotationHighlight(c){
+    const face=c.annotationFace;if(!face||!c.annotationTarget)return;c.annotationTarget.hidden=false;
     const r=annotationRect(c,face);Object.assign(c.annotationTarget.style,{left:r.x*100+'%',top:r.y*100+'%',width:r.width*100+'%',height:r.height*100+'%'});
-    for(const entry of c.annotationNodes)if(entry.face.id===face.id)for(const node of [entry.node,entry.marker,entry.line])node.classList.add('face-annotation-active');
+    for(const entry of c.annotationNodes)for(const node of [entry.node,entry.marker,entry.line])node.classList.toggle('face-annotation-active',entry.face.id===face.id);
+  }
+  function highlightAnnotation(c,face,timed=false){
+    if(!live(c)||!c.annotationNodes?.some(entry=>entry.face.id===face.id))return;
+    if(!timed&&c.annotationFace?.id===face.id&&c.annotationTimer){renderAnnotationHighlight(c);return;}
+    clearAnnotation(c,true);c.annotationFace=face;renderAnnotationHighlight(c);
     if(timed){c.annotationTarget.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});c.annotationTimer=setTimeout(()=>clearAnnotation(c,true),2000);}
   }
   function placeAnnotations(c,image){
@@ -163,8 +168,8 @@
     paintAnnotations(c);place(c);
   }
   function paintAnnotations(c){
-    if(!live(c)||!c.annotations)return;clearAnnotation(c,true);c.annotations.replaceChildren();c.labelList.replaceChildren();c.annotationNodes=[];c.annotationMeasurements=null;c.annotationLayout=null;
-    const options=window.FamilyPhotoDate?.overlays?.(c.item.id);if(!options?.showNames&&!options?.showAges)return;
+    if(!live(c)||!c.annotations)return;c.annotations.replaceChildren();c.labelList.replaceChildren();c.annotationNodes=[];c.annotationMeasurements=null;c.annotationLayout=null;
+    const options=window.FamilyPhotoDate?.overlays?.(c.item.id);if(!options?.showNames&&!options?.showAges){clearAnnotation(c,true);return;}
     for(const face of c.faces){
       if(!face.person)continue;const age=options.showAges?window.FamilyPhotoDate.ageFor(face.person,c.item):null;
       if(!options.showNames&&!age)continue;
@@ -178,6 +183,7 @@
       for(const host of [marker,node]){host.addEventListener('pointerenter',()=>highlightAnnotation(c,face));host.addEventListener('pointerleave',()=>{if(c.annotationFace?.id===face.id)clearAnnotation(c);});host.addEventListener('focusin',()=>highlightAnnotation(c,face));host.addEventListener('focusout',event=>{if(!host.contains(event.relatedTarget)&&c.annotationFace?.id===face.id)clearAnnotation(c);});}
       if(options.showNames)bindProfile(c,node,face);c.annotations.append(line,marker,node);c.annotationNodes.push({node,face,marker,line});
     }
+    if(c.annotationFace){const entry=c.annotationNodes.find(entry=>entry.face.id===c.annotationFace.id);if(entry){c.annotationFace=entry.face;renderAnnotationHighlight(c);}else clearAnnotation(c,true);}
   }
   function apply(c,faces){
     c.saved=faces;if(c.active){const updated=faces.find(face=>face.id===c.active.id);if(updated)c.active=updated;else if(c.active.person&&!c.saving)closePopup(c);}
