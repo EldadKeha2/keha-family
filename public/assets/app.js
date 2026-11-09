@@ -250,6 +250,7 @@
     if(!p)return;
     const previous = getMedia(p);
     media.set(personId, {...previous, ...item});
+    if(previous.profile!==item.profile||previous.profileFile!==item.profileFile)window.dispatchEvent(new CustomEvent('family-profile-changed',{detail:{id:personId}}));
     if('deathDate' in item)p.deathDate=item.deathDate;
     if('deceased' in item)p.deceased=item.deceased;
     if('aliyahYear' in item)p.aliyahYear=item.aliyahYear;

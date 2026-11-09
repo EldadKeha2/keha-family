@@ -27,7 +27,7 @@
     active=false;photoId=null;
   }
   function fitOptionalAlbums(){
-    const optional=[...icons.querySelectorAll('[data-photo-album-kind="baby"],[data-photo-album-kind="wedding"]')];
+    const optional=[...icons.querySelectorAll('[data-photo-album-kind="baby"]')];
     for(const button of optional)button.hidden=true;
     const gap=parseFloat(getComputedStyle(icons).columnGap)||0,buttons=[...icons.querySelectorAll('button,a')].filter(node=>node.getBoundingClientRect().width>0);
     let used=buttons.reduce((total,node)=>total+node.getBoundingClientRect().width,0)+Math.max(0,buttons.length-1)*gap,count=buttons.length;

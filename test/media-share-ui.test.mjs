@@ -164,12 +164,35 @@ test('the profile action follows the album owner gender when switching between p
   f.window.FamilyMedia.open([photo],0,'personal:guest');assert.equal(button.getAttribute('data-gender'),'unknown');
   f.window.FamilyMedia.open([photo],0,'gallery');assert.equal(button.hidden,true,'Only a personal album offers profile selection');
 });
+test('the effective profile stays selected across photo navigation and selected clicks do not save again',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english}),owner={profileFile:'b.jpg',profile:'/media/b?v=edited',profileId:'old-deleted'};
+  f.window.FamilyApp.getPerson=()=>({gender:'f'});f.window.FamilyApp.getPersonSummary=()=>owner;
+  const photos=['a','b'].map(id=>({...f.photo(id),file:id+'.jpg'})),button=f.get('openedProfilePhoto');
+  f.window.FamilyMedia.open(photos,0,'personal:rachel');assert.equal(button.getAttribute('aria-pressed'),'false');
+  f.get('mediaNext').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'true');assert.equal(button.querySelector('span').textContent,english?'Current profile photo':'זו תמונת הפרופיל');
+  await button.handlers.get('click')();assert.equal(f.requests.length,0);
+  f.get('mediaPrevious').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'false');
+  owner.profileFile='a.jpg';f.window.dispatchEvent(new CustomEvent('family-profile-changed',{detail:{id:'rachel'}}));assert.equal(button.getAttribute('aria-pressed'),'true');
+ }
+});
+test('a profile save updates the correct photo after navigation, survives reopening, and a failed save adds no selection',async()=>{
+ const f=fixture(),owners={rachel:{profileFile:'a.jpg'},other:{profileFile:'other.jpg'}},photos=['a','b','c'].map(id=>({...f.photo(id),file:id+'.jpg'})),button=f.get('openedProfilePhoto');
+ f.window.FamilyApp.getPersonSummary=id=>owners[id];f.window.FamilyApp.updatePerson=(id,person)=>Object.assign(owners[id],person);f.window.FamilyI18n.error=value=>value;
+ let resolve;f.window.FamilyI18n.fetch=async(path,options)=>{f.requests.push({path,options});return new Promise(done=>resolve=done);};
+ f.window.FamilyMedia.open(photos,1,'personal:rachel');const saving=button.handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'false');
+ f.get('mediaPrevious').handlers.get('click')();resolve({ok:true,json:async()=>({person:{profileFile:'b.jpg',profile:'/media/b'}})});await saving;
+ assert.equal(button.getAttribute('aria-pressed'),'false','The old photo must lose its mark when the new save succeeds');
+ f.get('mediaNext').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'true');f.close();f.window.FamilyMedia.open(photos,1,'personal:rachel');assert.equal(button.getAttribute('aria-pressed'),'true');
+ f.get('mediaNext').handlers.get('click')();const failing=button.handlers.get('click')();resolve({ok:false,json:async()=>({error:'Not saved'})});await failing;assert.equal(button.getAttribute('aria-pressed'),'false');assert.equal(button.disabled,false);assert.equal(owners.rachel.profileFile,'b.jpg');
+});
 test('wedding and baby albums offer their own cover selection without replacing a person profile',async()=>{
  for(const english of[false,true])for(const scope of['wedding:u-root','nursery:yona']){
   const f=fixture({english}),item={...f.photo('a'),file:'a.jpg'};let profileUpdates=0;f.window.FamilyApp.updatePerson=()=>profileUpdates++;
   f.window.FamilyI18n.fetch=async(path,options)=>{f.requests.push({path,options});return{ok:true,json:async()=>({saved:true,operation:'album-cover',scope,item,collection:{items:[item],count:1,cover:item.src}})};};
   f.window.FamilyMedia.open([item],0,scope);const button=f.get('openedProfilePhoto');assert.equal(button.hidden,false);assert.match(button.querySelector('span').textContent,scope.startsWith('wedding:')?(english?/wedding/:/חתונה/):(english?/baby/:/תינוקייה/));
-  await button.handlers.get('click')();assert.equal(f.requests[0].path,'api/collections/cover');assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection:scope,mediaId:'a'});assert.equal(profileUpdates,0);assert.equal(f.get('mediaViewer').open,true);assert.equal(button.disabled,false);
+  await button.handlers.get('click')();assert.equal(f.requests[0].path,'api/collections/cover');assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection:scope,mediaId:'a'});assert.equal(profileUpdates,0);assert.equal(f.get('mediaViewer').open,true);assert.equal(button.disabled,false);assert.equal(button.getAttribute('aria-pressed'),'true');
+  f.close();f.window.FamilyMedia.register(scope,[item],{cover:item.src+'?revision=latest'});f.window.FamilyMedia.open([item],0,scope);assert.equal(button.getAttribute('aria-pressed'),'true');
  }
 });
 test('desktop header captions follow photo navigation and both screen sizes retain their own description labels',()=>{

@@ -16,7 +16,7 @@ function fixture(english=false){
  const item=(id='one',collections=['gallery'])=>({id,kind:'photo',scope:'gallery',collections});
  const group=(photo=item(),scope='personal:tomer',viewer=false)=>{const node={dataset:{collectionPhoto:photo.id,collectionScope:scope,...(viewer?{collectionViewer:'true'}:{})},innerHTML:window.FamilyPhotoCollections.controls(photo,scope,{viewer})};groups.push(node);return node;};
  const button=(node,collection,pressed=false)=>({dataset:{photoCollection:collection},disabled:false,closest:()=>node,attributes:new Map([['aria-pressed',String(pressed)]]),getAttribute(key){return this.attributes.get(key);},setAttribute(key,value){this.attributes.set(key,value);},removeAttribute(key){this.attributes.delete(key);}});
- const click=target=>{const event=new Event('click');Object.defineProperty(event,'target',{value:{closest:()=>target}});document.dispatchEvent(event);};
+ const click=target=>{const event=new Event('click');Object.defineProperty(event,'target',{value:{closest:selector=>selector==='[data-photo-collection]'?target:null}});document.dispatchEvent(event);};
  const respond=async(index,photo,ok=true)=>{const body=JSON.parse(requests[index].options.body);requests[index].resolve({ok,json:async()=>ok?{operation:'collection',scope:body.collection,included:body.included??true,item:photo}:{error:'Connection lost'}});await flush();};
  const selected=(node,collection)=>new RegExp('data-photo-collection="'+collection+'"[^>]*aria-pressed="true"').test(node.innerHTML);
  return {window,document,groups,requests,messages,item,group,button,click,respond,selected};
@@ -34,6 +34,21 @@ test('viewers offer Family photos in both languages while profile thumbnails ret
   const unavailable=f.group(f.item(),'personal:extra');assert.equal((unavailable.innerHTML.match(/disabled/g)||[]).length,2);
   assert.equal(f.window.FamilyPhotoCollections.controls({...f.item(),kind:'video'},'personal:tomer'),'');
  }
+});
+test('every personal photo links to the owner wedding, even if the photo has no tags or wedding membership',()=>{
+ for(const english of [false,true]){
+  const f=fixture(english);f.window.FAMILY_DATA.people.avigail={id:'avigail',name:'Avigail'};f.window.FAMILY_DATA.people.paul={id:'paul',name:'Paul'};f.window.FAMILY_DATA.units.noble={id:'u-noble',people:['avigail','paul']};
+  for(const scope of ['personal:avigail','link:personal:avigail','nursery:avigail'])for(const photo of [f.item('first'),f.item('second')]){
+   const html=f.window.FamilyPhotoCollections.controls(photo,scope,{viewer:true});assert.match(html,/data-photo-wedding-link href="#weddings\/u-noble"/);assert.doesNotMatch(html,/data-photo-collection="wedding:u-noble"/);assert.doesNotMatch(html,/data-photo-wedding-link[^>]*hidden/);
+  }
+  assert.doesNotMatch(f.window.FamilyPhotoCollections.controls(f.item(),'personal:extra',{viewer:true}),/data-photo-album-kind="wedding"/,'A person without a partner does not get a wedding link');
+ }
+});
+test('shared photos link to tagged couples once and offer a chooser when several couples appear',()=>{
+ const f=fixture(),photo={...f.item(),tags:[{id:'tomer'},{id:'shani'}]};
+ let html=f.window.FamilyPhotoCollections.controls(photo,'gallery',{viewer:true});assert.equal((html.match(/data-photo-wedding-link /g)||[]).length,1);assert.match(html,/#weddings\/u-tomer/);
+ f.window.FAMILY_DATA.units.other={id:'u-other',people:['extra','partner']};
+ html=f.window.FamilyPhotoCollections.controls({...photo,tags:[...photo.tags,{id:'extra'}]},'gallery',{viewer:true});assert.match(html,/data-photo-wedding-choices/);assert.match(html,/aria-haspopup="dialog"/);
 });
 test('the family button adds and removes the exact photo immediately and a stale card cannot restore a removed selection',async()=>{
  const f=fixture(),g=f.group(f.item(),'gallery',true);assert.equal(f.selected(g,'photos'),false);

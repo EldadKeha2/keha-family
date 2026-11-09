@@ -3,7 +3,7 @@
   const I18n=window.FamilyI18n;
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const albums=new Map(),albumPages=new Map();
+  const albums=new Map(),albumPages=new Map(),albumCovers=new Map();
   const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null,paging:false,pageTarget:null,pageDirection:1,navigation:0};
   const identity=item=>item.id||item.file;
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
@@ -18,8 +18,9 @@
   function controls(item,scope){
     return I18n.html`<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?I18n.t('הסרת'):I18n.t('מחיקת')} ${safe(I18n.mediaName(item))}${linked(item,scope)?I18n.t(' מהאלבום'):''}">${I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט')}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
   }
-  function register(scope,items,{retainCurrent=false,pagination}={}){
+  function register(scope,items,{retainCurrent=false,pagination,cover}={}){
     albums.set(scope,items);
+    if(cover!==undefined)albumCovers.set(scope,cover);
     if(pagination)albumPages.set(scope,{...pagination});
     if(!$('mediaViewer')?.open||state.scope!==scope)return;
     if(state.paging&&pagination?.page===state.pageTarget){state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1);else $('mediaViewer').close();return;}
@@ -50,10 +51,16 @@
     $('downloadForInstagram').href=item.src;$('downloadForInstagram').download=item.filename||'';
     $('downloadForInstagram').textContent=item.kind==='video'?tr('הורדת הסרטון','Download video'):tr('הורדת התמונה','Download photo');
     $('mediaShareStatus').textContent='';$('mediaLinkFallback').hidden=true;
-    const ownerId=state.scope?.startsWith('personal:')?state.scope.slice(9):null,owner=ownerId&&(app()?.getPerson?.(ownerId)||window.FAMILY_DATA?.people?.[ownerId]),gender=['m','f'].includes(owner?.gender)?owner.gender:'unknown',profileButton=$('openedProfilePhoto');
+    const ownerId=state.scope?.startsWith('personal:')?state.scope.slice(9):null,owner=ownerId&&(app()?.getPersonSummary?.(ownerId)||app()?.getPerson?.(ownerId)||window.FAMILY_DATA?.people?.[ownerId]),gender=['m','f'].includes(owner?.gender)?owner.gender:'unknown',profileButton=$('openedProfilePhoto');
     const albumCover=/^(wedding|nursery):/.test(state.scope||'');
     profileButton.hidden=!((ownerId||albumCover)&&item.kind==='photo');profileButton.setAttribute('data-gender',gender);
-    const profileLabel=state.scope?.startsWith('wedding:')?tr('קבע כתמונת החתונה','Set wedding cover photo'):state.scope?.startsWith('nursery:')?tr('קבע כתמונת התינוקייה','Set baby album cover photo'):tr('קבע כתמונת פרופיל','Set profile photo');
+    const source=albumCover?albumCovers.get(state.scope):owner?.profile;
+    let selected=false;
+    if(!albumCover&&owner?.profileFile&&item.file)selected=owner.profileFile===item.file;
+    else if(source&&item.src){try{selected=new URL(source,location.origin).pathname===new URL(item.src,location.origin).pathname;}catch{}}
+    else if(!albumCover)selected=Boolean(owner?.profileId&&owner.profileId===item.id);
+    profileButton.setAttribute('aria-pressed',String(selected));
+    const profileLabel=state.scope?.startsWith('wedding:')?(selected?tr('זו תמונת החתונה','Current wedding cover photo'):tr('קבע כתמונת החתונה','Set wedding cover photo')):state.scope?.startsWith('nursery:')?(selected?tr('זו תמונת התינוקייה','Current baby album cover photo'):tr('קבע כתמונת התינוקייה','Set baby album cover photo')):(selected?tr('זו תמונת הפרופיל','Current profile photo'):tr('קבע כתמונת פרופיל','Set profile photo'));
     profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);profileButton.title=profileLabel;
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
@@ -235,6 +242,7 @@
     $('openedProfilePhoto').addEventListener('click',async()=>{
       const item=current(),scope=state.scope;if(!item||item.kind!=='photo'||!scope||!(/^(personal|wedding|nursery):/.test(scope)))return;
       const albumCover=!scope.startsWith('personal:'),id=scope.slice(9),button=$('openedProfilePhoto');button.disabled=true;
+      if(button.getAttribute('aria-pressed')==='true'){button.disabled=false;return;}
       try{
         const response=await I18n.fetch(albumCover?'api/collections/cover':'api/people/'+encodeURIComponent(id)+'/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify(albumCover?{collection:scope,mediaId:item.id}:{file:item.file})});
         const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));
@@ -243,7 +251,9 @@
         notify(albumCover?tr('תמונת הפרופיל של האלבום עודכנה ✓','Album cover photo updated ✓'):tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));
       }catch(error){notify(error.message);}finally{button.disabled=false;}
     });
-    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(!result.item)return;for(const [scope,items]of [...albums]){
+    const refreshProfile=event=>{if($('mediaViewer').open&&state.scope==='personal:'+event.detail.id)metadata();};
+    window.addEventListener('family-person-changed',refreshProfile);window.addEventListener('family-profile-changed',refreshProfile);
+    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.collection&&'cover' in result.collection)albumCovers.set(result.scope,result.collection.cover);if(!result.item)return;for(const [scope,items]of [...albums]){
       const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope),updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);
       // The visible photo may already be absent from the filtered album. Keep
       // its latest metadata, and pin it through every subsequent tag/scan event.

@@ -104,7 +104,7 @@
     if(scope()!==key)return;
     const collection=collections.get(key)||{items:[]},filter=filters.get(key)||'all',query=normalize(state.query);
     const items=collection.items.filter(item=>(filter==='all'||item.kind===filter)&&(!query||normalize(item.name+' '+item.caption+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
-    window.FamilyMedia.register(key,items);
+    window.FamilyMedia.register(key,items,{cover:collection.cover});
     const grid=$(gridId(key)),sameScope=grid.dataset.scope===key;
     const oldCards=new Map((sameScope?[...grid.children]:[]).filter(card=>card.dataset.mediaFile).map(card=>[card.dataset.mediaFile,card]));
     const cards=[];
@@ -292,7 +292,7 @@
       if(result.operation==='delete'){const id=draftKey(key,result.item.file);clearTimeout(drafts.get(id)?.timer);drafts.delete(id);}
       collections.set(key,result.collection);
       if(result.wedding){const id=result.wedding.id;summaries.set(id,result.wedding);if(details.has(id))details.set(id,{...details.get(id),...result.wedding,collection:result.collection});}
-      if(scope()===key)renderCollection(key);else window.FamilyMedia.register(key,result.collection.items);
+      if(scope()===key)renderCollection(key);else window.FamilyMedia.register(key,result.collection.items,{cover:result.collection.cover});
       if(state.view==='weddings'&&!state.weddingId)renderWeddings();
     });
     $('shareWedding').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(location.href);toast(I18n.t('הקישור לעמוד החתונה הועתק ✓'));}catch{toast(I18n.t('אפשר להעתיק את הקישור משורת הכתובת.'));}});

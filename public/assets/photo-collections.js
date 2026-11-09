@@ -24,14 +24,28 @@
     items.set(item.id,{...item,collections:[...collections],confirmed});
     if(items.size>512)items.delete(items.keys().next().value);
   }
+  function weddingTargets(item,scope){
+    const context=scope?.replace(/^link:/,''),family=window.FAMILY_DATA;
+    const owner=context?.startsWith('personal:')?context.slice(9):context?.startsWith('nursery:')?context.slice(8):null;
+    const people=new Set(owner?[owner]:[...(item.tags||[]).map(person=>person.id),...(item.personId?[item.personId]:[])]);
+    return Object.values(family?.units||{}).filter(pair=>pair.people?.length===2&&(context?.startsWith('wedding:')?pair.id===context.slice(8):pair.people.some(id=>people.has(id))));
+  }
+  const pairName=pair=>pair.people.map(id=>window.FamilyApp?.nameOf?.(id)||I.personName?.(window.FAMILY_DATA.people[id])||window.FAMILY_DATA.people[id]?.name||id).join(tr(' ו',' & '));
+  function weddingLink(pair,withName=false){const label=tr('עמוד החתונה של ','Wedding page for ')+pairName(pair);return `<a class="photo-collection-button" data-photo-wedding-link href="#weddings/${encodeURIComponent(pair.id)}" data-photo-album-kind="wedding" aria-label="${safe(label)}" title="${safe(label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg>${withName?`<span>${safe(pairName(pair))}</span>`:''}</a>`;}
+  function weddingControl(item,scope){
+    const pairs=weddingTargets(item,scope);if(!pairs.length)return '';
+    if(pairs.length===1)return weddingLink(pairs[0]);
+    const label=tr('עמודי החתונות של המתויגים בתמונה','Wedding pages for people in this photo');
+    return `<button type="button" class="photo-collection-button" data-photo-wedding-choices data-photo-album-kind="wedding" aria-haspopup="dialog" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg></button>`;
+  }
   function buttons(item,scope,viewer=false){
     const memberships=items.get(item.id)?.collections||item.collections||[item.scope];
-    return targets(scope,viewer).map(target=>{
+    return targets(scope,viewer).filter(target=>!viewer||target.icon!=='wedding').map(target=>{
       const active=memberships.includes(target.collection),busy=pending.has(item.id+':'+target.collection);
       const family=target.collection==='photos';
       const label=target.collection?(active?tr('הסרה מ','Remove from '):tr('הוספה ל','Add to '))+target.label:tr('אין לאדם זה אלבום מתאים: ','No album is available for this person: ')+target.label;
       return `<button type="button" class="photo-collection-button${family?' photo-collection-family':''}${active?' is-linked':''}" data-photo-collection="${safe(target.collection||'')}" data-photo-album-kind="${target.icon}" aria-label="${safe(label)}" title="${safe(label)}" aria-pressed="${active}" ${busy?'aria-busy="true" ':''}${!target.collection||busy?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true">${icons[target.icon]}</svg>${family?`<span class="photo-collection-name">${target.label}</span>`:''}</button>`;
-    }).join('');
+    }).join('')+(viewer?weddingControl(item,scope):'');
   }
   function controls(item,scope,{viewer=false}={}){
     if(item.kind!=='photo'||!item.id||(!viewer&&!scope?.startsWith('personal:')))return '';
@@ -59,6 +73,15 @@
     finally{pending.delete(key);button.disabled=false;button.removeAttribute('aria-busy');refresh();}
   }
   window.addEventListener('family-media-changed',event=>{const item=event.detail.item;if(item){remember(item,event.detail.operation==='collection'?event.detail:null);refresh();}});
-  document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-collection]');if(button){event.preventDefault();event.stopPropagation();add(button);}});
+  document.addEventListener('click',event=>{
+    const link=event.target.closest('[data-photo-wedding-link]');if(link&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){document.getElementById('photoWeddingChoices')?.close();document.getElementById('mediaViewer')?.close();return;}
+    if(event.target.closest('[data-close-photo-weddings]')){document.getElementById('photoWeddingChoices')?.close();return;}
+    const choices=event.target.closest('[data-photo-wedding-choices]');if(choices){
+      event.preventDefault();const group=choices.closest('[data-collection-photo]'),item=items.get(group?.dataset.collectionPhoto);if(!item)return;
+      let dialog=document.getElementById('photoWeddingChoices');if(!dialog){dialog=document.createElement('dialog');dialog.id='photoWeddingChoices';dialog.className='portal-dialog';dialog.setAttribute('aria-labelledby','photoWeddingChoicesTitle');document.body.append(dialog);}
+      dialog.innerHTML=`<button type="button" class="dialog-close" data-close-photo-weddings aria-label="${tr('סגירה','Close')}">×</button><h2 id="photoWeddingChoicesTitle">${tr('לאיזה עמוד חתונה לעבור?','Choose a wedding page')}</h2><div class="photo-wedding-options">${weddingTargets(item,group.dataset.collectionScope).map(pair=>weddingLink(pair,true)).join('')}</div>`;dialog.showModal();return;
+    }
+    const button=event.target.closest('[data-photo-collection]');if(button){event.preventDefault();event.stopPropagation();add(button);}
+  });
   window.FamilyPhotoCollections={controls};
 })();
