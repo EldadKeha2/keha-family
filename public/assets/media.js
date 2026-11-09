@@ -11,7 +11,7 @@
   const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
   let noticeTimer,expectedCaption='',captionEditing=false;
   let renderedVersion=null,instagramPrepared={key:null,file:null};
-  let restoringLink='';
+  let restoringLink='',photoSwipe=null;
   const tr=(he,en)=>I18n.isEnglish?en:he;
   function shareURL(item){const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);url.hash='gallery';return url.href;}
 
@@ -67,6 +67,7 @@
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
     const page=albumPages.get(state.scope),total=page?.total??state.items.length,offset=page?(page.page-1)*page.size:0;
+    $('mediaStage').classList.toggle('photo-swipe-enabled',item.kind==='photo'&&total>1&&!state.paging);
     $('mediaViewerCounter').textContent=`${offset+state.index+1} / ${total}`;
     $('mediaPrevious').hidden=$('mediaNext').hidden=total<2;
     $('mediaPrevious').disabled=$('mediaNext').disabled=state.paging;
@@ -115,6 +116,7 @@
     finally{if(isCurrent()){button.disabled=false;button.removeAttribute('aria-busy');}}
   }
   function clearStage(){
+    photoSwipe?.reset();
     renderedVersion=null;
     window.FamilyFaces?.clear();
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
@@ -224,6 +226,14 @@
     try{const response=await I18n.fetch('api/media/'+item.id+'/caption',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({caption:$('openedCaptionText').value,expectedCaption})});const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));captionEditing=false;$('openedCaptionForm').hidden=true;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));}catch(error){$('openedCaptionError').textContent=error.message;}finally{button.disabled=false;}
   }
   function init(){
+    const stage=$('mediaStage');
+    photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
+      enabled:()=>$('mediaViewer').open&&current()?.kind==='photo'&&!state.paging&&!captionEditing&&
+        (albumPages.get(state.scope)?.total??state.items.length)>1&&
+        !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open]')&&
+        (window.FamilyFaces?.canNavigate?.(stage)??true),
+      step,isEnglish:()=>I18n.isEnglish
+    });
     $('editOpenedPhoto')?.addEventListener('click',async()=>{
       const item=current();if(!item||item.kind!=='photo')return;
       if(!app()?.apiEnabled||!window.FamilyPhotoEditor?.edit){notify(tr('העורך אינו זמין כרגע. נסו לרענן.','The editor is unavailable. Please refresh.'));return;}

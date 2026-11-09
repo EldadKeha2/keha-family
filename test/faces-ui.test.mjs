@@ -55,6 +55,16 @@ function fixture(detected=[],{desktop=false}={}){
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
 
+test('photo navigation waits for fitted zoom and finished face editing, and clears zoom styling on the next photo',async()=>{
+ const f=fixture([first]);await f.mount();assert.equal(f.faces.canNavigate(f.stage),true);
+ const toolbar=f.find('face-zoom-toolbar');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
+ assert.equal(f.faces.canNavigate(f.stage),false);assert.equal(f.stage.classList.contains('face-photo-enlarged'),true);
+ f.emit(toolbar.querySelector('[data-face-zoom-reset]'),'click');assert.equal(f.faces.canNavigate(f.stage),true);assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);
+ f.emit(f.stage,'click',{target:f.image,clientX:200,clientY:220,detail:1});assert.equal(f.faces.canNavigate(f.stage),false);
+ f.faces.dismiss();assert.equal(f.faces.canNavigate(f.stage),true);
+ f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');f.faces.clear();assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);assert.equal(f.faces.canNavigate(f.stage),true);
+});
+
 test('face controls can mount after the phone layout has moved the edit button below the photo',async()=>{
  const f=fixture([first]);f.dialog.append(f.edit);await f.mount('moved-controls',{}, {scope:'gallery'});
  assert.ok(f.find('face-review-button'));assert.ok(f.find('face-regions-toggle'));assert.ok(f.find('face-zoom-toolbar'));f.faces.clear();

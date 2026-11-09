@@ -6,6 +6,7 @@ import {readFile} from 'node:fs/promises';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
+const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
@@ -34,10 +35,64 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>new Node(),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
   if(browser)window.addEventListener=browser.addEventListener;
   const context=vm.createContext({window,document,location,navigator,File,Blob,URL,CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
-  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
+  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(swipeSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
+
+function pointer(f,type,x,y=100,extra={}){
+ const event={pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:x,clientY:y,cancelable:true,target:{closest:()=>null},preventDefault(){this.prevented=true;},...extra};
+ f.events.get(type)?.(event);
+ if(type==='pointerdown')f.get('mediaStage').handlers.get(type)?.(event);
+ return event;
+}
+function swipe(f,dx,extra={}){pointer(f,'pointerdown',200,100,extra);pointer(f,'pointermove',200+dx,103,extra);pointer(f,'pointerup',200+dx,103,extra);}
+test('touch swipes navigate every photo album in both languages and on wide touch screens',()=>{
+ for(const english of [false,true])for(const width of [360,1440])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nostalgia','nursery:ruti']){
+  const f=fixture({english});f.get('mediaStage').clientWidth=width;
+  f.window.FamilyMedia.open([f.photo('a'),f.photo('b'),f.photo('c')],0,scope);
+  swipe(f,english?-120:120);assert.equal(f.get('mediaOriginal').href,'/media/b',scope);
+  swipe(f,english?120:-120);assert.equal(f.get('mediaOriginal').href,'/media/a',scope);
+  swipe(f,english?120:-120);assert.equal(f.get('mediaOriginal').href,'/media/c','Previous wraps just like its arrow');
+ }
+});
+test('taps, short drags, vertical scrolling, mouse drags and gestures over controls leave the photo in place',()=>{
+ const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
+ swipe(f,4);swipe(f,20);swipe(f,120,{pointerType:'mouse'});swipe(f,120,{target:{closest:()=>({})}});
+ pointer(f,'pointerdown',100,100);pointer(f,'pointermove',110,220);pointer(f,'pointerup',240,225);
+ assert.equal(f.get('mediaOriginal').href,'/media/a');
+ const tap={detail:1,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;}};
+ pointer(f,'pointerdown',100);pointer(f,'pointerup',100);f.get('mediaStage').handlers.get('click')(tap);assert.equal(tap.prevented,undefined,'An ordinary tap still reaches face tagging');
+});
+test('pinch, cancelled and stale gestures never navigate and swipes cannot activate a face tag',()=>{
+ const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
+ pointer(f,'pointerdown',100);pointer(f,'pointermove',150);pointer(f,'pointerdown',200,100,{pointerId:2,isPrimary:false});pointer(f,'pointerup',240);
+ pointer(f,'pointerdown',100);pointer(f,'pointermove',230);pointer(f,'pointercancel',230);pointer(f,'pointerup',230);
+ pointer(f,'pointerdown',100);f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'photos');pointer(f,'pointerup',240);
+ assert.equal(f.get('mediaOriginal').href,'/media/a');
+ swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/b');
+ const click={detail:1,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;}};
+ f.get('mediaStage').handlers.get('click')(click);assert.equal(click.prevented,true);assert.equal(click.stopped,true);
+ const keyboard={...click,detail:0,prevented:false,stopped:false};f.get('mediaStage').handlers.get('click')(keyboard);assert.equal(keyboard.prevented,false);
+});
+test('zoom, active tag edits, caption edits, other dialogs, videos and single-photo albums block swipes',()=>{
+ const f=fixture();f.get('mediaStage').clientWidth=360;
+ const open=()=>f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');open();
+ f.window.FamilyFaces={canNavigate:()=>false,clear(){},update(){},mount(){}};swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
+ f.window.FamilyFaces.canNavigate=()=>true;f.get('editOpenedCaption').handlers.get('click')();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
+ f.get('cancelOpenedCaption').handlers.get('click')();f.document.querySelector=()=>({open:true});swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');f.document.querySelector=()=>null;
+ f.window.FamilyMedia.open([{...f.photo('a'),kind:'video'},f.photo('b')],0,'videos');swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
+ f.open();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
+ open();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/b');
+});
+test('swiping across gallery pages preserves pagination and ignores additional gestures while loading',async()=>{
+ const f=fixture(),pages=[],pagination={page:1,pages:2,size:2,total:4};f.get('mediaStage').clientWidth=360;
+ let finish;f.window.FamilyPortal={pageGallery(page){pages.push(page);return new Promise(resolve=>{finish=()=>{f.window.FamilyMedia.register('gallery',[f.photo('c'),f.photo('d')],{pagination:{...pagination,page}});resolve();};});}};
+ f.window.FamilyMedia.register('gallery',[f.photo('a'),f.photo('b')],{pagination});f.window.FamilyMedia.openFrom('gallery','b');
+ swipe(f,120);swipe(f,120);assert.deepEqual(pages,[2]);finish();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.get('mediaOriginal').href,'/media/c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 4');
+ swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/d');
+});
 test('photo viewers request the family album toggle and keep current pixels while membership changes',()=>{
  const f=fixture(),calls=[];f.window.FamilyPhotoCollections={controls(item,scope,options){calls.push({item,scope,options});return item.kind==='photo'?'family-toggle':'';}};
  f.open();assert.equal(calls.at(-1).options.viewer,true);assert.equal(f.get('mediaViewerCollections').innerHTML,'family-toggle');
