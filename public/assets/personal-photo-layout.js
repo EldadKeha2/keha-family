@@ -27,10 +27,11 @@
     if(controller&&(changed||widthChanged))window.FamilyFaces?.fit?.();
     const actual=image.getBoundingClientRect(),viewport=controller?.scroller?.getBoundingClientRect()||actual,column=rightRail.getBoundingClientRect();
     const top=Math.max(actual.top,viewport.top)-column.top,height=Math.max(0,Math.min(actual.bottom,viewport.bottom)-Math.max(actual.top,viewport.top));
-    const albumHeight=rail*3+gap*2,leftHeight=rail*4+gap*3,editTop=top+height-rail,trashTop=editTop-gap-rail;
-    frame.style.setProperty('--personal-albums-top',Math.max(0,top+(height-leftHeight)/2)+'px');
+    const leftHeight=rail*4+gap*3,editTop=top+height-rail,trashTop=editTop-gap-rail;
+    const controlsTop=Math.max(0,top+(height-leftHeight)/2);
+    frame.style.setProperty('--personal-albums-top',controlsTop+'px');
     frame.style.setProperty('--personal-edit-top',Math.max(0,editTop)+'px');frame.style.setProperty('--personal-trash-top',Math.max(0,trashTop)+'px');
-    frame.style.setProperty('--personal-zoom-top',Math.max(0,Math.min(top+(height-albumHeight)/2,trashTop-gap-albumHeight))+'px');
+    frame.style.setProperty('--personal-zoom-top',controlsTop+'px');
   }
   function restore(){
     if(!active)return;

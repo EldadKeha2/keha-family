@@ -85,11 +85,11 @@ test('the red side trash uses the exact album removal handler and mirrors its di
  remove.disabled=true;f.sync();assert.equal(shortcut.disabled,true);shortcut.click();assert.equal(requests,1);
  remove.hidden=true;f.sync();assert.equal(shortcut.hidden,true);f.api.restore();assert.equal(f.get('personalPhotoTrashButton'),null);
 });
-test('photo-fit geometry hugs the rendered image, centers both rails and keeps the red trash above bottom-right editing',()=>{
+test('photo-fit geometry hugs the rendered image, aligns rail starts and keeps the red trash above bottom-right editing',()=>{
  const f=fixture();f.sync();const frame=f.get('personalPhotoFrame');frame.clientWidth=1200;frame.computed={columnGap:'12px',paddingLeft:'16px',paddingRight:'16px'};
  const image=f.add('actualPhoto',f.get('mediaStage'),'img');image.naturalWidth=1200;image.naturalHeight=800;image.getBoundingClientRect=()=>({top:40,bottom:540,width:750,height:500});
  f.controller.image=image;f.controller.scroller={computed:{maxHeight:'500px'},getBoundingClientRect:()=>({top:40,bottom:540,width:750,height:500})};f.get('personalPhotoRight').getBoundingClientRect=()=>({top:40});f.sync();
  const value=key=>parseFloat(frame.style.getPropertyValue(key)),rail=value('--personal-rail'),zoom=rail*3+24,left=rail*4+36;
- assert.equal(value('--personal-photo-width'),750);assert.ok(Math.abs(value('--personal-albums-top')+left/2-250)<.01);assert.ok(Math.abs(value('--personal-zoom-top')+zoom/2-250)<.01);
+ assert.equal(value('--personal-photo-width'),750);assert.ok(Math.abs(value('--personal-albums-top')+left/2-250)<.01);assert.equal(value('--personal-zoom-top'),value('--personal-albums-top'));
  assert.ok(Math.abs(value('--personal-edit-top')+rail-500)<.01);assert.ok(value('--personal-trash-top')+rail+11.9<=value('--personal-edit-top'));assert.ok(value('--personal-zoom-top')+zoom+11.9<=value('--personal-trash-top'));
 });
