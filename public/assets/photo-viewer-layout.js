@@ -41,7 +41,12 @@
         move(ages,moment,date);if(controls?.regionsButton)move(controls.regionsButton,moment,ages||date);
         move(names,moment,controls?.regionsButton||ages||date);
       }
-      arrange(icons,[moment,controls?.toolbar,controls?.reviewButton,$('mediaViewerCollections'),$('openedProfilePhoto'),$('editOpenedPhoto'),$('editOpenedCaption'),$('mediaOriginal'),$('mediaShareActions'),$('mediaViewerDelete')]);
+      if(controls?.toolbar){
+        move(controls.toolbar,header);
+        controls.toolbar.querySelector('[data-face-zoom-out]').dataset.zoomLabel=tr('הקטן','Zoom out');
+        controls.toolbar.querySelector('[data-face-zoom-in]').dataset.zoomLabel=tr('הגדל','Zoom in');
+      }
+      arrange(icons,[moment,controls?.reviewButton,$('mediaViewerCollections'),$('openedProfilePhoto'),$('editOpenedPhoto'),$('editOpenedCaption'),$('mediaOriginal'),$('mediaShareActions'),$('mediaViewerDelete')]);
       arrange(feedback,[controls?.regionsNote,controls?.reviewStatus,$('mediaShareStatus'),$('mediaLinkFallback'),$('instagramShareHelp')]);
       const reset=controls?.toolbar?.querySelector('[data-face-zoom-reset]');fit.disabled=!reset||reset.disabled;
       if(photoId!==item.id){photoId=item.id;strip.scrollLeft=0;}
