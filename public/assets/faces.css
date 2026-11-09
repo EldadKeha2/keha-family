@@ -15,7 +15,7 @@
 .face-layer{position:absolute;inset:0;pointer-events:none;z-index:2}
 .face-image-area{position:absolute;pointer-events:none}
 .face-visible-labels{position:absolute;inset:0;pointer-events:none}
-.face-label-leader{position:absolute;height:1px;background:#426535;transform-origin:left center;box-shadow:0 0 1px #fff;pointer-events:none}
+.face-label-leader{position:absolute;height:1.5px;border-radius:1px;background:#f3d792;transform-origin:left center;box-shadow:0 0 0 .6px #4b3925e6;pointer-events:none}
 .face-label-marker,.face-label-number{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:18px;height:18px;border-radius:50%;background:#426535;color:#fff;font:700 11px/1 Arial,sans-serif}
 .face-label-marker{position:absolute;z-index:4;pointer-events:none}
 .face-visible-labels .face-label-number{display:none}

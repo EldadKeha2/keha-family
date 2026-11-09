@@ -19,7 +19,8 @@ body[data-active-view=home] .workspace-header{display:none}
 }
 @media(min-width:701px){
  .phone-home-view{max-width:1160px}
- .home-slide-open{height:clamp(420px,65vh,760px);--home-slide-edge-shift:0px;--home-slide-in-scale:1;--home-slide-out-scale:1}
+ /* Reserve the rest of the first screen for the header, controls and tiles. */
+ .home-slide-open{height:clamp(140px,calc(100dvh - 550px),440px);--home-slide-edge-shift:0px;--home-slide-in-scale:1;--home-slide-out-scale:1}
  .home-slide-open img{object-fit:contain}
 }
 @media(prefers-reduced-motion:reduce){
