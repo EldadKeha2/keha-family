@@ -18,10 +18,26 @@
   function controls(item,scope){
     return I18n.html`<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?I18n.t('הסרת'):I18n.t('מחיקת')} ${safe(I18n.mediaName(item))}${linked(item,scope)?I18n.t(' מהאלבום'):''}">${I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט')}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
   }
+  function routeAlbum(){
+    const [view,raw]=new URL(location.href).hash.slice(1).split('/');let id;
+    try{id=raw&&decodeURIComponent(raw);}catch{return null;}
+    if(view==='person'&&id)return 'personal:'+id;
+    if(view==='weddings'&&id)return 'wedding:'+id;
+    if(view==='nursery'&&id)return 'nursery:'+id;
+    return ['gallery','photos','videos','nostalgia'].includes(view)?view:null;
+  }
+  function registeredLink(id){
+    const preferred=routeAlbum(),scopes=preferred?[preferred]:[...albums.keys()].filter(scope=>!scope.startsWith('link:'));
+    for(const scope of scopes){const items=albums.get(scope)||[],index=items.findIndex(item=>identity(item)===id);if(index>=0)return {scope,items,index};}
+    return null;
+  }
   function register(scope,items,{retainCurrent=false,pagination,cover}={}){
     albums.set(scope,items);
     if(cover!==undefined)albumCovers.set(scope,cover);
     if(pagination)albumPages.set(scope,{...pagination});
+    // A direct photo can arrive before its album. Adopt the matching route's
+    // album in place so the image, face editor, zoom and focus survive loading.
+    if($('mediaViewer')?.open&&state.scope?.startsWith('link:')&&scope===routeAlbum()&&new URL(location.href).searchParams.get('media')===state.activeId&&items.some(item=>identity(item)===state.activeId))state.scope=scope;
     if(!$('mediaViewer')?.open||state.scope!==scope)return;
     if(state.paging&&pagination?.page===state.pageTarget){state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1,{direction:state.pageDirection,native:state.pageNative});else $('mediaViewer').close();return;}
     const id=state.activeId,active=current();let index=items.findIndex(item=>identity(item)===id);
@@ -240,10 +256,10 @@
     const href=location.href,id=new URL(href).searchParams.get('media');
     if(!id){restoringLink='';if($('mediaViewer').open)$('mediaViewer').close();return;}
     if($('mediaViewer').open&&state.activeId===id||restoringLink===href)return;
-    for(const [scope,items]of albums){const index=items.findIndex(item=>identity(item)===id);if(index>=0){open(items,index,scope);return;}}
+    const known=registeredLink(id);if(known){open(known.items,known.index,known.scope);return;}
     if(!/^[a-f0-9]{32}$/.test(id))return;
     restoringLink=href;
-    try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
+    try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));const loaded=registeredLink(id);if(loaded)open(loaded.items,loaded.index,loaded.scope);else open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
   async function saveOpenedCaption(event){
     event.preventDefault();const item=current();if(!item)return;

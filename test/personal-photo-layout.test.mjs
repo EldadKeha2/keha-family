@@ -55,7 +55,7 @@ test('only supported desktop photo contexts use the layout; phones, nostalgia, v
  const f=fixture({ua:'Windows NT 10.0',touch:10});f.sync();assert.equal(f.viewer.classList.contains('personal-photo-desktop'),true,'A touch-screen Windows computer still uses the desktop layout');
 });
 test('family, wedding, nursery and personal viewers keep the same structure in desktop browser and installed Windows app',()=>{
- for(const scope of ['personal:avigail','gallery','photos','wedding:u-noble','nursery:avigail'])for(const english of [false,true])for(const installed of [false,true]){
+ for(const scope of ['personal:avigail','gallery','photos','wedding:u-noble','nursery:avigail','link:direct-photo'])for(const english of [false,true])for(const installed of [false,true]){
   const f=fixture({scope,english,installed});f.sync();assert.equal(f.viewer.classList.contains('personal-photo-desktop'),true,scope);assert.equal(f.viewer.classList.contains('personal-photo-shared'),!scope.startsWith('personal:'));
   for(const [id,parent]of [['mediaStage','personalPhotoFrame'],['mediaViewerCollections','personalPhotoAlbums'],['editOpenedPhoto','personalPhotoEdit'],['photoMomentTools','personalPhotoInformation'],['editOpenedCaption','personalPhotoPrimary'],['mediaShareActions','personalPhotoBelow']])assert.equal(f.get(id).parentNode.id,parent,scope+' / '+id);
   assert.equal(f.get('personalPhotoCounter').textContent,english?'Photo 1 of 12':'תמונה 1 מתוך 12');

@@ -8,7 +8,7 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 const source=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
-function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false}={}){
+function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
     constructor(){this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.classList={toggle(){}};this.children=new Map();this.content=[];}
@@ -27,10 +27,10 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
     close(){this.open=false;this.handlers.get('close')?.();}
   }
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
-  const browser=navigation?browserHistory('https://family.test/?lang='+(english?'en-US':'he')+'#gallery'):null;
-  const location=browser?.location||{origin:'https://family.test',href:'https://family.test/?lang='+(english?'en-US':'he')+'#gallery'};
+  const initial=url||'https://family.test/?lang='+(english?'en-US':'he')+'#gallery',browser=navigation?browserHistory(initial):null;
+  const location=browser?.location||{origin:'https://family.test',href:initial};
   const window={FamilyApp:{apiEnabled:true,toast(){}},FamilyTags:{taggable:item=>['photo','video'].includes(item.kind),mountInline(){},clearInline(){},controls:()=>'',labels:()=>''},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);},dispatchEvent(event){for(const fn of windowEvents.get(event.type)||[])fn(event);}};
-  window.FamilyI18n={isEnglish:english,language:english?'en-US':'he',t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:p=>p.name||'',fetch:async(path,options)=>{requests.push({path,options});return{ok:true,blob:()=>defer?new Promise(resolve=>pending.push(resolve)):Promise.resolve(new Blob(['picture'],{type:'image/jpeg'}))};}};
+  window.FamilyI18n={isEnglish:english,language:english?'en-US':'he',t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:p=>p.name||'',fetch:async(path,options)=>{requests.push({path,options});if(path.endsWith('/view')&&loadView)return loadView(path,options);return{ok:true,blob:()=>defer?new Promise(resolve=>pending.push(resolve)):Promise.resolve(new Blob(['picture'],{type:'image/jpeg'}))};}};
   const navigator={userActivation:{isActive:true},clipboard:{async writeText(value){if(!clipboard)throw Error('Unavailable');copied.push(value);}}};
   if(native){navigator.canShare=()=>files;navigator.share=async data=>{shared.push(data);if(cancel)throw Object.assign(Error('Cancelled'),{name:'AbortError'});};}
   const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>new Node(),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
@@ -40,6 +40,34 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
+
+test('direct photos adopt their route album after loading without resetting the image or active editing',async()=>{
+ const id='a'.repeat(32),item={id,kind:'photo',scope:'gallery',mime:'image/jpeg',src:'/media/'+id,tags:[]};
+ for(const [route,scope]of [['person/ora','personal:ora'],['weddings/u-fish','wedding:u-fish'],['nursery/ora','nursery:ora'],['gallery','gallery'],['photos','photos']]){
+  const f=fixture({navigation:true,url:'https://family.test/?media='+id+'#'+route,loadView:async()=>({ok:true,json:async()=>({item})})});await f.browser.flush();
+  assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),'link:'+id);const image=f.get('mediaStage').content[0];let clears=0,updates=0;f.window.FamilyFaces={mount(){},clear(){clears++;},update(){updates++;}};
+  f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='Unfinished caption';
+  f.window.FamilyMedia.register(scope==='gallery'?'photos':'gallery',[item]);assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),'link:'+id,'An unrelated album must not claim the open photo');
+  f.window.FamilyMedia.register(scope,[f.photo('before'),item,f.photo('after')]);
+  assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),scope);assert.equal(f.get('mediaViewerCounter').textContent,'2 / 3');assert.equal(f.get('mediaPrevious').hidden,false);assert.equal(f.get('mediaNext').hidden,false);
+  assert.equal(f.get('mediaStage').content[0],image);assert.equal(clears,0);assert.equal(updates,1);assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.get('openedCaptionText').value,'Unfinished caption');assert.equal(f.window.FamilyMedia.current().id,id);
+  assert.equal(f.requests.length,1);f.get('cancelOpenedCaption').handlers.get('click')();f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaOriginal').href,'/media/after');f.close();
+ }
+});
+test('a direct photo response rechecks the preferred album when other albums finished first',async()=>{
+ const id='b'.repeat(32),item={id,kind:'photo',scope:'gallery',mime:'image/jpeg',src:'/media/'+id,tags:[]};let finish;
+ const f=fixture({navigation:true,url:'https://family.test/?media='+id+'#person/ora',loadView:()=>new Promise(resolve=>{finish=resolve;})});
+ f.window.FamilyMedia.register('gallery',[item]);f.window.FamilyMedia.register('personal:ora',[f.photo('before'),item,f.photo('after')]);
+ finish({ok:true,json:async()=>({item})});await f.browser.flush();assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),'personal:ora');assert.equal(f.get('mediaViewerCounter').textContent,'2 / 3');assert.equal(f.get('openedProfilePhoto').hidden,false);f.close();
+});
+test('late album loading cannot reopen a closed direct photo or replace another selected photo',async()=>{
+ const id='c'.repeat(32),item={id,kind:'photo',scope:'gallery',src:'/media/'+id,tags:[]};
+ for(const action of ['closed','different-photo']){
+  const f=fixture({navigation:true,url:'https://family.test/?media='+id+'#person/ora',loadView:async()=>({ok:true,json:async()=>({item})})});await f.browser.flush();
+  if(action==='closed')f.close();else f.window.FamilyMedia.open([f.photo('other')],0,'photos');
+  f.window.FamilyMedia.register('personal:ora',[item]);assert.equal(f.get('mediaViewer').open,action!=='closed');if(action==='different-photo')assert.equal(f.window.FamilyMedia.current().id,'other');f.close();
+ }
+});
 
 function pointer(f,type,x,y=100,extra={}){
  const event={pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:x,clientY:y,cancelable:true,target:{closest:()=>null},preventDefault(){this.prevented=true;},...extra};
