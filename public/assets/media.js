@@ -268,6 +268,7 @@
   }
   function init(){
     const stage=$('mediaStage');
+    $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
       enabled:()=>canNavigatePhoto()&&!window.FamilyPhotoNative?.has(stage),
       step,isEnglish:()=>I18n.isEnglish,
@@ -329,8 +330,8 @@
     $('mediaViewer').addEventListener('close',()=>{state.navigation++;state.paging=false;state.pageTarget=null;instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open]')||event.target.closest('input,textarea'))return;
-      if(event.key===(I18n.isEnglish?'ArrowLeft':'ArrowRight')){event.preventDefault();step(-1);}
-      if(event.key===(I18n.isEnglish?'ArrowRight':'ArrowLeft')){event.preventDefault();step(1);}
+      if(event.key==='ArrowLeft'){event.preventDefault();step(-1);}
+      if(event.key==='ArrowRight'){event.preventDefault();step(1);}
     });
   }
   window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify,current,refreshPhotoPresentation,isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};

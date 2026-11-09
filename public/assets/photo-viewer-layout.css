@@ -6,6 +6,8 @@
 #mediaViewer.photo-controls-below .media-viewer-paging{display:contents}
 #mediaViewer.photo-controls-below .media-viewer-paging #mediaPrevious{grid-area:1 / 2;min-width:32px;width:36px;min-height:44px;padding:1px;background:transparent}
 #mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{grid-area:1 / 4;min-width:32px;width:36px;min-height:44px;padding:1px;background:transparent}
+html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaPrevious{grid-area:1 / 4}
+html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{grid-area:1 / 2}
 #mediaViewer.photo-controls-below .media-paging-label{font-size:calc(10px * var(--a11y-text-scale,1))}
 #mediaViewer.photo-controls-below [data-paging-arrow]{font-size:19px}
 #mediaViewer.photo-controls-below #mediaViewerCounter{position:absolute;inset-inline-end:4px;bottom:3px;width:28px;text-align:center;font:8.5px/1.1 Arial,sans-serif}

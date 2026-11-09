@@ -50,6 +50,12 @@ test('a committed drag continues from its existing position in one motion',()=>{
  const stage={clientWidth:640,classList:classes,querySelector:s=>s==='.face-photo-scroll'?scroller:image,getBoundingClientRect:()=>({left:0,top:0}),append(){}};
  vm.runInNewContext(presentation,{window,document:{createElement:()=>ghost},navigator:{},matchMedia:()=>({matches:false}),setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation;p.drag(stage,-100);const captured=p.snapshot(stage);p.slide(stage,captured,1);assert.equal(frames[0][1].transform,'translateX(-540px)');assert.equal(frames[1][0].transform,'translateX(540px)');p.cancel();
 });
+test('arrow animations capture the displayed photo rather than an off-screen native neighbour',()=>{
+ const window={},ghost={style:{},setAttribute(){}},shown={src:'/shown-photo',naturalWidth:2048,animate(){},getBoundingClientRect:()=>({left:20,top:10,width:640,height:400})},neighbour={...shown,src:'/off-screen-neighbour',getBoundingClientRect:()=>({left:-620,top:10,width:640,height:400})};
+ const stage={querySelector:selector=>selector==='img'?neighbour:selector==='.face-photo-scroll img'?shown:null,getBoundingClientRect:()=>({left:0,top:0})};
+ vm.runInNewContext(presentation,{window,document:{createElement:()=>ghost},navigator:{},matchMedia:()=>({matches:false}),setTimeout,clearTimeout});
+ const result=window.FamilyPhotoPresentation.snapshot(stage);assert.match(result.style.backgroundImage,/shown-photo/);assert.doesNotMatch(result.style.backgroundImage,/neighbour/);assert.equal(result.style.left,'20px');
+});
 test('a heavy photo gets grid and viewer copies while its original URL remains intact',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const requests=[],dimensions=[],images=[],window={FamilyApp:{apiEnabled:true},FAMILY_API_TOKEN:'test',dispatchEvent(){}};
  const item={id:'a',kind:'photo',mime:'image/jpeg',src:'/media/a',size:4000000},image={naturalWidth:6567,naturalHeight:4137,src:'/media/a'};

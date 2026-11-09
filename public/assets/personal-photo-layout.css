@@ -4,8 +4,8 @@
  #mediaViewer.personal-photo-desktop .media-viewer-header{display:grid;grid-template-columns:44px minmax(0,1fr) auto minmax(0,max-content) auto minmax(0,1fr) 44px;align-items:center;gap:20px;direction:ltr;padding:12px 20px;border-bottom:1px solid #ded4bd}
  #mediaViewer.personal-photo-desktop #mediaViewerTitle,#mediaViewer.personal-photo-desktop #mediaViewerCounter{display:none}
  #mediaViewer.personal-photo-desktop .media-viewer-paging{display:contents}
- #mediaViewer.personal-photo-desktop #mediaNext{grid-column:3;grid-row:1;justify-self:end;margin-right:clamp(24px,4vw,64px)}
- #mediaViewer.personal-photo-desktop #mediaPrevious{grid-column:5;grid-row:1;justify-self:start;margin-left:clamp(24px,4vw,64px)}
+ #mediaViewer.personal-photo-desktop #mediaNext{grid-column:5;grid-row:1;justify-self:start;margin-left:clamp(24px,4vw,64px)}
+ #mediaViewer.personal-photo-desktop #mediaPrevious{grid-column:3;grid-row:1;justify-self:end;margin-right:clamp(24px,4vw,64px)}
  #mediaViewer.personal-photo-desktop #closeMediaViewer{grid-column:1;grid-row:1;width:38px;height:38px;min-height:38px;padding:0;border:1px solid #baaa84;border-radius:7px;background:#fcf9f0;color:#635b43;font-size:30px}
  #mediaViewer.personal-photo-desktop #personalPhotoHeading{grid-column:4;grid-row:1;min-width:0;max-width:60vw;text-align:center;direction:rtl}
  html[dir=ltr] #mediaViewer.personal-photo-desktop #personalPhotoHeading{direction:ltr}

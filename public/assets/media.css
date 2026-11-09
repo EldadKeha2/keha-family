@@ -70,5 +70,6 @@
 .media-viewer-header .media-viewer-paging .media-paging-button[hidden]{display:none}
 .media-paging-button [data-paging-arrow]{display:block;font:calc(23px * var(--a11y-text-scale,1))/1 Arial,sans-serif}
 .media-paging-button .media-paging-label{font:calc(13px * var(--a11y-text-scale,1))/1.2 var(--sans);white-space:nowrap}
+html[dir=rtl] #mediaViewer .media-viewer-paging{direction:ltr}
 @media(max-width:600px){.media-viewer-header .media-viewer-paging .media-paging-button{min-width:40px;min-height:46px;padding:3px 2px}.media-paging-button .media-paging-label{font-size:calc(11px * var(--a11y-text-scale,1))}html[lang^=en] .media-viewer-header .media-viewer-paging .media-paging-button{min-width:48px}}
 @media(max-width:380px){.media-viewer-header{gap:4px}.media-viewer-header h2{gap:3px}.media-viewer-header .media-viewer-paging{gap:3px}html[lang^=en] .media-viewer-header .media-viewer-paging .media-paging-button{min-width:44px}html[lang^=en] .media-paging-button .media-paging-label{font-size:calc(10px * var(--a11y-text-scale,1))}}

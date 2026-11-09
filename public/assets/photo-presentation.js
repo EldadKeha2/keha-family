@@ -2,6 +2,7 @@
   'use strict';
   const prepared=new Map();let motion=null,dragged=null,serial=0;
   const source=item=>item.previewSrc||item.src;
+  const photoImage=stage=>stage._familyFaceContext?.image||stage.querySelector('.face-photo-scroll img')||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
   function prepare(item,priority='high',original=false){
     if(item?.kind!=='photo'||typeof Image==='undefined')return null;
     const src=original?item.src:source(item);
@@ -40,7 +41,7 @@
     if(from&&!matchMedia('(prefers-reduced-motion: reduce)').matches)node.animate?.([{transform:from},{transform:'translateX(0)'}],{duration:160,easing:'ease-out'});
   }
   function snapshot(stage){
-    const image=stage.querySelector('img');if(!image?.getBoundingClientRect||!image.naturalWidth||!image.animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return null;
+    const image=photoImage(stage);if(!image?.getBoundingClientRect||!image.naturalWidth||!image.animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return null;
     const r=image.getBoundingClientRect(),s=stage.getBoundingClientRect(),ghost=document.createElement('div');
     ghost.className='media-slide-outgoing';ghost.setAttribute('aria-hidden','true');
     ghost.swipeOffset=dragged?.stage===stage?dragged.dx||0:0;
@@ -48,7 +49,7 @@
     return ghost;
   }
   function slide(stage,ghost,direction){
-    if(!ghost)return;cancel();const image=stage.querySelector('img');if(!image?.animate)return;
+    if(!ghost)return;cancel();const image=photoImage(stage);if(!image?.animate)return;
     const distance=stage.clientWidth*direction,offset=ghost.swipeOffset||0,id=++serial;stage.classList.add('photo-slide-running');stage.append(ghost);
     const options={duration:Math.max(140,Math.min(300,300*(1-Math.min(.6,Math.abs(offset)/stage.clientWidth)))),easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};
     const animations=[ghost.animate([{transform:'translateX(0)'},{transform:'translateX('+(-distance-offset)+'px)'}],options),image.animate([{transform:'translateX('+(distance+offset)+'px)'},{transform:'translateX(0)'}],options)];

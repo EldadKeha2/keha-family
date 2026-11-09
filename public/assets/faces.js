@@ -248,13 +248,20 @@
     }
     c.popup=bubble;c.dialog.append(bubble);place(c);if(feedback||touch)c.labelTimer=setTimeout(()=>{if(live(c)&&c.popup===bubble)closePopup(c);},feedback?500:2000);
   }
+  function personAvatar(person){
+    const summary=window.FamilyApp?.getPersonSummary?.(person.id),profile=summary?.profile!==undefined?summary.profile:person.profile;
+    const initials=String(I.personName(person)||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>Array.from(part)[0]).join('')||'?';
+    let src=typeof profile==='string'?profile:'';
+    if(/^\/media\/[a-f0-9]{32}(?:\?|$)/.test(src)&&!/[?&]thumbnail=/.test(src))src+=(src.includes('?')?'&':'?')+'thumbnail=1';
+    return `<span class="face-person-avatar" aria-hidden="true"><span>${safe(initials)}</span>${src?`<img class="profile-photo" src="${safe(src)}" alt="" loading="lazy" decoding="async">`:''}</span>`;
+  }
   async function results(c,query){
     const panel=c.popup;if(c.saving||!panel?.classList.contains('face-picker'))return;const sequence=++c.searchSequence,host=panel.querySelector('[data-face-results]');
     host.replaceChildren();host.setAttribute('aria-busy','true');
     try{
       const people=await (c.adapter?.findPeople||window.FamilyTags.findPeople)(query,(c.item.tags||[]).map(person=>person.id));if(!live(c)||c.saving||c.popup!==panel||sequence!==c.searchSequence)return;
       const name=String(query).trim().replace(/\s+/g,' '),key=normalizeName(name),exact=people.some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalizeName(alias)===key));
-      host.innerHTML=people.map(person=>`<button class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="${person.id===c.active?.personId}"><span class="face-person-check" aria-hidden="true">${person.id===c.active?.personId?'✓':'＋'}</span><span><strong dir="auto">${safe(I.personName(person))}</strong><small>${safe(person.context)}</small></span></button>`).join('')||`<p class="face-no-results">${tr('לא נמצא שם מתאים. אפשר להוסיף שם חדש.','No matching name. You can add a new name.')}</p>`;
+      host.innerHTML=people.map(person=>`<button class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="${person.id===c.active?.personId}">${personAvatar(person)}<span><strong dir="auto">${safe(I.personName(person))}</strong><small>${safe(person.context)}</small></span></button>`).join('')||`<p class="face-no-results">${tr('לא נמצא שם מתאים. אפשר להוסיף שם חדש.','No matching name. You can add a new name.')}</p>`;
       if(key&&!exact)host.innerHTML+=`<button class="face-person-option face-add-name" type="button" role="option" data-face-add aria-selected="false"><span class="face-person-check" aria-hidden="true">＋</span><span><strong dir="auto">${tr('הוספת השם ״','Add “')}${safe(name)}${tr('״','”')}</strong><small>${tr('תיוג הפנים בשם חדש','Tag this face with a new name')}</small></span></button>`;
       for(const button of host.querySelectorAll('[data-face-person]'))button.addEventListener('click',()=>save(c,{personId:button.dataset.facePerson}));
       host.querySelector('[data-face-add]')?.addEventListener('click',()=>save(c,{name}));place(c);
