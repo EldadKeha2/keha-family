@@ -359,7 +359,7 @@
           changed(c,result);
           if(live(c)){c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);closePopup(c);paint(c);announce(c,c.reviewed?tr('כל הפרצופים תויגו.','All faces tagged.'):tr('אישור התיוג בוטל.','Tagging confirmation removed.'));}
         }catch(error){if(live(c)){c.reviewStatus.hidden=false;c.reviewStatus.textContent=error.message;}}
-        finally{c.reviewSaving=false;if(live(c)){c.reviewButton.disabled=false;c.reviewButton.setAttribute('aria-busy','false');}}
+        finally{c.reviewSaving=false;if(live(c)){c.reviewButton.disabled=false;c.reviewButton.setAttribute('aria-busy','false');if(!c.adapter)window.FamilyMedia?.refreshPhotoPresentation?.();}}
       });
     }
     paint(c);

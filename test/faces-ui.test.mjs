@@ -329,6 +329,24 @@ test('a failed completion confirmation leaves the photo markers and retry button
  const f=fixture([first]);f.window.FamilyI18n.fetch=async(path)=>path.endsWith('/review')?Response.json({error:'Connection lost'},{status:503}):Response.json({faces:[]});
  await f.mount('retry',{}, {scope:'gallery'});const button=f.find('face-review-button');f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(f.find('face-hit-buttons').children.length,1);assert.equal(button.disabled,false);assert.match(f.find('face-review-status').textContent,/Connection lost/);assert.equal(f.find('face-review-status').hidden,false);assert.equal(button['aria-pressed'],'false');
 });
+test('completion, undo and failed saves restore swiping after metadata pauses it in desktop browsers and Windows apps',async()=>{
+ for(const installed of [false,true]){
+  const f=fixture([],{desktop:true,windows:true,hoverNone:installed,installed});let nativeReady=false,fail=false;
+  f.window.FamilyMedia={refreshPhotoPresentation(){nativeReady=f.faces.canNavigate(f.stage);}};
+  // A saved review refreshes album metadata while the face controller is busy.
+  f.window.addEventListener('family-media-changed',()=>f.window.FamilyMedia.refreshPhotoPresentation());
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(!path.endsWith('/review'))return Response.json({faces:[]});
+   const {complete}=JSON.parse(options.body);return fail?Response.json({error:'Connection lost'},{status:503}):Response.json({operation:'face-review',item:{id:'swipe-review',kind:'photo',scope:'gallery',faceSummary:{reviewed:complete}}});
+  };
+  await f.mount('swipe-review',{}, {scope:'gallery'});assert.equal(nativeReady,true);const button=f.find('face-review-button');
+  for(const [failure,reviewed]of [[false,true],[false,false],[true,false]]){
+   fail=failure;f.emit(button,'click');f.window.FamilyMedia.refreshPhotoPresentation();assert.equal(nativeReady,false,'Navigation pauses during an outstanding review save');
+   await new Promise(resolve=>setImmediate(resolve));assert.equal(button['aria-pressed'],String(reviewed));assert.equal(f.faces.canNavigate(f.stage),true);assert.equal(nativeReady,true,'The swipe strip must be restored once saving has ended');
+  }
+  f.faces.clear();
+ }
+});
 
 test('desktop frame handles save new geometry with the same person, face identity and concurrency revision',async()=>{
  const original={id:'a'.repeat(32),rect:{x:.3,y:.2,width:.1,height:.15},personId:'yona',person:{id:'yona',name:'יונה'},revision:'face-r1'},requests=[];
