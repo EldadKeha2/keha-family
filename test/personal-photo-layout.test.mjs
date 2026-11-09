@@ -58,7 +58,7 @@ test('personal desktop groups retain actual controls, requested physical order, 
   const f=fixture({english}),download=f.get('mediaOriginal'),names=f.get('togglePhotoNames'),deleteButton=f.get('mediaViewerDelete');let clicks=0;download.addEventListener('click',()=>clicks++);names.addEventListener('click',()=>clicks++);deleteButton.addEventListener('click',()=>clicks++);names.focus();f.sync();
   assert.equal(f.get('mediaStage').parentNode.id,'personalPhotoFrame');assert.equal(f.get('mediaViewerCollections').parentNode.id,'personalPhotoAlbums');assert.equal(f.controller.toolbar.parentNode.id,'personalPhotoZoom');
   assert.deepEqual(f.get('personalPhotoPrimary').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['mediaViewerDelete','editOpenedCaption','openedProfilePhoto']);
-  assert.deepEqual(f.get('collectionGroup').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['album-wedding','album-family','album-baby']);
+  assert.deepEqual(f.get('collectionGroup').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['album-family','album-baby','album-wedding']);
   assert.equal(f.get('photoMomentTools').parentNode.id,'personalPhotoInformation');assert.equal(f.controller.regionsButton.parentNode.id,'photoMomentTools');assert.equal(download.parentNode.id,'mediaShareActions');assert.equal(f.get('mediaShareActions').parentNode.id,'personalPhotoBelow');
   assert.equal(f.get('personalPhotoCounter').textContent,english?'Photo 1 of 12':'תמונה 1 מתוך 12');assert.equal(f.document.activeElement,names);
   download.click();names.click();deleteButton.click();assert.equal(clicks,3);
@@ -85,11 +85,12 @@ test('the red side trash uses the exact album removal handler and mirrors its di
  remove.disabled=true;f.sync();assert.equal(shortcut.disabled,true);shortcut.click();assert.equal(requests,1);
  remove.hidden=true;f.sync();assert.equal(shortcut.hidden,true);f.api.restore();assert.equal(f.get('personalPhotoTrashButton'),null);
 });
-test('photo-fit geometry hugs the rendered image, aligns rail starts and keeps the red trash above bottom-right editing',()=>{
+test('photo-fit geometry aligns the four left controls with zoom and keeps trash below editing at the image bottom',()=>{
  const f=fixture();f.sync();const frame=f.get('personalPhotoFrame');frame.clientWidth=1200;frame.computed={columnGap:'12px',paddingLeft:'16px',paddingRight:'16px'};
  const image=f.add('actualPhoto',f.get('mediaStage'),'img');image.naturalWidth=1200;image.naturalHeight=800;image.getBoundingClientRect=()=>({top:40,bottom:540,width:750,height:500});
  f.controller.image=image;f.controller.scroller={computed:{maxHeight:'500px'},getBoundingClientRect:()=>({top:40,bottom:540,width:750,height:500})};f.get('personalPhotoRight').getBoundingClientRect=()=>({top:40});f.sync();
  const value=key=>parseFloat(frame.style.getPropertyValue(key)),rail=value('--personal-rail'),zoom=rail*3+24,left=rail*4+36;
- assert.equal(value('--personal-photo-width'),750);assert.ok(Math.abs(value('--personal-albums-top')+left/2-250)<.01);assert.equal(value('--personal-zoom-top'),value('--personal-albums-top'));
- assert.ok(Math.abs(value('--personal-edit-top')+rail-500)<.01);assert.ok(value('--personal-trash-top')+rail+11.9<=value('--personal-edit-top'));assert.ok(value('--personal-zoom-top')+zoom+11.9<=value('--personal-trash-top'));
+ assert.equal(value('--personal-photo-width'),750);assert.ok(Math.abs(value('--personal-review-top')+left/2-250)<.01);assert.equal(value('--personal-zoom-top'),value('--personal-review-top'));
+ assert.equal(value('--personal-albums-top'),value('--personal-review-top')+rail+12);
+ assert.ok(Math.abs(value('--personal-trash-top')+rail-500)<.01);assert.ok(value('--personal-edit-top')+rail+11.9<=value('--personal-trash-top'));assert.ok(value('--personal-zoom-top')+zoom+11.9<=value('--personal-edit-top'));
 });

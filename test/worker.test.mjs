@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFile} from 'node:fs/promises';
 import worker,{FamilyState,LIMITS,sniff} from '../src/worker.mjs';
 import {signedRequest} from '../src/hf.mjs';
-import {fail} from '../src/http.mjs';
+import {fail,sha256,uid} from '../src/http.mjs';
 import family from '../src/family.mjs';
 import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
 import {photoUploadPayload,PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES} from '../public/assets/photo-upload-metadata.mjs';
@@ -85,6 +85,76 @@ async function uploadWithDetails(f,path,metadata,{bytes=photo,name='23_11_1986_P
  let offset=0;const stream=split?new ReadableStream({pull(controller){if(offset===body.length){controller.close();return;}const end=Math.min(body.length,offset+(offset<150?1:57));controller.enqueue(body.subarray(offset,end));offset=end;}}):body;
  return f.call(path+'?filename='+encodeURIComponent(name),{method:'POST',body:stream,headers:{...payload.headers,'Content-Type':mime,'Content-Length':String(body.byteLength)}});
 }
+async function unlockTrash(f){
+ const key=uid()+uid(),password='test-only-recycle-password';f.env.TRASH_SETUP_DIGEST=await sha256(key);
+ const setup=await f.call('/api/trash/setup',{method:'POST',body:{setupKey:key,password}});assert.equal(setup.status,200,await setup.clone().text());
+ const login=await f.call('/api/trash/login',{method:'POST',body:{password}});assert.equal(login.status,200,await login.clone().text());
+ const cookie=login.headers.get('Set-Cookie');assert.match(cookie,/Secure; HttpOnly; SameSite=Strict/);assert.match(cookie,/Max-Age=7200/);
+ return {headers:{Cookie:cookie.split(';')[0]},key,password,login};
+}
+test('recycle access requires the private setup key, never exposes credentials, and cannot be reconfigured',async()=>{
+ const f=fixture();try{
+  await f.connect();assert.equal((await f.call('/api/trash')).status,401);
+  assert.equal((await f.call('/api/trash/setup',{method:'POST',body:{setupKey:'0'.repeat(64),password:'wrong-test-value'}})).status,403);
+  assert.equal((await f.call('/api/trash/setup',{method:'POST',body:{action:'export',setupKey:'0'.repeat(64),password:'wrong-test-value'}})).status,403,'Request JSON cannot replace the internal action');
+  assert.equal((await f.call('/api/trash/setup',{method:'POST',clientHeaders:false,body:{}})).status,403);
+  const auth=await unlockTrash(f);assert.deepEqual(await auth.login.json(),{unlocked:true,expires:JSON.parse(f.database.prepare("SELECT value FROM trash_auth WHERE id LIKE 'session:%'").get().value).expires});
+  assert.equal((await f.call('/api/trash/setup',{method:'POST',body:{setupKey:auth.key,password:'replacement-value'}})).status,409);
+  const raw=JSON.stringify(f.database.prepare('SELECT * FROM trash_auth').all());assert.ok(!raw.includes(auth.password));assert.ok(!raw.includes(auth.headers.Cookie.slice('__Host-FamilyTrash='.length)));
+  const exported=await(await f.call('/api/export')).text();for(const value of [auth.password,auth.key,'trash_auth','session:'])assert.ok(!exported.includes(value));
+  assert.equal((await f.call('/api/trash',{headers:{'X-Trash-Token':auth.headers.Cookie}})).status,401,'An unrelated header cannot substitute for the private session cookie');
+  assert.equal((await f.call('/api/trash',{headers:auth.headers})).status,200);
+  assert.equal((await f.call('/api/trash/login',{method:'POST',headers:{Origin:'https://other.example'},body:{password:auth.password}})).status,403);
+ }finally{await f.close();}
+});
+test('deleted photos from every album retain original bytes, tags, capture dates and memberships and restore after restart',async()=>{
+ const f=fixture();try{
+  await f.connect();const auth=await unlockTrash(f),photos=[];
+  for(const [index,path]of ['/api/collections/gallery/upload','/api/collections/photos/upload','/api/people/yona/photos','/api/nursery/yona/upload','/api/weddings/u-tomer/upload','/api/nostalgia/upload'].entries()){
+   const response=await uploadWithDetails(f,path,{caption:'Recycle sample '+index,date:{year:1980},familyPhoto:true,labels:['holidays'],complete:true,faces:[{personId:'yona',rect:{x:.1,y:.1,width:.1,height:.2}}]});assert.equal(response.status,201);
+   const result=await response.json(),item=(result.collection?.items||result.person.gallery).find(item=>item.file===result.file);photos.push(item);
+   const removed=await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:item.scope}});assert.equal(removed.status,200);
+   assert.equal((await f.call('/media/'+item.id)).status,404);assert.equal((await f.call('/api/trash/'+item.id+'/file')).status,401);
+   assert.equal((await f.call('/api/trash/'+item.id+'/restore',{method:'POST',body:{}})).status,401);
+  }
+  assert.equal(f.objects.size,photos.length);f.restart();
+  const listing=await(await f.call('/api/trash',{headers:auth.headers})).json();assert.equal(listing.count,photos.length);assert.ok(listing.items.every(item=>!('key' in item)&&item.preview.startsWith('/api/trash/')));
+  const backup=await(await f.call('/api/export')).text();for(const item of photos)assert.ok(!backup.includes(item.id),'Deleted photo metadata stays out of the public backup');
+  for(const item of photos){
+   const preview=await f.call('/api/trash/'+item.id+'/file',{headers:auth.headers});assert.equal(preview.status,200);assert.deepEqual(new Uint8Array(await preview.arrayBuffer()),new Uint8Array(photo));assert.match(preview.headers.get('Cache-Control'),/no-store/);
+   const restored=await f.call('/api/trash/'+item.id+'/restore',{method:'POST',headers:auth.headers,body:{}});assert.equal(restored.status,200,await restored.clone().text());const result=await restored.json();assert.equal(result.operation,'restore');assert.equal(result.item.id,item.id);assert.equal(result.item.caption,item.caption);assert.deepEqual(result.item.tags,item.tags);assert.deepEqual(result.item.photoDate,item.photoDate);assert.deepEqual(result.item.collections,item.collections);assert.deepEqual(result.item.labels,item.labels);
+   assert.equal((await f.call('/media/'+item.id)).status,200);assert.equal((await f.call('/api/trash/'+item.id+'/restore',{method:'POST',headers:auth.headers,body:{}})).status,404);
+  }
+  assert.equal((await(await f.call('/api/trash',{headers:auth.headers})).json()).count,0);
+ }finally{await f.close();}
+});
+test('recycle video seeking, document downloads, filtering and old-item restoration remain private',async()=>{
+ const f=fixture();try{
+  await f.connect();const auth=await unlockTrash(f),items=[];
+  for(const [name,bytes,kind]of [['film.mp4',video,'video'],['record.pdf',new TextEncoder().encode('%PDF-1.7\nExample\n%%EOF'),'document']]){
+   const response=await f.call('/api/nostalgia/upload?filename='+name,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}});assert.equal(response.status,201);const item=(await response.json()).collection.items[0];items.push(item);
+   assert.equal((await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:item.scope}})).status,200);
+   f.database.prepare('UPDATE media_trash SET deleted_at=? WHERE id=?').run('2001-01-01T00:00:00.000Z',item.id);
+   assert.equal((await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:item.scope,fromRecycleBin:true}})).status,403);
+   const filtered=await(await f.call('/api/trash?kind='+kind+'&q='+name,{headers:auth.headers})).json();assert.equal(filtered.count,1);assert.equal(filtered.items[0].id,item.id);
+  }
+  const ranged=await f.call('/api/trash/'+items[0].id+'/file',{headers:{...auth.headers,Range:'bytes=0-3'}});assert.equal(ranged.status,206);assert.equal((await ranged.arrayBuffer()).byteLength,4);
+  const doc=await f.call('/api/trash/'+items[1].id+'/file',{method:'HEAD',headers:auth.headers});assert.equal(doc.status,200);assert.match(doc.headers.get('Content-Disposition'),/^attachment;/);
+  for(const item of items)assert.equal((await f.call('/api/trash/'+item.id+'/restore',{method:'POST',headers:auth.headers,body:{}})).status,200);
+ }finally{await f.close();}
+});
+test('recycle sessions expire, logout revokes access, repeated guesses are limited, and the bin paginates',async()=>{
+ const f=fixture();try{
+  await f.connect();const auth=await unlockTrash(f);
+  for(let i=0;i<43;i++){const id=(i+1).toString(16).padStart(32,'0');f.database.prepare('INSERT INTO media_trash(id,data,deleted_at) VALUES(?,?,?)').run(id,JSON.stringify({id,category:'gallery',kind:'photo',name:'Test '+i,mime:'image/jpeg'}),new Date(1700000000000+i*1000).toISOString());}
+  const first=await(await f.call('/api/trash',{headers:auth.headers})).json(),second=await(await f.call('/api/trash?page=2',{headers:auth.headers})).json();assert.equal(first.items.length,40);assert.equal(second.items.length,3);assert.equal(first.count,43);assert.equal(new Set([...first.items,...second.items].map(item=>item.id)).size,43);
+  assert.equal((await f.call('/api/trash/logout',{method:'POST',headers:auth.headers,body:{}})).status,200);assert.equal((await f.call('/api/trash',{headers:auth.headers})).status,401);
+  const login=await f.call('/api/trash/login',{method:'POST',body:{password:auth.password}}),cookie=login.headers.get('Set-Cookie').split(';')[0];
+  f.database.prepare("UPDATE trash_auth SET value=json_set(value,'$.expires',1) WHERE id LIKE 'session:%'").run();f.restart();assert.equal((await f.call('/api/trash',{headers:{Cookie:cookie}})).status,401);
+  for(let i=0;i<5;i++)assert.equal((await f.call('/api/trash/login',{method:'POST',body:{password:'wrong-test-password'}})).status,401);
+  const blocked=await f.call('/api/trash/login',{method:'POST',body:{password:auth.password}});assert.equal(blocked.status,429);assert.ok(Number(blocked.headers.get('Retry-After'))>0);
+ }finally{await f.close();}
+});
 test('Roei Elharizi reaches existing photo tags, faces and saved text while keeping files, profiles and full-tag review intact',async()=>{
  const f=fixture();try{
   await f.connect();const response=await uploadWithDetails(f,'/api/collections/gallery/upload',{date:{year:1986},caption:'רועי חריזי / Roei Harizi'},{name:'Roei_Harizi.jpg'});assert.equal(response.status,201);

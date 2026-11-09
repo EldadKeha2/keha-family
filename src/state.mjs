@@ -1,4 +1,5 @@
 import family from './family.mjs';
+import {RecycleAccess} from './recycle-access.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
@@ -73,6 +74,8 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_face_ignores(media_id TEXT NOT NULL,photo_revision TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,photo_revision))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS photo_versions(media_id TEXT NOT NULL,id TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(media_id,id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_trash(id TEXT PRIMARY KEY,data TEXT NOT NULL,deleted_at TEXT NOT NULL,profile_selected INTEGER NOT NULL DEFAULT 0)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS trash_auth(id TEXT PRIMARY KEY,value TEXT NOT NULL,expires_at INTEGER NOT NULL DEFAULT 0)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS trash_auth_expiry ON trash_auth(expires_at)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS meta(id TEXT PRIMARY KEY,value TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS weddings(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
@@ -771,8 +774,9 @@ export class FamilyState {
         return this.mediaChanged(item,'delete',affected);
       }
       case 'media.restore':{
-        const row=this.rows('SELECT data,profile_selected FROM media_trash WHERE id=?',p.id)[0];
+        const row=this.rows('SELECT data,profile_selected,deleted_at FROM media_trash WHERE id=?',p.id)[0];
         if(!row)throw new HttpError(404,'לא נמצא פריט שניתן לשחזר.');
+        if(!p.fromRecycleBin&&Date.now()-Date.parse(row.deleted_at)>10*60*1000)throw new HttpError(403,'אפשר לשחזר פריט זה מתוך סל המחזור.');
         const {_profilePeople,...item}=JSON.parse(row.data);
         if(this.mediaScope(item)!==p.scope)throw new HttpError(404,'הפריט לא נמצא באלבום הזה.');
         this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId||null,JSON.stringify(item));
@@ -861,15 +865,46 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:3,faceIgnores:this.rows('SELECT media_id AS mediaId,photo_revision AS photoRevision,data FROM media_face_ignores').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,rects:JSON.parse(row.data)})),albumCovers:this.rows('SELECT collection,media_id AS mediaId FROM album_covers'),faceReviews:this.rows('SELECT media_id AS mediaId,photo_revision AS photoRevision,tags_revision AS tagsRevision,completed_at AS completedAt FROM media_face_reviews'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT media_id AS mediaId,data FROM media_faces').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
+      case 'export':return {schemaVersion:3,faceIgnores:this.rows('SELECT f.media_id AS mediaId,f.photo_revision AS photoRevision,f.data FROM media_face_ignores f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,rects:JSON.parse(row.data)})),albumCovers:this.rows('SELECT c.collection,c.media_id AS mediaId FROM album_covers c JOIN media m ON m.id=c.media_id'),faceReviews:this.rows('SELECT r.media_id AS mediaId,r.photo_revision AS photoRevision,r.tags_revision AS tagsRevision,r.completed_at AS completedAt FROM media_face_reviews r JOIN media m ON m.id=r.media_id'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT f.media_id AS mediaId,f.data FROM media_faces f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
+  }
+  recycle(action,p){
+    if(action==='trash.list'){
+      const page=Math.max(1,Math.min(100000,Math.floor(Number(p.page)||1))),size=40;
+      const kind=['photo','video','document'].includes(p.kind)?p.kind:null,query=typeof p.query==='string'?p.query.trim().slice(0,150):'';
+      const clauses=[],args=[];
+      if(kind){clauses.push("COALESCE(json_extract(data,'$.kind'),CASE WHEN json_extract(data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)=?");args.push(kind);}
+      if(query){clauses.push("(COALESCE(json_extract(data,'$.caption'),'')||' '||COALESCE(json_extract(data,'$.filename'),'')||' '||COALESCE(json_extract(data,'$.name'),'')) LIKE ?");args.push('%'+query+'%');}
+      const where=clauses.length?' WHERE '+clauses.join(' AND '):'',count=this.rows('SELECT count(*) AS n FROM media_trash'+where,...args)[0].n,pages=Math.max(1,Math.ceil(count/size)),current=Math.min(page,pages);
+      const items=this.rows('SELECT id,data,deleted_at FROM media_trash'+where+' ORDER BY deleted_at DESC,id LIMIT ? OFFSET ?',...args,size,(current-1)*size).map(row=>{
+        const item=JSON.parse(row.data),scope=this.mediaScope(item),owner=item.personId?this.person(item.personId):null;
+        return {id:row.id,kind:mediaKind(item),name:item.name||'',filename:item.filename||'',caption:item.caption||'',mime:item.mime,size:item.size||0,scope,owner:owner?.name||null,deletedAt:row.deleted_at,preview:item.key?'/api/trash/'+row.id+'/file':null};
+      });
+      return {items,count,page:current,pages};
+    }
+    if(!/^[a-f0-9]{32}$/.test(p.id||''))throw new HttpError(404,'הפריט לא נמצא בסל המחזור.');
+    const row=this.rows('SELECT data FROM media_trash WHERE id=?',p.id)[0];
+    if(!row)throw new HttpError(404,'הפריט לא נמצא בסל המחזור.');
+    const {_profilePeople,...item}=JSON.parse(row.data);
+    if(action==='trash.get')return {item};
+    if(action==='trash.restore')return this.run('media.restore',{id:p.id,scope:this.mediaScope(item),fromRecycleBin:true});
+    throw new HttpError(404,'הפעולה אינה זמינה.');
   }
   async fetch(request){
     try{
       if(this.initializationError&&Date.now()>=this.nextInitializationAttempt)this.initializeState();
       if(this.initializationError)throw this.initializationError;
-      const {action,...p}=await request.json();return json(this.ctx.storage.transactionSync(()=>this.run(action,p)));
+      const {action,...p}=await request.json();
+      if(action?.startsWith('trash.')){
+        const access=new RecycleAccess(this);
+        if(action==='trash.setup')return json(await access.setup(p));
+        if(action==='trash.login')return json(await access.login(p));
+        if(action==='trash.logout')return json(await access.logout(p.session));
+        await access.authorize(p.session);
+        return json(this.ctx.storage.transactionSync(()=>this.recycle(action,p)));
+      }
+      return json(this.ctx.storage.transactionSync(()=>this.run(action,p)));
     }
     catch(error){return fail(error);}
   }

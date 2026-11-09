@@ -18,4 +18,6 @@ for(const [id,fields]of Object.entries(grandparentCorrections))Object.assign(fam
 for(const [id,fields]of Object.entries(memorialCorrections))Object.assign(family.people[id],fields);
 for(const [id,nameEn]of Object.entries(englishNames))family.people[id].nameEn=nameEn;
 for(const branch of family.branches)branch.titleEn=({harizi:'Harizi',becker:'Becker',keha:'Keha',noble:'Noble',fish:'Fish',bloom:'Bloom'})[branch.id]+' Family';
+// These partners have not had a wedding. Keep their family relationships intact.
+for(const id of ['u-eldad','u-moran'])family.units[id].hasWedding=false;
 export default family;

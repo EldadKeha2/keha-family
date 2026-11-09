@@ -41,8 +41,25 @@ test('every personal photo links to the owner wedding, even if the photo has no 
   for(const scope of ['personal:avigail','link:personal:avigail','nursery:avigail'])for(const photo of [f.item('first'),f.item('second')]){
    const html=f.window.FamilyPhotoCollections.controls(photo,scope,{viewer:true});assert.match(html,/data-photo-wedding-link href="#weddings\/u-noble"/);assert.doesNotMatch(html,/data-photo-collection="wedding:u-noble"/);assert.doesNotMatch(html,/data-photo-wedding-link[^>]*hidden/);
   }
-  assert.doesNotMatch(f.window.FamilyPhotoCollections.controls(f.item(),'personal:extra',{viewer:true}),/data-photo-album-kind="wedding"/,'A person without a partner does not get a wedding link');
+  const unavailable=f.window.FamilyPhotoCollections.controls(f.item(),'personal:extra',{viewer:true});assert.match(unavailable,/data-photo-album-kind="wedding" disabled/);assert.doesNotMatch(unavailable,/data-photo-wedding-link/,'A person without a partner has a dim disabled icon without a link');
  }
+});
+test('unmarried couples keep their relationships and get a disabled wedding icon for both partners on desktop and phone markup',()=>{
+ for(const english of [false,true]){
+  const f=fixture(english);
+  for(const [unit,ids]of [['u-eldad',['eldad','adi']],['u-moran',['moran','maya']]]){
+   f.window.FAMILY_DATA.units[unit]={id:unit,people:ids,hasWedding:false};
+   for(const id of ids){f.window.FAMILY_DATA.people[id]={id,name:id};
+    for(const scope of ['personal:'+id,'link:personal:'+id,'nursery:'+id]){
+     const html=f.window.FamilyPhotoCollections.controls(f.item(),scope,{viewer:true});assert.match(html,/data-photo-album-kind="wedding" disabled/);assert.doesNotMatch(html,/data-photo-wedding-link|data-photo-wedding-choices/);
+    }
+   }
+  }
+ }
+});
+test('nursery tooltips identify the profile owner and wedding links identify the actual couple',()=>{
+ const f=fixture();f.window.FAMILY_DATA.people.tomer.name='תומר';f.window.FAMILY_DATA.people.shani.name='שני';
+ const html=f.window.FamilyPhotoCollections.controls(f.item(),'personal:tomer',{viewer:true});assert.match(html,/title="הוספה לאלבום התינוקייה של תומר"/);assert.match(html,/title="עמוד החתונה של תומר ושני"/);
 });
 test('shared viewers omit baby and wedding shortcuts even when tagged people and the photo owner have albums',()=>{
  for(const english of [false,true]){

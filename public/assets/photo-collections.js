@@ -8,13 +8,14 @@
     baby:'<circle cx="12" cy="12" r="8"/><path d="M10 4c0 3 4 2 3 0M8 11h.01M16 11h.01M9 15c2 2 4 2 6 0M4 10c-3 0-3 5 0 5m16-5c3 0 3 5 0 5"/>',
     wedding:'<circle cx="9" cy="14" r="6"/><circle cx="16" cy="14" r="5"/><path d="m6 6 3-4 3 4-3 3Z"/>'
   };
+  const personName=id=>window.FamilyApp?.nameOf?.(id)||I.personName?.(window.FAMILY_DATA?.people?.[id])||window.FAMILY_DATA?.people?.[id]?.name||id;
   function targets(scope,viewer=false){
     const id=scope?.startsWith('personal:')?scope.slice(9):null;
     const family=window.FAMILY_DATA,person=id&&(window.FamilyApp?.getPerson?.(id)||family?.people?.[id]);
     const pair=id&&Object.values(family?.units||{}).find(unit=>unit.people?.length===2&&unit.people.includes(id));
     return [...(viewer?[{icon:'family',collection:'photos',label:tr('תמונות משפחתיות','Family photos')}]:[]),...(id?[
-      {icon:'baby',collection:person&&!person.extended&&!person.extra?'nursery:'+id:null,label:tr('אלבום התינוקייה','Baby album')},
-      {icon:'wedding',collection:pair?'wedding:'+pair.id:null,label:tr('אלבום החתונה','Wedding album')}
+      {icon:'baby',collection:person&&!person.extended&&!person.extra?'nursery:'+id:null,label:tr('אלבום התינוקייה של ','Baby album for ')+personName(id)},
+      {icon:'wedding',collection:pair&&pair.hasWedding!==false?'wedding:'+pair.id:null,label:pair?tr('אלבום החתונה של ','Wedding album for ')+pairName(pair):tr('אלבום החתונה של ','Wedding album for ')+personName(id)}
     ]:[])];
   }
   function remember(item,change=null){
@@ -29,12 +30,18 @@
     const owner=context?.startsWith('personal:')?context.slice(9):context?.startsWith('nursery:')?context.slice(8):null;
     const wedding=context?.startsWith('wedding:')?context.slice(8):null;
     if(!owner&&!wedding)return [];
-    return Object.values(family?.units||{}).filter(pair=>pair.people?.length===2&&(owner?pair.people.includes(owner):pair.id===wedding));
+    return Object.values(family?.units||{}).filter(pair=>pair.people?.length===2&&pair.hasWedding!==false&&(owner?pair.people.includes(owner):pair.id===wedding));
   }
-  const pairName=pair=>pair.people.map(id=>window.FamilyApp?.nameOf?.(id)||I.personName?.(window.FAMILY_DATA.people[id])||window.FAMILY_DATA.people[id]?.name||id).join(tr(' ו',' & '));
+  const pairName=pair=>pair.people.map(personName).join(tr(' ו',' & '));
   function weddingLink(pair,withName=false){const label=tr('עמוד החתונה של ','Wedding page for ')+pairName(pair);return `<a class="photo-collection-button" data-photo-wedding-link href="#weddings/${encodeURIComponent(pair.id)}" data-photo-album-kind="wedding" aria-label="${safe(label)}" title="${safe(label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg>${withName?`<span>${safe(pairName(pair))}</span>`:''}</a>`;}
   function weddingControl(item,scope){
-    const pairs=weddingTargets(scope);if(!pairs.length)return '';
+    const pairs=weddingTargets(scope);
+    if(!pairs.length){
+      const context=scope?.replace(/^link:/,''),owner=context?.match(/^(?:personal|nursery):(.+)$/)?.[1];
+      if(!owner)return '';
+      const label=tr('אין אלבום חתונה זמין עבור ','No wedding album is available for ')+personName(owner);
+      return `<button type="button" class="photo-collection-button" data-photo-album-kind="wedding" disabled aria-label="${safe(label)}" title="${safe(label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg></button>`;
+    }
     if(pairs.length===1)return weddingLink(pairs[0]);
     const label=tr('עמודי החתונות של המתויגים בתמונה','Wedding pages for people in this photo');
     return `<button type="button" class="photo-collection-button" data-photo-wedding-choices data-photo-album-kind="wedding" aria-haspopup="dialog" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg></button>`;

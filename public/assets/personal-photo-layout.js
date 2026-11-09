@@ -27,9 +27,10 @@
     if(controller&&(changed||widthChanged))window.FamilyFaces?.fit?.();
     const actual=image.getBoundingClientRect(),viewport=controller?.scroller?.getBoundingClientRect()||actual,column=rightRail.getBoundingClientRect();
     const top=Math.max(actual.top,viewport.top)-column.top,height=Math.max(0,Math.min(actual.bottom,viewport.bottom)-Math.max(actual.top,viewport.top));
-    const leftHeight=rail*4+gap*3,editTop=top+height-rail,trashTop=editTop-gap-rail;
+    const leftHeight=rail*4+gap*3,trashTop=top+height-rail,editTop=trashTop-gap-rail;
     const controlsTop=Math.max(0,top+(height-leftHeight)/2);
-    frame.style.setProperty('--personal-albums-top',controlsTop+'px');
+    frame.style.setProperty('--personal-review-top',controlsTop+'px');
+    frame.style.setProperty('--personal-albums-top',(controlsTop+rail+gap)+'px');
     frame.style.setProperty('--personal-edit-top',Math.max(0,editTop)+'px');frame.style.setProperty('--personal-trash-top',Math.max(0,trashTop)+'px');
     frame.style.setProperty('--personal-zoom-top',controlsTop+'px');
   }
@@ -50,7 +51,7 @@
     counter=element('span','personalPhotoCounter',heading);
     frame=element('div','personalPhotoFrame');stage.before(frame);
     leftRail=element('div','personalPhotoLeft',frame);rightRail=element('div','personalPhotoRight',frame);
-    albums=element('div','personalPhotoAlbums',leftRail);reviewDock=element('div','personalPhotoReview',leftRail);
+    reviewDock=element('div','personalPhotoReview',leftRail);albums=element('div','personalPhotoAlbums',leftRail);
     zoom=element('div','personalPhotoZoom',rightRail);trashDock=element('div','personalPhotoTrash',rightRail);editDock=element('div','personalPhotoEdit',rightRail);
     trash=element('button','personalPhotoTrashButton',trashDock);trash.type='button';
     trash.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/></svg>';
@@ -81,7 +82,7 @@
       heading.setAttribute('aria-label',[$('mediaHeaderCaption')?.textContent||tr('תמונה','Photo'),counter.textContent].filter(Boolean).join(' · '));
       move($('mediaStage'),frame,rightRail);move($('mediaViewerCollections'),albums);
       const collection=$('mediaViewerCollections')?.querySelector('.photo-collections');
-      if(collection)arrange(collection,[collection.querySelector('[data-photo-album-kind="wedding"]'),collection.querySelector('[data-photo-album-kind="family"]'),collection.querySelector('[data-photo-album-kind="baby"]')]);
+      if(collection)arrange(collection,[collection.querySelector('[data-photo-album-kind="family"]'),collection.querySelector('[data-photo-album-kind="baby"]'),collection.querySelector('[data-photo-album-kind="wedding"]')]);
       const moment=$('photoMomentTools');move(moment,info);
       if(controller?.regionsButton)move(controller.regionsButton,moment);
       const taken=moment?.querySelector('.photo-taken-date');if(taken)move(taken,$('editPhotoDate'));
