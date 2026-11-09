@@ -13,6 +13,7 @@ function fixture(detected=[],{desktop=false}={}){
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
   get parentNode(){return this.parent;}
+  get isConnected(){return this===document||Boolean(this.parent?.isConnected);}
   get classList(){return {toggle:(value,force)=>{const enabled=force??!this.className.split(' ').includes(value);this.classList[enabled?'add':'remove'](value);return enabled;},contains:value=>this.className.split(' ').includes(value),add:(...values)=>{this.className=[...new Set([...this.className.split(' '),...values])].join(' ');},remove:(...values)=>{this.className=this.className.split(' ').filter(x=>!values.includes(x)).join(' ');}};}
   append(...nodes){for(const node of nodes){node.remove();node.parent=this;this.children.push(node);}}
   remove(){if(this.parent)this.parent.children=this.parent.children.filter(node=>node!==this);this.parent=null;}
@@ -22,11 +23,13 @@ function fixture(detected=[],{desktop=false}={}){
   replaceChildren(...nodes){for(const node of [...this.children])node.remove();this.append(...nodes);}
   setAttribute(name,value){this[name]=value;}
   querySelector(selector){if(!this.queries.has(selector)){const node=new Node();node.selector=selector;this.queries.set(selector,node);}return this.queries.get(selector);}
-  querySelectorAll(selector){const classes=selector.split(',').filter(value=>value.startsWith('.')).map(value=>value.slice(1)),nodes=[...this.children,...this.queries.values()];return nodes.flatMap(node=>[...(classes.some(name=>node.classList.contains(name))?[node]:[]),...node.querySelectorAll(selector)]);}
+  querySelectorAll(selector){const nodes=[...this.children,...this.queries.values()];return nodes.flatMap(node=>[...(node.matches(selector)?[node]:[]),...node.querySelectorAll(selector)]);}
   contains(node){return node===this||[...this.children,...this.queries.values()].some(child=>child.contains(node));}
   closest(selector){return this.matches(selector)?this:this.parent?.closest(selector)||null;}
-  matches(selector){return selector==='[data-face-handle]'?Boolean(this.dataset.faceHandle):selector==='.'+this.className;}
+  matches(selector){return selector.split(',').some(value=>{value=value.trim();if(value.startsWith('.'))return this.classList.contains(value.slice(1));if(value==='[data-face-handle]')return Boolean(this.dataset.faceHandle);if(value==='dialog[open]')return this.tagName.toLowerCase()==='dialog'&&this.open;if(value==='[hidden]')return this.hidden;if(value==='[inert]')return Boolean(this.inert);if(value==='[aria-hidden="true"]')return this['aria-hidden']==='true';if(value==='[role="textbox"]')return this.role==='textbox';return ['input','textarea','select'].includes(value)&&this.tagName.toLowerCase()===value;});}
   focus(){}
+  click(){this.dispatchEvent(new Event('click',{cancelable:true}));}
+  getClientRects(){return this.closest('[hidden]')?[]:[this.getBoundingClientRect()];}
   get clientWidth(){return this.className==='face-photo-scroll'?view.width:this.getBoundingClientRect().width;}
   get clientHeight(){return this.className==='face-photo-scroll'?Math.min(view.height*.43,parseFloat(this.children[0]?.style.height)||0):this.getBoundingClientRect().height;}
   getBoundingClientRect(){
@@ -37,16 +40,16 @@ function fixture(detected=[],{desktop=false}={}){
    return {x:0,y:0,left:0,top:0,width:280,height:240};
   }
  }
- const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node(),title=new Node('h2'),download=new Node('a'),edit=new Node('button');dialog.append(root);root.append(title,stage);title.append(download,edit);stage.append(image);
+ const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node('dialog'),title=new Node('h2'),download=new Node('a'),edit=new Node('button');dialog.open=true;dialog.append(root);root.append(title,stage);title.append(download,edit);stage.append(image);
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
- const document=new Node();document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
+ const document=new Node();document.body=new Node('body');document.append(document.body);document.body.append(dialog);document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
  const window=new Node();window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
  let progress,detectionImage;
  const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{progress=onProgress;detectionImage=img;return detected;}};
  const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
- const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);};
+ const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);return event;};
  return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
@@ -362,4 +365,66 @@ test('two removals renumber a real dense photo immediately, through overlay togg
   f.progress(original.map(face=>({rect:face.rect,score:.95})));check(24);
   f.faces.clear();await f.mount('dense-removals',{},snapshot().item);check(24);f.faces.clear();
  }
+});
+
+test('backslash toggles the existing all-faces button in every album that offers it',async()=>{
+ for(const scope of ['gallery','photos','personal:yona','wedding:parents','nostalgia','nursery:yona']){
+  const f=fixture([],{desktop:true}),requests=[],flushed=[];let reviewed=false,revision=0;
+  const item=()=>({id:'shortcut-photo',kind:'photo',scope,collections:['gallery'],tagsRevision:'t'+revision,faceSummary:{reviewed}});
+  f.window.FamilyTags.flush=async id=>flushed.push(id);
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(path.endsWith('/review')){const payload=JSON.parse(options.body);requests.push(payload);reviewed=payload.complete;revision++;return Response.json({operation:'face-review',scope,item:item()});}
+   return Response.json({item:item(),faces:[]});
+  };
+  await f.mount('shortcut-photo',{},item());const button=f.find('face-review-button');assert.equal(button['aria-keyshortcuts'],'\\');assert.ok(button.title.includes('\\'));
+  for(const complete of [true,false]){
+   const event=f.emit(f.document,'keydown',{key:'\\',target:f.stage});assert.equal(event.defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));
+   assert.equal(button['aria-pressed'],String(complete));assert.equal(requests.at(-1).complete,complete);assert.equal(requests.at(-1).photoRevision,'original');
+  }
+  assert.deepEqual(flushed,['shortcut-photo','shortcut-photo']);assert.equal(requests.length,2);f.faces.clear();
+  assert.equal(f.emit(f.document,'keydown',{key:'\\',target:f.stage}).defaultPrevented,false);
+ }
+});
+
+test('backslash leaves typing, modified keys, hidden controls, other dialogs and face editing alone',async()=>{
+ const f=fixture([],{desktop:true}),requests=[];f.window.FamilyI18n.fetch=async(path,options)=>{if(path.endsWith('/review'))requests.push(JSON.parse(options.body));return Response.json({faces:[],item:{id:'guarded',kind:'photo',scope:'gallery',faceSummary:{reviewed:true}}});};await f.mount('guarded',{}, {scope:'gallery'});
+ const button=f.find('face-review-button'),press=properties=>f.emit(f.document,'keydown',{key:'\\',target:f.stage,...properties});
+ for(const properties of [{key:'/'},{key:'|',shiftKey:true},{ctrlKey:true},{metaKey:true},{altKey:true},{shiftKey:true},{repeat:true},{isComposing:true}])assert.equal(press(properties).defaultPrevented,false);
+ for(const tag of ['input','textarea','select']){const input=f.document.createElement(tag);f.dialog.append(input);assert.equal(press({target:input}).defaultPrevented,false);input.remove();}
+ const editable=f.document.createElement('div');editable.isContentEditable=true;f.dialog.append(editable);assert.equal(press({target:editable}).defaultPrevented,false);editable.remove();
+ const textbox=f.document.createElement('div');textbox.setAttribute('role','textbox');f.dialog.append(textbox);assert.equal(press({target:textbox}).defaultPrevented,false);textbox.remove();
+ button.disabled=true;assert.equal(press().defaultPrevented,false);button.disabled=false;
+ button.hidden=true;assert.equal(press().defaultPrevented,false);button.hidden=false;
+ f.title.hidden=true;assert.equal(press().defaultPrevented,false);f.title.hidden=false;
+ button.inert=true;assert.equal(press().defaultPrevented,false);button.inert=false;
+ button.setAttribute('aria-hidden','true');assert.equal(press().defaultPrevented,false);button.setAttribute('aria-hidden','false');
+ button.remove();assert.equal(press().defaultPrevented,false);f.title.append(button);
+ f.dialog.open=false;assert.equal(press().defaultPrevented,false);f.dialog.open=true;
+ const other=f.document.createElement('dialog'),otherField=f.document.createElement('div');other.open=true;other.append(otherField);f.document.body.append(other);
+ assert.equal(press({target:otherField}).defaultPrevented,false);f.document.activeElement=otherField;assert.equal(press({target:f.document.body}).defaultPrevented,false);f.document.activeElement=null;assert.equal(press({target:f.document.body}).defaultPrevented,false);other.remove();
+ const openPicker=()=>{const r=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,target:f.stage,clientX:r.left+r.width/2,clientY:r.top+r.height/2});};openPicker();assert.ok(f.find('face-popover face-picker'));assert.equal(press().defaultPrevented,false);
+ f.emit(f.find('face-popover face-picker').querySelector('[data-face-adjust]'),'click');assert.equal(press().defaultPrevented,false);f.faces.dismiss();await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,0);
+ assert.equal(press({target:f.document.body}).defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);f.faces.clear();
+ const absent=fixture([],{desktop:true});await absent.mount('native-photo',{}, {scope:'photos',collections:['photos']});assert.equal(absent.find('face-review-button'),undefined);assert.equal(absent.emit(absent.document,'keydown',{key:'\\',target:absent.stage}).defaultPrevented,false);absent.faces.clear();
+});
+
+test('holding backslash cannot repeat a save or approve the next photo after navigation',async()=>{
+ const f=fixture([],{desktop:true}),requests=[];let finish;
+ f.window.FamilyI18n.fetch=async(path,options)=>{
+  if(!path.endsWith('/review'))return Response.json({faces:[]});const payload=JSON.parse(options.body);requests.push({path,payload});await new Promise(resolve=>finish=resolve);return Response.json({operation:'face-review',item:{id:path.split('/')[2],kind:'photo',scope:'gallery',faceSummary:{reviewed:payload.complete}}});
+ };
+ await f.mount('first',{}, {scope:'gallery'});f.emit(f.document,'keydown',{key:'\\',target:f.stage});assert.equal(f.find('face-review-button').disabled,true);await new Promise(resolve=>setImmediate(resolve));
+ for(const repeat of [true,false])assert.equal(f.emit(f.document,'keydown',{key:'\\',repeat,target:f.stage}).defaultPrevented,false);assert.equal(requests.length,1);finish();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.emit(f.document,'keydown',{key:'\\',repeat:true,target:f.stage}).defaultPrevented,false);assert.equal(requests.length,1);
+ await f.mount('next',{}, {scope:'gallery'});assert.equal(f.emit(f.document,'keydown',{key:'\\',repeat:true,target:f.stage}).defaultPrevented,false);assert.equal(requests.length,1);
+ f.emit(f.document,'keydown',{key:'\\',target:f.stage});await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,2);assert.match(requests[1].path,/media\/next\/faces\/review/);finish();await new Promise(resolve=>setImmediate(resolve));f.faces.clear();
+});
+
+test('the upload wizard uses the same backslash shortcut without writing a draft to the media API',async()=>{
+ const f=fixture([],{desktop:true}),requests=[];let reviewed=false,enabled=true;
+ const snapshot=()=>({item:{id:'draft',kind:'photo',faceSummary:{reviewed}},faces:[]}),adapter={enabled:()=>enabled,load:async()=>snapshot(),mapDetections:faces=>faces,review:async payload=>{requests.push(payload);reviewed=payload.complete;return snapshot();}};
+ f.window.FamilyI18n.fetch=async()=>{throw Error('A draft must not use the media API');};f.window.FamilyTags.flush=async()=>{throw Error('A draft has no server tags');};
+ await f.mount('draft',{adapter,reviewHost:f.title,reviewLabel:true,zoom:false});
+ for(const complete of [true,false]){assert.equal(f.emit(f.document,'keydown',{key:'\\',target:f.stage}).defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(reviewed,complete);assert.equal(f.find('face-review-button')['aria-pressed'],String(complete));}
+ enabled=false;assert.equal(f.emit(f.document,'keydown',{key:'\\',target:f.stage}).defaultPrevented,false);assert.equal(requests.length,2);f.faces.clear();
 });

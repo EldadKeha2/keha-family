@@ -152,7 +152,7 @@
     fitZoom(c);
   }
   function paint(c){
-    if(!live(c)||!c.buttons)return;reconcileControls(c);c.faces=visibleFaces(c,c.reviewed);if(c.reviewButton){const label=c.reviewed?tr('כל הפרצופים תויגו · לחצו לביטול האישור','All faces tagged · Click to undo confirmation'):tr('אישור שכל הפרצופים תויגו','Confirm all faces are tagged');c.reviewButton.setAttribute('aria-label',label);c.reviewButton.title=label;c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));if(c.reviewText)c.reviewText.textContent=c.reviewed?tr('כל הפרצופים תויגו','All faces tagged'):tr('אישור תיוג מלא','Confirm all tagged');}c.buttons.replaceChildren();
+    if(!live(c)||!c.buttons)return;reconcileControls(c);c.faces=visibleFaces(c,c.reviewed);if(c.reviewButton){const label=c.reviewed?tr('כל הפרצופים תויגו · לחצו לביטול האישור','All faces tagged · Click to undo confirmation'):tr('אישור שכל הפרצופים תויגו','Confirm all faces are tagged');c.reviewButton.setAttribute('aria-label',label);c.reviewButton.title=label+' · '+tr('קיצור דרך: ','Shortcut: ')+'\\';c.reviewButton.setAttribute('aria-pressed',String(c.reviewed));if(c.reviewText)c.reviewText.textContent=c.reviewed?tr('כל הפרצופים תויגו','All faces tagged'):tr('אישור תיוג מלא','Confirm all tagged');}c.buttons.replaceChildren();
     for(const face of c.faces){
       const button=document.createElement('button');button.type='button';button.className='face-hit';if(c.highlightMissing&&!face.person)button.classList.add('face-missing');button.dataset.faceId=face.id;button.setAttribute('aria-label',face.person?tr('פנים בתמונה: ','Face in photo: ')+photoName(face):tr('תיוג הפנים האלה','Tag this face'));
       Object.assign(button.style,{left:face.rect.x*100+'%',top:face.rect.y*100+'%',width:face.rect.width*100+'%',height:face.rect.height*100+'%'});
@@ -293,7 +293,7 @@
     if(highlightMissing){c.missingNote=document.createElement('p');c.missingNote.className='face-missing-note';c.missingNote.setAttribute('role','status');stage.before(c.missingNote);}
     const on=(target,type,callback,options={})=>target.addEventListener(type,callback,{...options,signal:c.events.signal});
     if(adapter||item.scope==='gallery'||item.collections?.includes('gallery')){
-      c.reviewButton=document.createElement('button');c.reviewButton.type='button';c.reviewButton.className='face-review-button';
+      c.reviewButton=document.createElement('button');c.reviewButton.type='button';c.reviewButton.className='face-review-button';c.reviewButton.setAttribute('aria-keyshortcuts','\\');
       c.reviewButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5"/><path d="M7 8h.01M13 8h.01M7 11.5a3.3 3.3 0 0 0 5.5.7"/><circle class="face-review-badge" cx="18" cy="17.5" r="5.5"/><path class="face-review-check" d="m15.5 17.5 1.7 1.7 3.3-3.5"/></svg>';
       if(reviewLabel){c.reviewText=document.createElement('span');c.reviewText.className='face-review-text';c.reviewButton.append(c.reviewText);}
       if(reviewHost)reviewHost.append(c.reviewButton);else document.getElementById('mediaViewerTitle').insertBefore(c.reviewButton,document.getElementById('editOpenedPhoto'));
@@ -329,7 +329,15 @@
     on(stage,'pointercancel',()=>{if(c.adjust||c.resizeDrag){c.drag=null;closePopup(c);}});
     on(document,'pointerdown',event=>{if(c.popup&&!c.popup.contains(event.target)&&!stage.contains(event.target))closePopup(c);},{capture:true});
     on(document,'pointermove',event=>{if(!c.active||!c.popup?.classList.contains('face-name')||touchMode(event))return;const r=screenFace(c,c.active);if(c.popup.contains(event.target)||(event.clientX>=r.x&&event.clientX<=r.x+r.width&&event.clientY>=r.y&&event.clientY<=r.y+r.height))keepLabel(c);else dismissLabelSoon(c);},{passive:true});
-    on(document,'keydown',event=>{if(event.key==='Escape'&&(c.popup||c.adjust)){event.preventDefault();event.stopPropagation();closePopup(c);}},{capture:true});
+    on(document,'keydown',event=>{
+      if(event.key==='Escape'&&(c.popup||c.adjust)){event.preventDefault();event.stopPropagation();closePopup(c);return;}
+      if(event.key!=='\\'||event.defaultPrevented||event.repeat||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||c.saving||c.reviewSaving||c.adjust||c.resizeDrag||c.popup?.classList.contains('face-picker'))return;
+      const button=c.reviewButton,target=event.target;
+      if(!live(c)||!button||button.disabled||!button.isConnected||!c.dialog.open||button.closest('[hidden],[inert],[aria-hidden="true"]')||!button.getClientRects().length||target?.isContentEditable||target?.closest?.('input,textarea,select,[role="textbox"]')||(c.adapter&&!c.adapter.enabled()))return;
+      const activeDialog=target?.closest?.('dialog[open]')||document.activeElement?.closest?.('dialog[open]')||[...document.querySelectorAll('dialog[open]')].at(-1);
+      if(activeDialog&&activeDialog!==c.dialog)return;
+      event.preventDefault();event.stopPropagation();button.click();
+    },{capture:true});
     on(c.dialog,'scroll',()=>{if(c.popup?.classList.contains('face-name'))closePopup(c);else place(c);},{passive:true});
     on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>place(c));on(window.visualViewport,'scroll',()=>place(c));}
     if(typeof ResizeObserver!=='undefined'){c.resize=new ResizeObserver(()=>place(c));c.resize.observe(image);c.resize.observe(stage);}
