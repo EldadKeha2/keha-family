@@ -1,7 +1,10 @@
 (() => {
   'use strict';
   const $=id=>document.getElementById(id),tr=(he,en)=>window.FamilyI18n.isEnglish?en:he;
-  const compact=matchMedia('(max-width:700px), (display-mode:standalone), (display-mode:fullscreen)');
+  // Desktop browser tabs and installed apps use the same width breakpoint.
+  // Keep existing phone and tablet app behavior, including landscape, intact.
+  const compact=matchMedia('(max-width:700px)'),appMode=matchMedia('(display-mode:standalone), (display-mode:fullscreen)');
+  const ua=navigator.userAgent||'',mobileDevice=navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
   const moved=new Map();let faces=null,viewer,header,strip,icons,feedback,fit,fitLabel,zoomValue,zoomGroup,busy=false,active=false,photoId=null,headingLabel,downloadText,shareHeadingText;
 
   // Move the actual controls so their listeners, pending writes and focus stay
@@ -29,7 +32,7 @@
   function sync(){
     if(!viewer||busy)return;busy=true;const focused=document.activeElement;
     try{
-      const item=window.FamilyMedia?.current?.(),enabled=viewer.open&&item?.kind==='photo'&&(compact.matches||navigator.standalone===true);
+      const item=window.FamilyMedia?.current?.(),enabled=viewer.open&&item?.kind==='photo'&&(compact.matches||mobileDevice&&(appMode.matches||navigator.standalone===true));
       if(!enabled){if(active||moved.size)restore();return;}
       active=true;viewer.classList.add('photo-controls-below');strip.hidden=false;zoomGroup.hidden=false;
       $('mediaViewerTitle').setAttribute('aria-label',tr('תצוגת תמונה','Photo viewer'));
@@ -75,7 +78,7 @@
     strip=document.createElement('div');strip.id='mediaPhotoIconScroll';strip.hidden=true;
     icons=document.createElement('div');icons.id='mediaPhotoIcons';icons.setAttribute('role','group');
     feedback=document.createElement('div');feedback.id='mediaPhotoToolbarFeedback';strip.append(icons);panel.append(strip,feedback);$('mediaStage').after(panel);
-    viewer.addEventListener('close',()=>{faces=null;restore();});window.addEventListener('resize',sync);compact.addEventListener('change',sync);sync();
+    viewer.addEventListener('close',()=>{faces=null;restore();});window.addEventListener('resize',sync);compact.addEventListener('change',sync);appMode.addEventListener('change',sync);sync();
   }
   window.FamilyPhotoViewerLayout={sync,faceControls};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
