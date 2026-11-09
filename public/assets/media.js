@@ -74,6 +74,7 @@
     window.FamilyPhotoLabels?.mount(item);
     window.FamilyPhotoDate?.mount(item);
     window.FamilyFaces?.update(item);
+    window.FamilyPhotoViewerLayout?.sync();
   }
   async function instagramFallback(item){
     if(identity(current()||{})!==identity(item)||!$('mediaViewer').open)return;
@@ -141,7 +142,7 @@
     state.navigation++;state.paging=false;state.pageTarget=null;state.scope=scope||items[index]?.scope||'shared';state.items=items;albums.set(state.scope,items);
     state.opener=document.activeElement;
     document.querySelectorAll('video').forEach(video=>video.pause());
-    show(index);if(!$('mediaViewer').open){syncMediaRoute(current());$('mediaViewer').showModal();}
+    show(index);if(!$('mediaViewer').open){syncMediaRoute(current());$('mediaViewer').showModal();}window.FamilyPhotoViewerLayout?.sync();
   }
   function syncMediaRoute(item,replace=false){
     if(!window.FamilyNavigation||!item?.id)return;

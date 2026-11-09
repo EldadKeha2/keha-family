@@ -43,6 +43,7 @@ function render(){
   if(['editPhotoDate','togglePhotoNames','togglePhotoAges'].includes(focused))$(focused)?.focus({preventScroll:true});
   refreshAges();
   window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:item.id,...overlays(item.id)}}));
+  window.FamilyPhotoViewerLayout?.sync();
 }
 function mount(photo){
   if(item?.id!==photo.id){showNames=false;showAges=false;}

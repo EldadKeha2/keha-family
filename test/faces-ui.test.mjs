@@ -55,6 +55,11 @@ function fixture(detected=[],{desktop=false}={}){
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
 
+test('face controls can mount after the phone layout has moved the edit button below the photo',async()=>{
+ const f=fixture([first]);f.dialog.append(f.edit);await f.mount('moved-controls',{}, {scope:'gallery'});
+ assert.ok(f.find('face-review-button'));assert.ok(f.find('face-regions-toggle'));assert.ok(f.find('face-zoom-toolbar'));f.faces.clear();
+});
+
 test('repeated metadata refreshes reuse one face viewer and remove leftover external controls',async()=>{
  const f=fixture([first]),options={highlightMissing:true},item={scope:'gallery',tagsRevision:'t1'};await f.mount('dated',options,item);
  const toolbar=f.find('face-zoom-toolbar'),review=f.find('face-review-button'),note=f.find('face-missing-note');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
