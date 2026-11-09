@@ -1,5 +1,5 @@
 import {photoDate} from './photo-date.mjs';
-import {PHOTO_LABELS,photoLabels} from './photo-labels-catalog.mjs';
+import {MAX_PHOTO_LABELS,normalizePhotoLabel,photoLabels} from './photo-labels-catalog.mjs';
 
 export const PHOTO_METADATA_HEADER='X-Family-Photo-Metadata-Length';
 export const MAX_PHOTO_METADATA_BYTES=98304;
@@ -30,7 +30,7 @@ export function normalizeUploadMetadata(value){
   if(typeof caption!=='string'||caption.length>5000)throw new RangeError('Invalid photo caption');
   if(value.familyPhoto!==undefined&&typeof value.familyPhoto!=='boolean')throw new RangeError('Invalid family photo choice');
   const result={date:photoDate(value.date),caption,...(value.familyPhoto===undefined?{}:{familyPhoto:value.familyPhoto})};
-  if(value.labels!==undefined){if(!Array.isArray(value.labels)||value.labels.length>PHOTO_LABELS.length||value.labels.some(id=>!PHOTO_LABELS.some(label=>label.id===id)))throw new RangeError('Invalid photo labels');result.labels=photoLabels(value.labels);}
+  if(value.labels!==undefined){if(!Array.isArray(value.labels)||value.labels.length>MAX_PHOTO_LABELS||value.labels.some(id=>!normalizePhotoLabel(id)))throw new RangeError('Invalid photo labels');result.labels=photoLabels(value.labels);}
   if(value.complete!==undefined){if(typeof value.complete!=='boolean')throw new RangeError('Invalid face confirmation');result.complete=value.complete;}
   if(value.faces!==undefined){
     if(!Array.isArray(value.faces)||value.faces.length>150)throw new RangeError('Invalid face tags');

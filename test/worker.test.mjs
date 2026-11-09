@@ -1658,6 +1658,22 @@ test('photo subject labels persist independently of people and completion, filte
  }finally{await f.close();}
 });
 
+test('custom photo labels persist, share one catalog and filter safely across punctuation and letter case',async()=>{
+ const f=fixture();try{
+  await f.connect();let a=await galleryPhoto(f,'Custom.jpg'),b=await galleryPhoto(f,'Other.jpg');
+  const name='טיולים, חוף & "משפחה"',label='custom:'+encodeURIComponent(name),reunion='custom:'+encodeURIComponent('Family reunion');
+  const patch=(item,label,tagged=true)=>f.call('/api/media/'+item.id+'/labels',{method:'POST',body:{label,tagged}});
+  let response=await patch(a,label);assert.equal(response.status,200);assert.deepEqual((await response.json()).item.labels,[label]);
+  await patch(a,reunion);response=await patch(b,'custom:'+encodeURIComponent('family reunion'));assert.deepEqual((await response.json()).item.labels,[reunion]);
+  f.restart();assert.deepEqual((await(await f.call('/api/media/'+a.id+'/view')).json()).item.labels,[label,reunion]);
+  const catalog=await(await f.call('/api/photo-labels')).json();assert.equal(catalog.version,2);assert.equal(catalog.labels.find(option=>option.id===label).name,name);assert.equal(catalog.labels.filter(option=>option.name.toLowerCase()==='family reunion').length,1);
+  const query=new URLSearchParams({labels:label});assert.deepEqual((await(await f.call('/api/gallery/selection?'+query)).json()).ids,[a.id]);assert.equal((await(await f.call('/api/collections/gallery?'+new URLSearchParams({labels:reunion}))).json()).count,2);
+  a=(await(await photoEdit(f,a)).json()).item;assert.deepEqual(a.labels,[label,reunion]);await patch(a,label,false);assert.ok(!(await(await f.call('/api/photo-labels')).json()).labels.some(option=>option.id===label));
+  for(const invalid of ['custom:','custom:%ZZ','custom:'+encodeURIComponent('a'.repeat(61))])assert.equal((await patch(a,invalid)).status,400);
+  response=await patch(a,'custom:'+encodeURIComponent('Purim'));assert.ok((await response.json()).item.labels.includes('purim'));
+ }finally{await f.close();}
+});
+
 test('dismissed detections and linked names persist only for that photo revision and survive rescanning',async()=>{
  const f=fixture();try{
   await f.connect();const item=await galleryPhoto(f,'Ignore.jpg'),other=await galleryPhoto(f,'Unaffected.jpg');await saveGalleryScan(f,item);await saveGalleryScan(f,other);

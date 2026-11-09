@@ -20,7 +20,7 @@ import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
 import {galleryRefinement,galleryRevision,galleryLabels,galleryOrdering} from './gallery.mjs';
-import {PHOTO_LABELS,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
+import {MAX_PHOTO_LABELS,normalizePhotoLabel,photoLabelKey,photoLabelOptions,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
 import {photoDate} from '../public/assets/photo-date.mjs';
 import {nameCorrectionKey,normalizedName,matchingPeople,correctPersonName,correctNamedContent} from './name-corrections.mjs';
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
@@ -666,10 +666,16 @@ export class FamilyState {
       case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');const ignoredFaces=this.ignoredFaces(item);return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:withoutIgnored(this.faceScan(item)?.faces||[],ignoredFaces),ignoredFaces};}
       case 'media.face.ignore':return this.ignoreFace(p);
       case 'media.face.save':return this.saveFace(p);
+      case 'photo.labels.catalog':{
+        const ids=this.rows("SELECT DISTINCT label.value AS id FROM media m,json_each(m.data,'$.labels') label WHERE label.type='text' AND label.value LIKE 'custom:%' ORDER BY label.value LIMIT 1000").map(row=>row.id);
+        return {version:2,labels:photoLabelOptions(ids)};
+      }
       case 'media.labels.patch':{
         const item=this.photo(p.id);
-        if(typeof p.tagged!=='boolean'||!PHOTO_LABELS.some(label=>label.id===p.label))throw new HttpError(400,'בחרו תגית מהרשימה.');
-        const labels=new Set(photoLabels(item.labels));if(p.tagged)labels.add(p.label);else labels.delete(p.label);
+        let label=normalizePhotoLabel(p.label);if(typeof p.tagged!=='boolean'||!label)throw new HttpError(400,'הזינו תגית באורך של עד 60 תווים.');
+        const key=photoLabelKey(label),current=photoLabels(item.labels),known=label.startsWith('custom:')?this.run('photo.labels.catalog').labels.find(option=>photoLabelKey(option.id)===key):null;label=known?.id||label;
+        const labels=new Set(current.filter(id=>photoLabelKey(id)!==key));
+        if(p.tagged){if(labels.size>=MAX_PHOTO_LABELS)throw new HttpError(400,'אפשר להוסיף עד 32 תגיות לתמונה.');labels.add(label);}
         item.labels=photoLabels([...labels]);item.updatedAt=new Date().toISOString();this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchMedia(item);
         return {saved:true,operation:'labels',scope:this.mediaScope(item),item:this.mediaPublic(item)};
       }

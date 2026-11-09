@@ -10,7 +10,7 @@ const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
  .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
 function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false}={}){
- const view={width:desktop?1200:360,height:800},created=[];
+ const view={width:desktop?1200:360,height:800,frameHeight:null},created=[];
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
   get parentNode(){return this.parent;}
@@ -32,7 +32,7 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
   click(){this.dispatchEvent(new Event('click',{cancelable:true}));}
   getClientRects(){return this.closest('[hidden]')?[]:[this.getBoundingClientRect()];}
   get clientWidth(){return this.className==='face-photo-scroll'?view.width:this.getBoundingClientRect().width;}
-  get clientHeight(){return this.className==='face-photo-scroll'?Math.min(view.height*.43,parseFloat(this.children[0]?.style.height)||0):this.getBoundingClientRect().height;}
+  get clientHeight(){return this.className==='face-photo-scroll'?(view.frameHeight??Math.min(view.height*.43,parseFloat(this.children[0]?.style.height)||0)):this.getBoundingClientRect().height;}
   getBoundingClientRect(){
    if(this===stage||this.className==='face-photo-scroll')return {x:0,y:100,left:0,top:100,width:view.width,height:this===stage?270:this.clientHeight};
    if(this.className==='face-photo-surface'){const width=parseFloat(this.style.width),height=parseFloat(this.style.height),left=Math.max(0,(view.width-width)/2)-this.parent.scrollLeft,top=100-this.parent.scrollTop;return {x:left,y:top,left,top,width,height};}
@@ -41,7 +41,7 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
    return {x:0,y:0,left:0,top:0,width:280,height:240};
   }
  }
- const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node('dialog'),title=new Node('h2'),download=new Node('a'),edit=new Node('button');dialog.open=true;dialog.append(root);root.append(title,stage);title.append(download,edit);stage.append(image);
+ const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node('dialog'),title=new Node('h2'),download=new Node('a'),edit=new Node('button'),footer=new Node(),tagPanel=new Node('section');dialog.open=true;dialog.append(root);root.append(title,stage,footer);footer.append(tagPanel);dialog.queries.set('#mediaTagPanel',tagPanel);title.append(download,edit);stage.append(image);
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
  const document=new Node();document.body=new Node('body');document.append(document.body);document.body.append(dialog);document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
  const window=new Node();window.navigator=windows?{userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',userAgentData:{mobile:false,platform:'Windows'},maxTouchPoints:10}:{};window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
@@ -51,9 +51,21 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);return event;};
- return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
+ return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,footer,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+test('100% fits each photo inside the measured phone frame and zoom changes only the image surface',async()=>{
+ const f=fixture();f.view.frameHeight=400;f.dialog.classList.add('mobile-photo-frame');
+ for(const [width,height]of [[4000,3000],[1000,3000],[3000,1000]]){
+  Object.assign(f.image,{naturalWidth:width,naturalHeight:height});await f.mount('frame-'+width+'-'+height,{}, {faceSummary:{reviewed:true}});
+  const surface=f.find('face-photo-surface'),scroller=f.find('face-photo-scroll'),toolbar=f.find('face-zoom-toolbar'),base={width:parseFloat(surface.style.width),height:parseFloat(surface.style.height)};
+  assert.ok(base.width<=360&&base.height<=400,'The full photo fits without cropping');assert.ok(Math.abs(base.width/base.height-width/height)<1e-12);assert.equal(scroller.clientHeight,400);
+  f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
+  assert.equal(parseFloat(surface.style.width),base.width*2);assert.equal(parseFloat(surface.style.height),base.height*2);assert.equal(scroller.clientHeight,400,'Zoom keeps the controls beneath a fixed frame');
+  Object.assign(f.image,{naturalWidth:width*2,naturalHeight:height*2});f.faces.fit();assert.equal(parseFloat(surface.style.width),base.width*2,'Loading a higher resolution original preserves the displayed size');
+  f.emit(toolbar.querySelector('[data-face-zoom-reset]'),'click');assert.equal(parseFloat(surface.style.width),base.width);assert.equal(parseFloat(surface.style.height),base.height);f.faces.clear();
+ }
+});
 test('zoom upgrades a browsing preview to the original and a late original cannot change a closed image',async()=>{
  for(const close of [false,true]){
   const f=fixture(),calls=[];let ready;f.window.FamilyPhotoPresentation={prepare(...args){calls.push(args);return new Promise(resolve=>{ready=resolve;});}};
@@ -418,6 +430,12 @@ test('dense all-name overlays fall back to a numbered legend and return to the p
  const faces=Array.from({length:60},(_,i)=>({id:String(i),rect:{x:.08+(i%6)*.15,y:.06+Math.floor(i/6)*.09,width:.055,height:.05},personId:'person-'+i,person:{id:'person-'+i,name:'בן משפחה '+i}})),f=fixture();f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();
  const legend=f.find('face-label-list');assert.equal(legend.hidden,false);assert.equal(legend.children.length,60);assert.ok(legend.children.every(node=>node.innerHTML.includes('face-label-number')));
  for(let i=0;i<6;i++)f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.equal(legend.hidden,true);assert.equal(legend.children.length,0);assert.equal(f.find('face-visible-labels').children.filter(node=>node.classList.contains('face-visible-label')).length,60);f.faces.clear();assert.equal(f.find('face-label-list'),undefined);
+});
+test('numbered group-photo names remain accessible beneath the fixed phone frame and are removed with their photo',async()=>{
+ const f=fixture(),faces=Array.from({length:60},(_,i)=>({id:String(i),rect:{x:.08+(i%6)*.15,y:.06+Math.floor(i/6)*.09,width:.055,height:.05},personId:'person-'+i,person:{id:'person-'+i,name:'בן משפחה '+i}}));
+ f.view.frameHeight=360;f.dialog.classList.add('mobile-photo-frame');f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();
+ const legend=f.find('face-label-list');assert.equal(legend.hidden,false);assert.equal(legend.children.length,60);assert.equal(legend.parentNode,f.footer,'The legend cannot be clipped inside the photo frame');assert.equal(f.find('face-photo-scroll').clientHeight,360);
+ f.faces.clear();assert.equal(legend.parentNode,null);
 });
 
 test('crowd numbers locate and highlight their own face on hover, keyboard focus and touch without opening an editor',async t=>{

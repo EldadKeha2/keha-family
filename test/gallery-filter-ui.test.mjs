@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 import family from '../src/family.mjs';
 import {familyOptions,familyLabel} from '../public/assets/gallery-family.mjs';
 import {PHOTO_LABELS,photoLabelName} from '../public/assets/photo-labels-catalog.mjs';
+import * as labelCatalog from '../public/assets/photo-labels-catalog.mjs';
 
 const source=(await readFile(new URL('../public/assets/gallery-filter.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 function fixture(english=false){
@@ -20,7 +21,7 @@ function fixture(english=false){
  const collection={items:[],count:0,pagination:{person:'',unit:'',query:''}};
  const window={FAMILY_DATA:family,addEventListener(){},FamilyI18n:{isEnglish:english,locale:english?'en-US':'he',personName:p=>english?p.nameEn||p.name:p.name,fetch:async path=>{requests.push(path);return Response.json({people:Object.values(family.people).filter(p=>!p.placeholder)});}},FamilyPortal:{getCollection:()=>collection,galleryQuery:()=>({...query}),refineGallery:value=>{query={...query,...value};collection.pagination={...query};window.FamilyGalleryFilter.render();}}};
  const document={readyState:'complete',getElementById:get,addEventListener:(name,callback)=>{if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(callback);}};
- vm.runInNewContext(source,{window,document,familyOptions,familyLabel,PHOTO_LABELS,photoLabelName,URLSearchParams});
+ vm.runInNewContext(source,{...labelCatalog,window,document,familyOptions,familyLabel,URLSearchParams});
  const change=(kind,id,checked)=>get('galleryFilterPanel').handlers.get('change')({target:{dataset:{[{person:'galleryPerson',family:'galleryFamily',label:'galleryLabel'}[kind]]:id},checked}});
  return {window,get,change,requests,query:()=>query,async open(){await get('galleryFilterToggle').handlers.get('click')();},search(text){get('galleryPersonSearch').value=text;get('galleryPersonSearch').handlers.get('input')();},reset(){get('clearGalleryFilter').handlers.get('click')();}};
 }

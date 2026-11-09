@@ -270,6 +270,7 @@ export default {
         return snapshot(request,await db('people'));
       }
       if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
+      if(path==='/api/photo-labels'&&request.method==='GET')return json(await db('photo.labels.catalog'));
       if(path==='/api/nursery'&&request.method==='GET')return json(await db('nursery'));
       if(path==='/api/memorial'&&request.method==='GET')return json(await db('memorial',{visitorId:/^[a-f0-9]{32}$/.test(request.headers.get('X-Candle-Visitor')||'')?request.headers.get('X-Candle-Visitor'):null}));
       if(path==='/api/games/who-is-it'&&request.method==='GET')return json(await db('game.quiz'));

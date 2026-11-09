@@ -1,5 +1,5 @@
 import {familyOptions,familyLabel} from './gallery-family.mjs?v=2';
-import {PHOTO_LABELS,photoLabelName} from './photo-labels-catalog.mjs?v=1';
+import {photoLabelOptions,photoLabelName,loadPhotoLabelCatalog} from './photo-labels-catalog.mjs?v=2';
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
@@ -26,7 +26,7 @@ function fillPeople(){
   checkboxes($('galleryPersonFilter'),people,state.people,'person');
 }
 function apply(){clearSelection();window.FamilyPortal.refineGallery(criteria());}
-function fillLabels(){checkboxes($('galleryLabelFilter'),PHOTO_LABELS.map(label=>({id:label.id,label:photoLabelName(label,I.isEnglish)})),state.labels,'label');}
+function fillLabels(){checkboxes($('galleryLabelFilter'),photoLabelOptions([...state.labels]).map(label=>({id:label.id,label:photoLabelName(label,I.isEnglish)})),state.labels,'label');}
 function clearCriteria(){state.people.clear();state.families.clear();state.labels.clear();if(ready){$('galleryPersonSearch').value='';fillPeople();fillFamilies();fillLabels();}}
 function reset(){state.open=false;for(const id of ['galleryPeopleChoices','galleryFamily2Choices','galleryFamily3Choices','galleryFamily4Choices','galleryLabelChoices'])$(id).open=false;clearCriteria();clearSelection();}
 function category(filter){if(filter!=='all')reset();render();}
@@ -94,9 +94,11 @@ function init(){
   $('galleryFilterToggle').addEventListener('click',async()=>{
     if(state.open){reset();window.FamilyPortal.refineGallery({person:'',unit:'',labels:''});return;}
     state.open=true;render();
+    loadPhotoLabelCatalog().then(fillLabels);
     try{const response=await I.fetch('api/tag-people',{cache:'no-store'});if(response.ok){const result=await response.json();roster=result.people;fillPeople();}}catch{}
   });
   $('galleryPersonSearch').addEventListener('input',fillPeople);
+  window.addEventListener('family-photo-label-catalog',()=>{if(ready)fillLabels();});
   $('galleryFilterPanel').addEventListener('change',event=>{
     const input=event.target;
     const person=input.dataset.galleryPerson,family=input.dataset.galleryFamily,label=input.dataset.galleryLabel;

@@ -133,9 +133,9 @@
     }catch(error){if(!isCurrent())return;if(error.name==='AbortError'){$('mediaShareStatus').textContent='';return;}await instagramFallback(item);}
     finally{if(isCurrent()){button.disabled=false;button.removeAttribute('aria-busy');}}
   }
-  function clearStage(){
+  function clearStage({preserveHandoff=false}={}){
     photoSwipe?.reset();
-    window.FamilyPhotoPresentation?.cancel();
+    window.FamilyPhotoPresentation?.cancel({preserveHandoff});
     renderedVersion=null;
     window.FamilyFaces?.clear();
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
@@ -143,9 +143,10 @@
   }
   function show(index,{direction=0,image=null,native=false}={}){
     if(!state.items.length)return;
+    const handoff=native?window.FamilyPhotoPresentation?.holdNative?.($('mediaStage'),image):null;
     const ghost=!native&&direction&&current()?.kind==='photo'?window.FamilyPhotoPresentation?.snapshot($('mediaStage')):null;
     state.index=(index+state.items.length)%state.items.length;
-    const item=current();state.activeId=identity(item);captionEditing=false;clearStage();renderedVersion=versionKey(item);metadata();
+    const item=current();state.activeId=identity(item);captionEditing=false;clearStage({preserveHandoff:Boolean(handoff)});renderedVersion=versionKey(item);metadata();
     if($('mediaViewer').open)syncMediaRoute(item,true);
     const stage=$('mediaStage');stage.classList.toggle('is-video',item.kind==='video');stage.classList.toggle('is-document',item.kind==='document');
     if(item.provider==='youtube'&&/^[\w-]{11}$/.test(item.youtubeId)){
@@ -166,6 +167,7 @@
       if(img.complete&&img.naturalWidth)preload();else img.addEventListener('load',preload,{once:true});
       if(item.kind==='photo')window.FamilyPhotoPresentation?.slide(stage,ghost,direction*(I18n.isEnglish?1:-1));
       refreshPhotoPresentation();
+      window.FamilyPhotoPresentation?.finishHandoff?.(handoff,img,window.FamilyFaces?.whenReady?.(stage,img));
     }else if(['application/pdf','text/plain','text/markdown'].includes(item.mime)){
       const frame=document.createElement('iframe');frame.src=item.src+'?inline=1';frame.title=I18n.mediaName(item);frame.referrerPolicy='same-origin';stage.append(frame);$('mediaPlaybackNote').hidden=true;
     }else{

@@ -2,7 +2,7 @@ import family from './family.mjs';
 import {HttpError,text} from './http.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION} from '../public/assets/face-coverage.mjs';
 import {familyMemberIds,hasFamily} from '../public/assets/gallery-family.mjs';
-import {PHOTO_LABELS} from '../public/assets/photo-labels-catalog.mjs';
+import {MAX_PHOTO_LABELS,normalizePhotoLabel} from '../public/assets/photo-labels-catalog.mjs';
 export function galleryOrdering(options={}){
   // Legacy clients omit sort; the gallery interface explicitly defaults to random.
   const sort=options.sort||'uploaded-desc';
@@ -24,9 +24,9 @@ export function galleryOrdering(options={}){
   return {sort,seed:null,sql:'CASE WHEN ('+date+') IS NULL THEN 1 ELSE 0 END ASC,('+date+') '+direction+',m.rowid DESC',args:[]};
 }
 export function galleryLabels(value){
-  const source=text(value||'','תגיות',200),labels=[...new Set(source?source.split(','):[])].sort();
-  if(labels.some(id=>!PHOTO_LABELS.some(label=>label.id===id)))throw new HttpError(400,'בחרו תגיות מהרשימה.');
-  return labels;
+  const source=text(value||'','תגיות',20000),labels=[...new Set(source?source.split(','):[])].sort();
+  if(labels.length>MAX_PHOTO_LABELS||labels.some(id=>!normalizePhotoLabel(id)))throw new HttpError(400,'בחרו תגיות תקינות.');
+  return [...new Set(labels.map(normalizePhotoLabel))].sort();
 }
 function refinementIds(value,label){
   const source=text(value||'',label,40000);

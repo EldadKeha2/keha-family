@@ -13,6 +13,17 @@
 .photo-label-choices label:has(input:focus-visible),.photo-label-toggle:focus-visible{outline:2px solid #9a7b40;outline-offset:2px}
 .photo-label-status{margin:4px 0 0;color:#8a7956;font:calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 .photo-label-status.is-error{color:#a34d37}
+#mediaViewer .photo-label-add{grid-column:1/-1;min-height:38px;padding:6px 10px;border:1px dashed #baa370;border-radius:5px;color:#795d29;background:#fbf7eb;font:calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.photo-custom-label-form{grid-column:1/-1;display:grid;gap:6px;margin:0;padding:9px;border:1px solid #d6c59d;border-radius:6px;background:#fbf7eb}
+.photo-custom-label-form>div{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.photo-custom-label-form input{box-sizing:border-box;flex:1 1 120px;width:auto;min-width:0;height:38px;margin:0;padding:6px 9px;border:1px solid #ccb889;border-radius:5px;background:white;color:#5b542f;font:16px/1.4 var(--sans)}
+#mediaViewer .photo-custom-label-form button{min-height:38px;padding:6px 10px;border:1px solid #c6b487;border-radius:5px;background:#eee4c9;color:#705b30;font:14px/1.4 var(--sans)}
+#mediaViewer.mobile-photo-frame{max-height:calc(100dvh - 12px);margin:6px auto}
+#mediaViewer.mobile-photo-frame #mediaStage{height:var(--photo-fit-height,min(calc(100vw - 32px),52dvh,440px));min-height:0;overflow:hidden}
+#mediaViewer.mobile-photo-frame #mediaStage .face-photo-scroll{display:flex;align-items:flex-start;height:var(--photo-fit-height,min(calc(100vw - 32px),52dvh,440px));max-height:var(--photo-fit-height,min(calc(100vw - 32px),52dvh,440px));min-height:0}
+#mediaViewer.mobile-photo-frame #mediaStage .face-photo-surface{margin:auto}
+#mediaViewer.mobile-photo-frame #mediaStage :is(.native-photo-strip,.native-photo-pane){height:100%;min-height:0}
+#mediaViewer.mobile-photo-frame #mediaStage>img{width:100%;height:100%;max-height:none;object-fit:contain}
 @media(max-width:700px){
   #mediaViewer.has-photo-labels{max-height:calc(100dvh - 12px);margin:6px auto}
   #mediaViewer.has-photo-labels .media-viewer-footer{padding:7px 12px 9px}

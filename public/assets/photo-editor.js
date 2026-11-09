@@ -1,8 +1,8 @@
 import {fullCrop,turns,isPhoto,normalizeCrop,rotateCrop,rotatedSize,pixelCrop,moveCrop,changed,outputFormat,outputName,drawPhoto} from './photo-edit-core.mjs';
-import {filenamePhotoDate,normalizeUploadMetadata,photoUploadPayload} from './photo-upload-metadata.mjs?v=3';
+import {filenamePhotoDate,normalizeUploadMetadata,photoUploadPayload} from './photo-upload-metadata.mjs?v=4';
 
 import {createUploadFaceAdapter,faceDraftPeople,transformedUploadFaces} from './photo-upload-faces.mjs?v=2';
-import {PHOTO_LABELS,photoLabelName} from './photo-labels-catalog.mjs';
+import {PHOTO_LABELS,photoLabelName} from './photo-labels-catalog.mjs?v=2';
 
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
@@ -17,7 +17,7 @@ function renderDraftTags(){
   const d=draft();if(!d?.metadata)return;
   const people=faceDraftPeople(d);get('PeopleSection').hidden=!people.length;
   get('PeopleTags').innerHTML=people.map(person=>`<button type="button" data-upload-remove-person="${safe(person.id)}" aria-label="${safe(tr('הסרת התיוג של ','Remove tag for ')+I.personName(person))}"><span dir="auto">${safe(I.personName(person))}</span><span aria-hidden="true">×</span></button>`).join('');
-  get('EventTags').innerHTML=PHOTO_LABELS.filter(label=>(d.metadata.labels||[]).includes(label.id)).map(label=>`<span>${safe(photoLabelName(label,I.isEnglish))}</span>`).join('');
+  get('EventTags').innerHTML=(d.metadata.labels||[]).map(label=>`<span>${safe(photoLabelName(label,I.isEnglish))}</span>`).join('');
 }
 function renderTagControls(){
   const d=draft(),enabled=Boolean(d&&!d.cropping&&desktop()&&session.mode!=='existing');

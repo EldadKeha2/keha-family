@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const prepared=new Map();let motion=null,dragged=null,serial=0;
+  const prepared=new Map();let motion=null,dragged=null,serial=0,handoff=null;
   const source=item=>item.previewSrc||item.src;
   const photoImage=stage=>stage._familyFaceContext?.image||stage.querySelector('.face-photo-scroll img')||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
   function prepare(item,priority='high',original=false){
@@ -26,8 +26,28 @@
   function cancelDrag(){
     if(!dragged)return;dragged.node.style.transform='';dragged.stage.classList.remove('photo-dragging');dragged=null;
   }
-  function cancel(){
+  function clearHandoff(token=handoff){if(token&&handoff===token){handoff=null;token.node.remove();}}
+  function holdNative(stage,fallback){
+    const strip=stage.querySelector('.native-photo-strip'),host=stage.closest?.('dialog');if(!strip||!host)return null;
+    const page=Math.round(strip.scrollLeft/strip.clientWidth),shown=strip.children[page]?.querySelector('img'),image=shown?.naturalWidth?shown:fallback;
+    if(!image?.naturalWidth||!image.naturalHeight)return null;
+    const r=strip.getBoundingClientRect();if(!r.width||!r.height)return null;
+    const node=document.createElement('div'),canvas=document.createElement('canvas'),ratio=Math.min(2,window.devicePixelRatio||1);
+    canvas.width=Math.ceil(r.width*ratio);canvas.height=Math.ceil(r.height*ratio);const ctx=canvas.getContext('2d');if(!ctx)return null;
+    const scale=Math.min(canvas.width/image.naturalWidth,canvas.height/image.naturalHeight),width=image.naturalWidth*scale,height=image.naturalHeight*scale;
+    try{ctx.drawImage(image,(canvas.width-width)/2,(canvas.height-height)/2,width,height);}catch{return null;}
+    clearHandoff();node.className='photo-transition-cover';node.setAttribute('aria-hidden','true');
+    Object.assign(node.style,{position:'fixed',left:r.left+'px',top:r.top+'px',width:r.width+'px',height:r.height+'px',pointerEvents:'none',zIndex:'8',opacity:'.999',background:getComputedStyle(stage).backgroundColor});
+    Object.assign(canvas.style,{display:'block',width:'100%',height:'100%'});node.append(canvas);host.append(node);
+    return handoff={node,stage};
+  }
+  const paintedFrame=()=>new Promise(resolve=>typeof requestAnimationFrame==='function'?requestAnimationFrame(resolve):setTimeout(resolve,0));
+  async function finishHandoff(token,image,ready){
+    if(!token)return;try{await Promise.all([image.decode?.().catch(()=>{}),ready]);await paintedFrame();await paintedFrame();}finally{clearHandoff(token);}
+  }
+  function cancel({preserveHandoff=false}={}){
     window.FamilyPhotoNative?.reset();
+    if(!preserveHandoff)clearHandoff();
     cancelDrag();if(!motion)return;const previous=motion;motion=null;clearTimeout(previous.timer);
     for(const animation of previous.animations)animation.cancel();previous.ghost.remove();previous.stage.classList.remove('photo-slide-running');
   }
@@ -57,5 +77,5 @@
     motion={id,stage,ghost,animations,timer:setTimeout(finish,400)};
     Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(finish);
   }
-  window.FamilyPhotoPresentation={source,prepare,preload,snapshot,slide,drag,settle,cancel};
+  window.FamilyPhotoPresentation={source,prepare,preload,snapshot,slide,drag,settle,cancel,holdNative,finishHandoff};
 })();

@@ -67,3 +67,13 @@ test('a heavy photo gets grid and viewer copies while its original URL remains i
  api.schedule({...item,thumbnailSrc:null},image);t.mock.timers.tick(2000);assert.equal(requests.length,2);
  assert.equal(api.attributes(item),'');assert.match(api.attributes({...item,thumbnailSrc:null}),/data-thumbnail-id="a"/);
 });
+test('native handoff retains the visible pixels until the new image and layout have painted',async()=>{
+ const frames=[],draws=[],host={children:[],append(node){this.children.push(node);}},image={naturalWidth:2048,naturalHeight:1280},strip={clientWidth:640,scrollLeft:0,children:[{querySelector:()=>image}],getBoundingClientRect:()=>({left:10,top:20,width:640,height:400})};
+ const stage={querySelector:selector=>selector==='.native-photo-strip'?strip:null,closest:()=>host},nodes=[];
+ const document={createElement(tag){const node={style:{},setAttribute(){},append(child){this.child=child;},remove(){this.removed=true;}};if(tag==='canvas')node.getContext=()=>({drawImage(...args){draws.push(args);}});nodes.push(node);return node;}};
+ const window={devicePixelRatio:2};vm.runInNewContext(presentation,{window,document,navigator:{},getComputedStyle:()=>({backgroundColor:'#eee'}),requestAnimationFrame:callback=>frames.push(callback),setTimeout,clearTimeout});
+ const p=window.FamilyPhotoPresentation,token=p.holdNative(stage);assert.equal(draws[0][0],image);assert.equal(token.node.child.width,1280);assert.equal(token.node.style.pointerEvents,'none');
+ let ready;const complete=p.finishHandoff(token,{decode:async()=>{}},new Promise(resolve=>{ready=resolve;}));await new Promise(resolve=>setImmediate(resolve));assert.equal(frames.length,0);assert.equal(token.node.removed,undefined);
+ ready();await new Promise(resolve=>setImmediate(resolve));frames.shift()();await new Promise(resolve=>setImmediate(resolve));assert.equal(token.node.removed,undefined);frames.shift()();await complete;assert.equal(token.node.removed,true);
+ const next=p.holdNative(stage);p.cancel();assert.equal(next.node.removed,true,'Closing or changing photos must remove a pending cover');
+});
