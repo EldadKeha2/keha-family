@@ -53,8 +53,8 @@
     const ownerId=state.scope?.startsWith('personal:')?state.scope.slice(9):null,owner=ownerId&&(app()?.getPerson?.(ownerId)||window.FAMILY_DATA?.people?.[ownerId]),gender=['m','f'].includes(owner?.gender)?owner.gender:'unknown',profileButton=$('openedProfilePhoto');
     const albumCover=/^(wedding|nursery):/.test(state.scope||'');
     profileButton.hidden=!((ownerId||albumCover)&&item.kind==='photo');profileButton.setAttribute('data-gender',gender);
-    const profileLabel=state.scope?.startsWith('wedding:')?tr('קביעה כתמונת פרופיל לחתונה','Set wedding cover photo'):state.scope?.startsWith('nursery:')?tr('קביעה כתמונת פרופיל לתינוקייה','Set baby album cover photo'):tr('קביעה כתמונת פרופיל','Set profile photo');
-    profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);
+    const profileLabel=state.scope?.startsWith('wedding:')?tr('קבע כתמונת החתונה','Set wedding cover photo'):state.scope?.startsWith('nursery:')?tr('קבע כתמונת התינוקייה','Set baby album cover photo'):tr('קבע כתמונת פרופיל','Set profile photo');
+    profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);profileButton.title=profileLabel;
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
     const page=albumPages.get(state.scope),total=page?.total??state.items.length,offset=page?(page.page-1)*page.size:0;

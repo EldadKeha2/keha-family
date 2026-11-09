@@ -2,7 +2,7 @@
   'use strict';
   const $=id=>document.getElementById(id),tr=(he,en)=>window.FamilyI18n.isEnglish?en:he;
   const compact=matchMedia('(max-width:700px), (display-mode:standalone), (display-mode:fullscreen)');
-  const moved=new Map();let faces=null,viewer,header,strip,icons,feedback,fit,fitLabel,zoomValue,zoomGroup,busy=false,active=false,photoId=null,headingLabel;
+  const moved=new Map();let faces=null,viewer,header,strip,icons,feedback,fit,fitLabel,zoomValue,zoomGroup,busy=false,active=false,photoId=null,headingLabel,downloadText,shareHeadingText;
 
   // Move the actual controls so their listeners, pending writes and focus stay
   // attached. Anchors restore the normal desktop and non-photo layouts.
@@ -21,6 +21,8 @@
       if(anchor.isConnected&&node.isConnected)anchor.replaceWith(node);else anchor.remove();
     }
     moved.clear();strip.hidden=true;zoomGroup.hidden=true;viewer.classList.remove('photo-controls-below');
+    const downloadLabel=$('mediaOriginal').querySelector('span');if(downloadLabel.textContent===tr('הורד','Download'))downloadLabel.textContent=downloadText||tr('הורדת תמונה','Download photo');
+    $('mediaShareActions').querySelector('.media-share-heading span').textContent=shareHeadingText;
     if(headingLabel===null)$('mediaViewerTitle').removeAttribute('aria-label');else $('mediaViewerTitle').setAttribute('aria-label',headingLabel);
     active=false;photoId=null;
   }
@@ -58,7 +60,11 @@
         controls.toolbar.querySelector('[data-face-zoom-out]').dataset.zoomLabel=tr('הקטן','Zoom out');
         controls.toolbar.querySelector('[data-face-zoom-in]').dataset.zoomLabel=tr('הגדל','Zoom in');
       }
-      arrange(icons,[moment,$('mediaViewerCollections'),controls?.reviewButton,$('editOpenedPhoto'),$('mediaOriginal')]);
+      arrange(icons,[moment,$('mediaViewerCollections'),controls?.reviewButton,$('editOpenedPhoto')]);
+      const sharing=$('mediaShareActions'),download=$('mediaOriginal'),copy=$('copyMediaLink'),downloadLabel=download.querySelector('span');
+      move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
+      if(downloadLabel.textContent!==tr('הורד','Download'))downloadText=downloadLabel.textContent;
+      downloadLabel.textContent=tr('הורד','Download');sharing.querySelector('.media-share-heading span').textContent=tr('הורדה ושיתוף','Download & share');
       arrange(feedback,[controls?.regionsNote,controls?.reviewStatus]);fitOptionalAlbums();
       const reset=controls?.toolbar?.querySelector('[data-face-zoom-reset]');fit.disabled=!reset||reset.disabled;
       zoomValue.textContent=controls?.toolbar?.querySelector('[data-face-zoom-level]')?.textContent||'100%';
@@ -71,7 +77,7 @@
     faces=controller;sync();
   }
   function init(){
-    viewer=$('mediaViewer');if(!viewer)return;header=viewer.querySelector('.media-viewer-header');headingLabel=$('mediaViewerTitle').getAttribute('aria-label');
+    viewer=$('mediaViewer');if(!viewer)return;header=viewer.querySelector('.media-viewer-header');headingLabel=$('mediaViewerTitle').getAttribute('aria-label');shareHeadingText=$('mediaShareActions').querySelector('.media-share-heading span').textContent;
     zoomGroup=document.createElement('div');zoomGroup.id='mediaPhotoZoomGroup';zoomGroup.hidden=true;
     fit=document.createElement('button');fit.type='button';fit.id='mediaPhotoFit';fitLabel=document.createElement('span');zoomValue=document.createElement('span');zoomValue.id='mediaPhotoZoomValue';
     fit.append(fitLabel,zoomValue);zoomGroup.append(fit);header.append(zoomGroup);

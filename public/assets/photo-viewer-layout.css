@@ -39,6 +39,17 @@
 #mediaViewer.photo-controls-below #mediaPhotoToolbarFeedback :is(.face-regions-note,.face-review-status):empty{display:none}
 #mediaViewer.photo-controls-below .photo-moment-row{display:none}
 #mediaViewer.photo-controls-below .media-stage{min-height:0}
+#mediaViewer.photo-controls-below #mediaShareActions{gap:4px}
+#mediaViewer.photo-controls-below #mediaShareActions>:is(a,button):not(#mediaOriginal)[id]{width:36px;inline-size:36px;min-width:36px;height:38px;min-height:38px;min-block-size:38px;flex-basis:36px;padding:4px}
+#mediaViewer.photo-controls-below #mediaShareActions .share-icon{width:28px;height:28px;flex-basis:28px}
+#mediaViewer.photo-controls-below #mediaShareActions>a#mediaOriginal[id]{display:inline-flex;align-items:center;justify-content:center;gap:5px;box-sizing:border-box;width:auto;inline-size:auto;min-width:64px;max-width:none;height:38px;min-height:38px;min-block-size:38px;flex:0 0 auto;padding:4px 7px;border:1px solid #c7cdb9;border-radius:7px;background:#f4f6ee;color:#526847;font:calc(12px * var(--a11y-text-scale,1))/1.3 var(--sans);text-decoration:none}
+#mediaViewer.photo-controls-below #mediaShareActions #mediaOriginal>span{position:static;width:auto;height:auto;margin:0;padding:0;overflow:visible;clip-path:none;white-space:nowrap;font:inherit}
+#mediaViewer.photo-controls-below #mediaShareActions #mediaOriginal svg{width:19px;height:19px;flex-basis:19px}
+#mediaViewer #openedProfilePhoto{border:1px solid #7e9fbe;background:#fff;color:#315d84;box-shadow:0 2px 0 #54779a35,inset 0 1px 0 #fff;cursor:pointer}
+#mediaViewer #openedProfilePhoto:hover{background:#eef5fc;border-color:#5a84ab}
+#mediaViewer #openedProfilePhoto:focus-visible{outline:2px solid #467fb2;outline-offset:2px}
+#mediaViewer #openedProfilePhoto:active{background:#e4eff9;box-shadow:inset 0 2px 4px #315d8426;transform:translateY(1px)}
+#mediaViewer #openedProfilePhoto:disabled{opacity:.55;cursor:wait;box-shadow:none;transform:none}
 @media(max-width:350px){
  #mediaViewer.photo-controls-below .media-viewer-header{grid-template-columns:24px 32px minmax(132px,1fr) 32px 24px;gap:2px;padding:4px}
  #mediaViewer.photo-controls-below #mediaPhotoZoomGroup{grid-template-columns:28px minmax(68px,80px) 28px;gap:2px}
@@ -46,4 +57,8 @@
  #mediaViewer.photo-controls-below #mediaPhotoIcons{gap:2px}
  #mediaViewer.photo-controls-below #mediaPhotoIconScroll{padding-inline:4px}
  #mediaViewer.photo-controls-below #mediaPhotoIcons :is(button,a){flex-basis:32px;width:32px;min-width:32px;max-width:32px;padding:4px}
+ #mediaViewer.photo-controls-below:has(#mediaViewerCollections) #mediaShareActions{gap:2px}
+ #mediaViewer.photo-controls-below #mediaShareActions>:is(a,button):not(#mediaOriginal)[id]{width:30px;inline-size:30px;min-width:30px;flex-basis:30px;padding:3px}
+ #mediaViewer.photo-controls-below #mediaShareActions .share-icon{width:24px;height:24px;flex-basis:24px}
+ #mediaViewer.photo-controls-below #mediaShareActions>a#mediaOriginal[id]{gap:4px;min-width:60px;padding-inline:5px;font-size:calc(11px * var(--a11y-text-scale,1))}
 }
