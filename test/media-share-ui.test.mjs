@@ -48,6 +48,14 @@ function pointer(f,type,x,y=100,extra={}){
  return event;
 }
 function swipe(f,dx,extra={}){pointer(f,'pointerdown',200,100,extra);pointer(f,'pointermove',200+dx,103,extra);pointer(f,'pointerup',200+dx,103,extra);}
+test('a committed swipe holds its offset while the next photo loads instead of springing back',async()=>{
+ const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');let finish,settles=0;
+ f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>{finish=resolve;});f.window.FamilyPhotoPresentation.settle=()=>{settles++;};
+ swipe(f,120);assert.equal(settles,0);assert.equal(f.get('mediaOriginal').href,'/media/a');finish(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.get('mediaOriginal').href,'/media/b');
+});
+test('viewer previews load for browsing while the original remains the download and editor source',()=>{
+ const f=fixture(),photo={...f.photo(),thumbnailSrc:'/media/a?thumbnail=1',previewSrc:'/media/a?preview=1'};f.window.FamilyMedia.open([photo],0,'gallery');assert.equal(f.get('mediaStage').content[0].src,photo.previewSrc);assert.equal(f.get('mediaOriginal').href,photo.src);
+});
 test('grid thumbnails never replace the original in the photo viewer, downloads or editing',()=>{
  const f=fixture(),photo={...f.photo(),thumbnailSrc:'/media/a?thumbnail=1',thumbnailSize:100};f.window.FamilyMedia.open([photo],0,'gallery');
  assert.equal(f.get('mediaStage').content[0].src,'/media/a');assert.equal(f.get('mediaOriginal').href,'/media/a');

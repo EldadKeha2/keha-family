@@ -54,6 +54,14 @@ function fixture(detected=[],{desktop=false}={}){
  return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+test('zoom upgrades a browsing preview to the original and a late original cannot change a closed image',async()=>{
+ for(const close of [false,true]){
+  const f=fixture(),calls=[];let ready;f.window.FamilyPhotoPresentation={prepare(...args){calls.push(args);return new Promise(resolve=>{ready=resolve;});}};
+  await f.mount('preview',{}, {src:'/media/original',previewSrc:'/media/original?preview=1',faceSummary:{reviewed:true}});f.image.src='/media/original?preview=1';
+  f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.equal(calls.length,1);assert.equal(calls[0][2],true);if(close)f.faces.clear();ready({src:'/media/original'});await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.image.src,close?'/media/original?preview=1':'/media/original');f.faces.clear();
+ }
+});
 
 test('short touch shows the saved name for two seconds; a 550ms hold edits that same face without a second click',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});

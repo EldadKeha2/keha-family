@@ -1,8 +1,8 @@
 (() => {
   'use strict';
   const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
-  let active=false,viewer=false,job=null,timer=null,after=0,finished=false,failed=0;
-  const eligible=()=>active&&!viewer&&document.visibilityState!=='hidden'&&window.FamilyApp?.apiEnabled;
+  let active=false,viewer=false,job=null,timer=null,idleTimer=null,idleUntil=0,after=0,finished=false,failed=0;
+  const eligible=()=>active&&!viewer&&Date.now()>=idleUntil&&document.visibilityState!=='hidden'&&window.FamilyApp?.apiEnabled;
   async function request(path,options={}){
     const response=await I.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
     const result=await response.json();if(!response.ok)throw Error(I.error(result.error));return result;
@@ -25,6 +25,7 @@
   function imageFor(item,signal){
     return new Promise((resolve,reject)=>{
       const image=new Image(),done=(error)=>{clearTimeout(timeout);signal.removeEventListener('abort',abort);image.onload=image.onerror=null;if(error){image.src='';reject(error);}else resolve(image);},abort=()=>done(new DOMException('Cancelled','AbortError'));
+      image.decoding='async';image.fetchPriority='low';
       const timeout=setTimeout(()=>done(Error('Photo loading timed out')),30000);
       image.onload=()=>done();image.onerror=()=>done(Error('Photo unavailable'));signal.addEventListener('abort',abort,{once:true});image.src=item.src;
     });
@@ -52,6 +53,8 @@
   function check(){finished=false;start();}
   window.FamilyGalleryFaces={setActive,save,changed,check};
   document.addEventListener('DOMContentLoaded',()=>{
+    const defer=()=>{if(!active)return;idleUntil=Date.now()+3000;pause();clearTimeout(idleTimer);idleTimer=setTimeout(start,3050);};
+    document.addEventListener('pointerdown',defer,{capture:true,passive:true});document.addEventListener('scroll',defer,{capture:true,passive:true});
     document.getElementById('retryGalleryFaceScan')?.addEventListener('click',()=>{failed=0;changed();status();});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')pause();else start();});
     window.addEventListener('family-face-viewer',event=>{viewer=event.detail.active;if(viewer)pause();else start();status();});

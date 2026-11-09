@@ -1,5 +1,5 @@
 import family from './family.mjs';
-import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure} from './http.mjs';
+import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {recycleRoute} from './recycle-route.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
@@ -47,21 +47,40 @@ function archiveFormat(head,name){
   throw new HttpError(415,'בחרו תמונה, סרטון MP4, WebM או MOV, או מסמך PDF, Word, TXT או Markdown.');
 }
 function filename(value){return String(value||'family').split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g,'_').slice(0,200)||'family';}
-async function saveThumbnail(request,env,db,ctx,id){
+async function saveThumbnail(request,env,db,ctx,id,variant='thumbnail'){
   const item=await db('media.get',{id}),revision=new URL(request.url).searchParams.get('revision');
   if(item.kind!=='photo'||item.provider)throw new HttpError(400,'אפשר להכין תצוגה מקדימה לתמונה בלבד.');
   if(revision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה בינתיים.');
-  if(item.thumbnail?.revision===revision)return json({saved:false,item:(await db('media.public',{id})).item});
-  const bytes=await boundedBody(request,1024*1024),format=sniff(new Uint8Array(bytes).subarray(0,128));
+  if(item[variant]?.revision===revision)return json({saved:false,item:(await db('media.public',{id})).item});
+  const bytes=await boundedBody(request,(variant==='preview'?4:1)*1024*1024),format=sniff(new Uint8Array(bytes).subarray(0,128));
   if(!['image/jpeg','image/webp'].includes(format.mime)||!bytes.byteLength||item.size&&bytes.byteLength>=item.size)throw new HttpError(400,'התצוגה המקדימה אינה קטנה מהמקור.');
-  const key='thumbnails/'+id+'/'+uid()+format.ext;
+  const key=(variant==='preview'?'previews/':'thumbnails/')+id+'/'+uid()+format.ext;
   await putObject(env,key,bytes,bytes.byteLength,format.mime);
   try{
-    const result=await db('photo.thumbnail',{id,revision,thumbnail:{key,size:bytes.byteLength,mime:format.mime,revision}});
+    const result=await db('photo.thumbnail',{id,revision,variant,thumbnail:{key,size:bytes.byteLength,mime:format.mime,revision}});
     if(!result.saved)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));
     if(result.obsoleteKey)ctx.waitUntil(deleteObject(env,result.obsoleteKey).catch(()=>{}));
     const {obsoleteKey,...publicResult}=result;return json(publicResult);
   }catch(error){ctx.waitUntil(deleteObject(env,key).catch(()=>{}));throw error;}
+}
+async function photoAsset(env,item,request,ctx,derived){
+  const cache=typeof caches!=='undefined'&&caches.default;
+  if(!derived||!cache||request.headers.has('Range'))return getObject(env,item,request);
+  // Authorization/existence was already checked in the live database. Only a
+  // derived pixel key enters this internal edge cache, never a family record.
+  const key=new Request(new URL('/.photo-cache/'+await sha256(item.key),request.url));
+  let cached;try{cached=await cache.match(key);}catch{}
+  if(cached){
+    const headers=new Headers(cached.headers);headers.set('Cache-Control','private, max-age=300, must-revalidate');
+    const etag=headers.get('ETag'),matched=request.headers.get('If-None-Match')?.split(',').some(value=>value.trim().replace(/^W\//,'')===etag||value.trim()==='*');
+    return new Response(matched||request.method==='HEAD'?null:cached.body,{status:matched?304:200,headers});
+  }
+  const response=await getObject(env,item,request);
+  if(response.status===200&&request.method==='GET'){
+    const copy=response.clone(),headers=new Headers(copy.headers);headers.set('Cache-Control','public, max-age=2592000');
+    ctx.waitUntil(cache.put(key,new Response(copy.body,{headers})).catch(()=>{}));
+  }
+  return response;
 }
 async function streamUpload(request,maximum,withPhotoMetadata=false){
   const prefix=withPhotoMetadata?request.headers.get(PHOTO_METADATA_HEADER):null,metadataLength=prefix===null?0:Number(prefix);
@@ -265,6 +284,7 @@ export default {
       }
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
+      if(path==='/api/photo-assets'&&request.method==='GET')return json(await db('photo.assets.queue',{after:url.searchParams.get('after'),limit:url.searchParams.get('limit')}));
       if(path==='/api/gallery/face-scan'&&request.method==='GET')return json(await db('gallery.face.scan',{after:url.searchParams.get('after')}));
       if(path==='/api/gallery/selection'&&request.method==='GET')return json(await db('gallery.selection',{person:url.searchParams.get('person'),unit:url.searchParams.get('unit'),labels:url.searchParams.get('labels'),query:url.searchParams.get('q')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/versions$/.exec(path))&&request.method==='GET')return json(await db('photo.versions',{id:match[1]}));
@@ -293,13 +313,14 @@ export default {
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia'}));
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
-        let item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]});
-        if(url.searchParams.get('thumbnail')==='1'&&!url.searchParams.has('version')&&item.thumbnail?.revision===(item.photoRevision||'original'))item={...item,...item.thumbnail};
+        let item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]}),derived=false;
+        const variant=url.searchParams.get('thumbnail')==='1'?'thumbnail':url.searchParams.get('preview')==='1'?'preview':null;
+        if(variant&&!url.searchParams.has('version')&&item[variant]?.revision===(item.photoRevision||'original')){item={...item,...item[variant]};derived=true;}
         if(item.provider==='youtube')return new Response(null,{status:302,headers:{Location:'https://www.youtube.com/watch?v='+item.youtubeId,'Cache-Control':'no-store'}});
-        return await getObject(env,item,request);
+        return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
-        if((match=/^\/api\/media\/([a-f0-9]{32})\/thumbnail$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1]);
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/(thumbnail|preview)$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1],match[2]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/ignore$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.ignore',{id:match[1],photoRevision:body.photoRevision,rect:body.rect,ignored:body.ignored,faceId:body.faceId,expectedRevision:body.expectedRevision}));}
         if(path==='/api/collections/cover'){const body=await readJSON(request,2000);return json(await db('collection.cover',{kind:body.collection,mediaId:body.mediaId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/review$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.review',{id:match[1],photoRevision:body.photoRevision,tagsRevision:body.tagsRevision,complete:body.complete}));}

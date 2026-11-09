@@ -73,7 +73,7 @@
       const xhr=new XMLHttpRequest();xhr.open('POST','api/nursery/'+encodeURIComponent(id)+'/upload?filename='+encodeURIComponent(file.name||'baby-photo.jpg'));
       xhr.setRequestHeader('X-Family-Token',window.FAMILY_API_TOKEN);xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
       xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded/event.total*100));};
-      xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Please try again.')));return;}if(xhr.status>=200&&xhr.status<300)resolve(result);else reject(Error(I.error(result.error)));};
+      xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Please try again.')));return;}if(xhr.status>=200&&xhr.status<300)Promise.resolve(window.FamilyPhotoThumbnails?.fromUpload?.(result,file)).then(()=>resolve(result),()=>resolve(result));else reject(Error(I.error(result.error)));};
       xhr.onerror=()=>reject(Error(tr('ההעלאה נקטעה. נסו שוב.','The upload was interrupted. Please try again.')));xhr.onabort=xhr.onerror;const payload=window.FamilyPhotoEditor?.upload?.(file)||{body:file};for(const [name,value]of Object.entries(payload.headers||{}))xhr.setRequestHeader(name,value);xhr.send(payload.body);
     });
   }

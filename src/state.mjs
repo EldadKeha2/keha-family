@@ -325,6 +325,7 @@ export class FamilyState {
   mediaCollections(item){return [...new Set([...(item.category==='personal'?[]:[item.category]),...this.rows('SELECT collection FROM media_collections WHERE media_id=?',item.id).map(row=>row.collection)])];}
   mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,nameEn:item.nameEn||null,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:photoSource(item),...(item.photoRevision?{photoRevision:item.photoRevision}:{}),uploadedAt:item.createdAt,tags:this.tags(item.id),tagsRevision:this.tagsRevision(item.id),
     ...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision,thumbnailSize:item.thumbnail.size}:{}),
+    ...(item.preview?.revision===(item.photoRevision||'original')?{previewSrc:'/media/'+item.id+'?preview=1&v='+item.preview.revision,previewSize:item.preview.size}:{}),
     collections:this.mediaCollections(item),modifiedAt:item.modifiedAt||item.updatedAt||item.photoEditedAt||item.createdAt,
     ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
@@ -598,16 +599,22 @@ export class FamilyState {
         return {saved:true,person:{...person}};
       }
       case 'media.public':return {item:this.mediaPublic(this.media(p.id))};
+      case 'photo.assets.queue':{
+        const after=Math.max(0,Number(p.after)||0),limit=Math.min(25,Math.max(1,Number(p.limit)||20));
+        const pending="coalesce(json_extract(data,'$.size'),0)>250000 AND coalesce(json_extract(data,'$.kind'),'photo')='photo' AND json_extract(data,'$.mime') LIKE 'image/%' AND json_extract(data,'$.mime')!='image/gif' AND (coalesce(json_extract(data,'$.thumbnail.revision'),'missing')!=coalesce(json_extract(data,'$.photoRevision'),'original') OR (coalesce(json_extract(data,'$.size'),0)>1000000 AND coalesce(json_extract(data,'$.preview.revision'),'missing')!=coalesce(json_extract(data,'$.photoRevision'),'original')))";
+        const rows=this.rows('SELECT rowid AS cursor,data FROM media WHERE rowid>? AND '+pending+' ORDER BY rowid LIMIT ?',after,limit);
+        return {version:1,pending:this.rows('SELECT count(*) AS total FROM media WHERE '+pending)[0].total,items:rows.map(row=>{const item=JSON.parse(row.data),revision=item.photoRevision||'original';return {cursor:row.cursor,id:item.id,src:photoSource(item),revision,mime:item.mime,size:item.size,thumbnail:item.thumbnail?.revision!==revision,preview:item.size>1000000&&item.preview?.revision!==revision};}),next:rows.at(-1)?.cursor||null};
+      }
       case 'photo.thumbnail':{
-        const item=this.photo(p.id);
+        const item=this.photo(p.id),variant=p.variant==='preview'?'preview':'thumbnail';
         if(p.revision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה בינתיים.');
-        if(item.thumbnail?.revision===p.revision)return {saved:false,item:this.mediaPublic(item)};
-        if(!p.thumbnail?.key?.startsWith('thumbnails/'+item.id+'/'))throw new HttpError(400,'התצוגה המקדימה אינה תקינה.');
-        const obsoleteKey=item.thumbnail?.key;item.thumbnail=p.thumbnail;
+        if(item[variant]?.revision===p.revision)return {saved:false,item:this.mediaPublic(item)};
+        if(!p.thumbnail?.key?.startsWith((variant==='preview'?'previews/':'thumbnails/')+item.id+'/'))throw new HttpError(400,'התצוגה המקדימה אינה תקינה.');
+        const obsoleteKey=item[variant]?.key;item[variant]=p.thumbnail;
         // Invalidate album snapshots without treating a derived thumbnail as a
         // photo edit or changing the "last modified" photo ordering.
         this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchPeople(this.relatedPeople(item));for(const kind of this.mediaCollections(item))this.touch(kind);
-        return {saved:true,operation:'thumbnail',scope:this.mediaScope(item),item:this.mediaPublic(item),obsoleteKey};
+        return {saved:true,operation:variant,scope:this.mediaScope(item),item:this.mediaPublic(item),obsoleteKey};
       }
       case 'photo.versions':return this.photoVersions(this.photo(p.id));
       case 'photo.version':{const item=this.photo(p.id),version=this.photoVersion(item,p.versionId);return {...item,...version,id:item.id};}

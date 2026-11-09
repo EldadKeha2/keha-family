@@ -59,6 +59,31 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('the background asset queue prepares all albums without exposing names or storage keys, and previews preserve originals and modification order',async()=>{
+ const f=fixture();try{
+  await f.connect();const a=await taggedUpload(f,'/api/collections/gallery'),b=await taggedUpload(f,'/api/collections/photos');
+  for(const item of [a,b]){const row=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data);row.size=2000000;f.database.prepare('UPDATE media SET data=? WHERE id=?').run(JSON.stringify(row),item.id);}
+  const first=await(await f.call('/api/photo-assets?limit=1')).json();assert.equal(first.version,1);assert.equal(first.pending,2);assert.equal(first.items.length,1);assert.equal(first.items[0].thumbnail,true);assert.equal(first.items[0].preview,true);assert.equal(JSON.stringify(first).includes('example-owner'),false);assert.equal('tags' in first.items[0],false);
+  const second=await(await f.call('/api/photo-assets?limit=1&after='+first.next)).json();assert.equal(second.items.length,1);assert.notEqual(second.items[0].id,first.items[0].id);
+  const before=(await(await f.call('/api/media/'+a.id+'/view')).json()).item.modifiedAt;
+  await f.call('/api/media/'+a.id+'/thumbnail?revision=original',{method:'POST',body:photo.subarray(0,48)});
+  const result=await(await f.call('/api/media/'+a.id+'/preview?revision=original',{method:'POST',body:photo.subarray(0,64)})).json();assert.equal(result.operation,'preview');assert.equal(result.item.modifiedAt,before);assert.equal(result.item.src,a.src);assert.match(result.item.previewSrc,/preview=1/);assert.equal(result.item.previewSize,64);
+  assert.deepEqual(Buffer.from(await(await f.call(a.src)).arrayBuffer()),photo);assert.equal((await(await f.call(result.item.previewSrc)).arrayBuffer()).byteLength,64);assert.equal((await(await f.call('/api/photo-assets')).json()).pending,1);
+  const edited=await(await photoEdit(f,a,{bytes:Buffer.concat([photo,Buffer.alloc(1500000)])})).json();assert.equal(edited.item.previewSrc,undefined);assert.equal(edited.item.thumbnailSrc,undefined);assert.equal((await(await f.call('/api/photo-assets')).json()).pending,2);
+  assert.equal((await f.call('/api/media/'+a.id+'/preview?revision=original',{method:'POST',body:photo.subarray(0,64)})).status,409);
+ }finally{await f.close();}
+});
+test('derived photos use the edge cache after the live existence check, without caching originals or weakening deletion and range handling',async()=>{
+ const previous=globalThis.caches,stored=new Map();globalThis.caches={default:{async match(key){return stored.get(key.url)?.clone();},async put(key,response){stored.set(key.url,response.clone());}}};
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),saved=await(await f.call('/api/media/'+item.id+'/thumbnail?revision=original',{method:'POST',body:photo.subarray(0,48)})).json();
+  const first=await f.call(saved.item.thumbnailSrc);await first.arrayBuffer();await f.flush();assert.equal(stored.size,1);assert.match(first.headers.get('Cache-Control'),/^private/);
+  const network=f.network.length,cached=await f.call(saved.item.thumbnailSrc);assert.equal((await cached.arrayBuffer()).byteLength,48);assert.equal(f.network.length,network);
+  const range=await f.call(saved.item.thumbnailSrc,{headers:{Range:'bytes=0-3'}});assert.equal(range.status,206);assert.equal((await range.arrayBuffer()).byteLength,4);
+  const original=await f.call(item.src);await original.arrayBuffer();assert.equal(stored.size,1);
+  await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:item.scope}});assert.equal((await f.call(saved.item.thumbnailSrc)).status,404);
+ }finally{await f.close();if(previous===undefined)delete globalThis.caches;else globalThis.caches=previous;}
+});
 test('small grid thumbnails preserve full originals, metadata and download URLs and invalidate on a pixel edit',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f,'/api/collections/gallery'),path='/api/media/'+item.id+'/thumbnail?revision=original',bytes=photo.subarray(0,48);

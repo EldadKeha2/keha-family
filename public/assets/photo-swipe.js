@@ -4,7 +4,7 @@
   function bind(stage,{enabled,step,isEnglish,move,cancel}){
     let gesture=null,suppressClickUntil=0,touchStart=null;
     const controls='a,input,textarea,select,video,iframe,[contenteditable],[role="textbox"],button:not(.face-hit),.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
-    const reset=(preserveTouch=false)=>{gesture=null;if(preserveTouch!==true)touchStart=null;cancel?.();};
+    const reset=(preserveTouch=false)=>{gesture=null;if(preserveTouch!==true){touchStart=null;cancel?.();}};
     const blockClick=()=>{suppressClickUntil=Date.now()+700;};
     document.addEventListener('pointerdown',event=>{
       if(gesture&&event.pointerId!==gesture.id){blockClick();reset();}
@@ -30,14 +30,15 @@
     };
     document.addEventListener('pointermove',moved,{capture:true,passive:false});
     const released=event=>{
-      const g=gesture;if(!g||event.pointerId!==g.id)return;reset();
+      const g=gesture;if(!g||event.pointerId!==g.id)return;
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
       const distance=Math.max(40,Math.min(80,stage.clientWidth*.12));
       if(g.dragged||Math.abs(dx)>10)blockClick();
-      if(!enabled()||Date.now()-g.time>4000||Math.abs(dx)<distance||Math.abs(dx)<Math.abs(dy)*1.5)return;
+      if(!enabled()||Date.now()-g.time>4000||Math.abs(dx)<distance||Math.abs(dx)<Math.abs(dy)*1.5){reset();return;}
+      gesture=null;touchStart=null;
       if(event.cancelable)event.preventDefault();
       // Match the existing previous/next arrows in Hebrew and English.
-      step((dx<0?1:-1)*(isEnglish()?1:-1));
+      step((dx<0?1:-1)*(isEnglish()?1:-1),{dragX:dx});
     };
     document.addEventListener('pointerup',released,{capture:true,passive:false});
     document.addEventListener('pointercancel',event=>{if(gesture?.id===event.pointerId){blockClick();reset(true);}},{capture:true,passive:true});

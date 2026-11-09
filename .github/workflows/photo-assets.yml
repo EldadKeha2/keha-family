@@ -1,0 +1,33 @@
+name: Prepare gallery photos
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17,47 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: family-photo-assets
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PHOTO_SITE_ORIGIN: https://keha-family.eldadkeha.workers.dev
+    steps:
+      - name: Read this source revision
+        run: |
+          git init source
+          git -C source remote add origin https://github.com/EldadKeha2/keha-family.git
+          git -C source fetch --depth=1 origin "$GITHUB_SHA"
+          git -C source checkout --detach FETCH_HEAD
+      - name: Prepare image tooling
+        run: |
+          python3 -m venv "$RUNNER_TEMP/photo-worker"
+          "$RUNNER_TEMP/photo-worker/bin/pip" install --disable-pip-version-check --only-binary=:all: Pillow==13.0.0
+      - name: Verify the encoder
+        run: '"$RUNNER_TEMP/photo-worker/bin/python" -m unittest discover -s source/test -p test_photo_assets.py'
+      - name: Prepare missing grid and viewer copies
+        run: '"$RUNNER_TEMP/photo-worker/bin/python" source/scripts/prepare-photo-assets.py --origin "$PHOTO_SITE_ORIGIN" --workers 4 --max-seconds 1200'
