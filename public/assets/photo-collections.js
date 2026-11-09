@@ -26,6 +26,7 @@
   }
   function weddingTargets(item,scope){
     const context=scope?.replace(/^link:/,''),family=window.FAMILY_DATA;
+    if(context==='gallery'||context==='photos')return [];
     const owner=context?.startsWith('personal:')?context.slice(9):context?.startsWith('nursery:')?context.slice(8):null;
     const people=new Set(owner?[owner]:[...(item.tags||[]).map(person=>person.id),...(item.personId?[item.personId]:[])]);
     return Object.values(family?.units||{}).filter(pair=>pair.people?.length===2&&(context?.startsWith('wedding:')?pair.id===context.slice(8):pair.people.some(id=>people.has(id))));

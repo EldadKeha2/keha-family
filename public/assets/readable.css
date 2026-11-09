@@ -63,7 +63,13 @@ h1{font-size:calc(68px * var(--a11y-text-scale,1));margin:12px 0 13px}
 .directory-card .directory-branch{font-size:calc(14px * var(--a11y-text-scale,1))}
 .directory-card .directory-date{font-size:calc(15px * var(--a11y-text-scale,1))}
 .search-results{width:360px;top:57px;max-height:420px}
-.search-result{font-size:calc(18px * var(--a11y-text-scale,1));padding:13px 12px}
+.search-result{font-size:calc(18px * var(--a11y-text-scale,1));padding:13px 12px;justify-content:flex-start;gap:10px;text-align:start}
+.search-result .portrait{box-sizing:border-box;width:42px;height:42px;min-width:42px;flex:0 0 42px;margin:0;padding:2px;border-radius:50%;box-shadow:none}
+.search-result .portrait .profile-photo{inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:50%}
+.search-result .portrait .silhouette{width:25px;height:31px;bottom:3px}
+.search-result-text{flex:1;min-width:0}
+.search-result-text>.person-name{display:block;font:inherit;line-height:1.4;white-space:normal;overflow-wrap:anywhere}
+.search-result-text>small{display:block;line-height:1.4}
 .search-result small{font-size:calc(13px * var(--a11y-text-scale,1))}
 .search-empty{font-size:calc(16px * var(--a11y-text-scale,1))}
 .person-dialog{width:min(850px,calc(100vw - 32px))}

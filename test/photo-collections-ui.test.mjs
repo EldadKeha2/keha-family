@@ -44,11 +44,17 @@ test('every personal photo links to the owner wedding, even if the photo has no 
   assert.doesNotMatch(f.window.FamilyPhotoCollections.controls(f.item(),'personal:extra',{viewer:true}),/data-photo-album-kind="wedding"/,'A person without a partner does not get a wedding link');
  }
 });
-test('shared photos link to tagged couples once and offer a chooser when several couples appear',()=>{
- const f=fixture(),photo={...f.item(),tags:[{id:'tomer'},{id:'shani'}]};
- let html=f.window.FamilyPhotoCollections.controls(photo,'gallery',{viewer:true});assert.equal((html.match(/data-photo-wedding-link /g)||[]).length,1);assert.match(html,/#weddings\/u-tomer/);
- f.window.FAMILY_DATA.units.other={id:'u-other',people:['extra','partner']};
- html=f.window.FamilyPhotoCollections.controls({...photo,tags:[...photo.tags,{id:'extra'}]},'gallery',{viewer:true});assert.match(html,/data-photo-wedding-choices/);assert.match(html,/aria-haspopup="dialog"/);
+test('shared viewers omit baby and wedding shortcuts even when tagged people and the photo owner have albums',()=>{
+ for(const english of [false,true]){
+  const f=fixture(english);f.window.FAMILY_DATA.units.other={id:'u-other',people:['extra','partner']};
+  for(const scope of ['gallery','photos','link:gallery','link:photos']){
+   const photo={...f.item(),personId:'tomer',tags:[{id:'tomer'},{id:'shani'},{id:'extra'}]},group=f.group(photo,scope,true);
+   assert.doesNotMatch(group.innerHTML,/data-photo-album-kind="(?:baby|wedding)"|data-photo-wedding-choices/);
+   assert.match(group.innerHTML,/data-photo-collection="photos"/);
+   f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'tags',item:photo}}));
+   assert.doesNotMatch(group.innerHTML,/data-photo-album-kind="(?:baby|wedding)"|data-photo-wedding-choices/);
+  }
+ }
 });
 test('the family button adds and removes the exact photo immediately and a stale card cannot restore a removed selection',async()=>{
  const f=fixture(),g=f.group(f.item(),'gallery',true);assert.equal(f.selected(g,'photos'),false);

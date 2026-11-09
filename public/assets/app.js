@@ -256,8 +256,8 @@
     if('aliyahYear' in item)p.aliyahYear=item.aliyahYear;
     if('aliyahMonth' in item)p.aliyahMonth=item.aliyahMonth;
     if((previous.birthday||p.birthday)!==birthdayOf(p)||(previous.name||p.name)!==(item.name||p.name))window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id:personId}}));
-    for (const node of document.querySelectorAll('[data-person]')) {
-      if (node.dataset.person !== personId) continue;
+    for (const node of document.querySelectorAll('[data-person], [data-search-person]')) {
+      if ((node.dataset.person||node.dataset.searchPerson) !== personId) continue;
       if (previous.profile !== item.profile) {
         const portrait = node.querySelector('.portrait');
         if (portrait) portrait.outerHTML = portraitHTML(p);
@@ -422,7 +422,7 @@
     if(state.view==='directory')renderDirectory();
     if(!query&&state.view!=='directory'){$('searchResults').hidden=true;return;}
     const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
-    $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button type="button" class="search-result" data-search-person="${p.id}"><span>${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
+    $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button type="button" class="search-result" data-search-person="${p.id}">${portraitHTML(p)}<span class="search-result-text"><span class="person-name">${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></span></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
     $('searchResults').hidden=false;
     fitSearchResults();
   }
