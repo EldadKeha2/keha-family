@@ -33,6 +33,7 @@
     if(!viewer||busy)return;busy=true;const focused=document.activeElement;
     try{
       const item=window.FamilyMedia?.current?.(),enabled=viewer.open&&item?.kind==='photo'&&(compact.matches||mobileDevice&&(appMode.matches||navigator.standalone===true));
+      if(enabled)window.FamilyPersonalPhotoLayout?.restore();
       if(!enabled){if(active||moved.size)restore();return;}
       active=true;viewer.classList.add('photo-controls-below');strip.hidden=false;zoomGroup.hidden=false;
       $('mediaViewerTitle').setAttribute('aria-label',tr('תצוגת תמונה','Photo viewer'));
@@ -61,7 +62,7 @@
       const reset=controls?.toolbar?.querySelector('[data-face-zoom-reset]');fit.disabled=!reset||reset.disabled;
       zoomValue.textContent=controls?.toolbar?.querySelector('[data-face-zoom-level]')?.textContent||'100%';
       if(photoId!==item.id){photoId=item.id;strip.scrollLeft=0;}
-    }finally{if(viewer.open&&focused?.isConnected&&viewer.contains(focused)&&document.activeElement!==focused)focused.focus({preventScroll:true});busy=false;}
+    }finally{window.FamilyPersonalPhotoLayout?.sync(faces);if(viewer.open&&focused?.isConnected&&viewer.contains(focused)&&document.activeElement!==focused)focused.focus({preventScroll:true});busy=false;}
   }
   function faceControls(controller,owner){
     if(controller&&controller.dialog!==viewer)return;
