@@ -313,7 +313,7 @@ export default {
           if(action==='about')return json(await db('person.about',{id,about:body.about,expectedAbout:body.expectedAbout,language:body.language}));
           if(action==='biography')return json(await db('person.biography',{id,section:body.section,value:body.value,expectedValue:body.expectedValue,language:body.language}));
           if(action==='death-date')return json(await db('death.date',{id,date:body.date,expectedDate:body.expectedDate}));
-          if(action==='profile')return json(await db('profile',{id,file:body.file}));
+          if(action==='profile')return json(await db('profile',{id,file:body.file,restorePrevious:body.restorePrevious}));
           return json(await db('media.caption',{personId:id,file:body.file,caption:body.caption}));
         }
         if((match=/^\/api\/collections\/(photos|videos|gallery)\/(upload|caption)$/.exec(path))){

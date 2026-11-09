@@ -715,6 +715,46 @@ test('tree corrections update existing names and add a spouse without changing s
     f.restart();assert.equal((await (await f.call('/api/people/bosmat')).json()).revision,after.revision,'Applying the same tree twice must not change the person again');
   }finally{await f.close();}
 });
+test('profile selections undo in order across restarts and an empty profile stays empty everywhere',async()=>{
+ const f=fixture();try{
+  await f.connect();const photos=[];
+  for(const name of ['first','second','third']){const response=await f.call('/api/people/yona/photos?filename='+name+'.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(response.status,201);const result=await response.json();photos.push(result.person.gallery.find(item=>item.file===result.file));}
+  const select=async(item,restorePrevious=false)=>{const response=await f.call('/api/people/yona/profile',{method:'POST',body:{file:item.file,...(restorePrevious?{restorePrevious:true}:{})}});assert.equal(response.status,200,await response.clone().text());return (await response.json()).person;};
+  for(const item of photos)await select(item);await select(photos[2]);f.restart();
+  let person=await select(photos[2],true);assert.equal(person.profile,photos[1].src);assert.equal(person.photoCount,3);
+  person=await select(photos[1],true);assert.equal(person.profile,photos[0].src);
+  person=await select(photos[0],true);assert.equal(person.profile,null);assert.equal(person.profileFile,null);assert.equal(person.profileIsManual,false);assert.equal(person.profileCleared,true);assert.equal(person.gallery.length,3);
+  f.restart();assert.equal((await(await f.call('/api/people/yona')).json()).profile,null);assert.equal((await(await f.call('/api/people/yona/page')).json()).person.profile,null);assert.equal((await(await f.call('/api/media')).json()).people.yona.profile,null);
+  const uploaded=await(await f.call('/api/people/yona/photos?filename=later.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json();assert.equal(uploaded.person.profile,null,'A new upload cannot replace an explicitly empty profile');
+  await select(photos[1]);person=await select(photos[1],true);assert.equal(person.profile,null,'Selecting from an empty profile and undoing must return to empty');assert.equal(person.photoCount,4);assert.equal(f.objects.size,4);
+ }finally{await f.close();}
+});
+test('profile undo skips deleted or untagged predecessors and rejects stale, foreign and unauthenticated requests',async()=>{
+ for(const removal of ['delete','untag']){
+  const f=fixture();try{
+   await f.connect();const photos=[];
+   for(const name of ['first','third']){const result=await(await f.call('/api/people/yona/photos?filename='+name+'.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json();photos.push(result.person.gallery.find(item=>item.file===result.file));}
+   const response=await uploadWithDetails(f,'/api/collections/gallery/upload',{faces:[{personId:'yona',rect:{x:.1,y:.1,width:.2,height:.2}}]});const linkedResult=await response.json(),linked=linkedResult.collection.items.find(item=>item.file===linkedResult.file);
+   for(const item of [photos[0],linked,photos[1]])assert.equal((await f.call('/api/people/yona/profile',{method:'POST',body:{file:item.file}})).status,200);
+   assert.equal((await f.call('/api/media/'+linked.id+'/'+removal,{method:'POST',body:{scope:removal==='delete'?'gallery':'personal:yona'}})).status,200);f.restart();
+   const restored=await(await f.call('/api/people/yona/profile',{method:'POST',body:{file:photos[1].file,restorePrevious:true}})).json();assert.equal(restored.person.profile,photos[0].src);assert.equal(restored.person.photoCount,2);
+   assert.equal((await f.call('/api/people/yona/profile',{method:'POST',body:{file:photos[1].file,restorePrevious:true}})).status,409);assert.equal((await(await f.call('/api/people/yona/page')).json()).person.profile,photos[0].src);
+   assert.equal((await f.call('/api/people/shlomo/profile',{method:'POST',body:{file:photos[0].file,restorePrevious:true}})).status,404);
+   assert.equal((await f.call('/api/people/yona/profile',{method:'POST',body:{file:photos[0].file,restorePrevious:true},clientHeaders:false})).status,403);
+   assert.equal((await f.call('/api/people/yona/profile',{method:'POST',body:{file:photos[0].file,restorePrevious:'true'}})).status,400);
+  }finally{await f.close();}
+ }
+});
+test('clearing an automatic profile uses the placeholder and restoring old media cannot overwrite that choice',async()=>{
+ const f=fixture();try{
+  await f.connect();const photos=[];
+  for(const name of ['first','second']){const result=await(await f.call('/api/people/yona/photos?filename='+name+'.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json();photos.push(result.person.gallery.find(item=>item.file===result.file));}
+  let result=await(await f.call('/api/people/yona/profile',{method:'POST',body:{file:photos[0].file,restorePrevious:true}})).json();assert.equal(result.person.profile,null);f.restart();assert.equal((await(await f.call('/api/people/yona/page')).json()).person.profile,null);
+  await f.call('/api/people/yona/profile',{method:'POST',body:{file:photos[0].file}});await f.call('/api/media/'+photos[0].id+'/delete',{method:'POST',body:{scope:'personal:yona'}});
+  result=await(await f.call('/api/people/yona/profile',{method:'POST',body:{file:photos[1].file,restorePrevious:true}})).json();assert.equal(result.person.profile,null);
+  await f.call('/api/media/'+photos[0].id+'/restore',{method:'POST',body:{scope:'personal:yona'}});assert.equal((await(await f.call('/api/people/yona/page')).json()).person.profile,null);
+ }finally{await f.close();}
+});
 test('personal uploads, captions, profile selection and ownership checks',async()=>{
   const f=fixture();try{
     await f.connect();let response=await f.call('/api/people/yona/photos?filename=family.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});

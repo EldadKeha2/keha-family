@@ -164,17 +164,35 @@ test('the profile action follows the album owner gender when switching between p
   f.window.FamilyMedia.open([photo],0,'personal:guest');assert.equal(button.getAttribute('data-gender'),'unknown');
   f.window.FamilyMedia.open([photo],0,'gallery');assert.equal(button.hidden,true,'Only a personal album offers profile selection');
 });
-test('the effective profile stays selected across photo navigation and selected clicks do not save again',async()=>{
+test('the effective profile stays selected across photo navigation and live owner updates',()=>{
  for(const english of [false,true]){
   const f=fixture({english}),owner={profileFile:'b.jpg',profile:'/media/b?v=edited',profileId:'old-deleted'};
   f.window.FamilyApp.getPerson=()=>({gender:'f'});f.window.FamilyApp.getPersonSummary=()=>owner;
   const photos=['a','b'].map(id=>({...f.photo(id),file:id+'.jpg'})),button=f.get('openedProfilePhoto');
   f.window.FamilyMedia.open(photos,0,'personal:rachel');assert.equal(button.getAttribute('aria-pressed'),'false');
   f.get('mediaNext').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'true');assert.equal(button.querySelector('span').textContent,english?'Current profile photo':'זו תמונת הפרופיל');
-  await button.handlers.get('click')();assert.equal(f.requests.length,0);
   f.get('mediaPrevious').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'false');
   owner.profileFile='a.jpg';f.window.dispatchEvent(new CustomEvent('family-profile-changed',{detail:{id:'rachel'}}));assert.equal(button.getAttribute('aria-pressed'),'true');
  }
+});
+test('clicking a selected profile restores its predecessor, updates the marks and sends one guarded request',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english}),owner={profileFile:'b.jpg',profile:'/media/b'},photos=['a','b'].map(id=>({...f.photo(id),file:id+'.jpg'})),button=f.get('openedProfilePhoto');
+  f.window.FamilyApp.getPersonSummary=()=>owner;f.window.FamilyApp.updatePerson=(_id,person)=>Object.assign(owner,person);
+  let resolve;f.window.FamilyI18n.fetch=async(path,options)=>{f.requests.push({path,options});return new Promise(done=>resolve=done);};
+  f.window.FamilyMedia.open(photos,1,'personal:rachel');assert.equal(button.getAttribute('aria-pressed'),'true');assert.match(button.title,english?/undo/:/לביטול/);
+  const undo=button.handlers.get('click')();await button.handlers.get('click')();assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/people/rachel/profile');assert.deepEqual(JSON.parse(f.requests[0].options.body),{file:'b.jpg',restorePrevious:true});
+  f.get('mediaPrevious').handlers.get('click')();resolve({ok:true,json:async()=>({person:{profileId:'a',profileFile:'a.jpg',profile:'/media/a'}})});await undo;
+  assert.equal(button.getAttribute('aria-pressed'),'true','The restored previous photo gets its mark even after navigation');f.get('mediaNext').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'false');assert.equal(button.disabled,false);
+ }
+});
+test('undo with no predecessor shows no profile, can be selected again, and a failed undo preserves the selected state',async()=>{
+ const f=fixture(),owner={profileId:'a',profileFile:'a.jpg',profile:'/media/a'},item={...f.photo(),file:'a.jpg'},button=f.get('openedProfilePhoto');
+ f.window.FamilyApp.getPersonSummary=()=>owner;f.window.FamilyApp.updatePerson=(_id,person)=>Object.assign(owner,person);f.window.FamilyI18n.error=value=>value;
+ let response={ok:false,json:async()=>({error:'Unavailable'})};f.window.FamilyI18n.fetch=async(path,options)=>{f.requests.push({path,options});return response;};
+ f.window.FamilyMedia.open([item],0,'personal:rachel');await button.handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'true');assert.equal(owner.profile,'/media/a');
+ response={ok:true,json:async()=>({person:{profileId:null,profileFile:null,profile:null,profileCleared:true}})};await button.handlers.get('click')();assert.equal(owner.profile,null);assert.equal(button.getAttribute('aria-pressed'),'false');
+ response={ok:true,json:async()=>({person:{profileId:'a',profileFile:'a.jpg',profile:'/media/a',profileCleared:false}})};await button.handlers.get('click')();assert.deepEqual(JSON.parse(f.requests.at(-1).options.body),{file:'a.jpg'});assert.equal(button.getAttribute('aria-pressed'),'true');
 });
 test('a profile save updates the correct photo after navigation, survives reopening, and a failed save adds no selection',async()=>{
  const f=fixture(),owners={rachel:{profileFile:'a.jpg'},other:{profileFile:'other.jpg'}},photos=['a','b','c'].map(id=>({...f.photo(id),file:id+'.jpg'})),button=f.get('openedProfilePhoto');

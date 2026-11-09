@@ -62,6 +62,7 @@
     profileButton.setAttribute('aria-pressed',String(selected));
     const profileLabel=state.scope?.startsWith('wedding:')?(selected?tr('זו תמונת החתונה','Current wedding cover photo'):tr('קבע כתמונת החתונה','Set wedding cover photo')):state.scope?.startsWith('nursery:')?(selected?tr('זו תמונת התינוקייה','Current baby album cover photo'):tr('קבע כתמונת התינוקייה','Set baby album cover photo')):(selected?tr('זו תמונת הפרופיל','Current profile photo'):tr('קבע כתמונת פרופיל','Set profile photo'));
     profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);profileButton.title=profileLabel;
+    if(selected&&!albumCover){const undoLabel=tr('זו תמונת הפרופיל. לחצו לביטול הבחירה ולחזרה לתמונה הקודמת','Current profile photo. Click to undo this selection and restore the previous photo');profileButton.title=undoLabel;profileButton.setAttribute('aria-label',undoLabel);}
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
     const page=albumPages.get(state.scope),total=page?.total??state.items.length,offset=page?(page.page-1)*page.size:0;
@@ -241,14 +242,14 @@
     $('copyMediaLink').addEventListener('click',async()=>{if(!current())return;const url=shareURL(current());try{await navigator.clipboard.writeText(url);$('mediaShareStatus').textContent=tr('הקישור הועתק ✓','Link copied ✓');}catch{$('mediaLinkFallback').value=url;$('mediaLinkFallback').hidden=false;$('mediaLinkFallback').focus();$('mediaLinkFallback').select();$('mediaShareStatus').textContent=tr('אפשר להעתיק את הקישור מהשדה','Copy the link from the field');}});
     $('openedProfilePhoto').addEventListener('click',async()=>{
       const item=current(),scope=state.scope;if(!item||item.kind!=='photo'||!scope||!(/^(personal|wedding|nursery):/.test(scope)))return;
-      const albumCover=!scope.startsWith('personal:'),id=scope.slice(9),button=$('openedProfilePhoto');button.disabled=true;
-      if(button.getAttribute('aria-pressed')==='true'){button.disabled=false;return;}
+      const albumCover=!scope.startsWith('personal:'),id=scope.slice(9),button=$('openedProfilePhoto'),selected=button.getAttribute('aria-pressed')==='true',restorePrevious=!albumCover&&selected;
+      if(button.disabled||albumCover&&selected)return;button.disabled=true;
       try{
-        const response=await I18n.fetch(albumCover?'api/collections/cover':'api/people/'+encodeURIComponent(id)+'/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify(albumCover?{collection:scope,mediaId:item.id}:{file:item.file})});
+        const response=await I18n.fetch(albumCover?'api/collections/cover':'api/people/'+encodeURIComponent(id)+'/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify(albumCover?{collection:scope,mediaId:item.id}:{file:item.file,...(restorePrevious?{restorePrevious:true}:{})})});
         const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));
         if(albumCover)window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
         else{app().updatePerson(id,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id}}));}
-        notify(albumCover?tr('תמונת הפרופיל של האלבום עודכנה ✓','Album cover photo updated ✓'):tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));
+        notify(restorePrevious?(result.person.profile?tr('תמונת הפרופיל הקודמת הוחזרה ✓','Previous profile photo restored ✓'):tr('הקביעה בוטלה. אין תמונת פרופיל.','Selection removed. No profile photo is set.')):albumCover?tr('תמונת הפרופיל של האלבום עודכנה ✓','Album cover photo updated ✓'):tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));
       }catch(error){notify(error.message);}finally{button.disabled=false;}
     });
     const refreshProfile=event=>{if($('mediaViewer').open&&state.scope==='personal:'+event.detail.id)metadata();};
