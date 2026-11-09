@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="assets/tags.css?v=a11y1">
   <link rel="stylesheet" href="assets/calendar.css?v=a11y1">
   <link rel="stylesheet" href="assets/upgrade.css?v=a11y1">
-  <link rel="stylesheet" href="assets/home-slideshow.css?v=desktop-home-tiles-v1">
+  <link rel="stylesheet" href="assets/home-slideshow.css?v=desktop-carousel-v1">
   <link rel="stylesheet" href="assets/i18n.css?v=a11y1">
   <link rel="stylesheet" href="assets/updates.css?v=a11y1">
   <link rel="stylesheet" href="assets/gallery-order.css?v=mobile-toolbar-v4">
@@ -79,7 +79,7 @@
   <script src="assets/biography.js" type="module"></script>
   <script src="assets/archive.js?v=profile-cover-v2" defer></script>
   <script src="assets/calendar.js" defer></script>
-  <script src="assets/home.js?v=home-viewer-isolation-v1" defer></script>
+  <script src="assets/home.js?v=desktop-carousel-v1" defer></script>
   <script src="assets/home-scroll.js?v=1" defer></script>
   <script src="assets/memorial.js?v=20261105.1" defer></script>
   <script src="assets/nursery.js?v=profile-cover-v2" defer></script>
@@ -128,7 +128,7 @@
         <div id="directoryView" hidden><div class="directory-tabs" role="tablist" aria-label="קבוצות בני משפחה"><button role="tab" type="button" data-directory-group="main" aria-selected="true">המשפחה שלנו</button><button role="tab" type="button" data-directory-group="extended" aria-selected="false">בני משפחה נוספים</button><button role="tab" type="button" data-directory-group="friends" aria-selected="false">מכרים וחברי משפחה</button></div><div class="directory-heading"><p id="directoryCount"></p><span id="directoryHelp">לחיצה על כרטיס פותחת את העמוד האישי</span></div><div class="directory-grid" id="directoryGrid"></div><div class="empty-search" id="emptySearch" hidden>לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.</div></div>
         <section id="homeView" class="phone-home-view" aria-label="הבית המשפחתי" hidden>
           <header class="phone-home-intro"><img src="assets/fez.svg" alt="" width="55" height="55"><div><h2>הבית שלנו מתחיל כאן</h2><p>כל המשפחה, הסיפורים והרגעים שלנו.</p></div></header>
-          <section class="family-slideshow" aria-label="רגעים מהאלבום המשפחתי"><button id="homeSlideOpen" class="home-slide-open" aria-label="פתיחת התמונה המשפחתית"><img id="homeSlideImage" alt="" hidden><span class="home-slide-placeholder" id="homeSlidePlaceholder"><span aria-hidden="true">❖</span><strong>הרגעים שלנו, ביחד</strong><small>תמונות מהאלבום המשפחתי יתחלפו כאן.</small></span></button><div class="home-slide-caption" id="homeSlideCaption" hidden></div><div class="home-slide-controls"><button id="homeSlidePrevious" aria-label="התמונה המשפחתית הקודמת">→</button><span id="homeSlideCounter"></span><button id="homeSlideNext" aria-label="התמונה המשפחתית הבאה">←</button><button id="homeSlidePause" aria-label="השהיית התמונות המתחלפות">Ⅱ</button></div></section>
+          <section class="family-slideshow" aria-label="רגעים מהאלבום המשפחתי"><div id="homeSlideStage" class="home-slide-stage" data-carousel="false"><div id="homeCarouselRail" class="home-carousel-rail" hidden></div><button id="homeSlideOpen" class="home-slide-open" aria-label="פתיחת התמונה המשפחתית"><img id="homeSlideImage" alt="" hidden><span class="home-slide-placeholder" id="homeSlidePlaceholder"><span aria-hidden="true">❖</span><strong>הרגעים שלנו, ביחד</strong><small>תמונות מהאלבום המשפחתי יתחלפו כאן.</small></span></button></div><div class="home-slide-caption" id="homeSlideCaption" hidden></div><div class="home-slide-controls"><button id="homeSlidePrevious" aria-label="התמונה המשפחתית הקודמת">→</button><span id="homeSlideCounter"></span><button id="homeSlideNext" aria-label="התמונה המשפחתית הבאה">←</button><button id="homeSlidePause" aria-label="השהיית התמונות המתחלפות">Ⅱ</button></div></section>
           <div class="phone-home-tiles" id="homeTiles"></div>
           <span id="homeScrollEnd" aria-hidden="true"></span>
           <button id="homeMoreHint" class="home-more-hint" type="button" data-i18n-skip hidden></button>
