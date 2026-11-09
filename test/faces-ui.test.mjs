@@ -173,7 +173,7 @@ test('age-only overlays also avoid an unlabelled face above their person',async(
  const obstacle={rect:{x:.3,y:.1,width:.35,height:.3},score:.95},person={id:'one',name:'אדם'},face={id:'named',rect:{x:.4,y:.5,width:.15,height:.15},personId:'one',person},f=fixture([obstacle]);
  f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});f.window.FamilyPhotoDate={overlays:()=>({showNames:false,showAges:true}),ageFor:()=>({text:'25',title:'גיל'})};await f.mount();
  const host=f.find('face-visible-labels'),label=host.children.find(node=>node.classList.contains('face-visible-label'));
- assert.ok(parseFloat(label.style.top)>=(face.rect.y+face.rect.height)*270);assert.match(label.innerHTML,/25/);assert.doesNotMatch(label.innerHTML,/אדם/);f.faces.clear();
+ assert.ok(parseFloat(label.style.top)>=(face.rect.y+face.rect.height)*270,JSON.stringify(label.style));assert.match(label.innerHTML,/25/);assert.doesNotMatch(label.innerHTML,/אדם/);f.faces.clear();
 });
 test('zoomed and scrolled image coordinates still select each of two tiny neighbouring faces',async()=>{
  const f=fixture([first,second]);await f.mount();
@@ -314,4 +314,23 @@ test('dense all-name overlays fall back to a numbered legend and return to the p
  const faces=Array.from({length:60},(_,i)=>({id:String(i),rect:{x:.08+(i%6)*.15,y:.06+Math.floor(i/6)*.09,width:.055,height:.05},personId:'person-'+i,person:{id:'person-'+i,name:'בן משפחה '+i}})),f=fixture();f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();
  const legend=f.find('face-label-list');assert.equal(legend.hidden,false);assert.equal(legend.children.length,60);assert.ok(legend.children.every(node=>node.innerHTML.includes('face-label-number')));
  for(let i=0;i<6;i++)f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.equal(legend.hidden,true);assert.equal(legend.children.length,0);assert.equal(f.find('face-visible-labels').children.filter(node=>node.classList.contains('face-visible-label')).length,60);f.faces.clear();assert.equal(f.find('face-label-list'),undefined);
+});
+
+test('crowd numbers locate and highlight their own face on hover, keyboard focus and touch without opening an editor',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const faces=Array.from({length:26},(_,i)=>({id:String(i),rect:{x:.05+(i%6)*.15,y:.05+Math.floor(i/6)*.18,width:.05,height:.06},personId:String(i),person:{id:String(i),name:'אדם '+i}})),f=fixture();
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();
+ const legend=f.find('face-label-list'),target=f.find('face-label-target'),markers=f.find('face-visible-labels').children.filter(node=>node.className==='face-label-marker');assert.equal(legend.hidden,false);assert.equal(target.hidden,true);assert.equal(markers[10].hidden,false);
+ f.emit(legend.children[10],'pointerenter');assert.equal(target.hidden,false);assert.equal(target.style.left,faces[10].rect.x*100+'%');assert.equal(markers[10].classList.contains('face-annotation-active'),true);
+ f.emit(legend.children[10],'pointerleave');assert.equal(target.hidden,true);
+ f.emit(legend.children[20],'focusin');assert.equal(target.style.top,faces[20].rect.y*100+'%');f.emit(legend.children[20],'focusout',{relatedTarget:null});assert.equal(target.hidden,true);
+ f.emit(markers[10],'click');t.mock.timers.tick(1999);assert.equal(target.hidden,false);assert.equal(f.find('face-popover face-picker'),undefined);t.mock.timers.tick(1);assert.equal(target.hidden,true);
+ f.emit(legend.children[20].querySelector('[data-face-locate]'),'click');assert.equal(target.style.left,faces[20].rect.x*100+'%');f.faces.clear();t.mock.timers.tick(2000);assert.equal(target.hidden,true);assert.equal(f.find('face-layer'),undefined);
+});
+
+test('visual connectors and locating use the precise matching head while face edit geometry stays unchanged',async()=>{
+ const person={id:'one',name:'אחד'},faces=[{id:'wide',personId:person.id,person,rect:{x:.35,y:.25,width:.4,height:.55}},{id:'precise',personId:person.id,person,rect:{x:.45,y:.27,width:.08,height:.1}},{id:'neighbour',personId:'two',person:{id:'two',name:'שני'},rect:{x:.62,y:.25,width:.08,height:.1}}],f=fixture([],{desktop:true});
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();const host=f.find('face-visible-labels'),label=host.children.find(node=>node.classList.contains('face-visible-label'));f.emit(label.querySelector('[data-face-locate]'),'click');
+ const target=f.find('face-label-target');assert.equal(target.style.left,faces[1].rect.x*100+'%');assert.equal(target.style.width,faces[1].rect.width*100+'%');
+ const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId==='wide');assert.equal(hit.style.width,'40%','Stored editing geometry is preserved');f.emit(f.stage,'click',{detail:0,target:hit});assert.equal(f.find('face-selection').style.width,'40%');assert.ok(f.find('face-popover face-picker'));f.faces.clear();
 });

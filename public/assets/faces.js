@@ -6,7 +6,7 @@
   const choices='[data-face-person],[data-face-add]';
   const labels=new Map();let current=null,serial=0,geometry=null;
   const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,time:Date.now(),tagsRevision:item?.tagsRevision,reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
-  const helpers=()=>geometry||=import('./face-geometry.mjs?v=8');
+  const helpers=()=>geometry||=import('./face-geometry.mjs?v=9');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   const touchMode=event=>event?.pointerType==='touch'||matchMedia('(hover:none), (max-width:700px)').matches;
   const desktopResize=()=>!touchMode();
@@ -42,7 +42,7 @@
     c.labelTimer=setTimeout(()=>{c.labelTimer=null;if(live(c)&&c.popup===bubble&&!bubble.contains(document.activeElement))closePopup(c);},250);
   }
   function dispose(c){
-    if(current===c)current=null;if(c.stage._familyFaceContext===c)delete c.stage._familyFaceContext;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);c.popup?.remove();c.layer?.remove();c.labelList?.remove();c.guide?.remove();c.status?.remove();c.toolbar?.remove();c.missingNote?.remove();c.reviewButton?.remove();c.reviewStatus?.remove();c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom','face-label-list-active');window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
+    if(current===c)current=null;if(c.stage._familyFaceContext===c)delete c.stage._familyFaceContext;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);clearAnnotation(c,true);c.popup?.remove();c.layer?.remove();c.labelList?.remove();c.guide?.remove();c.status?.remove();c.toolbar?.remove();c.missingNote?.remove();c.reviewButton?.remove();c.reviewStatus?.remove();c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom','face-label-list-active');window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
   }
   function clear(){if(current)dispose(current);}
   function reconcileControls(c){
@@ -66,7 +66,7 @@
     if(c.popup&&c.active){
       const v=viewport(),r=c.popup.getBoundingClientRect(),p=c.geom.popoverPosition(screenFace(c,c.active),{width:r.width||270,height:r.height||180},v);
       if(c.popup.classList.contains('face-name')){
-        const face=screenFace(c,c.active),left=v.left||0,top=v.top||0,faces=annotationFaces(c,image).map(rect=>({...rect,x:rect.x+image.x-left,y:rect.y+image.y-top}));
+        const face=screenFace(c,{...c.active,rect:annotationRect(c,c.active)}),left=v.left||0,top=v.top||0,faces=annotationFaces(c,image).map(rect=>({...rect,x:rect.x+image.x-left,y:rect.y+image.y-top}));
         const placed=c.geom.layoutFaceLabels([{width:r.width||130,height:r.height||30,face:{...face,x:face.x-left,y:face.y-top}}],{width:v.width,height:v.height,faces});
         if(placed){p.x=placed[0].x+left;p.y=placed[0].y+top;}
       }
@@ -77,8 +77,17 @@
     const dismissed=c.pendingDismiss,saved=dismissed?c.saved.filter(face=>dismissed.person?face.id!==dismissed.id:!c.geom.labelledRegion(dismissed.rect,face.rect)):c.saved,ignored=dismissed?[...c.ignored,dismissed.rect]:c.ignored;
     return c.geom.mergeFaces(saved,(reviewed?[]:c.detected).filter(face=>!ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));
   }
-  function annotationFaces(c,image){
-    return visibleFaces(c).map(face=>({x:face.rect.x*image.width,y:face.rect.y*image.height,width:face.rect.width*image.width,height:face.rect.height*image.height}));
+  const annotationRect=(c,face)=>c.geom.annotationFaceRect(face,c.saved);
+  function annotationFaces(c,image){return visibleFaces(c).map(face=>{const r=annotationRect(c,face);return {x:r.x*image.width,y:r.y*image.height,width:r.width*image.width,height:r.height*image.height};});}
+  function clearAnnotation(c,force=false){
+    if(c.annotationTimer&&!force)return;clearTimeout(c.annotationTimer);c.annotationTimer=null;c.annotationFace=null;if(c.annotationTarget)c.annotationTarget.hidden=true;
+    for(const entry of c.annotationNodes||[])for(const node of [entry.node,entry.marker,entry.line])node.classList.remove('face-annotation-active');
+  }
+  function highlightAnnotation(c,face,timed=false){
+    if(!live(c)||!c.annotationNodes?.some(entry=>entry.face.id===face.id))return;clearAnnotation(c,true);c.annotationFace=face;c.annotationTarget.hidden=false;
+    const r=annotationRect(c,face);Object.assign(c.annotationTarget.style,{left:r.x*100+'%',top:r.y*100+'%',width:r.width*100+'%',height:r.height*100+'%'});
+    for(const entry of c.annotationNodes)if(entry.face.id===face.id)for(const node of [entry.node,entry.marker,entry.line])node.classList.add('face-annotation-active');
+    if(timed){c.annotationTarget.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});c.annotationTimer=setTimeout(()=>clearAnnotation(c,true),2000);}
   }
   function placeAnnotations(c,image){
     const entries=c.annotationNodes||[];if(!entries.length){c.labelList.hidden=true;c.stage.classList.remove('face-label-list-active');return;}
@@ -93,7 +102,7 @@
       }
       c.annotationMeasurements={key:measureKey,sizes};
     }
-    const boxes=entries.map(({face},i)=>({...c.annotationMeasurements.sizes[i][0],variants:c.annotationMeasurements.sizes[i],face:{x:face.rect.x*image.width,y:face.rect.y*image.height,width:face.rect.width*image.width,height:face.rect.height*image.height}})),faces=annotationFaces(c,image);
+    const boxes=entries.map(({face},i)=>{const r=annotationRect(c,face);return {...c.annotationMeasurements.sizes[i][0],variants:c.annotationMeasurements.sizes[i],face:{x:r.x*image.width,y:r.y*image.height,width:r.width*image.width,height:r.height*image.height}};}),faces=annotationFaces(c,image);
     const key=JSON.stringify([image.width,image.height,boxes,faces]);
     if(c.annotationLayout?.key!==key){const bounds={...image,faces},layout=c.geom.layoutFaceLabels(boxes,bounds),legend=entries.length>0&&!layout;c.annotationLayout={key,layout,legend,markers:legend?c.geom.layoutFaceLabels(boxes.map(box=>({width:18,height:18,face:box.face})),bounds):null};}
     const {layout,legend,markers}=c.annotationLayout;
@@ -107,7 +116,7 @@
       if(legend&&box)Object.assign(marker.style,{left:box.x+'px',top:box.y+'px'});
       line.hidden=!box?.leader;if(!box?.leader)continue;
       const {from,to}=box.leader,x=from.x,y=from.y,dx=to.x-x,dy=to.y-y;
-      Object.assign(line.style,{left:x+'px',top:y+'px',width:Math.hypot(dx,dy)+'px',transform:'rotate('+Math.atan2(dy,dx)+'rad)'});
+      Object.assign(line.style,{left:x+'px',top:(y-.75)+'px',width:Math.hypot(dx,dy)+'px',transform:'rotate('+Math.atan2(dy,dx)+'rad)'});
     }
   }
   function fitZoom(c){
@@ -154,15 +163,19 @@
     paintAnnotations(c);place(c);
   }
   function paintAnnotations(c){
-    if(!live(c)||!c.annotations)return;c.annotations.replaceChildren();c.labelList.replaceChildren();c.annotationNodes=[];c.annotationMeasurements=null;c.annotationLayout=null;
+    if(!live(c)||!c.annotations)return;clearAnnotation(c,true);c.annotations.replaceChildren();c.labelList.replaceChildren();c.annotationNodes=[];c.annotationMeasurements=null;c.annotationLayout=null;
     const options=window.FamilyPhotoDate?.overlays?.(c.item.id);if(!options?.showNames&&!options?.showAges)return;
     for(const face of c.faces){
       if(!face.person)continue;const age=options.showAges?window.FamilyPhotoDate.ageFor(face.person,c.item):null;
       if(!options.showNames&&!age)continue;
       const node=document.createElement('div');node.className='face-visible-label';node.dataset.faceId=face.id;node.dir=I.isEnglish?'ltr':'rtl';
-      node.classList.toggle('face-age-only',!options.showNames);const number=c.annotationNodes.length+1;node.innerHTML=`<span class="face-label-number" aria-hidden="true">${number}</span>`+(options.showNames?nameHTML(face):'')+(age?`<span class="face-visible-age" dir="auto" title="${safe(age.title)}">${safe(age.text)}</span>`:'');
-      const marker=document.createElement('span');marker.className='face-label-marker';marker.textContent=number;marker.hidden=true;marker.setAttribute('aria-hidden','true');
-      const line=document.createElement('span');line.className='face-label-leader';line.setAttribute('aria-hidden','true');
+      const locateLabel=options.showNames?tr('הצגת הפנים של ','Locate the face of ')+photoName(face):tr('הדגשת הפנים בתמונה','Locate this face in the photo');
+      node.classList.toggle('face-age-only',!options.showNames);const number=c.annotationNodes.length+1;node.innerHTML=`<button type="button" class="face-label-number" data-face-locate aria-label="${safe(locateLabel)}">${number}</button>`+(options.showNames?nameHTML(face):'')+(age?`<span class="face-visible-age" dir="auto" title="${safe(age.title)}">${safe(age.text)}</span>`:'');
+      const marker=document.createElement('button');marker.type='button';marker.className='face-label-marker';marker.textContent=number;marker.hidden=true;marker.dataset.faceId=face.id;marker.setAttribute('aria-label',locateLabel);
+      const line=document.createElement('span');line.className='face-label-leader';line.dataset.faceId=face.id;line.setAttribute('aria-hidden','true');
+      const locate=event=>{event.preventDefault();event.stopPropagation();highlightAnnotation(c,face,true);};
+      marker.addEventListener('click',locate);node.querySelector('[data-face-locate]').addEventListener('click',locate);
+      for(const host of [marker,node]){host.addEventListener('pointerenter',()=>highlightAnnotation(c,face));host.addEventListener('pointerleave',()=>{if(c.annotationFace?.id===face.id)clearAnnotation(c);});host.addEventListener('focusin',()=>highlightAnnotation(c,face));host.addEventListener('focusout',event=>{if(!host.contains(event.relatedTarget)&&c.annotationFace?.id===face.id)clearAnnotation(c);});}
       if(options.showNames)bindProfile(c,node,face);c.annotations.append(line,marker,node);c.annotationNodes.push({node,face,marker,line});
     }
   }
@@ -267,7 +280,7 @@
     clear();stage._familyFaceContext?.dispose();if(item.kind!=='photo'||!item.id||!window.FamilyApp?.apiEnabled)return;
     const c={serial:++serial,stage,image,item,adapter,highlightMissing,reviewHost,reviewLabel,zoomEnabled:zoom,reviewed:Boolean(item.faceSummary?.reviewed),dialog,events:new AbortController(),saved:[],detected:[],ignored:[],adjusted:new Map(),faces:[],active:null,popup:null,ready:false,searchSequence:0,saving:false,adjust:false,drag:null,skipClick:false};current=c;stage._familyFaceContext=c;c.dispose=()=>dispose(c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:true}}));
     c.geom=await helpers();if(!live(c))return;
-    c.layer=document.createElement('div');c.layer.className='face-layer';c.hits=document.createElement('div');c.hits.className='face-image-area';c.buttons=document.createElement('div');c.buttons.className='face-hit-buttons';c.annotations=document.createElement('div');c.annotations.className='face-visible-labels';c.annotationNodes=[];c.selection=document.createElement('div');c.selection.className='face-selection';c.selection.hidden=true;c.hits.append(c.buttons,c.annotations,c.selection);c.layer.append(c.hits);
+    c.layer=document.createElement('div');c.layer.className='face-layer';c.hits=document.createElement('div');c.hits.className='face-image-area';c.buttons=document.createElement('div');c.buttons.className='face-hit-buttons';c.annotations=document.createElement('div');c.annotations.className='face-visible-labels';c.annotationNodes=[];c.selection=document.createElement('div');c.selection.className='face-selection';c.selection.hidden=true;c.annotationTarget=document.createElement('span');c.annotationTarget.className='face-label-target';c.annotationTarget.hidden=true;c.annotationTarget.setAttribute('aria-hidden','true');c.hits.append(c.buttons,c.annotations,c.selection,c.annotationTarget);c.layer.append(c.hits);
     if(desktopResize())for(const handle of ['nw','n','ne','e','se','s','sw','w']){const node=document.createElement('button');node.type='button';node.className='face-resize-handle face-handle-'+handle;node.dataset.faceHandle=handle;node.setAttribute('aria-label',tr('שינוי גודל מסגרת הפנים','Resize face frame'));node.addEventListener('keydown',event=>{if(!c.active||c.saving||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();event.stopPropagation();const r=c.active.rect,area=imageArea(c),step=event.shiftKey?10:1,p={x:handle.includes('w')?r.x:r.x+r.width,y:handle.includes('n')?r.y:r.y+r.height};p.x+=(event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0)/area.width;p.y+=(event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0)/area.height;resized(c,{...c.active,rect:c.geom.resizeFaceRect(r,handle,p)});});c.selection.append(node);}
     c.guide=document.createElement('div');c.guide.className='face-adjust-guide';c.guide.hidden=true;c.guide.innerHTML=`<span>${tr('סמנו מסביב לפנים בעזרת גרירה','Drag around the face')}</span><button type="button">${tr('ביטול','Cancel')}</button>`;c.guide.querySelector('button').addEventListener('click',()=>closePopup(c));c.layer.append(c.guide);
     c.status=document.createElement('p');c.status.className='visually-hidden';c.status.setAttribute('role','status');c.status.setAttribute('aria-live','polite');c.labelList=document.createElement('div');c.labelList.className='face-label-list';c.labelList.hidden=true;c.labelList.setAttribute('aria-label',tr('שמות לפי המספרים על הפנים','Names matching the numbered faces'));stage.append(c.layer,c.status,c.labelList);stage.classList.add('has-face-layer');
