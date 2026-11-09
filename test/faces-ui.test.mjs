@@ -9,7 +9,7 @@ import {createUploadFaceAdapter,faceDraftPeople} from '../public/assets/photo-up
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
  .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
-function fixture(detected=[],{desktop=false}={}){
+function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false}={}){
  const view={width:desktop?1200:360,height:800},created=[];
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
@@ -44,10 +44,10 @@ function fixture(detected=[],{desktop=false}={}){
  const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node('dialog'),title=new Node('h2'),download=new Node('a'),edit=new Node('button');dialog.open=true;dialog.append(root);root.append(title,stage);title.append(download,edit);stage.append(image);
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
  const document=new Node();document.body=new Node('body');document.append(document.body);document.body.append(dialog);document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
- const window=new Node();window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
+ const window=new Node();window.navigator=windows?{userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',userAgentData:{mobile:false,platform:'Windows'},maxTouchPoints:10}:{};window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
  let progress,detectionImage,detectionCalls=0;
  const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{detectionCalls++;progress=onProgress;detectionImage=img;return detected;}};
- const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
+ const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:query=>({matches:query.includes('display-mode')?installed:query.includes('hover:none')?hoverNone||!desktop:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);return event;};
@@ -343,6 +343,37 @@ test('desktop resizing works after zoom and late detections keep the adjusted bo
  f.emit(f.stage,'pointermove',{target:handle,pointerId:1,clientX:area.left+.497*area.width,clientY:area.top+.395*area.height});f.emit(f.stage,'pointerup',{target:handle,pointerId:1});await new Promise(resolve=>setImmediate(resolve));
  const width=parseFloat(selection.style.width);assert.ok(Math.abs(width-1.5)<1e-8);f.progress([first,second]);assert.ok(Math.abs(parseFloat(f.find('face-hit-buttons').children[0].style.width)-1.5)<1e-8);
  f.faces.clear();const phone=fixture([first]);await phone.mount();assert.equal(phone.find('face-selection').children.length,0);phone.faces.clear();
+});
+test('Windows touch apps keep frame handles with no hover, narrow windows and any last pointer',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const original={id:'a'.repeat(32),rect:{x:.3,y:.2,width:.1,height:.15},personId:'yona',person:{id:'yona',name:'יונה'},revision:'face-r1'};
+ for(const desktop of [false,true])for(const installed of [false,true])for(const pointerType of ['touch','pen','mouse']){
+  const f=fixture([],{desktop,installed,windows:true,hoverNone:true}),requests=[];
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(!path.endsWith('/save'))return Response.json({faces:[original]});
+   const payload=JSON.parse(options.body);requests.push(payload);const face={...original,rect:payload.rect,revision:'face-r2'};return Response.json({item:{id:'windows-photo',kind:'photo'},faces:[face],face});
+  };
+  await f.mount('windows-photo');const area=f.image.getBoundingClientRect(),hit=f.find('face-hit-buttons').children[0],selection=f.find('face-selection');
+  assert.equal(selection.children.length,8);assert.equal(selection.dataset.faceResizable,'true');
+  const pointer={target:hit,pointerId:7,pointerType,isPrimary:true,button:0,clientX:area.left+.35*area.width,clientY:area.top+.25*area.height};
+  f.emit(f.stage,'pointerdown',pointer);f.emit(f.stage,'pointerup',pointer);f.emit(f.stage,'click',{...pointer,detail:1});
+  assert.equal(selection.hidden,false);assert.ok(f.find(pointerType==='mouse'?'face-popover face-picker':'face-popover face-name'));
+  const handle=selection.children.find(node=>node.dataset.faceHandle==='se'),start={...pointer,target:handle,clientX:area.left+.405*area.width,clientY:area.top+.355*area.height};
+  assert.equal(f.emit(f.stage,'pointerdown',start).defaultPrevented,true);assert.equal(f.stage.classList.contains('face-resizing'),true);
+  t.mock.timers.tick(2100);assert.equal(selection.hidden,false);
+  f.emit(f.stage,'pointermove',{...start,pointerId:8,isPrimary:false,clientX:area.left+.8*area.width});f.emit(f.stage,'pointerup',{...start,pointerId:8});assert.equal(requests.length,0);assert.equal(f.stage.classList.contains('face-resizing'),true);
+  f.emit(f.stage,'pointermove',{...start,clientX:start.clientX+.03*area.width,clientY:start.clientY+.04*area.height});f.emit(f.stage,'pointerup',start);await new Promise(resolve=>setImmediate(resolve));await f.faces.flush();
+  assert.equal(requests.length,1);assert.equal(requests[0].faceId,original.id);assert.equal(requests[0].personId,'yona');assert.equal(requests[0].expectedRevision,'face-r1');assert.ok(Math.abs(requests[0].rect.width-.13)<1e-10);assert.ok(Math.abs(requests[0].rect.height-.19)<1e-10);
+  await f.mount('next-windows-photo');assert.equal(f.find('face-selection').children.length,8);f.faces.clear();
+ }
+});
+test('cancelling a Windows touch resize keeps the saved frame unchanged',async()=>{
+ const original={id:'saved',rect:{x:.3,y:.2,width:.1,height:.15},personId:'yona',person:{id:'yona',name:'יונה'}},f=fixture([],{desktop:true,windows:true,hoverNone:true}),writes=[];
+ f.window.FamilyI18n.fetch=async(path,options)=>{if(options?.body)writes.push(path);return Response.json({faces:[original]});};await f.mount();
+ const hit=f.find('face-hit-buttons').children[0],area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{target:hit,detail:1,pointerType:'touch'});
+ const handle=f.find('face-selection').children.find(node=>node.dataset.faceHandle==='se'),p={target:handle,pointerId:1,pointerType:'touch',clientX:area.left+.4*area.width,clientY:area.top+.35*area.height};
+ f.emit(f.stage,'pointerdown',p);f.emit(f.stage,'pointermove',{...p,clientX:area.left+.5*area.width});f.emit(f.stage,'pointercancel',p);f.emit(f.stage,'pointerup',p);await f.faces.flush();
+ assert.equal(writes.length,0);assert.deepEqual(original.rect,{x:.3,y:.2,width:.1,height:.15});assert.equal(f.stage.classList.contains('face-resizing'),false);f.faces.clear();
 });
 test('ignoring one false detection disappears immediately, stays hidden after reopening and has no Undo control',async()=>{
  const f=fixture([first,second]),requests=[];let ignored=[];

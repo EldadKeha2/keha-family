@@ -116,10 +116,10 @@
 @media(max-width:380px){.media-viewer-header{padding:8px}.media-viewer-header .face-review-button,.media-viewer-header .media-viewer-edit,.media-viewer-header .media-viewer-download{flex-basis:36px;width:36px;min-width:36px;padding:6px}.media-viewer-header .media-viewer-paging button{width:29px;min-width:29px}.media-viewer-header .media-viewer-counter{font-size:11px}.media-viewer-header>button{width:32px}}
 @media(prefers-reduced-motion:reduce){.media-viewer-header .face-review-button{transition:none}}
 .face-resize-handle{display:none}
-@media(min-width:701px) and (hover:hover) and (pointer:fine){
- .face-selection:has(.face-resize-handle){pointer-events:auto;overflow:visible}
- .face-resize-handle{display:block;position:absolute;width:13px;height:13px;padding:0;border:2px solid #fff;background:#ae812b;border-radius:2px;pointer-events:auto;touch-action:none;transform:translate(-50%,-50%);z-index:2}
- .face-handle-nw{left:0;top:0;cursor:nwse-resize}.face-handle-n{left:50%;top:0;cursor:ns-resize}.face-handle-ne{left:100%;top:0;cursor:nesw-resize}.face-handle-e{left:100%;top:50%;cursor:ew-resize}
- .face-handle-se{left:100%;top:100%;cursor:nwse-resize}.face-handle-s{left:50%;top:100%;cursor:ns-resize}.face-handle-sw{left:0;top:100%;cursor:nesw-resize}.face-handle-w{left:0;top:50%;cursor:ew-resize}
- .face-resizing{user-select:none}.face-resizing .face-selection{cursor:grabbing}
-}
+.face-selection[data-face-resizable]{pointer-events:auto;overflow:visible}
+.face-selection[data-face-resizable] .face-resize-handle{display:block;position:absolute;width:20px;height:20px;min-width:0;min-height:0;padding:0;border:0;background:transparent;border-radius:2px;box-shadow:none;pointer-events:auto;touch-action:none;transform:translate(-50%,-50%);z-index:2}
+.face-selection[data-face-resizable] .face-resize-handle::after{content:'';position:absolute;left:50%;top:50%;width:13px;height:13px;box-sizing:border-box;border:2px solid #fff;background:#ae812b;border-radius:2px;transform:translate(-50%,-50%)}
+.face-handle-nw{left:0;top:0;cursor:nwse-resize}.face-handle-n{left:50%;top:0;cursor:ns-resize}.face-handle-ne{left:100%;top:0;cursor:nesw-resize}.face-handle-e{left:100%;top:50%;cursor:ew-resize}
+.face-handle-se{left:100%;top:100%;cursor:nwse-resize}.face-handle-s{left:50%;top:100%;cursor:ns-resize}.face-handle-sw{left:0;top:100%;cursor:nesw-resize}.face-handle-w{left:0;top:50%;cursor:ew-resize}
+.face-resizing{user-select:none}.face-resizing .face-selection{cursor:grabbing}
+@media(any-pointer:coarse){.face-selection[data-face-resizable] .face-resize-handle{width:32px;height:32px}}
