@@ -375,9 +375,9 @@ export class FamilyState {
     const albums={};
     for(const [key,type]of [['photos','photo'],['videos','video'],['documents','document']]){
       const requested=Number(options[key]||1);if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
-      const total=counts[type]||0,pages=Math.max(1,Math.ceil(total/10)),page=Math.min(requested,pages);
-      const items=this.rows('SELECT m.data FROM media m WHERE '+owner+' AND '+kind+'=? ORDER BY m.rowid DESC LIMIT 10 OFFSET ?',id,id,type,(page-1)*10).map(row=>this.mediaPublic(JSON.parse(row.data)));
-      albums[key]={items,page,pages,total,size:10};
+      const size=key==='photos'?25:10,total=counts[type]||0,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
+      const items=this.rows('SELECT m.data FROM media m WHERE '+owner+' AND '+kind+'=? ORDER BY m.rowid DESC LIMIT ? OFFSET ?',id,id,type,size,(page-1)*size).map(row=>this.mediaPublic(JSON.parse(row.data)));
+      albums[key]={items,page,pages,total,size};
     }
     const row=this.rows('SELECT m.data FROM media m WHERE '+owner+" AND "+kind+"='photo' ORDER BY CASE WHEN m.id=? THEN 0 WHEN m.category='personal' AND m.person_id=? THEN 1 ELSE 2 END,m.rowid LIMIT 1",id,id,person.profileId||'',id)[0];
     const candidate=row?JSON.parse(row.data):null,profile=person.profileCleared&&candidate?.id!==person.profileId?null:candidate;

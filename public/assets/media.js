@@ -60,9 +60,9 @@
     else if(source&&item.src){try{selected=new URL(source,location.origin).pathname===new URL(item.src,location.origin).pathname;}catch{}}
     else if(!albumCover)selected=Boolean(owner?.profileId&&owner.profileId===item.id);
     profileButton.setAttribute('aria-pressed',String(selected));
-    const profileLabel=state.scope?.startsWith('wedding:')?(selected?tr('זו תמונת החתונה','Current wedding cover photo'):tr('קבע כתמונת החתונה','Set wedding cover photo')):state.scope?.startsWith('nursery:')?(selected?tr('זו תמונת התינוקייה','Current baby album cover photo'):tr('קבע כתמונת התינוקייה','Set baby album cover photo')):(selected?tr('זו תמונת הפרופיל','Current profile photo'):tr('קבע כתמונת פרופיל','Set profile photo'));
+    const profileLabel=state.scope?.startsWith('wedding:')?(selected?tr('זו תמונת החתונה','Current wedding cover photo'):tr('קבע כתמונת החתונה','Set wedding cover photo')):state.scope?.startsWith('nursery:')?(selected?tr('זו תמונת התינוקייה','Current baby album cover photo'):tr('קבע כתמונת התינוקייה','Set baby album cover photo')):(selected?tr('זו תמונת הפרופיל','Current profile picture'):tr('קבע כתמונת פרופיל','Set as profile picture'));
     profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);profileButton.title=profileLabel;
-    if(selected&&!albumCover){const undoLabel=tr('זו תמונת הפרופיל. לחצו לביטול הבחירה ולחזרה לתמונה הקודמת','Current profile photo. Click to undo this selection and restore the previous photo');profileButton.title=undoLabel;profileButton.setAttribute('aria-label',undoLabel);}
+    if(selected&&!albumCover){const undoLabel=tr('זו תמונת הפרופיל. לחצו לביטול הבחירה ולחזרה לתמונה הקודמת','Current profile picture. Click to undo this selection and restore the previous photo');profileButton.title=undoLabel;profileButton.setAttribute('aria-label',undoLabel);}
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
     $('openedCaptionForm').hidden=!captionEditing;
     const page=albumPages.get(state.scope),total=page?.total??state.items.length,offset=page?(page.page-1)*page.size:0;
@@ -249,7 +249,7 @@
         const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));
         if(albumCover)window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
         else{app().updatePerson(id,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id}}));}
-        notify(restorePrevious?(result.person.profile?tr('תמונת הפרופיל הקודמת הוחזרה ✓','Previous profile photo restored ✓'):tr('הקביעה בוטלה. אין תמונת פרופיל.','Selection removed. No profile photo is set.')):albumCover?tr('תמונת הפרופיל של האלבום עודכנה ✓','Album cover photo updated ✓'):tr('תמונת הפרופיל עודכנה ✓','Profile photo updated ✓'));
+        notify(restorePrevious?(result.person.profile?tr('תמונת הפרופיל הקודמת הוחזרה ✓','Previous profile picture restored ✓'):tr('הקביעה בוטלה. אין תמונת פרופיל.','Selection removed. No profile picture is set.')):albumCover?tr('תמונת הפרופיל של האלבום עודכנה ✓','Album cover photo updated ✓'):tr('תמונת הפרופיל עודכנה ✓','Profile picture updated ✓'));
       }catch(error){notify(error.message);}finally{button.disabled=false;}
     });
     const refreshProfile=event=>{if($('mediaViewer').open&&state.scope==='personal:'+event.detail.id)metadata();};

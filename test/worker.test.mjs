@@ -1236,12 +1236,12 @@ test('unchanged gallery polling checks only its revision instead of loading the 
  }finally{await f.close();}
 });
 
-test('personal pages paginate owned and tagged media by type with ten items and no duplicate links',async()=>{
+test('personal pages paginate owned and tagged media by type with 25 photos and no duplicate links',async()=>{
  const f=fixture();try{
-  for(let i=1;i<=25;i++){const id=(10000+i).toString(16).padStart(32,'0'),kind=i<=23?'photo':'video',item={id,category:'personal',personId:'yehiel',file:id+'.'+(kind==='photo'?'jpg':'mp4'),name:'Personal '+i,mime:kind==='photo'?'image/jpeg':'video/mp4',kind,createdAt:new Date().toISOString()};f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,'personal','yehiel',JSON.stringify(item));}
+  for(let i=1;i<=55;i++){const id=(10000+i).toString(16).padStart(32,'0'),kind=i<=53?'photo':'video',item={id,category:'personal',personId:'yehiel',file:id+'.'+(kind==='photo'?'jpg':'mp4'),name:'Personal '+i,mime:kind==='photo'?'image/jpeg':'video/mp4',kind,createdAt:new Date().toISOString()};f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,'personal','yehiel',JSON.stringify(item));}
   const id=(10001).toString(16).padStart(32,'0');f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(id,'yehiel');
-  const p1=await f.call('/api/people/yehiel/page'),data=await p1.json();assert.equal(data.albums.photos.total,23);assert.equal(data.albums.photos.items.length,10);assert.equal(data.albums.photos.pages,3);assert.equal(data.albums.videos.total,2);assert.equal(data.albums.documents.total,0);assert.equal(data.person.photoCount,23);assert.equal(data.person.gallery,undefined);
-  const p2=await (await f.call('/api/people/yehiel/page?photos=2')).json();assert.equal(p2.albums.photos.items.length,10);assert.ok(p2.albums.photos.items.every(item=>!data.albums.photos.items.some(p=>p.id===item.id)));
+  const p1=await f.call('/api/people/yehiel/page'),data=await p1.json();assert.equal(data.albums.photos.total,53);assert.equal(data.albums.photos.items.length,25);assert.equal(data.albums.photos.pages,3);assert.equal(data.albums.videos.total,2);assert.equal(data.albums.documents.total,0);assert.equal(data.person.photoCount,53);assert.equal(data.person.gallery,undefined);
+  const p2=await (await f.call('/api/people/yehiel/page?photos=2')).json();assert.equal(p2.albums.photos.items.length,25);assert.ok(p2.albums.photos.items.every(item=>!data.albums.photos.items.some(p=>p.id===item.id)));
   const p3=await (await f.call('/api/people/yehiel/page?photos=999')).json();assert.equal(p3.albums.photos.page,3);assert.equal(p3.albums.photos.items.length,3);
   assert.equal((await f.call('/api/people/yehiel/page',{headers:{'If-None-Match':p1.headers.get('ETag')}})).status,304);
   assert.equal((await f.call('/api/people/yehiel/page?photos=-1')).status,400);

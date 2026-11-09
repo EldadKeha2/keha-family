@@ -170,7 +170,7 @@ test('the effective profile stays selected across photo navigation and live owne
   f.window.FamilyApp.getPerson=()=>({gender:'f'});f.window.FamilyApp.getPersonSummary=()=>owner;
   const photos=['a','b'].map(id=>({...f.photo(id),file:id+'.jpg'})),button=f.get('openedProfilePhoto');
   f.window.FamilyMedia.open(photos,0,'personal:rachel');assert.equal(button.getAttribute('aria-pressed'),'false');
-  f.get('mediaNext').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'true');assert.equal(button.querySelector('span').textContent,english?'Current profile photo':'זו תמונת הפרופיל');
+  f.get('mediaNext').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'true');assert.equal(button.querySelector('span').textContent,english?'Current profile picture':'זו תמונת הפרופיל');
   f.get('mediaPrevious').handlers.get('click')();assert.equal(button.getAttribute('aria-pressed'),'false');
   owner.profileFile='a.jpg';f.window.dispatchEvent(new CustomEvent('family-profile-changed',{detail:{id:'rachel'}}));assert.equal(button.getAttribute('aria-pressed'),'true');
  }

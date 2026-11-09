@@ -57,7 +57,6 @@
 /* One compact action row, followed by the full-width description. */
 .media-photo-actions{align-items:stretch;justify-content:space-between;gap:12px}
 .media-photo-actions #editOpenedCaption,.media-photo-actions #openedProfilePhoto{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:44px;box-sizing:border-box;margin:0;padding:7px 11px;border:1px solid #d7cfb9;border-radius:7px;background:#f1f1e5;color:#7f8e63;font:calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans);white-space:normal}
-.media-photo-actions #openedProfilePhoto{background:#edf0e1;border-color:#cbd3b7;color:#60764b}
 .media-photo-actions button svg{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .media-photo-actions #openedProfilePhoto[hidden],.media-profile-icon [hidden]{display:none}
 @media(max-width:600px){.media-photo-actions{gap:6px}.media-photo-actions #mediaViewerDelete,.media-photo-actions #editOpenedCaption,.media-photo-actions #openedProfilePhoto{flex:1 1 0;max-width:none;min-width:0;padding:6px 5px;gap:4px;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.4}.media-photo-actions button>span{min-width:0;overflow-wrap:anywhere}:root[lang^=en] .media-photo-actions #editOpenedCaption{white-space:normal}}

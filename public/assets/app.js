@@ -309,7 +309,7 @@
 
   function renderGallery(item) {
     if (!Array.isArray(item.gallery)) return;
-    const personId=state.currentPerson,scope='personal:'+personId,album=item;
+    const personId=state.currentPerson,scope='personal:'+personId;
     const items=item.gallery.filter(media=>state.galleryFilter==='all'||media.kind===state.galleryFilter);
     state.gallery=items;window.FamilyMedia.register(scope,items);
     const photoCount=item.photoCount??item.gallery.filter(media=>media.kind==='photo').length,videoCount=item.videoCount||0;
@@ -326,13 +326,10 @@
         if(item.provider==='youtube')viewer=I18n.html`<button class="personal-video-cover" data-media-open="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="ניגון ${safe(I18n.mediaName(item))} בגלריה"><span aria-hidden="true">▶</span><strong>${safe(I18n.mediaName(item))}</strong></button>`;
         else if(item.kind==='video')viewer=I18n.html`<video class="person-gallery-video" controls playsinline preload="metadata" src="${safe(item.src)}" aria-label="${safe(I18n.mediaName(item))}"></video><p class="video-codec-note" hidden>הסרטון לא מתנגן בדפדפן הזה. אפשר לפתוח אותו בגלריה ולהוריד את המקור.</p><div class="personal-media-name">${safe(I18n.mediaName(item))}</div>`;
         else viewer=I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(scope)}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.src)}" alt="${safe(item.caption||I18n.mediaName(item))}" loading="lazy"></button>`;
-        const profile=item.kind==='photo'?I18n.html`<div class="photo-actions"><button class="profile-select" data-set-profile="${safe(item.file)}" data-owner="${personId}">קביעה כתמונת פרופיל</button></div>`:'';
         const captionId='caption-'+personId+'-'+encodeURIComponent(item.file);
-        card.innerHTML=viewer+(item.linked?I18n.t('<p class="linked-media-note">מופיע באלבום הזה בזכות תיוג</p>'):'')+profile+window.FamilyMedia.controls(item,scope)+I18n.html`<div class="caption-editor"><label class="visually-hidden" for="${safe(captionId)}">כיתוב ל${item.kind==='video'?I18n.t('סרטון'):I18n.t('תמונה')} ${safe(I18n.mediaName(item))}</label><textarea dir="auto" id="${safe(captionId)}" data-caption-file="${safe(item.file)}" data-owner="${personId}" rows="2" maxlength="5000" placeholder="מי מופיע כאן? איפה ומתי? כתבו כאן…" ${apiEnabled?'':'disabled'}></textarea><div class="caption-toolbar"><span data-caption-status role="status"></span><button data-save-caption="${safe(item.file)}" data-owner="${personId}">שמירה</button></div></div>`;
+        card.innerHTML=viewer+(item.linked?I18n.t('<p class="linked-media-note">מופיע באלבום הזה בזכות תיוג</p>'):'')+window.FamilyMedia.controls(item,scope)+I18n.html`<div class="caption-editor"><label class="visually-hidden" for="${safe(captionId)}">כיתוב ל${item.kind==='video'?I18n.t('סרטון'):I18n.t('תמונה')} ${safe(I18n.mediaName(item))}</label><textarea dir="auto" id="${safe(captionId)}" data-caption-file="${safe(item.file)}" data-owner="${personId}" rows="2" maxlength="5000" placeholder="מי מופיע כאן? איפה ומתי? כתבו כאן…" ${apiEnabled?'':'disabled'}></textarea><div class="caption-toolbar"><span data-caption-status role="status"></span><button data-save-caption="${safe(item.file)}" data-owner="${personId}">שמירה</button></div></div>`;
         card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;});
       }
-      const profileButton=card.querySelector('.profile-select');
-      if(profileButton){const isProfile=Boolean(album.profileIsManual)&&album.profileFile===item.file;profileButton.classList.toggle('is-profile',isProfile);profileButton.disabled=isProfile;profileButton.setAttribute('aria-pressed',String(isProfile));profileButton.textContent=isProfile?I18n.t('✓ תמונת הפרופיל'):I18n.t('קביעה כתמונת פרופיל');}
       const area=card.querySelector('textarea'),draft=drafts.get(keyFor(personId,item.file));
       if(area!==document.activeElement)area.value=draft?.dirty?draft.value:item.caption||'';
       cards.push(card);
@@ -357,21 +354,6 @@
     } catch(error) {
       if (force && personId === state.currentPerson && $('personDialog').open) toast(error.message || I18n.t('לא ניתן לקרוא את הגלריה כרגע.'));
     } finally {galleryLoading = false;}
-  }
-
-  async function chooseProfilePhoto(personId, file) {
-    if (!apiEnabled) return;
-    try {
-      const response = await I18n.fetch('api/people/' + encodeURIComponent(personId) + '/profile', {
-        method:'POST', headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},
-        body:JSON.stringify({file})
-      });
-      const result = await response.json();
-      if (!response.ok) throw Error(I18n.error(result.error) || I18n.t('תמונת הפרופיל לא נשמרה.'));
-      updatePersonUI(personId, result.person);
-      if (state.currentPerson === personId && $('personDialog').open) renderGallery(result.person);
-      toast(I18n.t('תמונת הפרופיל של ') + nameOf(data.people[personId]) + I18n.t(' עודכנה'));
-    } catch(error) {toast(error.message || I18n.t('לא ניתן לשמור את תמונת הפרופיל כרגע.'));}
   }
 
   function editCaption(area) {
@@ -522,7 +504,6 @@
     const view=event.target.closest('[data-view]');if(view){setView(view.dataset.view);return;}
     const search=event.target.closest('[data-search-person]');if(search){$('searchResults').hidden=true;$('searchInput').blur();openPerson(search.dataset.searchPerson);return;}
     const photo=event.target.closest('[data-open-photo]');if(photo){openPhoto(state.gallery.findIndex(p=>p.file===photo.dataset.openPhoto));return;}
-    const profile=event.target.closest('[data-set-profile]');if(profile){chooseProfilePhoto(profile.dataset.owner,profile.dataset.setProfile);return;}
     const save=event.target.closest('[data-save-caption]');if(save){saveCaption(keyFor(save.dataset.owner,save.dataset.saveCaption));return;}
     if(event.target.closest('#uploadPhotos')){$('photoUploadInput').value='';$('photoUploadInput').click();return;}
     if(!event.target.closest('.search-wrap'))$('searchResults').hidden=true;
