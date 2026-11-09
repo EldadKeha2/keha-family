@@ -4,6 +4,7 @@ import {clampRect,mergeFaces,chooseFace,manualRect,popoverPosition,unrotateRect,
 import {faceCoverage} from '../public/assets/face-coverage.mjs';
 import {detectionSize,detectionRegions} from '../public/assets/face-scan.mjs';
 import {faceRect} from '../src/faces.mjs';
+import {crowdPhotoFaces,crowdPhotoAspect} from './helpers/crowd-photo.mjs';
 
 test('normalized face positions survive portrait, landscape and phone display sizes',()=>{
  const rect={x:.2,y:.1,width:.17,height:.24};
@@ -159,10 +160,24 @@ test('connector conflicts include crossings, shared ends and close parallel runs
  assert.equal(labelLeadersConflict(a,{from:{x:30,y:0},to:{x:30,y:20}}),false);
 });
 
+test('one unrouteable face never hides safe numbered markers for the rest of the photo',()=>{
+ const labels=[{width:18,height:18,face:{x:100,y:100,width:10,height:10}},{width:18,height:18,face:{x:220,y:80,width:20,height:30}}],bounds={width:300,height:200,faces:[{x:90,y:90,width:30,height:30}]};
+ assert.equal(layoutFaceLabels(labels,bounds),null);
+ const partial=layoutFaceLabels(labels,{...bounds,partial:true});assert.equal(partial.length,2);assert.equal(partial[0],null);assert.ok(partial[1]?.leader);
+ const afterRemoval=layoutFaceLabels(labels.slice(1),{...bounds,partial:true});assert.equal(afterRemoval.length,1);assert.ok(afterRemoval[0]?.leader);
+});
+
+test('removing two precise duplicate tags keeps all remaining crowd markers at desktop and phone sizes',()=>{
+ const original=crowdPhotoFaces(),removed=[original[20].id,original[23].id];
+ for(const width of [360,450,748,1120])for(const count of [1,2]){
+  const saved=original.filter(face=>!removed.slice(0,count).includes(face.id)),height=width*crowdPhotoAspect,project=face=>{const r=annotationFaceRect(face,saved);return{x:r.x*width,y:r.y*height,width:r.width*width,height:r.height*height};},faces=saved.map(project),labels=saved.filter(face=>face.person).map(face=>({width:18,height:18,face:project(face)}));
+  const layout=layoutFaceLabels(labels,{width,height,faces,partial:true});assert.equal(layout.filter(Boolean).length,26-count,width+'px after '+count+' removals');
+  for(let i=0;i<layout.length;i++)for(const other of layout.slice(i+1))assert.equal(labelLeadersConflict(layout[i].leader,other.leader),false);
+ }
+});
+
 test('crowd markers connect to precise saved heads without crossing each other, another label or another face',()=>{
- // An anonymized multi-row scene, including nested old and precise tag boxes.
- const scene=[[.899033,.323409,.078094,.078223],[.83764,.26606,.075548,.075673],[.745796,.507121,.071874,.071994],[.530735,.571416,.07098,.071097],[.446377,.5129,.063647,.063753],[.052417,.531256,.07625,.076376],[.187984,.461099,.079992,.080125],[.051488,.350634,.058171,.058268],[.304729,.250508,.05159,.051676],[.378132,.259356,.047379,.047457],[.290268,.415956,.053571,.053659],[.444727,.398846,.054255,.054345],[.467082,.281455,.050604,.050688],[.556582,.300931,.051452,.051537],[.641199,.249228,.058661,.058758],[.575329,.336013,.219191,.219554],[.356199,.508175,.065906,.066015],[.742074,.267351,.072144,.072263],[.811375,.284852,.045989,.063797],[.708726,.31057,.035957,.04257],[.764108,.286849,.039498,.054642],[.510658,.327195,.038642,.047269],[.573708,.26981,.038107,.04552],[.635861,.319793,.054013,.06846],[.158813,.320292,.046806,.061374],[.370228,.362723,.041932,.058045],[.235146,.323427,.039157,.050197],[.535415,.461884,.048489,.063869]];
- const saved=scene.map(([x,y,width,height],i)=>({personId:i===15||i===23?'a':i===17||i===20?'b':String(i),rect:{x,y,width,height}}));
+ const saved=crowdPhotoFaces();
  const sampleHits=(line,box)=>{const n=Math.max(1,Math.ceil(Math.hypot(line.to.x-line.from.x,line.to.y-line.from.y)*2));for(let i=1;i<n;i++){const t=i/n,x=line.from.x+(line.to.x-line.from.x)*t,y=line.from.y+(line.to.y-line.from.y)*t;if(x>box.x&&x<box.x+box.width&&y>box.y&&y<box.y+box.height)return true;}return false;};
  for(const width of [360,450,748,1120]){
   const height=width*.99837,faces=saved.map(face=>{const r=annotationFaceRect(face,saved);return{x:r.x*width,y:r.y*height,width:r.width*width,height:r.height*height};}),labels=faces.slice(0,26).map(face=>({width:18,height:18,face})),layout=layoutFaceLabels(labels,{width,height,faces});

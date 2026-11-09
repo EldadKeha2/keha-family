@@ -6,7 +6,7 @@
   const choices='[data-face-person],[data-face-add]';
   const labels=new Map();let current=null,serial=0,geometry=null;
   const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,time:Date.now(),tagsRevision:item?.tagsRevision,reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
-  const helpers=()=>geometry||=import('./face-geometry.mjs?v=9');
+  const helpers=()=>geometry||=import('./face-geometry.mjs?v=10');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   const touchMode=event=>event?.pointerType==='touch'||matchMedia('(hover:none), (max-width:700px)').matches;
   const desktopResize=()=>!touchMode();
@@ -109,7 +109,7 @@
     }
     const boxes=entries.map(({face},i)=>{const r=annotationRect(c,face);return {...c.annotationMeasurements.sizes[i][0],variants:c.annotationMeasurements.sizes[i],face:{x:r.x*image.width,y:r.y*image.height,width:r.width*image.width,height:r.height*image.height}};}),faces=annotationFaces(c,image);
     const key=JSON.stringify([image.width,image.height,boxes,faces]);
-    if(c.annotationLayout?.key!==key){const bounds={...image,faces},layout=c.geom.layoutFaceLabels(boxes,bounds),legend=entries.length>0&&!layout;c.annotationLayout={key,layout,legend,markers:legend?c.geom.layoutFaceLabels(boxes.map(box=>({width:18,height:18,face:box.face})),bounds):null};}
+    if(c.annotationLayout?.key!==key){const bounds={...image,faces},layout=c.geom.layoutFaceLabels(boxes,bounds),legend=entries.length>0&&!layout;c.annotationLayout={key,layout,legend,markers:legend?c.geom.layoutFaceLabels(boxes.map(box=>({width:18,height:18,face:box.face})),{...bounds,partial:true}):null};}
     const {layout,legend,markers}=c.annotationLayout;
     c.labelList.hidden=!legend;c.stage.classList.toggle('face-label-list-active',legend);
     for(let i=0;i<entries.length;i++){

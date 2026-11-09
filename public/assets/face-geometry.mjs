@@ -82,15 +82,16 @@ export function annotationFaceRect(face,faces=[]){
   }).sort((a,b)=>a.rect.width*a.rect.height-b.rect.width*b.rect.height);
   return precise.length&&precise.every(other=>other===precise[0]||sameRegion(other.rect,precise[0].rect))?precise[0].rect:rect;
 }
-export function labelLeader(box,face){
+export function labelLeader(box,face,side='auto'){
   const cx=box.x+box.width/2,cy=box.y+box.height/2,fx=face.x+face.width/2,fy=face.y+face.height/2,pad=2.5;
   const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
   // End close to the centre of one face edge, rather than at a padded corner
   // halfway towards a neighbour. The small endpoint dot stays outside the face.
   let to;
-  if(box.y+box.height<=face.y)to={x:clamp(cx,face.x+face.width*.28,face.x+face.width*.72),y:face.y-pad};
-  else if(box.y>=face.y+face.height)to={x:clamp(cx,face.x+face.width*.28,face.x+face.width*.72),y:face.y+face.height+pad};
-  else if(cx<fx)to={x:face.x-pad,y:clamp(cy,face.y+face.height*.3,face.y+face.height*.7)};
+  if(side==='auto')side=box.y+box.height<=face.y?'top':box.y>=face.y+face.height?'bottom':cx<fx?'left':'right';
+  if(side==='top')to={x:clamp(cx,face.x+face.width*.28,face.x+face.width*.72),y:face.y-pad};
+  else if(side==='bottom')to={x:clamp(cx,face.x+face.width*.28,face.x+face.width*.72),y:face.y+face.height+pad};
+  else if(side==='left')to={x:face.x-pad,y:clamp(cy,face.y+face.height*.3,face.y+face.height*.7)};
   else to={x:face.x+face.width+pad,y:clamp(cy,face.y+face.height*.3,face.y+face.height*.7)};
   return {from:{x:clamp(to.x,box.x,box.x+box.width),y:clamp(to.y,box.y,box.y+box.height)},to};
 }
@@ -124,10 +125,10 @@ export function labelLeadersConflict(a,b,clearance=2.5){
 }
 // Try measured one-, two- and three-line labels in the free space around every
 // head. A separate legend is safer than covering faces in an impossible crowd.
-export function layoutFaceLabels(labels,{width,height,faces=[]},gap=4){
+export function layoutFaceLabels(labels,{width,height,faces=[],partial=false},gap=4){
   if(!(width>0&&height>0))return null;if(!labels.length)return [];
   const variants=labels.map(label=>(label.variants||[label]).map((v,index)=>({width:Math.min(v.width,width),height:v.height,variant:index})).filter(v=>v.width>0&&v.height>0&&v.height<=height));
-  if(variants.some(v=>!v.length)||variants.reduce((sum,v)=>sum+Math.min(...v.map(r=>r.width*r.height)),0)>width*height)return null;
+  if(!partial&&(variants.some(v=>!v.length)||variants.reduce((sum,v)=>sum+Math.min(...v.map(r=>r.width*r.height)),0)>width*height))return null;
   const uniqueFaces=new Map([...labels.map(l=>l.face),...faces].filter(r=>r&&r.width>0&&r.height>0&&r.x<width&&r.y<height&&r.x+r.width>0&&r.y+r.height>0).map(r=>[[r.x,r.y,r.width,r.height].join(','),r]));
   const actualFaces=[...uniqueFaces.values()],heads=actualFaces.map(labelFaceBounds),faceGrid=labelGrid(heads,gap),routeFaces=actualFaces.map(face=>({...expandRect(face,1),face})),routeGrid=labelGrid(routeFaces),pad=1;
   const options=labels.map((label,index)=>{
@@ -141,10 +142,13 @@ export function layoutFaceLabels(labels,{width,height,faces=[]},gap=4){
       const unique=(values,max)=>[...new Set(values.map(n=>Math.max(pad,Math.min(max,n))))];
       for(const x of unique(xs,maxX))for(const y of unique(ys,maxY)){
         const box={x,y,...v};if(faceGrid.near(box).some(r=>labelCollision(box,r,gap)))continue;
-        const leader=labelLeader(box,label.face),distance=Math.hypot(leader.to.x-leader.from.x,leader.to.y-leader.from.y),above=y+h<=head.y,below=y>=head.y+head.height;
-        const wrap=Math.max(0,h-variants[index][0].height)*.35;
-        const score=distance+(above?0:below?10+head.height*.2:18+head.height*.35)+wrap+Math.abs(x+w/2-cx)*.08;
-        candidates.push({...box,leader,score});
+        const endpoints=new Set();
+        for(const side of ['auto','top','bottom','left','right']){
+          const leader=labelLeader(box,label.face,side),key=leader.to.x+':'+leader.to.y;if(endpoints.has(key)||leader.to.x<0||leader.to.y<0||leader.to.x>width||leader.to.y>height||lineCrossesFace(leader,label.face))continue;endpoints.add(key);
+          const distance=Math.hypot(leader.to.x-leader.from.x,leader.to.y-leader.from.y),above=y+h<=head.y,below=y>=head.y+head.height,wrap=Math.max(0,h-variants[index][0].height)*.35;
+          const score=distance+(above?0:below?10+head.height*.2:18+head.height*.35)+wrap+Math.abs(x+w/2-cx)*.08+(side==='auto'?0:3);
+          candidates.push({...box,leader,score});
+        }
       }
     }
     candidates.sort((a,b)=>a.score-b.score||a.variant-b.variant||a.y-b.y||a.x-b.x);
@@ -185,6 +189,18 @@ export function layoutFaceLabels(labels,{width,height,faces=[]},gap=4){
       return false;
     };
     if(arrange(0))return result;
+  }
+  if(partial){
+    // One ambiguous frame must not hide every other number. Keep the original
+    // indexes, and retain unplaced entries in the numbered, clickable legend.
+    let best=Array(labels.length).fill(null),bestCount=0,bestScore=Infinity;
+    const fits=(a,b)=>!labelCollision(a,b,gap)&&!lineCrossesFace(a.leader,expandRect(b,1.5))&&!lineCrossesFace(b.leader,expandRect(a,1.5))&&!labelLeadersConflict(a.leader,b.leader);
+    for(const ordered of orders){
+      const result=Array(labels.length).fill(null),placed=[];let score=0;
+      for(const label of ordered){const box=label.candidates.find(box=>placed.every(other=>fits(box,other)));if(box){result[label.index]=box;placed.push(box);score+=box.score;}}
+      if(placed.length>bestCount||placed.length===bestCount&&score<bestScore){best=result;bestCount=placed.length;bestScore=score;}
+    }
+    return best;
   }
   return null;
 }

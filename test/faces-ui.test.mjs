@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import * as geometryModule from '../public/assets/face-geometry.mjs';
+import {crowdPhotoFaces} from './helpers/crowd-photo.mjs';
 
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
@@ -333,4 +334,32 @@ test('visual connectors and locating use the precise matching head while face ed
  f.window.FamilyI18n.fetch=async()=>Response.json({faces});f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};await f.mount();const host=f.find('face-visible-labels'),label=host.children.find(node=>node.classList.contains('face-visible-label'));f.emit(label.querySelector('[data-face-locate]'),'click');
  const target=f.find('face-label-target');assert.equal(target.style.left,faces[1].rect.x*100+'%');assert.equal(target.style.width,faces[1].rect.width*100+'%');
  const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId==='wide');assert.equal(hit.style.width,'40%','Stored editing geometry is preserved');f.emit(f.stage,'click',{detail:0,target:hit});assert.equal(f.find('face-selection').style.width,'40%');assert.ok(f.find('face-popover face-picker'));f.faces.clear();
+});
+
+test('two removals renumber a real dense photo immediately, through overlay toggles, late scans and reopening',async()=>{
+ for(const desktop of [false,true]){
+  const original=crowdPhotoFaces(),detected=original.filter(face=>!face.person),f=fixture(detected,{desktop}),removed=[original[20].id,original[23].id];let saved=original.filter(face=>face.person),ignored=[],showNames=true,revision=0;
+  f.image.naturalWidth=f.image.naturalHeight=3000;f.view.width=450;f.view.height=1100;
+  const snapshot=()=>({item:{id:'dense-removals',kind:'photo',scope:'photos',tagsRevision:'t'+revision},faces:saved,ignoredFaces:ignored,detectedFaces:detected});
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(path.endsWith('/ignore')){const payload=JSON.parse(options.body),face=saved.find(face=>face.id===payload.faceId);assert.ok(face);saved=saved.filter(face=>face.id!==payload.faceId);ignored=[...ignored,face.rect];revision++;return Response.json({...snapshot(),operation:'face-ignore',scope:'photos'});}
+   return Response.json(snapshot());
+  };
+  f.window.FamilyPhotoDate={overlays:()=>({showNames})};await f.mount('dense-removals',{},snapshot().item);
+  const check=count=>{
+   const legend=f.find('face-label-list'),host=f.find('face-visible-labels');assert.equal(legend.hidden,false);
+   assert.deepEqual(legend.children.map(node=>Number(/face-label-number[^>]*>(\d+)/.exec(node.innerHTML)[1])),Array.from({length:count},(_,i)=>i+1));
+   const markers=host.children.filter(node=>node.classList.contains('face-label-marker')&&!node.hidden);assert.equal(markers.length,count,'The remaining markers must not disappear as one group');assert.deepEqual(markers.map(node=>Number(node.textContent)),Array.from({length:count},(_,i)=>i+1));
+  };
+  check(26);
+  for(const [i,id]of removed.entries()){
+   const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===id);
+   if(desktop)f.emit(f.stage,'click',{detail:0,target:hit});else{f.emit(hit,'focus');f.emit(f.find('face-popover face-name').querySelector('[data-face-edit]'),'click');}
+   f.emit(f.find('face-popover face-picker').querySelector('[data-face-remove]'),'click');check(25-i);await f.faces.flush();check(25-i);
+  }
+  showNames=false;f.window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:'dense-removals'}}));assert.equal(f.find('face-visible-labels').children.length,0);
+  showNames=true;f.window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:'dense-removals'}}));check(24);
+  f.progress(original.map(face=>({rect:face.rect,score:.95})));check(24);
+  f.faces.clear();await f.mount('dense-removals',{},snapshot().item);check(24);f.faces.clear();
+ }
 });
