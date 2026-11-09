@@ -1,6 +1,6 @@
 /* Shared desktop photo layout for personal, family, wedding and nursery albums. */
 @media(min-width:701px){
- #mediaViewer.personal-photo-desktop{--personal-rail:clamp(48px,5vw,76px);--personal-rail-gap:12px;--personal-rail-height:calc(var(--personal-rail)*3 + var(--personal-rail-gap)*2);width:min(1600px,calc(100vw - 28px));max-height:calc(100dvh - 24px)}
+ #mediaViewer.personal-photo-desktop{--personal-rail:clamp(48px,5vw,76px);--personal-rail-gap:12px;--personal-rail-height:calc(var(--personal-rail)*3 + var(--personal-rail-gap)*2);--personal-details-width:1060px;--personal-footer-inset:max(0px,calc((100% - var(--personal-details-width))/2));width:min(1600px,calc(100vw - 28px));max-height:calc(100dvh - 24px)}
  #mediaViewer.personal-photo-desktop .media-viewer-header{display:grid;grid-template-columns:44px minmax(0,1fr) auto minmax(0,max-content) auto minmax(0,1fr) 44px;align-items:center;gap:20px;direction:ltr;padding:12px 20px;border-bottom:1px solid #ded4bd}
  #mediaViewer.personal-photo-desktop #mediaViewerTitle,#mediaViewer.personal-photo-desktop #mediaViewerCounter{display:none}
  #mediaViewer.personal-photo-desktop .media-viewer-paging{display:contents}
@@ -39,6 +39,7 @@
  #mediaViewer.personal-photo-desktop #personalPhotoZoom [data-face-zoom-out]{grid-row:4}
  #mediaViewer.personal-photo-desktop #personalPhotoZoom :is([data-face-zoom-in],[data-face-zoom-out]){box-sizing:border-box;display:grid;place-items:center;width:100%;height:calc(var(--personal-rail) - 17px);min-width:0;min-height:30px;margin:0;padding:0;font:24px/1 var(--sans);border:1px solid #d0c19f;background:#fffdf6;color:#536441}
  #mediaViewer.personal-photo-desktop .media-viewer-footer{padding:0 22px 18px}
+ #mediaViewer.personal-photo-desktop #mediaTagPanel{box-sizing:border-box;padding-right:var(--personal-footer-inset)}
  #mediaViewer.personal-photo-desktop #mediaTagPanel .inline-tag-widget{display:grid;grid-template-columns:max-content minmax(0,1fr) auto;align-items:start;gap:8px 16px}
  #mediaViewer.personal-photo-desktop #mediaTagPanel .tag-widget-heading{display:contents}
  #mediaViewer.personal-photo-desktop #mediaTagPanel .tag-widget-heading h3{grid-column:1;grid-row:1;margin:0;padding-block:7px;white-space:nowrap}
@@ -47,7 +48,7 @@
  #mediaViewer.personal-photo-desktop #mediaTagPanel :is(.tag-autosave-status,.tag-error-actions){grid-column:1/-1}
  #mediaViewer.personal-photo-desktop .photo-moment-row,#mediaViewer.personal-photo-desktop .media-viewer-tools{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoBelow{padding-top:6px}
- #mediaViewer.personal-photo-desktop #personalPhotoDetails{display:grid;grid-template-columns:minmax(210px,380px) minmax(260px,480px);justify-content:space-between;align-items:center;gap:clamp(28px,5vw,90px);max-width:1060px;margin:0 auto 8px;direction:ltr}
+ #mediaViewer.personal-photo-desktop #personalPhotoDetails{display:grid;grid-template-columns:minmax(210px,380px) minmax(260px,480px);justify-content:space-between;align-items:center;gap:clamp(28px,5vw,90px);max-width:var(--personal-details-width);margin:0 auto 8px;direction:ltr}
  #mediaViewer.personal-photo-desktop #personalPhotoInformation{padding:0}
  #mediaViewer.personal-photo-desktop #personalPhotoInformation .photo-moment-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;width:100%;margin:0;direction:rtl}
  html[dir=ltr] #mediaViewer.personal-photo-desktop #personalPhotoInformation .photo-moment-tools{direction:ltr}
@@ -80,7 +81,7 @@
  #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-badge{fill:#fcf8ee}
  #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-button[aria-pressed=true] .face-review-badge{fill:#5d743e}
  #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-text{display:none}
- #mediaViewer.personal-photo-desktop #mediaShareActions{display:grid;grid-template-columns:repeat(6,40px) max-content;grid-auto-rows:auto;justify-content:end;align-items:center;gap:10px;direction:ltr;box-sizing:border-box;width:100%;max-width:none;margin:0;padding:6px 0 8px;border:0;border-block:1px solid #ded4bd}
+ #mediaViewer.personal-photo-desktop #mediaShareActions{display:grid;grid-template-columns:repeat(6,40px) max-content;grid-auto-rows:auto;justify-content:end;align-items:center;gap:10px;direction:ltr;box-sizing:border-box;width:100%;max-width:none;margin:0;padding:6px var(--personal-footer-inset) 8px 0;border:0;border-block:1px solid #ded4bd}
  #mediaViewer.personal-photo-desktop #mediaShareActions .media-share-heading{display:none}
  #mediaViewer.personal-photo-desktop #mediaShareActions>:is(a,button)[id]{grid-row:1;box-sizing:border-box;width:40px;min-width:40px;height:44px;min-height:44px;margin:0;padding:5px;background:transparent;border:0}
  #mediaViewer.personal-photo-desktop #mediaShareActions #mediaOriginal{grid-column:7;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;width:auto;padding:8px 15px;border:1px solid #5c6e47;border-radius:8px;background:#5c6e47;color:#fffdf7;font:calc(clamp(14px,1.25vw,18px) * var(--a11y-text-scale,1))/1.35 var(--sans);text-decoration:none;direction:rtl}
