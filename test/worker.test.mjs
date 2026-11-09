@@ -59,6 +59,42 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('small grid thumbnails preserve full originals, metadata and download URLs and invalidate on a pixel edit',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/collections/gallery'),path='/api/media/'+item.id+'/thumbnail?revision=original',bytes=photo.subarray(0,48);
+  const saved=await f.call(path,{method:'POST',body:bytes});assert.equal(saved.status,200);const result=await saved.json();assert.equal(result.item.src,item.src);assert.match(result.item.thumbnailSrc,/thumbnail=1/);assert.equal(result.item.thumbnailSize,48);assert.equal(JSON.stringify(result).includes('thumbnails/'),false);
+  const preview=await f.call(result.item.thumbnailSrc),original=await f.call(item.src);assert.equal((await preview.arrayBuffer()).byteLength,48);assert.deepEqual(Buffer.from(await original.arrayBuffer()),photo);
+  const album=await(await f.call('/api/collections/gallery')).json();assert.equal(album.items[0].thumbnailSrc,result.item.thumbnailSrc);
+  const objects=f.objects.size;assert.equal((await(await f.call(path,{method:'POST',body:bytes})).json()).saved,false);assert.equal(f.objects.size,objects);
+  const edit=await(await photoEdit(f,item)).json();assert.equal(edit.item.thumbnailSrc,undefined);assert.equal((await f.call(path,{method:'POST',body:bytes})).status,409);
+  const fresh=await(await f.call('/api/media/'+item.id+'/thumbnail?revision='+edit.currentVersion,{method:'POST',body:bytes})).json();assert.match(fresh.item.thumbnailSrc,new RegExp(edit.currentVersion));await f.flush();assert.equal(f.objects.size,3,'Original, edited original and current thumbnail remain');
+  f.restart();assert.equal((await(await f.call('/api/media/'+item.id+'/view')).json()).item.thumbnailSrc,fresh.item.thumbnailSrc);
+ }finally{await f.close();}
+});
+test('thumbnail writes enforce existing origin/token, size, type, source revision and deleted-photo checks',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),path='/api/media/'+item.id+'/thumbnail?revision=original';
+  assert.equal((await f.call(path,{method:'POST',body:photo.subarray(0,48),clientHeaders:false})).status,403);
+  assert.equal((await f.call(path,{method:'POST',body:photo.subarray(0,48),headers:{Origin:'https://elsewhere.example'}})).status,403);
+  assert.equal((await f.call(path,{method:'POST',body:photo})).status,400);
+  assert.equal((await f.call(path,{method:'POST',body:Buffer.from('invalid')})).status,415);
+  assert.equal((await f.call(path,{method:'POST',body:Buffer.alloc(1024*1024+1)})).status,413);
+  await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:item.scope}});assert.equal((await f.call(path,{method:'POST',body:photo.subarray(0,48)})).status,404);
+ }finally{await f.close();}
+});
+
+test('photo bytes use a private cache and version validator without fetching storage again, while edits, deletion and ranges stay correct',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/collections/gallery'),first=await f.call(item.src),etag=first.headers.get('ETag');
+  assert.equal(first.status,200);assert.match(first.headers.get('Cache-Control'),/^private, max-age=300, must-revalidate$/);assert.match(etag,/^"photo-[a-f0-9]+"$/);
+  await first.arrayBuffer();const requests=f.network.length;
+  const cached=await f.call(item.src,{headers:{'If-None-Match':'W/'+etag}});assert.equal(cached.status,304);assert.equal(f.network.length,requests);assert.equal(cached.headers.get('ETag'),etag);
+  const range=await f.call(item.src,{headers:{'If-None-Match':etag,Range:'bytes=0-3'}});assert.equal(range.status,206);assert.equal((await range.arrayBuffer()).byteLength,4);
+  const edited=await(await photoEdit(f,item)).json(),fresh=await f.call(edited.item.src,{headers:{'If-None-Match':etag}});assert.equal(fresh.status,200);assert.notEqual(fresh.headers.get('ETag'),etag);await fresh.arrayBuffer();
+  const original=await f.call('/media/'+item.id+'?version=original',{headers:{'If-None-Match':etag}});assert.equal(original.status,304);
+  await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'gallery'}});assert.equal((await f.call(item.src,{headers:{'If-None-Match':etag}})).status,404);
+ }finally{await f.close();}
+});
 
 test('uploaded face tags, event labels, family membership and completion save atomically in every photo album',async()=>{
  const f=fixture();try{

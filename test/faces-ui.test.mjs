@@ -45,15 +45,60 @@ function fixture(detected=[],{desktop=false}={}){
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
  const document=new Node();document.body=new Node('body');document.append(document.body);document.body.append(dialog);document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
  const window=new Node();window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
- let progress,detectionImage;
- const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{progress=onProgress;detectionImage=img;return detected;}};
+ let progress,detectionImage,detectionCalls=0;
+ const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{detectionCalls++;progress=onProgress;detectionImage=img;return detected;}};
  const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:()=>({matches:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);return event;};
- return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
+ return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+
+test('short touch shows the saved name for two seconds; a 550ms hold edits that same face without a second click',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const person={id:'yona',name:'יונה'},saved={...first,id:'saved',personId:'yona',person,revision:'r1'},f=fixture();
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces:[saved]});await f.mount();const hit=f.find('face-hit-buttons').children[0];
+ const pointer={target:hit,pointerId:1,pointerType:'touch',isPrimary:true,button:0,clientX:180,clientY:210};
+ f.emit(f.stage,'pointerdown',pointer);t.mock.timers.tick(100);f.emit(f.stage,'pointerup',pointer);f.emit(f.stage,'click',{...pointer,detail:1});
+ assert.ok(f.find('face-popover face-name'));assert.equal(f.find('face-popover face-picker'),undefined);
+ t.mock.timers.tick(1999);assert.ok(f.find('face-popover face-name'));t.mock.timers.tick(1);assert.equal(f.find('face-popover face-name'),undefined);
+ f.emit(f.stage,'pointerdown',pointer);t.mock.timers.tick(549);assert.equal(f.find('face-popover face-picker'),undefined);t.mock.timers.tick(1);
+ const panel=f.find('face-popover face-picker');assert.ok(panel);assert.match(panel.innerHTML,/יונה/);
+ assert.equal(f.emit(f.stage,'pointerup',pointer).defaultPrevented,true);f.emit(f.stage,'click',{...pointer,detail:1});assert.equal(f.find('face-popover face-picker'),panel);
+ f.faces.clear();
+});
+test('moving, pinching, cancelling or leaving a photo cancels a held edit; untagged faces open immediately on a tap',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const person={id:'yona',name:'יונה'},saved={...first,id:'saved',personId:'yona',person};
+ for(const action of ['move','pinch','cancel','leave','release']){
+  const f=fixture();f.window.FamilyI18n.fetch=async()=>Response.json({faces:[saved]});await f.mount();const hit=f.find('face-hit-buttons').children[0],p={target:hit,pointerId:1,pointerType:'touch',isPrimary:true,clientX:180,clientY:210};
+  f.emit(f.stage,'pointerdown',p);
+  if(action==='move')f.emit(f.stage,'pointermove',{...p,clientX:210});
+  if(action==='pinch')f.emit(f.document,'pointerdown',{...p,pointerId:2,isPrimary:false});
+  if(action==='cancel')f.emit(f.stage,'pointercancel',p);
+  if(action==='leave')f.faces.clear();
+  if(action==='release')f.emit(f.document,'pointerup',p);
+  t.mock.timers.tick(600);assert.equal(f.find('face-popover face-picker'),undefined,action);f.faces.clear();
+ }
+ const f=fixture([first]);await f.mount();const hit=f.find('face-hit-buttons').children[0];f.emit(f.stage,'click',{target:hit,pointerType:'touch',detail:1,clientX:180,clientY:210});assert.ok(f.find('face-popover face-picker'));f.faces.clear();
+});
+test('saved hit buttons survive scan/metadata updates, scroll keeps a touched label, and pointer clicks use the visible hit identity',async()=>{
+ for(const desktop of [false,true]){
+  const f=fixture([],{desktop}),person={id:'yona',name:'יונה'},saved={...first,id:'saved',personId:'yona',person};f.window.FamilyI18n.fetch=async()=>Response.json({faces:[saved]});await f.mount();
+  const hit=f.find('face-hit-buttons').children[0];f.emit(hit,'focus');const bubble=f.find('face-popover face-name');
+  f.progress([second]);f.faces.update({id:'photo',kind:'photo',tags:[person]});assert.equal(f.find('face-hit-buttons').children[0],hit);
+  f.emit(f.dialog,'scroll');assert.equal(f.find('face-popover face-name'),bubble);
+  // A layout change between pointerdown and click must not turn a saved hit into a new face.
+  f.emit(f.stage,'click',{target:hit,pointerType:desktop?'mouse':'touch',detail:1,clientX:-1,clientY:-1});
+  assert.ok(f.find(desktop?'face-popover face-picker':'face-popover face-name'));if(desktop)assert.match(f.find('face-popover face-picker').innerHTML,/יונה/);f.faces.clear();
+ }
+});
+test('completed photos mount saved faces without rerunning the image detector',async()=>{
+ const f=fixture([first]),saved={...first,id:'saved',person:{id:'yona',name:'יונה'},personId:'yona'};
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces:[saved]});await f.mount('complete',{}, {faceSummary:{reviewed:true}});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.detectionCalls,0);assert.equal(f.stage.dataset.faceDetection,'reviewed');assert.equal(f.find('face-hit-buttons').children[0].dataset.faceId,'saved');
+ f.faces.update({id:'complete',kind:'photo',faceSummary:{reviewed:false}});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,1);f.faces.clear();
+});
 
 test('photo navigation waits for fitted zoom and finished face editing, and clears zoom styling on the next photo',async()=>{
  const f=fixture([first]);await f.mount();assert.equal(f.faces.canNavigate(f.stage),true);

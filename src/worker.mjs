@@ -47,6 +47,22 @@ function archiveFormat(head,name){
   throw new HttpError(415,'בחרו תמונה, סרטון MP4, WebM או MOV, או מסמך PDF, Word, TXT או Markdown.');
 }
 function filename(value){return String(value||'family').split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g,'_').slice(0,200)||'family';}
+async function saveThumbnail(request,env,db,ctx,id){
+  const item=await db('media.get',{id}),revision=new URL(request.url).searchParams.get('revision');
+  if(item.kind!=='photo'||item.provider)throw new HttpError(400,'אפשר להכין תצוגה מקדימה לתמונה בלבד.');
+  if(revision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה בינתיים.');
+  if(item.thumbnail?.revision===revision)return json({saved:false,item:(await db('media.public',{id})).item});
+  const bytes=await boundedBody(request,1024*1024),format=sniff(new Uint8Array(bytes).subarray(0,128));
+  if(!['image/jpeg','image/webp'].includes(format.mime)||!bytes.byteLength||item.size&&bytes.byteLength>=item.size)throw new HttpError(400,'התצוגה המקדימה אינה קטנה מהמקור.');
+  const key='thumbnails/'+id+'/'+uid()+format.ext;
+  await putObject(env,key,bytes,bytes.byteLength,format.mime);
+  try{
+    const result=await db('photo.thumbnail',{id,revision,thumbnail:{key,size:bytes.byteLength,mime:format.mime,revision}});
+    if(!result.saved)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));
+    if(result.obsoleteKey)ctx.waitUntil(deleteObject(env,result.obsoleteKey).catch(()=>{}));
+    const {obsoleteKey,...publicResult}=result;return json(publicResult);
+  }catch(error){ctx.waitUntil(deleteObject(env,key).catch(()=>{}));throw error;}
+}
 async function streamUpload(request,maximum,withPhotoMetadata=false){
   const prefix=withPhotoMetadata?request.headers.get(PHOTO_METADATA_HEADER):null,metadataLength=prefix===null?0:Number(prefix);
   if(prefix!==null&&(!/^[0-9]+$/.test(prefix)||!Number.isSafeInteger(metadataLength)||metadataLength<2||metadataLength>MAX_PHOTO_METADATA_BYTES))throw new HttpError(400,'פרטי התמונה אינם תקינים. בחרו את התמונה מחדש.');
@@ -277,11 +293,13 @@ export default {
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia'}));
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
-        const item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]});
+        let item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]});
+        if(url.searchParams.get('thumbnail')==='1'&&!url.searchParams.has('version')&&item.thumbnail?.revision===(item.photoRevision||'original'))item={...item,...item.thumbnail};
         if(item.provider==='youtube')return new Response(null,{status:302,headers:{Location:'https://www.youtube.com/watch?v='+item.youtubeId,'Cache-Control':'no-store'}});
         return await getObject(env,item,request);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/thumbnail$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/ignore$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.ignore',{id:match[1],photoRevision:body.photoRevision,rect:body.rect,ignored:body.ignored,faceId:body.faceId,expectedRevision:body.expectedRevision}));}
         if(path==='/api/collections/cover'){const body=await readJSON(request,2000);return json(await db('collection.cover',{kind:body.collection,mediaId:body.mediaId}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/review$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.review',{id:match[1],photoRevision:body.photoRevision,tagsRevision:body.tagsRevision,complete:body.complete}));}

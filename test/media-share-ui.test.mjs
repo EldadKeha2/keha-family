@@ -7,6 +7,7 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
+const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
@@ -35,7 +36,7 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>new Node(),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
   if(browser)window.addEventListener=browser.addEventListener;
   const context=vm.createContext({window,document,location,navigator,File,Blob,URL,CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
-  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(swipeSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
+  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(presentationSource,context);vm.runInContext(swipeSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
@@ -47,6 +48,31 @@ function pointer(f,type,x,y=100,extra={}){
  return event;
 }
 function swipe(f,dx,extra={}){pointer(f,'pointerdown',200,100,extra);pointer(f,'pointermove',200+dx,103,extra);pointer(f,'pointerup',200+dx,103,extra);}
+test('grid thumbnails never replace the original in the photo viewer, downloads or editing',()=>{
+ const f=fixture(),photo={...f.photo(),thumbnailSrc:'/media/a?thumbnail=1',thumbnailSize:100};f.window.FamilyMedia.open([photo],0,'gallery');
+ assert.equal(f.get('mediaStage').content[0].src,'/media/a');assert.equal(f.get('mediaOriginal').href,'/media/a');
+});
+test('wide Windows-style touch events can swipe after pointer cancellation without double navigation',()=>{
+ const f=fixture();f.get('mediaStage').clientWidth=1440;f.window.FamilyMedia.open([f.photo('a'),f.photo('b'),f.photo('c')],0,'gallery');
+ const touch=(type,x)=>{const p={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[p],changedTouches:[p],target:p.target,cancelable:true,preventDefault(){this.prevented=true;}};f.get('mediaStage').handlers.get(type)(event);return event;};
+ pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointercancel',200);assert.equal(touch('touchmove',340).prevented,true);touch('touchend',340);
+ assert.equal(f.get('mediaOriginal').href,'/media/b');
+ pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointermove',340);pointer(f,'pointerup',340);touch('touchend',340);assert.equal(f.get('mediaOriginal').href,'/media/c','A browser emitting both streams advances just once');
+});
+test('photo preparation keeps the current photo visible, blocks duplicate moves and cannot reopen a closed or changed album',async()=>{
+ for(const action of ['finish','close','another-album','edit-target']){
+  const f=fixture();let finish;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
+  f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>{finish=resolve;});
+  const pending=f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaOriginal').href,'/media/a');assert.equal(f.get('mediaNext').disabled,true);
+  await f.get('mediaNext').handlers.get('click')();
+  if(action==='close')f.close();if(action==='another-album')f.window.FamilyMedia.open([f.photo('c')],0,'photos');
+  if(action==='edit-target')f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'photo-edit',item:{...f.photo('b'),src:'/media/b?v=edited',photoRevision:'edited'}}}));
+  const oldImage=f.document.createElement('img');oldImage.src='/media/b';finish(oldImage);await pending;
+  if(action==='close')assert.equal(f.get('mediaViewer').open,false);
+  else if(action==='another-album')assert.equal(f.get('mediaOriginal').href,'/media/c');
+  else{assert.equal(f.get('mediaOriginal').href,action==='finish'?'/media/b':'/media/b?v=edited');assert.equal(f.get('mediaStage').content[0].src,f.get('mediaOriginal').href);assert.equal(f.get('mediaNext').disabled,false);}
+ }
+});
 test('touch swipes navigate every photo album in both languages and on wide touch screens',()=>{
  for(const english of [false,true])for(const width of [360,1440])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nostalgia','nursery:ruti']){
   const f=fixture({english});f.get('mediaStage').clientWidth=width;

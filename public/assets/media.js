@@ -4,7 +4,7 @@
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const albums=new Map(),albumPages=new Map(),albumCovers=new Map();
-  const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null,paging:false,pageTarget:null,pageDirection:1,navigation:0};
+  const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null,paging:false,pageTarget:null,pageDirection:1,navigation:0,photoLoading:false};
   const identity=item=>item.id||item.file;
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
@@ -23,7 +23,7 @@
     if(cover!==undefined)albumCovers.set(scope,cover);
     if(pagination)albumPages.set(scope,{...pagination});
     if(!$('mediaViewer')?.open||state.scope!==scope)return;
-    if(state.paging&&pagination?.page===state.pageTarget){state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1);else $('mediaViewer').close();return;}
+    if(state.paging&&pagination?.page===state.pageTarget){state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1,{direction:state.pageDirection});else $('mediaViewer').close();return;}
     const id=state.activeId,active=current();let index=items.findIndex(item=>identity(item)===id);
     // Keep the photo being tagged open even after it leaves the untagged filter.
     if(retainCurrent&&!state.deleting&&index<0&&active){items=[...items];index=Math.min(state.index,items.length);items.splice(index,0,active);}
@@ -70,7 +70,8 @@
     $('mediaStage').classList.toggle('photo-swipe-enabled',item.kind==='photo'&&total>1&&!state.paging);
     $('mediaViewerCounter').textContent=`${offset+state.index+1} / ${total}`;
     $('mediaPrevious').hidden=$('mediaNext').hidden=total<2;
-    $('mediaPrevious').disabled=$('mediaNext').disabled=state.paging;
+    $('mediaPrevious').disabled=$('mediaNext').disabled=state.paging||state.photoLoading;
+    $('mediaStage').setAttribute('aria-busy',String(state.photoLoading));
     const link=$('mediaOriginal');link.href=item.watchUrl||item.src;
     const edit=$('editOpenedPhoto');if(edit){edit.hidden=!(item.id&&item.kind==='photo');edit.setAttribute('aria-label',tr('עריכת תמונה','Edit photo'));edit.title=tr('עריכת תמונה','Edit photo');}
     const downloadLabel=item.kind==='video'?tr('הורדת סרטון','Download video'):item.kind==='document'?tr('הורדת מסמך','Download document'):tr('הורדת תמונה','Download photo');
@@ -117,13 +118,15 @@
   }
   function clearStage(){
     photoSwipe?.reset();
+    window.FamilyPhotoPresentation?.cancel();
     renderedVersion=null;
     window.FamilyFaces?.clear();
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
     $('mediaStage').replaceChildren();
   }
-  function show(index){
+  function show(index,{direction=0,image=null}={}){
     if(!state.items.length)return;
+    const ghost=direction&&current()?.kind==='photo'?window.FamilyPhotoPresentation?.snapshot($('mediaStage')):null;
     state.index=(index+state.items.length)%state.items.length;
     const item=current();state.activeId=identity(item);captionEditing=false;clearStage();renderedVersion=versionKey(item);metadata();
     if($('mediaViewer').open)syncMediaRoute(item,true);
@@ -141,7 +144,10 @@
       video.addEventListener('error',()=>{$('mediaPlaybackNote').textContent=I18n.t('הסרטון לא מתנגן בדפדפן הזה. אפשר להוריד את המקור או להעלות MP4 עם H.264.');$('mediaPlaybackNote').hidden=false;});stage.append(video);
       $('mediaPlaybackNote').hidden=true;
     }else if(item.kind==='photo'||item.mime?.startsWith('image/')){
-      const img=document.createElement('img');img.src=item.src+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;window.FamilyFaces?.mount(stage,img,item,{highlightMissing:state.scope==='gallery'&&window.FamilyPortal?.isPartialGallery?.()===true});
+      const img=image||document.createElement('img');img.decoding='async';img.fetchPriority='high';if(!image)img.src=item.src+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;window.FamilyFaces?.mount(stage,img,item,{highlightMissing:state.scope==='gallery'&&window.FamilyPortal?.isPartialGallery?.()===true});
+      const preload=()=>{if($('mediaViewer').open&&current()===item){window.FamilyPhotoPresentation?.preload(state.items,state.index);window.FamilyPhotoThumbnails?.schedule(item,img);}};
+      if(img.complete&&img.naturalWidth)preload();else img.addEventListener('load',preload,{once:true});
+      if(item.kind==='photo')window.FamilyPhotoPresentation?.slide(stage,ghost,direction*(I18n.isEnglish?1:-1));
     }else if(['application/pdf','text/plain','text/markdown'].includes(item.mime)){
       const frame=document.createElement('iframe');frame.src=item.src+'?inline=1';frame.title=I18n.mediaName(item);frame.referrerPolicy='same-origin';stage.append(frame);$('mediaPlaybackNote').hidden=true;
     }else{
@@ -150,7 +156,7 @@
   }
   function open(items,index=0,scope){
     if(!items?.length||index<0)return;
-    state.navigation++;state.paging=false;state.pageTarget=null;state.scope=scope||items[index]?.scope||'shared';state.items=items;albums.set(state.scope,items);
+    state.navigation++;state.paging=false;state.photoLoading=false;state.pageTarget=null;state.scope=scope||items[index]?.scope||'shared';state.items=items;albums.set(state.scope,items);
     state.opener=document.activeElement;
     document.querySelectorAll('video').forEach(video=>video.pause());
     show(index);if(!$('mediaViewer').open){syncMediaRoute(current());$('mediaViewer').showModal();}window.FamilyPhotoViewerLayout?.sync();
@@ -161,8 +167,15 @@
   }
   function openFrom(scope,id){const items=albums.get(scope)||[];open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
   async function step(direction){
-    if(state.paging||!current())return;const next=state.index+direction,page=albumPages.get(state.scope);
-    if(next>=0&&next<state.items.length||state.scope!=='gallery'||!(page?.pages>1)||!window.FamilyPortal?.pageGallery){show(next);return;}
+    if(state.paging||state.photoLoading||!current())return;const next=state.index+direction,page=albumPages.get(state.scope);
+    if(next>=0&&next<state.items.length||state.scope!=='gallery'||!(page?.pages>1)||!window.FamilyPortal?.pageGallery){
+      const target=(next+state.items.length)%state.items.length,item=state.items[target],pending=item.kind==='photo'?window.FamilyPhotoPresentation?.prepare(item):null;
+      if(!pending){show(next,{direction});return;}
+      const navigation=++state.navigation;state.photoLoading=true;metadata();window.FamilyPhotoPresentation?.settle();let image=null;
+      try{image=await pending;}catch{}
+      if(navigation!==state.navigation||!$('mediaViewer').open)return;
+      state.photoLoading=false;const updated=state.items.findIndex(photo=>identity(photo)===identity(item));if(updated>=0)show(updated,{direction,image:versionKey(state.items[updated])===versionKey(item)?image:null});else metadata();return;
+    }
     const navigation=++state.navigation;state.paging=true;state.pageDirection=direction;state.pageTarget=(page.page-1+direction+page.pages)%page.pages+1;metadata();
     try{await window.FamilyPortal.pageGallery(state.pageTarget);}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;if($('mediaViewer').open)metadata();}}
   }
@@ -228,11 +241,12 @@
   function init(){
     const stage=$('mediaStage');
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
-      enabled:()=>$('mediaViewer').open&&current()?.kind==='photo'&&!state.paging&&!captionEditing&&
+      enabled:()=>$('mediaViewer').open&&current()?.kind==='photo'&&!state.paging&&!state.photoLoading&&!captionEditing&&
         (albumPages.get(state.scope)?.total??state.items.length)>1&&
         !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open]')&&
         (window.FamilyFaces?.canNavigate?.(stage)??true),
-      step,isEnglish:()=>I18n.isEnglish
+      step,isEnglish:()=>I18n.isEnglish,
+      move:dx=>window.FamilyPhotoPresentation?.drag(stage,dx),cancel:()=>window.FamilyPhotoPresentation?.settle()
     });
     $('editOpenedPhoto')?.addEventListener('click',async()=>{
       const item=current();if(!item||item.kind!=='photo')return;
@@ -265,6 +279,7 @@
     });
     const refreshProfile=event=>{if($('mediaViewer').open&&state.scope==='personal:'+event.detail.id)metadata();};
     window.addEventListener('family-person-changed',refreshProfile);window.addEventListener('family-profile-changed',refreshProfile);
+    window.addEventListener('family-thumbnail-ready',event=>{const item=event.detail.item;if(item)for(const items of albums.values())for(const photo of items)if(photo.id===item.id){photo.thumbnailSrc=item.thumbnailSrc;photo.thumbnailSize=item.thumbnailSize;}});
     window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.collection&&'cover' in result.collection)albumCovers.set(result.scope,result.collection.cover);if(!result.item)return;for(const [scope,items]of [...albums]){
       const albumRemoval=result.operation==='collection'&&result.included===false&&scope===result.scope&&/^(nursery|wedding):/.test(scope);
       const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope)||albumRemoval,updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);

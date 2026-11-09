@@ -324,6 +324,7 @@ export class FamilyState {
   mediaScope(item){return item.category==='personal'?'personal:'+item.personId:item.category;}
   mediaCollections(item){return [...new Set([...(item.category==='personal'?[]:[item.category]),...this.rows('SELECT collection FROM media_collections WHERE media_id=?',item.id).map(row=>row.collection)])];}
   mediaPublic(item){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,nameEn:item.nameEn||null,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:photoSource(item),...(item.photoRevision?{photoRevision:item.photoRevision}:{}),uploadedAt:item.createdAt,tags:this.tags(item.id),tagsRevision:this.tagsRevision(item.id),
+    ...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision,thumbnailSize:item.thumbnail.size}:{}),
     collections:this.mediaCollections(item),modifiedAt:item.modifiedAt||item.updatedAt||item.photoEditedAt||item.createdAt,
     ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
@@ -597,6 +598,17 @@ export class FamilyState {
         return {saved:true,person:{...person}};
       }
       case 'media.public':return {item:this.mediaPublic(this.media(p.id))};
+      case 'photo.thumbnail':{
+        const item=this.photo(p.id);
+        if(p.revision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה בינתיים.');
+        if(item.thumbnail?.revision===p.revision)return {saved:false,item:this.mediaPublic(item)};
+        if(!p.thumbnail?.key?.startsWith('thumbnails/'+item.id+'/'))throw new HttpError(400,'התצוגה המקדימה אינה תקינה.');
+        const obsoleteKey=item.thumbnail?.key;item.thumbnail=p.thumbnail;
+        // Invalidate album snapshots without treating a derived thumbnail as a
+        // photo edit or changing the "last modified" photo ordering.
+        this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchPeople(this.relatedPeople(item));for(const kind of this.mediaCollections(item))this.touch(kind);
+        return {saved:true,operation:'thumbnail',scope:this.mediaScope(item),item:this.mediaPublic(item),obsoleteKey};
+      }
       case 'photo.versions':return this.photoVersions(this.photo(p.id));
       case 'photo.version':{const item=this.photo(p.id),version=this.photoVersion(item,p.versionId);return {...item,...version,id:item.id};}
       case 'photo.prepare':return this.preparePhoto(p);

@@ -25,6 +25,13 @@ export async function putObject(env,key,body,size,mime,fetcher=fetch){
 export async function deleteObject(env,key,fetcher=fetch){const response=await fetcher(await signedRequest(env,key,{method:'DELETE'}));await response.body?.cancel();}
 export async function getObject(env,item,request,fetcher=fetch){
   const method=request.method==='HEAD'?'HEAD':'GET',headers={};
+  // Only public photo responses use the browser's private cache. Trash previews
+  // and documents keep their existing no-store policy. Keys identify pixels,
+  // so edits and restored versions receive the correct validator.
+  const cachePhoto=item.kind==='photo'&&new URL(request.url).pathname.startsWith('/media/');
+  const etag=cachePhoto?'"photo-'+await sha256(item.key+'|'+item.size+'|'+item.mime)+'"':null;
+  const cacheControl=cachePhoto?'private, max-age=300, must-revalidate':'private, no-store';
+  if(etag&&!request.headers.has('Range')&&request.headers.get('If-None-Match')?.split(',').some(value=>value.trim().replace(/^W\//,'')===etag||value.trim()==='*'))return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':cacheControl}});
   const range=request.headers.get('Range');if(range)headers.Range=range;
   let response=await fetcher(await signedRequest(env,item.key,{method,headers}));
   if([301,302,307,308].includes(response.status)){
@@ -35,8 +42,9 @@ export async function getObject(env,item,request,fetcher=fetch){
     response=await fetcher(new Request(url,{method,headers,redirect:'follow'}));
   }
   if(!response.ok&&![304,416].includes(response.status)){await response.body?.cancel();throw new HttpError(response.status===404?404:502,'הקובץ אינו זמין כרגע.');}
-  const output=new Headers({'Content-Type':item.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Accept-Ranges':'bytes'});
+  const output=new Headers({'Content-Type':item.mime,'Cache-Control':cacheControl,'X-Content-Type-Options':'nosniff','Accept-Ranges':'bytes'});
   for(const name of ['Content-Length','Content-Range','ETag','Last-Modified'])if(response.headers.has(name))output.set(name,response.headers.get(name));
+  if(etag)output.set('ETag',etag);
   if(item.category==='attachment'||item.kind==='document'){const inline=new URL(request.url).searchParams.get('inline')==='1'&&/^(application\/pdf|text\/plain|text\/markdown|image\/(jpeg|png|webp|gif|avif))$/.test(item.mime);output.set('Content-Disposition',`${inline?'inline':'attachment'}; filename*=UTF-8''${encode(item.filename)}`);output.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'self'");}
   return new Response(method==='HEAD'?null:response.body,{status:response.status,headers:output});
 }
