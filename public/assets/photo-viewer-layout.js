@@ -26,17 +26,6 @@
     if(headingLabel===null)$('mediaViewerTitle').removeAttribute('aria-label');else $('mediaViewerTitle').setAttribute('aria-label',headingLabel);
     active=false;photoId=null;
   }
-  function fitOptionalAlbums(){
-    const optional=[...icons.querySelectorAll('[data-photo-album-kind="baby"]')];
-    for(const button of optional)button.hidden=true;
-    const gap=parseFloat(getComputedStyle(icons).columnGap)||0,buttons=[...icons.querySelectorAll('button,a')].filter(node=>node.getBoundingClientRect().width>0);
-    let used=buttons.reduce((total,node)=>total+node.getBoundingClientRect().width,0)+Math.max(0,buttons.length-1)*gap,count=buttons.length;
-    const available=icons.getBoundingClientRect().width;
-    for(const button of optional){
-      if(!button.dataset.photoCollection)continue;button.hidden=false;const width=button.getBoundingClientRect().width,next=used+(count?gap:0)+width;
-      if(next>available+.5)button.hidden=true;else{used=next;count++;}
-    }
-  }
   function sync(){
     if(!viewer||busy)return;busy=true;const focused=document.activeElement;
     try{
@@ -65,7 +54,7 @@
       move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
       if(downloadLabel.textContent!==tr('הורד','Download'))downloadText=downloadLabel.textContent;
       downloadLabel.textContent=tr('הורד','Download');sharing.querySelector('.media-share-heading span').textContent=tr('הורדה ושיתוף','Download & share');
-      arrange(feedback,[controls?.regionsNote,controls?.reviewStatus]);fitOptionalAlbums();
+      arrange(feedback,[controls?.regionsNote,controls?.reviewStatus]);
       const reset=controls?.toolbar?.querySelector('[data-face-zoom-reset]');fit.disabled=!reset||reset.disabled;
       zoomValue.textContent=controls?.toolbar?.querySelector('[data-face-zoom-level]')?.textContent||'100%';
       if(photoId!==item.id){photoId=item.id;strip.scrollLeft=0;}
