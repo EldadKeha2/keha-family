@@ -121,6 +121,15 @@ test('a photo changed or closed during preparation is never shared or attached t
     const f=fixture({defer:true});f.open('a');const pending=f.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.pending.length,1);if(close)f.close();else f.open('b');f.pending[0](new Blob(['old-photo'],{type:'image/jpeg'}));await pending;assert.equal(f.shared.length,0);assert.equal(f.copied.length,0);if(!close)assert.equal(f.get('shareMediaInstagram').disabled,false);
   }
 });
+test('removing the current photo from its own event album advances or closes that album while preserving other albums',()=>{
+ for(const scope of ['wedding:u-root','nursery:yona'])for(const last of [false,true]){
+  const f=fixture(),first={...f.photo('a'),scope:'gallery',collections:['gallery','photos',scope]},next={...f.photo('b'),scope:'gallery',collections:['gallery',scope]};
+  f.window.FamilyMedia.register('gallery',[first,next]);f.window.FamilyMedia.open(last?[first]:[first,next],0,scope);
+  f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'collection',scope,included:false,item:{...first,collections:['gallery','photos']},collection:{items:last?[]:[next],count:last?0:1}}}));
+  assert.equal(f.get('mediaViewer').open,!last);if(!last)assert.equal(f.get('mediaOriginal').href,'/media/b');
+  f.window.FamilyMedia.openFrom('gallery','a');assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a','The original is still available in the family gallery');
+ }
+});
 test('tagging can keep the current photo open while the untagged album updates behind it',()=>{
   const f=fixture();f.open('a');
   const next={id:'b',kind:'photo',src:'/media/b',name:'Next photo',tags:[]};

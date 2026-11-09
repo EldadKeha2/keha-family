@@ -9,7 +9,16 @@
     wedding:'<circle cx="9" cy="14" r="6"/><circle cx="16" cy="14" r="5"/><path d="m6 6 3-4 3 4-3 3Z"/>'
   };
   const personName=id=>window.FamilyApp?.nameOf?.(id)||I.personName?.(window.FAMILY_DATA?.people?.[id])||window.FAMILY_DATA?.people?.[id]?.name||id;
-  function targets(scope,viewer=false){
+  function targets(scope,viewer=false,desktop=false){
+    if(viewer&&desktop&&!scope?.startsWith('personal:')){
+      const family={icon:'family',collection:'photos',label:tr('תמונות משפחתיות','Family photos')};
+      if(scope?.startsWith('nursery:'))return [family,{icon:'baby',collection:scope,removeOnly:true,label:tr('אלבום התינוקייה של ','Baby album for ')+personName(scope.slice(8))}];
+      if(scope?.startsWith('wedding:')){
+        const pair=Object.values(window.FAMILY_DATA?.units||{}).find(unit=>unit.id===scope.slice(8));
+        return [family,{icon:'wedding',collection:scope,removeOnly:true,label:tr('אלבום החתונה של ','Wedding album for ')+(pair?pairName(pair):scope.slice(8))}];
+      }
+      return [family];
+    }
     const id=scope?.startsWith('personal:')?scope.slice(9):null;
     const family=window.FAMILY_DATA,person=id&&(window.FamilyApp?.getPerson?.(id)||family?.people?.[id]);
     const pair=id&&Object.values(family?.units||{}).find(unit=>unit.people?.length===2&&unit.people.includes(id));
@@ -46,14 +55,14 @@
     const label=tr('עמודי החתונות של המתויגים בתמונה','Wedding pages for people in this photo');
     return `<button type="button" class="photo-collection-button" data-photo-wedding-choices data-photo-album-kind="wedding" aria-haspopup="dialog" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg></button>`;
   }
-  function buttons(item,scope,viewer=false){
+  function buttons(item,scope,viewer=false,desktop=false){
     const memberships=items.get(item.id)?.collections||item.collections||[item.scope];
-    return targets(scope,viewer).filter(target=>!viewer||target.icon!=='wedding').map(target=>{
+    return targets(scope,viewer,desktop).filter(target=>!viewer||target.icon!=='wedding'||desktop&&target.removeOnly).map(target=>{
       const active=memberships.includes(target.collection),busy=pending.has(item.id+':'+target.collection);
       const family=target.collection==='photos';
-      const label=target.collection?(active?tr('הסרה מ','Remove from '):tr('הוספה ל','Add to '))+target.label:tr('אין לאדם זה אלבום מתאים: ','No album is available for this person: ')+target.label;
-      return `<button type="button" class="photo-collection-button${family?' photo-collection-family':''}${active?' is-linked':''}" data-photo-collection="${safe(target.collection||'')}" data-photo-album-kind="${target.icon}" aria-label="${safe(label)}" title="${safe(label)}" aria-pressed="${active}" ${busy?'aria-busy="true" ':''}${!target.collection||busy?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true">${icons[target.icon]}</svg>${family?`<span class="photo-collection-name">${target.label}</span>`:''}</button>`;
-    }).join('')+(viewer?weddingControl(item,scope):'');
+      const label=target.collection?(active?tr('הסרה מ','Remove from '):target.removeOnly?tr('התמונה הוסרה מ','Photo removed from '):tr('הוספה ל','Add to '))+target.label:tr('אין לאדם זה אלבום מתאים: ','No album is available for this person: ')+target.label;
+      return `<button type="button" class="photo-collection-button${family?' photo-collection-family':''}${active?' is-linked':''}" data-photo-collection="${safe(target.collection||'')}" data-photo-album-kind="${target.icon}" aria-label="${safe(label)}" title="${safe(label)}" aria-pressed="${active}" ${busy?'aria-busy="true" ':''}${!target.collection||busy||target.removeOnly&&!active?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true">${icons[target.icon]}</svg>${family?`<span class="photo-collection-name">${target.label}</span>`:''}</button>`;
+    }).join('')+(viewer&&(!desktop||scope?.startsWith('personal:'))?weddingControl(item,scope):'');
   }
   function controls(item,scope,{viewer=false}={}){
     if(item.kind!=='photo'||!item.id||(!viewer&&!scope?.startsWith('personal:')))return '';
@@ -62,7 +71,7 @@
   }
   function refresh(){
     for(const group of document.querySelectorAll('[data-collection-photo]')){
-      const item=items.get(group.dataset.collectionPhoto);if(item)group.innerHTML=buttons(item,group.dataset.collectionScope,group.dataset.collectionViewer==='true');
+      const item=items.get(group.dataset.collectionPhoto);if(item)group.innerHTML=buttons(item,group.dataset.collectionScope,group.dataset.collectionViewer==='true',group.dataset.collectionDesktop==='true');
     }
     window.FamilyPhotoViewerLayout?.sync();
   }
@@ -91,5 +100,13 @@
     }
     const button=event.target.closest('[data-photo-collection]');if(button){event.preventDefault();event.stopPropagation();add(button);}
   });
-  window.FamilyPhotoCollections={controls};
+  function setViewerDesktop(enabled){
+    const value=String(enabled===true);
+    for(const group of document.querySelectorAll('[data-collection-photo]')){
+      if(group.dataset.collectionViewer!=='true'||group.dataset.collectionDesktop===value)continue;
+      group.dataset.collectionDesktop=value;
+      const item=items.get(group.dataset.collectionPhoto);if(item)group.innerHTML=buttons(item,group.dataset.collectionScope,true,enabled===true);
+    }
+  }
+  window.FamilyPhotoCollections={controls,setViewerDesktop};
 })();

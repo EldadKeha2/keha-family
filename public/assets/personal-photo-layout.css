@@ -1,4 +1,4 @@
-/* Personal desktop albums only. Phone controls and other gallery layouts stay untouched. */
+/* Shared desktop photo layout for personal, family, wedding and nursery albums. */
 @media(min-width:701px){
  #mediaViewer.personal-photo-desktop{--personal-rail:clamp(48px,5vw,76px);--personal-rail-gap:12px;--personal-rail-height:calc(var(--personal-rail)*3 + var(--personal-rail-gap)*2);width:min(1600px,calc(100vw - 28px));max-height:calc(100dvh - 24px)}
  #mediaViewer.personal-photo-desktop .media-viewer-header{display:grid;grid-template-columns:44px minmax(0,1fr) auto minmax(0,max-content) auto minmax(0,1fr) 44px;align-items:center;gap:20px;direction:ltr;padding:12px 20px;border-bottom:1px solid #ded4bd}
@@ -18,6 +18,7 @@
  #mediaViewer.personal-photo-desktop #personalPhotoLeft{grid-column:1;grid-row:1}
  #mediaViewer.personal-photo-desktop #personalPhotoRight{grid-column:3;grid-row:1}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums{position:absolute;top:var(--personal-albums-top,0px)}
+ #mediaViewer.personal-photo-desktop #personalPhotoAlbums{height:var(--personal-albums-height,var(--personal-rail-height))}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums #mediaViewerCollections{height:100%;margin:0;padding:0}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collections{height:100%;display:flex;flex-direction:column;justify-content:space-between;gap:var(--personal-rail-gap);padding:0}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-button{display:grid;place-items:center;box-sizing:border-box;flex:0 0 var(--personal-rail);width:var(--personal-rail);min-width:0;height:var(--personal-rail);min-height:0;margin:0;padding:10px;border:1px solid #cdbd99;border-radius:9px}
@@ -58,6 +59,8 @@
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #mediaViewerDelete{background:#fff5ef;color:#a34732;border-color:#d8aa99}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #openedProfilePhoto{color:#456f96;background:#eef5fc;border-color:#bdd2e7}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #openedProfilePhoto[aria-pressed=true]{background:#234e78;border-color:#193c60;color:#fff}
+ #mediaViewer.personal-photo-desktop.personal-photo-shared #personalPhotoPrimary #openedProfilePhoto{display:none}
+ #mediaViewer.personal-photo-desktop.personal-photo-shared #personalPhotoPrimary{grid-template-columns:minmax(0,250px);justify-content:end}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit,#personalPhotoTrash){position:absolute;width:var(--personal-rail);height:var(--personal-rail)}
  #mediaViewer.personal-photo-desktop #personalPhotoReview{top:var(--personal-review-top,0px)}
  #mediaViewer.personal-photo-desktop #personalPhotoEdit{top:var(--personal-edit-top,0px)}

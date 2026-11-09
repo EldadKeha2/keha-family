@@ -615,7 +615,9 @@ export class FamilyState {
         if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר להוסיף לאלבומים האלה תמונות בלבד.');
         const included=p.included===undefined?true:p.included;
         if(typeof included!=='boolean')throw new HttpError(400,'בחרו אם להוסיף את התמונה לאלבום או להסיר את השיוך אליו.');
-        if(kind!=='photos'){
+        const removeFromOwnAlbum=included===false&&p.scope===kind&&/^(nursery|wedding):/.test(kind);
+        if(removeFromOwnAlbum&&!this.mediaCollections(item).includes(kind))throw new HttpError(404,'התמונה אינה נמצאת באלבום הזה.');
+        if(kind!=='photos'&&!removeFromOwnAlbum){
           const personId=typeof p.scope==='string'&&p.scope.startsWith('personal:')?p.scope.slice(9):null;
           if(!personId||!this.relatedPeople(item).includes(personId))throw new HttpError(400,'בחרו תמונה מתוך הפרופיל של האדם המתאים.');
           if(kind.startsWith('nursery:')){

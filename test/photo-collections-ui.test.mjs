@@ -61,6 +61,23 @@ test('nursery tooltips identify the profile owner and wedding links identify the
  const f=fixture();f.window.FAMILY_DATA.people.tomer.name='תומר';f.window.FAMILY_DATA.people.shani.name='שני';
  const html=f.window.FamilyPhotoCollections.controls(f.item(),'personal:tomer',{viewer:true});assert.match(html,/title="הוספה לאלבום התינוקייה של תומר"/);assert.match(html,/title="עמוד החתונה של תומר ושני"/);
 });
+test('desktop shared galleries have only family membership while each event album has its own removal control',async()=>{
+ for(const english of [false,true])for(const scope of ['gallery','photos','nursery:tomer','wedding:u-tomer']){
+  const f=fixture(english),g=f.group(f.item('one',['gallery','photos',scope]),scope,true);f.window.FamilyPhotoCollections.setViewerDesktop(true);
+  assert.match(g.innerHTML,/data-photo-album-kind="family"/);assert.doesNotMatch(g.innerHTML,/data-photo-wedding-link|data-photo-wedding-choices/);
+  assert.equal(/data-photo-album-kind="baby"/.test(g.innerHTML),scope.startsWith('nursery:'));assert.equal(/data-photo-album-kind="wedding"/.test(g.innerHTML),scope.startsWith('wedding:'));
+  if(scope.includes(':')){
+   const before=f.item('one',['gallery','photos']),button=f.button(g,scope,true);f.click(button);assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection:scope,scope,included:false});
+   await f.respond(0,before);assert.match(g.innerHTML,new RegExp('data-photo-collection="'+scope+'"[^>]*aria-pressed="false"[^>]*disabled'));
+   assert.doesNotMatch(g.innerHTML,/data-photo-wedding-link|data-photo-wedding-choices/,'Mutation refresh keeps the event-specific desktop controls');
+  }
+ }
+});
+test('returning from desktop to phone restores the existing event buttons and leaves profile controls unchanged',()=>{
+ const f=fixture(),g=f.group(f.item('one',['gallery','nursery:tomer']),'nursery:tomer',true),profile=f.group(f.item('two'),'personal:tomer',true);
+ f.window.FamilyPhotoCollections.setViewerDesktop(true);assert.match(g.innerHTML,/data-photo-collection="nursery:tomer"/);assert.doesNotMatch(g.innerHTML,/data-photo-wedding-link/);assert.match(profile.innerHTML,/data-photo-wedding-link/);
+ f.window.FamilyPhotoCollections.setViewerDesktop(false);assert.doesNotMatch(g.innerHTML,/data-photo-collection="nursery:tomer"/);assert.match(g.innerHTML,/data-photo-wedding-link/);assert.match(profile.innerHTML,/data-photo-wedding-link/);
+});
 test('shared viewers omit baby and wedding shortcuts even when tagged people and the photo owner have albums',()=>{
  for(const english of [false,true]){
   const f=fixture(english);f.window.FAMILY_DATA.units.other={id:'u-other',people:['extra','partner']};

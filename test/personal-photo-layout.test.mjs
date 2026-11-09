@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../public/assets/personal-photo-layout.js',import.meta.url),'utf8');
-function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch=0,scope='personal:avigail',kind='photo',english=false}={}){
+function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch=0,scope='personal:avigail',kind='photo',english=false,installed=false}={}){
  const nodes=new Map();let fits=0,current={id:'one',kind};
  class Node extends EventTarget{
   constructor(tag='div',id=''){super();this.tagName=tag.toUpperCase();this.id=id;this.childNodes=[];this.attributes=new Map();this.textContent='';this.hidden=false;this.disabled=false;this.open=false;this.classes=new Set();this.classList={add:value=>this.classes.add(value),remove:value=>this.classes.delete(value),contains:value=>this.classes.has(value)};const properties=new Map();this.style={setProperty:(key,value)=>properties.set(key,value),getPropertyValue:key=>properties.get(key)||''};}
@@ -21,6 +21,7 @@ function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch
   contains(node){return node===this||this.childNodes.some(child=>child.contains(node));}
   matches(selector){if(selector.startsWith('.'))return this.classes.has(selector.slice(1));if(selector.startsWith('#'))return this.id===selector.slice(1);const attribute=selector.match(/^\[([^=\]]+)(?:="([^"]*)")?\]$/);return attribute?this.attributes.has(attribute[1])&&(attribute[2]===undefined||this.getAttribute(attribute[1])===attribute[2]):this.tagName.toLowerCase()===selector;}
   querySelector(selector){for(const child of this.childNodes){if(child.matches(selector))return child;const found=child.querySelector(selector);if(found)return found;}return null;}
+  querySelectorAll(selector){return this.childNodes.flatMap(child=>[...(child.matches(selector)?[child]:[]),...child.querySelectorAll(selector)]);}
   focus(){document.activeElement=this;}
   click(){if(!this.disabled)this.dispatchEvent(new Event('click'));}
  }
@@ -42,16 +43,26 @@ function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch
  const share=add('mediaShareActions',tools);for(const id of ['shareMediaWhatsApp','shareMediaFacebook','shareMediaMessenger','shareMediaInstagram','shareMediaEmail','copyMediaLink'])add(id,share,'button');
  const tags=add('mediaTagPanel',footer);tags.textContent='Existing people tags';
  const window={FamilyI18n:{isEnglish:english},FamilyMedia:{current:()=>current},FamilyPhotoViewerLayout:{sync(){}},FamilyFaces:{fit(){fits++;}}};
- vm.runInNewContext(source,{document,window,innerHeight:900,getComputedStyle:node=>node.computed||{},navigator:{userAgent:ua,userAgentData:{mobile},maxTouchPoints:touch},matchMedia:()=>({get matches(){return width<=700;}})});
+ vm.runInNewContext(source,{document,window,innerHeight:900,getComputedStyle:node=>node.computed||{},navigator:{userAgent:ua,userAgentData:{mobile},maxTouchPoints:touch,standalone:installed},matchMedia:query=>({get matches(){return query.includes('width')?width<=700:installed;}})});
  const controller={item:current,dialog:viewer,toolbar,regionsButton:region,regionsNote:regionNote,reviewButton:review,reviewStatus:status};
  const api=window.FamilyPersonalPhotoLayout;
  return{nodes,viewer,document,window,api,controller,get:id=>document.getElementById(id),sync:()=>api.sync(controller),get fits(){return fits;},width(value){width=value;},scope(value){viewer.setAttribute('data-media-scope',value);},photo(id,kind='photo'){current={id,kind};controller.item=current;},add};
 }
-test('only computer personal-photo viewers use the new layout; phones and every other gallery keep their controls',()=>{
- for(const options of [{width:390},{width:700},{width:1024,ua:'Android 15 Mobile'},{width:1024,ua:'iPhone'},{width:1024,ua:'Macintosh',touch:5},{width:1024,mobile:true},{scope:'gallery'},{scope:'photos'},{scope:'wedding:parents'},{scope:'nursery:avigail'},{scope:'nostalgia'},{kind:'video'},{kind:'document'}]){
+test('only supported desktop photo contexts use the layout; phones, nostalgia, video and documents retain their controls',()=>{
+ for(const options of [{width:390},{width:700},{width:1024,ua:'Android 15 Mobile'},{width:1024,ua:'iPhone'},{width:1024,ua:'Macintosh',touch:5},{width:1024,mobile:true},{scope:'nostalgia'},{scope:'videos'},{kind:'video'},{kind:'document'}]){
   const f=fixture(options),download=f.get('mediaOriginal'),parent=download.parentNode;f.sync();assert.equal(f.get('personalPhotoFrame'),null,JSON.stringify(options));assert.equal(download.parentNode,parent);assert.equal(f.viewer.getAttribute('aria-labelledby'),'mediaViewerTitle');
  }
  const f=fixture({ua:'Windows NT 10.0',touch:10});f.sync();assert.equal(f.viewer.classList.contains('personal-photo-desktop'),true,'A touch-screen Windows computer still uses the desktop layout');
+});
+test('family, wedding, nursery and personal viewers keep the same structure in desktop browser and installed Windows app',()=>{
+ for(const scope of ['personal:avigail','gallery','photos','wedding:u-noble','nursery:avigail'])for(const english of [false,true])for(const installed of [false,true]){
+  const f=fixture({scope,english,installed});f.sync();assert.equal(f.viewer.classList.contains('personal-photo-desktop'),true,scope);assert.equal(f.viewer.classList.contains('personal-photo-shared'),!scope.startsWith('personal:'));
+  for(const [id,parent]of [['mediaStage','personalPhotoFrame'],['mediaViewerCollections','personalPhotoAlbums'],['editOpenedPhoto','personalPhotoEdit'],['photoMomentTools','personalPhotoInformation'],['editOpenedCaption','personalPhotoPrimary'],['mediaShareActions','personalPhotoBelow']])assert.equal(f.get(id).parentNode.id,parent,scope+' / '+id);
+  assert.equal(f.get('personalPhotoCounter').textContent,english?'Photo 1 of 12':'תמונה 1 מתוך 12');
+ }
+ for(const scope of ['gallery','photos','wedding:u-noble','nursery:avigail'])for(const installed of [false,true])for(const width of [390,700,1024]){
+  const f=fixture({scope,installed,width,ua:'Android 16 Mobile'});f.sync();assert.equal(f.get('personalPhotoFrame'),null,scope+' / '+width);
+ }
 });
 test('personal desktop groups retain actual controls, requested physical order, zoom clicks and focus',()=>{
  for(const english of [false,true]){
@@ -77,7 +88,7 @@ test('late face controls and replaced metadata mount in the right group and swit
  const f=fixture();f.api.sync(null);f.sync();assert.equal(f.controller.reviewButton.parentNode.id,'personalPhotoReview');assert.equal(f.get('editOpenedPhoto').parentNode.id,'personalPhotoEdit');
  const old=f.get('togglePhotoNames');old.remove();const replacement=f.add('togglePhotoNames',f.get('photoMomentTools'),'button');f.get('mediaViewerCounter').textContent='4 / 12';f.get('mediaHeaderCaption').textContent='Updated caption';f.photo('two');f.sync();
  assert.equal(f.get('togglePhotoNames'),replacement);assert.equal(f.get('personalPhotoCounter').textContent,'תמונה 4 מתוך 12');assert.equal(f.get('mediaHeaderCaption').parentNode.id,'personalPhotoHeading');
- f.scope('wedding:parents');f.sync();assert.equal(f.get('personalPhotoFrame'),null);assert.equal(f.get('mediaOriginal').parentNode.id,'mediaViewerTitle');assert.equal(f.get('mediaTagPanel').textContent,'Existing people tags');
+ f.scope('nostalgia');f.sync();assert.equal(f.get('personalPhotoFrame'),null);assert.equal(f.get('mediaOriginal').parentNode.id,'mediaViewerTitle');assert.equal(f.get('mediaTagPanel').textContent,'Existing people tags');
 });
 test('the red side trash uses the exact album removal handler and mirrors its disabled state',()=>{
  const f=fixture();let requests=0;const remove=f.get('mediaViewerDelete');remove.title='Remove from this album';remove.addEventListener('click',()=>requests++);f.sync();

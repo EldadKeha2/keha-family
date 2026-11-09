@@ -256,7 +256,8 @@
     const refreshProfile=event=>{if($('mediaViewer').open&&state.scope==='personal:'+event.detail.id)metadata();};
     window.addEventListener('family-person-changed',refreshProfile);window.addEventListener('family-profile-changed',refreshProfile);
     window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.collection&&'cover' in result.collection)albumCovers.set(result.scope,result.collection.cover);if(!result.item)return;for(const [scope,items]of [...albums]){
-      const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope),updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);
+      const albumRemoval=result.operation==='collection'&&result.included===false&&scope===result.scope&&/^(nursery|wedding):/.test(scope);
+      const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope)||albumRemoval,updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);
       // The visible photo may already be absent from the filtered album. Keep
       // its latest metadata, and pin it through every subsequent tag/scan event.
       if(!remove&&state.scope===scope&&state.activeId===result.item.id)state.items=state.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);

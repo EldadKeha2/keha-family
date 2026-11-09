@@ -449,6 +449,23 @@ test('last-modified gallery order follows tags, face positions, reviews, labels,
   f.restart();assert.equal((await current()).modifiedAt,before.modifiedAt);
  }finally{await f.close();}
 });
+test('event albums can remove their own native and linked photos without deleting originals or allowing unrelated assignments',async()=>{
+ const f=fixture();try{
+  await f.connect();
+  for(const [collection,path]of [['nursery:yona','/api/nursery/yona/upload'],['wedding:u-root','/api/weddings/u-root/upload']])for(const native of [false,true]){
+   const response=await uploadWithDetails(f,native?path:'/api/collections/gallery/upload',{caption:'Keep this original',date:{year:1980},familyPhoto:true,faces:[{personId:'yona',rect:{x:.1,y:.1,width:.2,height:.2}}]});assert.equal(response.status,201);
+   const result=await response.json(),item=result.collection.items.find(item=>item.file===result.file),endpoint='/api/media/'+item.id+'/collections';
+   if(!native)assert.equal((await f.call(endpoint,{method:'POST',body:{scope:'personal:yona',collection,included:true}})).status,200);
+   assert.equal((await f.call(endpoint,{method:'POST',body:{scope:collection,collection,included:true}})).status,400,'The album itself cannot assign a photo to a person or couple');
+   const removed=await f.call(endpoint,{method:'POST',body:{scope:collection,collection,included:false}});assert.equal(removed.status,200,await removed.clone().text());const updated=await removed.json();
+   assert.equal(updated.included,false);assert.equal(updated.scope,collection);assert.ok(!updated.item.collections.includes(collection));assert.ok(updated.item.collections.includes('photos'));assert.equal(updated.item.scope,'gallery');assert.equal(updated.item.caption,item.caption);assert.deepEqual(updated.item.tags,item.tags);assert.deepEqual(updated.item.photoDate,item.photoDate);
+   assert.equal((await f.call(item.src)).status,200);assert.equal(f.database.prepare('SELECT id FROM media_trash WHERE id=?').get(item.id),undefined);assert.equal((await(await f.call('/api/media/'+item.id+'/faces')).json()).faces.length,1);
+   assert.equal((await f.call(endpoint,{method:'POST',body:{scope:collection,collection,included:false}})).status,404,'An unrelated or already removed item cannot be removed through that album');
+   assert.equal((await f.call(endpoint,{method:'POST',body:{scope:'gallery',collection,included:false}})).status,400);
+   f.restart();assert.equal((await f.call(item.src)).status,200);
+  }
+ }finally{await f.close();}
+});
 test('album shortcuts reject wrong people, unrelated weddings, nonphotos and forged writes',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f,'/api/collections/gallery');await setTags(f,item,['tomer']);
