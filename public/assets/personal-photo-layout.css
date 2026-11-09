@@ -12,7 +12,7 @@
  #mediaViewer.personal-photo-desktop #mediaHeaderCaption{display:block;margin:0;padding:0;color:#586044;font:calc(clamp(18px,1.8vw,27px) * var(--a11y-text-scale,1))/1.35 var(--sans);white-space:pre-wrap;overflow-wrap:anywhere}
  #mediaViewer.personal-photo-desktop #mediaHeaderCaption:empty{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoCounter{display:block;margin-top:4px;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);color:#7b745c}
- #mediaViewer.personal-photo-desktop #personalPhotoFrame{display:grid;grid-template-columns:var(--personal-rail) minmax(0,var(--personal-photo-width,1fr)) var(--personal-rail);justify-content:center;gap:12px;align-items:center;direction:ltr;padding:10px 16px;background:#f5f0e4;min-height:calc(var(--personal-rail)*5 + var(--personal-rail-gap)*4)}
+ #mediaViewer.personal-photo-desktop #personalPhotoFrame{--personal-rail-height:calc(var(--personal-rail)*3 + var(--personal-rail-gap)*2);display:grid;grid-template-columns:var(--personal-rail) minmax(0,var(--personal-photo-width,1fr)) var(--personal-rail);justify-content:center;gap:12px;align-items:center;direction:ltr;padding:10px 16px;background:#f5f0e4;min-height:calc(var(--personal-rail)*5 + var(--personal-rail-gap)*4)}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums,#mediaViewer.personal-photo-desktop #personalPhotoZoom{box-sizing:border-box;width:var(--personal-rail);height:var(--personal-rail-height);min-width:0}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoLeft,#personalPhotoRight){position:relative;align-self:stretch;width:var(--personal-rail);min-width:0}
  #mediaViewer.personal-photo-desktop #personalPhotoLeft{grid-column:1;grid-row:1}
@@ -65,7 +65,7 @@
  #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit):empty{display:none}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit,#personalPhotoTrash)>button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:var(--personal-rail);min-width:0;height:var(--personal-rail);min-height:0;padding:10px;border:1px solid #cfc2a5;border-radius:9px;background:#fcf8ee;color:#61734d}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit,#personalPhotoTrash) svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
- #mediaViewer.personal-photo-desktop #personalPhotoTrashButton{color:#a34732;border-color:#d6aaa0;background:#fff4ef}
+ #mediaViewer.personal-photo-desktop #personalPhotoTrash>#personalPhotoTrashButton{color:#a34732;border-color:#d6aaa0;background:#fff4ef}
  #mediaViewer.personal-photo-desktop #personalPhotoTrashButton[hidden]{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-button[aria-pressed=true]{background:#5d743e;border-color:#435a2e;color:#fffdf5}
  #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-badge{fill:#fcf8ee}
