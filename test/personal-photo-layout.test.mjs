@@ -74,7 +74,7 @@ test('a phone resize restores the original controls and ordering and a desktop r
  f.width(1400);f.sync();f.sync();assert.equal(f.get('mediaOriginal').parentNode.id,'mediaShareActions');f.api.restore();assert.equal(f.get('mediaOriginal').parentNode,parents.get('mediaOriginal'));
 });
 test('late face controls and replaced metadata mount in the right group and switching albums restores them',()=>{
- const f=fixture();f.api.sync(null);f.sync();assert.equal(f.controller.reviewButton.parentNode.id,'personalPhotoEditing');
+ const f=fixture();f.api.sync(null);f.sync();assert.equal(f.controller.reviewButton.parentNode.id,'personalPhotoReview');assert.equal(f.get('editOpenedPhoto').parentNode.id,'personalPhotoEdit');
  const old=f.get('togglePhotoNames');old.remove();const replacement=f.add('togglePhotoNames',f.get('photoMomentTools'),'button');f.get('mediaViewerCounter').textContent='4 / 12';f.get('mediaHeaderCaption').textContent='Updated caption';f.photo('two');f.sync();
  assert.equal(f.get('togglePhotoNames'),replacement);assert.equal(f.get('personalPhotoCounter').textContent,'תמונה 4 מתוך 12');assert.equal(f.get('mediaHeaderCaption').parentNode.id,'personalPhotoHeading');
  f.scope('wedding:parents');f.sync();assert.equal(f.get('personalPhotoFrame'),null);assert.equal(f.get('mediaOriginal').parentNode.id,'mediaViewerTitle');assert.equal(f.get('mediaTagPanel').textContent,'Existing people tags');

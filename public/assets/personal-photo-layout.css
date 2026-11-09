@@ -14,17 +14,19 @@
  #mediaViewer.personal-photo-desktop #personalPhotoCounter{display:block;margin-top:4px;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);color:#7b745c}
  #mediaViewer.personal-photo-desktop #personalPhotoFrame{display:grid;grid-template-columns:var(--personal-rail) minmax(0,1fr) var(--personal-rail);gap:clamp(12px,2vw,30px);align-items:center;direction:ltr;padding:10px clamp(12px,3vw,42px);background:#f5f0e4}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums,#mediaViewer.personal-photo-desktop #personalPhotoZoom{box-sizing:border-box;width:var(--personal-rail);height:var(--personal-rail-height);min-width:0}
- #mediaViewer.personal-photo-desktop #personalPhotoAlbums{grid-column:1;grid-row:1;align-self:center}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoLeft,#personalPhotoRight){display:flex;flex-direction:column;align-self:end;gap:var(--personal-rail-gap);width:var(--personal-rail);min-width:0}
+ #mediaViewer.personal-photo-desktop #personalPhotoLeft{grid-column:1;grid-row:1}
+ #mediaViewer.personal-photo-desktop #personalPhotoRight{grid-column:3;grid-row:1}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums #mediaViewerCollections{height:100%;margin:0;padding:0}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collections{height:100%;display:flex;flex-direction:column;justify-content:space-between;gap:var(--personal-rail-gap);padding:0}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-button{display:grid;place-items:center;box-sizing:border-box;flex:0 0 var(--personal-rail);width:var(--personal-rail);min-width:0;height:var(--personal-rail);min-height:0;margin:0;padding:10px;border:1px solid #cdbd99;border-radius:9px}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-name{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums svg{width:32px;height:32px}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-button.is-linked::after{width:16px;height:16px;font-size:12px}
- #mediaViewer.personal-photo-desktop #mediaStage{grid-column:2;grid-row:1;min-width:0;min-height:0;direction:initial;background:#ede5d4;align-self:center}
+ #mediaViewer.personal-photo-desktop #mediaStage{grid-column:2;grid-row:1;min-width:0;min-height:0;direction:initial;background:#ede5d4;align-self:end}
  #mediaViewer.personal-photo-desktop #mediaStage .face-photo-scroll{max-height:clamp(250px,61dvh,760px)}
  #mediaViewer.personal-photo-desktop #mediaStage>img{max-height:61dvh}
- #mediaViewer.personal-photo-desktop #personalPhotoZoom{grid-column:3;grid-row:1;display:grid;grid-template-rows:1.2fr 1fr 24px 1fr;align-items:center;justify-items:center;padding:7px;border:1px solid #cdbd99;border-radius:9px;color:#536441;background:#fcf8ee}
+ #mediaViewer.personal-photo-desktop #personalPhotoZoom{display:grid;grid-template-rows:1.2fr 1fr 24px 1fr;align-items:center;justify-items:center;padding:7px;border:1px solid #cdbd99;border-radius:9px;color:#536441;background:#fcf8ee}
  #mediaViewer.personal-photo-desktop #personalPhotoZoom .face-zoom-toolbar,#mediaViewer.personal-photo-desktop #personalPhotoZoom .face-zoom-toolbar>div{display:contents}
  #mediaViewer.personal-photo-desktop #personalPhotoZoom :is(.face-zoom-help,[data-face-zoom-reset]){display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoFit{grid-row:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;width:100%;min-width:0;min-height:0;height:100%;padding:0;border:0;background:transparent;color:inherit;font:calc(clamp(10px,1vw,13px) * var(--a11y-text-scale,1))/1.2 var(--sans);white-space:normal}
@@ -44,20 +46,21 @@
  #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-label,.face-regions-text){display:inline;min-width:0}
  #mediaViewer.personal-photo-desktop #editPhotoDate{display:grid;grid-template-columns:auto auto;column-gap:7px;row-gap:2px;align-content:center}
  #mediaViewer.personal-photo-desktop #editPhotoDate .photo-taken-date{grid-column:1/-1;font-size:12px;text-align:center;white-space:normal}
- #mediaViewer.personal-photo-desktop #personalPhotoActions{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;gap:clamp(14px,3vw,40px);direction:ltr;padding-bottom:12px}
+ #mediaViewer.personal-photo-desktop #personalPhotoActions{display:block;padding-bottom:16px}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;min-width:0;direction:ltr}
- #mediaViewer.personal-photo-desktop #personalPhotoPrimary>button{display:flex;align-items:center;justify-content:center;gap:9px;box-sizing:border-box;width:100%;max-width:none;min-width:0;min-height:56px;margin:0;padding:10px 14px;border:1px solid #cfc5aa;border-radius:8px;background:#f4f3e9;color:#727858;font:calc(clamp(13px,1.35vw,19px) * var(--a11y-text-scale,1))/1.35 var(--sans);white-space:normal}
+ #mediaViewer.personal-photo-desktop #personalPhotoPrimary>button{display:flex;align-items:center;justify-content:center;gap:10px;box-sizing:border-box;width:100%;max-width:none;min-width:0;min-height:64px;margin:0;padding:13px 18px;border:1px solid #cfc5aa;border-radius:8px;background:#f4f3e9;color:#727858;font:calc(clamp(15px,1.45vw,21px) * var(--a11y-text-scale,1))/1.35 var(--sans);white-space:normal}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary>button svg{width:24px;height:24px;flex:0 0 24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #mediaViewerDelete{background:#fff5ef;color:#a34732;border-color:#d8aa99}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #openedProfilePhoto{color:#456f96;background:#eef5fc;border-color:#bdd2e7}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #openedProfilePhoto[aria-pressed=true]{background:#234e78;border-color:#193c60;color:#fff}
- #mediaViewer.personal-photo-desktop #personalPhotoEditing{display:flex;align-items:center;gap:12px;min-width:0;padding-left:20px;border-left:1px solid #d8cbb0;direction:ltr}
- #mediaViewer.personal-photo-desktop #personalPhotoEditing>button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:50px;min-width:50px;height:50px;min-height:50px;padding:9px;border:1px solid #cfc2a5;border-radius:8px;background:#fcf8ee;color:#61734d}
- #mediaViewer.personal-photo-desktop #personalPhotoEditing svg{width:29px;height:29px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
- #mediaViewer.personal-photo-desktop #personalPhotoEditing .face-review-button[aria-pressed=true]{background:#5d743e;border-color:#435a2e;color:#fffdf5}
- #mediaViewer.personal-photo-desktop #personalPhotoEditing .face-review-badge{fill:#fcf8ee}
- #mediaViewer.personal-photo-desktop #personalPhotoEditing .face-review-button[aria-pressed=true] .face-review-badge{fill:#5d743e}
- #mediaViewer.personal-photo-desktop #personalPhotoEditing .face-review-text{display:none}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit){width:var(--personal-rail);height:var(--personal-rail)}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit):empty{display:none}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit)>button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:var(--personal-rail);min-width:0;height:var(--personal-rail);min-height:0;padding:10px;border:1px solid #cfc2a5;border-radius:9px;background:#fcf8ee;color:#61734d}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoReview,#personalPhotoEdit) svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+ #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-button[aria-pressed=true]{background:#5d743e;border-color:#435a2e;color:#fffdf5}
+ #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-badge{fill:#fcf8ee}
+ #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-button[aria-pressed=true] .face-review-badge{fill:#5d743e}
+ #mediaViewer.personal-photo-desktop #personalPhotoReview .face-review-text{display:none}
  #mediaViewer.personal-photo-desktop #mediaShareActions{display:grid;grid-template-columns:repeat(6,40px) max-content;grid-auto-rows:auto;justify-content:end;align-items:center;gap:10px;direction:ltr;box-sizing:border-box;width:100%;max-width:none;margin:0;padding:10px 0 12px;border:0;border-block:1px solid #ded4bd}
  #mediaViewer.personal-photo-desktop #mediaShareActions .media-share-heading{display:none}
  #mediaViewer.personal-photo-desktop #mediaShareActions>:is(a,button)[id]{grid-row:1;box-sizing:border-box;width:40px;min-width:40px;height:44px;min-height:44px;margin:0;padding:5px;background:transparent;border:0}
@@ -76,7 +79,7 @@
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback>[hidden]{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback>:not([hidden]){display:block;margin:6px 0;white-space:normal;font-size:14px}
  #mediaViewer.personal-photo-desktop #openedCaptionForm{margin:12px 0}
- #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoEditing) [hidden]{display:none}
- #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoEditing) button:disabled{opacity:.55;cursor:wait}
- #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoEditing,#personalPhotoZoom) button:focus-visible{outline:2px solid #8d9d70;outline-offset:3px}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit) [hidden]{display:none}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit) button:disabled{opacity:.55;cursor:wait}
+ #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit,#personalPhotoZoom) button:focus-visible{outline:2px solid #8d9d70;outline-offset:3px}
 }
