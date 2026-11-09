@@ -44,11 +44,17 @@ def call(origin, path, body=None):
     headers = {"User-Agent": "Keha-Photo-Preparation/1"}
     if body is not None:
         headers.update({"Origin": origin, "X-Family-Token": "family-public-v1", "Content-Type": "image/webp"})
-    with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=90) as response:
-        data = response.read(MAX_SOURCE_BYTES + 1)
-        if len(data) > MAX_SOURCE_BYTES:
-            raise ValueError("Photo exceeds source limit")
-        return data
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=90) as response:
+                data = response.read(MAX_SOURCE_BYTES + 1)
+                if len(data) > MAX_SOURCE_BYTES:
+                    raise ValueError("Photo exceeds source limit")
+                return data
+        except urllib.error.HTTPError as error:
+            if error.code not in [429, 502, 503, 504] or attempt == 2:
+                raise
+            time.sleep(1 + attempt)
 
 
 def process(origin, item):
@@ -82,6 +88,11 @@ def main():
     while True:
         try:
             batch = json.loads(call(origin, "/api/photo-assets?limit=20"))
+            if batch.get("version", 0) < 2:
+                if time.monotonic() - started > 180:
+                    raise RuntimeError("Waiting for the matching photo backend")
+                time.sleep(5)
+                continue
             break
         except urllib.error.HTTPError as error:
             if error.code not in [404, 503] or time.monotonic() - started > 180:
@@ -107,7 +118,7 @@ def main():
                 except Exception as error:
                     failed += 1
                     # Log categories only, never family names, photo URLs or bytes.
-                    print(json.dumps({"photo_error": type(error).__name__}), flush=True)
+                    print(json.dumps({"photo_error": type(error).__name__, "status": getattr(error, "code", None)}), flush=True)
             print(json.dumps({"processed": processed, "assets_saved": saved, "failed": failed}), flush=True)
     remaining = json.loads(call(origin, "/api/photo-assets?limit=1"))["pending"]
     print(json.dumps({"processed": processed, "assets_saved": saved, "failed": failed, "remaining": remaining}), flush=True)

@@ -28,7 +28,7 @@ export async function getObject(env,item,request,fetcher=fetch){
   // Only public photo responses use the browser's private cache. Trash previews
   // and documents keep their existing no-store policy. Keys identify pixels,
   // so edits and restored versions receive the correct validator.
-  const cachePhoto=item.kind==='photo'&&new URL(request.url).pathname.startsWith('/media/');
+  const cachePhoto=(item.kind||(item.mime?.startsWith('image/')?'photo':null))==='photo'&&new URL(request.url).pathname.startsWith('/media/');
   const etag=cachePhoto?'"photo-'+await sha256(item.key+'|'+item.size+'|'+item.mime)+'"':null;
   const cacheControl=cachePhoto?'private, max-age=300, must-revalidate':'private, no-store';
   if(etag&&!request.headers.has('Range')&&request.headers.get('If-None-Match')?.split(',').some(value=>value.trim().replace(/^W\//,'')===etag||value.trim()==='*'))return new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':cacheControl}});

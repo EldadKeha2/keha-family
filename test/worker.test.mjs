@@ -63,7 +63,7 @@ test('the background asset queue prepares all albums without exposing names or s
  const f=fixture();try{
   await f.connect();const a=await taggedUpload(f,'/api/collections/gallery'),b=await taggedUpload(f,'/api/collections/photos');
   for(const item of [a,b]){const row=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data);row.size=2000000;f.database.prepare('UPDATE media SET data=? WHERE id=?').run(JSON.stringify(row),item.id);}
-  const first=await(await f.call('/api/photo-assets?limit=1')).json();assert.equal(first.version,1);assert.equal(first.pending,2);assert.equal(first.items.length,1);assert.equal(first.items[0].thumbnail,true);assert.equal(first.items[0].preview,true);assert.equal(JSON.stringify(first).includes('example-owner'),false);assert.equal('tags' in first.items[0],false);
+  const first=await(await f.call('/api/photo-assets?limit=1')).json();assert.equal(first.version,2);assert.equal(first.pending,2);assert.equal(first.items.length,1);assert.equal(first.items[0].thumbnail,true);assert.equal(first.items[0].preview,true);assert.equal(JSON.stringify(first).includes('example-owner'),false);assert.equal('tags' in first.items[0],false);
   const second=await(await f.call('/api/photo-assets?limit=1&after='+first.next)).json();assert.equal(second.items.length,1);assert.notEqual(second.items[0].id,first.items[0].id);
   const before=(await(await f.call('/api/media/'+a.id+'/view')).json()).item.modifiedAt;
   await f.call('/api/media/'+a.id+'/thumbnail?revision=original',{method:'POST',body:photo.subarray(0,48)});
@@ -71,6 +71,13 @@ test('the background asset queue prepares all albums without exposing names or s
   assert.deepEqual(Buffer.from(await(await f.call(a.src)).arrayBuffer()),photo);assert.equal((await(await f.call(result.item.previewSrc)).arrayBuffer()).byteLength,64);assert.equal((await(await f.call('/api/photo-assets')).json()).pending,1);
   const edited=await(await photoEdit(f,a,{bytes:Buffer.concat([photo,Buffer.alloc(1500000)])})).json();assert.equal(edited.item.previewSrc,undefined);assert.equal(edited.item.thumbnailSrc,undefined);assert.equal((await(await f.call('/api/photo-assets')).json()).pending,2);
   assert.equal((await f.call('/api/media/'+a.id+'/preview?revision=original',{method:'POST',body:photo.subarray(0,64)})).status,409);
+ }finally{await f.close();}
+});
+test('legacy images without an explicit kind can receive derived assets and use image caching',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),stored=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data);delete stored.kind;stored.size=2000000;f.database.prepare('UPDATE media SET data=? WHERE id=?').run(JSON.stringify(stored),item.id);
+  for(const variant of ['thumbnail','preview']){const response=await f.call('/api/media/'+item.id+'/'+variant+'?revision=original',{method:'POST',body:photo.subarray(0,48)});assert.equal(response.status,200,await response.clone().text());assert.equal((await response.json()).item.kind,'photo');}
+  assert.equal((await(await f.call('/api/photo-assets')).json()).pending,0);const original=await f.call(item.src);assert.match(original.headers.get('Cache-Control'),/^private, max-age=300/);await original.arrayBuffer();
  }finally{await f.close();}
 });
 test('derived photos use the edge cache after the live existence check, without caching originals or weakening deletion and range handling',async()=>{

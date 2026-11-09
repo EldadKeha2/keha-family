@@ -49,7 +49,7 @@ function archiveFormat(head,name){
 function filename(value){return String(value||'family').split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g,'_').slice(0,200)||'family';}
 async function saveThumbnail(request,env,db,ctx,id,variant='thumbnail'){
   const item=await db('media.get',{id}),revision=new URL(request.url).searchParams.get('revision');
-  if(item.kind!=='photo'||item.provider)throw new HttpError(400,'אפשר להכין תצוגה מקדימה לתמונה בלבד.');
+  if((item.kind||(item.mime?.startsWith('image/')?'photo':null))!=='photo'||item.provider)throw new HttpError(400,'אפשר להכין תצוגה מקדימה לתמונה בלבד.');
   if(revision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה בינתיים.');
   if(item[variant]?.revision===revision)return json({saved:false,item:(await db('media.public',{id})).item});
   const bytes=await boundedBody(request,(variant==='preview'?4:1)*1024*1024),format=sniff(new Uint8Array(bytes).subarray(0,128));
