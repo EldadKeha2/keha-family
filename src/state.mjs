@@ -13,6 +13,7 @@ import {jachnunScore,JACHNUN_SCORE_LIMIT} from './jachnun-scores.mjs';
 import {rexScore,REX_SCORE_LIMIT} from './rex-scores.mjs';
 import {netoTetrisScore,NETO_TETRIS_SCORE_LIMIT} from './neto-tetris-scores.mjs';
 import {rutiHouseScore,RUTI_HOUSE_SCORE_LIMIT,RUTI_HOUSE_SCORE_FIELDS} from './ruti-house-scores.mjs';
+import {quizScore,QUIZ_SCORE_LIMIT,QUIZ_GAMES} from './quiz-scores.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
@@ -42,6 +43,10 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS memorial_candles(person_id TEXT NOT NULL,period TEXT NOT NULL,visitor_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(person_id,period,visitor_id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS trivia_questions(id TEXT PRIMARY KEY,language TEXT NOT NULL,data TEXT NOT NULL,created_at TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS trivia_question_language ON trivia_questions(language,created_at)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS quiz_runs(id TEXT PRIMARY KEY,game TEXT NOT NULL,questions TEXT NOT NULL,created_at TEXT NOT NULL)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS quiz_runs_created ON quiz_runs(created_at)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS quiz_scores(id TEXT PRIMARY KEY,game TEXT NOT NULL,name TEXT NOT NULL,score INTEGER NOT NULL,correct INTEGER NOT NULL,total INTEGER NOT NULL,elapsed_ms INTEGER NOT NULL,answers TEXT NOT NULL,created_at TEXT NOT NULL)');
+    this.sql.exec('CREATE INDEX IF NOT EXISTS quiz_scores_ranking ON quiz_scores(game,score DESC,correct DESC,elapsed_ms,created_at,id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS jachnun_scores(id TEXT PRIMARY KEY,name TEXT NOT NULL,score INTEGER NOT NULL,head_id TEXT NOT NULL,created_at TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS jachnun_scores_ranking ON jachnun_scores(score DESC,created_at,id)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS rex_scores(id TEXT PRIMARY KEY,name TEXT NOT NULL,score INTEGER NOT NULL,head_id TEXT NOT NULL,basket TEXT NOT NULL,created_at TEXT NOT NULL)');
@@ -142,12 +147,20 @@ export class FamilyState {
         if(table==='stories')this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
       }
     }
-    for(const table of ['jachnun_scores','rex_scores','neto_tetris_scores','ruti_house_scores']){
+    for(const table of ['jachnun_scores','rex_scores','neto_tetris_scores','ruti_house_scores','quiz_scores']){
       for(const row of this.rows('SELECT id,name FROM '+table+' WHERE name LIKE ? OR name LIKE ?','%חריזי%','%Harizi%')){
         const name=correctPersonName(row.name);if(name!==row.name)this.sql.exec('UPDATE '+table+' SET name=? WHERE id=?',name,row.id);
       }
     }
     this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',nameCorrectionKey,'applied');
+  }
+  quizRun(game,data){
+    if(data.questions.length!==10)return {...data,runId:null};
+    const runId=uid(),questions=data.questions.map(q=>({id:q.id,correctId:q.correctId,optionIds:q.options.map(option=>option.id)}));
+    // Expire abandoned rounds; saved rounds retain their key for safe retries.
+    this.sql.exec('DELETE FROM quiz_runs WHERE created_at<? AND NOT EXISTS(SELECT 1 FROM quiz_scores s WHERE s.id=quiz_runs.id)',new Date(Date.now()-86400000).toISOString());
+    this.sql.exec('INSERT INTO quiz_runs(id,game,questions,created_at) VALUES(?,?,?,?)',runId,game,JSON.stringify(questions),new Date().toISOString());
+    return {...data,runId};
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
   person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');return JSON.parse(row.data);}
@@ -515,11 +528,24 @@ export class FamilyState {
         const rank=this.rows('SELECT count(*) AS n FROM ruti_house_scores s JOIN ruti_house_scores own ON own.id=? WHERE s.score>own.score OR (s.score=own.score AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id)))',entry.id)[0].n+1;
         return {saved:true,id:entry.id,rank,...this.run('game.ruti-house.scores')};
       }
-      case 'game.kinship':return {questions:makeKinshipQuiz(family,this.run('people').people),available:kinshipPool(family).length,required:10};
+      case 'game.quiz.scores':{
+        if(!QUIZ_GAMES.includes(p.game))throw new HttpError(400,'המשחק אינו נתמך.');
+        return {scores:this.rows('SELECT id,name,score,correct,total,elapsed_ms AS elapsedMs,created_at AS createdAt FROM quiz_scores WHERE game=? ORDER BY score DESC,correct DESC,elapsed_ms,created_at,id LIMIT ?',p.game,QUIZ_SCORE_LIMIT),limit:QUIZ_SCORE_LIMIT};
+      }
+      case 'game.quiz.score.add':{
+        const run=typeof p.requestId==='string'?this.rows('SELECT game,questions FROM quiz_runs WHERE id=?',p.requestId)[0]:null;
+        if(!run||run.game!==p.game)throw new HttpError(400,'הסיבוב אינו זמין לשמירת שיא. התחילו משחק חדש.');
+        const entry=quizScore(p,JSON.parse(run.questions)),answers=JSON.stringify(entry.answers),previous=this.rows('SELECT game,name,score,answers FROM quiz_scores WHERE id=?',entry.id)[0];
+        if(previous&&(previous.game!==entry.game||previous.name!==entry.name||previous.score!==entry.score||previous.answers!==answers))throw new HttpError(409,'התוצאה של המשחק הזה כבר נשמרה.');
+        if(!previous)this.sql.exec('INSERT INTO quiz_scores(id,game,name,score,correct,total,elapsed_ms,answers,created_at) VALUES(?,?,?,?,?,?,?,?,?)',entry.id,entry.game,entry.name,entry.score,entry.correct,entry.total,entry.elapsedMs,answers,new Date().toISOString());
+        const rank=this.rows('SELECT count(*) AS n FROM quiz_scores s JOIN quiz_scores own ON own.id=? WHERE s.game=own.game AND (s.score>own.score OR (s.score=own.score AND (s.correct>own.correct OR (s.correct=own.correct AND (s.elapsed_ms<own.elapsed_ms OR (s.elapsed_ms=own.elapsed_ms AND (s.created_at<own.created_at OR (s.created_at=own.created_at AND s.id<own.id))))))))',entry.id)[0].n+1;
+        return {saved:true,id:entry.id,rank,...this.run('game.quiz.scores',{game:entry.game})};
+      }
+      case 'game.kinship':return this.quizRun('kinship',{questions:makeKinshipQuiz(family,this.run('people').people),available:kinshipPool(family).length,required:10});
       case 'game.trivia':{
         const language=triviaLanguage(p.language),people=this.run('people').people,custom=this.rows('SELECT id,data FROM trivia_questions WHERE language=? ORDER BY random() LIMIT 30',language).map(row=>({id:row.id,...JSON.parse(row.data)}));
         const questions=mixTriviaQuestions(makeTriviaQuiz(family,people),custom);
-        return {questions:questions.length===10?questions:[],available:triviaPool(family,people).pool.length+this.rows('SELECT count(*) n FROM trivia_questions WHERE language=?',language)[0].n,required:10};
+        return this.quizRun('trivia',{questions:questions.length===10?questions:[],available:triviaPool(family,people).pool.length+this.rows('SELECT count(*) n FROM trivia_questions WHERE language=?',language)[0].n,required:10});
       }
       case 'trivia.question.add':{
         const question=validateTriviaQuestion(p),previous=this.rows('SELECT data FROM trivia_questions WHERE id=?',p.requestId)[0];
@@ -536,7 +562,7 @@ export class FamilyState {
         const tags=new Map();
         if(rows.length){const ids=rows.map(row=>JSON.parse(row.data).id);for(const row of this.rows('SELECT media_id,person_id FROM media_tags WHERE media_id IN ('+ids.map(()=>'?').join(',')+')',...ids)){if(!tags.has(row.media_id))tags.set(row.media_id,[]);tags.get(row.media_id).push(row.person_id);}}
         const questions=(missing?makeMissingQuiz:makeQuiz)(rows.map(row=>{const item=JSON.parse(row.data);return {id:item.id,kind:'photo',tags:tags.get(item.id)||[]};}),roster);
-        return {questions:missing||questions.length===10?questions:[],available:questions.length,required:missing?1:10};
+        return this.quizRun(missing?'missing':'photos',{questions:missing||questions.length===10?questions:[],available:questions.length,required:missing?1:10});
       }
       case 'health':this.rows('SELECT value FROM meta WHERE id=?',correctionKey);return {available:true};
       case 'people':{

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {quizGrade} from '../public/assets/quiz.mjs';
+import {QUIZ_ROUND_MS,quizScoreSummary} from '../public/assets/quiz-scoring.mjs';
 import {makeChickQuiz,withinChickTarget} from '../public/assets/chick.mjs';
 import {webcrypto} from 'node:crypto';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
@@ -11,7 +12,7 @@ const source=(await readFile(new URL('../public/assets/games.js',import.meta.url
 const questions=Array.from({length:10},(_,i)=>({id:'photo-'+i,src:'/media/photo-'+i,correctId:'p0',options:Array.from({length:4},(_,j)=>({id:'p'+j,name:'אדם '+j,nameEn:'Person '+j}))}));
 const kinshipQuestions=questions.map(q=>({...q,kind:'kinship',subject:{id:'rivi',name:'ריוי גנדלמן',nameEn:'Revital Gandelman',gender:'f',profile:'/media/rivi'},reference:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha',gender:'m',profile:'/media/eldad'},options:[{id:'p0',name:'בת דודה',nameEn:'First cousin'},{id:'p1',name:'אחות',nameEn:'Sister'},{id:'p2',name:'אחיינית',nameEn:'Niece'},{id:'p3',name:'נכדה',nameEn:'Granddaughter'}]}));
 const triviaQuestions=questions.map(q=>({...q,kind:'trivia',subject:kinshipQuestions[0].subject,prompt:'באיזו שנה נולדה ריוי גנדלמן?',promptEn:'In which year was Revital Gandelman born?',options:q.options.map((o,i)=>({...o,name:String(1970+i),nameEn:String(1970+i)}))}));
-function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false}={}){
+function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false,scoreSaveFailures=0,scoreLoadFailures=0}={}){
   let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null,northMounts=0,northPauses=0,northBack=null,netoMounts=0,netoPauses=0,netoBack=null,rutiMounts=0,rutiPauses=0,rutiBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
   const chickQuestions=makeChickQuiz(()=>.5);
   class Node{
@@ -37,7 +38,7 @@ function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoI
   nodes.get('gameShareFallback').hidden=true;
   const document={visibilityState:'visible',getElementById:id=>nodes.get(id),addEventListener:(kind,callback)=>documentEvents.set(kind,callback)};
   const browser=navigation?browserHistory(entryUrl||'https://family.test/?lang='+(english?'en-US':'he')+'#games'):null;let view='games';
-  const window={location:browser?.location||{origin:'https://family.test',pathname:'/',href:entryUrl||'https://family.test/?media=private-image&lang=he#games'},FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:english,language:english?'en-US':'he',personName:p=>english?p?.nameEn:p?.name,error:String,fetch:async(path,options)=>{requests.push(path);if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push({path,body});return {ok:true,json:async()=>({saved:true,language:body.language})};}const base=path.split('?')[0],selected=base.endsWith('relationships')?kinshipQuestions:base.endsWith('/trivia')?triviaQuestions:questions;return {ok:true,json:async()=>({questions:selected.slice(0,count).map(q=>customTrivia&&base.endsWith('/trivia')?{...q,subject:null,prompt:'שאלה מותאמת <script>',promptEn:'Custom question <script>'}:q),available:count})};}},FamilyApp:{getView:()=> 'games'}};
+  const window={location:browser?.location||{origin:'https://family.test',pathname:'/',href:entryUrl||'https://family.test/?media=private-image&lang=he#games'},FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:english,language:english?'en-US':'he',personName:p=>english?p?.nameEn:p?.name,error:String,fetch:async(path,options)=>{requests.push(path);if(path.endsWith('/scores')){if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push({path,body});if(scoreSaveFailures-->0)return {ok:false,json:async()=>({})};return {ok:true,json:async()=>({saved:true,rank:1,scores:[{id:body.requestId,name:body.name,score:body.score,correct:10,total:10,elapsedMs:body.answers.reduce((sum,a)=>sum+a.elapsedMs,0)}]})};}if(scoreLoadFailures-->0)return {ok:false,json:async()=>({})};return {ok:true,json:async()=>({scores:[],limit:20})};}if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push({path,body});return {ok:true,json:async()=>({saved:true,language:body.language})};}const base=path.split('?')[0],selected=base.endsWith('relationships')?kinshipQuestions:base.endsWith('/trivia')?triviaQuestions:questions;return {ok:true,json:async()=>({questions:selected.slice(0,count).map(q=>customTrivia&&base.endsWith('/trivia')?{...q,subject:null,prompt:'שאלה מותאמת <script>',promptEn:'Custom question <script>'}:q),available:count,runId:count===10?'a'.repeat(32):null})};}},FamilyApp:{getView:()=> 'games'}};
   if(browser){
     window.addEventListener=browser.addEventListener;window.FamilyApp.getView=()=>view;
     window.FamilyApp.setView=(next,sync=true)=>{if(sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyGames?.activate(next);};
@@ -46,7 +47,7 @@ function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoI
   const navigator={clipboard:{async writeText(value){if(clipboardError)throw Error('Clipboard unavailable');copied.push(value);}}};
   if(nativeShare)navigator.share=async data=>{shared.push(data);if(shareError)throw Object.assign(Error('Share unavailable'),{name:shareError});};
   const FakeDate=class extends Date{static now(){return now;}};
-  const context=vm.createContext({window,document,navigator,URL,location:browser?.location,history:browser?.history,matchMedia:()=>({matches:phone}),crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},mountRutiHouse(_root,onBack){rutiMounts++;rutiBack=onBack;},pauseRutiHouse(){rutiPauses++;},quizGrade,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
+  const context=vm.createContext({window,document,navigator,URL,location:browser?.location,history:browser?.history,matchMedia:()=>({matches:phone}),crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},mountRutiHouse(_root,onBack){rutiMounts++;rutiBack=onBack;},pauseRutiHouse(){rutiPauses++;},quizGrade,QUIZ_ROUND_MS,quizScoreSummary,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);
   documentEvents.get('DOMContentLoaded')();
   const root=nodes.get('familyGamesContent'),flush=()=>new Promise(resolve=>setImmediate(resolve));
@@ -56,7 +57,7 @@ function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoI
     openTrivia:()=>click('[data-game-start]',{dataset:{gameStart:'trivia',gameHome:'trivia'}}),
     click,input(id,value){nodes.get(id).value=value;root.handlers.get('input')({target:{id,value}});},
     correct(index){root.handlers.get('change')({target:{dataset:{triviaCorrect:String(index)}}});},
-    async submit(){root.handlers.get('submit')({preventDefault(){},target:{matches:()=>true}});await flush();},
+    async submit(selector='[data-trivia-question-form]'){root.handlers.get('submit')({preventDefault(){},target:{matches:s=>s===selector}});await flush();},
     find:(x,y)=>click('[data-game-find-stage]',nodes.get('chickSceneStage'),1,{clientX:x*1000,clientY:y*700}),
     next:()=>click('[data-game-find-next]'),
     zoom:()=>click('[data-game-find-zoom]',new Node()),
@@ -85,7 +86,7 @@ test('each answer advances immediately without correctness, score, or a next but
     assert.equal(f.round,String(i));assert.doesNotMatch(f.html,/data-game-next|data-game-feedback|class="game-score"|game-option (?:correct|incorrect)/);
     await f.choose();
   }
-  assert.match(f.html,/data-game-result/);assert.match(f.html,/<strong>100<\/strong>/);assert.match(f.html,/10 תשובות נכונות מתוך 10/);assert.equal(f.intervals.size,0);f.advance(60000);assert.match(f.html,/<strong>100<\/strong>/);
+  assert.match(f.html,/data-game-result/);assert.match(f.html,/<b>100%<\/b>/);assert.match(f.html,/10 תשובות נכונות מתוך 10/);assert.equal(f.intervals.size,0);f.advance(60000);assert.match(f.html,/<b>100%<\/b>/);
 });
 test('timeouts count as zero and all ten timed-out rounds finish with feedback only at the end',async()=>{
   const f=fixture();await f.start();f.advance(150000);assert.match(f.html,/data-game-result/);assert.match(f.html,/<strong>0<\/strong>/);assert.match(f.html,/10 תמונות הסתיימו ללא תשובה בזמן/);assert.equal(f.intervals.size,0);
@@ -93,7 +94,7 @@ test('timeouts count as zero and all ten timed-out rounds finish with feedback o
 test('a late answer, old image callback, stale click, or double click cannot score or skip an extra round',async()=>{
   const f=fixture();await f.start();const old=f.nodes.get('familyGamePhoto');f.jump(15001);await f.choose();assert.equal(f.round,'1');
   f.advance(5000);f.load(old);assert.equal(f.seconds,'10');await f.choose('p0',0);assert.equal(f.round,'1');await f.choose('p0',1,2);assert.equal(f.round,'1');
-  for(let i=1;i<10;i++)await f.choose();assert.match(f.html,/<strong>90<\/strong>/);assert.match(f.html,/תמונה אחת הסתיימה ללא תשובה בזמן/);
+  for(let i=1;i<10;i++)await f.choose();assert.match(f.html,/<b>90%<\/b>/);assert.match(f.html,/תמונה אחת הסתיימה ללא תשובה בזמן/);
 });
 test('leaving the game stops callbacks, preserves the deadline, and only expires the current round when returning',async()=>{
   const f=fixture();await f.start();f.advance(5000);f.window.FamilyGames.activate('tree');assert.equal(f.intervals.size,0);f.jump(30000);f.window.FamilyGames.activate('games');assert.equal(f.round,'1');assert.equal(f.seconds,'15');assert.equal(f.intervals.size,1);
@@ -107,7 +108,7 @@ test('players can choose either game, and the relationship quiz shows two profil
     const f=fixture({english});assert.match(f.html,/data-game-start="photos"/);assert.match(f.html,/data-game-start="kinship"/);
     await f.start('kinship');assert.equal(f.requests[0],'api/games/relationships');assert.equal(f.seconds,'15');assert.match(f.html,/src="\/media\/rivi"/);assert.match(f.html,/src="\/media\/eldad"/);
     for(let i=0;i<10;i++){assert.equal(f.round,String(i));assert.doesNotMatch(f.html,/kinship-review|class="game-score"|data-game-feedback/);await f.choose();}
-    assert.match(f.html,/<strong>100<\/strong>/);assert.match(f.html,/kinship-review/);assert.match(f.html,english?/Revital Gandelman is Eldad Keha’s first cousin/:/ריוי גנדלמן היא בת דודה של אלדד קהא/);assert.equal(f.intervals.size,0);
+    assert.match(f.html,/<b>100%<\/b>/);assert.match(f.html,/kinship-review/);assert.match(f.html,english?/Revital Gandelman is Eldad Keha’s first cousin/:/ריוי גנדלמן היא בת דודה של אלדד קהא/);assert.equal(f.intervals.size,0);
     await f.lobby();assert.match(f.html,/data-game-start="photos"/);assert.equal(f.intervals.size,0);await f.start('photos');assert.equal(f.requests.at(-1),'api/games/who-is-it');
   }
 });
@@ -121,9 +122,9 @@ test('all four games provide a ten-question review and localized score sharing o
     if(game==='missing')assert.match(f.html,english?/Who’s missing\?/:/מי חסר\?/);
     if(game==='trivia'){assert.match(f.html,english?/In which year was Revital/:/באיזו שנה נולדה ריוי/);assert.match(f.html,/src="\/media\/rivi"/);}
     for(let i=0;i<10;i++){assert.doesNotMatch(f.html,/game-result-sharing|data-game-review-question|class="game-score"/);await f.choose(i<6?'p0':'p1');}
-    assert.equal((f.html.match(/data-game-review-question=/g)||[]).length,10);assert.match(f.html,/<strong>60<\/strong>/);assert.match(f.html,/game-share-whatsapp/);assert.match(f.html,/game-share-email/);assert.match(f.html,/data-game-share-messenger/);
+    assert.equal((f.html.match(/data-game-review-question=/g)||[]).length,10);assert.match(f.html,/<b>60%<\/b>/);assert.match(f.html,/game-share-whatsapp/);assert.match(f.html,/game-share-email/);assert.match(f.html,/data-game-share-messenger/);
     if(['photos','missing'].includes(game)){assert.equal((f.html.match(/class="game-review-photo"/g)||[]).length,10);assert.match(f.html,/loading="lazy"/);}
-    const href=f.html.match(/href="(https:\/\/wa\.me\/\?text=[^"]+)"/)[1],text=new URL(href).searchParams.get('text');assert.match(text,/60\/100/);assert.match(text,english?/6 correct answers/:/6 תשובות נכונות/);assert.ok(text.includes('https://family.test/?lang='+(english?'en-US':'he')+'#games'));assert.doesNotMatch(text,/private-image|media=/);
+    const href=f.html.match(/href="(https:\/\/wa\.me\/\?text=[^"]+)"/)[1],text=new URL(href).searchParams.get('text');assert.match(text,/1,200/);assert.match(text,english?/6 correct out of/:/6 תשובות נכונות/);assert.ok(text.includes('https://family.test/?lang='+(english?'en-US':'he')+'#games'));assert.doesNotMatch(text,/private-image|media=/);
     const email=f.html.match(/href="(mailto:[^"]+)"/)[1].replaceAll('&amp;','&'),params=new URLSearchParams(email.split('?')[1]);assert.equal(params.get('body'),text);assert.ok(params.get('subject'));
     assert.equal(f.intervals.size,0);
   }
@@ -136,19 +137,46 @@ test('Messenger shares the complete result natively or copies it for the Messeng
   for(const nativeShare of [true,false]){
     const f=fixture({nativeShare});await f.messenger();assert.equal(f.shared.length,0);assert.equal(f.copied.length,0);
     await f.start('missing');for(let i=0;i<10;i++)await f.choose();await f.messenger();
-    if(nativeShare){assert.equal(f.prevented,true);assert.equal(f.shared.length,1);assert.match(f.shared[0].title,/מי חסר/);assert.match(f.shared[0].text,/100\/100/);assert.equal(f.shared[0].url,'https://family.test/?lang=he#games');}
-    else{assert.equal(f.prevented,false,'The Messenger link opens via the normal user click');assert.equal(f.copied.length,1);assert.match(f.copied[0],/100\/100/);assert.match(f.nodes.get('gameShareStatus').textContent,/התוצאה הועתקה/);}
+    if(nativeShare){assert.equal(f.prevented,true);assert.equal(f.shared.length,1);assert.match(f.shared[0].title,/מי חסר/);assert.match(f.shared[0].text,/2,000/);assert.equal(f.shared[0].url,'https://family.test/?lang=he#games/missing');}
+    else{assert.equal(f.prevented,false,'The Messenger link opens via the normal user click');assert.equal(f.copied.length,1);assert.match(f.copied[0],/2,000/);assert.match(f.nodes.get('gameShareStatus').textContent,/התוצאה הועתקה/);}
   }
 });
 test('share cancellation stays quiet and unavailable sharing or clipboard exposes selectable result text',async()=>{
   for(const setup of [{nativeShare:true,shareError:'AbortError'},{nativeShare:true,shareError:'NotAllowedError'},{clipboardError:true}]){
     const f=fixture(setup);await f.start('trivia');for(let i=0;i<10;i++)await f.choose();await f.messenger();
     if(setup.shareError==='AbortError'){assert.equal(f.nodes.get('gameShareStatus').textContent,'');assert.equal(f.nodes.get('gameShareFallback').hidden,true);}
-    else{assert.equal(f.nodes.get('gameShareFallback').hidden,false);assert.match(f.nodes.get('gameShareFallback').value,/100\/100/);assert.match(f.nodes.get('gameShareFallback').value,/טריוויה משפחתית/);}
+    else{assert.equal(f.nodes.get('gameShareFallback').hidden,false);assert.match(f.nodes.get('gameShareFallback').value,/2,000/);assert.match(f.nodes.get('gameShareFallback').value,/טריוויה משפחתית/);}
   }
 });
 test('missing-person games work with the available group photos and calculate score and sharing with the actual total',async()=>{
-  const f=fixture({count:1});await f.start('missing');assert.match(f.html,/1 \/ 1/);await f.choose();assert.match(f.html,/<strong>100<\/strong>/);assert.match(f.html,/1 תשובה נכונה מתוך 1/);assert.equal((f.html.match(/data-game-review-question=/g)||[]).length,1);
+  const f=fixture({count:1});await f.start('missing');assert.match(f.html,/1 \/ 1/);await f.choose();assert.match(f.html,/<b>100%<\/b>/);assert.match(f.html,/1 תשובה נכונה מתוך 1/);assert.equal((f.html.match(/data-game-review-question=/g)||[]).length,1);
+});
+test('all four timed quizzes distinguish equally accurate fast and slow rounds without revealing points during play',async()=>{
+  for(const game of ['photos','kinship','missing','trivia']){
+    for(const [delay,expected] of [[1500,'1,900'],[7500,'1,500']]){
+      const f=fixture();await f.start(game);
+      for(let i=0;i<10;i++){f.advance(delay);assert.doesNotMatch(f.html,/class="game-score"|quiz-score-entry|data-game-review-question/);await f.choose();}
+      assert.match(f.html,new RegExp('<strong>'+expected+'</strong>'));assert.match(f.html,/10 תשובות נכונות מתוך 10/);assert.match(f.html,/בונוס מהירות/);assert.match(f.html,/data-quiz-score-form/);assert.equal(f.requests.filter(path=>!path.endsWith('/scores')).length,1);
+      f.input('quizScoreName','אלדד');await f.submit('[data-quiz-score-form]');const saved=f.writes.at(-1);assert.equal(saved.body.score,Number(expected.replace(',','')));assert.equal(saved.body.answers.length,10);assert.equal(saved.body.answers[0].elapsedMs,delay);assert.match(f.nodes.get('quizScoreEntry').innerHTML,/נשמרה/);
+    }
+  }
+});
+test('photo download time is excluded from speed points and short missing-person rounds do not enter the leaderboard',async()=>{
+  const f=fixture({autoImages:false});await f.start('photos');
+  for(let i=0;i<10;i++){f.advance(45000);f.load();f.advance(1500);await f.choose();}
+  assert.match(f.html,/<strong>1,900<\/strong>/);f.input('quizScoreName','Player');await f.submit('[data-quiz-score-form]');assert.ok(f.writes[0].body.answers.every(a=>a.elapsedMs===1500));
+  const practice=fixture({count:2});await practice.start('missing');await practice.choose();await practice.choose();assert.match(practice.html,/<strong>400<\/strong>/);assert.doesNotMatch(practice.html,/data-quiz-score-form/);assert.match(practice.html,/סיבוב אימון קצר/);
+});
+test('leaderboards can be viewed from the lobby and a failed score save keeps the same run and name for retry',async()=>{
+  const f=fixture({scoreSaveFailures:1,scoreLoadFailures:1});assert.match(f.html,/data-quiz-board="trivia"/);
+  await f.click('[data-quiz-board]',{dataset:{quizBoard:'trivia'}});assert.equal(f.requests.at(-1),'api/games/trivia/scores');assert.match(f.nodes.get('quizLeaderboard').innerHTML,/הטבלה לא נטענה/);
+  await f.click('[data-quiz-refresh]',{dataset:{quizRefresh:'trivia'}});assert.match(f.nodes.get('quizLeaderboard').innerHTML,/הטבלה מחכה/);
+  await f.start('trivia');for(let i=0;i<10;i++)await f.choose();f.input('quizScoreName','Player <script>');await f.submit('[data-quiz-score-form]');assert.match(f.nodes.get('quizScoreEntry').innerHTML,/התוצאה לא נשמרה/);assert.match(f.nodes.get('quizScoreEntry').innerHTML,/Player &lt;script&gt;/);
+  await f.submit('[data-quiz-score-form]');assert.equal(f.writes.length,2);assert.deepEqual(f.writes[0],f.writes[1]);assert.match(f.nodes.get('quizScoreEntry').innerHTML,/נשמרה/);assert.match(f.nodes.get('quizLeaderboard').innerHTML,/Player &lt;script&gt;/);assert.doesNotMatch(f.nodes.get('quizLeaderboard').innerHTML,/<script>/);
+  await f.submit('[data-quiz-score-form]');assert.equal(f.writes.length,2);
+});
+test('wrong fast answers and timeouts earn zero speed points',async()=>{
+  const f=fixture();await f.start('kinship');for(let i=0;i<9;i++)await f.choose('p1');f.advance(15000);assert.match(f.html,/<strong>0<\/strong>/);assert.match(f.html,/0 תשובות נכונות מתוך 10/);f.input('quizScoreName','Player');await f.submit('[data-quiz-score-form]');assert.equal(f.writes[0].body.score,0);assert.equal(f.writes[0].body.answers.at(-1).selectedId,null);assert.equal(f.writes[0].body.answers.at(-1).elapsedMs,15000);
 });
 test('the illustrated hunt gives sixty seconds after the image loads and immediate feedback when a target is found',async()=>{
   for(const english of [false,true]){

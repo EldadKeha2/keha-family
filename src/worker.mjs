@@ -192,6 +192,13 @@ export default {
       }
       if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);
       if(path==='/api/games/jachnun/head-request')return await headRequestRoute(request,env);
+      const quizScores=/^\/api\/games\/(who-is-it|relationships|who-is-missing|trivia)\/scores$/.exec(path);
+      if(quizScores){
+        const game={'who-is-it':'photos',relationships:'kinship','who-is-missing':'missing',trivia:'trivia'}[quizScores[1]];
+        if(request.method==='GET')return json(await db('game.quiz.scores',{game}));
+        if(request.method==='POST')return json(await db('game.quiz.score.add',{...await readJSON(request,8192),game}));
+        throw new HttpError(405,'הפעולה אינה נתמכת.');
+      }
       if(path==='/api/games/jachnun/scores'){
         if(request.method==='GET')return json(await db('game.jachnun.scores'));
         if(request.method==='POST')return json(await db('game.jachnun.score.add',await readJSON(request,4096)));
