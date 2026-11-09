@@ -47,8 +47,9 @@ test('every personal photo links to the owner wedding, even if the photo has no 
 test('shared viewers omit baby and wedding shortcuts even when tagged people and the photo owner have albums',()=>{
  for(const english of [false,true]){
   const f=fixture(english);f.window.FAMILY_DATA.units.other={id:'u-other',people:['extra','partner']};
-  for(const scope of ['gallery','photos','link:gallery','link:photos']){
-   const photo={...f.item(),personId:'tomer',tags:[{id:'tomer'},{id:'shani'},{id:'extra'}]},group=f.group(photo,scope,true);
+  const id='a'.repeat(32);
+  for(const scope of ['gallery','photos','link:gallery','link:photos','link:'+id]){
+   const photo={...f.item(id),personId:'tomer',tags:[{id:'tomer'},{id:'shani'},{id:'extra'}]},group=f.group(photo,scope,true);
    assert.doesNotMatch(group.innerHTML,/data-photo-album-kind="(?:baby|wedding)"|data-photo-wedding-choices/);
    assert.match(group.innerHTML,/data-photo-collection="photos"/);
    f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'tags',item:photo}}));

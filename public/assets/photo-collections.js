@@ -24,17 +24,17 @@
     items.set(item.id,{...item,collections:[...collections],confirmed});
     if(items.size>512)items.delete(items.keys().next().value);
   }
-  function weddingTargets(item,scope){
+  function weddingTargets(scope){
     const context=scope?.replace(/^link:/,''),family=window.FAMILY_DATA;
-    if(context==='gallery'||context==='photos')return [];
     const owner=context?.startsWith('personal:')?context.slice(9):context?.startsWith('nursery:')?context.slice(8):null;
-    const people=new Set(owner?[owner]:[...(item.tags||[]).map(person=>person.id),...(item.personId?[item.personId]:[])]);
-    return Object.values(family?.units||{}).filter(pair=>pair.people?.length===2&&(context?.startsWith('wedding:')?pair.id===context.slice(8):pair.people.some(id=>people.has(id))));
+    const wedding=context?.startsWith('wedding:')?context.slice(8):null;
+    if(!owner&&!wedding)return [];
+    return Object.values(family?.units||{}).filter(pair=>pair.people?.length===2&&(owner?pair.people.includes(owner):pair.id===wedding));
   }
   const pairName=pair=>pair.people.map(id=>window.FamilyApp?.nameOf?.(id)||I.personName?.(window.FAMILY_DATA.people[id])||window.FAMILY_DATA.people[id]?.name||id).join(tr(' ו',' & '));
   function weddingLink(pair,withName=false){const label=tr('עמוד החתונה של ','Wedding page for ')+pairName(pair);return `<a class="photo-collection-button" data-photo-wedding-link href="#weddings/${encodeURIComponent(pair.id)}" data-photo-album-kind="wedding" aria-label="${safe(label)}" title="${safe(label)}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg>${withName?`<span>${safe(pairName(pair))}</span>`:''}</a>`;}
   function weddingControl(item,scope){
-    const pairs=weddingTargets(item,scope);if(!pairs.length)return '';
+    const pairs=weddingTargets(scope);if(!pairs.length)return '';
     if(pairs.length===1)return weddingLink(pairs[0]);
     const label=tr('עמודי החתונות של המתויגים בתמונה','Wedding pages for people in this photo');
     return `<button type="button" class="photo-collection-button" data-photo-wedding-choices data-photo-album-kind="wedding" aria-haspopup="dialog" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons.wedding}</svg></button>`;
@@ -80,7 +80,7 @@
     const choices=event.target.closest('[data-photo-wedding-choices]');if(choices){
       event.preventDefault();const group=choices.closest('[data-collection-photo]'),item=items.get(group?.dataset.collectionPhoto);if(!item)return;
       let dialog=document.getElementById('photoWeddingChoices');if(!dialog){dialog=document.createElement('dialog');dialog.id='photoWeddingChoices';dialog.className='portal-dialog';dialog.setAttribute('aria-labelledby','photoWeddingChoicesTitle');document.body.append(dialog);}
-      dialog.innerHTML=`<button type="button" class="dialog-close" data-close-photo-weddings aria-label="${tr('סגירה','Close')}">×</button><h2 id="photoWeddingChoicesTitle">${tr('לאיזה עמוד חתונה לעבור?','Choose a wedding page')}</h2><div class="photo-wedding-options">${weddingTargets(item,group.dataset.collectionScope).map(pair=>weddingLink(pair,true)).join('')}</div>`;dialog.showModal();return;
+      dialog.innerHTML=`<button type="button" class="dialog-close" data-close-photo-weddings aria-label="${tr('סגירה','Close')}">×</button><h2 id="photoWeddingChoicesTitle">${tr('לאיזה עמוד חתונה לעבור?','Choose a wedding page')}</h2><div class="photo-wedding-options">${weddingTargets(group.dataset.collectionScope).map(pair=>weddingLink(pair,true)).join('')}</div>`;dialog.showModal();return;
     }
     const button=event.target.closest('[data-photo-collection]');if(button){event.preventDefault();event.stopPropagation();add(button);}
   });
