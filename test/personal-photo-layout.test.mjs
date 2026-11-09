@@ -6,7 +6,7 @@ const source=await readFile(new URL('../public/assets/personal-photo-layout.js',
 function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch=0,scope='personal:avigail',kind='photo',english=false}={}){
  const nodes=new Map();let fits=0,current={id:'one',kind};
  class Node extends EventTarget{
-  constructor(tag='div',id=''){super();this.tagName=tag.toUpperCase();this.id=id;this.childNodes=[];this.attributes=new Map();this.textContent='';this.hidden=false;this.disabled=false;this.open=false;this.classes=new Set();this.classList={add:value=>this.classes.add(value),remove:value=>this.classes.delete(value),contains:value=>this.classes.has(value)};}
+  constructor(tag='div',id=''){super();this.tagName=tag.toUpperCase();this.id=id;this.childNodes=[];this.attributes=new Map();this.textContent='';this.hidden=false;this.disabled=false;this.open=false;this.classes=new Set();this.classList={add:value=>this.classes.add(value),remove:value=>this.classes.delete(value),contains:value=>this.classes.has(value)};const properties=new Map();this.style={setProperty:(key,value)=>properties.set(key,value),getPropertyValue:key=>properties.get(key)||''};}
   get isConnected(){return this===document.body||Boolean(this.parentNode?.isConnected);}
   get firstChild(){return this.childNodes[0]||null;}
   get nextSibling(){const a=this.parentNode?.childNodes||[];return a[a.indexOf(this)+1]||null;}
@@ -24,7 +24,7 @@ function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch
   focus(){document.activeElement=this;}
   click(){if(!this.disabled)this.dispatchEvent(new Event('click'));}
  }
- const document={readyState:'complete',activeElement:null,createElement:tag=>new Node(tag),createComment:()=>new Node('comment'),getElementById:id=>document.body.id===id?document.body:document.body.querySelector('#'+id)};
+ const document={readyState:'complete',activeElement:null,documentElement:{clientWidth:1400},createElement:tag=>new Node(tag),createComment:()=>new Node('comment'),getElementById:id=>document.body.id===id?document.body:document.body.querySelector('#'+id)};
  document.body=new Node('body');
  const add=(id,parent,tag='div',className='')=>{const node=new Node(tag,id);if(className)node.classes.add(className);nodes.set(id,node);parent.append(node);return node;};
  const viewer=add('mediaViewer',document.body,'dialog');viewer.open=true;viewer.setAttribute('aria-labelledby','mediaViewerTitle');viewer.setAttribute('data-media-scope',scope);
@@ -42,7 +42,7 @@ function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch
  const share=add('mediaShareActions',tools);for(const id of ['shareMediaWhatsApp','shareMediaFacebook','shareMediaMessenger','shareMediaInstagram','shareMediaEmail','copyMediaLink'])add(id,share,'button');
  const tags=add('mediaTagPanel',footer);tags.textContent='Existing people tags';
  const window={FamilyI18n:{isEnglish:english},FamilyMedia:{current:()=>current},FamilyPhotoViewerLayout:{sync(){}},FamilyFaces:{fit(){fits++;}}};
- vm.runInNewContext(source,{document,window,navigator:{userAgent:ua,userAgentData:{mobile},maxTouchPoints:touch},matchMedia:()=>({get matches(){return width<=700;}})});
+ vm.runInNewContext(source,{document,window,innerHeight:900,getComputedStyle:node=>node.computed||{},navigator:{userAgent:ua,userAgentData:{mobile},maxTouchPoints:touch},matchMedia:()=>({get matches(){return width<=700;}})});
  const controller={item:current,dialog:viewer,toolbar,regionsButton:region,regionsNote:regionNote,reviewButton:review,reviewStatus:status};
  const api=window.FamilyPersonalPhotoLayout;
  return{nodes,viewer,document,window,api,controller,get:id=>document.getElementById(id),sync:()=>api.sync(controller),get fits(){return fits;},width(value){width=value;},scope(value){viewer.setAttribute('data-media-scope',value);},photo(id,kind='photo'){current={id,kind};controller.item=current;},add};
@@ -78,4 +78,18 @@ test('late face controls and replaced metadata mount in the right group and swit
  const old=f.get('togglePhotoNames');old.remove();const replacement=f.add('togglePhotoNames',f.get('photoMomentTools'),'button');f.get('mediaViewerCounter').textContent='4 / 12';f.get('mediaHeaderCaption').textContent='Updated caption';f.photo('two');f.sync();
  assert.equal(f.get('togglePhotoNames'),replacement);assert.equal(f.get('personalPhotoCounter').textContent,'תמונה 4 מתוך 12');assert.equal(f.get('mediaHeaderCaption').parentNode.id,'personalPhotoHeading');
  f.scope('wedding:parents');f.sync();assert.equal(f.get('personalPhotoFrame'),null);assert.equal(f.get('mediaOriginal').parentNode.id,'mediaViewerTitle');assert.equal(f.get('mediaTagPanel').textContent,'Existing people tags');
+});
+test('the red side trash uses the exact album removal handler and mirrors its disabled state',()=>{
+ const f=fixture();let requests=0;const remove=f.get('mediaViewerDelete');remove.title='Remove from this album';remove.addEventListener('click',()=>requests++);f.sync();
+ const shortcut=f.get('personalPhotoTrashButton');assert.equal(shortcut.getAttribute('aria-label'),remove.title);shortcut.click();assert.equal(requests,1);
+ remove.disabled=true;f.sync();assert.equal(shortcut.disabled,true);shortcut.click();assert.equal(requests,1);
+ remove.hidden=true;f.sync();assert.equal(shortcut.hidden,true);f.api.restore();assert.equal(f.get('personalPhotoTrashButton'),null);
+});
+test('photo-fit geometry hugs the rendered image, centers both rails and keeps the red trash above bottom-right editing',()=>{
+ const f=fixture();f.sync();const frame=f.get('personalPhotoFrame');frame.clientWidth=1200;frame.computed={columnGap:'12px',paddingLeft:'16px',paddingRight:'16px'};
+ const image=f.add('actualPhoto',f.get('mediaStage'),'img');image.naturalWidth=1200;image.naturalHeight=800;image.getBoundingClientRect=()=>({top:40,bottom:540,width:750,height:500});
+ f.controller.image=image;f.controller.scroller={computed:{maxHeight:'500px'},getBoundingClientRect:()=>({top:40,bottom:540,width:750,height:500})};f.get('personalPhotoRight').getBoundingClientRect=()=>({top:40});f.sync();
+ const value=key=>parseFloat(frame.style.getPropertyValue(key)),rail=value('--personal-rail'),zoom=rail*3+24,left=rail*4+36;
+ assert.equal(value('--personal-photo-width'),750);assert.ok(Math.abs(value('--personal-albums-top')+left/2-250)<.01);assert.ok(Math.abs(value('--personal-zoom-top')+zoom/2-250)<.01);
+ assert.ok(Math.abs(value('--personal-edit-top')+rail-500)<.01);assert.ok(value('--personal-trash-top')+rail+11.9<=value('--personal-edit-top'));assert.ok(value('--personal-zoom-top')+zoom+11.9<=value('--personal-trash-top'));
 });
