@@ -84,18 +84,20 @@ def main():
     if urllib.parse.urlparse(origin).scheme != "https":
         raise ValueError("HTTPS origin required")
     started = time.monotonic()
-    # A push starts this job alongside the site's own deployment.
+    # A push starts this job alongside the site's own deployment. Active
+    # Durable Objects may retain the previous code for five minutes after it.
+    backend_deadline = started + 900
     while True:
         try:
             batch = json.loads(call(origin, "/api/photo-assets?limit=20"))
             if batch.get("version", 0) < 2:
-                if time.monotonic() - started > 180:
+                if time.monotonic() > backend_deadline:
                     raise RuntimeError("Waiting for the matching photo backend")
                 time.sleep(5)
                 continue
             break
         except urllib.error.HTTPError as error:
-            if error.code not in [404, 503] or time.monotonic() - started > 180:
+            if error.code not in [404, 503] or time.monotonic() > backend_deadline:
                 raise
             time.sleep(5)
     items = []
