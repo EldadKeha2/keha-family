@@ -3,7 +3,7 @@
 .photo-edit-toolbar .photo-edit-family-choice{margin:0;min-height:44px;flex-shrink:0}
 .photo-edit-toolbar .photo-edit-family-text{font-size:13px}
 .photo-edit-toolbar>button svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.photo-edit-face-tools{display:inline-flex;align-items:center}
+.photo-edit-face-tools{display:inline-flex;align-items:center;flex-wrap:wrap;gap:7px}
 .photo-upload-editor:not(.is-face-tagging) .face-hit-buttons,.photo-upload-editor:not(.is-face-tagging) .face-selection{display:none}
 .photo-upload-editor.is-face-tagging .face-hit{outline:1.5px dashed #ffd76a;outline-offset:1px;background:#ffce4c10}
 .photo-edit-crop-layer.is-editing{z-index:6}

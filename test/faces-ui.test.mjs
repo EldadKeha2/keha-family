@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import * as geometryModule from '../public/assets/face-geometry.mjs';
 import {crowdPhotoFaces} from './helpers/crowd-photo.mjs';
+import {createUploadFaceAdapter,faceDraftPeople} from '../public/assets/photo-upload-faces.mjs';
 
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
@@ -427,4 +428,45 @@ test('the upload wizard uses the same backslash shortcut without writing a draft
  await f.mount('draft',{adapter,reviewHost:f.title,reviewLabel:true,zoom:false});
  for(const complete of [true,false]){assert.equal(f.emit(f.document,'keydown',{key:'\\',target:f.stage}).defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(reviewed,complete);assert.equal(f.find('face-review-button')['aria-pressed'],String(complete));}
  enabled=false;assert.equal(f.emit(f.document,'keydown',{key:'\\',target:f.stage}).defaultPrevented,false);assert.equal(requests.length,2);f.faces.clear();
+});
+
+test('tagged-area controls cover every shared album, preserve their state through refresh and zoom, and reset between photos',async()=>{
+ for(const scope of ['gallery','photos','personal:yona','wedding:parents','nostalgia','nursery:yona']){
+  const f=fixture([second],{desktop:true}),face={...first,id:'saved',personId:'yona',person:{id:'yona',name:'יונה'}};f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});
+  await f.mount('regions',{}, {scope});const toggle=f.find('face-regions-toggle'),note=f.find('face-regions-note'),hits=()=>f.find('face-hit-buttons').children,tagged=()=>hits().filter(node=>node.classList.contains('face-tagged-region'));
+  assert.equal(toggle['aria-pressed'],'false');assert.equal(note.hidden,true);assert.equal(tagged().length,0);assert.equal(f.find('face-regions-text').textContent,'הצג אזורים מתויגים');
+  f.emit(toggle,'click');assert.equal(toggle['aria-pressed'],'true');assert.equal(tagged().length,1);assert.equal(hits().length,2);assert.match(note.textContent,/לחצו על מסגרת להסרת התיוג/);
+  f.emit(tagged()[0],'focus');f.emit(tagged()[0],'pointerenter',{pointerType:'mouse'});assert.equal(f.find('face-popover face-name'),undefined);
+  f.faces.update({id:'regions',kind:'photo',scope,takenDate:{year:1986}});await f.mount('regions',{}, {scope,takenDate:{year:1986}});f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');
+  assert.equal(f.find('face-regions-toggle'),toggle);assert.equal(tagged().length,1);assert.equal(tagged()[0].style.left,first.rect.x*100+'%');assert.equal(toggle['aria-pressed'],'true');assert.equal(f.dialog.querySelectorAll('.face-regions-toggle').length,1);
+  f.emit(toggle,'click');assert.equal(tagged().length,0);assert.equal(note.hidden,true);f.emit(toggle,'click');await f.mount('next',{}, {scope});assert.equal(toggle.isConnected,false);assert.equal(f.find('face-regions-toggle')['aria-pressed'],'false');f.faces.clear();
+  assert.equal(f.dialog.querySelectorAll('.face-regions-toggle,.face-regions-note').length,0);
+ }
+ const f=fixture();f.window.FamilyI18n.isEnglish=true;await f.mount();f.emit(f.find('face-regions-toggle'),'click');assert.equal(f.find('face-regions-text').textContent,'Hide tagged areas');assert.match(f.find('face-regions-note').textContent,/no tagged areas/);f.faces.clear();
+});
+
+test('clicking a dashed region removes its exact duplicate tag, renumbers immediately and restores a failed removal',async()=>{
+ for(const desktop of [false,true]){
+  const person={id:'maya',name:'מאיה'},original=[{...first,id:'duplicate-a',revision:'a1',personId:person.id,person},{...second,id:'duplicate-b',revision:'b1',personId:person.id,person},{id:'other',revision:'c1',rect:{x:.2,y:.2,width:.1,height:.1},personId:'other',person:{id:'other',name:'אחר'}}],f=fixture([first,second],{desktop}),requests=[];let saved=original,ignored=[],finish,fail=false;
+  f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(!path.endsWith('/ignore'))return Response.json({faces:saved,ignoredFaces:ignored});
+   const payload=JSON.parse(options.body);requests.push(payload);if(fail)return Response.json({error:'Connection lost'},{status:503});await new Promise(resolve=>finish=resolve);
+   const removed=saved.find(face=>face.id===payload.faceId);saved=saved.filter(face=>face.id!==payload.faceId);ignored=[...ignored,removed.rect];return Response.json({operation:'face-ignore',item:{id:'regions-remove',kind:'photo',tags:[person,original[2].person]},faces:saved,ignoredFaces:ignored});
+  };
+  await f.mount('regions-remove');f.emit(f.find('face-regions-toggle'),'click');
+  const click=id=>{const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===id);f.emit(f.stage,'click',{target:hit,detail:desktop?0:1,pointerType:desktop?'mouse':'touch'});};
+  const check=count=>{const host=f.find('face-visible-labels'),numbers=host.children.filter(node=>node.classList.contains('face-visible-label')).map(node=>Number(/face-label-number[^>]*>(\d+)/.exec(node.innerHTML)[1]));assert.deepEqual(numbers,Array.from({length:count},(_,i)=>i+1));assert.equal(f.find('face-hit-buttons').children.filter(node=>node.classList.contains('face-tagged-region')).length,count);};
+  click('duplicate-b');check(2);assert.equal(f.find('face-popover face-picker'),undefined);assert.equal(f.find('face-popover face-name'),undefined);await new Promise(resolve=>setImmediate(resolve));assert.equal(requests[0].faceId,'duplicate-b');assert.equal(requests[0].expectedRevision,'b1');
+  f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',item:{id:'regions-remove',kind:'photo'},faces:original}}));check(2);finish();await f.faces.flush();check(2);assert.equal(saved.filter(face=>face.personId===person.id).length,1);
+  fail=true;click('other');check(1);await f.faces.flush();check(2);assert.equal(f.find('face-regions-toggle')['aria-pressed'],'true');assert.match(f.find('face-regions-note').textContent,/2/);f.faces.clear();
+ }
+});
+
+test('the upload wizard removes dashed tags from the rotated draft without making media requests',async()=>{
+ const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'},d={key:'regions-draft',width:4000,height:3000,rotation:1,facesComplete:true,faceTags:[{...first,id:'one',revision:'r1',person},{...second,id:'two',revision:'r2',person}]};let enabled=true,changed=0;
+ const adapter=createUploadFaceAdapter(d,{findPeople:async()=>[person],getPerson:()=>person,onChange:()=>changed++});adapter.enabled=()=>enabled;
+ f.window.FamilyI18n.fetch=async()=>{throw Error('A draft must not use the media API');};await f.mount(d.key,{adapter,reviewHost:f.title,reviewLabel:true,zoom:false});const toggle=f.find('face-regions-toggle');assert.equal(toggle.parent,f.title);assert.equal(f.find('face-regions-text').textContent,'הצג אזורים מתויגים');f.emit(toggle,'click');
+ const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId==='two');assert.notEqual(hit.style.left,second.rect.x*100+'%');enabled=false;f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(d.faceTags.length,2);
+ enabled=true;f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(f.find('face-hit-buttons').children.length,1);await f.faces.flush();assert.equal(changed,1);assert.equal(d.faceTags.length,1);assert.equal(d.faceTags[0].id,'one');assert.deepEqual(d.ignoredFaces,[second.rect]);assert.equal(faceDraftPeople(d).length,1);assert.equal(d.facesComplete,false);assert.equal(toggle['aria-pressed'],'true');f.faces.clear();
 });
