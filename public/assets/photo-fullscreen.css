@@ -57,6 +57,10 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #photoFullscreenRoot :is(.photo-fullscreen-caption,.photo-fullscreen-status){position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;margin:0;padding:20px 76px calc(18px + env(safe-area-inset-bottom,0px));max-height:28%;overflow:auto;background:linear-gradient(transparent,#000c);color:#fff;text-align:center;white-space:pre-wrap;font:clamp(15px,2vw,20px)/1.6 var(--sans);text-shadow:0 1px 5px #000}
 #photoFullscreenRoot .photo-fullscreen-status:empty,#photoFullscreenRoot [hidden]{display:none!important}
 #photoFullscreenRoot .photo-fullscreen-status{z-index:20}
+.photo-fullscreen-face-label{position:absolute;z-index:18;box-sizing:border-box;max-width:min(260px,calc(100% - 16px));padding:6px 10px;border:1px solid #c2d0a8;border-radius:8px;background:#202819ed;color:#fffdf5;font:calc(15px * var(--a11y-text-scale,1))/1.4 var(--sans);text-align:center;overflow-wrap:anywhere;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 2px 8px #0005}
+.photo-fullscreen-face-label[data-below=true]{transform:translate(-50%,0)}
+.photo-fullscreen-face-outline{position:absolute;z-index:17;box-sizing:border-box;border:1px solid #d0e4a7c4;border-radius:5px;box-shadow:0 0 0 1px #17220b66;pointer-events:none}
+.photo-fullscreen-face-label[hidden],.photo-fullscreen-face-outline[hidden]{display:none!important}
 @media(hover:none),(pointer:coarse){#photoFullscreenRoot :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){opacity:1;pointer-events:auto}}
 @media(pointer:coarse){.photo-fullscreen-launch::before{inset:-9px}#mediaViewer .photo-fullscreen-viewer::before{inset:-2px}}
 @media(max-width:700px){#photoFullscreenRoot button{width:44px;height:44px;min-width:44px;min-height:44px;padding:10px}#photoFullscreenRoot .photo-fullscreen-speed{height:44px;width:68px}#photoFullscreenRoot .photo-fullscreen-effects{width:56px;padding:4px}#photoFullscreenRoot .photo-fullscreen-counter{font-size:13px}#photoFullscreenRoot .photo-fullscreen-caption{padding-inline:56px}}

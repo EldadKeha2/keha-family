@@ -37,7 +37,7 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
  window.FamilyMedia={register(){},open:(list,index,scope)=>{opened.push({id:list[index].id,scope});get('mediaViewer').open=true;}};
  const setTimer=(fn,delay)=>{const id=++sequence;timers.set(id,{fn,time:now+delay});return id;};
  class Clock extends Date{static now(){return now;}}
- vm.runInNewContext(source,{window,document,Image:Photo,matchMedia:query=>query.includes('min-width')?desktopQuery:motion,Date:Clock,setTimeout:setTimer,clearTimeout:id=>timers.delete(id)});
+ vm.runInNewContext(source,{window,document,navigator:{userAgent:desktop?'Windows NT':'Android Mobile',userAgentData:{mobile:!desktop}},Image:Photo,matchMedia:query=>query.includes('min-width')?desktopQuery:motion,Date:Clock,setTimeout:setTimer,clearTimeout:id=>timers.delete(id)});
  document.dispatchEvent(new Event('DOMContentLoaded'));
  return {window,document,get,images,opened,motion,
   async resize(w,h,isDesktop=true){width=w;height=h;desktopQuery.matches=isDesktop;window.dispatchEvent(new Event('resize'));await tick();},
@@ -83,15 +83,31 @@ test('a failed photo is skipped without displaying its text, and an empty album 
  const f=fixture();await f.ready();await f.resolve('/a.jpg');await f.advance(1950);await f.next();f.images.findLast(i=>i.src==='/b.jpg').fail();await tick();assert.equal(f.get('homeSlideImage').src,'/a.jpg');await f.resolve('/c.jpg');await f.advance(1950);assert.equal(f.get('homeSlideCaption').textContent,'Caption c');
  const empty=fixture({items:[]});await empty.ready();assert.equal(empty.get('homeSlidePlaceholder').hidden,false);assert.equal(empty.get('homeSlideOpen').disabled,true);assert.equal(empty.get('homeSlideCaption').hidden,true);
 });
-test('the carousel only fills substantial side margins in a shallow wide desktop stage',async()=>{
+test('the desktop filmstrip fills tall, wide and narrow stages, including panoramas and two-photo albums',async()=>{
  const f=fixture({carousel:true});await f.ready();await f.resolve('/a.jpg');
  assert.equal(f.get('homeSlideStage').dataset.carousel,'true');assert.equal(f.get('homeCarouselRail').hidden,false);assert.equal(f.get('homeSlideOpen').disabled,true);assert.equal(f.get('homeSlideOpen').attrs['aria-hidden'],'true');
  const cards=f.get('homeCarouselRail').children;assert.ok(cards.length>=5);assert.equal(cards.filter(n=>n.dataset.active==='true').length,1);assert.ok(cards.some(n=>parseFloat(n.style['--home-card-x'])<0));assert.ok(cards.some(n=>parseFloat(n.style['--home-card-x'])>0));
- await f.resize(1120,440);assert.equal(f.get('homeSlideStage').dataset.carousel,'false');assert.equal(f.get('homeCarouselRail').hidden,true);assert.equal(f.get('homeSlideOpen').disabled,false);assert.equal(f.get('homeSlideOpen').attrs['aria-hidden'],undefined);
- await f.resize(390,190,false);assert.equal(f.get('homeSlideStage').dataset.carousel,'false');
+ await f.resize(1120,440);assert.equal(f.get('homeSlideStage').dataset.carousel,'true');assert.equal(f.get('homeCarouselRail').hidden,false);
+ await f.resize(390,190,false);assert.equal(f.get('homeSlideStage').dataset.carousel,'true','Narrowing a Windows window does not turn the filmstrip off');
  await f.resize(1120,190);assert.equal(f.get('homeSlideStage').dataset.carousel,'true');
- const full=fixture({carousel:true});await full.ready();await full.resolve('/a.jpg',1800,300);assert.equal(full.get('homeSlideStage').dataset.carousel,'false','A photo which already fills the banner stays in the single-photo view');
- const two=fixture({carousel:true,items:photos.slice(0,2)});await two.ready();await two.resolve('/a.jpg');assert.equal(two.get('homeSlideStage').dataset.carousel,'false');
+ const full=fixture({carousel:true});await full.ready();await full.resolve('/a.jpg',1800,300);assert.equal(full.get('homeSlideStage').dataset.carousel,'true');
+ const two=fixture({carousel:true,items:photos.slice(0,2)});await two.ready();await two.resolve('/a.jpg');assert.equal(two.get('homeSlideStage').dataset.carousel,'true');
+ const phone=fixture({carousel:true,desktop:false,width:1120,height:440});await phone.ready();await phone.resolve('/a.jpg');assert.equal(phone.get('homeSlideStage').dataset.carousel,'false','A phone retains its slideshow even in landscape');
+ const one=fixture({carousel:true,items:photos.slice(0,1)});await one.ready();await one.resolve('/a.jpg');assert.equal(one.get('homeSlideStage').dataset.carousel,'false');
+});
+test('the film moves continuously, tracks the nearest center between photos and stays bounded over loops',async()=>{
+ const f=fixture({carousel:true});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');await f.advance(650);
+ const rail=f.get('homeCarouselRail'),first=rail.children.find(n=>n.dataset.active==='true'),x=()=>parseFloat(first.style['--home-card-x']);const initial=x();await f.advance(200);assert.ok(x()<initial,'Motion continues between image centers');
+ await f.advance(3400);assert.equal(f.get('homeSlideImage').src,'/a.jpg','The first image has not yet left the logical anchor');assert.equal(f.window.FamilyHome.centeredPhoto().id,'b','The visible center changes before the next image reaches the anchor');assert.equal(f.get('homeSlideOpen').dataset.photoId,'b');
+ await f.advance(5000);assert.equal(f.get('homeSlideImage').src,'/b.jpg');assert.ok(rail.children.length<=24);
+ await f.resolve('/a.jpg');await f.advance(24000);assert.ok(rail.children.length<=24,'Wrapping never accumulates an unbounded row of photos');
+});
+test('film motion pauses on user pause, open photos, hidden tabs and reduced motion, and then resumes',async()=>{
+ const f=fixture({carousel:true});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');await f.advance(650);const rail=f.get('homeCarouselRail'),card=rail.children.find(n=>n.dataset.active==='true'),x=()=>card.style['--home-card-x'];
+ f.get('homeSlidePause').click();const paused=x();await f.advance(3000);assert.equal(x(),paused);f.get('homeSlidePause').click();await f.advance(200);assert.notEqual(x(),paused);
+ rail.children.find(n=>n.dataset.active==='true').click();const opened=x();await f.advance(3000);assert.equal(x(),opened);f.get('mediaViewer').close();await f.advance(200);assert.notEqual(x(),opened);
+ await f.visibility('hidden');const hidden=x();await f.advance(3000);assert.equal(x(),hidden);await f.visibility('visible');await f.advance(200);assert.notEqual(x(),hidden);
+ await f.reduced(true);const reduced=x();await f.advance(3000);assert.equal(x(),reduced);await f.reduced(false);await f.advance(200);assert.notEqual(x(),reduced);
 });
 test('carousel photos and their own captions move together in both directions and the center opens the visible photo',async()=>{
  const f=fixture({carousel:true});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');await f.advance(650);

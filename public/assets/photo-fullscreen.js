@@ -51,6 +51,7 @@
   }
   function present(item,image){
     const token=++paint;ready=false;cancelAdvance();if(!active)return;
+    window.FamilyFullscreenFaces?.mount(stage,image,item);
     status.textContent='';
     const loaded=image.complete?(image.naturalWidth?Promise.resolve():Promise.reject(Error('Image unavailable'))):new Promise((resolve,reject)=>{
       image.addEventListener('load',resolve,{once:true});image.addEventListener('error',reject,{once:true});
@@ -75,15 +76,16 @@
   }
   function exit(){
     if(!active)return;const back=returnToViewer;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;
-    leaveNative();restoreStage();media().setFullscreen(false);
+    window.FamilyFullscreenFaces?.clear();leaveNative();restoreStage();media().setFullscreen(false);
     if(!back&&viewer.open)viewer.close();else viewer.querySelector('[data-photo-fullscreen="viewer"]')?.focus({preventScroll:true});
   }
   function closed(){
-    if(!root)return;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;leaveNative();restoreStage();
+    if(!root)return;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;window.FamilyFullscreenFaces?.clear();leaveNative();restoreStage();
   }
   function launch(opener){
     const wasOpen=viewer.open;
     if(opener===stage){enter(true);return;}
+    if(opener===$('homeSlideOpen')){const centered=window.FamilyHome?.centeredPhoto?.();if(centered){if(media().openFrom(opener.dataset.photoAlbum,centered.id))enter(wasOpen);return;}}
     const scope=opener.dataset.photoAlbum||opener.dataset.mediaScope,id=opener.dataset.photoId||opener.dataset.mediaOpen;
     if(scope&&id){if(!media().openFrom(scope,id))return;}
     else if(opener.matches('[data-person-item]'))opener.click();

@@ -83,6 +83,10 @@ test('album and home photos offer direct fullscreen while profile portraits offe
  portrait.click();assert.equal(f.api.isActive(),false,'Opening the profile first uses its normal photo viewer');assert.equal(f.viewer.open,true);f.find('photo-fullscreen-viewer').click();await f.flush();assert.equal(f.media.current().src,'/profile');assert.equal(f.media.current().caption,'Profile name');assert.equal(f.find('photo-fullscreen-play').disabled,true);f.api.exit();assert.equal(f.viewer.open,true);f.viewer.close();
  home.querySelector('[data-photo-fullscreen]').click();await f.flush();assert.equal(f.state.scope,'home:photos');assert.equal(f.media.current().id,'a');assert.equal(f.api.isActive(),true);f.api.exit();
 });
+test('the home fullscreen button opens the nearest moving center instead of the older logical slide',async()=>{
+ const f=fixture({viewerOpen:false}),home=f.document.createElement('div'),opener=f.document.createElement('button');home.id='homeSlideStage';opener.id='homeSlideOpen';opener.dataset.photoAlbum='home:photos';opener.dataset.photoId='a';opener.disabled=true;opener.append(f.document.createElement('img'));home.append(opener);f.document.body.append(home);
+ f.window.FamilyHome={centeredPhoto:()=>f.photo('c')};f.redecorate();home.querySelector('[data-photo-fullscreen]').click();await f.flush();assert.equal(f.media.current().id,'c');assert.equal(f.api.isActive(),true);f.api.exit();
+});
 test('slideshow loops, pauses, waits four seconds per loaded image and never advances while hidden or closed',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.enter();await f.flush();f.find('photo-fullscreen-play').click();
  for(const id of ['b','c','a']){t.mock.timers.tick(3999);assert.equal(f.steps.length,['b','c','a'].indexOf(id));t.mock.timers.tick(1);await f.flush();assert.equal(f.media.current().id,id);}

@@ -7,7 +7,7 @@
   const labels=new Map();let current=null,retained=null,serial=0,geometry=null,touchUntil=0;
   const controlRoots=['toolbar','missingNote','reviewButton','reviewStatus','regionsButton','regionsNote'];
   function releaseControls(){if(retained){for(const key of controlRoots)retained.controls[key]?.remove();retained=null;}}
-  const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,time:Date.now(),tagsRevision:item?.tagsRevision,reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
+  const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,time:Date.now(),tagsRevision:item?.tagsRevision,photoRevision:item?.photoRevision||'original',reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
   const helpers=()=>geometry||=import('./face-geometry.mjs?v=10');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   const touchMode=event=>event?.pointerType?['touch','pen'].includes(event.pointerType):event?.sourceCapabilities?.firesTouchEvents||Date.now()<touchUntil||matchMedia('(hover:none), (max-width:700px)').matches;
@@ -525,9 +525,17 @@
       if(result.faces)apply(c,result.faces);else if(['tags','untag','retag','restore'].includes(result.operation))load(c,true).catch(()=>{});
     });
   });
+  async function saved(item,{signal}={}){
+    if(!item?.id||item.kind!=='photo')return [];
+    const cached=labels.get(item.id),revision=item.photoRevision||'original';
+    if(cached&&cached.tagsRevision===item.tagsRevision&&cached.photoRevision===revision&&Date.now()-cached.time<30000)return cached.faces;
+    const result=await request('api/media/'+item.id+'/faces',{signal});
+    if(signal?.aborted||(result.item?.photoRevision||'original')!==revision)return [];
+    const faces=result.faces||[];remember(item.id,faces,result.item||item,result.detectedFaces,result.ignoredFaces);return faces;
+  }
   function canNavigate(stage){
     const c=stage._familyFaceContext;
     return !c||(!(c.zoom>1)&&!c.adjust&&!c.resizeDrag&&!c.saving&&!c.reviewSaving&&!c.popup?.classList.contains('face-picker'));
   }
-  window.FamilyFaces={mount,clear,update,canNavigate,whenReady(stage,image){const c=stage._familyFaceContext;return c?.image===image?c.paintReady:Promise.resolve();},async flush(){await current?.pendingSave;},dismiss(){if(current){stopTabFaces(current);closePopup(current);}},fit(){if(current&&imageWidth(current.image)){fitZoom(current);place(current);}}};
+  window.FamilyFaces={mount,clear,update,canNavigate,saved,whenReady(stage,image){const c=stage._familyFaceContext;return c?.image===image?c.paintReady:Promise.resolve();},async flush(){await current?.pendingSave;},dismiss(){if(current){stopTabFaces(current);closePopup(current);}},fit(){if(current&&imageWidth(current.image)){fitZoom(current);place(current);}}};
 })();

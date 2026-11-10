@@ -54,6 +54,12 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
  return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,footer,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+test('fullscreen reads reuse saved face labels without mounting an editor or detector and reject stale pixels',async()=>{
+ const f=fixture(),item={id:'readonly-photo',kind:'photo',tagsRevision:'tags-1',photoRevision:'pixels-1'},saved={...first,person:{id:'yona',name:'יונה'}};let reads=0;
+ f.window.FamilyI18n.fetch=async(_path,options)=>{reads++;assert.equal(options.method,undefined);return Response.json({faces:[saved],item});};
+ assert.equal((await f.faces.saved(item))[0].person.name,'יונה');await f.faces.saved(item);assert.equal(reads,1);assert.equal(f.detectionCalls,0);assert.equal(f.stage._familyFaceContext,undefined);
+ assert.equal((await f.faces.saved({...item,photoRevision:'pixels-2'})).length,0);assert.equal(reads,2,'A previous revision cannot supply face positions for newly edited pixels');
+});
 test('desktop Tab starts after selecting a face, wraps both ways and focuses the next face search in every album',async()=>{
  for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
   const person={id:'yona',name:'יונה'},named={...first,id:'named',personId:person.id,person},f=fixture([second],{desktop:true});
