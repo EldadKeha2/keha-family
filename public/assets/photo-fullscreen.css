@@ -1,12 +1,12 @@
 .photo-fullscreen-thumb{position:relative;min-width:0;isolation:isolate}
 .photo-fullscreen-thumb:not(.photo-fullscreen-portrait)>:first-child{width:100%}
 .photo-fullscreen-portrait{display:inline-block;flex:none}
-.photo-fullscreen-launch{position:absolute;top:8px;right:8px;z-index:4;display:grid;place-items:center;box-sizing:border-box;width:36px;height:36px;min-width:36px;min-height:36px;padding:7px;border:1px solid #fff9;border-radius:8px;background:#fbf7edee;color:#536441;box-shadow:0 2px 7px #0003;cursor:pointer;touch-action:manipulation}
-.photo-fullscreen-launch svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.photo-fullscreen-launch:hover{background:#fffdf6;color:#354729}
-.photo-fullscreen-launch:focus-visible{outline:3px solid #ad8135;outline-offset:2px}
+.photo-fullscreen-launch{position:absolute;top:1px;right:1px;z-index:4;display:grid;place-items:center;box-sizing:border-box;width:40px;height:40px;min-width:40px;min-height:40px;padding:11px;border:0;border-radius:5px;background:transparent;color:#fff8e9;box-shadow:none;opacity:.78;cursor:pointer;touch-action:manipulation}
+.photo-fullscreen-launch svg{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 1px #332a20b3);pointer-events:none}
+.photo-fullscreen-launch:hover{background:transparent;opacity:1}
+.photo-fullscreen-launch:focus-visible{outline:2px solid #ad8135;outline-offset:-3px;opacity:1}
 #mediaViewer #mediaStage{position:relative}
-#mediaViewer .photo-fullscreen-viewer{z-index:9;width:40px;height:40px;padding:8px;line-height:1}
+#mediaViewer .photo-fullscreen-viewer{z-index:9;width:44px;height:44px;min-width:44px;min-height:44px;padding:13px;line-height:1}
 #homeSlideStage{position:relative}
 #homeSlideStage:has(#homeSlideImage[hidden]) .photo-fullscreen-home{display:none}
 html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
@@ -37,5 +37,6 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #photoFullscreenRoot .photo-fullscreen-status:empty,#photoFullscreenRoot [hidden]{display:none!important}
 #photoFullscreenRoot .photo-fullscreen-status{z-index:20}
 @media(hover:none),(pointer:coarse){#photoFullscreenRoot :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){opacity:1;pointer-events:auto}}
-@media(max-width:700px){.photo-fullscreen-launch{top:5px;right:5px;width:32px;height:32px;min-width:32px;min-height:32px;padding:6px}#photoFullscreenRoot button{width:44px;height:44px;min-width:44px;min-height:44px;padding:10px}#photoFullscreenRoot .photo-fullscreen-counter{font-size:13px}#photoFullscreenRoot .photo-fullscreen-caption{padding-inline:56px}}
+@media(pointer:coarse){.photo-fullscreen-launch{width:44px;height:44px;min-width:44px;min-height:44px;padding:13px}}
+@media(max-width:700px){.photo-fullscreen-launch{top:0;right:0;width:44px;height:44px;min-width:44px;min-height:44px;padding:15px}.photo-fullscreen-launch svg{width:14px;height:14px}#mediaViewer .photo-fullscreen-viewer{padding:15px}#photoFullscreenRoot button{width:44px;height:44px;min-width:44px;min-height:44px;padding:10px}#photoFullscreenRoot .photo-fullscreen-counter{font-size:13px}#photoFullscreenRoot .photo-fullscreen-caption{padding-inline:56px}}
 @media(prefers-reduced-motion:reduce){#photoFullscreenRoot :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){transition:none}}
