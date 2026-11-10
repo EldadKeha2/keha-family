@@ -42,9 +42,10 @@ function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch
  const tools=add('tools',footer),manage=add('manage',tools);add('mediaViewerDelete',manage,'button');add('openedProfilePhoto',manage,'button');add('editOpenedCaption',tools,'button');add('openedCaptionForm',tools,'form');
  const share=add('mediaShareActions',tools);for(const id of ['shareMediaWhatsApp','shareMediaFacebook','shareMediaMessenger','shareMediaInstagram','shareMediaEmail','copyMediaLink'])add(id,share,'button');
  const tags=add('mediaTagPanel',footer);tags.textContent='Existing people tags';
+ add('mediaPhotoLabels',footer).textContent='Existing topic labels';const labelList=add('faceLabelList',stage);labelList.hidden=true;
  const window={FamilyI18n:{isEnglish:english},FamilyMedia:{current:()=>current},FamilyPhotoViewerLayout:{sync(){}},FamilyFaces:{fit(){fits++;}}};
  vm.runInNewContext(source,{document,window,innerHeight:900,getComputedStyle:node=>node.computed||{},navigator:{userAgent:ua,userAgentData:{mobile},maxTouchPoints:touch,standalone:installed},matchMedia:query=>({get matches(){return query.includes('width')?width<=700:installed;}})});
- const controller={item:current,dialog:viewer,toolbar,regionsButton:region,regionsNote:regionNote,reviewButton:review,reviewStatus:status};
+ const controller={item:current,dialog:viewer,toolbar,regionsButton:region,regionsNote:regionNote,reviewButton:review,reviewStatus:status,labelList};
  const api=window.FamilyPersonalPhotoLayout;
  return{nodes,viewer,document,window,api,controller,get:id=>document.getElementById(id),sync:()=>api.sync(controller),get fits(){return fits;},width(value){width=value;},scope(value){viewer.setAttribute('data-media-scope',value);},photo(id,kind='photo'){current={id,kind};controller.item=current;},add};
 }
@@ -77,7 +78,7 @@ test('personal desktop groups retain actual controls, requested physical order, 
  }
 });
 test('a phone resize restores the original controls and ordering and a desktop resize can reapply once',()=>{
- const f=fixture(),keys=['mediaStage','mediaOriginal','mediaViewerCollections','mediaHeaderCaption','photoMomentTools','regions','toolbar','review','editOpenedPhoto','mediaViewerDelete','openedProfilePhoto','editOpenedCaption','openedCaptionForm'];
+ const f=fixture(),keys=['mediaStage','mediaOriginal','mediaViewerCollections','mediaHeaderCaption','photoMomentTools','regions','toolbar','review','editOpenedPhoto','mediaViewerDelete','openedProfilePhoto','editOpenedCaption','openedCaptionForm','mediaPhotoLabels','faceLabelList'];
  const parents=new Map(keys.map(id=>[id,f.get(id).parentNode]));f.sync();f.width(390);f.sync();
  assert.equal(f.get('personalPhotoFrame'),null);assert.equal(f.viewer.classList.contains('personal-photo-desktop'),false);assert.equal(f.viewer.getAttribute('aria-labelledby'),'mediaViewerTitle');
  for(const id of keys)assert.equal(f.get(id).parentNode,parents.get(id),id);
@@ -96,12 +97,22 @@ test('the red side trash uses the exact album removal handler and mirrors its di
  remove.disabled=true;f.sync();assert.equal(shortcut.disabled,true);shortcut.click();assert.equal(requests,1);
  remove.hidden=true;f.sync();assert.equal(shortcut.hidden,true);f.api.restore();assert.equal(f.get('personalPhotoTrashButton'),null);
 });
-test('photo-fit geometry aligns the four left controls with zoom and keeps trash below editing at the image bottom',()=>{
- const f=fixture();f.sync();const frame=f.get('personalPhotoFrame');frame.clientWidth=1200;frame.computed={columnGap:'12px',paddingLeft:'16px',paddingRight:'16px'};
+test('desktop frames and side controls stay fixed before loading and across portrait, landscape and panoramic photos',()=>{
+ const f=fixture();f.sync();const frame=f.get('personalPhotoFrame');frame.clientWidth=1200;frame.clientHeight=520;frame.computed={columnGap:'12px',paddingLeft:'16px',paddingRight:'16px',paddingTop:'10px',paddingBottom:'10px'};f.sync();
+ const keys=['--personal-photo-width','--personal-photo-height','--personal-rail','--personal-review-top','--personal-albums-top','--personal-edit-top','--personal-trash-top','--personal-zoom-top'];
+ const before=keys.map(key=>frame.style.getPropertyValue(key));
  const image=f.add('actualPhoto',f.get('mediaStage'),'img');image.naturalWidth=1200;image.naturalHeight=800;image.getBoundingClientRect=()=>({top:40,bottom:540,width:750,height:500});
  f.controller.image=image;f.controller.scroller={computed:{maxHeight:'500px'},getBoundingClientRect:()=>({top:40,bottom:540,width:750,height:500})};f.get('personalPhotoRight').getBoundingClientRect=()=>({top:40});f.sync();
  const value=key=>parseFloat(frame.style.getPropertyValue(key)),rail=value('--personal-rail'),zoom=rail*3+24,left=rail*4+36;
- assert.equal(value('--personal-photo-width'),750);assert.ok(Math.abs(value('--personal-review-top')+left/2-250)<.01);assert.equal(value('--personal-zoom-top'),value('--personal-review-top'));
+ assert.deepEqual(keys.map(key=>frame.style.getPropertyValue(key)),before);assert.equal(value('--personal-photo-height'),500);assert.ok(value('--personal-photo-width')>900);assert.ok(Math.abs(value('--personal-review-top')+left/2-250)<.01);assert.equal(value('--personal-zoom-top'),value('--personal-review-top'));
  assert.equal(value('--personal-albums-top'),value('--personal-review-top')+rail+12);
  assert.ok(Math.abs(value('--personal-trash-top')+rail-500)<.01);assert.ok(value('--personal-edit-top')+rail+11.9<=value('--personal-trash-top'));assert.ok(value('--personal-zoom-top')+zoom+11.9<=value('--personal-edit-top'));
+ for(const [width,height]of [[800,2400],[5000,600],[50,40]]){image.naturalWidth=width;image.naturalHeight=height;f.get('mediaHeaderCaption').textContent='A long caption that must wrap without shifting navigation. '.repeat(15);f.get('mediaTagPanel').textContent='Many people tags '.repeat(100);f.photo(width+'x'+height);f.sync();assert.deepEqual(keys.map(key=>frame.style.getPropertyValue(key)),before);}
+ frame.clientHeight=420;f.sync();assert.equal(value('--personal-photo-height'),400);assert.ok(f.fits>1,'a resized window refits the same photo inside the new frame');
+});
+test('topic labels precede the desktop actions and people tags, and each newly selected photo reveals them without scrolling',()=>{
+ const f=fixture(),footer=f.get('footer'),labels=f.get('mediaPhotoLabels');f.sync();const order=footer.childNodes;
+ assert.ok(order.indexOf(labels)<order.indexOf(f.get('personalPhotoBelow')));assert.ok(order.indexOf(labels)<order.indexOf(f.get('mediaTagPanel')));assert.equal(labels.textContent,'Existing topic labels');
+ footer.scrollTop=160;f.viewer.scrollTop=120;f.sync();assert.equal(footer.scrollTop,160,'metadata updates preserve an ongoing footer interaction');
+ f.photo('two');f.sync();assert.equal(footer.scrollTop,0);assert.equal(f.viewer.scrollTop,0);f.api.restore();assert.ok(footer.childNodes.indexOf(labels)>footer.childNodes.indexOf(f.get('mediaTagPanel')));
 });

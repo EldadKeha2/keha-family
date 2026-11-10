@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id),tr=(he,en)=>window.FamilyI18n?.isEnglish?en:he;
   const narrow=matchMedia('(max-width:700px)'),ua=navigator.userAgent||'';
   const mobile=navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
-  const moved=new Map();let viewer,active=false,busy=false,controller=null,roots=[],heading,counter,frame,leftRail,rightRail,albums,zoom,fit,fitLabel,info,actions,primary,reviewDock,editDock,trashDock,trash,below,details,feedback,labelledBy;
+  const moved=new Map();let viewer,active=false,busy=false,controller=null,photoId=null,roots=[],heading,counter,frame,leftRail,rightRail,albums,zoom,fit,fitLabel,info,actions,primary,reviewDock,editDock,trashDock,trash,below,details,feedback,labelledBy;
   function move(node,parent,before=null){
     if(!node||!parent||node===before||node.parentNode===parent&&node.nextSibling===before)return;
     if(!moved.has(node)&&node.parentNode){const anchor=document.createComment('personal-photo-control');node.before(anchor);moved.set(node,anchor);}
@@ -12,27 +12,23 @@
   function arrange(parent,nodes){let before=null;for(const node of nodes.filter(Boolean).reverse()){move(node,parent,before);before=node;}}
   function element(tag,id,parent){const node=document.createElement(tag);node.id=id;if(parent)parent.append(node);return node;}
   function positionControls(changed){
-    const image=controller?.image||$('mediaStage')?.querySelector('img');
-    if(!image?.naturalWidth||!image.naturalHeight){if(changed&&controller)window.FamilyFaces?.fit?.();return;}
     const style=getComputedStyle(frame),gap=parseFloat(style.columnGap)||12;
     const padding=(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
+    const verticalPadding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
+    const height=Math.max(100,(frame.clientHeight||innerHeight*.55)-verticalPadding);
     const baseRail=Math.max(48,Math.min(76,document.documentElement.clientWidth*.05));
-    const maxHeight=controller?.scroller?parseFloat(getComputedStyle(controller.scroller).maxHeight):innerHeight*.61;
-    const ratio=image.naturalWidth/image.naturalHeight,available=frame.clientWidth-padding;
-    const initialWidth=Math.min(image.naturalWidth,Math.max(1,available-baseRail*2-gap*2),maxHeight*ratio);
-    const rail=Math.min(baseRail,Math.max(36,(initialWidth/ratio-gap*6)/7));
-    const width=Math.min(image.naturalWidth,Math.max(1,available-rail*2-gap*2),maxHeight*ratio);
-    const widthChanged=Math.abs(parseFloat(frame.style.getPropertyValue('--personal-photo-width'))-width)>.5||!frame.style.getPropertyValue('--personal-photo-width');
-    frame.style.setProperty('--personal-rail',rail+'px');frame.style.setProperty('--personal-photo-width',width+'px');
-    if(controller&&(changed||widthChanged))window.FamilyFaces?.fit?.();
-    const actual=image.getBoundingClientRect(),viewport=controller?.scroller?.getBoundingClientRect()||actual,column=rightRail.getBoundingClientRect();
-    const top=Math.max(actual.top,viewport.top)-column.top,height=Math.max(0,Math.min(actual.bottom,viewport.bottom)-Math.max(actual.top,viewport.top));
+    // Reserve the same viewport for every photo, including while it is loading.
+    // Image dimensions and tag counts must never move the frame or navigation.
+    const rail=Math.min(baseRail,Math.max(28,(height-gap*6)/7));
+    const width=Math.max(1,(frame.clientWidth||document.documentElement.clientWidth)-padding-rail*2-gap*2);
+    const sizeChanged=[['--personal-photo-width',width],['--personal-photo-height',height]].some(([key,value])=>!frame.style.getPropertyValue(key)||Math.abs(parseFloat(frame.style.getPropertyValue(key))-value)>.5);
+    frame.style.setProperty('--personal-rail',rail+'px');frame.style.setProperty('--personal-photo-width',width+'px');frame.style.setProperty('--personal-photo-height',height+'px');
+    if(controller&&(changed||sizeChanged))window.FamilyFaces?.fit?.();
     const albumCount=[...albums.querySelectorAll('[data-photo-album-kind]')].filter(button=>!button.hidden).length;
-    const review=reviewDock.querySelector('button'),reviewCount=review&&!review.hidden?1:0;
-    const leftCount=Math.max(3,albumCount+reviewCount),leftHeight=rail*leftCount+gap*(leftCount-1),trashTop=top+height-rail,editTop=trashTop-gap-rail;
-    const controlsTop=Math.max(0,top+(height-leftHeight)/2);
+    const leftHeight=rail*4+gap*3,trashTop=height-rail,editTop=trashTop-gap-rail;
+    const controlsTop=Math.max(0,(height-leftHeight)/2);
     frame.style.setProperty('--personal-review-top',controlsTop+'px');
-    frame.style.setProperty('--personal-albums-top',(controlsTop+reviewCount*(rail+gap))+'px');
+    frame.style.setProperty('--personal-albums-top',(controlsTop+rail+gap)+'px');
     frame.style.setProperty('--personal-albums-height',Math.max(0,albumCount*rail+gap*(albumCount-1))+'px');
     frame.style.setProperty('--personal-edit-top',Math.max(0,editTop)+'px');frame.style.setProperty('--personal-trash-top',Math.max(0,trashTop)+'px');
     frame.style.setProperty('--personal-zoom-top',controlsTop+'px');
@@ -46,7 +42,7 @@
     moved.clear();for(const root of roots)root.remove();roots=[];
     viewer.classList.remove('personal-photo-desktop');viewer.classList.remove('personal-photo-shared');
     if(labelledBy===null)viewer.removeAttribute('aria-labelledby');else viewer.setAttribute('aria-labelledby',labelledBy);
-    active=false;controller=null;
+    active=false;controller=null;photoId=null;
   }
   function create(){
     const header=viewer.querySelector('.media-viewer-header'),footer=viewer.querySelector('.media-viewer-footer'),stage=$('mediaStage');
@@ -98,6 +94,10 @@
       const sharing=$('mediaShareActions'),copy=$('copyMediaLink'),download=$('mediaOriginal');
       move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
       move(sharing,below,feedback);move($('openedCaptionForm'),below,feedback);
+      const footer=viewer.querySelector('.media-viewer-footer');
+      move($('mediaPhotoLabels'),footer,below);
+      move(controller?.labelList,footer,$('mediaTagPanel'));
+      if(photoId!==item.id){photoId=item.id;viewer.scrollTop=0;footer.scrollTop=0;}
       arrange(feedback,[controller?.regionsNote,controller?.reviewStatus]);
       if(controller?.toolbar)move(controller.toolbar,zoom);
       fitLabel.textContent=tr('התאמה למסך','Fit photo');fit.title=tr('התאמת התמונה למסך','Fit the photo to the screen');zoom.setAttribute('aria-label',fit.title);
