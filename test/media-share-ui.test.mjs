@@ -295,6 +295,15 @@ test('pointer cancellation during a repeated Android stroke retains it through i
  const first=f.window.FamilyMedia.step(1,{native:true});pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointercancel',200);loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');
  touch('touchend',340);assert.deepEqual([...loads.keys()],['b','c']);loads.get('c')(null);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
 });
+test('mixed Windows pointer and touch streams finish a swipe even without pointerup or pointercancel',()=>{
+ for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia']){
+  const f=fixture(),stage=f.get('mediaStage');stage.clientWidth=1440;f.navigator.userAgent='Windows NT';f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native'};f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  const touch=(type,x)=>{const t={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[t],changedTouches:[t],target:t.target,cancelable:true,preventDefault(){}};(type==='touchstart'?stage.handlers:f.events).get(type)(event);};
+  pointer(f,'pointerdown',200);touch('touchstart',200);touch('touchmove',350);touch('touchend',350);assert.equal(f.window.FamilyMedia.current().id,'b',scope);
+  pointer(f,'pointerup',350);assert.equal(f.window.FamilyMedia.current().id,'b','A delayed compatibility pointerup must not advance twice');
+  pointer(f,'pointerdown',350);touch('touchstart',350);touch('touchmove',200);touch('touchend',200);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+ }
+});
 test('a second stroke can finish the first native snap before scrollend, even with fully prepared neighbours',async()=>{
  const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.preload=()=>{};
  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});let first,claimed=false;

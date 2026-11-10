@@ -21,6 +21,9 @@
       gesture={id:event.pointerId,x:event.clientX,y:event.clientY,time:Date.now(),dragged:false};
       const ownership=claim?.(event)||'manual',mode=isMouse?'queued':ownership;
       if(mode==='native'){nativePointer=gesture;gesture=null;return mode;}
+      // Capture the stable stage before face/image setup reparents the target.
+      // Touch browsers otherwise lose the end of an implicitly captured stream.
+      if(!isMouse&&typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       gesture.mode=mode;gesture.mouse=isMouse;return mode;
     };
     stage.addEventListener('pointerdown',begin,{capture:true,passive:true});
@@ -63,17 +66,17 @@
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
       if(!touchStart||touchStart.native)return;
       const touch=fromTouch(event,event.touches[0]),dx=touch.clientX-touchStart.clientX,dy=touch.clientY-touchStart.clientY;
-      if(Math.abs(dy)>10&&Math.abs(dy)>=Math.abs(dx)){touchStart=null;return;}
+      if(Math.abs(dy)>10&&Math.abs(dy)>=Math.abs(dx)){reset();return;}
       if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.3&&enabled()){
         if(event.cancelable)event.preventDefault();
         if(!gesture)begin(touchStart);
-        if(gesture?.id===touch.pointerId)moved(touch);
+        if(gesture)moved({...touch,pointerId:gesture.id});
       }
     },{capture:true,passive:false});
     document.addEventListener('touchend',event=>{
       if(touchStart?.native){const touch=[...event.changedTouches].find(touch=>'touch-'+touch.identifier===touchStart.pointerId);if(touch)nativeEnded({x:touchStart.clientX,y:touchStart.clientY,time:touchStart.time},fromTouch(event,touch));nativePointer=null;}
       if(touchStart&&!touchStart.native&&!gesture)begin(touchStart);
-      if(touchStart&&gesture?.id===touchStart.pointerId){const touch=[...event.changedTouches].find(touch=>'touch-'+touch.identifier===gesture.id);if(touch)released(fromTouch(event,touch));}
+      if(touchStart&&gesture){const touch=[...event.changedTouches].find(touch=>'touch-'+touch.identifier===touchStart.pointerId);if(touch)released({...fromTouch(event,touch),pointerId:gesture.id});}
       touchStart=null;if(!gesture)finished();
     },{capture:true,passive:false});
     document.addEventListener('touchcancel',()=>{touchStart=null;blockClick();reset();},{capture:true,passive:true});
