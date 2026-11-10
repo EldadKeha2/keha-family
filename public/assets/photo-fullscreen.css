@@ -11,6 +11,8 @@
 #mediaViewer :is(#mediaNext,#mediaPrevious) [data-paging-arrow]{font-size:28px;font-weight:700}
 #mediaViewer :is(#mediaNext,#mediaPrevious) .media-paging-label{font-weight:600}
 #mediaViewer .photo-fullscreen-viewer{z-index:9;width:44px;height:44px;min-width:44px;min-height:44px;padding:13px;line-height:1}
+#mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer{top:0;right:0;width:100%;min-width:0;height:44px;min-height:24px;max-height:calc(var(--personal-zoom-top,76px) - 6px);padding:0;color:#61734d;opacity:.9}
+#mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer svg{filter:none}
 #homeSlideStage{position:relative}
 #homeSlideStage:has(#homeSlideImage[hidden]) .photo-fullscreen-home{display:none}
 html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}

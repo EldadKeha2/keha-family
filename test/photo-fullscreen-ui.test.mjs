@@ -51,6 +51,15 @@ test('the viewer enters native fullscreen or the phone fallback and restores its
   assert.equal(f.api.isActive(),false);assert.equal(f.viewer.open,true);assert.equal(f.stage.parentNode,before);assert.equal(f.media.current().id,'b');assert.equal(f.document.fullscreenElement,null);
  }
 });
+test('the desktop fullscreen icon stays in the right rail above zoom and returns to the photo on compact layouts',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english}),launch=f.find('photo-fullscreen-viewer'),rail=f.document.createElement('div');rail.id='personalPhotoRight';f.viewer.append(rail);f.viewer.classList.add('personal-photo-desktop');
+  f.api.sync();f.api.sync();assert.equal(launch.parentNode,rail);assert.equal(f.viewer.querySelectorAll('[data-photo-fullscreen="viewer"]').length,1);
+  f.media.step(1);f.api.sync();assert.equal(f.find('photo-fullscreen-viewer'),launch,'Photo navigation reuses the rail icon');assert.equal(launch.parentNode,rail);
+  launch.click();await f.flush();assert.equal(f.api.isActive(),true,'The moved icon still opens the current photo fullscreen');f.api.exit();assert.equal(f.find('photo-fullscreen-viewer').parentNode,rail);
+  f.viewer.classList.remove('personal-photo-desktop');f.emit(f.window,'resize');assert.equal(f.find('photo-fullscreen-viewer').parentNode,f.stage);assert.equal(f.viewer.querySelectorAll('[data-photo-fullscreen="viewer"]').length,1);
+ }
+});
 test('thumbnail fullscreen buttons are siblings, are not duplicated, skip video posters and return to the grid',async()=>{
  const f=fixture({viewerOpen:false});assert.equal(f.opener.parentNode.className,'photo-fullscreen-thumb');assert.equal(f.opener.querySelector('[data-photo-fullscreen]'),null);assert.equal(f.poster.parentNode,f.grid);
  f.redecorate();f.redecorate();assert.equal(f.document.querySelectorAll('[data-photo-fullscreen="thumbnail"]').length,1);

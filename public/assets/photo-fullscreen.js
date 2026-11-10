@@ -20,7 +20,12 @@
   function sync(){
     if(!viewer||!media())return;const state=media().photoState(),photo=state.item?.kind==='photo';
     if(!active){
-      if(viewer.open&&photo&&!stage.querySelector('[data-photo-fullscreen]')){const launch=button('photo-fullscreen-launch photo-fullscreen-viewer',tr('הצגת התמונה במסך מלא','View photo fullscreen'),expand);launch.dataset.photoFullscreen='viewer';stage.append(launch);}
+      let launch=viewer.querySelector('[data-photo-fullscreen="viewer"]');
+      if(viewer.open&&photo){
+        if(!launch){launch=button('photo-fullscreen-launch photo-fullscreen-viewer',tr('הצגת התמונה במסך מלא','View photo fullscreen'),expand);launch.dataset.photoFullscreen='viewer';}
+        const rail=viewer.classList.contains('personal-photo-desktop')?$('personalPhotoRight'):null,host=rail||stage;
+        if(launch.parentNode!==host)host.append(launch);
+      }else launch?.remove();
       return;
     }
     if(!viewer.open){closed();return;}if(!photo){exit();return;}
@@ -61,7 +66,7 @@
   function exit(){
     if(!active)return;const back=returnToViewer;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;
     leaveNative();restoreStage();media().setFullscreen(false);
-    if(!back&&viewer.open)viewer.close();else stage.querySelector('[data-photo-fullscreen]')?.focus({preventScroll:true});
+    if(!back&&viewer.open)viewer.close();else viewer.querySelector('[data-photo-fullscreen="viewer"]')?.focus({preventScroll:true});
   }
   function closed(){
     if(!root)return;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;leaveNative();restoreStage();
@@ -114,7 +119,7 @@
       if(control.dataset.photoFullscreen==='viewer')launch(stage);else launch(control._photoOpener);
     },{capture:true});
     if(typeof MutationObserver!=='undefined')new MutationObserver(records=>{if(records.some(record=>!viewer.contains(record.target)&&[...record.addedNodes].some(node=>node.nodeType===1)))scheduleDecoration();}).observe(document.body,{childList:true,subtree:true});
-    window.addEventListener('family-media-changed',scheduleDecoration);decorate();sync();
+    window.addEventListener('family-media-changed',scheduleDecoration);window.addEventListener('resize',sync);decorate();sync();
   }
   window.FamilyPhotoFullscreen={enter,exit,closed,sync,present,isActive:()=>active};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
