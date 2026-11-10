@@ -11,7 +11,7 @@ const presentationSource=await readFile(new URL('../public/assets/photo-presenta
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
-    constructor(tag='div'){this.tagName=tag;this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;const classes=new Set();this.classList={toggle(name,on){on=on??!classes.has(name);classes[on?'add':'delete'](name);},contains:name=>classes.has(name),add:name=>classes.add(name),remove:name=>classes.delete(name)};this.children=new Map();this.content=[];}
+    constructor(tag='div'){this.tagName=tag;this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.style={};const classes=new Set();this.classList={toggle(name,on){on=on??!classes.has(name);classes[on?'add':'delete'](name);},contains:name=>classes.has(name),add:name=>classes.add(name),remove:name=>classes.delete(name)};this.children=new Map();this.content=[];}
     addEventListener(type,callback){this.handlers.set(type,callback);}
     setAttribute(key,value){this[key]=value;}
     getAttribute(key){return key in this?String(this[key]):null;}
@@ -19,7 +19,8 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
     querySelector(selector){if(this===nodes.get('mediaStage')&&['img','.native-photo-pane:nth-child(2) img','.face-photo-scroll img'].includes(selector))return this.content.find(node=>node.tagName==='img')||null;if(!this.children.has(selector))this.children.set(selector,new Node());return this.children.get(selector);}
     querySelectorAll(){return [];}
     replaceChildren(...nodes){this.content=nodes;}
-    append(...nodes){this.content.push(...nodes);}
+    append(...nodes){for(const node of nodes)node.parentNode=this;this.content.push(...nodes);}
+    remove(){this.isConnected=false;if(this.parentNode)this.parentNode.content=this.parentNode.content.filter(node=>node!==this);this.parentNode=null;}
     focus(){}
     select(){}
     load(){}
@@ -117,7 +118,7 @@ test('grid thumbnails never replace the original in the photo viewer, downloads 
 });
 test('wide Windows-style touch events can swipe after pointer cancellation without double navigation',()=>{
  const f=fixture();f.get('mediaStage').clientWidth=1440;f.window.FamilyMedia.open([f.photo('a'),f.photo('b'),f.photo('c')],0,'gallery');
- const touch=(type,x)=>{const p={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[p],changedTouches:[p],target:p.target,cancelable:true,preventDefault(){this.prevented=true;}};f.get('mediaStage').handlers.get(type)(event);return event;};
+ const touch=(type,x)=>{const p={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[p],changedTouches:[p],target:p.target,cancelable:true,preventDefault(){this.prevented=true;}};(type==='touchstart'?f.get('mediaStage').handlers:f.events).get(type)(event);return event;};
  pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointercancel',200);assert.equal(touch('touchmove',340).prevented,true);touch('touchend',340);
  assert.equal(f.get('mediaOriginal').href,'/media/b');
  pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointermove',340);pointer(f,'pointerup',340);touch('touchend',340);assert.equal(f.get('mediaOriginal').href,'/media/c','A browser emitting both streams advances just once');
@@ -215,13 +216,59 @@ test('zoom, active tag edits, caption edits, other dialogs, videos and single-ph
  f.open();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
  open();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/b');
 });
-test('swiping across gallery pages preserves pagination and ignores additional gestures while loading',async()=>{
+test('swiping across gallery pages preserves pagination and applies the following gesture after loading',async()=>{
  const f=fixture(),pages=[],pagination={page:1,pages:2,size:2,total:4};f.get('mediaStage').clientWidth=360;
  let finish;f.window.FamilyPortal={pageGallery(page){pages.push(page);return new Promise(resolve=>{finish=()=>{f.window.FamilyMedia.register('gallery',[f.photo('c'),f.photo('d')],{pagination:{...pagination,page}});resolve();};});}};
  f.window.FamilyMedia.register('gallery',[f.photo('a'),f.photo('b')],{pagination});f.window.FamilyMedia.openFrom('gallery','b');
  swipe(f,120);swipe(f,120);assert.deepEqual(pages,[2]);finish();await new Promise(resolve=>setImmediate(resolve));
- assert.equal(f.get('mediaOriginal').href,'/media/c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 4');
- swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/d');
+ assert.equal(f.get('mediaOriginal').href,'/media/d');assert.equal(f.get('mediaViewerCounter').textContent,'4 / 4');
+ swipe(f,-120);assert.equal(f.get('mediaOriginal').href,'/media/c');
+});
+test('successive phone strokes select every pending target without waiting for the previous image load',async()=>{
+ for(const english of [false,true])for(const native of [false,true]){
+  const f=fixture({english}),loads=new Map();f.get('mediaStage').clientWidth=360;f.window.FamilyPhotoPresentation.preload=()=>{};
+  f.window.FamilyMedia.open(['a','b','c','d'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.set(item.id,resolve));
+  f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=>native?'queued':'manual'};
+  swipe(f,english?-120:120);swipe(f,english?-120:120);swipe(f,english?-120:120);assert.deepEqual([...loads.keys()],['b','c','d']);
+  loads.get('b')(null);loads.get('c')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');
+  loads.get('d')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'d');f.close();
+ }
+});
+test('a photo load finishing under the next finger cannot replace its touch target or lose that stroke',async()=>{
+ for(const native of [false,true]){
+ const f=fixture(),loads=new Map();f.get('mediaStage').clientWidth=360;f.window.FamilyPhotoPresentation.preload=()=>{};f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+ const moves=[];f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.set(item.id,resolve));f.window.FamilyPhotoPresentation.dragQueued=(_stage,dx,photos)=>moves.push({dx,current:photos.current.id,next:photos.next.id});f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=>native?'queued':'manual'};
+ const first=f.window.FamilyMedia.step(1,{native,queued:true}),shown=f.get('mediaStage').content[0];pointer(f,'pointerdown',200);pointer(f,'pointermove',340);
+ if(native)assert.deepEqual(moves,[{dx:140,current:'b',next:'c'}],'The following photo already follows the finger while the earlier target is still loading');
+ loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaStage').content[0],shown);
+ pointer(f,'pointerup',340);assert.deepEqual([...loads.keys()],['b','c']);loads.get('c')(null);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+ }
+});
+test('pointer cancellation during a repeated Android stroke retains it through image loading and touch release',async()=>{
+ const f=fixture(),loads=new Map();f.get('mediaStage').clientWidth=360;f.window.FamilyPhotoPresentation.preload=()=>{};f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+ f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.set(item.id,resolve));f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'queued'};
+ const touch=(type,x)=>{const p={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[p],changedTouches:[p],target:p.target,cancelable:true,preventDefault(){}};(type==='touchstart'?f.get('mediaStage').handlers:f.events).get(type)(event);};
+ const first=f.window.FamilyMedia.step(1,{native:true});pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointercancel',200);loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');
+ touch('touchend',340);assert.deepEqual([...loads.keys()],['b','c']);loads.get('c')(null);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+});
+test('a second stroke can finish the first native snap before scrollend, even with fully prepared neighbours',async()=>{
+ const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.preload=()=>{};
+ f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});let first,claimed=false;
+ f.window.FamilyPhotoNative={mount(){},reset(){},claim(){if(!claimed){claimed=true;first=f.window.FamilyMedia.step(1,{native:true});}return 'queued';}};
+ pointer(f,'pointerdown',200);assert.equal(f.window.FamilyMedia.current().id,'a');pointer(f,'pointermove',340);pointer(f,'pointerup',340);await first;
+ assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+});
+test('a native gallery page arriving under the next stroke keeps the touch target until release, then advances again',async()=>{
+ const f=fixture(),pagination={page:1,pages:2,size:2,total:4};let finish;f.get('mediaStage').clientWidth=360;
+ f.window.FamilyPortal={pageGallery:page=>new Promise(resolve=>{finish=()=>{f.window.FamilyMedia.register('gallery',['c','d'].map(f.photo),{pagination:{...pagination,page}});resolve();};})};
+ f.window.FamilyMedia.register('gallery',['a','b'].map(f.photo),{pagination});f.window.FamilyMedia.openFrom('gallery','b');f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'queued'};
+ const first=f.window.FamilyMedia.step(1,{native:true});pointer(f,'pointerdown',200);pointer(f,'pointermove',340);finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'b');
+ pointer(f,'pointerup',340);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.get('mediaViewerCounter').textContent,'4 / 4');f.close();
+});
+test('the first native touch stays with browser scrolling and cannot also trigger fallback navigation',()=>{
+ const f=fixture(),notes=[];f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native',note:(_stage,dx)=>notes.push(dx)};
+ const touch=(type,x)=>{const p={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[p],changedTouches:[p],target:p.target,cancelable:true,preventDefault(){this.prevented=true;}};(type==='touchstart'?f.get('mediaStage').handlers:f.events).get(type)(event);return event;};
+ pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointercancel',200);assert.equal(touch('touchmove',340).prevented,undefined);assert.deepEqual(notes,[]);touch('touchend',340);assert.deepEqual(notes,[140]);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
 });
 test('photo viewers request the family album toggle and keep current pixels while membership changes',()=>{
  const f=fixture(),calls=[];f.window.FamilyPhotoCollections={controls(item,scope,options){calls.push({item,scope,options});return item.kind==='photo'?'family-toggle':'';}};

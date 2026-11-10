@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const scheduled=new Map(),attempted=new Set();let busy=false;
+  const scheduled=new Map(),attempted=new Set();let busy=false,pauseTimer=null;
   function schedule(item,image){
     if(item?.kind!=='photo'||item.thumbnailSrc&&(item.previewSrc||!(item.size>1000000))||!item.id||!window.FamilyApp?.apiEnabled||attempted.has(item.src)||scheduled.has(item.src)||scheduled.size>=3||!image?.naturalWidth)return;
     if(!(item.size>250000||image.naturalWidth*image.naturalHeight>2000000)||item.mime==='image/gif')return;
@@ -8,6 +8,7 @@
   }
   async function run(){
     if(busy||!scheduled.size||document.hidden)return;busy=true;
+    if(window.FamilyMedia?.isPhotoBrowsing?.()){busy=false;if(!pauseTimer)pauseTimer=setTimeout(()=>{pauseTimer=null;run();},400);return;}
     const [src,job]=scheduled.entries().next().value;const {item}=job;let image=job.image;scheduled.delete(src);attempted.add(src);
     try{
       if(!image)image=await createImageBitmap(job.file);

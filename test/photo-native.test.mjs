@@ -38,3 +38,21 @@ test('native scrolling waits for a completed snap and freezes the target while i
  strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(strip.style.overflowX,'hidden');
  finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(strip.style.overflowX,'');assert.equal(strip.scrollLeft,360);f.api.reset();
 });
+test('a new stroke claims a completed native snap before scrollend and queues further strokes while loading',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({mobile:true,english,scrollEnd:true});let finish,busy=true;
+  f.options.busy=()=>busy;f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(resolve=>finish=resolve);};
+  f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(f.api.claim(f.stage),'native');strip.scrollLeft=0;
+  assert.equal(f.api.claim(f.stage),'queued');assert.deepEqual(f.calls,[{direction:english?-1:1,native:true}]);strip.handlers.get('scrollend')();assert.equal(f.calls.length,1);
+  finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.api.claim(f.stage),'queued','An older load ending cannot unlock a strip used by a newer queued target');assert.equal(strip.scrollLeft,0);
+  busy=false;f.api.reset();assert.equal(f.api.claim(f.stage),'manual');
+ }
+});
+test('a released native flick is counted before a second stroke interrupts its unfinished snap',async()=>{
+ for(const dx of [-120,120]){
+  const f=fixture({mobile:true,scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];strip.scrollLeft=360-dx;
+  f.api.note(f.stage,dx);assert.equal(f.calls.length,0,'A single swipe still belongs to native scrolling until it snaps');
+  assert.equal(f.api.claim(f.stage),'queued');assert.deepEqual(f.calls,[{direction:dx>0?1:-1,native:true}]);await new Promise(resolve=>setImmediate(resolve));
+ }
+ const f=fixture({mobile:true,scrollEnd:true});f.api.mount(f.stage,f.options);f.api.note(f.stage,120);f.stage.children[0].handlers.get('scrollend')();assert.equal(f.api.claim(f.stage),'native','A snap back to the center cancels its old flick');f.api.reset();
+});

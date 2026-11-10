@@ -39,7 +39,7 @@ function render(){
   const dateLabel=tr('תאריך צילום','Photo date'),nameLabel=showNames?tr('הסתרת שמות בתמונה','Hide names in photo'):tr('הצגת שמות בתמונה','Show names in photo'),ageLabel=showAges&&known?tr('הסתרת גילים','Hide ages'):tr('הצגת גילים','Show ages');
   const ageHelp=known?ageLabel:tr('יש להזין שנת צילום כדי להציג גילים','Add the year the photo was taken to show ages');
   const focused=document.activeElement?.id;
-  if($('mediaViewer')?.classList.contains('personal-photo-desktop')&&$('editPhotoDate')&&$('togglePhotoNames')&&$('togglePhotoAges')){
+  if($('editPhotoDate')?.isConnected&&$('togglePhotoNames')?.isConnected&&$('togglePhotoAges')?.isConnected){
     const update=(id,label,help=label)=>{const button=$(id);button.setAttribute('aria-label',help);button.title=help;button.querySelector('.photo-moment-label').textContent=label;return button;};
     const dateButton=update('editPhotoDate',dateLabel,dateLabel+(date?': '+date:''));dateButton.disabled=!window.FamilyApp?.apiEnabled;dateButton.classList.toggle('has-date',Boolean(date));
     update('togglePhotoNames',nameLabel).setAttribute('aria-pressed',String(showNames));

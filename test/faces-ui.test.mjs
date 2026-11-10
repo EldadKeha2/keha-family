@@ -200,6 +200,13 @@ test('photo navigation waits for fitted zoom and finished face editing, and clea
  f.faces.dismiss();assert.equal(f.faces.canNavigate(f.stage),true);
  f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');f.faces.clear();assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);assert.equal(f.faces.canNavigate(f.stage),true);
 });
+test('phone face detection waits through active browsing, cancels old jobs and runs once after browsing settles',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture([]);let browsing=true;f.window.FamilyMedia={isPhotoBrowsing:()=>browsing};
+ await f.mount('first-phone');t.mock.timers.tick(650);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,0);
+ await f.mount('next-phone');t.mock.timers.tick(650);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,0);
+ browsing=false;t.mock.timers.tick(650);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,1);
+ f.faces.clear();t.mock.timers.tick(2000);assert.equal(f.detectionCalls,1);
+});
 
 test('face controls can mount after the phone layout has moved the edit button below the photo',async()=>{
  const f=fixture([first]);f.dialog.append(f.edit);await f.mount('moved-controls',{}, {scope:'gallery'});
@@ -228,9 +235,9 @@ test('stage ownership disposes a previous face controller and ignores its delaye
  f.window.FamilyFaces.clear();assert.equal(f.dialog.querySelectorAll('.face-zoom-toolbar').length,0);assert.equal(f.title.children.length,2);
 });
 
-test('desktop photo navigation retains the same review and zoom nodes and binds them only to the new photo',async()=>{
- for(const installed of [false,true]){
-  const f=fixture([],{desktop:true,windows:true,installed}),requests=[];
+test('phone and desktop photo navigation retain review and zoom nodes and bind them only to the new photo',async()=>{
+ for(const desktop of [false,true])for(const installed of [false,true]){
+  const f=fixture([],{desktop,windows:desktop,installed}),requests=[];
   f.window.FamilyI18n.fetch=async(path,options)=>{const review=path.endsWith('/review');if(review)requests.push({path,body:JSON.parse(options.body)});return Response.json({faces:[],item:{id:path.includes('/first/')?'first':'next',kind:'photo',scope:'gallery',faceSummary:{reviewed:!review,scanned:true}}});};
   await f.mount('first',{}, {scope:'gallery',faceSummary:{reviewed:false,scanned:true}});
   const toolbar=f.find('face-zoom-toolbar'),review=f.find('face-review-button'),regions=f.find('face-regions-toggle'),zoomIn=toolbar.querySelector('[data-face-zoom-in]');

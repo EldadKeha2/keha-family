@@ -8,7 +8,17 @@
     b.viewport.before(b.node);b.viewport.remove();b.stage.classList.remove('has-native-photo-strip');
   }
   function has(stage){return active?.stage===stage;}
-  function mount(stage,{previous,next,isEnglish,enabled,step}){
+  function note(stage,dx){const b=active;if(b?.stage===stage&&!b.locked){b.releasedPage=dx>0?0:2;b.releasedAt=Date.now();}}
+  function claim(stage){
+    const b=active;if(!b||b.stage!==stage)return 'manual';
+    if(b.locked)return 'queued';
+    const page=b.releasedPage!=null&&Date.now()-b.releasedAt<750?b.releasedPage:Math.round(b.viewport.scrollLeft/b.width);
+    if(page===1)return 'native';
+    // A second finger stroke can start before scrollend from the first one.
+    // Finish that snap now and retain the new stroke while its photo loads.
+    b.viewport.scrollLeft=page*b.width;b.finish();return 'queued';
+  }
+  function mount(stage,{previous,next,isEnglish,enabled,step,busy}){
     if(stage?.nodeType!==1||!supported()||!enabled()){reset(stage);return false;}
     const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?stage.querySelector('img'):null);
     if(!node)return false;
@@ -27,14 +37,14 @@
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
     const b=active={stage,node,viewport,center,width:viewport.clientWidth,locked:false,timer:null};
     viewport.scrollLeft=b.width;
-    const finish=()=>{
+    const finish=b.finish=()=>{
       if(active!==b||b.locked||!b.width)return;
       const page=Math.round(viewport.scrollLeft/b.width);
-      if(page===1||Math.abs(viewport.scrollLeft-page*b.width)>2)return;
+      if(page===1){b.releasedPage=null;return;}if(Math.abs(viewport.scrollLeft-page*b.width)>2)return;
       if(!enabled()){viewport.scrollLeft=b.width;return;}
       b.locked=true;viewport.style.overflowX='hidden';
       const direction=(page>1?1:-1)*(isEnglish?1:-1);
-      Promise.resolve(step(direction,{native:true})).finally(()=>{if(active===b){b.locked=false;viewport.style.overflowX='';viewport.scrollLeft=b.width;}});
+      Promise.resolve(step(direction,{native:true})).finally(()=>{if(active===b&&!busy?.()){b.locked=false;viewport.style.overflowX='';viewport.scrollLeft=b.width;}});
     };
     // Native scrollend waits for the finger and momentum to finish. Only older
     // browsers need a timer; committing a half-finished snap causes a jump.
@@ -46,5 +56,5 @@
     }
     return true;
   }
-  window.FamilyPhotoNative={mount,reset,has};
+  window.FamilyPhotoNative={mount,reset,has,claim,note};
 })();

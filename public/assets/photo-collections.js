@@ -71,9 +71,8 @@
   }
   function renderGroup(group,item){
     const markup=buttons(item,group.dataset.collectionScope,group.dataset.collectionViewer==='true',group.dataset.collectionDesktop==='true');
-    if(group.dataset.collectionDesktop!=='true'||!group.firstElementChild){group.innerHTML=markup;return;}
-    // Membership changes update the existing button and SVG in the desktop
-    // rail. Replacing their markup restarts painting and flashes the icons.
+    if(group.dataset.collectionViewer!=='true'||!group.firstElementChild){group.innerHTML=markup;return;}
+    // Both photo layouts retain their buttons and SVGs during browsing.
     const template=document.createElement('div');template.innerHTML=markup;
     const key=node=>node.tagName+':'+node.dataset.photoAlbumKind;
     const existing=new Map([...group.children].map(node=>[key(node),node]));let index=0;
@@ -90,11 +89,11 @@
   }
   function mountViewer(host,item,scope){
     const desktop=document.getElementById('mediaViewer')?.classList.contains('personal-photo-desktop');
-    if(!desktop||item.kind!=='photo'||!item.id){host.innerHTML=controls(item,scope,{viewer:true});return;}
+    if(item.kind!=='photo'||!item.id){host.innerHTML=controls(item,scope,{viewer:true});return;}
     remember(item);
     if(!host.firstElementChild)host.innerHTML=controls(item,scope,{viewer:true});
     const group=host.firstElementChild;
-    group.dataset.collectionPhoto=item.id;group.dataset.collectionScope=scope;group.dataset.collectionViewer='true';group.dataset.collectionDesktop='true';
+    group.dataset.collectionPhoto=item.id;group.dataset.collectionScope=scope;group.dataset.collectionViewer='true';group.dataset.collectionDesktop=String(Boolean(desktop));
     group.setAttribute('aria-label',tr('אלבומי התמונה','Photo albums'));renderGroup(group,item);
   }
   function refresh(){

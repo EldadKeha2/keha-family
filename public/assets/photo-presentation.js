@@ -1,12 +1,12 @@
 (() => {
   'use strict';
-  const prepared=new Map(),originals=new Map();let motion=null,dragged=null,serial=0,handoff=null,lastSlide=0;
+  const prepared=new Map(),originals=new Map();let motion=null,dragged=null,queuedDrag=null,serial=0,handoff=null,lastSlide=0;
   const source=item=>item.previewSrc||item.src;
   const mobile=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
   const desktop=()=>!mobile()&&!matchMedia('(max-width:700px)').matches;
   const copy=image=>image?.cloneNode?image.cloneNode(false):image;
   function trim(cache,keep){
-    const limit=cache===originals?2:mobile()?5:8,budget=(mobile()?12:24)*1024*1024;
+    const limit=cache===originals?2:mobile()?6:8,budget=(mobile()?16:24)*1024*1024;
     let pixels=[...cache.values()].reduce((sum,entry)=>sum+entry.pixels,0);
     for(const [key,entry]of cache){if(cache.size<=limit&&pixels<=budget)break;if(key===keep)continue;cache.delete(key);pixels-=entry.pixels;}
   }
@@ -31,16 +31,29 @@
   function preload(items,index){
     const connection=navigator.connection;
     if(items.length<2||connection?.saveData||/^(slow-)?2g$/.test(connection?.effectiveType||''))return;
-    const distances=mobile()?[1,-1,2]:[1,-1,2,3,-2,4],seen=new Set([source(items[index]||{})]);
-    for(const distance of distances){const next=items[(index+distance+items.length)%items.length];if(next?.kind==='photo'&&!seen.has(source(next))&&!(Number(next.previewSize||next.size)>16*1024*1024)){seen.add(source(next));prepare(next,Math.abs(distance)===1?'high':'low')?.catch(()=>{});}}
+    const distances=mobile()?[1,-1,2,-2,3]:[1,-1,2,3,-2,4],seen=new Set([source(items[index]||{})]);
+    for(const distance of distances){const next=items[(index+distance+items.length)%items.length];if(mobile()&&Math.abs(distance)>1&&!next?.previewSrc&&Number(next?.size)>1000000)continue;if(next?.kind==='photo'&&!seen.has(source(next))&&!(Number(next.previewSize||next.size)>16*1024*1024)){seen.add(source(next));prepare(next,Math.abs(distance)===1?'high':'low')?.catch(()=>{});}}
   }
   function cancelDrag(){
     if(!dragged)return;dragged.node.style.transform='';dragged.stage.classList.remove('photo-dragging');dragged=null;
   }
+  function clearQueuedDrag(){if(queuedDrag){queuedDrag.node.remove();queuedDrag=null;}}
+  function dragQueued(stage,dx,{current,next}){
+    const direction=dx<0?-1:1,key=[source(current||{}),source(next||{}),direction].join('|');
+    if(queuedDrag?.stage!==stage||queuedDrag.key!==key){
+      const node=document.createElement('div'),outgoing=document.createElement('div'),incoming=document.createElement('div');node.className='photo-queued-drag';node.setAttribute('aria-hidden','true');
+      Object.assign(node.style,{position:'absolute',inset:'0',overflow:'hidden',pointerEvents:'none',zIndex:'8',backgroundColor:typeof getComputedStyle==='function'?getComputedStyle(stage).backgroundColor:'#ede5d4'});
+      for(const [layer,item]of [[outgoing,current],[incoming,next]])Object.assign(layer.style,{position:'absolute',inset:'0',backgroundImage:item?'url('+JSON.stringify(source(item))+')':'none',backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',willChange:'transform'});
+      node.append(outgoing,incoming);clearQueuedDrag();stage.append(node);queuedDrag={stage,node,outgoing,incoming,key,next};
+      prepare(next,'high')?.catch(()=>{});
+    }
+    const offset=Math.max(-stage.clientWidth,Math.min(stage.clientWidth,dx));
+    queuedDrag.outgoing.style.transform='translateX('+offset+'px)';queuedDrag.incoming.style.transform='translateX('+(offset-direction*stage.clientWidth)+'px)';
+  }
   function clearHandoff(token=handoff){if(token&&handoff===token){handoff=null;token.node.remove();}}
   function holdNative(stage,fallback){
     const strip=stage.querySelector('.native-photo-strip'),host=stage.closest?.('#photoFullscreenRoot')||stage.closest?.('dialog');if(!strip||!host)return null;
-    const page=Math.round(strip.scrollLeft/strip.clientWidth),shown=strip.children[page]?.querySelector('img'),image=shown?.naturalWidth?shown:fallback;
+    const page=Math.round(strip.scrollLeft/strip.clientWidth),shown=strip.children[page]?.querySelector('img'),queued=queuedDrag?.stage===stage?prepared.get(source(queuedDrag.next||{})):null,image=queued?.ready?queued.image:queuedDrag?.stage===stage&&fallback?.naturalWidth?fallback:shown?.naturalWidth?shown:fallback;
     if(!image?.naturalWidth||!image.naturalHeight)return null;
     const r=strip.getBoundingClientRect();if(!r.width||!r.height)return null;
     const node=document.createElement('div'),canvas=document.createElement('canvas'),ratio=Math.min(2,window.devicePixelRatio||1);
@@ -59,7 +72,7 @@
   function cancel({preserveHandoff=false}={}){
     window.FamilyPhotoNative?.reset();
     if(!preserveHandoff)clearHandoff();
-    cancelDrag();if(!motion)return;const previous=motion;motion=null;clearTimeout(previous.timer);
+    cancelDrag();clearQueuedDrag();if(!motion)return;const previous=motion;motion=null;clearTimeout(previous.timer);
     for(const animation of previous.animations)animation.cancel();previous.ghost.remove();previous.incoming.remove();previous.stage.classList.remove('photo-slide-running');
   }
   function drag(stage,dx){
@@ -68,6 +81,7 @@
     dragged.dx=Math.max(-stage.clientWidth,Math.min(stage.clientWidth,dx));stage.classList.add('photo-dragging');node.style.transform='translateX('+dragged.dx+'px)';
   }
   function settle(){
+    clearQueuedDrag();
     if(!dragged)return;const {node}=dragged,from=node.style.transform;cancelDrag();
     if(from&&!matchMedia('(prefers-reduced-motion: reduce)').matches)node.animate?.([{transform:from},{transform:'translateX(0)'}],{duration:160,easing:'ease-out'});
   }
@@ -95,5 +109,5 @@
     motion={id,stage,ghost,incoming,animations,timer:setTimeout(finish,220)};
     Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(finish);
   }
-  window.FamilyPhotoPresentation={source,desktop,prepare,ready,copy,preload,snapshot,slide,drag,settle,cancel,holdNative,finishHandoff};
+  window.FamilyPhotoPresentation={source,desktop,prepare,ready,copy,preload,snapshot,slide,drag,dragQueued,settle,cancel,holdNative,finishHandoff};
 })();

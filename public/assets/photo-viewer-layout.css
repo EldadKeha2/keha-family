@@ -4,8 +4,10 @@
 #mediaViewer.photo-controls-below .media-viewer-header{position:relative;display:grid;grid-template-columns:26px 36px minmax(138px,1fr) 36px 26px;grid-template-rows:44px;gap:3px;align-items:center;padding:6px;border-bottom:1px solid #ddd4bc}
 #mediaViewer.photo-controls-below .media-viewer-header h2,#mediaViewer.photo-controls-below #mediaHeaderCaption{display:none}
 #mediaViewer.photo-controls-below .media-viewer-paging{display:contents}
-#mediaViewer.photo-controls-below .media-viewer-paging #mediaPrevious{grid-area:1 / 2;min-width:32px;width:36px;min-height:44px;padding:1px;background:transparent}
-#mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{grid-area:1 / 4;min-width:32px;width:36px;min-height:44px;padding:1px;background:transparent}
+#mediaViewer.photo-controls-below .media-viewer-paging #mediaPrevious{grid-area:1 / 2;min-width:32px;width:36px;min-height:44px;padding:1px}
+#mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{grid-area:1 / 4;min-width:32px;width:36px;min-height:44px;padding:1px}
+#mediaViewer.photo-controls-below .media-viewer-paging :is(#mediaPrevious,#mediaNext){background:#647c4e;color:#fffdf5;border-color:#52683e}
+#mediaViewer.photo-controls-below .media-viewer-paging :is(#mediaPrevious,#mediaNext):hover{background:#536b3f;color:#fff}
 html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaPrevious{grid-area:1 / 4}
 html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{grid-area:1 / 2}
 #mediaViewer.photo-controls-below .media-paging-label{font-size:calc(10px * var(--a11y-text-scale,1))}

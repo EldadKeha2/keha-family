@@ -2,6 +2,7 @@
   'use strict';
   const $=id=>document.getElementById(id),tr=(he,en)=>window.FamilyI18n.isEnglish?en:he;
   const expand='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5"/></svg>';
+  const fullscreenIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M3 3l7 7M15 3h6v6M21 3l-7 7M3 15v6h6M3 21l7-7M15 21h6v-6M21 21l-7-7"/></svg>';
   const playIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>',pauseIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
   let viewer,stage,root,anchor,bar,play,close,previous,next,counter,caption,status,active=false,playing=false,returnToViewer=true,hadNative=false;
   let timer=null,hideTimer=null,frame=null,paint=0,ready=false,wasBusy=false;
@@ -22,7 +23,8 @@
     if(!active){
       let launch=viewer.querySelector('[data-photo-fullscreen="viewer"]');
       if(viewer.open&&photo){
-        if(!launch){launch=button('photo-fullscreen-launch photo-fullscreen-viewer',tr('הצגת התמונה במסך מלא','View photo fullscreen'),expand);launch.dataset.photoFullscreen='viewer';}
+        if(!launch){launch=button('photo-fullscreen-launch photo-fullscreen-viewer',tr('הצגת התמונה במסך מלא','View photo fullscreen'),fullscreenIcon+'<span class="photo-fullscreen-label">'+tr('מסך מלא','Full screen')+'</span>');launch.dataset.photoFullscreen='viewer';}
+        const label=launch.querySelector('.photo-fullscreen-label');if(label)label.textContent=tr('מסך מלא','Full screen');
         const rail=viewer.classList.contains('personal-photo-desktop')?$('personalPhotoRight'):null,host=rail||stage;
         if(launch.parentNode!==host)host.append(launch);
       }else launch?.remove();

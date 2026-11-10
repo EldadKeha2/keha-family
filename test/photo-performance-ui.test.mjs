@@ -51,8 +51,8 @@ test('desktop and mobile warm different browsing windows without duplicating the
   const images=[],window={};class Image{constructor(){images.push(this);this.naturalWidth=1024;this.naturalHeight=768;}}
   vm.runInNewContext(presentation,{window,Image,navigator:{userAgentData:{mobile}},setTimeout,clearTimeout});
   const items=Array.from({length:12},(_,id)=>({kind:'photo',src:'/original/'+id,previewSrc:'/preview/'+id}));window.FamilyPhotoPresentation.preload(items,5);
-  assert.deepEqual(images.map(image=>image.src),mobile?['/preview/6','/preview/4','/preview/7']:['/preview/6','/preview/4','/preview/7','/preview/8','/preview/3','/preview/9']);
-  assert.deepEqual(images.map(image=>image.fetchPriority),mobile?['high','high','low']:['high','high','low','low','low','low']);await Promise.all(images.map(image=>image.onload()));
+  assert.deepEqual(images.map(image=>image.src),mobile?['/preview/6','/preview/4','/preview/7','/preview/3','/preview/8']:['/preview/6','/preview/4','/preview/7','/preview/8','/preview/3','/preview/9']);
+  assert.deepEqual(images.map(image=>image.fetchPriority),mobile?['high','high','low','low','low']:['high','high','low','low','low','low']);await Promise.all(images.map(image=>image.onload()));
  }
 });
 test('decoded previews are available synchronously and remain intact after zooming to originals',async()=>{
@@ -63,6 +63,12 @@ test('decoded previews are available synchronously and remain intact after zoomi
  for(const id of ['a','b','c']){const prepared=p.prepare({...item,src:'/original/'+id},'low',true);await images.at(-1).onload();await prepared;}
  assert.equal(p.ready(item).src,'/preview/a','Automatic original preparation cannot evict or mutate a browsing preview');assert.notEqual(p.ready(item),p.ready(item));
  const originalAgain=p.prepare(item,'high',true);assert.equal(images.length,5,'The original cache holds at most two entries');await images.at(-1).onload();await originalAgain;
+});
+test('phone lookahead uses prepared previews without speculatively downloading distant heavy originals',async()=>{
+ const images=[],window={};class Image{constructor(){images.push(this);this.naturalWidth=1200;this.naturalHeight=800;}}
+ vm.runInNewContext(presentation,{window,Image,navigator:{userAgentData:{mobile:true}},setTimeout,clearTimeout});
+ const items=Array.from({length:12},(_,id)=>({kind:'photo',src:'/original/'+id,size:8000000}));items[8].previewSrc='/preview/8';
+ window.FamilyPhotoPresentation.preload(items,5);assert.deepEqual(images.map(image=>image.src),['/original/6','/original/4','/preview/8']);await Promise.all(images.map(image=>image.onload()));
 });
 test('decoded pixel budget releases large previews even before the image-count limit',async()=>{
  const images=[],window={};class Image{constructor(){images.push(this);this.naturalWidth=this.naturalHeight=4096;}}
@@ -75,19 +81,26 @@ test('a committed drag continues from its existing position in one motion',()=>{
  const stage={clientWidth:640,classList:classes,querySelector:s=>s==='.face-photo-scroll'?scroller:image,getBoundingClientRect:()=>({left:0,top:0}),append(){}};
  vm.runInNewContext(presentation,{window,document:{createElement:()=>ghost},navigator:{},matchMedia:()=>({matches:false}),setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation;p.drag(stage,-100);const captured=p.snapshot(stage);p.slide(stage,captured,1);assert.equal(frames[0][1].transform,'translateX(-540px)');assert.equal(frames[1][0].transform,'translateX(540px)');p.cancel();
 });
+test('another stroke immediately drags the following preview and can interrupt it again before any image or metadata load',()=>{
+ const nodes=[],window={},make=()=>({style:{},children:[],setAttribute(){},append(...children){this.children.push(...children);},remove(){this.removed=true;}}),stage={clientWidth:360,append(node){nodes.push(node);}};
+ vm.runInNewContext(presentation,{window,document:{createElement:make},navigator:{},setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation,photo=id=>({kind:'photo',src:'/original/'+id,previewSrc:'/preview/'+id});
+ p.dragQueued(stage,120,{current:photo('b'),next:photo('c')});const first=nodes[0];assert.match(first.children[0].style.backgroundImage,/preview\/b/);assert.match(first.children[1].style.backgroundImage,/preview\/c/);assert.equal(first.children[1].style.transform,'translateX(-240px)');
+ p.dragQueued(stage,80,{current:photo('c'),next:photo('d')});assert.equal(first.removed,true);assert.match(nodes[1].children[1].style.backgroundImage,/preview\/d/);assert.equal(nodes[1].children[1].style.transform,'translateX(-280px)');p.settle();assert.equal(nodes[1].removed,true);
+});
 test('arrow animations capture the displayed photo rather than an off-screen native neighbour',()=>{
  const window={},ghost={style:{},setAttribute(){}},shown={src:'/shown-photo',naturalWidth:2048,animate(){},getBoundingClientRect:()=>({left:20,top:10,width:640,height:400})},neighbour={...shown,src:'/off-screen-neighbour',getBoundingClientRect:()=>({left:-620,top:10,width:640,height:400})};
  const stage={querySelector:selector=>selector==='img'?neighbour:selector==='.face-photo-scroll img'?shown:null,getBoundingClientRect:()=>({left:0,top:0})};
  vm.runInNewContext(presentation,{window,document:{createElement:()=>ghost},navigator:{},matchMedia:()=>({matches:false}),setTimeout,clearTimeout});
  const result=window.FamilyPhotoPresentation.snapshot(stage);assert.match(result.style.backgroundImage,/shown-photo/);assert.doesNotMatch(result.style.backgroundImage,/neighbour/);assert.equal(result.style.left,'20px');
 });
-test('a heavy photo gets grid and viewer copies while its original URL remains intact',async t=>{
+test('background copies wait for browsing to settle and retain the full original URL',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const requests=[],dimensions=[],images=[],window={FamilyApp:{apiEnabled:true},FAMILY_API_TOKEN:'test',dispatchEvent(){}};
  const item={id:'a',kind:'photo',mime:'image/jpeg',src:'/media/a',size:4000000},image={naturalWidth:6567,naturalHeight:4137,src:'/media/a'};
  const document={hidden:false,querySelectorAll:()=>images,addEventListener(){},createElement(){const canvas={getContext:()=>({drawImage(...args){dimensions.push(args.slice(1));}}),toBlob(callback,type){callback(new Blob(['small image'],{type}));}};return canvas;}};
  window.FamilyI18n={fetch:async(path,options)=>{requests.push({path,options});return Response.json({saved:true,item:{...item,thumbnailSrc:'/media/a?thumbnail=1&v=original',thumbnailSize:11,...(path.includes('/preview?')?{previewSrc:'/media/a?preview=1',previewSize:20}:{})}});}};
- vm.runInNewContext(thumbnails,{window,document,setTimeout,Blob,CustomEvent});const api=window.FamilyPhotoThumbnails;
+ let browsing=true;window.FamilyMedia={isPhotoBrowsing:()=>browsing};vm.runInNewContext(thumbnails,{window,document,setTimeout,Blob,CustomEvent});const api=window.FamilyPhotoThumbnails;
  api.schedule(item,image);api.schedule(item,image);t.mock.timers.tick(1000);await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(requests.length,0);assert.equal(dimensions.length,0,'Canvas processing must not compete with photo browsing');browsing=false;t.mock.timers.tick(400);await new Promise(resolve=>setImmediate(resolve));
  assert.equal(requests.length,2);assert.deepEqual(Array.from(dimensions[0]),[0,0,640,403]);assert.equal(requests[0].options.body.type,'image/webp');assert.equal(image.src,'/media/a');assert.equal(item.src,'/media/a');assert.match(item.thumbnailSrc,/thumbnail=1/);assert.match(item.previewSrc,/preview=1/);
  api.schedule({...item,thumbnailSrc:null},image);t.mock.timers.tick(2000);assert.equal(requests.length,2);
  assert.equal(api.attributes(item),'');assert.match(api.attributes({...item,thumbnailSrc:null}),/data-thumbnail-id="a"/);

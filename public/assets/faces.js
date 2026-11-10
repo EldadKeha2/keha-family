@@ -101,7 +101,7 @@
   function clear({preserveControls=false,item=null}={}){
     if(current)dispose(current,{preserveControls});
     if(!preserveControls){releaseControls();return;}
-    // The desktop rail stays mounted while the image and its editor change.
+    // Photo controls stay mounted while the image and its editor change.
     // Old listeners are aborted; the next controller binds these same nodes.
     const controls=retained?.controls;if(!controls)return;
     if(controls.reviewButton){controls.reviewButton.hidden=!(item?.scope==='gallery'||item?.collections?.includes('gallery'));controls.reviewButton.disabled=false;controls.reviewButton.setAttribute('aria-busy','false');controls.reviewButton.setAttribute('aria-pressed',String(Boolean(item?.faceSummary?.reviewed)));}
@@ -501,9 +501,9 @@
     };
     c.scheduleDetection=()=>{
       if(!live(c)||c.reviewed||c.scanning||c.detectionTimer)return;
-      // Let rapid desktop browsing and preview downloads finish first. Saved
+      // Let rapid browsing and preview downloads finish first. Saved
       // face regions and all editing controls are already available meanwhile.
-      if(!adapter&&dialog.classList.contains('personal-photo-desktop'))c.detectionTimer=setTimeout(()=>{c.detectionTimer=null;if(live(c)&&!c.reviewed)c.runDetection();},650);
+      if(!adapter&&(dialog.classList.contains('personal-photo-desktop')||window.FamilyMedia?.isPhotoBrowsing?.()))c.detectionTimer=setTimeout(()=>{c.detectionTimer=null;if(live(c)&&!c.reviewed){if(window.FamilyMedia?.isPhotoBrowsing?.())c.scheduleDetection();else c.runDetection();}},650);
       else return c.runDetection();
     };
     // Completed photos use their saved regions; undoing confirmation can still
