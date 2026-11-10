@@ -6,8 +6,8 @@
 .photo-fullscreen-launch:hover{background:transparent;opacity:1}
 .photo-fullscreen-launch:focus-visible{outline:2px solid #ad8135;outline-offset:-3px;opacity:1}
 #mediaViewer #mediaStage{position:relative}
-#mediaViewer :is(#mediaNext,#mediaPrevious){background:#54733d;color:#fffdf5;border:1px solid #405c2d;border-radius:8px;box-shadow:0 2px 5px #354b2426}
-#mediaViewer :is(#mediaNext,#mediaPrevious):hover{background:#405d2c;color:#fff}
+#mediaViewer :is(#mediaNext,#mediaPrevious){background:#647c4e;color:#fffdf5;border:1px solid #52683e;border-radius:8px;box-shadow:0 2px 5px #354b2426}
+#mediaViewer :is(#mediaNext,#mediaPrevious):hover{background:#536b3f;color:#fff}
 #mediaViewer :is(#mediaNext,#mediaPrevious) [data-paging-arrow]{font-size:28px;font-weight:700}
 #mediaViewer :is(#mediaNext,#mediaPrevious) .media-paging-label{font-weight:600}
 #mediaViewer .photo-fullscreen-viewer{z-index:9;width:44px;height:44px;min-width:44px;min-height:44px;padding:13px;line-height:1}
@@ -37,8 +37,8 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #photoFullscreenRoot .photo-fullscreen-previous{position:absolute;top:50%;left:max(14px,env(safe-area-inset-left,0px));transform:translateY(-50%)}
 #photoFullscreenRoot .photo-fullscreen-next{position:absolute;top:50%;right:max(14px,env(safe-area-inset-right,0px));transform:translateY(-50%)}
 #photoFullscreenRoot button:hover{background:#34383bd9;border-color:#fff}
-#photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next){background:#54733d;color:#fffdf5;border-color:#9bb887;box-shadow:0 2px 7px #17230f40}
-#photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next):hover{background:#405d2c;border-color:#c3d7b5}
+#photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next){background:#647c4e;color:#fffdf5;border-color:#a9bf95;box-shadow:0 2px 7px #17230f40}
+#photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next):hover{background:#536b3f;border-color:#c3d7b5}
 #photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next) svg{stroke-width:2.6}
 #photoFullscreenRoot button:focus-visible{outline:3px solid #edce8e;outline-offset:3px}
 #photoFullscreenRoot button:disabled{opacity:.35;cursor:default}
