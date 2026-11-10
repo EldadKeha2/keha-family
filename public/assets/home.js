@@ -130,6 +130,7 @@
   }
   function controls(){
     const item=state.current,index=state.items.findIndex(photo=>photo.id===item?.id);
+    $('homeSlideOpen').dataset.photoAlbum=viewerScope;$('homeSlideOpen').dataset.photoId=item?.id||'';
     $('homeSlideOpen').disabled=index<0||carousel.enabled;
     $('homeSlidePrevious').disabled=$('homeSlideNext').disabled=state.items.length<2;
     $('homeSlideCounter').textContent=index<0?'':`${index+1} / ${state.items.length}`;

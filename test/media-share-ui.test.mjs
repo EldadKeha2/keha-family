@@ -11,12 +11,12 @@ const presentationSource=await readFile(new URL('../public/assets/photo-presenta
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
-    constructor(){this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.classList={toggle(){}};this.children=new Map();this.content=[];}
+    constructor(tag='div'){this.tagName=tag;this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;const classes=new Set();this.classList={toggle(name,on){on=on??!classes.has(name);classes[on?'add':'delete'](name);},contains:name=>classes.has(name),add:name=>classes.add(name),remove:name=>classes.delete(name)};this.children=new Map();this.content=[];}
     addEventListener(type,callback){this.handlers.set(type,callback);}
     setAttribute(key,value){this[key]=value;}
     getAttribute(key){return key in this?String(this[key]):null;}
     removeAttribute(key){delete this[key];}
-    querySelector(selector){if(!this.children.has(selector))this.children.set(selector,new Node());return this.children.get(selector);}
+    querySelector(selector){if(this===nodes.get('mediaStage')&&['img','.native-photo-pane:nth-child(2) img','.face-photo-scroll img'].includes(selector))return this.content.find(node=>node.tagName==='img')||null;if(!this.children.has(selector))this.children.set(selector,new Node());return this.children.get(selector);}
     querySelectorAll(){return [];}
     replaceChildren(...nodes){this.content=nodes;}
     append(...nodes){this.content.push(...nodes);}
@@ -33,7 +33,7 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   window.FamilyI18n={isEnglish:english,language:english?'en-US':'he',t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:p=>p.name||'',fetch:async(path,options)=>{requests.push({path,options});if(path.endsWith('/view')&&loadView)return loadView(path,options);return{ok:true,blob:()=>defer?new Promise(resolve=>pending.push(resolve)):Promise.resolve(new Blob(['picture'],{type:'image/jpeg'}))};}};
   const navigator={userActivation:{isActive:true},clipboard:{async writeText(value){if(!clipboard)throw Error('Unavailable');copied.push(value);}}};
   if(native){navigator.canShare=()=>files;navigator.share=async data=>{shared.push(data);if(cancel)throw Object.assign(Error('Cancelled'),{name:'AbortError'});};}
-  const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:()=>new Node(),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
+  const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:tag=>new Node(tag),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
   if(browser)window.addEventListener=browser.addEventListener;
   const context=vm.createContext({window,document,location,navigator,File,Blob,URL,CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(presentationSource,context);vm.runInContext(swipeSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
@@ -41,6 +41,33 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
 
+test('fullscreen reuses the decoded image, skips non-photos, wraps and restores tagging on the selected photo in every album',async()=>{
+ for(const english of [false,true])for(const scope of ['gallery','photos','personal:ora','wedding:parents','nursery:ora','nostalgia','home:photos']){
+  const f=fixture({english}),a=f.photo('a'),b=f.photo('b'),video={...f.photo('v'),kind:'video'},doc={...f.photo('d'),kind:'document'};let mounts=0;
+  f.window.FamilyFaces={mount(){mounts++;},clear(){},update(){}};f.window.FamilyMedia.open([a,video,b,doc],0,scope);const image=f.get('mediaStage').content[0];assert.equal(mounts,1);
+  assert.equal(f.window.FamilyMedia.setFullscreen(true),true);assert.equal(f.get('mediaStage').content[0],image);assert.equal(mounts,1,'A fullscreen slideshow does not run face detection');assert.equal(f.window.FamilyMedia.photoState().total,2);
+  await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.window.FamilyMedia.photoState().index,1);await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'a');await f.window.FamilyMedia.step(-1);assert.equal(f.window.FamilyMedia.current().id,'b');
+  f.window.FamilyMedia.setFullscreen(false);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(mounts,2);assert.equal(f.get('mediaViewer').classList.contains('photo-fullscreen'),false);f.close();
+ }
+});
+test('fullscreen traverses gallery pages, wraps the last page and retains the selected filter context',async()=>{
+ const f=fixture(),pages=[[f.photo('a'),f.photo('b')],[f.photo('c'),f.photo('d')]],visited=[];
+ const register=page=>f.window.FamilyMedia.register('gallery',pages[page-1],{pagination:{page,size:2,pages:2,total:4}});register(1);f.window.FamilyMedia.open(pages[0],1,'gallery');f.window.FamilyMedia.setFullscreen(true);
+ f.window.FamilyPortal={pageGallery:async page=>{visited.push(page);register(page);}};
+ await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.window.FamilyMedia.photoState().index,2);assert.equal(f.window.FamilyMedia.photoState().total,4);assert.equal(f.window.FamilyMedia.photoState().active,true);
+ await f.window.FamilyMedia.step(1);await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'a');assert.deepEqual(visited,[2,1]);f.close();assert.equal(f.window.FamilyMedia.photoState().active,false);
+});
+test('fullscreen cannot discard a caption draft or interrupt face editing and pending face saves',()=>{
+ const f=fixture();f.open();f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='Unfinished description';assert.equal(f.window.FamilyMedia.setFullscreen(true),false);assert.equal(f.get('openedCaptionText').value,'Unfinished description');assert.equal(f.get('openedCaptionForm').hidden,false);
+ f.get('cancelOpenedCaption').handlers.get('click')();
+ for(const field of ['saving','reviewSaving','adjust','resizeDrag']){f.get('mediaStage')._familyFaceContext={[field]:true};assert.equal(f.window.FamilyMedia.setFullscreen(true),false,field);assert.equal(f.window.FamilyMedia.photoState().active,false);}
+ delete f.get('mediaStage')._familyFaceContext;assert.equal(f.window.FamilyMedia.setFullscreen(true),true);f.close();
+});
+test('exiting fullscreen cancels an outstanding next-photo preparation and a late image cannot change the restored viewer',async()=>{
+ const f=fixture();f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'photos');f.window.FamilyMedia.setFullscreen(true);let finish;
+ f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>finish=resolve);const pending=f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.photoState().busy,true);
+ f.window.FamilyMedia.setFullscreen(false);finish(f.document.createElement('img'));await pending;assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.window.FamilyMedia.photoState().active,false);assert.equal(f.window.FamilyMedia.photoState().busy,false);f.close();
+});
 test('direct photos adopt their route album after loading without resetting the image or active editing',async()=>{
  const id='a'.repeat(32),item={id,kind:'photo',scope:'gallery',mime:'image/jpeg',src:'/media/'+id,tags:[]};
  for(const [route,scope]of [['person/ora','personal:ora'],['weddings/u-fish','wedding:u-fish'],['nursery/ora','nursery:ora'],['gallery','gallery'],['photos','photos']]){

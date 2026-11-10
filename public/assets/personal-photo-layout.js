@@ -75,7 +75,7 @@
     viewer=$('mediaViewer');if(!viewer||busy)return;
     const item=window.FamilyMedia?.current?.(),scope=viewer.getAttribute('data-media-scope')||'';
     const supported=/^(?:personal:.+|gallery|photos|wedding:.+|nursery:.+|link:.+)$/.test(scope);
-    if(!viewer.open||item?.kind!=='photo'||!supported||mobile||narrow.matches){restore();return;}
+    if(!viewer.open||viewer.classList.contains('photo-fullscreen')||item?.kind!=='photo'||!supported||mobile||narrow.matches){restore();return;}
     busy=true;const focused=document.activeElement,entering=!active;
     try{
       if(!active)create();

@@ -32,7 +32,7 @@
   function sync(){
     if(!viewer||busy)return;busy=true;const focused=document.activeElement;
     try{
-      const item=window.FamilyMedia?.current?.(),enabled=viewer.open&&item?.kind==='photo'&&(compact.matches||mobileDevice&&(appMode.matches||navigator.standalone===true));
+      const item=window.FamilyMedia?.current?.(),enabled=viewer.open&&!viewer.classList.contains('photo-fullscreen')&&item?.kind==='photo'&&(compact.matches||mobileDevice&&(appMode.matches||navigator.standalone===true));
       if(enabled)window.FamilyPersonalPhotoLayout?.restore();
       if(!enabled){if(active||moved.size)restore();return;}
       active=true;viewer.classList.add('photo-controls-below');strip.hidden=false;zoomGroup.hidden=false;
