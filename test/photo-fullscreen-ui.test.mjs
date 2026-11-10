@@ -72,13 +72,15 @@ test('both languages keep the next action at +1 and the previous action at -1; E
   f.api.enter();await f.flush();f.document.fullscreenElement=null;f.emit(f.document,'fullscreenchange');assert.equal(f.api.isActive(),false);
  }
 });
-test('personal album photos, profile portraits and the home carousel open directly without activating their ordinary click paths',async()=>{
+test('album and home photos offer direct fullscreen while profile portraits offer it only after opening',async()=>{
  const f=fixture({viewerOpen:false}),person=f.document.createElement('button'),portrait=f.document.createElement('button'),home=f.document.createElement('div'),homePhoto=f.document.createElement('button');
  person.dataset.personItem='c';person.dataset.personKind='photos';person.append(f.document.createElement('img'));person.addEventListener('click',()=>f.media.openFrom('personal:ora','c'));
  portrait.dataset.personPortrait='';const profile=f.document.createElement('img');profile.src=profile.currentSrc='/profile';profile.alt='Profile name';portrait.append(profile);
+ portrait.addEventListener('click',()=>f.media.open([{id:'profile',kind:'photo',src:profile.src,caption:profile.alt}],0,'personal:ora'));
  home.id='homeSlideStage';homePhoto.id='homeSlideOpen';homePhoto.dataset.photoAlbum='home:photos';homePhoto.dataset.photoId='a';homePhoto.disabled=true;homePhoto.append(f.document.createElement('img'));home.append(homePhoto);f.document.body.append(person,portrait,home);f.redecorate();
  person._photoFullscreenLaunch.click();await f.flush();assert.equal(f.state.scope,'personal:ora');assert.equal(f.media.current().id,'c');assert.equal(f.api.isActive(),true);f.api.exit();assert.equal(f.viewer.open,false);
- portrait._photoFullscreenLaunch.click();await f.flush();assert.equal(f.media.current().src,'/profile');assert.equal(f.media.current().caption,'Profile name');assert.equal(f.find('photo-fullscreen-play').disabled,true);f.api.exit();
+ assert.equal(portrait._photoFullscreenLaunch,undefined);assert.equal(portrait.parentNode,f.document.body,'The profile keeps its original layout without an icon wrapper');f.redecorate();assert.equal(portrait._photoFullscreenLaunch,undefined);
+ portrait.click();assert.equal(f.api.isActive(),false,'Opening the profile first uses its normal photo viewer');assert.equal(f.viewer.open,true);f.find('photo-fullscreen-viewer').click();await f.flush();assert.equal(f.media.current().src,'/profile');assert.equal(f.media.current().caption,'Profile name');assert.equal(f.find('photo-fullscreen-play').disabled,true);f.api.exit();assert.equal(f.viewer.open,true);f.viewer.close();
  home.querySelector('[data-photo-fullscreen]').click();await f.flush();assert.equal(f.state.scope,'home:photos');assert.equal(f.media.current().id,'a');assert.equal(f.api.isActive(),true);f.api.exit();
 });
 test('slideshow loops, pauses, waits four seconds per loaded image and never advances while hidden or closed',async t=>{

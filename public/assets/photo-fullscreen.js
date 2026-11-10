@@ -87,18 +87,14 @@
     const scope=opener.dataset.photoAlbum||opener.dataset.mediaScope,id=opener.dataset.photoId||opener.dataset.mediaOpen;
     if(scope&&id){if(!media().openFrom(scope,id))return;}
     else if(opener.matches('[data-person-item]'))opener.click();
-    else if(opener.matches('[data-person-portrait]')){
-      const image=opener.querySelector('img');if(!image)return;
-      const src=image.currentSrc||image.src;media().open([{kind:'photo',src,file:src,caption:image.alt||'',name:image.alt||'',mime:'image/jpeg',tags:[]}],0,'profile-photo');
-    }
     if(viewer.open&&media().current()?.kind==='photo')enter(wasOpen);
   }
   function decorate(){
     frame=null;
-    for(const opener of document.querySelectorAll('[data-media-open],[data-person-item][data-person-kind="photos"],[data-person-portrait]')){
-      if(opener.closest('#mediaViewer')||!opener.querySelector('img')||opener.disabled||opener._photoFullscreenLaunch?.isConnected)continue;
+    for(const opener of document.querySelectorAll('[data-media-open],[data-person-item][data-person-kind="photos"]')){
+      if(opener.matches('[data-person-portrait]')||opener.closest('#mediaViewer')||!opener.querySelector('img')||opener.disabled||opener._photoFullscreenLaunch?.isConnected)continue;
       if(opener.dataset.mediaOpen&&media()?.lookup(opener.dataset.mediaScope,opener.dataset.mediaOpen)?.kind!=='photo')continue;
-      const wrapper=document.createElement('div');wrapper.className='photo-fullscreen-thumb'+(opener.matches('[data-person-portrait]')?' photo-fullscreen-portrait':'');
+      const wrapper=document.createElement('div');wrapper.className='photo-fullscreen-thumb';
       opener.before(wrapper);wrapper.append(opener);const control=button('photo-fullscreen-launch',tr('הצגת התמונה במסך מלא','View photo fullscreen'),fullscreenIcon);
       control.dataset.photoFullscreen='thumbnail';control._photoOpener=opener;opener._photoFullscreenLaunch=control;wrapper.append(control);
     }
