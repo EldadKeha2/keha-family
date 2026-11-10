@@ -166,6 +166,28 @@ test('stage ownership disposes a previous face controller and ignores its delaye
  f.window.FamilyFaces.clear();assert.equal(f.dialog.querySelectorAll('.face-zoom-toolbar').length,0);assert.equal(f.title.children.length,2);
 });
 
+test('desktop photo navigation retains the same review and zoom nodes and binds them only to the new photo',async()=>{
+ for(const installed of [false,true]){
+  const f=fixture([],{desktop:true,windows:true,installed}),requests=[];
+  f.window.FamilyI18n.fetch=async(path,options)=>{const review=path.endsWith('/review');if(review)requests.push({path,body:JSON.parse(options.body)});return Response.json({faces:[],item:{id:path.includes('/first/')?'first':'next',kind:'photo',scope:'gallery',faceSummary:{reviewed:!review,scanned:true}}});};
+  await f.mount('first',{}, {scope:'gallery',faceSummary:{reviewed:false,scanned:true}});
+  const toolbar=f.find('face-zoom-toolbar'),review=f.find('face-review-button'),regions=f.find('face-regions-toggle'),zoomIn=toolbar.querySelector('[data-face-zoom-in]');
+  const next={id:'next',kind:'photo',scope:'gallery',faceSummary:{reviewed:true,scanned:true}};
+  f.faces.clear({preserveControls:true,item:next});assert.equal(toolbar.isConnected,true);assert.equal(review.isConnected,true);assert.equal(review['aria-pressed'],'true');assert.equal(toolbar.querySelector('[data-face-zoom-level]').textContent,'100%');
+  await f.mount('next',{},next);
+  assert.equal(f.find('face-zoom-toolbar'),toolbar);assert.equal(f.find('face-review-button'),review);assert.equal(f.find('face-regions-toggle'),regions);
+  f.emit(zoomIn,'click');assert.equal(toolbar.querySelector('[data-face-zoom-level]').textContent,'150%','Only the new controller handles the retained zoom button');
+  f.emit(review,'click');await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);assert.equal(requests[0].path,'api/media/next/faces/review');assert.equal(requests[0].body.complete,false);
+  f.faces.clear();assert.equal(toolbar.isConnected,false);assert.equal(review.isConnected,false);
+ }
+});
+test('rapid navigation transfers retained controls through an interrupted mount and closing removes all parked controls',async()=>{
+ const f=fixture([],{desktop:true});await f.mount('first',{}, {scope:'gallery',faceSummary:{scanned:true}});const toolbar=f.find('face-zoom-toolbar'),review=f.find('face-review-button');
+ f.faces.clear({preserveControls:true,item:{scope:'gallery'}});const interrupted=f.mount('second',{}, {scope:'gallery',faceSummary:{scanned:true}});f.faces.clear({preserveControls:true,item:{scope:'gallery'}});await interrupted;
+ await f.mount('third',{}, {scope:'gallery',faceSummary:{reviewed:true,scanned:true}});assert.equal(f.find('face-zoom-toolbar'),toolbar);assert.equal(f.find('face-review-button'),review);assert.equal(review['aria-pressed'],'true');
+ f.faces.clear({preserveControls:true,item:{scope:'gallery'}});assert.equal(toolbar.isConnected,true);f.faces.clear();assert.equal(toolbar.isConnected,false);assert.equal(review.isConnected,false);
+});
+
 test('metadata received before face controls are ready is retained without interrupting mounting',async()=>{
  const f=fixture(),pending=f.mount('dated',{highlightMissing:true},{scope:'gallery'});
  assert.doesNotThrow(()=>f.faces.update({id:'dated',kind:'photo',scope:'gallery',takenDate:{year:2006},faceSummary:{reviewed:true}}));await pending;

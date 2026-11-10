@@ -135,14 +135,27 @@ test('photo preparation keeps the current photo visible and cannot reopen a clos
   else{assert.equal(f.get('mediaOriginal').href,action==='finish'?'/media/b':'/media/b?v=edited');assert.equal(f.get('mediaStage').content[0].src,f.get('mediaOriginal').href);assert.equal(f.get('mediaNext').disabled,false);}
  }
 });
-test('prepared desktop photos switch synchronously and only the settled photo mounts face controls',async t=>{
+test('desktop button presses switch prepared photos and rebind their controls synchronously',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture(),mounts=[],tags=[];let preparations=0;
  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});f.window.FamilyPhotoPresentation.prepare=()=>{preparations++;return null;};f.window.FamilyPhotoPresentation.preload=()=>{};
  f.window.FamilyFaces={mount(_stage,_image,item){mounts.push(item.id);},clear(){},update(){}};f.window.FamilyTags.mountInline=(_panel,item)=>tags.push(item.id);
  f.get('mediaViewer').classList.add('personal-photo-desktop');f.window.FamilyMedia.open(['a','b','c','d'].map(f.photo),0,'photos');mounts.length=0;tags.length=0;
  const clicks=['b','c','d'].map(id=>{const pending=f.get('mediaNext').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,id,'No microtask or image load is needed for a warm neighbour');return pending;});
- assert.equal(preparations,0);assert.deepEqual(tags,['b','c','d']);assert.deepEqual(mounts,[]);t.mock.timers.tick(179);assert.deepEqual(mounts,[]);t.mock.timers.tick(1);assert.deepEqual(mounts,['d']);
- await Promise.all(clicks);f.get('mediaPrevious').handlers.get('click')();f.close();t.mock.timers.tick(200);assert.deepEqual(mounts,['d'],'Closing cancels delayed face controls');
+ assert.equal(preparations,0);assert.deepEqual(tags,['b','c','d']);assert.deepEqual(mounts,['b','c','d']);t.mock.timers.tick(200);assert.deepEqual(mounts,['b','c','d'],'Button navigation does not queue a second controls mount');
+ await Promise.all(clicks);f.close();t.mock.timers.tick(200);assert.deepEqual(mounts,['b','c','d']);
+});
+test('only desktop Previous and Next buttons skip sliding, including delayed loads and gallery page boundaries',async()=>{
+ for(const desktop of [false,true])for(const fullscreen of [false,true]){
+  const f=fixture(),slides=[],snapshots=[];f.window.FamilyPhotoPresentation.desktop=()=>desktop;f.window.FamilyPhotoPresentation.snapshot=()=>{snapshots.push(true);return {};};f.window.FamilyPhotoPresentation.slide=(_stage,_ghost,direction)=>{if(direction)slides.push(direction);};
+  f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);slides.length=0;snapshots.length=0;
+  await f.get('mediaNext').handlers.get('click')();await f.get('mediaPrevious').handlers.get('click')();assert.equal(slides.length,desktop?0:2);assert.equal(snapshots.length,desktop?0:2);
+  await f.window.FamilyMedia.step(1);assert.equal(slides.length,desktop?1:3,'Keyboard, slideshow and swipe navigation keep their existing transition');
+  let finish;f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>finish=resolve);const pending=f.get('mediaNext').handlers.get('click')();finish(null);await pending;assert.equal(slides.length,desktop?1:4,'Preparation retains the requested button transition');f.close();
+ }
+ const f=fixture(),slides=[];f.window.FamilyPhotoPresentation.desktop=()=>true;f.window.FamilyPhotoPresentation.slide=(_stage,_ghost,direction)=>{if(direction)slides.push(direction);};
+ f.window.FamilyMedia.register('gallery',[f.photo('a')],{pagination:{page:1,pages:2,size:1,total:2}});f.window.FamilyMedia.openFrom('gallery','a');
+ f.window.FamilyPortal={pageGallery:async page=>f.window.FamilyMedia.register('gallery',[f.photo(page===2?'b':'a')],{pagination:{page,pages:2,size:1,total:2}})};
+ await f.get('mediaNext').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,'b');assert.deepEqual(slides,[]);f.close();
 });
 test('rapid clicks select the latest pending photo and ignore earlier out-of-order image loads',async()=>{
  for(const fullscreen of [false,true]){

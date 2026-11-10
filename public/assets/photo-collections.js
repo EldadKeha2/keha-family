@@ -69,9 +69,37 @@
     remember(item);
     return `<div class="photo-collections" data-collection-photo="${safe(item.id)}" data-collection-scope="${safe(scope)}"${viewer?' data-collection-viewer="true"':''} role="group" aria-label="${tr('אלבומי התמונה','Photo albums')}">${buttons(item,scope,viewer)}</div>`;
   }
+  function renderGroup(group,item){
+    const markup=buttons(item,group.dataset.collectionScope,group.dataset.collectionViewer==='true',group.dataset.collectionDesktop==='true');
+    if(group.dataset.collectionDesktop!=='true'||!group.firstElementChild){group.innerHTML=markup;return;}
+    // Membership changes update the existing button and SVG in the desktop
+    // rail. Replacing their markup restarts painting and flashes the icons.
+    const template=document.createElement('div');template.innerHTML=markup;
+    const key=node=>node.tagName+':'+node.dataset.photoAlbumKind;
+    const existing=new Map([...group.children].map(node=>[key(node),node]));let index=0;
+    for(const next of [...template.children]){
+      const button=existing.get(key(next))||next;existing.delete(key(next));
+      if(button!==next){
+        for(const name of button.getAttributeNames())if(!next.hasAttribute(name))button.removeAttribute(name);
+        for(const name of next.getAttributeNames())if(button.getAttribute(name)!==next.getAttribute(name))button.setAttribute(name,next.getAttribute(name));
+        const label=button.querySelector('.photo-collection-name');if(label)label.textContent=next.querySelector('.photo-collection-name')?.textContent||'';
+      }
+      if(group.children[index]!==button)group.insertBefore(button,group.children[index]||null);index++;
+    }
+    for(const node of existing.values())node.remove();
+  }
+  function mountViewer(host,item,scope){
+    const desktop=document.getElementById('mediaViewer')?.classList.contains('personal-photo-desktop');
+    if(!desktop||item.kind!=='photo'||!item.id){host.innerHTML=controls(item,scope,{viewer:true});return;}
+    remember(item);
+    if(!host.firstElementChild)host.innerHTML=controls(item,scope,{viewer:true});
+    const group=host.firstElementChild;
+    group.dataset.collectionPhoto=item.id;group.dataset.collectionScope=scope;group.dataset.collectionViewer='true';group.dataset.collectionDesktop='true';
+    group.setAttribute('aria-label',tr('אלבומי התמונה','Photo albums'));renderGroup(group,item);
+  }
   function refresh(){
     for(const group of document.querySelectorAll('[data-collection-photo]')){
-      const item=items.get(group.dataset.collectionPhoto);if(item)group.innerHTML=buttons(item,group.dataset.collectionScope,group.dataset.collectionViewer==='true',group.dataset.collectionDesktop==='true');
+      const item=items.get(group.dataset.collectionPhoto);if(item)renderGroup(group,item);
     }
     window.FamilyPhotoViewerLayout?.sync();
   }
@@ -105,8 +133,8 @@
     for(const group of document.querySelectorAll('[data-collection-photo]')){
       if(group.dataset.collectionViewer!=='true'||group.dataset.collectionDesktop===value)continue;
       group.dataset.collectionDesktop=value;
-      const item=items.get(group.dataset.collectionPhoto);if(item)group.innerHTML=buttons(item,group.dataset.collectionScope,true,enabled===true);
+      const item=items.get(group.dataset.collectionPhoto);if(item)renderGroup(group,item);
     }
   }
-  window.FamilyPhotoCollections={controls,setViewerDesktop};
+  window.FamilyPhotoCollections={controls,mountViewer,setViewerDesktop};
 })();

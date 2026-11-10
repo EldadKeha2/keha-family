@@ -3,6 +3,7 @@
   const prepared=new Map(),originals=new Map();let motion=null,dragged=null,serial=0,handoff=null,lastSlide=0;
   const source=item=>item.previewSrc||item.src;
   const mobile=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
+  const desktop=()=>!mobile()&&!matchMedia('(max-width:700px)').matches;
   const copy=image=>image?.cloneNode?image.cloneNode(false):image;
   function trim(cache,keep){
     const limit=cache===originals?2:mobile()?5:8,budget=(mobile()?12:24)*1024*1024;
@@ -94,5 +95,5 @@
     motion={id,stage,ghost,incoming,animations,timer:setTimeout(finish,220)};
     Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(finish);
   }
-  window.FamilyPhotoPresentation={source,prepare,ready,copy,preload,snapshot,slide,drag,settle,cancel,holdNative,finishHandoff};
+  window.FamilyPhotoPresentation={source,desktop,prepare,ready,copy,preload,snapshot,slide,drag,settle,cancel,holdNative,finishHandoff};
 })();

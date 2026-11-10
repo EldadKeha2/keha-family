@@ -4,7 +4,9 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalizeName=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
   const choices='[data-face-person],[data-face-add]';
-  const labels=new Map();let current=null,serial=0,geometry=null,touchUntil=0;
+  const labels=new Map();let current=null,retained=null,serial=0,geometry=null,touchUntil=0;
+  const controlRoots=['toolbar','missingNote','reviewButton','reviewStatus','regionsButton','regionsNote'];
+  function releaseControls(){if(retained){for(const key of controlRoots)retained.controls[key]?.remove();retained=null;}}
   const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,time:Date.now(),tagsRevision:item?.tagsRevision,reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
   const helpers=()=>geometry||=import('./face-geometry.mjs?v=10');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
@@ -47,14 +49,28 @@
     if(c.labelTimer||!c.popup?.classList.contains('face-name'))return;const bubble=c.popup;
     c.labelTimer=setTimeout(()=>{c.labelTimer=null;if(live(c)&&c.popup===bubble&&!bubble.contains(document.activeElement))closePopup(c);},250);
   }
-  function dispose(c){
+  function dispose(c,{preserveControls=false}={}){
     clearTimeout(c.detectionTimer);
     c.resolvePaint?.();
     window.FamilyPhotoNative?.reset(c.stage);
     cancelPress(c);
-    if(current===c)current=null;if(c.stage._familyFaceContext===c)delete c.stage._familyFaceContext;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);clearAnnotation(c,true);c.popup?.remove();c.layer?.remove();c.labelList?.remove();c.guide?.remove();c.status?.remove();c.regionsButton?.remove();c.regionsNote?.remove();c.toolbar?.remove();c.missingNote?.remove();c.reviewButton?.remove();c.reviewStatus?.remove();c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom','face-label-list-active','face-photo-enlarged');window.FamilyPhotoViewerLayout?.faceControls(null,c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
+    if(current===c)current=null;if(c.stage._familyFaceContext===c)delete c.stage._familyFaceContext;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);clearAnnotation(c,true);c.popup?.remove();c.layer?.remove();c.labelList?.remove();c.guide?.remove();c.status?.remove();
+    if(preserveControls&&!c.adapter){releaseControls();retained={stage:c.stage,dialog:c.dialog,reviewLabel:c.reviewLabel,zoomEnabled:c.zoomEnabled,controls:Object.fromEntries([...controlRoots,'regionsText','reviewText'].map(key=>[key,c[key]]))};}
+    else for(const key of controlRoots)c[key]?.remove();
+    c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom','face-label-list-active','face-photo-enlarged');window.FamilyPhotoViewerLayout?.faceControls(null,c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
   }
-  function clear(){if(current)dispose(current);}
+  function clear({preserveControls=false,item=null}={}){
+    if(current)dispose(current,{preserveControls});
+    if(!preserveControls){releaseControls();return;}
+    // The desktop rail stays mounted while the image and its editor change.
+    // Old listeners are aborted; the next controller binds these same nodes.
+    const controls=retained?.controls;if(!controls)return;
+    if(controls.reviewButton){controls.reviewButton.hidden=!(item?.scope==='gallery'||item?.collections?.includes('gallery'));controls.reviewButton.disabled=false;controls.reviewButton.setAttribute('aria-busy','false');controls.reviewButton.setAttribute('aria-pressed',String(Boolean(item?.faceSummary?.reviewed)));}
+    if(controls.reviewStatus){controls.reviewStatus.hidden=true;controls.reviewStatus.textContent='';}
+    if(controls.regionsButton)controls.regionsButton.setAttribute('aria-pressed','false');
+    if(controls.regionsNote)controls.regionsNote.hidden=true;
+    if(controls.toolbar){controls.toolbar.querySelector('[data-face-zoom-level]').textContent='100%';controls.toolbar.querySelector('[data-face-zoom-out]').disabled=true;controls.toolbar.querySelector('[data-face-zoom-in]').disabled=false;controls.toolbar.querySelector('[data-face-zoom-reset]').disabled=true;}
+  }
   function reconcileControls(c){
     // These controls live outside the photo stage. Reconcile them as well as
     // the pixels, so an interrupted refresh cannot leave an older copy behind.
@@ -158,23 +174,28 @@
     c.surface=document.createElement('div');c.surface.className='face-photo-surface';c.surface.append(c.image,c.layer);c.scroller.append(c.surface);c.stage.append(c.scroller,c.guide,c.labelList);c.stage.classList.add('has-face-zoom');
     // Dense group-photo names belong below the controls, outside the fixed frame.
     if(c.dialog.classList.contains('mobile-photo-frame'))c.dialog.querySelector('#mediaTagPanel')?.before(c.labelList);
-    c.toolbar=document.createElement('div');c.toolbar.className='face-zoom-toolbar';c.toolbar.setAttribute('role','group');c.toolbar.setAttribute('aria-label',tr('הגדלה לדיוק תיוג פנים','Zoom for precise face tagging'));
-    c.toolbar.innerHTML=`<span class="face-zoom-help">${tr('פנים קטנות? הגדילו לתּיוג מדויק','Small faces? Zoom in to tag precisely')}</span><div><button type="button" data-face-zoom-out disabled aria-label="${tr('הקטנת התמונה','Zoom out')}">−</button><output data-face-zoom-level aria-live="polite">100%</output><button type="button" data-face-zoom-in aria-label="${tr('הגדלת התמונה','Zoom in')}">＋</button><button type="button" data-face-zoom-reset disabled>${tr('התאמה למסך','Fit photo')}</button></div>`;
-    c.toolbar.insertBefore(c.regionsButton,c.toolbar.firstChild);c.toolbar.append(c.regionsNote);
-    c.stage.before(c.toolbar);const levels=[1,1.5,2,3,4,6,8];
-    c.toolbar.querySelector('[data-face-zoom-in]').addEventListener('click',()=>setZoom(c,levels[Math.min(levels.length-1,levels.indexOf(c.zoom)+1)]));
-    c.toolbar.querySelector('[data-face-zoom-out]').addEventListener('click',()=>setZoom(c,levels[Math.max(0,levels.indexOf(c.zoom)-1)]));
-    c.toolbar.querySelector('[data-face-zoom-reset]').addEventListener('click',()=>setZoom(c,1));
+    if(!c.toolbar){
+      c.toolbar=document.createElement('div');c.toolbar.className='face-zoom-toolbar';c.toolbar.setAttribute('role','group');c.toolbar.setAttribute('aria-label',tr('הגדלה לדיוק תיוג פנים','Zoom for precise face tagging'));
+      c.toolbar.innerHTML=`<span class="face-zoom-help">${tr('פנים קטנות? הגדילו לתּיוג מדויק','Small faces? Zoom in to tag precisely')}</span><div><button type="button" data-face-zoom-out disabled aria-label="${tr('הקטנת התמונה','Zoom out')}">−</button><output data-face-zoom-level aria-live="polite">100%</output><button type="button" data-face-zoom-in aria-label="${tr('הגדלת התמונה','Zoom in')}">＋</button><button type="button" data-face-zoom-reset disabled>${tr('התאמה למסך','Fit photo')}</button></div>`;
+      c.toolbar.insertBefore(c.regionsButton,c.toolbar.firstChild);c.toolbar.append(c.regionsNote);c.stage.before(c.toolbar);
+    }
+    const levels=[1,1.5,2,3,4,6,8],options={signal:c.events.signal};
+    c.toolbar.querySelector('[data-face-zoom-in]').addEventListener('click',()=>setZoom(c,levels[Math.min(levels.length-1,levels.indexOf(c.zoom)+1)]),options);
+    c.toolbar.querySelector('[data-face-zoom-out]').addEventListener('click',()=>setZoom(c,levels[Math.max(0,levels.indexOf(c.zoom)-1)]),options);
+    c.toolbar.querySelector('[data-face-zoom-reset]').addEventListener('click',()=>setZoom(c,1),options);
     c.scroller.addEventListener('scroll',()=>place(c),{passive:true,signal:c.events.signal});
     c.scroller.addEventListener('pointerdown',event=>{c.scrollStart={x:c.scroller.scrollLeft,y:c.scroller.scrollTop};},{passive:true,signal:c.events.signal});
     fitZoom(c);
   }
   function setupRegions(c,on){
-    c.showRegions=false;c.regionsButton=document.createElement('button');c.regionsButton.type='button';c.regionsButton.className='face-regions-toggle';
-    c.regionsButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" stroke-dasharray="3 3"/><circle cx="12" cy="10" r="3"/><path d="M7 18a5 5 0 0 1 10 0"/></svg>';
-    c.regionsText=document.createElement('span');c.regionsText.className='face-regions-text';c.regionsButton.append(c.regionsText);
-    c.regionsNote=document.createElement('span');c.regionsNote.className='face-regions-note';c.regionsNote.hidden=true;c.regionsNote.id='faceRegionsNote-'+c.serial;c.regionsNote.setAttribute('role','status');c.regionsButton.setAttribute('aria-describedby',c.regionsNote.id);
-    if(c.reviewHost)c.reviewHost.append(c.regionsButton,c.regionsNote);else{c.stage.before(c.regionsButton);c.stage.before(c.regionsNote);}
+    c.showRegions=false;
+    if(!c.regionsButton){
+      c.regionsButton=document.createElement('button');c.regionsButton.type='button';c.regionsButton.className='face-regions-toggle';
+      c.regionsButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" stroke-dasharray="3 3"/><circle cx="12" cy="10" r="3"/><path d="M7 18a5 5 0 0 1 10 0"/></svg>';
+      c.regionsText=document.createElement('span');c.regionsText.className='face-regions-text';c.regionsButton.append(c.regionsText);
+      c.regionsNote=document.createElement('span');c.regionsNote.className='face-regions-note';c.regionsNote.hidden=true;c.regionsNote.id='faceRegionsNote-'+c.serial;c.regionsNote.setAttribute('role','status');c.regionsButton.setAttribute('aria-describedby',c.regionsNote.id);
+    }
+    if(!c.regionsButton.isConnected){if(c.reviewHost)c.reviewHost.append(c.regionsButton,c.regionsNote);else{c.stage.before(c.regionsButton);c.stage.before(c.regionsNote);}}
     on(c.regionsButton,'click',()=>{if(!live(c)||(c.adapter&&!c.adapter.enabled()))return;closePopup(c);c.showRegions=!c.showRegions;paint(c);});
   }
   function paint(c){
@@ -332,8 +353,10 @@
   async function mount(stage,image,item,{highlightMissing=false,adapter=null,dialog:hostDialog,reviewHost=null,reviewLabel=false,zoom=true,detectionImage=null}={}){
     const dialog=hostDialog||document.getElementById('mediaViewer'),existing=current;
     if(item.kind==='photo'&&window.FamilyApp?.apiEnabled&&live(existing)&&existing.initialized&&existing.stage===stage&&existing.image===image&&existing.item.id===item.id&&existing.item.photoRevision===item.photoRevision&&existing.adapter===adapter&&existing.highlightMissing===highlightMissing&&existing.dialog===dialog&&existing.reviewHost===reviewHost&&existing.reviewLabel===reviewLabel&&existing.zoomEnabled===zoom){update(item);return;}
-    clear();stage._familyFaceContext?.dispose();if(item.kind!=='photo'||!item.id||!window.FamilyApp?.apiEnabled)return;
-    const c={serial:++serial,stage,image,item,adapter,highlightMissing,reviewHost,reviewLabel,zoomEnabled:zoom,reviewed:Boolean(item.faceSummary?.reviewed),dialog,events:new AbortController(),saved:[],detected:[],ignored:[],adjusted:new Map(),faces:[],active:null,popup:null,ready:false,searchSequence:0,saving:false,adjust:false,drag:null,skipClick:false};current=c;stage._familyFaceContext=c;c.dispose=()=>dispose(c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:true}}));
+    if(current)clear();stage._familyFaceContext?.dispose();if(item.kind!=='photo'||!item.id||!window.FamilyApp?.apiEnabled){clear();return;}
+    if(retained&&(adapter||retained.stage!==stage||retained.dialog!==dialog||retained.reviewLabel!==reviewLabel||retained.zoomEnabled!==zoom))releaseControls();
+    const controls=retained?.controls;retained=null;
+    const c={serial:++serial,stage,image,item,adapter,highlightMissing,reviewHost,reviewLabel,zoomEnabled:zoom,reviewed:Boolean(item.faceSummary?.reviewed),dialog,events:new AbortController(),saved:[],detected:[],ignored:[],adjusted:new Map(),faces:[],active:null,popup:null,ready:false,searchSequence:0,saving:false,adjust:false,drag:null,skipClick:false,...controls};current=c;stage._familyFaceContext=c;c.dispose=()=>dispose(c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:true}}));
     c.paintReady=new Promise(resolve=>{c.resolvePaint=resolve;});
     c.geom=await helpers();if(!live(c))return;
     c.layer=document.createElement('div');c.layer.className='face-layer';c.hits=document.createElement('div');c.hits.className='face-image-area';c.buttons=document.createElement('div');c.buttons.className='face-hit-buttons';c.annotations=document.createElement('div');c.annotations.className='face-visible-labels';c.annotationNodes=[];c.selection=document.createElement('div');c.selection.className='face-selection';c.selection.hidden=true;c.annotationTarget=document.createElement('span');c.annotationTarget.className='face-label-target';c.annotationTarget.hidden=true;c.annotationTarget.setAttribute('aria-hidden','true');c.hits.append(c.buttons,c.annotations,c.selection,c.annotationTarget);c.layer.append(c.hits);
@@ -343,15 +366,18 @@
     }
     c.guide=document.createElement('div');c.guide.className='face-adjust-guide';c.guide.hidden=true;c.guide.innerHTML=`<span>${tr('סמנו מסביב לפנים בעזרת גרירה','Drag around the face')}</span><button type="button">${tr('ביטול','Cancel')}</button>`;c.guide.querySelector('button').addEventListener('click',()=>closePopup(c));c.layer.append(c.guide);
     c.status=document.createElement('p');c.status.className='visually-hidden';c.status.setAttribute('role','status');c.status.setAttribute('aria-live','polite');c.labelList=document.createElement('div');c.labelList.className='face-label-list';c.labelList.hidden=true;c.labelList.setAttribute('aria-label',tr('שמות לפי המספרים על הפנים','Names matching the numbered faces'));stage.append(c.layer,c.status,c.labelList);stage.classList.add('has-face-layer');
-    if(highlightMissing){c.missingNote=document.createElement('p');c.missingNote.className='face-missing-note';c.missingNote.setAttribute('role','status');stage.before(c.missingNote);}
+    if(highlightMissing){if(!c.missingNote){c.missingNote=document.createElement('p');c.missingNote.className='face-missing-note';c.missingNote.setAttribute('role','status');stage.before(c.missingNote);}}else{c.missingNote?.remove();c.missingNote=null;}
     const on=(target,type,callback,options={})=>target.addEventListener(type,callback,{...options,signal:c.events.signal});
     setupRegions(c,on);
     if(adapter||item.scope==='gallery'||item.collections?.includes('gallery')){
-      c.reviewButton=document.createElement('button');c.reviewButton.type='button';c.reviewButton.className='face-review-button';c.reviewButton.setAttribute('aria-keyshortcuts','\\');
-      c.reviewButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5"/><path d="M7 8h.01M13 8h.01M7 11.5a3.3 3.3 0 0 0 5.5.7"/><circle class="face-review-badge" cx="18" cy="17.5" r="5.5"/><path class="face-review-check" d="m15.5 17.5 1.7 1.7 3.3-3.5"/></svg>';
-      if(reviewLabel){c.reviewText=document.createElement('span');c.reviewText.className='face-review-text';c.reviewButton.append(c.reviewText);}
-      if(reviewHost)reviewHost.append(c.reviewButton);else{const title=document.getElementById('mediaViewerTitle'),edit=document.getElementById('editOpenedPhoto');title.insertBefore(c.reviewButton,edit.parentNode===title?edit:null);}
-      c.reviewStatus=document.createElement('span');c.reviewStatus.className='face-review-status';c.reviewStatus.hidden=true;c.reviewStatus.setAttribute('role','status');stage.before(c.reviewStatus);
+      if(!c.reviewButton){
+        c.reviewButton=document.createElement('button');c.reviewButton.type='button';c.reviewButton.className='face-review-button';c.reviewButton.setAttribute('aria-keyshortcuts','\\');
+        c.reviewButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5"/><path d="M7 8h.01M13 8h.01M7 11.5a3.3 3.3 0 0 0 5.5.7"/><circle class="face-review-badge" cx="18" cy="17.5" r="5.5"/><path class="face-review-check" d="m15.5 17.5 1.7 1.7 3.3-3.5"/></svg>';
+        if(reviewLabel){c.reviewText=document.createElement('span');c.reviewText.className='face-review-text';c.reviewButton.append(c.reviewText);}
+        c.reviewStatus=document.createElement('span');c.reviewStatus.className='face-review-status';c.reviewStatus.hidden=true;c.reviewStatus.setAttribute('role','status');stage.before(c.reviewStatus);
+      }
+      c.reviewButton.hidden=false;
+      if(!c.reviewButton.isConnected){if(reviewHost)reviewHost.append(c.reviewButton);else{const title=document.getElementById('mediaViewerTitle'),edit=document.getElementById('editOpenedPhoto');title.insertBefore(c.reviewButton,edit.parentNode===title?edit:null);}}
       on(c.reviewButton,'click',async()=>{
         if(!live(c)||c.reviewSaving||c.saving)return;c.reviewSaving=true;c.reviewButton.disabled=true;c.reviewButton.setAttribute('aria-busy','true');c.reviewStatus.hidden=true;c.reviewStatus.textContent='';
         try{
@@ -362,7 +388,7 @@
         }catch(error){if(live(c)){c.reviewStatus.hidden=false;c.reviewStatus.textContent=error.message;}}
         finally{c.reviewSaving=false;if(live(c)){c.reviewButton.disabled=false;c.reviewButton.setAttribute('aria-busy','false');if(!c.adapter)window.FamilyMedia?.refreshPhotoPresentation?.();}}
       });
-    }
+    }else{c.reviewButton?.remove();c.reviewStatus?.remove();c.reviewButton=null;c.reviewStatus=null;c.reviewText=null;}
     paint(c);
 
     on(stage,'click',event=>{

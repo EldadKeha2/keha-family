@@ -102,7 +102,7 @@
     counter=document.createElement('span');counter.className='photo-fullscreen-counter';counter.setAttribute('role','status');counter.setAttribute('aria-live','polite');counter.dir='auto';
     caption=document.createElement('p');caption.className='photo-fullscreen-caption';caption.dir='auto';status=document.createElement('p');status.className='photo-fullscreen-status';status.setAttribute('role','status');
     bar.append(play,counter,close);root.append(bar,previous,next,caption,status);viewer.append(root);
-    close.addEventListener('click',exit);previous.addEventListener('click',()=>media().step(-1));next.addEventListener('click',()=>media().step(1));
+    close.addEventListener('click',exit);previous.addEventListener('click',()=>media().step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.()}));next.addEventListener('click',()=>media().step(1,{instant:window.FamilyPhotoPresentation?.desktop?.()}));
     play.addEventListener('click',()=>{playing=!playing;sync();schedule();showControls();});
     root.addEventListener('pointermove',showControls,{passive:true});root.addEventListener('pointerdown',showControls,{passive:true});root.addEventListener('focusin',showControls);
     viewer.addEventListener('cancel',event=>{if(active){event.preventDefault();exit();}});

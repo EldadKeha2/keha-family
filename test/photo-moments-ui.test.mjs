@@ -8,7 +8,7 @@ const source=(await readFile(new URL('../public/assets/photo-moments.js',import.
 function fixture(english=false){
  const nodes=new Map(),changes=[];
  class Node extends EventTarget{
-  constructor(id=''){super();this.id=id;this.open=false;this.value='';this.dataset={};this.properties=new Map();this.style={setProperty:(key,value)=>this.properties.set(key,value)};}
+  constructor(id=''){super();this.id=id;this.open=false;this.value='';this.dataset={};this.classList={contains:()=>false};this.properties=new Map();this.style={setProperty:(key,value)=>this.properties.set(key,value)};}
   replaceChildren(){this.innerHTML='';}
   setAttribute(key,value){this[key]=value;}
   querySelectorAll(){return [];}
