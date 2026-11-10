@@ -9,7 +9,8 @@
 #mediaViewer .photo-fullscreen-viewer{z-index:9;width:40px;height:40px;padding:8px;line-height:1}
 #homeSlideStage{position:relative}
 #homeSlideStage:has(#homeSlideImage[hidden]) .photo-fullscreen-home{display:none}
-#mediaViewer.photo-fullscreen{position:fixed;inset:0;box-sizing:border-box;width:100vw;max-width:none;height:100dvh;max-height:100dvh;min-height:0;margin:0;padding:0;border:0;border-radius:0;overflow:hidden;background:#08090b;color:#fff}
+html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
+#mediaViewer.photo-fullscreen{position:fixed;inset:0;box-sizing:border-box;width:100%;max-width:none;height:100dvh;max-height:100dvh;min-height:0;margin:0;padding:0;border:0;border-radius:0;overflow:hidden;background:#08090b;color:#fff}
 #mediaViewer.photo-fullscreen::backdrop{background:#08090b;backdrop-filter:none}
 #mediaViewer.photo-fullscreen>:not(#photoFullscreenRoot){display:none!important}
 #photoFullscreenRoot{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:#08090b;color:#fff;isolation:isolate}
