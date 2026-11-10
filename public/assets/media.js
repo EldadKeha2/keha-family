@@ -267,8 +267,13 @@
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open]')&&(window.FamilyFaces?.canNavigate?.(stage)??true);
   }
   function refreshPhotoPresentation(){
+    const stage=$('mediaStage'),manual=desktopPhotoInput();
+    stage.classList.toggle('photo-manual-swipes',manual);
+    // Desktop/Windows uses the same immediate drag layers for trackpad, mouse
+    // and screen touch. A second horizontal scroller can steal the first touch
+    // before its initial snap/layout has settled; do not mount it in this mode.
+    if(manual){window.FamilyPhotoNative?.reset(stage);return;}
     if(!window.FamilyPhotoNative||state.photoLoading||state.paging)return;
-    $('mediaStage').classList.toggle('photo-manual-swipes',desktopPhotoInput());
     const page=albumPages.get(state.scope),wrap=state.scope!=='gallery'||!(page?.pages>1),items=state.items;
     window.FamilyPhotoNative.mount($('mediaStage'),{previous:items[state.fullscreen?photoIndex(-1,wrap):state.index-1]||(!state.fullscreen&&wrap?items.at(-1):null),next:items[state.fullscreen?photoIndex(1,wrap):state.index+1]||(!state.fullscreen&&wrap?items[0]:null),isEnglish:I18n.isEnglish,enabled:canNavigatePhoto,busy:()=>state.photoLoading||state.paging,step});
   }
@@ -335,7 +340,7 @@
     const stage=$('mediaStage');
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
-      enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:event=>{const mode=window.FamilyPhotoNative?.claim?.(stage)||'manual';return desktopPhotoInput()&&['touch','pen'].includes(event?.pointerType)?'queued':mode;},nativeEnd:dx=>window.FamilyPhotoNative?.note?.(stage,dx),
+      enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:()=>desktopPhotoInput()?'queued':window.FamilyPhotoNative?.claim?.(stage)||'manual',nativeEnd:dx=>window.FamilyPhotoNative?.note?.(stage,dx),
       step,isEnglish:()=>I18n.isEnglish,
       move:(dx,{queued=false}={})=>{
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}

@@ -305,7 +305,7 @@ test('mixed Windows pointer and touch streams finish a swipe even without pointe
  }
 });
 test('a second stroke can finish the first native snap before scrollend, even with fully prepared neighbours',async()=>{
- const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.preload=()=>{};
+ const f=fixture();f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.preload=()=>{};
  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});let first,claimed=false;
  f.window.FamilyPhotoNative={mount(){},reset(){},claim(){if(!claimed){claimed=true;first=f.window.FamilyMedia.step(1,{native:true});}return 'queued';}};
  pointer(f,'pointerdown',200);assert.equal(f.window.FamilyMedia.current().id,'a');pointer(f,'pointermove',340);pointer(f,'pointerup',340);await first;
@@ -328,6 +328,20 @@ test('Windows touch browsing owns horizontal swipes in every album and fullscree
   const f=fixture(),notes=[];f.navigator.userAgent='Mozilla/5.0 (Windows NT 10.0; Win64; x64)';f.window.FamilyPhotoPresentation.desktop=()=>false;f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native',note:(_stage,dx)=>notes.push(dx)};
   const stage=f.get('mediaStage');stage.clientWidth=width;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);assert.equal(stage.classList.contains('photo-manual-swipes'),true);
   swipe(f,120);assert.equal(f.window.FamilyMedia.current().id,'b',scope);swipe(f,-120);assert.equal(f.window.FamilyMedia.current().id,'a',scope);assert.deepEqual(notes,[],'No native browser scroll completion is required on Windows');f.close();
+ }
+});
+test('Windows galleries are ready for the first screen touch without a trackpad gesture or native-scroll initialization',()=>{
+ for(const width of [400,1440])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){
+  const f=fixture(),native={mounts:0,claims:0},stage=f.get('mediaStage'),captures=[];stage.clientWidth=width;stage.setPointerCapture=id=>captures.push(id);
+  f.navigator.userAgent='Mozilla/5.0 (Windows NT 10.0; Win64; x64)';f.window.FamilyPhotoPresentation.desktop=()=>false;
+  // A not-yet-centered native strip can try to finish a snap on pointerdown.
+  // It must never claim a Windows gesture before the finger has even moved.
+  f.window.FamilyPhotoNative={mount(){native.mounts++;},reset(){},claim(){native.claims++;f.window.FamilyMedia.step(1,{native:true});return 'queued';}};
+  f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  pointer(f,'pointerdown',200);assert.equal(f.window.FamilyMedia.photoState().busy,false,scope+' must not start another navigation on initial contact');assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(native.claims,0);assert.deepEqual(captures,[1]);
+  pointer(f,'pointermove',340);pointer(f,'pointerup',340);assert.equal(f.window.FamilyMedia.current().id,'b');
+  f.window.FamilyMedia.refreshPhotoPresentation();assert.equal(native.mounts,0,'Late face/image layout must not install a competing horizontal scroller');
+  f.close();f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);swipe(f,120);assert.equal(f.window.FamilyMedia.current().id,'b','Reopening is ready for touch immediately too');f.close();
  }
 });
 test('photo viewers request the family album toggle and keep current pixels while membership changes',()=>{
