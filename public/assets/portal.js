@@ -339,7 +339,15 @@
       }
       const close=event.target.closest('[data-close-dialog]');if(close){$(close.dataset.closeDialog).close();return;}
       const death=event.target.closest('[data-edit-death]');if(death){openBirthday(death.dataset.editDeath,'death');return;}
-      const upload=event.target.closest('[data-upload-collection]');if(upload){if(!canSave())return;const input=$({videos:'sharedVideosInput',photos:'sharedPhotosInput',gallery:'sharedGalleryInput'}[upload.dataset.uploadCollection]);input.value='';input.click();return;}
+      const source=event.target.closest('[data-gallery-upload-source]');if(source){
+        if(!canSave())return;const id={gallery:'sharedGalleryInput',camera:'sharedGalleryCamera'}[source.dataset.galleryUploadSource];if(!id)return;
+        $('galleryUploadSource').close();const input=$(id);input.value='';input.click();return;
+      }
+      const upload=event.target.closest('[data-upload-collection]');if(upload){
+        if(!canSave())return;const kind=upload.dataset.uploadCollection;
+        if(kind==='gallery'&&matchMedia('(max-width:700px)').matches){if(!$('galleryUploadSource').open)$('galleryUploadSource').showModal();return;}
+        const input=$({videos:'sharedVideosInput',photos:'sharedPhotosInput',gallery:'sharedGalleryInput'}[kind]);input.value='';input.click();return;
+      }
       const camera=event.target.closest('[data-camera-collection]');if(camera){if(!canSave())return;const input=$(camera.dataset.cameraCollection==='videos'?'sharedVideosCamera':'sharedPhotosCamera');input.value='';input.click();return;}
       const save=event.target.closest('[data-save-shared]');if(save){saveCaption(captionKey(save.dataset.sharedKind,save.dataset.saveShared));return;}
       const editCaption=event.target.closest('[data-edit-shared-caption]');if(editCaption){openPhotoCaption(editCaption);return;}
@@ -353,7 +361,11 @@
     document.addEventListener('change',event=>{if(event.target.matches('[data-gallery-sort]')){sortGallery(event.target.value);return;}if(!event.target.matches('[data-gallery-size]'))return;galleryPage.size=Number(event.target.value);galleryPage.page=1;refreshCollection('gallery',true);});
     document.addEventListener('input',event=>{if(event.target.matches('textarea[data-shared-file]'))editCaption(event.target);if(event.target.closest('#birthdayForm'))previewBirthday();});
     document.addEventListener('focusout',event=>{if(event.target.matches('textarea[data-shared-file]')&&event.target.dataset.captionInline===undefined)saveCaption(captionKey(event.target.dataset.sharedKind,event.target.dataset.sharedFile));});
-    for(const[kind,ids]of Object.entries({photos:['sharedPhotosInput','sharedPhotosCamera'],videos:['sharedVideosInput','sharedVideosCamera'],gallery:['sharedGalleryInput']}))for(const id of ids)$(id).addEventListener('change',()=>{if($(id).files.length)addFiles(kind,$(id).files);$(id).value='';});
+    for(const[kind,ids]of Object.entries({photos:['sharedPhotosInput','sharedPhotosCamera'],videos:['sharedVideosInput','sharedVideosCamera'],gallery:['sharedGalleryInput','sharedGalleryCamera']}))for(const id of ids)$(id).addEventListener('change',()=>{if($(id).files.length)addFiles(kind,$(id).files);$(id).value='';});
+    $('galleryUploadSource').addEventListener('click',event=>{
+      if(event.target!==$('galleryUploadSource'))return;const rect=event.target.getBoundingClientRect();
+      if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)event.target.close();
+    });
     for(const kind of ['photos','videos','gallery'])$(kind+'Dropzone').addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(kind+'Dropzone').contains(event.relatedTarget))$(kind+'Dropzone').classList.remove('drag-over');});
     $('birthdayForm').addEventListener('submit',saveBirthday);$('storyForm').addEventListener('submit',saveStory);
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
@@ -423,3 +435,4 @@
   window.FamilyPortal={getCollection:kind=>state.collections[kind],galleryQuery:()=>({...galleryPage}),refineGallery,sortGallery,pageGallery,isPartialGallery:()=>state.view==='gallery'&&galleryPage.filter==='partial',activate,search,acceptDrop,acceptPaste,dragOver};
   document.addEventListener('DOMContentLoaded',init);
 })();
+

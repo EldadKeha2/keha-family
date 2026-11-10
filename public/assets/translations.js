@@ -1,5 +1,7 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "הוספת תמונות מהגלריה בנייד":"Add photos from your phone gallery",
+  "הוספת תמונות ישירות ממצלמה":"Take a photo with your camera",
   "סדר לפי":"Order by",
   "אקראי":"Random",
   "בעמוד":"per page",
@@ -807,3 +809,4 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
  'יש לרענן את הדף לפני ההורדה.':'Refresh the page before downloading.'
 });
 Object.assign(window.FAMILY_TRANSLATIONS,{'לא נמצאו תמונות בסינון הזה':'No photos match these filters','אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':'Choose another person or family, or reset the filters.'});
+
