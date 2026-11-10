@@ -109,5 +109,28 @@
     motion={id,stage,ghost,incoming,animations,timer:setTimeout(finish,220)};
     Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(finish);
   }
-  window.FamilyPhotoPresentation={source,desktop,prepare,ready,copy,preload,snapshot,slide,drag,dragQueued,settle,cancel,holdNative,finishHandoff};
+  function transition(stage,ghost,effect){
+    if(!ghost)return;cancel();
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){ghost.remove();return;}
+    const image=photoImage(stage);if(!image?.animate){ghost.remove();return;}
+    const still=[{opacity:1},{opacity:1}],fade=[{opacity:1},{opacity:0}];
+    const effects={
+      dissolve:[fade,[{opacity:0},{opacity:1}]],
+      'zoom-in':[[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.94)'}],[{opacity:0,transform:'scale(1.12)'},{opacity:1,transform:'scale(1)'}]],
+      'zoom-out':[[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(1.1)'}],[{opacity:0,transform:'scale(.9)'},{opacity:1,transform:'scale(1)'}]],
+      drift:[[ {opacity:1,transform:'translateX(0)'},{opacity:0,transform:'translateX(-4%)'}],[{opacity:0,transform:'translateX(4%)'},{opacity:1,transform:'translateX(0)'}]],
+      rise:[fade,[{opacity:0,transform:'translateY(6%)'},{opacity:1,transform:'translateY(0)'}]],
+      curtain:[still,[{clipPath:'inset(0 50%)'},{clipPath:'inset(0 0)'}]],
+      iris:[still,[{clipPath:'circle(0% at 50% 50%)'},{clipPath:'circle(150% at 50% 50%)'}]]
+    };
+    const frames=effects[effect];if(!frames){ghost.remove();return;}
+    const incoming=document.createElement('div');incoming.className='media-slide-incoming';incoming.setAttribute('aria-hidden','true');
+    Object.assign(incoming.style,{position:'absolute',inset:'0',backgroundImage:'url('+JSON.stringify(image.currentSrc||image.src)+')',backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',backgroundColor:'#08090b',pointerEvents:'none',zIndex:'7',willChange:'transform,opacity,clip-path'});
+    const id=++serial,options={duration:650,easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};ghost.style.willChange='transform,opacity';
+    stage.classList.add('photo-slide-running');stage.append(ghost,incoming);
+    const animations=[ghost.animate(frames[0],options),incoming.animate(frames[1],options)];
+    const finish=()=>{if(motion?.id!==id)return;cancel();window.FamilyMedia?.refreshPhotoPresentation?.();};
+    motion={id,stage,ghost,incoming,animations,timer:setTimeout(finish,720)};Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(finish);
+  }
+  window.FamilyPhotoPresentation={source,desktop,prepare,ready,copy,preload,snapshot,slide,transition,drag,dragQueued,settle,cancel,holdNative,finishHandoff};
 })();

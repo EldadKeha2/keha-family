@@ -1,17 +1,18 @@
 .photo-fullscreen-thumb{position:relative;min-width:0;isolation:isolate}
 .photo-fullscreen-thumb:not(.photo-fullscreen-portrait)>:first-child{width:100%}
 .photo-fullscreen-portrait{display:inline-block;flex:none}
-.photo-fullscreen-launch{position:absolute;top:1px;right:1px;z-index:4;display:grid;place-items:center;box-sizing:border-box;width:40px;height:40px;min-width:40px;min-height:40px;padding:11px;border:0;border-radius:5px;background:transparent;color:#fff8e9;box-shadow:none;opacity:.78;cursor:pointer;touch-action:manipulation}
-.photo-fullscreen-launch svg{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 1px #332a20b3);pointer-events:none}
-.photo-fullscreen-launch:hover{background:transparent;opacity:1}
+.photo-fullscreen-launch{position:absolute;top:6px;right:6px;z-index:4;display:grid;place-items:center;box-sizing:border-box;width:40px;height:40px;min-width:40px;min-height:40px;padding:8px;border:1px solid #dce5d0;border-radius:9px;background:#536b3f;color:#fffdf5;box-shadow:0 2px 6px #23301b40;opacity:1;cursor:pointer;touch-action:manipulation}
+.photo-fullscreen-launch svg{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.photo-fullscreen-launch:hover{background:#435b30;opacity:1}
 .photo-fullscreen-launch:focus-visible{outline:2px solid #ad8135;outline-offset:-3px;opacity:1}
 #mediaViewer #mediaStage{position:relative}
 #mediaViewer :is(#mediaNext,#mediaPrevious){background:#647c4e;color:#fffdf5;border:1px solid #52683e;border-radius:8px;box-shadow:0 2px 5px #354b2426}
 #mediaViewer :is(#mediaNext,#mediaPrevious):hover{background:#536b3f;color:#fff}
 #mediaViewer :is(#mediaNext,#mediaPrevious) [data-paging-arrow]{font-size:28px;font-weight:700}
 #mediaViewer :is(#mediaNext,#mediaPrevious) .media-paging-label{font-weight:600}
-#mediaViewer .photo-fullscreen-viewer{z-index:9;width:44px;height:44px;min-width:44px;min-height:44px;padding:13px;line-height:1}
+#mediaViewer .photo-fullscreen-viewer{z-index:9;display:flex;flex-direction:column;justify-content:center;gap:3px;width:56px;height:54px;min-width:44px;min-height:44px;padding:5px;line-height:1}
 .photo-fullscreen-label{display:none}
+#mediaViewer .photo-fullscreen-viewer .photo-fullscreen-label{display:block;font:calc(10px * var(--a11y-text-scale,1))/1.1 var(--sans);white-space:nowrap}
 #mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer{top:0;right:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-width:0;height:auto;min-height:max(44px,var(--personal-rail));max-height:calc(var(--personal-zoom-top,76px) - 6px);padding:5px 2px;border:1px solid #cdbd99;border-radius:9px;background:#fcf8ee;color:#61734d;opacity:1}
 #mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer:hover{background:#f0f3e8;border-color:#a7b58c}
 #mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer svg{width:24px;height:24px;flex:none;stroke-width:1.8;filter:none}
@@ -30,7 +31,7 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #mediaViewer.photo-fullscreen #photoFullscreenRoot .native-photo-strip,#mediaViewer.photo-fullscreen #photoFullscreenRoot .native-photo-pane{height:100%;min-height:0}
 #mediaViewer.photo-fullscreen #photoFullscreenRoot #mediaStage>.photo-fullscreen-launch{display:none}
 #photoFullscreenRoot :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){z-index:20;opacity:0;transition:opacity .18s;pointer-events:none}
-#photoFullscreenRoot:is(.controls-visible,:has(button:focus-visible)) :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){opacity:1;pointer-events:auto}
+#photoFullscreenRoot:is(.controls-visible,:has(:is(button,select):focus-visible)) :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){opacity:1;pointer-events:auto}
 #photoFullscreenRoot .photo-fullscreen-bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:14px;padding:calc(12px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) 16px calc(16px + env(safe-area-inset-left,0px));background:linear-gradient(#000b,transparent)}
 #photoFullscreenRoot button{display:grid;place-items:center;flex:none;box-sizing:border-box;width:48px;height:48px;min-width:48px;min-height:48px;padding:12px;border:1px solid #ffffff4d;border-radius:50%;background:#17191bb8;color:white;cursor:pointer;touch-action:manipulation}
 #photoFullscreenRoot button svg{display:block;width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
@@ -38,6 +39,11 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #photoFullscreenRoot .photo-fullscreen-play:hover{background:linear-gradient(145deg,#a0bedb99 0%,#638ebbb0 48%,#436f9fc2 100%);border-color:#c3d8f1a6}
 #photoFullscreenRoot .photo-fullscreen-play svg{width:21px;height:21px;fill:currentColor}
 #photoFullscreenRoot .photo-fullscreen-play[aria-pressed=true] svg{fill:none;stroke-width:3.5}
+#photoFullscreenRoot .photo-fullscreen-speed{flex:none;box-sizing:border-box;width:76px;height:48px;min-height:44px;padding:6px;border:1px solid #ffffff73;border-radius:12px;background:#20282e;color:#fff;font:600 15px var(--sans);color-scheme:dark;cursor:pointer;touch-action:manipulation}
+#photoFullscreenRoot .photo-fullscreen-effects{width:62px;padding:5px;border-radius:12px;gap:2px;font:10px/1.1 var(--sans)}
+#photoFullscreenRoot .photo-fullscreen-effects svg{width:21px;height:21px}
+#photoFullscreenRoot .photo-fullscreen-effects[aria-pressed=true]{background:#345d80;border-color:#a4cff3;box-shadow:0 0 0 1px #a4cff34d}
+#photoFullscreenRoot .photo-fullscreen-speed:focus-visible{outline:3px solid #edce8e;outline-offset:3px}
 #photoFullscreenRoot .photo-fullscreen-counter{flex:1;text-align:center;font:15px/1.4 var(--sans);text-shadow:0 1px 5px #000}
 #photoFullscreenRoot .photo-fullscreen-previous{position:absolute;top:50%;left:max(14px,env(safe-area-inset-left,0px));transform:translateY(-50%)}
 #photoFullscreenRoot .photo-fullscreen-next{position:absolute;top:50%;right:max(14px,env(safe-area-inset-right,0px));transform:translateY(-50%)}
@@ -51,6 +57,7 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #photoFullscreenRoot .photo-fullscreen-status:empty,#photoFullscreenRoot [hidden]{display:none!important}
 #photoFullscreenRoot .photo-fullscreen-status{z-index:20}
 @media(hover:none),(pointer:coarse){#photoFullscreenRoot :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){opacity:1;pointer-events:auto}}
-@media(pointer:coarse){.photo-fullscreen-launch{width:44px;height:44px;min-width:44px;min-height:44px;padding:13px}}
-@media(max-width:700px){.photo-fullscreen-launch{top:0;right:0;width:44px;height:44px;min-width:44px;min-height:44px;padding:15px}.photo-fullscreen-launch svg{width:14px;height:14px}#mediaViewer .photo-fullscreen-viewer{padding:15px}#photoFullscreenRoot button{width:44px;height:44px;min-width:44px;min-height:44px;padding:10px}#photoFullscreenRoot .photo-fullscreen-counter{font-size:13px}#photoFullscreenRoot .photo-fullscreen-caption{padding-inline:56px}}
+@media(pointer:coarse){.photo-fullscreen-launch{width:44px;height:44px;min-width:44px;min-height:44px;padding:10px}}
+@media(max-width:700px){.photo-fullscreen-launch{width:44px;height:44px;min-width:44px;min-height:44px;padding:10px}#photoFullscreenRoot button{width:44px;height:44px;min-width:44px;min-height:44px;padding:10px}#photoFullscreenRoot .photo-fullscreen-speed{height:44px;width:68px}#photoFullscreenRoot .photo-fullscreen-effects{width:56px;padding:4px}#photoFullscreenRoot .photo-fullscreen-counter{font-size:13px}#photoFullscreenRoot .photo-fullscreen-caption{padding-inline:56px}}
+@media(max-width:480px){#photoFullscreenRoot .photo-fullscreen-bar{flex-wrap:wrap;gap:8px;padding-inline:12px}#photoFullscreenRoot .photo-fullscreen-close{margin-left:auto}#photoFullscreenRoot .photo-fullscreen-counter{order:5;flex:0 0 100%;margin-top:2px}}
 @media(prefers-reduced-motion:reduce){#photoFullscreenRoot :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){transition:none}}

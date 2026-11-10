@@ -63,7 +63,7 @@
     if($('mediaViewer')?.open&&state.scope?.startsWith('link:')&&scope===routeAlbum()&&new URL(location.href).searchParams.get('media')===state.activeId&&items.some(item=>identity(item)===state.activeId))state.scope=scope;
     if(!$('mediaViewer')?.open||state.scope!==scope)return;
     if(state.paging&&pagination?.page===state.pageTarget){
-      const session=state.session,render=()=>{if(session!==state.session||!$('mediaViewer').open)return;state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1,{direction:state.pageDirection,native:state.pageNative,instant:state.pageInstant});else $('mediaViewer').close();};
+      const session=state.session,render=()=>{if(session!==state.session||!$('mediaViewer').open)return;state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1,{direction:state.pageDirection,native:state.pageNative,instant:state.pageInstant,effect:state.pageEffect});else $('mediaViewer').close();};
       let idle=state.pageNative||state.pageQueued?photoSwipe?.whenIdle?.():null;
       if(idle)state.pageRender=(async()=>{do{await idle;idle=photoSwipe?.whenIdle?.();}while(idle);render();})();else render();return;
     }
@@ -175,7 +175,7 @@
     $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
     $('mediaStage').replaceChildren();
   }
-  function show(index,{direction=0,image=null,native=false,instant=false}={}){
+  function show(index,{direction=0,image=null,native=false,instant=false,effect=null}={}){
     if(!state.items.length)return;
     const handoff=native?window.FamilyPhotoPresentation?.holdNative?.($('mediaStage'),image):null;
     const ghost=!instant&&!native&&direction&&current()?.kind==='photo'?window.FamilyPhotoPresentation?.snapshot($('mediaStage')):null;
@@ -204,7 +204,7 @@
       }
       const preload=()=>{if($('mediaViewer').open&&current()===item)window.FamilyPhotoThumbnails?.schedule(item,img);};
       if(img.complete&&img.naturalWidth)preload();else img.addEventListener('load',preload,{once:true});
-      if(item.kind==='photo'&&!instant)window.FamilyPhotoPresentation?.slide(stage,ghost,direction*(I18n.isEnglish?1:-1));
+      if(item.kind==='photo'&&!instant){if(effect&&!native)window.FamilyPhotoPresentation?.transition(stage,ghost,effect);else window.FamilyPhotoPresentation?.slide(stage,ghost,direction*(I18n.isEnglish?1:-1));}
       refreshPhotoPresentation();
       window.FamilyPhotoPresentation?.finishHandoff?.(handoff,img,window.FamilyFaces?.whenReady?.(stage,img));
       if(state.fullscreen)window.FamilyPhotoFullscreen?.present(item,img);
@@ -227,13 +227,13 @@
     const url=new URL(location.href);url.searchParams.set('media',item.id);window.FamilyNavigation.go(url.href,{replace});
   }
   function openFrom(scope,id){const items=albums.get(scope)||[];return open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
-  async function step(direction,{native=false,instant=false,queued=false}={}){
+  async function step(direction,{native=false,instant=false,queued=false,effect=null}={}){
     if(!current())return;
     state.photoActivity=Date.now();
     if(state.paging){
       if(!queued||!state.pageRequest)return;
       const session=state.session;try{await state.pageRequest;}catch{return;}
-      if(session===state.session&&$('mediaViewer').open)return step(direction,{native,instant,queued});return;
+      if(session===state.session&&$('mediaViewer').open)return step(direction,{native,instant,queued,effect});return;
     }
     if(state.photoLoading&&native&&!queued)return;
     const waiting=state.photoLoading?state.items.findIndex(item=>identity(item)===state.photoTarget):-1,from=waiting>=0?waiting:state.index;
@@ -242,11 +242,11 @@
     if(next>=0&&next<state.items.length||state.scope!=='gallery'||!(page?.pages>1)||!window.FamilyPortal?.pageGallery){
       const target=(next+state.items.length)%state.items.length,item=state.items[target],navigation=++state.navigation;
       const ready=item.kind==='photo'?window.FamilyPhotoPresentation?.ready?.(item):null;
-      if(state.photoLoading&&target===state.index){state.photoLoading=false;state.photoTarget=null;window.FamilyPhotoNative?.reset?.($('mediaStage'));navigationBusy();refreshPhotoPresentation();window.FamilyPhotoFullscreen?.sync();return;}
+      if(state.photoLoading&&target===state.index){state.photoLoading=false;state.photoTarget=null;window.FamilyPhotoPresentation?.cancel();navigationBusy();refreshPhotoPresentation();window.FamilyPhotoFullscreen?.sync();return;}
       let idle=native||queued?photoSwipe?.whenIdle?.():null;
-      if(ready&&!idle){state.photoLoading=false;state.photoTarget=null;show(target,{direction,native,instant,image:ready});return;}
+      if(ready&&!idle){state.photoLoading=false;state.photoTarget=null;show(target,{direction,native,instant,effect,image:ready});return;}
       const pending=ready?Promise.resolve(ready):item.kind==='photo'?window.FamilyPhotoPresentation?.prepare(item):null;
-      if(!pending&&!idle){state.photoLoading=false;state.photoTarget=null;show(next,{direction,native,instant});return;}
+      if(!pending&&!idle){state.photoLoading=false;state.photoTarget=null;show(next,{direction,native,instant,effect});return;}
       state.photoLoading=true;state.photoTarget=identity(item);navigationBusy();window.FamilyPhotoFullscreen?.sync();let image=null;
       try{image=await pending;}catch{}
       if(navigation!==state.navigation||!$('mediaViewer').open)return;
@@ -254,9 +254,9 @@
       // select another photo before the earlier load replaces the touch target.
       if(idle)await idle;while((native||queued)&&(idle=photoSwipe?.whenIdle?.()))await idle;
       if(navigation!==state.navigation||!$('mediaViewer').open)return;
-      state.photoLoading=false;state.photoTarget=null;const updated=state.items.findIndex(photo=>identity(photo)===identity(item));if(updated>=0)show(updated,{direction,native,instant,image:versionKey(state.items[updated])===versionKey(item)?window.FamilyPhotoPresentation?.copy?.(image)||image:null});else metadata();return;
+      state.photoLoading=false;state.photoTarget=null;const updated=state.items.findIndex(photo=>identity(photo)===identity(item));if(updated>=0)show(updated,{direction,native,instant,effect,image:versionKey(state.items[updated])===versionKey(item)?window.FamilyPhotoPresentation?.copy?.(image)||image:null});else metadata();return;
     }
-    const navigation=++state.navigation;state.photoLoading=false;state.photoTarget=null;state.paging=true;state.pageDirection=direction;state.pageNative=native;state.pageQueued=queued;state.pageInstant=instant;state.pageTarget=(page.page-1+direction+page.pages)%page.pages+1;metadata();
+    const navigation=++state.navigation;state.photoLoading=false;state.photoTarget=null;state.paging=true;state.pageDirection=direction;state.pageNative=native;state.pageQueued=queued;state.pageInstant=instant;state.pageEffect=effect;state.pageTarget=(page.page-1+direction+page.pages)%page.pages+1;metadata();
     state.pageRender=null;
     try{state.pageRequest=Promise.resolve(window.FamilyPortal.pageGallery(state.pageTarget)).then(()=>state.pageRender);await state.pageRequest;}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;state.pageRequest=null;state.pageRender=null;if($('mediaViewer').open)metadata();}}
   }

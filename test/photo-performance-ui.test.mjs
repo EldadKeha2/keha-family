@@ -55,6 +55,19 @@ test('desktop and mobile warm different browsing windows without duplicating the
   assert.deepEqual(images.map(image=>image.fetchPriority),mobile?['high','high','low','low','low']:['high','high','low','low','low','low']);await Promise.all(images.map(image=>image.onload()));
  }
 });
+test('slideshow effects animate independent layers, clean up on reversal and respect reduced motion',async()=>{
+ let reduced=false,refreshed=0;const animations=[],layers=[],classes=new Set(),window={FamilyMedia:{refreshPhotoPresentation(){refreshed++;}}};
+ const node=()=>({style:{},setAttribute(){},remove(){this.removed=true;},animate(frames,options){let resolve;const animation={owner:this,frames,options,finished:new Promise(done=>resolve=done),cancel(){this.cancelled=true;resolve();},finish:()=>resolve()};animations.push(animation);return animation;}});
+ const image={...node(),src:'/photo/current',naturalWidth:1600,getBoundingClientRect:()=>({left:0,top:0,width:640,height:400})},stage={clientWidth:640,classList:{add:name=>classes.add(name),remove:name=>classes.delete(name)},querySelector:()=>image,getBoundingClientRect:()=>({left:0,top:0}),append:(...nodes)=>layers.push(...nodes)};
+ vm.runInNewContext(presentation,{window,document:{createElement:node},navigator:{},matchMedia:()=>({matches:reduced}),setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation;
+ for(const effect of ['dissolve','zoom-in','zoom-out','drift','rise','curtain','iris']){
+  const start=animations.length,ghost=p.snapshot(stage);p.transition(stage,ghost,effect);assert.equal(animations.length,start+2);assert.equal(classes.has('photo-slide-running'),true);assert.equal(animations.at(-1).options.duration,650);assert.equal(animations.some(animation=>animation.owner===image),false);
+  if(effect==='iris'){animations.at(-2).finish();animations.at(-1).finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(refreshed,1);}
+  else p.drag(stage,-100);
+  assert.equal(classes.has('photo-slide-running'),false);assert.equal(ghost.removed,true);assert.equal(layers.at(-1).removed,true);p.cancel();
+ }
+ const ghost=p.snapshot(stage);reduced=true;const before=animations.length;p.transition(stage,ghost,'iris');assert.equal(animations.length,before);assert.equal(ghost.removed,true);assert.equal(p.snapshot(stage),null);assert.equal(image.removed,undefined);
+});
 test('decoded previews are available synchronously and remain intact after zooming to originals',async()=>{
  const images=[],window={};class Image{constructor(){images.push(this);this.naturalWidth=1200;this.naturalHeight=800;}cloneNode(){return {src:this.src,naturalWidth:this.naturalWidth,naturalHeight:this.naturalHeight};}}
  vm.runInNewContext(presentation,{window,Image,navigator:{},setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation,item={kind:'photo',src:'/original/a',previewSrc:'/preview/a'};

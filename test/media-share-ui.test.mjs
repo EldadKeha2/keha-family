@@ -58,6 +58,15 @@ test('fullscreen traverses gallery pages, wraps the last page and retains the se
  await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.window.FamilyMedia.photoState().index,2);assert.equal(f.window.FamilyMedia.photoState().total,4);assert.equal(f.window.FamilyMedia.photoState().active,true);
  await f.window.FamilyMedia.step(1);await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'a');assert.deepEqual(visited,[2,1]);f.close();assert.equal(f.window.FamilyMedia.photoState().active,false);
 });
+test('slideshow effects survive gallery pagination and ordinary navigation never requests them',async()=>{
+ const f=fixture(),transitions=[],slides=[];f.window.FamilyPhotoPresentation.snapshot=()=>({});f.window.FamilyPhotoPresentation.transition=(_stage,_ghost,effect)=>transitions.push(effect);f.window.FamilyPhotoPresentation.slide=(_stage,_ghost,direction)=>slides.push(direction);
+ const pages=[[f.photo('a'),f.photo('b')],[f.photo('c')]],register=page=>f.window.FamilyMedia.register('gallery',pages[page-1],{pagination:{page,pages:2,size:2,total:3}});
+ register(1);f.window.FamilyMedia.openFrom('gallery','a');f.window.FamilyMedia.setFullscreen(true);
+ f.window.FamilyPortal={pageGallery:async page=>register(page)};
+ await f.window.FamilyMedia.step(1,{effect:'iris'});await f.window.FamilyMedia.step(1,{effect:'curtain'});assert.deepEqual(transitions,['iris','curtain']);assert.equal(f.window.FamilyMedia.current().id,'c');
+ await f.window.FamilyMedia.step(-1,{instant:true});assert.deepEqual(transitions,['iris','curtain']);assert.equal(f.window.FamilyMedia.current().id,'b');
+ await f.window.FamilyMedia.step(-1);assert.equal(slides.at(-1),1);assert.deepEqual(transitions,['iris','curtain']);f.close();
+});
 test('fullscreen cannot discard a caption draft or interrupt face editing and pending face saves',()=>{
  const f=fixture();f.open();f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='Unfinished description';assert.equal(f.window.FamilyMedia.setFullscreen(true),false);assert.equal(f.get('openedCaptionText').value,'Unfinished description');assert.equal(f.get('openedCaptionForm').hidden,false);
  f.get('cancelOpenedCaption').handlers.get('click')();
@@ -242,6 +251,22 @@ test('a photo load finishing under the next finger cannot replace its touch targ
  if(native)assert.deepEqual(moves,[{dx:140,current:'b',next:'c'}],'The following photo already follows the finger while the earlier target is still loading');
  loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaStage').content[0],shown);
  pointer(f,'pointerup',340);assert.deepEqual([...loads.keys()],['b','c']);loads.get('c')(null);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+ }
+});
+test('reversing an unfinished native swipe removes both partial previews and restores the original photo',async()=>{
+ for(const english of [false,true])for(const fullscreen of [false,true]){
+  const f=fixture({english}),loads=new Map(),stage=f.get('mediaStage');stage.clientWidth=360;
+  f.window.FamilyPhotoPresentation.preload=()=>{};f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+  if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  const original=stage.content[0];f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.set(item.id,resolve));
+  f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'queued'};
+  const dx=english?-140:140;swipe(f,dx);pointer(f,'pointerdown',200);pointer(f,'pointermove',200-dx);
+  assert.equal(stage.content.filter(node=>node.className==='photo-queued-drag').length,1,'The second stroke shows partial images while the first target loads');
+  pointer(f,'pointerup',200-dx);
+  assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.window.FamilyMedia.photoState().busy,false);
+  assert.equal(stage.content.filter(node=>node.className==='photo-queued-drag').length,0,'Returning to the displayed photo must clear both half-images');assert.equal(stage.content[0],original);
+  loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a','The cancelled load cannot revive the next photo');
+  swipe(f,dx);loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'b','Another swipe remains usable after reversing');f.close();
  }
 });
 test('pointer cancellation during a repeated Android stroke retains it through image loading and touch release',async()=>{
