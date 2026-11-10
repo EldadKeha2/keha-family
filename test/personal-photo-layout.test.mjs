@@ -69,7 +69,7 @@ test('personal desktop groups retain actual controls, requested physical order, 
  for(const english of [false,true]){
   const f=fixture({english}),download=f.get('mediaOriginal'),names=f.get('togglePhotoNames'),deleteButton=f.get('mediaViewerDelete');let clicks=0;download.addEventListener('click',()=>clicks++);names.addEventListener('click',()=>clicks++);deleteButton.addEventListener('click',()=>clicks++);names.focus();f.sync();
   assert.equal(f.get('mediaStage').parentNode.id,'personalPhotoFrame');assert.equal(f.get('mediaViewerCollections').parentNode.id,'personalPhotoAlbums');assert.equal(f.controller.toolbar.parentNode.id,'personalPhotoZoom');
-  assert.deepEqual(f.get('personalPhotoPrimary').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['mediaViewerDelete','editOpenedCaption','openedProfilePhoto']);
+  assert.deepEqual(f.get('personalPhotoPrimary').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['mediaViewerDelete','openedProfilePhoto','editOpenedCaption']);
   assert.deepEqual(f.get('collectionGroup').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['album-family','album-baby','album-wedding']);
   assert.equal(f.get('photoMomentTools').parentNode.id,'personalPhotoInformation');assert.equal(f.controller.regionsButton.parentNode.id,'photoMomentTools');assert.equal(download.parentNode.id,'mediaShareActions');assert.equal(f.get('mediaShareActions').parentNode.id,'personalPhotoBelow');
   assert.equal(f.get('personalPhotoCounter').textContent,english?'Photo 1 of 12':'תמונה 1 מתוך 12');assert.equal(f.document.activeElement,names);

@@ -89,7 +89,7 @@
       const moment=$('photoMomentTools');move(moment,info);
       if(controller?.regionsButton)move(controller.regionsButton,moment);
       const taken=moment?.querySelector('.photo-taken-date');if(taken)move(taken,$('editPhotoDate'));
-      arrange(primary,[$('mediaViewerDelete'),$('editOpenedCaption'),$('openedProfilePhoto')]);
+      arrange(primary,[$('mediaViewerDelete'),$('openedProfilePhoto'),$('editOpenedCaption')]);
       arrange(editDock,[$('editOpenedPhoto')]);arrange(reviewDock,[controller?.reviewButton]);
       const sharing=$('mediaShareActions'),copy=$('copyMediaLink'),download=$('mediaOriginal');
       move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
