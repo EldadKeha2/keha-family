@@ -6,6 +6,10 @@
 .photo-fullscreen-launch:hover{background:transparent;opacity:1}
 .photo-fullscreen-launch:focus-visible{outline:2px solid #ad8135;outline-offset:-3px;opacity:1}
 #mediaViewer #mediaStage{position:relative}
+#mediaViewer :is(#mediaNext,#mediaPrevious){background:#54733d;color:#fffdf5;border:1px solid #405c2d;border-radius:8px;box-shadow:0 2px 5px #354b2426}
+#mediaViewer :is(#mediaNext,#mediaPrevious):hover{background:#405d2c;color:#fff}
+#mediaViewer :is(#mediaNext,#mediaPrevious) [data-paging-arrow]{font-size:28px;font-weight:700}
+#mediaViewer :is(#mediaNext,#mediaPrevious) .media-paging-label{font-weight:600}
 #mediaViewer .photo-fullscreen-viewer{z-index:9;width:44px;height:44px;min-width:44px;min-height:44px;padding:13px;line-height:1}
 #homeSlideStage{position:relative}
 #homeSlideStage:has(#homeSlideImage[hidden]) .photo-fullscreen-home{display:none}
@@ -33,6 +37,9 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #photoFullscreenRoot .photo-fullscreen-previous{position:absolute;top:50%;left:max(14px,env(safe-area-inset-left,0px));transform:translateY(-50%)}
 #photoFullscreenRoot .photo-fullscreen-next{position:absolute;top:50%;right:max(14px,env(safe-area-inset-right,0px));transform:translateY(-50%)}
 #photoFullscreenRoot button:hover{background:#34383bd9;border-color:#fff}
+#photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next){background:#54733d;color:#fffdf5;border-color:#9bb887;box-shadow:0 2px 7px #17230f40}
+#photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next):hover{background:#405d2c;border-color:#c3d7b5}
+#photoFullscreenRoot :is(.photo-fullscreen-previous,.photo-fullscreen-next) svg{stroke-width:2.6}
 #photoFullscreenRoot button:focus-visible{outline:3px solid #edce8e;outline-offset:3px}
 #photoFullscreenRoot button:disabled{opacity:.35;cursor:default}
 #photoFullscreenRoot :is(.photo-fullscreen-caption,.photo-fullscreen-status){position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;margin:0;padding:20px 76px calc(18px + env(safe-area-inset-bottom,0px));max-height:28%;overflow:auto;background:linear-gradient(transparent,#000c);color:#fff;text-align:center;white-space:pre-wrap;font:clamp(15px,2vw,20px)/1.6 var(--sans);text-shadow:0 1px 5px #000}
