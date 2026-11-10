@@ -4,11 +4,16 @@
   const supported=()=>typeof CSS!=='undefined'&&CSS.supports('scroll-snap-type','x mandatory');
   function reset(stage){
     if(!active||stage&&active.stage!==stage)return;
-    const b=active;active=null;clearTimeout(b.timer);b.resize?.disconnect();
+    const b=active;active=null;clearTimeout(b.timer);clearTimeout(b.releaseTimer);b.resize?.disconnect();
     b.viewport.before(b.node);b.viewport.remove();b.stage.classList.remove('has-native-photo-strip');
   }
   function has(stage){return active?.stage===stage;}
-  function note(stage,dx){const b=active;if(b?.stage===stage&&!b.locked){b.releasedPage=dx>0?0:2;b.releasedAt=Date.now();}}
+  function note(stage,dx){
+    const b=active;if(b?.stage!==stage||b.locked)return;b.releasedPage=dx>0?0:2;b.releasedAt=Date.now();clearTimeout(b.releaseTimer);
+    // A Windows/browser gesture can finish without scrolling its native strip.
+    // The released finger still selects its neighbour; never lose that swipe.
+    b.releaseTimer=setTimeout(()=>{if(active!==b||b.locked||b.releasedPage==null)return;b.width=b.viewport.clientWidth||b.width;b.viewport.scrollLeft=b.releasedPage*b.width;b.finish();},180);
+  }
   function claim(stage){
     const b=active;if(!b||b.stage!==stage)return 'manual';
     if(b.locked)return 'queued';
@@ -40,9 +45,9 @@
     const finish=b.finish=()=>{
       if(active!==b||b.locked||!b.width)return;
       const page=Math.round(viewport.scrollLeft/b.width);
-      if(page===1){b.releasedPage=null;return;}if(Math.abs(viewport.scrollLeft-page*b.width)>2)return;
+      if(page===1)return;if(Math.abs(viewport.scrollLeft-page*b.width)>2)return;
       if(!enabled()){viewport.scrollLeft=b.width;return;}
-      b.locked=true;viewport.style.overflowX='hidden';
+      clearTimeout(b.releaseTimer);b.releasedPage=null;b.locked=true;viewport.style.overflowX='hidden';
       const direction=(page>1?1:-1)*(isEnglish?1:-1);
       Promise.resolve(step(direction,{native:true})).finally(()=>{if(active===b&&!busy?.()){b.locked=false;viewport.style.overflowX='';viewport.scrollLeft=b.width;}});
     };

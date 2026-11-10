@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../public/assets/photo-native.js',import.meta.url),'utf8');
-function fixture({mobile=false,english=false,supported=true,scrollEnd=false}={}){
+function fixture({mobile=false,english=false,supported=true,scrollEnd=false,width=mobile?360:800}={}){
  class Node{
-  constructor(){this.nodeType=1;this.children=[];this.handlers=new Map();this.clientWidth=mobile?360:800;this.scrollLeft=0;this.className='';this.parent=null;this.style={};if(scrollEnd)this.onscrollend=null;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)};}
+  constructor(){this.nodeType=1;this.children=[];this.handlers=new Map();this.clientWidth=width;this.scrollLeft=0;this.className='';this.parent=null;this.style={};if(scrollEnd)this.onscrollend=null;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)};}
   setAttribute(name,value){this[name]=value;}
   addEventListener(type,handler){this.handlers.set(type,handler);}
   append(...nodes){for(const node of nodes){node.remove();node.parent=this;this.children.push(node);}}
@@ -54,5 +54,14 @@ test('a released native flick is counted before a second stroke interrupts its u
   f.api.note(f.stage,dx);assert.equal(f.calls.length,0,'A single swipe still belongs to native scrolling until it snaps');
   assert.equal(f.api.claim(f.stage),'queued');assert.deepEqual(f.calls,[{direction:dx>0?1:-1,native:true}]);await new Promise(resolve=>setImmediate(resolve));
  }
- const f=fixture({mobile:true,scrollEnd:true});f.api.mount(f.stage,f.options);f.api.note(f.stage,120);f.stage.children[0].handlers.get('scrollend')();assert.equal(f.api.claim(f.stage),'native','A snap back to the center cancels its old flick');f.api.reset();
+ const f=fixture({mobile:true,scrollEnd:true});f.api.mount(f.stage,f.options);f.stage.children[0].handlers.get('scrollend')();assert.equal(f.api.claim(f.stage),'native','Returning to center without a released swipe never selects another photo');f.api.reset();
+});
+test('released touch swipes still select a neighbour when native scrolling is cancelled or reports no completion',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const mobile of [false,true])for(const english of [false,true])for(const dx of [-120,120]){
+  const f=fixture({mobile,english,scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];f.api.note(f.stage,dx);strip.handlers.get('scrollend')();assert.equal(f.calls.length,0);
+  t.mock.timers.tick(179);assert.equal(f.calls.length,0);t.mock.timers.tick(1);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.calls,[{direction:(dx>0?-1:1)*(english?1:-1),native:true}]);strip.handlers.get('scrollend')();assert.equal(f.calls.length,1,'A late browser completion cannot advance twice');
+ }
+ const hidden=fixture({mobile:true,scrollEnd:true,width:0});hidden.api.mount(hidden.stage,hidden.options);hidden.stage.children[0].clientWidth=360;hidden.api.note(hidden.stage,120);t.mock.timers.tick(180);assert.equal(hidden.calls.length,1,'Opening while hidden must not permanently retain a zero-width strip');
+ const closed=fixture({mobile:true,scrollEnd:true});closed.api.mount(closed.stage,closed.options);closed.api.note(closed.stage,120);closed.api.reset();t.mock.timers.tick(500);assert.equal(closed.calls.length,0);
 });

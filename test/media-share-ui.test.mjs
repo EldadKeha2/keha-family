@@ -196,13 +196,32 @@ test('touch swipes navigate every photo album in both languages and on wide touc
   swipe(f,english?120:-120);assert.equal(f.get('mediaOriginal').href,'/media/c','Previous wraps just like its arrow');
  }
 });
-test('taps, short drags, vertical scrolling, mouse drags and gestures over controls leave the photo in place',()=>{
+test('taps, short drags, vertical scrolling and gestures over controls leave the photo in place',()=>{
  const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
- swipe(f,4);swipe(f,20);swipe(f,120,{pointerType:'mouse'});swipe(f,120,{target:{closest:()=>({})}});
+ swipe(f,4);swipe(f,20);swipe(f,120,{target:{closest:()=>({})}});
  pointer(f,'pointerdown',100,100);pointer(f,'pointermove',110,220);pointer(f,'pointerup',240,225);
  assert.equal(f.get('mediaOriginal').href,'/media/a');
  const tap={detail:1,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;}};
  pointer(f,'pointerdown',100);pointer(f,'pointerup',100);f.get('mediaStage').handlers.get('click')(tap);assert.equal(tap.prevented,undefined,'An ordinary tap still reaches face tagging');
+});
+test('desktop mouse drags navigate every album and fullscreen without triggering native image dragging',()=>{
+ for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){
+  const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=1440;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  assert.equal(stage.content[0].draggable,false);f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native'};
+  swipe(f,english?-120:120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'b',scope);swipe(f,english?120:-120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'a',scope);
+  for(const extra of [{button:2},{ctrlKey:true},{metaKey:true},{target:{closest:()=>({})}}])swipe(f,120,{pointerType:'mouse',buttons:1,...extra});assert.equal(f.window.FamilyMedia.current().id,'a');
+  f.window.FamilyPhotoPresentation.desktop=()=>false;swipe(f,120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'a','Phone mouse compatibility events cannot duplicate touch swipes');f.close();
+ }
+});
+test('horizontal trackpad bursts navigate once while vertical scrolling and pinch-zoom remain native',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const english of [false,true]){
+  const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=1440;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+  const wheel=(dx,dy=0,extra={})=>{const event={deltaX:dx,deltaY:dy,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){this.prevented=true;},...extra};stage.handlers.get('wheel')(event);return event;};
+  assert.equal(wheel(0,120).prevented,undefined);assert.equal(wheel(80,0,{ctrlKey:true}).prevented,undefined);assert.equal(wheel(80,0,{target:{closest:()=>({})}}).prevented,undefined);
+  const dx=english?35:-35;wheel(dx);wheel(dx);wheel(dx);t.mock.timers.tick(119);assert.equal(f.window.FamilyMedia.current().id,'a');t.mock.timers.tick(1);assert.equal(f.window.FamilyMedia.current().id,'b');t.mock.timers.tick(300);assert.equal(f.window.FamilyMedia.current().id,'b');
+  wheel(-dx);wheel(-dx);wheel(-dx);t.mock.timers.tick(120);assert.equal(f.window.FamilyMedia.current().id,'a');wheel(dx);f.close();t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,'a');
+ }
 });
 test('pinch, cancelled and stale gestures never navigate and swipes cannot activate a face tag',()=>{
  const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
@@ -291,9 +310,16 @@ test('a native gallery page arriving under the next stroke keeps the touch targe
  pointer(f,'pointerup',340);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.get('mediaViewerCounter').textContent,'4 / 4');f.close();
 });
 test('the first native touch stays with browser scrolling and cannot also trigger fallback navigation',()=>{
- const f=fixture(),notes=[];f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native',note:(_stage,dx)=>notes.push(dx)};
+ const f=fixture(),notes=[];f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native',note:(_stage,dx)=>notes.push(dx)};
  const touch=(type,x)=>{const p={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[p],changedTouches:[p],target:p.target,cancelable:true,preventDefault(){this.prevented=true;}};(type==='touchstart'?f.get('mediaStage').handlers:f.events).get(type)(event);return event;};
  pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointercancel',200);assert.equal(touch('touchmove',340).prevented,undefined);assert.deepEqual(notes,[]);touch('touchend',340);assert.deepEqual(notes,[140]);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+});
+test('Windows touch browsing owns horizontal swipes in every album and fullscreen even in a narrow app window',()=>{
+ for(const width of [400,1440])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){
+  const f=fixture(),notes=[];f.navigator.userAgent='Mozilla/5.0 (Windows NT 10.0; Win64; x64)';f.window.FamilyPhotoPresentation.desktop=()=>false;f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native',note:(_stage,dx)=>notes.push(dx)};
+  const stage=f.get('mediaStage');stage.clientWidth=width;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);assert.equal(stage.classList.contains('photo-manual-swipes'),true);
+  swipe(f,120);assert.equal(f.window.FamilyMedia.current().id,'b',scope);swipe(f,-120);assert.equal(f.window.FamilyMedia.current().id,'a',scope);assert.deepEqual(notes,[],'No native browser scroll completion is required on Windows');f.close();
+ }
 });
 test('photo viewers request the family album toggle and keep current pixels while membership changes',()=>{
  const f=fixture(),calls=[];f.window.FamilyPhotoCollections={controls(item,scope,options){calls.push({item,scope,options});return item.kind==='photo'?'family-toggle':'';}};

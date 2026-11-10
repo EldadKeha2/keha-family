@@ -30,6 +30,7 @@ html[data-a11y-motion] .home-slide-incoming,html[data-a11y-motion] .home-slide-o
 
 /* The desktop filmstrip fills the stage at every window size. */
 .home-slide-stage{position:relative;isolation:isolate;overflow:hidden}
+.home-slide-stage,.home-slide-stage :is(.home-carousel-card,.home-slide-open){touch-action:pan-y pinch-zoom}
 .home-carousel-rail{position:absolute;inset:0;overflow:hidden;direction:ltr;background:linear-gradient(130deg,#e9e3d5,#f5f0e6 45%,#e7e2d3)}
 .home-carousel-rail::after{content:"";position:absolute;z-index:4;inset:0;pointer-events:none;background:linear-gradient(90deg,#e9e3d599,transparent 3%,transparent 97%,#e7e2d399)}
 .home-carousel-card{position:absolute;left:50%;top:9px;width:var(--home-card-width,240px);height:calc(100% - 18px);padding:0;border:1px solid #c9bc9e;border-radius:8px;overflow:hidden;background:#f9f5eb;box-shadow:0 4px 12px #453b2826;transform:translate3d(calc(-50% + var(--home-card-x,0px)),0,0);opacity:1;transition:none;color:#fffdf4;text-align:start;direction:rtl;cursor:pointer;isolation:isolate;will-change:transform}

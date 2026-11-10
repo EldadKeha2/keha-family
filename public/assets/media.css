@@ -33,6 +33,8 @@
 #mediaStage.photo-slide-running .face-layer{visibility:hidden}
 #mediaStage.photo-slide-running>img,#mediaStage.photo-slide-running .face-photo-scroll,#mediaStage.photo-slide-running .native-photo-strip{visibility:hidden}
 #mediaStage.photo-dragging>.face-photo-scroll,#mediaStage.photo-dragging>img{will-change:transform}
+#mediaStage.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) img{user-select:none;-webkit-user-drag:none}
+@media(any-hover:hover){#mediaStage.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(img,.face-photo-surface){cursor:grab}#mediaStage.photo-pointer-dragging :is(img,.face-photo-surface){cursor:grabbing}}
 .native-photo-strip{display:flex;flex:1 1 auto;width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none;direction:ltr;touch-action:auto}
 .native-photo-strip::-webkit-scrollbar{display:none}
 .native-photo-pane{position:relative;flex:0 0 100%;width:100%;min-width:0;scroll-snap-align:center;display:flex;align-items:center;justify-content:center}
@@ -40,6 +42,8 @@
 #mediaStage.has-native-photo-strip.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
 #mediaStage.has-native-photo-strip.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:auto}
 #mediaStage.has-native-photo-strip:not(.face-photo-enlarged) .face-photo-scroll{overflow:visible;overscroll-behavior:auto;flex:0 0 100%}
+#mediaStage.has-native-photo-strip.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
+#mediaStage.has-native-photo-strip.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pan-y pinch-zoom}
 .media-stage.is-video{aspect-ratio:16/9;max-height:64vh;max-height:64dvh;min-height:200px;width:100%;margin:auto}
 .media-stage video,.media-stage iframe{display:block;width:100%;height:100%;min-height:200px;border:0;object-fit:contain}
 .media-viewer-footer{padding:14px 22px 18px}

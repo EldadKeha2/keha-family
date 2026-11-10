@@ -8,6 +8,7 @@
   const identity=item=>item.id||item.file;
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
+  const desktopPhotoInput=()=>window.FamilyPhotoPresentation?.desktop?.()===true||navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||'');
   function photoIndex(direction,wrap=true,from=state.index){
     for(let distance=1;distance<=state.items.length;distance++){
       const index=from+direction*distance;
@@ -196,7 +197,7 @@
       video.addEventListener('error',()=>{$('mediaPlaybackNote').textContent=I18n.t('הסרטון לא מתנגן בדפדפן הזה. אפשר להוריד את המקור או להעלות MP4 עם H.264.');$('mediaPlaybackNote').hidden=false;});stage.append(video);
       $('mediaPlaybackNote').hidden=true;
     }else if(item.kind==='photo'||item.mime?.startsWith('image/')){
-      const img=image||document.createElement('img');img.decoding='async';img.fetchPriority='high';if(!image)img.src=(item.kind==='photo'?item.previewSrc||item.src:item.src)+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;
+      const img=image||document.createElement('img');img.decoding='async';img.fetchPriority='high';img.draggable=false;if(!image)img.src=(item.kind==='photo'?item.previewSrc||item.src:item.src)+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;
       window.FamilyPhotoPresentation?.preload(state.items,state.index);
       if(!state.fullscreen){
         const mountFaces=()=>{faceTimer=null;if(current()&&identity(current())===identity(item)&&renderedVersion===versionKey(item))window.FamilyFaces?.mount(stage,img,current(),{highlightMissing:state.scope==='gallery'&&window.FamilyPortal?.isPartialGallery?.()===true});};
@@ -267,6 +268,7 @@
   }
   function refreshPhotoPresentation(){
     if(!window.FamilyPhotoNative||state.photoLoading||state.paging)return;
+    $('mediaStage').classList.toggle('photo-manual-swipes',desktopPhotoInput());
     const page=albumPages.get(state.scope),wrap=state.scope!=='gallery'||!(page?.pages>1),items=state.items;
     window.FamilyPhotoNative.mount($('mediaStage'),{previous:items[state.fullscreen?photoIndex(-1,wrap):state.index-1]||(!state.fullscreen&&wrap?items.at(-1):null),next:items[state.fullscreen?photoIndex(1,wrap):state.index+1]||(!state.fullscreen&&wrap?items[0]:null),isEnglish:I18n.isEnglish,enabled:canNavigatePhoto,busy:()=>state.photoLoading||state.paging,step});
   }
@@ -333,7 +335,7 @@
     const stage=$('mediaStage');
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
-      enabled:()=>canNavigatePhoto({pending:true}),claim:()=>window.FamilyPhotoNative?.claim?.(stage)||'manual',nativeEnd:dx=>window.FamilyPhotoNative?.note?.(stage,dx),
+      enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:event=>{const mode=window.FamilyPhotoNative?.claim?.(stage)||'manual';return desktopPhotoInput()&&['touch','pen'].includes(event?.pointerType)?'queued':mode;},nativeEnd:dx=>window.FamilyPhotoNative?.note?.(stage,dx),
       step,isEnglish:()=>I18n.isEnglish,
       move:(dx,{queued=false}={})=>{
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}

@@ -222,6 +222,7 @@
     state.ready=true;updatePauseControl();$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
     $('mobileMenuToggle').addEventListener('click',()=>$('mobileNavDialog').showModal());$('closeMobileMenu').addEventListener('click',()=>$('mobileNavDialog').close());
     $('homeSlidePrevious').addEventListener('click',()=>slide(state.target-1,-1));$('homeSlideNext').addEventListener('click',()=>slide(state.target+1,1));$('homeSlidePause').addEventListener('click',togglePause);
+    const stage=$('homeSlideStage');if(stage)window.FamilyPhotoSwipe?.bind(stage,{enabled:()=>state.view==='home'&&state.items.length>1&&!$('mediaViewer')?.open,mouse:desktopDevice,photoButtons:true,claim:()=>{stopAdvance();return 'manual';},isEnglish:()=>I18n.isEnglish,move:stopAdvance,cancel:scheduleAdvance,step:direction=>slide(state.target+direction,direction)});
     $('homeSlideOpen').addEventListener('click',()=>{const index=state.items.findIndex(item=>item.id===state.current?.id);if(index<0)return;stopAdvance();window.FamilyMedia.open(state.items,index,viewerScope);});
     $('mediaViewer')?.addEventListener('close',scheduleAdvance);
     window.addEventListener('family-accessibility-changed',motionChanged);motionQuery.addEventListener?.('change',motionChanged);
