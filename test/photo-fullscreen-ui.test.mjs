@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../public/assets/photo-fullscreen.js',import.meta.url),'utf8');
-function fixture({english=false,native=false,rejected=false,viewerOpen=true,loading=false,items=null}={}){
+function fixture({english=false,native=false,rejected=false,viewerOpen=true,loading=false,items=null,mobile=false}={}){
  const frames=[],steps=[],stepOptions=[],nativeCalls=[],handlers=()=>new Map();let document,window,state,viewer,stage;
  const camel=name=>name.replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase());
  class Node{
@@ -38,7 +38,7 @@ function fixture({english=false,native=false,rejected=false,viewerOpen=true,load
  function emit(target,type,props={}){const event={target,...props,preventDefault(){this.defaultPrevented=true;},stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=true;}};const path=[];for(let node=target;node&&node!==document;node=node.parentNode)path.push(node);for(const handler of document.handlers.get(type)||[])if(handler.capture)handler.fn(event);if(!event.stopped){for(const node of path)for(const handler of node.handlers?.get(type)||[])handler.fn(event);for(const handler of document.handlers.get(type)||[])if(!handler.capture)handler.fn(event);}return event;}
  const grid=new Node();document.body.append(grid);const opener=new Node('button');opener.dataset.mediaOpen='b';opener.dataset.mediaScope='gallery';opener.append(imageFor(list[1]||list[0]));grid.append(opener);
  const poster=new Node('button');poster.dataset.mediaOpen='video';poster.dataset.mediaScope='videos';poster.append(new Node('img'));grid.append(poster);
- vm.runInNewContext(source,{window,document,setTimeout,clearTimeout,requestAnimationFrame:fn=>{frames.push(fn);return frames.length;}});
+ vm.runInNewContext(source,{window,document,navigator:{userAgent:mobile?'Android Mobile':'Windows NT',userAgentData:{mobile}},setTimeout,clearTimeout,requestAnimationFrame:fn=>{frames.push(fn);return frames.length;}});
  const api=window.FamilyPhotoFullscreen,find=className=>document.body.querySelector('.'+className);
  return{document,window,media,state,viewer,stage,opener,poster,grid,api,steps,stepOptions,nativeCalls,find,emit,photo,flush:()=>new Promise(resolve=>setImmediate(resolve)),load(){const image=stage.querySelector('img');image.complete=true;image.naturalWidth=1600;emit(image,'load');},redecorate(){for(const {fn}of window.handlers.get('family-media-changed')||[])fn();for(const fn of frames.splice(0))fn();}};
 }
@@ -64,6 +64,16 @@ test('thumbnail fullscreen buttons are siblings, are not duplicated, skip video 
  const f=fixture({viewerOpen:false});assert.equal(f.opener.parentNode.className,'photo-fullscreen-thumb');assert.equal(f.opener.querySelector('[data-photo-fullscreen]'),null);assert.equal(f.poster.parentNode,f.grid);
  f.redecorate();f.redecorate();assert.equal(f.document.querySelectorAll('[data-photo-fullscreen="thumbnail"]').length,1);
  f.opener._photoFullscreenLaunch.click();await f.flush();assert.equal(f.api.isActive(),true);assert.equal(f.media.current().id,'b');f.find('photo-fullscreen-close').click();assert.equal(f.viewer.open,false);assert.equal(f.stage.parentNode,f.viewer);
+});
+test('only mobile grid launchers use the smaller treatment while home and open-photo controls keep their own size',()=>{
+ for(const mobile of [false,true]){
+  const f=fixture({mobile}),grid=f.opener._photoFullscreenLaunch;
+  assert.equal(grid.classList.contains('photo-fullscreen-mobile-grid'),mobile);
+  assert.equal(f.find('photo-fullscreen-viewer').classList.contains('photo-fullscreen-mobile-grid'),false);
+  const home=f.document.createElement('div'),opener=f.document.createElement('button');home.id='homeSlideStage';opener.id='homeSlideOpen';opener.dataset.photoAlbum='home:photos';opener.dataset.photoId='a';opener.append(f.document.createElement('img'));home.append(opener);f.document.body.append(home);f.redecorate();
+  assert.equal(home.querySelector('[data-photo-fullscreen]').classList.contains('photo-fullscreen-mobile-grid'),false);
+  grid.click();assert.equal(f.api.isActive(),true);assert.equal(f.media.current().id,'b');f.api.exit();
+ }
 });
 test('both languages keep the next action at +1 and the previous action at -1; Escape and native Escape exit cleanly',async()=>{
  for(const english of [false,true]){

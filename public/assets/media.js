@@ -222,7 +222,7 @@
       }
       const preload=()=>{if($('mediaViewer').open&&current()===item)window.FamilyPhotoThumbnails?.schedule(item,img);};
       if(img.complete&&img.naturalWidth)preload();else img.addEventListener('load',preload,{once:true});
-      if(item.kind==='photo'&&!instant){if(effect&&!native)window.FamilyPhotoPresentation?.transition(stage,ghost,effect);else window.FamilyPhotoPresentation?.slide(stage,ghost,direction*(I18n.isEnglish?1:-1));}
+      if(item.kind==='photo'&&!instant){if(effect&&!native)window.FamilyPhotoPresentation?.transition(stage,ghost,effect);else window.FamilyPhotoPresentation?.slide(stage,ghost,-direction);}
       refreshPhotoPresentation();
       window.FamilyPhotoPresentation?.finishHandoff?.(handoff,img,window.FamilyFaces?.whenReady?.(stage,img));
       if(state.fullscreen)window.FamilyPhotoFullscreen?.present(item,img);
@@ -291,7 +291,7 @@
     // before its initial snap/layout has settled; do not mount it in this mode.
     if(manual){window.FamilyPhotoNative?.reset(stage);return;}
     if(!window.FamilyPhotoNative||state.photoLoading||state.paging)return;
-    window.FamilyPhotoNative.mount($('mediaStage'),{previous:photoNeighbour(-1),next:photoNeighbour(1),isEnglish:I18n.isEnglish,enabled:canNavigatePhoto,busy:()=>state.photoLoading||state.paging,step});
+    window.FamilyPhotoNative.mount($('mediaStage'),{previous:photoNeighbour(-1),next:photoNeighbour(1),enabled:canNavigatePhoto,busy:()=>state.photoLoading||state.paging,step});
   }
   function requestDelete(scope,id){
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
@@ -357,10 +357,10 @@
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
       enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:()=>desktopPhotoInput()?'queued':window.FamilyPhotoNative?.claim?.(stage)||'manual',nativeEnd:dx=>window.FamilyPhotoNative?.note?.(stage,dx),
-      step,isEnglish:()=>I18n.isEnglish,
+      step,
       move:(dx,{queued=false}={})=>{
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}
-        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=(dx<0?1:-1)*(I18n.isEnglish?1:-1),next=photoNeighbour(direction,from);
+        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=dx>0?1:-1,next=photoNeighbour(direction,from);
         window.FamilyPhotoPresentation?.dragQueued?.(stage,dx,{current:state.items[from],next});
       },cancel:()=>window.FamilyPhotoPresentation?.settle()
     });

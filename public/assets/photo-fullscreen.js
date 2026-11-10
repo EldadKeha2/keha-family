@@ -8,6 +8,7 @@
   let viewer,stage,root,anchor,bar,play,speedControl,effectsControl,close,previous,next,counter,caption,status,active=false,playing=false,returnToViewer=true,hadNative=false;
   let timer=null,hideTimer=null,frame=null,paint=0,ready=false,wasBusy=false;
   const media=()=>window.FamilyMedia;
+  const mobileGrid=()=>typeof navigator!=='undefined'&&(navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
   function button(className,label,html){const node=document.createElement('button');node.type='button';node.className=className;node.setAttribute('aria-label',label);node.title=label;node.innerHTML=html;return node;}
   function cancelAdvance(){clearTimeout(timer);timer=null;}
   function nextEffect(){
@@ -98,6 +99,7 @@
       if(opener.dataset.mediaOpen&&media()?.lookup(opener.dataset.mediaScope,opener.dataset.mediaOpen)?.kind!=='photo')continue;
       const wrapper=document.createElement('div');wrapper.className='photo-fullscreen-thumb';
       opener.before(wrapper);wrapper.append(opener);const control=button('photo-fullscreen-launch',tr('הצגת התמונה במסך מלא','View photo fullscreen'),fullscreenIcon);
+      if(mobileGrid())control.classList.add('photo-fullscreen-mobile-grid');
       control.dataset.photoFullscreen='thumbnail';control._photoOpener=opener;opener._photoFullscreenLaunch=control;wrapper.append(control);
     }
     const home=$('homeSlideStage'),opener=$('homeSlideOpen');

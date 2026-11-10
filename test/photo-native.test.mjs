@@ -22,8 +22,9 @@ test('phone and desktop native scrolling selects the adjacent photo once in eith
  for(const mobile of [false,true])for(const english of [true,false])for(const page of [0,2]){
   const f=fixture({mobile,english}),width=mobile?360:800;assert.equal(f.api.mount(f.stage,f.options),true);const strip=f.stage.children[0];assert.equal(strip.className,'native-photo-strip');assert.equal(strip.scrollLeft,width);
   assert.equal(strip.children[1].children[0],f.scroll);assert.equal(f.api.mount(f.stage,f.options),true);assert.equal(f.stage.children.length,1);
+  assert.equal(strip.children[0].children[0].src,'/next-small','A rightward finger movement reveals the higher-numbered photo on the left');assert.equal(strip.children[2].children[0].src,'/prev-small');
   strip.scrollLeft=page*width;strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();await new Promise(resolve=>setImmediate(resolve));
-  assert.deepEqual(f.calls,[{direction:(page===2?1:-1)*(english?1:-1),native:true}]);assert.equal(f.scroll.parent,f.stage);assert.equal(f.api.has(f.stage),false);
+  assert.deepEqual(f.calls,[{direction:page===0?1:-1,native:true}]);assert.equal(f.scroll.parent,f.stage);assert.equal(f.api.has(f.stage),false);
  }
 });
 test('native swiping disables itself for zoom, editing and browsers needing the gesture fallback',()=>{
@@ -43,7 +44,7 @@ test('a new stroke claims a completed native snap before scrollend and queues fu
   const f=fixture({mobile:true,english,scrollEnd:true});let finish,busy=true;
   f.options.busy=()=>busy;f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(resolve=>finish=resolve);};
   f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(f.api.claim(f.stage),'native');strip.scrollLeft=0;
-  assert.equal(f.api.claim(f.stage),'queued');assert.deepEqual(f.calls,[{direction:english?-1:1,native:true}]);strip.handlers.get('scrollend')();assert.equal(f.calls.length,1);
+  assert.equal(f.api.claim(f.stage),'queued');assert.deepEqual(f.calls,[{direction:1,native:true}]);strip.handlers.get('scrollend')();assert.equal(f.calls.length,1);
   finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.api.claim(f.stage),'queued','An older load ending cannot unlock a strip used by a newer queued target');assert.equal(strip.scrollLeft,0);
   busy=false;f.api.reset();assert.equal(f.api.claim(f.stage),'manual');
  }
@@ -60,7 +61,7 @@ test('released touch swipes still select a neighbour when native scrolling is ca
  t.mock.timers.enable({apis:['setTimeout']});
  for(const mobile of [false,true])for(const english of [false,true])for(const dx of [-120,120]){
   const f=fixture({mobile,english,scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];f.api.note(f.stage,dx);strip.handlers.get('scrollend')();assert.equal(f.calls.length,0);
-  t.mock.timers.tick(179);assert.equal(f.calls.length,0);t.mock.timers.tick(1);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.calls,[{direction:(dx>0?-1:1)*(english?1:-1),native:true}]);strip.handlers.get('scrollend')();assert.equal(f.calls.length,1,'A late browser completion cannot advance twice');
+  t.mock.timers.tick(179);assert.equal(f.calls.length,0);t.mock.timers.tick(1);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.calls,[{direction:dx>0?1:-1,native:true}]);strip.handlers.get('scrollend')();assert.equal(f.calls.length,1,'A late browser completion cannot advance twice');
  }
  const hidden=fixture({mobile:true,scrollEnd:true,width:0});hidden.api.mount(hidden.stage,hidden.options);hidden.stage.children[0].clientWidth=360;hidden.api.note(hidden.stage,120);t.mock.timers.tick(180);assert.equal(hidden.calls.length,1,'Opening while hidden must not permanently retain a zero-width strip');
  const closed=fixture({mobile:true,scrollEnd:true});closed.api.mount(closed.stage,closed.options);closed.api.note(closed.stage,120);closed.api.reset();t.mock.timers.tick(500);assert.equal(closed.calls.length,0);

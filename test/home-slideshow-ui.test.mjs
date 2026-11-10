@@ -7,8 +7,8 @@ const source=await readFile(new URL('../public/assets/home.js',import.meta.url),
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 const photos=['a','b','c'].map(id=>({id,src:'/'+id+'.jpg',name:id,caption:'Caption '+id,kind:'photo'}));
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-function fixture({items=photos,reduced=false,carousel=false,width=1120,height=190,desktop=true,swipe=false}={}){
- const nodes=[],images=[],timers=new Map(),opened=[];let now=0,sequence=0;
+function fixture({items=photos,reduced=false,carousel=false,width=1120,height=190,desktop=true,swipe=false,random=()=>.999999,english=false}={}){
+ const nodes=[],images=[],timers=new Map(),opened=[],registered=[];let now=0,sequence=0;
  class Node extends EventTarget{
   constructor(){super();nodes.push(this);this.children=[];this.parent=null;this.id='';this.hidden=false;this.className='';this.textContent='';this.attrs={};this.dataset={};this.style={setProperty(name,value){this[name]=value;}};}
   get classList(){return {add:(...names)=>this.className=[...new Set([...this.className.split(' ').filter(Boolean),...names])].join(' '),remove:(...names)=>this.className=this.className.split(' ').filter(n=>!names.includes(n)).join(' '),contains:name=>this.className.split(' ').includes(name)};}
@@ -36,14 +36,14 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
  const document=new EventTarget();document.getElementById=get;document.createElement=()=>new Node();document.visibilityState='visible';
  const window=new EventTarget(),motion=new EventTarget(),desktopQuery=new EventTarget();motion.matches=reduced;desktopQuery.matches=desktop;
  window.FamilyApp={getView:()=> 'home'};
- window.FamilyI18n={t:String,isEnglish:false,mediaName:item=>item.name,fetch:async()=>Response.json({items})};
- window.FamilyMedia={register(){},open:(list,index,scope)=>{opened.push({id:list[index].id,scope});get('mediaViewer').open=true;}};
+ window.FamilyI18n={t:String,isEnglish:english,mediaName:item=>item.name,fetch:async()=>Response.json({items})};
+ window.FamilyMedia={register(scope,list){registered.push({scope,ids:Array.from(list,item=>item.id)});},open:(list,index,scope)=>{opened.push({id:list[index].id,scope});get('mediaViewer').open=true;}};
  const setTimer=(fn,delay)=>{const id=++sequence;timers.set(id,{fn,time:now+delay});return id;};
  class Clock extends Date{static now(){return now;}}
- const context=vm.createContext({window,document,navigator:{userAgent:desktop?'Windows NT':'Android Mobile',userAgentData:{mobile:!desktop}},Image:Photo,matchMedia:query=>query.includes('min-width')?desktopQuery:motion,Date:Clock,setTimeout:setTimer,clearTimeout:id=>timers.delete(id)});
+ const context=vm.createContext({window,document,Math:Object.assign(Object.create(Math),{random}),navigator:{userAgent:desktop?'Windows NT':'Android Mobile',userAgentData:{mobile:!desktop}},Image:Photo,matchMedia:query=>query.includes('min-width')?desktopQuery:motion,Date:Clock,setTimeout:setTimer,clearTimeout:id=>timers.delete(id)});
  if(swipe)vm.runInContext(swipeSource,context);vm.runInContext(source,context);
  document.dispatchEvent(new Event('DOMContentLoaded'));
- return {window,document,get,images,opened,motion,
+ return {window,document,get,images,opened,registered,motion,
   async resize(w,h,isDesktop=true){width=w;height=h;desktopQuery.matches=isDesktop;window.dispatchEvent(new Event('resize'));await tick();},
   async update(list){const event=new Event('family-media-changed');Object.defineProperty(event,'detail',{value:{scope:'photos',collection:{items:list}}});window.dispatchEvent(event);await tick();},
   async ready(){await tick();},
@@ -54,6 +54,27 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
   async reduced(value){motion.matches=value;motion.dispatchEvent(new Event('change'));await tick();}
  };
 }
+
+test('home photo order is shuffled on desktop and phone without changing the source album or its visible captions',async()=>{
+ for(const desktop of [false,true]){
+  const items=photos.map(item=>({...item})),f=fixture({items,desktop,carousel:true,reduced:true,random:()=>0});await f.ready();
+  assert.deepEqual(f.registered.at(-1),{scope:'home:photos',ids:['b','c','a']});assert.deepEqual(items.map(item=>item.id),['a','b','c']);
+  await f.resolve('/b.jpg');assert.equal(f.window.FamilyHome.centeredPhoto().id,'b');
+  if(desktop)f.get('homeCarouselRail').children.find(card=>card.dataset.active==='true').click();else f.get('homeSlideOpen').click();
+  assert.deepEqual(f.opened,[{id:'b',scope:'home:photos'}]);f.get('mediaViewer').close();await f.advance(1300);
+  if(desktop)assert.equal(f.get('homeCarouselRail').children.find(card=>card.dataset.active==='true').children[1].textContent,'Caption b');else assert.equal(f.get('homeSlideCaption').textContent,'Caption b');
+  f.window.FamilyHome.activate('tree');
+ }
+});
+test('a new home visit reshuffles while background album refreshes and caption edits retain that visit order',async()=>{
+ let random=.999999;const f=fixture({random:()=>random,reduced:true});await f.ready();await f.resolve('/a.jpg');
+ assert.deepEqual(f.registered.at(-1).ids,['a','b','c']);f.window.FamilyHome.activate('tree');random=0;f.window.FamilyHome.activate('home');await f.ready();
+ assert.deepEqual(f.registered.at(-1).ids,['b','c','a']);await f.resolve('/b.jpg');
+ await f.update([photos[0],photos[2],{...photos[1],caption:'Updated b'}]);assert.deepEqual(f.registered.at(-1).ids,['b','c','a']);await f.advance(1300);assert.equal(f.get('homeSlideCaption').textContent,'Updated b');
+ await f.advance(31000);await f.visibility('hidden');await f.visibility('visible');assert.deepEqual(f.registered.at(-1).ids,['b','c','a'],'A fresh server response must not reset the random sequence');
+ await f.update([photos[0],{id:'d',kind:'photo',src:'/d.jpg',caption:'New d'},photos[1]]);assert.deepEqual(f.registered.at(-1).ids.filter(id=>id!=='d'),['b','a']);assert.equal(new Set(f.registered.at(-1).ids).size,3);assert.equal(f.window.FamilyHome.centeredPhoto().id,'b');
+ f.window.FamilyHome.activate('tree');
+});
 
 test('a slow new photo never receives its caption over the preceding photo; the caption waits until after entry',async()=>{
  const f=fixture();await f.ready();await f.resolve('/a.jpg');assert.equal(f.get('homeSlideImage').src,'/a.jpg');assert.equal(f.get('homeSlideCaption').hidden,true);
@@ -101,7 +122,7 @@ test('the desktop filmstrip fills tall, wide and narrow stages, including panora
 });
 test('the film moves continuously, tracks the nearest center between photos and stays bounded over loops',async()=>{
  const f=fixture({carousel:true});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');await f.advance(650);
- const rail=f.get('homeCarouselRail'),first=rail.children.find(n=>n.dataset.active==='true'),x=()=>parseFloat(first.style['--home-card-x']);const initial=x();await f.advance(200);assert.ok(x()<initial,'Motion continues between image centers');
+ const rail=f.get('homeCarouselRail'),first=rail.children.find(n=>n.dataset.active==='true'),x=()=>parseFloat(first.style['--home-card-x']);const initial=x();await f.advance(200);assert.ok(x()>initial,'Motion continues to the right between image centers');
  await f.advance(3400);assert.equal(f.get('homeSlideImage').src,'/a.jpg','The first image has not yet left the logical anchor');assert.equal(f.window.FamilyHome.centeredPhoto().id,'b','The visible center changes before the next image reaches the anchor');assert.equal(f.get('homeSlideOpen').dataset.photoId,'b');
  await f.advance(5000);assert.equal(f.get('homeSlideImage').src,'/b.jpg');assert.ok(rail.children.length<=24);
  await f.resolve('/a.jpg');await f.advance(24000);assert.ok(rail.children.length<=24,'Wrapping never accumulates an unbounded row of photos');
@@ -116,12 +137,12 @@ test('film motion pauses on user pause, open photos, hidden tabs and reduced mot
 test('carousel photos and their own captions move together in both directions and the center opens the visible photo',async()=>{
  const f=fixture({carousel:true});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');await f.advance(650);
  const rail=f.get('homeCarouselRail'),original=rail.children.find(n=>n.dataset.active==='true');assert.equal(original.children[1].textContent,'Caption a');
- await f.next();assert.equal(rail.dataset.animate,'true');assert.ok(parseFloat(original.style['--home-card-x'])<0);let active=rail.children.find(n=>n.dataset.active==='true');assert.equal(active.children[1].textContent,'Caption b');assert.equal(active.children[0].src,'/b.jpg');
+ await f.next();assert.equal(rail.dataset.animate,'true');assert.ok(parseFloat(original.style['--home-card-x'])>0);let active=rail.children.find(n=>n.dataset.active==='true');assert.equal(active.children[1].textContent,'Caption b');assert.equal(active.children[0].src,'/b.jpg');
  active.click();assert.deepEqual(f.opened,[{id:'b',scope:'home:photos'}]);f.get('mediaViewer').close();await f.previous();await f.resolve('/a.jpg');active=rail.children.find(n=>n.dataset.active==='true');assert.equal(active,original);assert.equal(active.children[1].textContent,'Caption a');assert.equal(parseFloat(active.style['--home-card-x']),0);
 });
 test('a side preview centers its photo, keeps captions safe, and reduced motion disables animation and autoplay',async()=>{
  const f=fixture({carousel:true,reduced:true,items:photos.map(p=>({...p,caption:p.caption+' <script>'}))});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');
- const rail=f.get('homeCarouselRail'),right=rail.children.find(n=>parseFloat(n.style['--home-card-x'])>0);right.click();await tick();let active=rail.children.find(n=>n.dataset.active==='true');assert.equal(active.children[1].textContent,'Caption b <script>');assert.equal(rail.dataset.animate,'false');assert.equal(f.get('homeSlidePause').disabled,true);
+ const rail=f.get('homeCarouselRail'),next=rail.children.find(n=>parseFloat(n.style['--home-card-x'])<0);next.click();await tick();let active=rail.children.find(n=>n.dataset.active==='true');assert.equal(active.children[1].textContent,'Caption b <script>');assert.equal(rail.dataset.animate,'false');assert.equal(f.get('homeSlidePause').disabled,true);
  await f.advance(10000);assert.equal(f.get('homeSlideImage').src,'/b.jpg');assert.ok(rail.children.filter(n=>n.tabIndex===0).length<=3);
 });
 test('carousel captions stay attached to the right photo after album edits or reorder, and stale side downloads cannot revive a hidden stage',async()=>{
@@ -130,8 +151,8 @@ test('carousel captions stay attached to the right photo after album edits or re
  const late=fixture({carousel:true});await late.ready();await late.resolve('/a.jpg');late.window.FamilyHome.activate('tree');await late.resolve('/b.jpg');assert.ok(late.get('homeCarouselRail').children.filter(n=>n.dataset.active!=='true').every(n=>n.dataset.ready!=='true'));
 });
 test('the shared gesture handler also browses the running home film with touch and desktop mouse dragging',async()=>{
- for(const pointerType of ['touch','mouse']){
-  const f=fixture({carousel:true,swipe:true});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');
+ for(const english of [false,true])for(const pointerType of ['touch','mouse']){
+  const f=fixture({carousel:true,swipe:true,english});await f.ready();await f.resolve('/a.jpg');await f.resolve('/b.jpg');await f.resolve('/c.jpg');
   const pointer=(type,x)=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries({pointerId:1,pointerType,isPrimary:true,button:0,buttons:1,clientX:x,clientY:100}))Object.defineProperty(event,key,{value});(type==='pointerdown'?f.get('homeSlideStage'):f.document).dispatchEvent(event);};
   pointer('pointerdown',200);pointer('pointermove',340);pointer('pointerup',340);await tick();assert.equal(f.get('homeSlideImage').src,'/b.jpg');
   pointer('pointerdown',340);pointer('pointermove',200);pointer('pointerup',200);await f.resolve('/a.jpg');assert.equal(f.get('homeSlideImage').src,'/a.jpg');f.window.FamilyHome.activate('tree');

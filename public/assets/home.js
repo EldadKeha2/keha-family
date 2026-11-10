@@ -16,6 +16,17 @@
   // The slideshow has its own cache; it must never replace the Family Photos
   // grid's viewer list, especially before the home screen has been loaded.
   const viewerScope='home:photos';
+  function orderPhotos(items,{shuffle=false}={}){
+    const incoming=new Map(items.map(item=>[item.id,item]));
+    const ordered=shuffle?[]:state.items.flatMap(item=>incoming.has(item.id)?[incoming.get(item.id)]:[]),known=new Set(ordered.map(item=>item.id));
+    const added=[...incoming.values()].filter(item=>!known.has(item.id));
+    for(let i=added.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[added[i],added[j]]=[added[j],added[i]];}
+    if(!ordered.length)return added;
+    // Album edits keep existing neighbours together. Only new photos receive
+    // a new random position; refreshing metadata must not restart the film.
+    for(const item of added)ordered.splice(Math.floor(Math.random()*(ordered.length+1)),0,item);
+    return ordered;
+  }
   function disableCarousel(){
     const stage=$('homeSlideStage'),rail=$('homeCarouselRail');
     if(!stage||!rail)return;
@@ -26,7 +37,7 @@
   }
   function paintCarousel(){
     let nearest=carousel.center,distance=Infinity;
-    for(const [key,slot]of carousel.slots){const x=(carousel.positions.get(key)||0)-carousel.travel;slot.button.style.setProperty('--home-card-x',x+'px');if(Math.abs(x)<distance){nearest=key;distance=Math.abs(x);}}
+    for(const [key,slot]of carousel.slots){const x=carousel.travel-(carousel.positions.get(key)||0);slot.button.style.setProperty('--home-card-x',x+'px');if(Math.abs(x)<distance){nearest=key;distance=Math.abs(x);}}
     carousel.focused=nearest;
     for(const [key,slot]of carousel.slots){
       const active=key===nearest;if(slot.button.dataset.active===String(active))continue;
@@ -190,7 +201,7 @@
       const previous=$('homeSlideImage'),animate=!reducedMotion(),outgoing=state.current&&!previous.hidden;
       previous.removeAttribute('id');previous.classList.remove('home-slide-incoming');previous.classList.add('home-slide-outgoing');previous.alt='';previous.setAttribute('aria-hidden','true');
       image.id='homeSlideImage';image.alt=item.caption||I18n.mediaName(item)||I18n.t('תמונה משפחתית');image.hidden=false;image.className=animate?'home-slide-incoming':'';
-      $('homeSlideOpen').style.setProperty('--home-slide-duration',TRANSITION_MS+'ms');$('homeSlideOpen').style.setProperty('--home-slide-shift',direction<0?'-24px':'24px');$('homeSlideOpen').append(image);
+      $('homeSlideOpen').style.setProperty('--home-slide-duration',TRANSITION_MS+'ms');$('homeSlideOpen').style.setProperty('--home-slide-shift',direction<0?'24px':'-24px');$('homeSlideOpen').append(image);
       state.index=target;state.current=item;$('homeSlidePlaceholder').hidden=true;controls();
       syncCarousel(direction,animate);
       if(!outgoing||!animate)previous.remove();
@@ -205,10 +216,14 @@
   }
   async function load(){
     if(state.loading)return;state.loading=true;
-    try{const response=await I18n.fetch('api/collections/photos',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json(),old=state.items[state.index]?.id;state.items=data.items;state.loadedAt=Date.now();window.FamilyMedia.register(viewerScope,state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));}
+    try{const response=await I18n.fetch('api/collections/photos',{cache:'no-store'});if(!response.ok)throw Error();const data=await response.json(),old=state.items[state.index]?.id;state.items=orderPhotos(data.items);state.loadedAt=Date.now();window.FamilyMedia.register(viewerScope,state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));}
     catch{if(!state.items.length)slide(0);}finally{state.loading=false;}
   }
-  function activate(view){state.view=view;$('homeView').hidden=view!=='home';if(!state.ready)return;if(view!=='home'){suspend();return;}slide(state.index);load();}
+  function activate(view){
+    const entering=view==='home'&&state.view!=='home';state.view=view;$('homeView').hidden=view!=='home';if(!state.ready)return;if(view!=='home'){suspend();return;}
+    if(entering&&state.items.length){disableCarousel();state.items=orderPhotos(state.items,{shuffle:true});state.index=state.target=0;window.FamilyMedia.register(viewerScope,state.items);}
+    slide(state.index);load();
+  }
   function updatePauseControl(){
     if(!state.ready)return;
     const reduced=reducedMotion(),paused=state.paused||reduced,button=$('homeSlidePause');
@@ -222,13 +237,13 @@
     state.ready=true;updatePauseControl();$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
     $('mobileMenuToggle').addEventListener('click',()=>$('mobileNavDialog').showModal());$('closeMobileMenu').addEventListener('click',()=>$('mobileNavDialog').close());
     $('homeSlidePrevious').addEventListener('click',()=>slide(state.target-1,-1));$('homeSlideNext').addEventListener('click',()=>slide(state.target+1,1));$('homeSlidePause').addEventListener('click',togglePause);
-    const stage=$('homeSlideStage');if(stage)window.FamilyPhotoSwipe?.bind(stage,{enabled:()=>state.view==='home'&&state.items.length>1&&!$('mediaViewer')?.open,mouse:desktopDevice,photoButtons:true,claim:()=>{stopAdvance();return 'manual';},isEnglish:()=>I18n.isEnglish,move:stopAdvance,cancel:scheduleAdvance,step:direction=>slide(state.target+direction,direction)});
+    const stage=$('homeSlideStage');if(stage)window.FamilyPhotoSwipe?.bind(stage,{enabled:()=>state.view==='home'&&state.items.length>1&&!$('mediaViewer')?.open,mouse:desktopDevice,photoButtons:true,claim:()=>{stopAdvance();return 'manual';},move:stopAdvance,cancel:scheduleAdvance,step:direction=>slide(state.target+direction,direction)});
     $('homeSlideOpen').addEventListener('click',()=>{const index=state.items.findIndex(item=>item.id===state.current?.id);if(index<0)return;stopAdvance();window.FamilyMedia.open(state.items,index,viewerScope);});
     $('mediaViewer')?.addEventListener('close',scheduleAdvance);
     window.addEventListener('family-accessibility-changed',motionChanged);motionQuery.addEventListener?.('change',motionChanged);
     window.addEventListener('resize',()=>syncCarousel());desktopCarouselQuery.addEventListener?.('change',()=>syncCarousel());
     if(typeof ResizeObserver!=='undefined'&&$('homeSlideStage'))new ResizeObserver(()=>syncCarousel()).observe($('homeSlideStage'));
-    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.scope!=='photos')return;const old=state.items[state.index]?.id;state.items=result.collection?.items||state.items.map(item=>item.id===result.item?.id?{...item,...result.item}:item);window.FamilyMedia.register(viewerScope,state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));});
+    window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.scope!=='photos')return;const old=state.items[state.index]?.id;state.items=orderPhotos(result.collection?.items||state.items.map(item=>item.id===result.item?.id?{...item,...result.item}:item));window.FamilyMedia.register(viewerScope,state.items);if(state.view==='home')slide(Math.max(0,state.items.findIndex(item=>item.id===old)));});
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible'){suspend();return;}if(state.view==='home'){slide(state.index);if(Date.now()-state.loadedAt>30000)load();}});window.addEventListener('pagehide',suspend);activate(app().getView());
   }
   window.FamilyHome={activate,centeredPhoto};document.addEventListener('DOMContentLoaded',init);

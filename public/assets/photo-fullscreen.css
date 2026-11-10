@@ -5,6 +5,9 @@
 .photo-fullscreen-launch svg{display:block;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .photo-fullscreen-launch:hover{background:#fcf8ee;color:#435b30;opacity:1}
 .photo-fullscreen-launch:focus-visible{outline:2px solid #ad8135;outline-offset:-3px;opacity:1}
+.photo-fullscreen-launch.photo-fullscreen-mobile-grid{top:4px;right:4px;width:20px;height:20px;padding:3px;border-radius:4px}
+.photo-fullscreen-launch.photo-fullscreen-mobile-grid svg{width:11px;height:11px}
+.photo-fullscreen-launch.photo-fullscreen-mobile-grid::before{inset:-12px}
 #mediaViewer #mediaStage{position:relative}
 #mediaViewer :is(#mediaNext,#mediaPrevious){background:#647c4e;color:#fffdf5;border:1px solid #52683e;border-radius:8px;box-shadow:0 2px 5px #354b2426}
 #mediaViewer :is(#mediaNext,#mediaPrevious):hover{background:#536b3f;color:#fff}

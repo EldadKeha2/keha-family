@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,step,isEnglish,move,cancel,claim,nativeEnd,mouse=()=>false,photoButtons=false}){
+  function bind(stage,{enabled,step,move,cancel,claim,nativeEnd,mouse=()=>false,photoButtons=false}){
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null;
     const idle=new Set(),finished=()=>{for(const resolve of idle)resolve();idle.clear();};
     const controls='a,input,textarea,select,video,iframe,[contenteditable],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
@@ -49,8 +49,8 @@
       if(!enabled()||Date.now()-g.time>4000||Math.abs(dx)<distance||Math.abs(dx)<Math.abs(dy)*1.5){reset();return;}
       gesture=null;touchStart=null;stage.classList.remove('photo-pointer-dragging');finished();
       if(event.cancelable)event.preventDefault();
-      // Match the existing previous/next arrows in Hebrew and English.
-      step((dx<0?1:-1)*(isEnglish()?1:-1),{dragX:dx,queued:true,...(g.mode==='queued'?{native:true}:{})});
+      // Physical movement to the right always advances, in every language.
+      step(dx>0?1:-1,{dragX:dx,queued:true,...(g.mode==='queued'?{native:true}:{})});
     };
     document.addEventListener('pointerup',released,{capture:true,passive:false});
     document.addEventListener('pointercancel',event=>{if(gesture?.id===event.pointerId){blockClick();reset(true);}},{capture:true,passive:true});
@@ -85,8 +85,8 @@
       if(!mouse()||!enabled()||gesture||touchStart||event.ctrlKey||event.metaKey||event.target.closest(controls)||Math.abs(event.deltaX)<2||Math.abs(event.deltaX)<Math.abs(event.deltaY)*1.3)return;
       if(event.cancelable)event.preventDefault();blockClick();
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;
-      wheelGesture||={dx:0};wheelGesture.dx-=event.deltaX*unit;move?.(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
-      wheelTimer=setTimeout(()=>{wheelTimer=null;const dx=wheelGesture?.dx||0;wheelGesture=null;finished();const distance=Math.max(40,Math.min(80,stage.clientWidth*.12));if(enabled()&&Math.abs(dx)>=distance)step((dx<0?1:-1)*(isEnglish()?1:-1),{dragX:dx,queued:true,native:true});else cancel?.();},120);
+      wheelGesture||={dx:0};wheelGesture.dx+=event.deltaX*unit;move?.(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
+      wheelTimer=setTimeout(()=>{wheelTimer=null;const dx=wheelGesture?.dx||0;wheelGesture=null;finished();const distance=Math.max(40,Math.min(80,stage.clientWidth*.12));if(enabled()&&Math.abs(dx)>=distance)step(dx>0?1:-1,{dragX:dx,queued:true,native:true});else cancel?.();},120);
     },{passive:false});
     // A swipe starting over a face must not also open or remove its tag.
     stage.addEventListener('click',event=>{

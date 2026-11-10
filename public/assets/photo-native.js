@@ -23,7 +23,7 @@
     // Finish that snap now and retain the new stroke while its photo loads.
     b.viewport.scrollLeft=page*b.width;b.finish();return 'queued';
   }
-  function mount(stage,{previous,next,isEnglish,enabled,step,busy}){
+  function mount(stage,{previous,next,enabled,step,busy}){
     if(stage?.nodeType!==1||!supported()||!enabled()){reset(stage);return false;}
     const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?stage.querySelector('img'):null);
     if(!node)return false;
@@ -38,7 +38,7 @@
       const source=constrained?item.thumbnailSrc:item.previewSrc||item.thumbnailSrc||(item.size<1000000?item.src:null);
       if(source&&item.kind==='photo'){image.src=source;pane.append(image);}
     };
-    side(left,isEnglish?previous:next);side(right,isEnglish?next:previous);
+    side(left,next);side(right,previous);
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
     const b=active={stage,node,viewport,center,width:viewport.clientWidth,locked:false,timer:null};
     viewport.scrollLeft=b.width;
@@ -48,7 +48,7 @@
       if(page===1)return;if(Math.abs(viewport.scrollLeft-page*b.width)>2)return;
       if(!enabled()){viewport.scrollLeft=b.width;return;}
       clearTimeout(b.releaseTimer);b.releasedPage=null;b.locked=true;viewport.style.overflowX='hidden';
-      const direction=(page>1?1:-1)*(isEnglish?1:-1);
+      const direction=page<1?1:-1;
       Promise.resolve(step(direction,{native:true})).finally(()=>{if(active===b&&!busy?.()){b.locked=false;viewport.style.overflowX='';viewport.scrollLeft=b.width;}});
     };
     // Native scrollend waits for the finger and momentum to finish. Only older

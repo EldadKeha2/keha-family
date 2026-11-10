@@ -119,7 +119,7 @@ test('touch gestures and buttons loop both ways in every photo viewer, including
   f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});
   f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'queued'};
   f.window.FamilyMedia.open(['a','b','c'].map(f.photo),2,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
-  const dx=english?-120:120;
+  const dx=120;
   swipe(f,dx);assert.equal(f.window.FamilyMedia.current().id,'a',scope+' last → first');
   swipe(f,-dx);assert.equal(f.window.FamilyMedia.current().id,'c',scope+' first → last');
   await f.get('mediaNext').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,'a');
@@ -136,8 +136,8 @@ test('paginated gallery loop keeps boundary previews and swipes through a single
   f.window.FamilyPortal={pageGallery:async page=>{visits.push(page);register(page);}};
   register(1);f.window.FamilyMedia.openFrom('gallery','a');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
   await f.window.FamilyMedia.step(-1);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(previews.at(-1).next?.id,'a','The next preview at the end of the album is its first photo');
-  swipe(f,english?-120:120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 3');assert.equal(previews.at(-1).previous?.id,'c');
-  swipe(f,english?120:-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');assert.deepEqual(visits,[2,1,2]);
+  swipe(f,120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 3');assert.equal(previews.at(-1).previous?.id,'c');
+  swipe(f,-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');assert.deepEqual(visits,[2,1,2]);
   register(1);f.window.FamilyMedia.register('gallery',pages[0],{pagination:{page:1,pages:2,total:3,size:2,filter:'all',sort:'random',seed:8}});f.window.FamilyMedia.openFrom('gallery','a');assert.equal(previews.at(-1).previous,null,'A different filter or random order must not reuse the previous album boundary');f.close();
  }
 });
@@ -219,9 +219,9 @@ test('touch swipes navigate every photo album in both languages and on wide touc
  for(const english of [false,true])for(const width of [360,1440])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nostalgia','nursery:ruti']){
   const f=fixture({english});f.get('mediaStage').clientWidth=width;
   f.window.FamilyMedia.open([f.photo('a'),f.photo('b'),f.photo('c')],0,scope);
-  swipe(f,english?-120:120);assert.equal(f.get('mediaOriginal').href,'/media/b',scope);
-  swipe(f,english?120:-120);assert.equal(f.get('mediaOriginal').href,'/media/a',scope);
-  swipe(f,english?120:-120);assert.equal(f.get('mediaOriginal').href,'/media/c','Previous wraps just like its arrow');
+  swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/b',scope);
+  swipe(f,-120);assert.equal(f.get('mediaOriginal').href,'/media/a',scope);
+  swipe(f,-120);assert.equal(f.get('mediaOriginal').href,'/media/c','Previous wraps just like its arrow');
  }
 });
 test('taps, short drags, vertical scrolling and gestures over controls leave the photo in place',()=>{
@@ -236,7 +236,7 @@ test('desktop mouse drags navigate every album and fullscreen without triggering
  for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){
   const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=1440;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
   assert.equal(stage.content[0].draggable,false);f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native'};
-  swipe(f,english?-120:120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'b',scope);swipe(f,english?120:-120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'a',scope);
+  swipe(f,120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'b',scope);swipe(f,-120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'a',scope);
   for(const extra of [{button:2},{ctrlKey:true},{metaKey:true},{target:{closest:()=>({})}}])swipe(f,120,{pointerType:'mouse',buttons:1,...extra});assert.equal(f.window.FamilyMedia.current().id,'a');
   f.window.FamilyPhotoPresentation.desktop=()=>false;swipe(f,120,{pointerType:'mouse',buttons:1});assert.equal(f.window.FamilyMedia.current().id,'a','Phone mouse compatibility events cannot duplicate touch swipes');f.close();
  }
@@ -247,8 +247,24 @@ test('horizontal trackpad bursts navigate once while vertical scrolling and pinc
   const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=1440;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
   const wheel=(dx,dy=0,extra={})=>{const event={deltaX:dx,deltaY:dy,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){this.prevented=true;},...extra};stage.handlers.get('wheel')(event);return event;};
   assert.equal(wheel(0,120).prevented,undefined);assert.equal(wheel(80,0,{ctrlKey:true}).prevented,undefined);assert.equal(wheel(80,0,{target:{closest:()=>({})}}).prevented,undefined);
-  const dx=english?35:-35;wheel(dx);wheel(dx);wheel(dx);t.mock.timers.tick(119);assert.equal(f.window.FamilyMedia.current().id,'a');t.mock.timers.tick(1);assert.equal(f.window.FamilyMedia.current().id,'b');t.mock.timers.tick(300);assert.equal(f.window.FamilyMedia.current().id,'b');
+  const dx=35;wheel(dx);wheel(dx);wheel(dx);t.mock.timers.tick(119);assert.equal(f.window.FamilyMedia.current().id,'a');t.mock.timers.tick(1);assert.equal(f.window.FamilyMedia.current().id,'b');t.mock.timers.tick(300);assert.equal(f.window.FamilyMedia.current().id,'b');
   wheel(-dx);wheel(-dx);wheel(-dx);t.mock.timers.tick(120);assert.equal(f.window.FamilyMedia.current().id,'a');wheel(dx);f.close();t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,'a');
+ }
+});
+test('rightward screen, mouse and trackpad gestures increase the counter in every gallery and language',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){
+  const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=1440;f.navigator.userAgent='Windows NT';f.window.FamilyPhotoPresentation.desktop=()=>true;
+  f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  for(const pointerType of ['touch','mouse']){
+   swipe(f,120,{pointerType,buttons:1});assert.equal(f.get('mediaViewerCounter').textContent,'2 / 3',scope+' right '+pointerType);
+   swipe(f,-120,{pointerType,buttons:1});assert.equal(f.get('mediaViewerCounter').textContent,'1 / 3',scope+' left '+pointerType);
+  }
+  for(const [deltaX,expected]of [[40,'2 / 3'],[-40,'1 / 3']]){
+   for(let i=0;i<3;i++)stage.handlers.get('wheel')({deltaX,deltaY:0,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){}});
+   t.mock.timers.tick(120);assert.equal(f.get('mediaViewerCounter').textContent,expected,scope+' horizontal trackpad');
+  }
+  f.close();
  }
 });
 test('pinch, cancelled and stale gestures never navigate and swipes cannot activate a face tag',()=>{
@@ -285,7 +301,7 @@ test('successive phone strokes select every pending target without waiting for t
   const f=fixture({english}),loads=new Map();f.get('mediaStage').clientWidth=360;f.window.FamilyPhotoPresentation.preload=()=>{};
   f.window.FamilyMedia.open(['a','b','c','d'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.set(item.id,resolve));
   f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=>native?'queued':'manual'};
-  swipe(f,english?-120:120);swipe(f,english?-120:120);swipe(f,english?-120:120);assert.deepEqual([...loads.keys()],['b','c','d']);
+  swipe(f,120);swipe(f,120);swipe(f,120);assert.deepEqual([...loads.keys()],['b','c','d']);
   loads.get('b')(null);loads.get('c')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');
   loads.get('d')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'d');f.close();
  }
@@ -307,7 +323,7 @@ test('reversing an unfinished native swipe removes both partial previews and res
   if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
   const original=stage.content[0];f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.set(item.id,resolve));
   f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'queued'};
-  const dx=english?-140:140;swipe(f,dx);pointer(f,'pointerdown',200);pointer(f,'pointermove',200-dx);
+  const dx=140;swipe(f,dx);pointer(f,'pointerdown',200);pointer(f,'pointermove',200-dx);
   assert.equal(stage.content.filter(node=>node.className==='photo-queued-drag').length,1,'The second stroke shows partial images while the first target loads');
   pointer(f,'pointerup',200-dx);
   assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.window.FamilyMedia.photoState().busy,false);
