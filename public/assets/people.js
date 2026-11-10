@@ -15,7 +15,7 @@
     if(!response.ok)throw Error(I.error(result.error));return result;
   }
   function dates(){return app().getPerson(state.id)?app().birthdayHTML(state.id):'';}
-  function pager(key,album){return `<nav class="person-album-pager" aria-label="${tr('דפדוף באלבום','Album pages')}"><button type="button" class="secondary-button" data-person-page="${key}" data-step="-1" ${album.page<=1?'disabled':''}>${tr('הקודם','Previous')}</button><span>${tr('עמוד','Page')} ${album.page} ${tr('מתוך','of')} ${album.pages} · ${album.total} ${tr('פריטים','items')}</span><button type="button" class="secondary-button" data-person-page="${key}" data-step="1" ${album.page>=album.pages?'disabled':''}>${tr('הבא','Next')}</button></nav>`;}
+  function pager(key,album){return `<nav class="person-album-pager" aria-label="${tr('דפדוף באלבום','Album pages')}"><button type="button" class="secondary-button" data-person-page="${key}" data-step="-1" ${(key==='photos'?album.pages<2:album.page<=1)?'disabled':''}>${tr('הקודם','Previous')}</button><span>${tr('עמוד','Page')} ${album.page} ${tr('מתוך','of')} ${album.pages} · ${album.total} ${tr('פריטים','items')}</span><button type="button" class="secondary-button" data-person-page="${key}" data-step="1" ${(key==='photos'?album.pages<2:album.page>=album.pages)?'disabled':''}>${tr('הבא','Next')}</button></nav>`;}
   function card(key,item){
     let content;
     if(key==='photos')content=`<img src="${safe(item.thumbnailSrc||item.src)}" ${window.FamilyPhotoThumbnails?.attributes(item)||''} alt="${safe(item.caption||I.mediaName(item))}" loading="lazy" decoding="async">`;
@@ -127,7 +127,7 @@
       }
       if(event.target.closest('[data-person-back]')){event.preventDefault();if(!window.FamilyNavigation?.back('#directory'))app().setView('directory',false);return;}
       if(event.target.closest('[data-person-retry]')){load(true);return;}
-      const page=event.target.closest('[data-person-page]');if(page&&!page.disabled){const key=page.dataset.personPage;state.pages[key]+=Number(page.dataset.step);await load(true);$('personAlbum-'+key)?.scrollIntoView({block:'start',behavior:'instant'});return;}
+      const page=event.target.closest('[data-person-page]');if(page&&!page.disabled){const key=page.dataset.personPage,pages=state.data.albums[key].pages;state.pages[key]=key==='photos'?(state.pages[key]-1+Number(page.dataset.step)+pages)%pages+1:state.pages[key]+Number(page.dataset.step);await load(true);$('personAlbum-'+key)?.scrollIntoView({block:'start',behavior:'instant'});return;}
       const item=event.target.closest('[data-person-item]');if(item){const items=state.data.albums[item.dataset.personKind].items;window.FamilyMedia.open(items,items.findIndex(p=>p.id===item.dataset.personItem),'personal:'+state.id);return;}
       if(event.target.closest('[data-person-portrait]')&&state.data.person.profile){const id=state.data.person.profile.split('?')[0].split('/').pop();try{const result=await api('api/media/'+id+'/view');window.FamilyMedia.open([result.item],0,'personal:'+state.id);}catch(error){app().toast(error.message);}return;}
       if(event.target.closest('[data-edit-about]')&&!state.partial&&!biography()?.isEditing()){state.aboutEditing=true;state.aboutExpected=state.data.person[aboutKey()]||'';state.aboutDraft=state.aboutExpected;render();$('personAboutText').focus();return;}

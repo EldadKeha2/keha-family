@@ -113,6 +113,34 @@ function pointer(f,type,x,y=100,extra={}){
  return event;
 }
 function swipe(f,dx,extra={}){pointer(f,'pointerdown',200,100,extra);pointer(f,'pointermove',200+dx,103,extra);pointer(f,'pointerup',200+dx,103,extra);}
+test('touch gestures and buttons loop both ways in every photo viewer, including fullscreen',async()=>{
+ for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ora','wedding:parents','nursery:ora','nostalgia','home:photos']){
+  const f=fixture({english});f.navigator.userAgent='Windows NT';f.get('mediaStage').clientWidth=1440;
+  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});
+  f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'queued'};
+  f.window.FamilyMedia.open(['a','b','c'].map(f.photo),2,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  const dx=english?-120:120;
+  swipe(f,dx);assert.equal(f.window.FamilyMedia.current().id,'a',scope+' last → first');
+  swipe(f,-dx);assert.equal(f.window.FamilyMedia.current().id,'c',scope+' first → last');
+  await f.get('mediaNext').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,'a');
+  await f.get('mediaPrevious').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+ }
+});
+test('paginated gallery loop keeps boundary previews and swipes through a single-photo last page',async()=>{
+ for(const english of [false,true])for(const fullscreen of [false,true]){
+  const f=fixture({english}),pages=[['a','b'].map(f.photo),['c'].map(f.photo)],visits=[],previews=[];
+  f.navigator.userAgent='Android';f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;
+  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});
+  f.window.FamilyPhotoNative={mount:(_stage,options)=>previews.push(options),reset(){},claim:()=> 'queued'};
+  const register=page=>f.window.FamilyMedia.register('gallery',pages[page-1],{pagination:{page,pages:2,total:3,size:2,filter:'partial',sort:'random',seed:7}});
+  f.window.FamilyPortal={pageGallery:async page=>{visits.push(page);register(page);}};
+  register(1);f.window.FamilyMedia.openFrom('gallery','a');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  await f.window.FamilyMedia.step(-1);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(previews.at(-1).next?.id,'a','The next preview at the end of the album is its first photo');
+  swipe(f,english?-120:120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 3');assert.equal(previews.at(-1).previous?.id,'c');
+  swipe(f,english?120:-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');assert.deepEqual(visits,[2,1,2]);
+  register(1);f.window.FamilyMedia.register('gallery',pages[0],{pagination:{page:1,pages:2,total:3,size:2,filter:'all',sort:'random',seed:8}});f.window.FamilyMedia.openFrom('gallery','a');assert.equal(previews.at(-1).previous,null,'A different filter or random order must not reuse the previous album boundary');f.close();
+ }
+});
 test('a committed swipe holds its offset while the next photo loads instead of springing back',async()=>{
  const f=fixture();f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');let finish,settles=0;
  f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>{finish=resolve;});f.window.FamilyPhotoPresentation.settle=()=>{settles++;};

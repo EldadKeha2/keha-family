@@ -27,8 +27,9 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
  }
  const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
  const filters=['all','untagged','partial','complete'].map(filter=>{const n=new Node();n.dataset.galleryFilter=filter;return n;});
+ const pagers=[new Node(),new Node()];
  const listen=(map,name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);};
- const document={activeElement:null,visibilityState:'visible',body:new Node(),documentElement:new Node(),getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
+ const document={activeElement:null,visibilityState:'visible',body:new Node(),documentElement:new Node(),getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:s==='[data-gallery-pager]'?pagers:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
  const collection=path=>{
   const params=new URL(path,'https://test/').searchParams,filter=params.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length&&!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:filter==='complete'?item.faceSummary.reviewed:true);
   const size=Math.min(Number(params.get('size'))||100,filter==='all'?allPageSize:Infinity),pages=Math.max(1,Math.ceil(selected.length/size)),page=Math.max(1,Math.min(pages,Number(params.get('page'))||1));
@@ -45,7 +46,8 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
  vm.runInContext(mediaSource,context);vm.runInContext(portalSource,context);if(home)vm.runInContext(homeSource,context);if(routing){vm.runInContext(appSource,context);window.FamilyApp.apiEnabled=true;}
  for(const fn of documentHandlers.get('DOMContentLoaded'))fn();window.FamilyPortal.activate(initialView);
  const flush=async()=>{await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
- return{window,get,requests,pending,mounted,filters,flush,server,browser,
+ return{window,get,requests,pending,mounted,filters,pagers,flush,server,browser,
+  page(direction){const button=pagers[0].querySelector(direction>0?'[data-gallery-next]':'[data-gallery-prev]');button.hasAttribute=s=>s==='data-gallery-next'&&direction>0;button.closest=()=>null;for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-next],[data-gallery-prev]'?button:null}});},
   filter(name){for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-filter]'?{dataset:{galleryFilter:name}}:null}});},
   open:id=>window.FamilyMedia.openFrom('gallery',id),close:()=>get('closeMediaViewer').click(),poll:()=>intervals.forEach(fn=>fn()),defer(){nextDeferred=true;},
   change(id,operation='tags',tagCount=1){const item=server.find(i=>i.id===id);item.tags=Array.from({length:tagCount},(_,i)=>({id:'person-'+i,name:'Person '+i}));item.tagsRevision='tags-'+(++revision);item.faceSummary={total:2,unmatched:2-tagCount,partial:tagCount>0,reviewed:false};window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'gallery',item:structuredClone(item)}}));},
@@ -153,6 +155,17 @@ test('the viewer counts the whole category and loads adjacent pages without losi
   f.get('mediaNext').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/100');assert.equal(f.get('mediaViewerCounter').textContent,'101 / 205');assert.equal(f.window.FamilyPortal.galleryQuery().filter,filter);assert.equal(f.window.FamilyPortal.galleryQuery().sort,'taken-asc');
   f.get('mediaPrevious').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/99');assert.equal(f.get('mediaViewerCounter').textContent,'100 / 205');f.close();
  }
+});
+
+test('gallery grid pages loop at both ends on phones and desktops and retain filters and ordering',async()=>{
+ for(const phone of [false,true]){
+  const f=fixture(Array.from({length:205},(_,i)=>photo(String(i),[{id:'person-0'}])),{phone});await f.flush();f.filter('partial');await f.flush();await f.window.FamilyPortal.sortGallery('taken-asc');
+  for(const pager of f.pagers)assert.equal(pager.querySelector('[data-gallery-prev]').disabled,false);
+  f.page(-1);await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().page,3);assert.deepEqual(f.cards,['200.jpg','201.jpg','202.jpg','203.jpg','204.jpg']);
+  for(const pager of f.pagers)assert.equal(pager.querySelector('[data-gallery-next]').disabled,false);
+  f.page(1);await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().page,1);assert.equal(f.cards[0],'0.jpg');assert.equal(f.window.FamilyPortal.galleryQuery().filter,'partial');assert.equal(f.window.FamilyPortal.galleryQuery().sort,'taken-asc');
+ }
+ const single=fixture([photo('a')]);await single.flush();for(const pager of single.pagers)for(const button of ['[data-gallery-prev]','[data-gallery-next]'])assert.equal(pager.querySelector(button).disabled,true);
 });
 
 test('an empty people or family filter explains how to change the criteria and reset restores the normal empty gallery',async()=>{

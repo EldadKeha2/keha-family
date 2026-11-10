@@ -95,7 +95,7 @@
       const empty=$('sharedGalleryEmpty');
       empty.querySelector('h3').textContent=I18n.t(complete?'אין עדיין תמונות שסומנו כמתויגות מלא':partial?'לא נמצאו תמונות מתויגות חלקית':untagged?'לא נמצאו תמונות לא מתויגות':galleryPage.person||galleryPage.unit||galleryPage.labels?'לא נמצאו תמונות בסינון הזה':galleryPage.query?'לא נמצאו תמונות בחיפוש הזה':'כל רגע משפחתי מתחיל בתמונה');
       empty.querySelector('p').textContent=I18n.t(complete?'תמונות שאישרתם בהן ״כל הפרצופים תויגו״ יופיעו כאן.':partial?'פתחו תמונה והוסיפו את השמות החסרים בלחיצה על הפנים. בסיום לחצו על ״כל הפרצופים תויגו״.':galleryPage.person||galleryPage.unit||galleryPage.labels?'אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':untagged||galleryPage.query?'אפשר להציג את כל התמונות או לשנות את החיפוש.':'אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.');
-      for(const control of document.querySelectorAll('[data-gallery-pager]')){control.hidden=!p.total;control.querySelector('[data-gallery-page-label]').textContent=I18n.isEnglish?`Page ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} of ${p.total}`:`עמוד ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} מתוך ${p.total}`;control.querySelector('[data-gallery-prev]').disabled=p.page<=1;control.querySelector('[data-gallery-next]').disabled=p.page>=p.pages;control.querySelector('[data-gallery-size]').value=String(p.size);control.querySelector('[data-gallery-sort]').value=galleryPage.sort;}
+      for(const control of document.querySelectorAll('[data-gallery-pager]')){control.hidden=!p.total;control.querySelector('[data-gallery-page-label]').textContent=I18n.isEnglish?`Page ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} of ${p.total}`:`עמוד ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} מתוך ${p.total}`;control.querySelector('[data-gallery-prev]').disabled=control.querySelector('[data-gallery-next]').disabled=p.pages<2;control.querySelector('[data-gallery-size]').value=String(p.size);control.querySelector('[data-gallery-sort]').value=galleryPage.sort;}
     }
     const signature = filtered.map(item=>item.file+'|'+item.src).join('\u0000');
     if (signatures[kind] !== signature) {
@@ -329,7 +329,8 @@
       const pager=event.target.closest('[data-gallery-next],[data-gallery-prev]');if(pager){
         if(pager.disabled)return;
         const phone=matchMedia('(max-width:700px)').matches,topPager=Boolean(pager.closest('.gallery-pager-wrap'));
-        galleryPage.page=Math.max(1,galleryPage.page+(pager.hasAttribute('data-gallery-next')?1:-1));
+        const pages=state.collections.gallery.pagination?.pages||1;
+        galleryPage.page=(galleryPage.page-1+(pager.hasAttribute('data-gallery-next')?1:-1)+pages)%pages+1;
         refreshCollection('gallery',true).then(()=>{
           if(state.view!=='gallery')return;
           if(phone){if(!topPager)window.scrollTo({top:0,behavior:'instant'});}

@@ -32,6 +32,12 @@ test('nursery cards follow new core members automatically and exclude extended a
  f.people.push({id:'new-relative',name:'New relative'});f.window.FamilyNursery.search('');assert.match(f.html,/#nursery\/new-relative/);
  f.window.FamilyNursery.search('new relative');assert.match(f.html,/#nursery\/new-relative/);assert.doesNotMatch(f.html,/#nursery\/yona/);
 });
+test('baby album grid pages wrap from first to last and last to first',async()=>{
+ const requested=[],f=fixture({albumFetch:async path=>{const page=Number(new URL(path,'https://test/').searchParams.get('page'));requested.push(page);return Response.json({...empty('yona'),count:21,pagination:{page,pages:3,total:21,size:10}});}});
+ await f.flush();f.open('yona');await f.flush();assert.doesNotMatch(f.html,/data-nursery-page="-1" disabled/);
+ f.click('[data-nursery-page]',{nurseryPage:'-1'});await f.flush();assert.deepEqual(requested,[1,3]);assert.doesNotMatch(f.html,/data-nursery-page="1" disabled/);
+ f.click('[data-nursery-page]',{nurseryPage:'1'});await f.flush();assert.deepEqual(requested,[1,3,1]);
+});
 test('a selected baby cover stays on the index even when the newest photo is different',async()=>{
  const f=fixture();await f.flush();f.window.FamilyI18n.fetch=async path=>Response.json(path==='api/nursery'?{albums:{yona:{count:2,cover:'/media/chosen'}}}:{...empty('yona'),cover:'/media/chosen',items:[{id:'newest',src:'/media/newest',name:'Newest'}],count:2});
  f.open('yona');await f.flush();f.click('[data-nursery-back]');await f.flush();assert.match(f.html,/src="\/media\/chosen"/);assert.doesNotMatch(f.html,/src="\/media\/newest"/);

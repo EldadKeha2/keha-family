@@ -7,15 +7,16 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const relationsSource=await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8');
 const peopleSource=await readFile(new URL('../public/assets/people.js',import.meta.url),'utf8');
-async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={},pageAlbums={}}={}){
+async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={},pageAlbums={},photoPages=null}={}){
   const browser=navigation?browserHistory(entryUrl||'https://family.test/#person/'+id):null;let view=browser?browser.location.hash.slice(1).split('/')[0]:'person';
   const nodes=new Map(),listeners=new Map(),requests=[],registered=[],location=browser?.location||{hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
-  function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
+  function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,scrollIntoView(){},addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
   const summary=id=>({...family.people[id],...overrides[id]});
   const window={FAMILY_DATA:family,FamilyMedia:{register:(...args)=>registered.push(args)},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',error:String,mediaName:item=>item.caption||item.name||'',fetch:async url=>{
     requests.push(String(url));if(String(url).startsWith('api/media/'))return {ok:true,json:async()=>({item:{id:String(url).split('/')[2],kind:'photo',src:'/media/current'}})};
     const id=decodeURIComponent(String(url).match(/api\/people\/([^/]+)\/page/)[1]);
-    return {ok:true,status:200,json:async()=>({person:summary(id),revision:id,albums:Object.fromEntries(['photos','videos','documents'].map(key=>[key,{items:pageAlbums[key]||[],page:1,pages:1,total:pageAlbums[key]?.length||0}]))})};
+    const page=Number(new URL(url,'https://family.test').searchParams.get('photos')||1);
+    return {ok:true,status:200,json:async()=>({person:summary(id),revision:id,albums:Object.fromEntries(['photos','videos','documents'].map(key=>[key,key==='photos'&&photoPages?{items:photoPages[page-1],page,pages:photoPages.length,total:photoPages.flat().length}:{items:pageAlbums[key]||[],page:1,pages:1,total:pageAlbums[key]?.length||0}]))})};
   }},scrollTo(){},addEventListener(event,callback){callbacks.set(event,callback);browser?.addEventListener(event,callback);}};
   window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
   const document={getElementById:node,addEventListener:(event,callback)=>callbacks.set(event,callback),querySelector:()=>null,visibilityState:'visible'};
@@ -23,13 +24,20 @@ async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overr
   if(browser){vm.runInContext(navigationSource,context);browser.addEventListener('popstate',()=>{const next=location.hash.slice(1).split('/')[0];if(next!==view)window.FamilyApp.setView(next,false);});}
   vm.runInContext(relationsSource,context);vm.runInContext(peopleSource,context);callbacks.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
-  return {window,browser,registered,get view(){return view;},clickPortrait(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-portrait]'?{}:null}});},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
+  return {window,browser,registered,get view(){return view;},clickPage(step){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-page]'?{dataset:{personPage:'photos',step:String(step)}}:null}});},clickPortrait(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-portrait]'?{}:null}});},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
     let prevented=false,stopped=false;
     await listeners.get('personPageContent:click')({button:0,ctrlKey:modifier,preventDefault(){prevented=true;},stopPropagation(){stopped=true;},target:{closest:selector=>selector==='[data-person-relative]'?{dataset:{personRelative:id}}:null}});
     await flush();return {prevented,stopped};
   }};
 }
 const group=(html,key)=>html.match(new RegExp('<section class="person-family-group" data-relative-kind="'+key+'"[\\s\\S]*?<\\/section>'))[0];
+
+test('personal photo grid pages loop without changing the video and document pages',async()=>{
+ const photoPages=['a','b','c'].map(id=>[{id,kind:'photo',mime:'image/jpeg',src:'/media/'+id}]),f=await fixture('eldad',{photoPages});
+ assert.doesNotMatch(f.html,/data-person-page="photos" data-step="-1" disabled/);
+ await f.clickPage(-1);assert.match(f.requests.at(-1),/photos=3&videos=1&documents=1/);assert.match(f.html,/data-person-item="c"/);assert.doesNotMatch(f.html,/data-person-page="photos" data-step="1" disabled/);
+ await f.clickPage(1);assert.match(f.requests.at(-1),/photos=1&videos=1&documents=1/);assert.match(f.html,/data-person-item="a"/);
+});
 
 test('personal pages register the loaded album of a directly linked item without mixing media kinds',async()=>{
  const id='a'.repeat(32),make=(id,kind,mime)=>({id,kind,mime,src:'/media/'+id,caption:'Family memory',filename:id+'.jpg'});

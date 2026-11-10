@@ -3,7 +3,7 @@
   const I18n=window.FamilyI18n;
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const albums=new Map(),albumPages=new Map(),albumCovers=new Map();
+  const albums=new Map(),albumPages=new Map(),albumCovers=new Map(),albumEdges=new Map();
   const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null,paging:false,pageTarget:null,pageDirection:1,pageRequest:null,pageRender:null,pageQueued:false,navigation:0,session:0,photoActivity:0,photoLoading:false,photoTarget:null,fullscreen:false};
   const identity=item=>item.id||item.file;
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
@@ -16,6 +16,16 @@
       const next=(index%state.items.length+state.items.length)%state.items.length;if(state.items[next]?.kind==='photo')return next;
     }
     return from;
+  }
+  function photoNeighbour(direction,from=state.index){
+    const page=albumPages.get(state.scope),wrap=state.scope!=='gallery'||!(page?.pages>1);
+    const index=state.fullscreen?photoIndex(direction,wrap,from):from+direction;
+    if(state.items[index])return state.items[index];
+    if(wrap)return state.items[(index+state.items.length)%state.items.length];
+    // The first and last pages are neighbours in the same album. Keep their
+    // already loaded previews under the finger while the page changes.
+    const edge=albumEdges.get(state.scope);
+    return (direction>0&&page.page===page.pages?edge?.first:direction<0&&page.page===1?edge?.last:null)||null;
   }
   function photoState(){
     const photos=state.items.filter(item=>item.kind==='photo'),page=state.scope==='gallery'?albumPages.get(state.scope):null;
@@ -58,7 +68,14 @@
   function register(scope,items,{retainCurrent=false,pagination,cover}={}){
     albums.set(scope,items);
     if(cover!==undefined)albumCovers.set(scope,cover);
-    if(pagination)albumPages.set(scope,{...pagination});
+    if(pagination){
+      albumPages.set(scope,{...pagination});
+      const {page,...context}=pagination,key=JSON.stringify(context);
+      const edge=albumEdges.get(scope)?.key===key?albumEdges.get(scope):{key};
+      if(page===1)edge.first=items.find(item=>item.kind==='photo');
+      if(page===pagination.pages)edge.last=items.findLast(item=>item.kind==='photo');
+      albumEdges.set(scope,edge);
+    }
     // A direct photo can arrive before its album. Adopt the matching route's
     // album in place so the image, face editor, zoom and focus survive loading.
     if($('mediaViewer')?.open&&state.scope?.startsWith('link:')&&scope===routeAlbum()&&new URL(location.href).searchParams.get('media')===state.activeId&&items.some(item=>identity(item)===state.activeId))state.scope=scope;
@@ -274,8 +291,7 @@
     // before its initial snap/layout has settled; do not mount it in this mode.
     if(manual){window.FamilyPhotoNative?.reset(stage);return;}
     if(!window.FamilyPhotoNative||state.photoLoading||state.paging)return;
-    const page=albumPages.get(state.scope),wrap=state.scope!=='gallery'||!(page?.pages>1),items=state.items;
-    window.FamilyPhotoNative.mount($('mediaStage'),{previous:items[state.fullscreen?photoIndex(-1,wrap):state.index-1]||(!state.fullscreen&&wrap?items.at(-1):null),next:items[state.fullscreen?photoIndex(1,wrap):state.index+1]||(!state.fullscreen&&wrap?items[0]:null),isEnglish:I18n.isEnglish,enabled:canNavigatePhoto,busy:()=>state.photoLoading||state.paging,step});
+    window.FamilyPhotoNative.mount($('mediaStage'),{previous:photoNeighbour(-1),next:photoNeighbour(1),isEnglish:I18n.isEnglish,enabled:canNavigatePhoto,busy:()=>state.photoLoading||state.paging,step});
   }
   function requestDelete(scope,id){
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
@@ -344,8 +360,7 @@
       step,isEnglish:()=>I18n.isEnglish,
       move:(dx,{queued=false}={})=>{
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}
-        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=(dx<0?1:-1)*(I18n.isEnglish?1:-1),page=albumPages.get(state.scope),wrap=state.scope!=='gallery'||!(page?.pages>1);
-        const index=state.fullscreen?photoIndex(direction,wrap,from):from+direction,next=state.items[index]||(wrap?state.items[(index+state.items.length)%state.items.length]:null);
+        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=(dx<0?1:-1)*(I18n.isEnglish?1:-1),next=photoNeighbour(direction,from);
         window.FamilyPhotoPresentation?.dragQueued?.(stage,dx,{current:state.items[from],next});
       },cancel:()=>window.FamilyPhotoPresentation?.settle()
     });
