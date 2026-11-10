@@ -28,7 +28,7 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
   contains(node){return node===this||[...this.children,...this.queries.values()].some(child=>child.contains(node));}
   closest(selector){return this.matches(selector)?this:this.parent?.closest(selector)||null;}
   matches(selector){return selector.split(',').some(value=>{value=value.trim();if(value.startsWith('.'))return this.classList.contains(value.slice(1));if(value==='[data-face-handle]')return Boolean(this.dataset.faceHandle);if(value==='dialog[open]')return this.tagName.toLowerCase()==='dialog'&&this.open;if(value==='[hidden]')return this.hidden;if(value==='[inert]')return Boolean(this.inert);if(value==='[aria-hidden="true"]')return this['aria-hidden']==='true';if(value==='[role="textbox"]')return this.role==='textbox';return ['input','textarea','select'].includes(value)&&this.tagName.toLowerCase()===value;});}
-  focus(){}
+  focus(){document.activeElement=this;}
   click(){this.dispatchEvent(new Event('click',{cancelable:true}));}
   getClientRects(){return this.closest('[hidden]')?[]:[this.getBoundingClientRect()];}
   get clientWidth(){return this.className==='face-photo-scroll'?view.width:this.getBoundingClientRect().width;}
@@ -54,6 +54,68 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
  return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,footer,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+test('desktop Tab starts after selecting a face, wraps both ways and focuses the next face search in every album',async()=>{
+ for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
+  const person={id:'yona',name:'יונה'},named={...first,id:'named',personId:person.id,person},f=fixture([second],{desktop:true});
+  f.window.FamilyI18n.fetch=async()=>Response.json({faces:[named]});await f.mount('tab-'+scope,{}, {scope});
+  const hits=()=>f.find('face-hit-buttons').children,current=()=>hits().find(node=>node.classList.contains('face-tab-current'))?.dataset.faceId;
+  const press=properties=>f.emit(f.document,'keydown',{key:'Tab',target:f.document.activeElement||f.stage,...properties});
+  assert.equal(press().defaultPrevented,false,'Ordinary Tab works until a face is deliberately selected');
+  f.emit(f.stage,'click',{target:hits()[0],detail:0});assert.equal(current(),'named');assert.ok(f.find('face-tab-help'));
+  assert.equal(press().defaultPrevented,true);assert.equal(current(),hits()[1].dataset.faceId);assert.equal(f.document.activeElement,f.find('face-popover face-picker').querySelector('input'));
+  assert.equal(f.find('face-selection').style.left,second.rect.x*100+'%');
+  press();assert.equal(current(),'named','The last face wraps to the first');press({shiftKey:true});assert.equal(current(),hits()[1].dataset.faceId,'Shift+Tab wraps backwards');
+  f.emit(f.document,'keydown',{key:'Escape',target:f.document.activeElement});assert.equal(current(),undefined);assert.equal(f.find('face-popover face-picker'),undefined);assert.equal(press({target:f.stage}).defaultPrevented,false);
+  f.faces.clear();
+ }
+});
+test('saving preserves face traversal order and focus after feedback, streamed detections and ID replacement',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const third={rect:{x:.2,y:.2,width:.1,height:.1},score:.9},fourth={rect:{x:.7,y:.7,width:.1,height:.1},score:.9},f=fixture([first,second,third],{desktop:true}),person={id:'yona',name:'יונה'},writes=[];let saved=[];
+ f.window.FamilyTags.findPeople=async()=>[person];
+ f.window.FamilyI18n.fetch=async(path,options)=>{
+  if(path.endsWith('/save')){const body=JSON.parse(options.body),face={id:'saved-'+writes.length,rect:body.rect,personId:person.id,person,revision:'r1'};writes.push(body);saved.push(face);return Response.json({operation:'faces',item:{id:'tab-save',kind:'photo',tags:[person]},faces:saved,face});}
+  return Response.json({faces:saved});
+ };
+ await f.mount('tab-save');const hits=()=>f.find('face-hit-buttons').children,original=hits().map(node=>node.dataset.faceId);
+ f.emit(f.stage,'click',{target:hits()[1],detail:0});const panel=f.find('face-popover face-picker'),host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];
+ await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();assert.equal(writes.length,1);assert.equal(f.document.activeElement.dataset.faceId,'saved-0');
+ t.mock.timers.tick(501);assert.equal(f.find('face-popover face-name'),undefined);
+ f.progress([first,second,third,fourth]);
+ const press=properties=>f.emit(f.document,'keydown',{key:'Tab',target:f.document.activeElement,...properties}),selected=()=>hits().find(node=>node.classList.contains('face-tab-current'))?.dataset.faceId;
+ press();assert.equal(selected(),original[2],'Saving the middle detection does not skip the following face');
+ press();assert.equal(f.find('face-selection').style.left,fourth.rect.x*100+'%','New detections join the traversal');
+ press();assert.equal(selected(),original[0]);press();assert.equal(selected(),'saved-0','The saved face keeps its original place');
+ const ignored=saved[0];f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'face-ignore',item:{id:'tab-save',kind:'photo'},faces:[],ignoredFaces:[ignored.rect]}}));
+ press({target:f.document.body});assert.equal(selected(),original[2],'A removed current face advances to the following surviving face');f.faces.clear();
+});
+test('Tab leaves unrelated fields, editing controls and modified keys alone, and selection ends on outside focus or another photo',async()=>{
+ const f=fixture([first,second],{desktop:true});await f.mount('tab-guards');const hits=()=>f.find('face-hit-buttons').children,select=()=>f.emit(f.stage,'click',{target:hits()[0],detail:0}),press=properties=>f.emit(f.document,'keydown',{key:'Tab',target:f.document.activeElement,...properties});select();
+ const panel=f.find('face-popover face-picker'),outside=f.document.createElement('input');f.dialog.append(outside);
+ for(const properties of [{ctrlKey:true},{metaKey:true},{altKey:true},{isComposing:true},{target:outside},{target:panel.querySelector('[data-face-adjust]')},{target:panel.querySelector('[data-face-close]')}])assert.equal(press(properties).defaultPrevented,false);
+ const other=f.document.createElement('dialog');other.open=true;f.document.body.append(other);assert.equal(press({target:other}).defaultPrevented,false);other.remove();
+ f.emit(f.document,'focusin',{target:outside});assert.equal(press({target:f.stage}).defaultPrevented,false);assert.equal(hits().some(node=>node.classList.contains('face-tab-current')),false);
+ select();f.emit(f.document,'pointerdown',{target:outside});assert.equal(press({target:f.stage}).defaultPrevented,false);
+ select();f.emit(f.find('face-popover face-picker').querySelector('[data-face-close]'),'click');assert.equal(press({target:f.stage}).defaultPrevented,false);
+ select();await f.mount('another-photo');assert.equal(press({target:f.stage}).defaultPrevented,false);f.faces.clear();assert.equal(press({target:f.stage}).defaultPrevented,false);
+});
+test('Windows apps support Tab without hover or a wide window while phones and tablets retain native Tab',async()=>{
+ for(const options of [{windows:true,installed:true,hoverNone:true},{desktop:true,windows:true,installed:false,hoverNone:true},{desktop:true}]){
+  const f=fixture([first,second],options);await f.mount();const hits=f.find('face-hit-buttons');f.emit(f.stage,'click',{target:hits.children[0],detail:0});const event=f.emit(f.document,'keydown',{key:'Tab',target:f.find('face-popover face-picker').querySelector('input')});assert.equal(event.defaultPrevented,true);assert.equal(hits.children[1].classList.contains('face-tab-current'),true);f.faces.clear();
+ }
+ for(const userAgent of ['Mozilla/5.0 (Android) Mobile','Mozilla/5.0 (iPhone)','Mozilla/5.0 (Macintosh; Intel Mac OS X)']){
+  const f=fixture([first,second],{desktop:true});f.window.navigator={userAgent,maxTouchPoints:5};await f.mount();const hit=f.find('face-hit-buttons').children[0];f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(f.find('face-tab-help'),undefined);assert.equal(f.emit(f.document,'keydown',{key:'Tab',target:f.find('face-popover face-picker').querySelector('input')}).defaultPrevented,false);f.faces.clear();
+ }
+});
+test('the upload wizard traverses the same draft faces without media writes and cannot navigate during a save',async()=>{
+ const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'},draft={key:'upload-tab',rotation:0,faceTags:[{...first,id:'a',personId:person.id,person},{...second,id:'b',personId:person.id,person}],detectedFaces:[],ignoredFaces:[],facesComplete:false},adapter=createUploadFaceAdapter(draft,{findPeople:async()=>[person],getPerson:()=>person});adapter.enabled=()=>true;
+ f.window.FamilyI18n.fetch=async()=>{throw Error('No media request is allowed');};f.window.FamilyTags.findPeople=async()=>[person];
+ let complete;const saveDraft=adapter.save.bind(adapter);adapter.save=payload=>new Promise(resolve=>{complete=()=>resolve(saveDraft(payload));});
+ await f.mount('upload-tab',{adapter,dialog:f.dialog,reviewHost:f.title,zoom:false},{scope:'gallery'});const hits=()=>f.find('face-hit-buttons').children;
+ f.emit(f.stage,'click',{target:hits()[0],detail:0});let panel=f.find('face-popover face-picker');const host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await new Promise(resolve=>setImmediate(resolve));
+ f.emit(f.document,'keydown',{key:'Tab',target:panel.querySelector('input')});assert.equal(f.find('face-popover face-picker'),panel,'A pending save keeps the current face');complete();await f.faces.flush();
+ f.emit(f.document,'keydown',{key:'Tab',target:f.document.activeElement});assert.equal(hits().find(node=>node.classList.contains('face-tab-current')).dataset.faceId,'b');assert.equal(draft.faceTags.length,2);f.faces.clear();
+});
 test('100% fits each photo inside the measured phone frame and zoom changes only the image surface',async()=>{
  const f=fixture();f.view.frameHeight=400;f.dialog.classList.add('mobile-photo-frame');
  for(const [width,height]of [[4000,3000],[1000,3000],[3000,1000]]){

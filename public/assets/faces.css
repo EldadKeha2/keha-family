@@ -67,6 +67,7 @@
 .gallery-tag-filters button:focus-visible{outline:3px solid #d89132;outline-offset:2px}
 .gallery-tag-help{margin:6px 0;color:#766b53;font-size:calc(13px * var(--a11y-text-scale,1));line-height:1.6}
 .face-selection{position:absolute;border:2px dashed #f5dca3;border-radius:5px;box-shadow:0 0 0 1px #50603c88;pointer-events:none}
+:is(#mediaViewer,#photoUploadEditor) .face-hit.face-tab-current{outline:2px solid #f5dca3;outline-offset:2px;box-shadow:0 0 0 3px #304a36b3}
 .face-popover{position:fixed;z-index:30;max-width:calc(100vw - 16px);box-sizing:border-box;border:1px solid #b8a078;border-radius:9px;background:#fffdf6;color:#4e583e;box-shadow:0 8px 30px #3f352b33;font:calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans);overflow:auto;overscroll-behavior:contain;text-align:start}
 .face-name{display:flex;align-items:center;gap:9px;padding:8px 12px;width:max-content;max-width:260px;background:#f2f5e8;border-color:#a6b58d;box-shadow:0 4px 13px #39452b35;pointer-events:auto}
 .face-name>span,.face-name>.face-profile-link{font-weight:600;overflow-wrap:anywhere}
@@ -75,6 +76,7 @@
 .face-profile-link:focus-visible{outline:2px solid #647d48;outline-offset:4px;border-radius:2px}
 :is(#mediaViewer,#photoUploadEditor) .face-name button{pointer-events:auto;min-width:36px;min-height:36px;padding:3px;border:1px solid #c5ceb5;border-radius:6px;font-size:calc(19px * var(--a11y-text-scale,1));line-height:1;background:#fffdf4;flex-shrink:0}
 .face-picker{width:280px;padding:10px}
+.face-picker .face-tab-help{margin:8px 0 0;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.5;color:#64714e}
 .face-picker>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
 .face-picker>header>strong{font-size:calc(16px * var(--a11y-text-scale,1))}
 :is(#mediaViewer,#photoUploadEditor) .face-picker [data-face-close]{min-width:32px;min-height:32px;font:calc(22px * var(--a11y-text-scale,1))/1 Arial,sans-serif;padding:2px;color:#887557}
