@@ -119,6 +119,15 @@ test('completed photos mount saved faces without rerunning the image detector',a
  assert.equal(f.detectionCalls,0);assert.equal(f.stage.dataset.faceDetection,'reviewed');assert.equal(f.find('face-hit-buttons').children[0].dataset.faceId,'saved');
  f.faces.update({id:'complete',kind:'photo',faceSummary:{reviewed:false}});await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,1);f.faces.clear();
 });
+test('rapid desktop navigation postpones automatic scans while saved faces and controls stay available',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture([first],{desktop:true}),saved={...first,id:'saved',personId:'yona',person:{id:'yona',name:'יונה'}};
+ f.dialog.classList.add('personal-photo-desktop');f.window.FamilyI18n.fetch=async()=>Response.json({faces:[saved]});
+ await f.mount('a');await new Promise(resolve=>setImmediate(resolve));assert.ok(f.find('face-zoom-toolbar'));assert.equal(f.find('face-hit-buttons').children[0].dataset.faceId,'saved');t.mock.timers.tick(300);assert.equal(f.detectionCalls,0);
+ await f.mount('b');t.mock.timers.tick(649);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,0);t.mock.timers.tick(1);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,1);
+ await f.mount('c');f.faces.clear();t.mock.timers.tick(1000);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,1,'Leaving a photo cancels its queued scan');
+ await f.mount('scanned',{}, {faceSummary:{scanned:true}});f.faces.update({id:'scanned',kind:'photo',faceSummary:{scanned:true},caption:'Updated'});t.mock.timers.tick(1000);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,1,'Metadata updates do not rescan saved photos');f.faces.clear();
+ await f.mount('reviewed',{}, {faceSummary:{scanned:true,reviewed:true}});f.faces.update({id:'reviewed',kind:'photo',faceSummary:{scanned:true,reviewed:false}});t.mock.timers.tick(650);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,2,'Undoing confirmation can still restart detection');f.faces.clear();
+});
 
 test('photo navigation waits for fitted zoom and finished face editing, and clears zoom styling on the next photo',async()=>{
  const f=fixture([first]);await f.mount();assert.equal(f.faces.canNavigate(f.stage),true);

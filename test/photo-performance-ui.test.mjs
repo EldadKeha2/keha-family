@@ -25,25 +25,50 @@ test('adjacent preparation deduplicates downloads, decodes before use, bounds me
  const photo=id=>({kind:'photo',src:'/media/'+id,size:1000000});
  const a=p.prepare(photo('a'));assert.equal(p.prepare(photo('a')),a);assert.equal(images.length,1);assert.equal(images[0].fetchPriority,'high');
  await images[0].onload();assert.equal(await a,images[0]);assert.equal(images[0].decoded,true);
- p.preload([photo('a'),photo('b')],0);assert.equal(images.length,2);assert.equal(images[1].fetchPriority,'low');await images[1].onload();
+ p.preload([photo('a'),photo('b')],0);assert.equal(images.length,2);assert.equal(images[1].fetchPriority,'high');await images[1].onload();
  navigator.connection.saveData=true;p.preload([photo('b'),photo('c')],0);assert.equal(images.length,2);
  navigator.connection={effectiveType:'2g'};p.preload([photo('b'),photo('c')],0);assert.equal(images.length,2);
- navigator.connection={};const c=p.prepare(photo('c'));await images[2].onload();await c;
- const d=p.prepare(photo('d'));await images[3].onload();await d;
- const again=p.prepare(photo('a'));assert.equal(images.length,5,'Only three prepared photos are retained');await images[4].onload();await again;
+ navigator.connection={};for(const id of ['c','d','e','f','g','h','i']){const pending=p.prepare(photo(id));await images.at(-1).onload();await pending;}
+ const again=p.prepare(photo('a'));assert.equal(images.length,10,'The browsing cache retains at most eight images');await images.at(-1).onload();await again;
 });
 test('sliding keeps one outgoing layer, follows the drag and cleans animation state without removing the full-resolution image',async()=>{
  const animations=[],nodes=[],window={FamilyFaces:{fit(){window.fitted=true;}}};let reduced=false;
  const classes=()=>{const set=new Set();return{add:v=>set.add(v),remove:v=>set.delete(v),contains:v=>set.has(v)};};
- const node=()=>({style:{},classList:classes(),setAttribute(){},remove(){this.removed=true;},animate(frames,options){let finish;const animation={frames,options,finished:new Promise(resolve=>{finish=resolve;}),cancel(){finish();}};animations.push(animation);return animation;}});
+ const node=()=>({style:{},classList:classes(),setAttribute(){},remove(){this.removed=true;},animate(frames,options){let finish;const animation={owner:this,frames,options,finished:new Promise(resolve=>{finish=resolve;}),cancel(){this.cancelled=true;finish();}};animations.push(animation);return animation;}});
  const image={...node(),src:'/media/full',naturalWidth:6567,getBoundingClientRect:()=>({left:20,top:0,width:640,height:403})},scroll=node();
- const stage={classList:classes(),clientWidth:640,querySelector:s=>s==='.face-photo-scroll'?scroll:image,getBoundingClientRect:()=>({left:0,top:0}),append:n=>nodes.push(n)};
+ const stage={classList:classes(),clientWidth:640,querySelector:s=>s==='.face-photo-scroll'?scroll:image,getBoundingClientRect:()=>({left:0,top:0}),append:(...added)=>nodes.push(...added)};
  const document={createElement:()=>node()};vm.runInNewContext(presentation,{window,document,navigator:{},setTimeout,clearTimeout,matchMedia:()=>({matches:reduced})});const p=window.FamilyPhotoPresentation;
  p.drag(stage,90);assert.equal(scroll.style.transform,'translateX(90px)');p.cancel();assert.equal(scroll.style.transform,'');
  const ghost=p.snapshot(stage);assert.match(ghost.style.backgroundImage,/\/media\/full/);p.slide(stage,ghost,-1);assert.equal(stage.classList.contains('photo-slide-running'),true);
- assert.equal(animations.at(-1).frames[0].transform,'translateX(-640px)');assert.equal(image.src,'/media/full');p.cancel();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(animations.at(-1).frames[0].transform,'translateX(-640px)');assert.equal(image.src,'/media/full');assert.equal(animations.some(a=>a.owner===image),false,'The face editor must not reparent the animated element');assert.equal(animations.at(-1).options.duration,160);
+ const incoming=nodes.at(-1),nextGhost=p.snapshot(stage);p.slide(stage,nextGhost,1);await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(animations.length,2,'A rapid second press shows the new photo without queuing a second animation');assert.equal(animations.every(a=>a.cancelled),true);assert.equal(nextGhost.removed,true);assert.equal(incoming.removed,true);
  assert.equal(ghost.removed,true);assert.equal(stage.classList.contains('photo-slide-running'),false);assert.equal(image.removed,undefined);
  reduced=true;assert.equal(p.snapshot(stage),null);
+});
+test('desktop and mobile warm different browsing windows without duplicating the current photo',async()=>{
+ for(const mobile of [false,true]){
+  const images=[],window={};class Image{constructor(){images.push(this);this.naturalWidth=1024;this.naturalHeight=768;}}
+  vm.runInNewContext(presentation,{window,Image,navigator:{userAgentData:{mobile}},setTimeout,clearTimeout});
+  const items=Array.from({length:12},(_,id)=>({kind:'photo',src:'/original/'+id,previewSrc:'/preview/'+id}));window.FamilyPhotoPresentation.preload(items,5);
+  assert.deepEqual(images.map(image=>image.src),mobile?['/preview/6','/preview/4','/preview/7']:['/preview/6','/preview/4','/preview/7','/preview/8','/preview/3','/preview/9']);
+  assert.deepEqual(images.map(image=>image.fetchPriority),mobile?['high','high','low']:['high','high','low','low','low','low']);await Promise.all(images.map(image=>image.onload()));
+ }
+});
+test('decoded previews are available synchronously and remain intact after zooming to originals',async()=>{
+ const images=[],window={};class Image{constructor(){images.push(this);this.naturalWidth=1200;this.naturalHeight=800;}cloneNode(){return {src:this.src,naturalWidth:this.naturalWidth,naturalHeight:this.naturalHeight};}}
+ vm.runInNewContext(presentation,{window,Image,navigator:{},setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation,item={kind:'photo',src:'/original/a',previewSrc:'/preview/a'};
+ const pending=p.prepare(item,'low');assert.equal(p.ready(item),null);assert.equal(p.prepare(item,'high'),pending);assert.equal(images[0].fetchPriority,'high');await images[0].onload();await pending;
+ const displayed=p.ready(item);assert.equal(displayed.src,'/preview/a');assert.notEqual(displayed,images[0]);displayed.src='/original/a';
+ for(const id of ['a','b','c']){const prepared=p.prepare({...item,src:'/original/'+id},'low',true);await images.at(-1).onload();await prepared;}
+ assert.equal(p.ready(item).src,'/preview/a','Automatic original preparation cannot evict or mutate a browsing preview');assert.notEqual(p.ready(item),p.ready(item));
+ const originalAgain=p.prepare(item,'high',true);assert.equal(images.length,5,'The original cache holds at most two entries');await images.at(-1).onload();await originalAgain;
+});
+test('decoded pixel budget releases large previews even before the image-count limit',async()=>{
+ const images=[],window={};class Image{constructor(){images.push(this);this.naturalWidth=this.naturalHeight=4096;}}
+ vm.runInNewContext(presentation,{window,Image,navigator:{},setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation,photo=id=>({kind:'photo',src:'/media/'+id});
+ for(const id of ['a','b']){const prepared=p.prepare(photo(id));await images.at(-1).onload();await prepared;}
+ assert.equal(p.ready(photo('a')),null);assert.equal(p.ready(photo('b')),images[1]);
 });
 test('a committed drag continues from its existing position in one motion',()=>{
  const frames=[],window={},classes={add(){},remove(){}},image={src:'/preview',naturalWidth:2000,style:{},animate(k){frames.push(k);return{finished:new Promise(()=>{}),cancel(){}};},getBoundingClientRect:()=>({left:-100,top:0,width:640,height:400})},scroller={style:{}},ghost={style:{},setAttribute(){},remove(){},animate:image.animate};

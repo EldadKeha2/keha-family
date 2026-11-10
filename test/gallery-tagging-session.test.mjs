@@ -13,7 +13,7 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
  const nodes=new Map(),documentHandlers=new Map(),windowHandlers=new Map(),intervals=[],requests=[],pending=[];let nextDeferred=false,revision=1;
  const server=structuredClone(items),mounted=[];
  class Node{
-  constructor(){this.handlers=new Map();this.children=[];this.widgets=new Map();this.dataset={};this.className='';this.style={setProperty(){}};this.classList={add(){},toggle(){},remove(){}};this.hidden=false;this.open=false;this.value='';this.isConnected=true;}
+  constructor(){this.handlers=new Map();this.children=[];this.widgets=new Map();this.dataset={};this.className='';this.style={setProperty(){}};this.classList={add(){},toggle(){},remove(){},contains:name=>this.className.split(' ').includes(name)};this.hidden=false;this.open=false;this.value='';this.isConnected=true;}
   addEventListener(name,fn){if(!this.handlers.has(name))this.handlers.set(name,[]);this.handlers.get(name).push(fn);}
   emit(name,event={}){for(const fn of this.handlers.get(name)||[])fn(event);}
   click(){this.emit('click');}setAttribute(k,v){this[k]=String(v);}getAttribute(k){return this[k]??null;}removeAttribute(k){delete this[k];}

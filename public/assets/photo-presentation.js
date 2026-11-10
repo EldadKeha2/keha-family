@@ -1,27 +1,37 @@
 (() => {
   'use strict';
-  const prepared=new Map();let motion=null,dragged=null,serial=0,handoff=null;
+  const prepared=new Map(),originals=new Map();let motion=null,dragged=null,serial=0,handoff=null,lastSlide=0;
   const source=item=>item.previewSrc||item.src;
+  const mobile=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
+  const copy=image=>image?.cloneNode?image.cloneNode(false):image;
+  function trim(cache,keep){
+    const limit=cache===originals?2:mobile()?5:8,budget=(mobile()?12:24)*1024*1024;
+    let pixels=[...cache.values()].reduce((sum,entry)=>sum+entry.pixels,0);
+    for(const [key,entry]of cache){if(cache.size<=limit&&pixels<=budget)break;if(key===keep)continue;cache.delete(key);pixels-=entry.pixels;}
+  }
+  function ready(item){const key=source(item),entry=prepared.get(key);if(!entry?.ready)return null;prepared.delete(key);prepared.set(key,entry);return copy(entry.image);}
   const photoImage=stage=>stage._familyFaceContext?.image||stage.querySelector('.face-photo-scroll img')||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
   function prepare(item,priority='high',original=false){
     if(item?.kind!=='photo'||typeof Image==='undefined')return null;
-    const src=original?item.src:source(item);
-    if(prepared.has(src))return prepared.get(src);
-    const promise=new Promise((resolve,reject)=>{
-      const image=new Image();image.decoding='async';image.fetchPriority=priority;
+    const src=original?item.src:source(item),cache=original&&src!==source(item)?originals:prepared;
+    if(cache.has(src)){const entry=cache.get(src);cache.delete(src);cache.set(src,entry);if(priority==='high')entry.image.fetchPriority='high';return entry.promise;}
+    const image=new Image(),entry={image,promise:null,ready:false,pixels:0};
+    const promise=entry.promise=new Promise((resolve,reject)=>{
+      image.decoding='async';image.fetchPriority=priority;
       const timeout=setTimeout(()=>reject(Error('Photo preparation timed out')),original?30000:10000);
-      image.onload=async()=>{clearTimeout(timeout);try{await image.decode?.();}catch{}if(image.naturalWidth)resolve(image);else reject(Error('Photo unavailable'));};
+      image.onload=async()=>{clearTimeout(timeout);try{await image.decode?.();}catch{}if(image.naturalWidth){entry.ready=true;entry.pixels=image.naturalWidth*(image.naturalHeight||1);trim(cache,src);resolve(image);}else reject(Error('Photo unavailable'));};
       image.onerror=()=>{clearTimeout(timeout);reject(Error('Photo unavailable'));};image.src=src;
     });
-    prepared.set(src,promise);
-    promise.catch(()=>{if(prepared.get(src)===promise)prepared.delete(src);});
-    while(prepared.size>3)prepared.delete(prepared.keys().next().value);
+    cache.set(src,entry);
+    promise.catch(()=>{if(cache.get(src)===entry)cache.delete(src);});
+    trim(cache,src);
     return promise;
   }
   function preload(items,index){
     const connection=navigator.connection;
     if(items.length<2||connection?.saveData||/^(slow-)?2g$/.test(connection?.effectiveType||''))return;
-    for(const direction of [-1,1]){const next=items[(index+direction+items.length)%items.length];if(next?.kind==='photo'&&!(Number(next.previewSize||next.size)>16*1024*1024))prepare(next,'low')?.catch(()=>{});}
+    const distances=mobile()?[1,-1,2]:[1,-1,2,3,-2,4],seen=new Set([source(items[index]||{})]);
+    for(const distance of distances){const next=items[(index+distance+items.length)%items.length];if(next?.kind==='photo'&&!seen.has(source(next))&&!(Number(next.previewSize||next.size)>16*1024*1024)){seen.add(source(next));prepare(next,Math.abs(distance)===1?'high':'low')?.catch(()=>{});}}
   }
   function cancelDrag(){
     if(!dragged)return;dragged.node.style.transform='';dragged.stage.classList.remove('photo-dragging');dragged=null;
@@ -49,7 +59,7 @@
     window.FamilyPhotoNative?.reset();
     if(!preserveHandoff)clearHandoff();
     cancelDrag();if(!motion)return;const previous=motion;motion=null;clearTimeout(previous.timer);
-    for(const animation of previous.animations)animation.cancel();previous.ghost.remove();previous.stage.classList.remove('photo-slide-running');
+    for(const animation of previous.animations)animation.cancel();previous.ghost.remove();previous.incoming.remove();previous.stage.classList.remove('photo-slide-running');
   }
   function drag(stage,dx){
     const node=stage.querySelector('.face-photo-scroll')||stage.querySelector('img');if(!node?.style)return;
@@ -69,13 +79,20 @@
     return ghost;
   }
   function slide(stage,ghost,direction){
-    if(!ghost)return;cancel();const image=photoImage(stage);if(!image?.animate)return;
-    const distance=stage.clientWidth*direction,offset=ghost.swipeOffset||0,id=++serial;stage.classList.add('photo-slide-running');stage.append(ghost);
-    const options={duration:Math.max(140,Math.min(300,300*(1-Math.min(.6,Math.abs(offset)/stage.clientWidth)))),easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};
-    const animations=[ghost.animate([{transform:'translateX(0)'},{transform:'translateX('+(-distance-offset)+'px)'}],options),image.animate([{transform:'translateX('+(distance+offset)+'px)'},{transform:'translateX(0)'}],options)];
+    if(!ghost)return;cancel();const image=photoImage(stage);if(!image?.animate){ghost.remove();return;}
+    const now=Date.now(),rapid=now-lastSlide<160&&!ghost.swipeOffset;lastSlide=now;
+    if(rapid){ghost.remove();return;}
+    // Animate independent pixels, never the image that the face editor resizes
+    // and reparents. Fast repeated presses skip motion and show the latest photo.
+    const incoming=document.createElement('div');incoming.className='media-slide-incoming';incoming.setAttribute('aria-hidden','true');
+    Object.assign(incoming.style,{position:'absolute',inset:'0',backgroundImage:'url('+JSON.stringify(image.currentSrc||image.src)+')',backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',backgroundColor:typeof getComputedStyle==='function'?getComputedStyle(stage).backgroundColor:'#ede5d4',pointerEvents:'none',zIndex:'7',willChange:'transform'});
+    ghost.style.willChange='transform';
+    const distance=stage.clientWidth*direction,offset=ghost.swipeOffset||0,id=++serial;stage.classList.add('photo-slide-running');stage.append(ghost,incoming);
+    const options={duration:Math.max(90,160*(1-Math.min(.6,Math.abs(offset)/stage.clientWidth))),easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};
+    const animations=[ghost.animate([{transform:'translateX(0)'},{transform:'translateX('+(-distance-offset)+'px)'}],options),incoming.animate([{transform:'translateX('+(distance+offset)+'px)'},{transform:'translateX(0)'}],options)];
     const finish=()=>{if(motion?.id!==id)return;cancel();window.FamilyFaces?.fit();window.FamilyMedia?.refreshPhotoPresentation?.();};
-    motion={id,stage,ghost,animations,timer:setTimeout(finish,400)};
+    motion={id,stage,ghost,incoming,animations,timer:setTimeout(finish,220)};
     Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(finish);
   }
-  window.FamilyPhotoPresentation={source,prepare,preload,snapshot,slide,drag,settle,cancel,holdNative,finishHandoff};
+  window.FamilyPhotoPresentation={source,prepare,ready,copy,preload,snapshot,slide,drag,settle,cancel,holdNative,finishHandoff};
 })();

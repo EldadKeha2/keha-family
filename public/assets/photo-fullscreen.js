@@ -28,7 +28,7 @@
     const label=tr('תמונה '+(state.index+1)+' מתוך '+state.total,'Photo '+(state.index+1)+' of '+state.total);
     if(counter.textContent!==label)counter.textContent=label;
     if(caption.textContent!==(state.item.caption||''))caption.textContent=state.item.caption||'';caption.hidden=!state.item.caption;
-    previous.hidden=next.hidden=state.total<2;previous.disabled=next.disabled=state.busy;
+    previous.hidden=next.hidden=state.total<2;previous.disabled=next.disabled=state.pageLoading??state.busy;
     if(state.total<2){playing=false;cancelAdvance();}play.disabled=state.total<2;
     const playLabel=playing?tr('השהיית המצגת','Pause slideshow'):tr('הפעלת מצגת בלולאה','Play looping slideshow');
     if(play.getAttribute('aria-label')!==playLabel){play.setAttribute('aria-label',playLabel);play.title=playLabel;play.innerHTML=playing?pauseIcon:playIcon;}play.setAttribute('aria-pressed',String(playing));

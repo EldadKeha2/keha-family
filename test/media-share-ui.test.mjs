@@ -122,12 +122,11 @@ test('wide Windows-style touch events can swipe after pointer cancellation witho
  assert.equal(f.get('mediaOriginal').href,'/media/b');
  pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointermove',340);pointer(f,'pointerup',340);touch('touchend',340);assert.equal(f.get('mediaOriginal').href,'/media/c','A browser emitting both streams advances just once');
 });
-test('photo preparation keeps the current photo visible, blocks duplicate moves and cannot reopen a closed or changed album',async()=>{
+test('photo preparation keeps the current photo visible and cannot reopen a closed or changed album',async()=>{
  for(const action of ['finish','close','another-album','edit-target']){
   const f=fixture();let finish;f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');
   f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>{finish=resolve;});
-  const pending=f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaOriginal').href,'/media/a');assert.equal(f.get('mediaNext').disabled,true);
-  await f.get('mediaNext').handlers.get('click')();
+  const pending=f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaOriginal').href,'/media/a');assert.equal(f.get('mediaNext').disabled,false);
   if(action==='close')f.close();if(action==='another-album')f.window.FamilyMedia.open([f.photo('c')],0,'photos');
   if(action==='edit-target')f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'photo-edit',item:{...f.photo('b'),src:'/media/b?v=edited',photoRevision:'edited'}}}));
   const oldImage=f.document.createElement('img');oldImage.src='/media/b';finish(oldImage);await pending;
@@ -135,6 +134,35 @@ test('photo preparation keeps the current photo visible, blocks duplicate moves 
   else if(action==='another-album')assert.equal(f.get('mediaOriginal').href,'/media/c');
   else{assert.equal(f.get('mediaOriginal').href,action==='finish'?'/media/b':'/media/b?v=edited');assert.equal(f.get('mediaStage').content[0].src,f.get('mediaOriginal').href);assert.equal(f.get('mediaNext').disabled,false);}
  }
+});
+test('prepared desktop photos switch synchronously and only the settled photo mounts face controls',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture(),mounts=[],tags=[];let preparations=0;
+ f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});f.window.FamilyPhotoPresentation.prepare=()=>{preparations++;return null;};f.window.FamilyPhotoPresentation.preload=()=>{};
+ f.window.FamilyFaces={mount(_stage,_image,item){mounts.push(item.id);},clear(){},update(){}};f.window.FamilyTags.mountInline=(_panel,item)=>tags.push(item.id);
+ f.get('mediaViewer').classList.add('personal-photo-desktop');f.window.FamilyMedia.open(['a','b','c','d'].map(f.photo),0,'photos');mounts.length=0;tags.length=0;
+ const clicks=['b','c','d'].map(id=>{const pending=f.get('mediaNext').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,id,'No microtask or image load is needed for a warm neighbour');return pending;});
+ assert.equal(preparations,0);assert.deepEqual(tags,['b','c','d']);assert.deepEqual(mounts,[]);t.mock.timers.tick(179);assert.deepEqual(mounts,[]);t.mock.timers.tick(1);assert.deepEqual(mounts,['d']);
+ await Promise.all(clicks);f.get('mediaPrevious').handlers.get('click')();f.close();t.mock.timers.tick(200);assert.deepEqual(mounts,['d'],'Closing cancels delayed face controls');
+});
+test('rapid clicks select the latest pending photo and ignore earlier out-of-order image loads',async()=>{
+ for(const fullscreen of [false,true]){
+  const f=fixture(),pending=new Map(),tags=[];f.window.FamilyPhotoPresentation.preload=()=>{};f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>pending.set(item.id,resolve));
+  f.window.FamilyMedia.open(['a','b','c','d'].map(f.photo),0,'photos');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);f.window.FamilyTags.mountInline=(_panel,item)=>tags.push(item.id);
+  const first=f.window.FamilyMedia.step(1),second=f.window.FamilyMedia.step(1),last=f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaNext').disabled,false);assert.deepEqual(tags,[],'Waiting does not rebuild the old photo');
+  pending.get('c')(f.document.createElement('img'));await second;pending.get('b')(f.document.createElement('img'));await first;assert.equal(f.window.FamilyMedia.current().id,'a');
+  pending.get('d')(f.document.createElement('img'));await last;assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.window.FamilyMedia.photoState().busy,false);assert.deepEqual(tags,['d']);f.close();
+ }
+});
+test('reversing a pending next press keeps the displayed image and cancels the late result',async()=>{
+ const f=fixture();f.window.FamilyPhotoPresentation.preload=()=>{};f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');const image=f.get('mediaStage').content[0];let finish;
+ f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>finish=resolve);const pending=f.window.FamilyMedia.step(1);await f.window.FamilyMedia.step(-1);assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.window.FamilyMedia.photoState().busy,false);
+ finish(f.document.createElement('img'));await pending;assert.equal(f.get('mediaStage').content[0],image);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+});
+test('a pending neighbour cannot overwrite a later gallery page selected by another next press',async()=>{
+ const f=fixture(),pagination={page:1,pages:2,size:2,total:4};let finish;f.window.FamilyPhotoPresentation.preload=()=>{};f.window.FamilyMedia.register('gallery',['a','b'].map(f.photo),{pagination});f.window.FamilyMedia.openFrom('gallery','a');
+ f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>finish=resolve);f.window.FamilyPortal={pageGallery:async page=>f.window.FamilyMedia.register('gallery',['c','d'].map(f.photo),{pagination:{...pagination,page}})};
+ const pending=f.window.FamilyMedia.step(1);await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.window.FamilyMedia.photoState().pageLoading,false);
+ finish(f.document.createElement('img'));await pending;assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
 });
 test('touch swipes navigate every photo album in both languages and on wide touch screens',()=>{
  for(const english of [false,true])for(const width of [360,1440])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nostalgia','nursery:ruti']){

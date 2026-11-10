@@ -48,6 +48,7 @@
     c.labelTimer=setTimeout(()=>{c.labelTimer=null;if(live(c)&&c.popup===bubble&&!bubble.contains(document.activeElement))closePopup(c);},250);
   }
   function dispose(c){
+    clearTimeout(c.detectionTimer);
     c.resolvePaint?.();
     window.FamilyPhotoNative?.reset(c.stage);
     cancelPress(c);
@@ -420,6 +421,7 @@
     const imageReady=()=>new Promise(resolve=>{if(imageWidth(image)&&(image.complete||image.tagName?.toLowerCase()==='canvas'))resolve();else on(image,'load',resolve,{once:true});});
     await imageReady();if(!live(c))return;if(zoom)setupZoom(c);c.initialized=true;window.FamilyPhotoViewerLayout?.faceControls(c);place(c);window.FamilyMedia?.refreshPhotoPresentation?.();c.resolvePaint();
     c.runDetection=async()=>{
+    clearTimeout(c.detectionTimer);c.detectionTimer=null;
     if(!live(c)||c.scanning)return;c.scanning=true;
     stage.dataset.faceDetection='scanning';
     const detected=found=>{if(!live(c))return;const used=new Set(),visible=c.highlightMissing&&Array.isArray(found.galleryFaces)?found.galleryFaces:found;c.detected=visible.map(face=>{const override=[...c.adjusted].find(([,change])=>c.geom.sameRegion(change.original,face.rect)),previous=c.detected.find(previous=>!used.has(previous.id)&&c.geom.sameRegion(previous.rect,face.rect)),id=override?.[0]||previous?.id||uuid();used.add(id);return {id,rect:override?.[1].rect||face.rect,score:face.score,revision:null};});stage.dataset.faceEngine=found.engine;paint(c);};
@@ -427,13 +429,20 @@
     try{const original=!adapter&&c.item.previewSrc?await window.FamilyPhotoPresentation?.prepare(c.item,'low',true):null;if(!live(c))return;const detector=await import('./face-detector.mjs?v=12'),found=await detector.detectFaces(item.id+':'+(adapter?'upload':item.photoRevision||'original'),detectionImage||original||image,c.events.signal,receive);if(!live(c))return;receive(found);stage.dataset.faceDetection='ready';if(!adapter)window.FamilyGalleryFaces?.save(item,found,c.events.signal).catch(()=>{});}
     catch(error){if(live(c)&&error.name!=='AbortError'){stage.dataset.faceDetection='manual';console.warn('Face detection unavailable:',error.message);announce(c,tr('אפשר ללחוץ על הפנים בתמונה ולתייג גם ידנית.','You can click a face to tag it manually.'));}}
     };
+    c.scheduleDetection=()=>{
+      if(!live(c)||c.reviewed||c.scanning||c.detectionTimer)return;
+      // Let rapid desktop browsing and preview downloads finish first. Saved
+      // face regions and all editing controls are already available meanwhile.
+      if(!adapter&&dialog.classList.contains('personal-photo-desktop'))c.detectionTimer=setTimeout(()=>{c.detectionTimer=null;if(live(c)&&!c.reviewed)c.runDetection();},650);
+      else return c.runDetection();
+    };
     // Completed photos use their saved regions; undoing confirmation can still
     // start the same detector later without rebuilding the interactive image.
     if(c.reviewed&&!adapter){stage.dataset.faceDetection='reviewed';return;}
     if(c.item.faceSummary?.scanned&&!adapter){stage.dataset.faceDetection='saved';return;}
-    await c.runDetection();
+    await c.scheduleDetection();
   }
-  function update(item){if(current?.item.id===item.id){current.item=item;current.reviewed=Boolean(item.faceSummary?.reviewed);paint(current);if(!current.reviewed)current.runDetection?.();}}
+  function update(item){if(current?.item.id===item.id){const wasReviewed=current.reviewed;current.item=item;current.reviewed=Boolean(item.faceSummary?.reviewed);paint(current);if(!current.reviewed&&(wasReviewed||!item.faceSummary?.scanned))current.scheduleDetection?.();}}
   document.addEventListener('DOMContentLoaded',()=>{
     window.addEventListener('family-photo-overlays-changed',event=>{const c=current;if(c?.item.id===event.detail.id){paintAnnotations(c);if(c.hits)place(c);}});
     window.addEventListener('family-media-changed',event=>{
