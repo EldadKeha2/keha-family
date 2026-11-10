@@ -44,6 +44,11 @@
 #mediaStage.has-native-photo-strip:not(.face-photo-enlarged) .face-photo-scroll{overflow:visible;overscroll-behavior:auto;flex:0 0 100%}
 #mediaStage.has-native-photo-strip.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
 #mediaStage.has-native-photo-strip.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pan-y pinch-zoom}
+/* Desktop touch owns its axis from first contact. Otherwise Windows may cancel
+   the pointer stream on the diagonal start of a horizontal stroke. Vertical
+   finger movement scrolls the dialog in photo-swipe.js; pinch stays native. */
+#mediaStage.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
+#mediaStage.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(img,.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pinch-zoom}
 .media-stage.is-video{aspect-ratio:16/9;max-height:64vh;max-height:64dvh;min-height:200px;width:100%;margin:auto}
 .media-stage video,.media-stage iframe{display:block;width:100%;height:100%;min-height:200px;border:0;object-fit:contain}
 .media-viewer-footer{padding:14px 22px 18px}

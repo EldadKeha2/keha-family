@@ -251,6 +251,33 @@ test('horizontal trackpad bursts navigate once while vertical scrolling and pinc
   wheel(-dx);wheel(-dx);wheel(-dx);t.mock.timers.tick(120);assert.equal(f.window.FamilyMedia.current().id,'a');wheel(dx);f.close();t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,'a');
  }
 });
+test('Windows precision trackpads accumulate fractional horizontal deltas instead of discarding every event',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture(),stage=f.get('mediaStage');stage.clientWidth=1440;f.navigator.userAgent='Windows NT';f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+ for(const [dx,expected]of [[.75,'b'],[-.75,'a']]){
+  for(let i=0;i<96;i++){stage.handlers.get('wheel')({deltaX:dx,deltaY:.1,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){}});t.mock.timers.tick(8);}
+  t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,expected);t.mock.timers.tick(500);assert.equal(f.window.FamilyMedia.current().id,expected,'One continuous gesture must advance only once');
+ }
+ f.close();
+});
+test('desktop screen swipes tolerate a small diagonal start and a slow completed drag',t=>{
+ t.mock.timers.enable({apis:['Date']});
+ const f=fixture(),stage=f.get('mediaStage');stage.clientWidth=1440;f.navigator.userAgent='Windows NT';f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+ pointer(f,'pointerdown',200,100);pointer(f,'pointermove',209,112);pointer(f,'pointermove',330,125);pointer(f,'pointerup',330,125);assert.equal(f.window.FamilyMedia.current().id,'b','A small initial diagonal must not cancel the later horizontal swipe');
+ pointer(f,'pointerdown',350,100);pointer(f,'pointermove',220,103);t.mock.timers.tick(6000);pointer(f,'pointerup',220,103);assert.equal(f.window.FamilyMedia.current().id,'a','A completed drag must not be rejected solely because the finger moved slowly');
+ f.close();
+});
+test('Windows touch compatibility events with mouse pointer type are not mistaken for an unpressed mouse',()=>{
+ const f=fixture(),stage=f.get('mediaStage');stage.clientWidth=1440;f.navigator.userAgent='Windows NT';f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+ swipe(f,120,{pointerType:'mouse',buttons:0,sourceCapabilities:{firesTouchEvents:true}});assert.equal(f.window.FamilyMedia.current().id,'b');
+ f.close();
+});
+test('desktop vertical finger movement scrolls the viewer, never selects a photo, and cannot turn into a horizontal swipe',()=>{
+ const f=fixture(),stage=f.get('mediaStage'),viewer=f.get('mediaViewer');stage.clientWidth=1440;f.navigator.userAgent='Windows NT';f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');viewer.scrollTop=100;
+ pointer(f,'pointerdown',200,200);pointer(f,'pointermove',203,160);assert.equal(viewer.scrollTop,140);pointer(f,'pointermove',205,130);assert.equal(viewer.scrollTop,170);pointer(f,'pointerup',205,130);assert.equal(f.window.FamilyMedia.current().id,'a');
+ pointer(f,'pointerdown',200,200);pointer(f,'pointermove',203,160);pointer(f,'pointermove',350,160);pointer(f,'pointerup',350,160);assert.equal(f.window.FamilyMedia.current().id,'a','The locked vertical gesture cannot change photos');
+ swipe(f,120);assert.equal(f.window.FamilyMedia.current().id,'b','A new horizontal stroke works immediately');f.close();
+});
 test('rightward screen, mouse and trackpad gestures increase the counter in every gallery and language',t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){
