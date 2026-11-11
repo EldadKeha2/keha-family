@@ -1,5 +1,5 @@
-import {familyTimeline,timelineTracks,nearestTimelineYear} from './family-timeline-data.mjs?v=foliage-portraits-v6';
-import {mountTimelineOverview} from './family-timeline-overview.mjs?v=foliage-portraits-v6';
+import {familyTimeline,timelineTracks,nearestTimelineYear,annualBirthYears} from './family-timeline-data.mjs?v=annual-board-v7';
+import {mountTimelineOverview} from './family-timeline-overview.mjs?v=annual-board-v7';
 import {bindTimelinePan} from './family-timeline-pan.mjs?v=touch-drag-v3';
 import {enchantedTreeLayout,enchantedCohortLayout,treeBoughPaths} from './family-timeline-tree.mjs?v=enchanted-v4';
 
@@ -36,13 +36,13 @@ function weddingHTML({compact=false}={}){
   const src=weddingPhoto(),date=state.model?.marriage;
   return `<a class="ft-wedding${compact?' ft-wedding-compact':''}" href="#weddings/u-root"><span class="ft-wedding-image">${src?`<img src="${safe(src)}" alt="${tr('החתונה של יונה ושלמה','Yona and Shlomo’s wedding')}" decoding="async">`:'<span aria-hidden="true">♡</span>'}</span><span><strong>${tr('החתונה של יונה ושלמה','Yona and Shlomo’s wedding')}</strong><small>${date?safe(dateLabel(date)):tr('שנת הנישואים טרם הוזנה','Wedding year not yet recorded')}</small></span></a>`;
 }
-function eventLabel(event){return event.kind==='aliyah'?tr(event.person.gender==='f'?'עלתה לארץ':'עלה לארץ','Moved to Israel'):tr(event.person.gender==='f'?'נולדה':'נולד','Born');}
+function eventLabel(event){return tr(event.person.gender==='f'?'נולדה':'נולד','Born');}
 function focusHTML(events){
   return events.map(event=>event.kind==='wedding'?`<li class="ft-focus-event ft-focus-wedding">${weddingHTML()}</li>`:`<li class="ft-focus-event"><a href="#person/${encodeURIComponent(event.person.id)}" aria-label="${safe(name(event.person)+' · '+eventLabel(event)+' · '+dateLabel(event))}">${portrait(event.person)}<strong>${safe(name(event.person))}</strong><small>${safe(eventLabel(event))} · <bdi>${safe(dateLabel(event))}</bdi></small></a></li>`).join('');
 }
 function matches(event,query){
   if(!query)return true;
-  return normalize([event.year,dateLabel(event),event.person?I.searchNames(event.person):tr('חתונה נישואים יונה שלמה','wedding marriage Yona Shlomo'),event.kind==='aliyah'?tr('עלייה לארץ','immigration Israel'):''].join(' ')).includes(query);
+  return normalize([event.year,dateLabel(event),event.person?I.searchNames(event.person):tr('חתונה נישואים יונה שלמה','wedding marriage Yona Shlomo')].join(' ')).includes(query);
 }
 function activeYear(track){
   const year=nearestTimelineYear(track.years,state.years.get(track.generation)??track.years[0]);
@@ -69,6 +69,19 @@ function overviewPreview(events){
   const people=[...new Map(events.filter(e=>e.person).map(e=>[e.person.id,e.person])).values()],wedding=events.some(e=>e.kind==='wedding'),src=wedding?weddingPhoto():'';
   return (wedding?`<span class="ft-overview-wedding">${src?`<img src="${safe(src)}" alt="" decoding="async">`:'♡'}</span>`:'')+people.slice(0,wedding?2:3).map(p=>portrait(p,{mini:events.length>1})).join('');
 }
+function annualHTML(){
+  const years=annualBirthYears(state.model),count=years.reduce((sum,row)=>sum+row.events.length,0);
+  const weights=years.map(row=>1+Math.max(0,Math.ceil(row.events.reduce((sum,event)=>sum+name(event.person).length+3,0)/34)-1)*.65),columns=[];
+  let column=[],weight=0,remaining=weights.reduce((sum,value)=>sum+value,0);
+  years.forEach((row,index)=>{
+    const target=remaining/(4-columns.length);
+    if(column.length&&columns.length<3&&weight+weights[index]/2>target){columns.push(column);remaining-=weight;column=[];weight=0;}
+    column.push(row);weight+=weights[index];
+  });
+  if(column.length)columns.push(column);
+  const flourish=`<svg viewBox="0 0 260 30" aria-hidden="true"><path d="M2 18q42 12 75-4t53 0q24-16 53 0t75 4M36 20q-9-20-20-13q3 15 20 13m31-3q9-22 20-16q-2 15-20 16m126 0q-9-22-20-16q2 15 20 16m31 3q9-20 20-13q-3 15-20 13"/><path d="m130 4 9 9-9 9-9-9Z"/><circle cx="109" cy="13" r="2"/><circle cx="151" cy="13" r="2"/></svg>`;
+  return `<section class="ft-annual-board" aria-labelledby="ft-annual-title"><header class="ft-annual-heading">${flourish}<h3 id="ft-annual-title">${tr('לוח משפחתי שנתי','Family year register')}</h3><p>${tr('שנות הלידה שלנו, מהשורשים ועד הענפים הצעירים','Our birth years, from our roots to the youngest branches')}</p>${years.length?`<div class="ft-annual-summary"><span>${count} ${tr('בני משפחה','family members')}</span><i aria-hidden="true">❖</i><span>${years.length} ${tr('שנות לידה','birth years')}</span><i aria-hidden="true">❖</i><bdi>${years[0].year}–${years.at(-1).year}</bdi></div><button type="button" class="ft-annual-print" data-annual-print aria-label="${tr('הדפסת הלוח בעמוד אחד','Print the register on one page')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5M7 17H4V8h16v9h-3M7 14h10v7H7ZM17 11h.01"/></svg><span>${tr('הדפסה','Print')}</span></button>`:''}</header>${columns.length?`<div class="ft-annual-tables">${columns.map(column=>`<table class="ft-annual-table"><caption class="visually-hidden">${tr('שנות לידה','Birth years')} ${column[0].year}–${column.at(-1).year}</caption><thead><tr><th scope="col">${tr('שנה','Year')}</th><th scope="col">${tr('בני המשפחה','Family members')}</th></tr></thead><tbody>${column.map(row=>`<tr data-annual-year="${row.year}"><th scope="row"><time datetime="${row.year}">${row.year}</time></th><td>${row.events.map(event=>`<a class="ft-annual-member" href="#person/${encodeURIComponent(event.person.id)}" data-annual-person="${safe(event.person.id)}" aria-label="${safe(name(event.person)+' · '+tr('שנת לידה','Birth year')+' '+row.year)}">${safe(name(event.person))}</a>`).join('')}</td></tr>`).join('')}</tbody></table>`).join('')}</div>`:`<p class="ft-annual-empty">${tr('לא נמצאו שנות לידה להצגה.','No birth years to display.')}</p>`}<div class="ft-annual-ending" aria-hidden="true">${flourish}</div></section>`;
+}
 function magicPeopleHTML(layout){
   return `<ol class="ft-magic-people">${layout.people.map((p,index)=>`<li class="ft-magic-person${state.treeDecade==='all'||state.treeDecade===p.decade?' is-lit':''}" data-tree-person-decade="${p.decade}" style="--person-x:${p.x/layout.width*100}%;--person-y:${p.y/layout.height*100}%;--person-order:${index}"><a href="#person/${encodeURIComponent(p.event.person.id)}" aria-label="${safe(name(p.event.person)+' · '+dateLabel(p.event))}" title="${safe(name(p.event.person)+' · '+dateLabel(p.event))}">${portrait(p.event.person)}<strong>${safe(name(p.event.person))}</strong><time>${p.event.year}</time></a></li>`).join('')}</ol>`;
 }
@@ -88,7 +101,7 @@ function treeHTML(chapters){
 function render(){
   if(!state.ready||state.view!=='timeline')return;
   const people=app().getPeople().map(p=>app().getPersonSummary(p.id));
-  const signature=JSON.stringify([I.language,state.mode,state.mobileGeneration,state.query,state.wedding,state.loading,state.error,people.map(p=>[p.id,p.generation,p.name,p.nameEn,p.birthday,p.invalidBirthday,p.profile,p.aliyahYear,p.aliyahMonth])]);
+  const signature=JSON.stringify([I.language,state.mode,state.mobileGeneration,state.query,state.wedding,state.loading,state.error,people.map(p=>[p.id,p.generation,p.name,p.nameEn,p.birthday,p.invalidBirthday,p.profile])]);
   if(signature===state.signature)return;state.signature=signature;
   const all=familyTimeline({people,wedding:state.wedding}),query=normalize(state.query),events=all.events.filter(e=>matches(e,query));
   state.model={...all,events,chapters:all.chapters.map(c=>({...c,events:c.events.filter(e=>matches(e,query))}))};
@@ -97,7 +110,7 @@ function render(){
   $('timelineContent').dataset.timelineMode=state.mode;
   $('timelineContent').dataset.reducedMotion=String(Boolean(reduced()));
   unmountOverview?.();unmountOverview=null;
-  $('timelineContent').innerHTML=`<div class="ft-mode-switch" role="group" aria-label="${tr('תצוגת ציר הזמן','Timeline display')}"><button type="button" data-timeline-mode="rails" aria-pressed="${state.mode==='rails'}"><span aria-hidden="true">↔</span>${tr('ציר לפי דורות','Generation timelines')}</button><button type="button" data-timeline-mode="tree" aria-pressed="${state.mode==='tree'}"><span aria-hidden="true">❧</span>${tr('עץ השנים','Tree of years')}</button></div>${state.mode==='rails'?railsHTML():treeHTML(chapters)}${query&&!events.length?`<p class="ft-no-match">${tr('לא נמצאו שמות או שנים שמתאימים לחיפוש.','No names or years match your search.')}</p>`:''}<footer class="ft-closing"><span aria-hidden="true">❧</span>${all.unknown.length?`<small>${all.unknown.length} ${tr('בני משפחה יתווספו כשיתועד תאריך הלידה שלהם.','family members will join when their birth dates are recorded.')}</small>`:''}${state.error?`<p role="status">${tr('אלבום החתונה לא נטען כרגע.','The wedding album could not be loaded.')} <button type="button" data-timeline-retry>${tr('ניסיון נוסף','Try again')}</button></p>`:''}</footer>`;
+  $('timelineContent').innerHTML=`<div class="ft-mode-switch" role="group" aria-label="${tr('תצוגת ציר הזמן','Timeline display')}"><button type="button" data-timeline-mode="rails" aria-pressed="${state.mode==='rails'}"><span aria-hidden="true">↔</span>${tr('ציר לפי דורות','Generation timelines')}</button><button type="button" data-timeline-mode="tree" aria-pressed="${state.mode==='tree'}"><span aria-hidden="true">❧</span>${tr('עץ השנים','Tree of years')}</button><button type="button" data-timeline-mode="annual" aria-pressed="${state.mode==='annual'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3ZM3 9h18M9 9v11M3 14h18"/></svg>${tr('לוח משפחתי שנתי','Family year register')}</button></div>${state.mode==='rails'?railsHTML():state.mode==='annual'?annualHTML():treeHTML(chapters)}${query&&!events.length?`<p class="ft-no-match">${tr('לא נמצאו שמות או שנים שמתאימים לחיפוש.','No names or years match your search.')}</p>`:''}<footer class="ft-closing"><span aria-hidden="true">❧</span>${all.unknown.length?`<small>${all.unknown.length} ${tr('בני משפחה יתווספו כשיתועד תאריך הלידה שלהם.','family members will join when their birth dates are recorded.')}</small>`:''}${state.error&&state.mode!=='annual'?`<p role="status">${tr('אלבום החתונה לא נטען כרגע.','The wedding album could not be loaded.')} <button type="button" data-timeline-retry>${tr('ניסיון נוסף','Try again')}</button></p>`:''}</footer>`;
   if(state.mode==='rails')unmountOverview=mountTimelineOverview($('timelineContent').querySelector('[data-timeline-overview]'),{
     model:state.model,view:overviewView,tr,preview:overviewPreview,details:focusHTML,
     labels:[tr('סבא וסבתא','Grandparents'),tr('הילדים','Children'),tr('הנכדים','Grandchildren'),tr('הנינים ובני הנינים','Great-grandchildren & beyond')],
@@ -159,7 +172,8 @@ function init(){
   state.ready=true;const content=$('timelineContent');
   bindTimelinePan(content,{getTrack:g=>state.tracks.find(t=>t.generation===g),getYear:g=>state.years.get(g),moveYear,pixelsPerYear:STEP});
   content.addEventListener('click',event=>{
-    const target=event.target.closest('[data-timeline-mode],[data-mobile-generation],[data-rail-step],[data-rail-year],[data-tree-decade],[data-tree-step],[data-timeline-retry]');if(!target)return;
+    const target=event.target.closest('[data-timeline-mode],[data-mobile-generation],[data-rail-step],[data-rail-year],[data-tree-decade],[data-tree-step],[data-timeline-retry],[data-annual-print]');if(!target)return;
+    if(target.hasAttribute('data-annual-print')){window.print();return;}
     if(target.dataset.timelineMode){state.mode=target.dataset.timelineMode;render();return;}
     if(target.dataset.mobileGeneration){state.mobileGeneration=Number(target.dataset.mobileGeneration);render();return;}
     if(target.hasAttribute('data-timeline-retry')){loadWedding();return;}

@@ -26,9 +26,6 @@ export function familyTimeline({people=[],wedding=null,today=new Date()}={}) {
     const born=timelineDate(person.birthday);
     if(allowed(born)&&!person.invalidBirthday)events.push({id:'birth-'+person.id,kind:'birth',person,...born});
     else if(!person.placeholder)unknown.push(person);
-    if(!['yona','shlomo'].includes(person.id))continue;
-    const arrival=timelineDate(person.aliyahYear+(person.aliyahMonth?'-'+String(person.aliyahMonth).padStart(2,'0'):''));
-    if(allowed(arrival))events.push({id:'aliyah-'+person.id,kind:'aliyah',person,...arrival});
   }
   const married=timelineDate(wedding?.date||wedding?.year);
   const marriage=allowed(married)?{id:'wedding-u-root',kind:'wedding',wedding,...married}:null;
@@ -39,6 +36,18 @@ export function familyTimeline({people=[],wedding=null,today=new Date()}={}) {
   const chapterMap=new Map(chapters.map(c=>[c.id,c]));
   for(const event of events)chapterMap.get(timelineDecade(event.year))?.events.push(event);
   return {chapters,events,unknown,marriage,birthCount:events.filter(e=>e.kind==='birth').length};
+}
+
+// A birth-year register, rather than a calendar of recurring birthdays.
+export function annualBirthYears(model) {
+  const years=new Map(),seen=new Set();
+  for(const event of model.events.filter(event=>event.kind==='birth').sort(compare)){
+    if(seen.has(event.person.id))continue;
+    seen.add(event.person.id);
+    if(!years.has(event.year))years.set(event.year,{year:event.year,events:[]});
+    years.get(event.year).events.push(event);
+  }
+  return [...years.values()];
 }
 
 export function timelineGeneration(person) {

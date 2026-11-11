@@ -1,4 +1,4 @@
-import {timelineTracks} from './family-timeline-data.mjs?v=foliage-portraits-v6';
+import {timelineTracks} from './family-timeline-data.mjs?v=annual-board-v7';
 
 // All generations use one date-to-pixel mapping, including the 1988 descendants.
 export function overviewLayout(model,width,zoom=1,today=new Date()){

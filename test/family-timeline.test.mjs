@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {familyTimeline,timelineDate,timelineDecade,timelineTracks,timelineGeneration,nearestTimelineYear} from '../public/assets/family-timeline-data.mjs';
+import {familyTimeline,timelineDate,timelineDecade,timelineTracks,timelineGeneration,nearestTimelineYear,annualBirthYears} from '../public/assets/family-timeline-data.mjs';
 import family from '../src/family.mjs';
 import vm from 'node:vm';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
@@ -24,12 +24,37 @@ test('roots share one opening chapter, and every birth belongs to the decade of 
   assert.equal(timelineDecade(1929),'before-1930');assert.equal(timelineDecade(2000),'2000');
 });
 
-test('immigration keeps the known month/year precision and an unknown wedding year is never invented',()=>{
+test('immigration is omitted from all timeline events while the recorded profile data remains intact',()=>{
   const model=familyTimeline({people,wedding:{id:'u-root',date:'',cover:'/actual-wedding'},today});
-  const arrivals=model.events.filter(e=>e.kind==='aliyah');
-  assert.deepEqual(arrivals.map(e=>[e.person.id,e.year,e.month,e.day,e.precision]),[['shlomo',1932,null,null,'year'],['yona',1934,12,null,'month']]);
+  assert.ok(!model.events.some(e=>e.kind==='aliyah'));
+  assert.ok(!model.chapters.flatMap(c=>c.events).some(e=>e.kind==='aliyah'));
+  assert.deepEqual(people.slice(0,2).map(p=>[p.id,p.aliyahYear,p.aliyahMonth]),[['shlomo',1932,undefined],['yona',1934,12]]);
   assert.equal(model.marriage,null);assert.ok(!model.events.some(e=>e.kind==='wedding'));
-  assert.equal(model.chapters.find(c=>c.id==='1930').events.filter(e=>e.kind==='aliyah').length,2);
+});
+
+test('the annual register groups only births in ascending years and orders people by their recorded birth date',()=>{
+  const relatives=[
+    {id:'later',name:'מאוחר',birthday:'1984-12-27'},
+    {id:'early',name:'מוקדם',birthday:'1984-02-29'},
+    {id:'year-only',name:'שנה בלבד',birthday:'1984'},
+    {id:'oldest',name:'ראשון',birthday:'1907'},
+    {id:'latest',name:'צעיר',birthday:'2021'},
+    {id:'missing',name:'ללא תאריך'},
+    {id:'invalid',birthday:'31.2.1980'},
+    {id:'future',birthday:'2030'},
+    {id:'friend',birthday:'1950',extra:true}
+  ];
+  const model=familyTimeline({people:relatives,wedding:{date:'1938'},today});
+  const years=annualBirthYears(model);
+  assert.deepEqual(years.map(row=>row.year),[1907,1984,2021]);
+  assert.deepEqual(years[1].events.map(event=>event.person.id),['year-only','early','later']);
+  assert.equal(years.flatMap(row=>row.events).length,model.birthCount);
+  assert.ok(years.flatMap(row=>row.events).every(event=>event.kind==='birth'));
+  assert.deepEqual(annualBirthYears({events:[]}),[]);
+  // Filtering keeps the same birth-only projection without reintroducing other events.
+  assert.deepEqual(annualBirthYears({...model,events:model.events.filter(event=>event.year===1984)}).map(row=>row.year),[1984]);
+  const duplicate=model.events.find(event=>event.person?.id==='early');
+  assert.equal(annualBirthYears({...model,events:[...model.events,duplicate]}).flatMap(row=>row.events).length,model.birthCount);
 });
 
 test('recorded wedding dates move into their chronological decade, including year-only dates',()=>{
@@ -72,7 +97,7 @@ test('overlapping birth years stay with their family generation, and descendants
   assert.deepEqual(tracks[3].events.filter(e=>e.year===1988).map(e=>e.person.id).sort(),['amit','same-year']);
   assert.equal(tracks[3].events.find(e=>e.person.id==='rami').year,2024);
   assert.equal(timelineGeneration(family.people.rami),4);
-  assert.deepEqual(tracks[0].events.filter(e=>e.kind!=='birth').map(e=>e.kind),['aliyah','aliyah','wedding']);
+  assert.deepEqual(tracks[0].events.filter(e=>e.kind!=='birth').map(e=>e.kind),['wedding']);
   const births=tracks.flatMap(t=>t.events.filter(e=>e.kind==='birth').map(e=>e.person.id));
   assert.equal(births.length,model.birthCount);assert.equal(new Set(births).size,model.birthCount);
   assert.deepEqual(model.chapters.find(c=>c.id==='1980').events.filter(e=>e.kind==='birth').map(e=>e.person.id).sort(),['amit','same-year']);
@@ -104,7 +129,7 @@ test('the new page is wired into the shared navigation, search and phone home me
   const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   const home=await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8');
   assert.match(html,/data-view="timeline"[^>]*>ציר זמן משפחתי/);
-  assert.match(html,/id="timelineView"/);assert.match(html,/family-timeline\.js\?v=foliage-portraits-v6/);
+  assert.match(html,/id="timelineView"/);assert.match(html,/family-timeline\.js\?v=annual-board-v7/);
   assert.match(app,/FamilyTimeline\?\.activate\(state.view\)/);assert.match(app,/FamilyTimeline\?\.search\(state.query\)/);
   assert.match(home,/\['timeline',I18n.t\('ציר זמן משפחתי'\)/);
 });
