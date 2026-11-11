@@ -1,14 +1,35 @@
-/* Separate, touch-friendly tabs, with the family's engraved gold detail. */
+/* Desktop browsers and installed desktop apps share the same glossy page colors. */
 @media(min-width:701px){
+  #mainNav .nav-link[data-view="tree"],#homeTiles .home-tile-tree{--tab-top:#f1f7e9;--tab-mid:#d2e2be;--tab-low:#b9d098;--tab-line:#a6bc8f;--tab-ink:#496339}
+  #mainNav .nav-link[data-view="timeline"],#homeTiles .home-tile-timeline{--tab-top:#eff2fd;--tab-mid:#cdd7ee;--tab-low:#aebfdf;--tab-line:#a0b1cf;--tab-ink:#465d82}
+  #mainNav .nav-link[data-view="directory"],#homeTiles .home-tile-directory{--tab-top:#fff0e8;--tab-mid:#f1cdbd;--tab-low:#e5b29d;--tab-line:#d0aa98;--tab-ink:#7d4c38}
+  #mainNav .nav-link[data-view="videos"],#homeTiles .home-tile-videos{--tab-top:#f6eefb;--tab-mid:#decaed;--tab-low:#c2a7d8;--tab-line:#b59ac9;--tab-ink:#654876}
+  #mainNav .nav-link[data-view="gallery"],#homeTiles .home-tile-gallery{--tab-top:#eaf9f2;--tab-mid:#beded2;--tab-low:#99c8b6;--tab-line:#99bfae;--tab-ink:#3c6b60}
+  #mainNav .nav-link[data-view="calendar"],#homeTiles .home-tile-calendar{--tab-top:#fff8dc;--tab-mid:#f2dea7;--tab-low:#e4c984;--tab-line:#ceb478;--tab-ink:#765b25}
+  #mainNav .nav-link[data-view="photos"],#homeTiles .home-tile-photos{--tab-top:#eef6fd;--tab-mid:#cbdfef;--tab-low:#accbe2;--tab-line:#9ebbd1;--tab-ink:#415d72}
+  #mainNav .nav-link[data-view="stories"],#homeTiles .home-tile-stories{--tab-top:#fff2df;--tab-mid:#efd5b1;--tab-low:#ddb98a;--tab-line:#ccac7e;--tab-ink:#7c592f}
+  #mainNav .nav-link[data-view="weddings"],#homeTiles .home-tile-weddings{--tab-top:#fff0f6;--tab-mid:#f0ccdb;--tab-low:#dfadc3;--tab-line:#d3a2b9;--tab-ink:#82465f}
+  #mainNav .nav-link[data-view="nostalgia"],#homeTiles .home-tile-nostalgia{--tab-top:#f7f2e2;--tab-mid:#e2d6b9;--tab-low:#cdbb94;--tab-line:#bdaa83;--tab-ink:#6d5e3d}
+  #mainNav .nav-link[data-view="updates"],#homeTiles .home-tile-updates{--tab-top:#edf8fb;--tab-mid:#c6e1e9;--tab-low:#9fc7d4;--tab-line:#98becb;--tab-ink:#456d7c}
+  #mainNav .nav-link[data-view="games"],#homeTiles .home-tile-games{--tab-top:#f7edfc;--tab-mid:#e3ccef;--tab-low:#caaaDC;--tab-line:#bb9acc;--tab-ink:#715582}
+  #mainNav .nav-link[data-view="nursery"],#homeTiles .home-tile-nursery{--tab-top:#fff4e4;--tab-mid:#f4dbb9;--tab-low:#e8bf93;--tab-line:#d3ae96;--tab-ink:#895c42}
+  #mainNav .nav-link[data-view="memorial"],#homeTiles .home-tile-memorial{--tab-top:#f7f4e9;--tab-mid:#e5dfcb;--tab-low:#d1c6a8;--tab-line:#c1b38f;--tab-ink:#6d6040}
   .site-header .main-nav{gap:10px;align-items:stretch;padding:15px 0 5px;position:relative}
   .site-header .main-nav:before{content:'';position:absolute;top:0;inset-inline:0;height:1px;background:linear-gradient(90deg,transparent,#d0bb91 15%,#d0bb91 85%,transparent)}
-  .site-header .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid #cdb78e;border-radius:7px;background:linear-gradient(#fffdf7,#f5eddd);color:#716145;box-shadow:inset 0 0 0 2px #fffaf0,0 2px 4px #7053260a;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.4;transition:background .18s,border-color .18s,box-shadow .18s}
-  .site-header .main-nav .nav-link:before{content:'';width:6px;height:6px;border:1px solid #ad8c50;transform:rotate(45deg);flex-shrink:0}
-  .site-header .main-nav .nav-link:hover{border-color:#9c7c43;background:#eee4ce;box-shadow:inset 0 0 0 2px #fffaf0,0 3px 9px #70532615}
-  .site-header .main-nav .nav-link.active{color:#fffaf0;border-color:#596c48;background:#596c48;box-shadow:inset 0 0 0 2px #ffffff1c,0 3px 8px #40532f20}
-  .site-header .main-nav .nav-link.active:before{border-color:#ecd4a0}
+  .site-header .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid var(--tab-line,#cdb78e);border-radius:9px;background:linear-gradient(180deg,#ffffffad 0%,#ffffff3b 43%,#ffffff00 47%,#ffffff00 100%),linear-gradient(135deg,var(--tab-top,#fffdf7),var(--tab-mid,#f5eddd) 57%,var(--tab-low,#e8dcc3));color:var(--tab-ink,#716145);box-shadow:inset 0 1px 0 #ffffffed,inset 0 0 0 2px #ffffff5c,inset 0 -2px 3px #6e532010,0 3px 6px #70532612;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.4;transition:transform .18s,border-color .18s,box-shadow .18s}
+  .site-header .main-nav .nav-link:before{content:'';width:6px;height:6px;border:1px solid var(--tab-ink,#ad8c50);opacity:.65;transform:rotate(45deg);flex-shrink:0}
+  .site-header .main-nav .nav-link:hover{border-color:var(--tab-ink,#9c7c43);transform:translateY(-1px);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 2px #ffffff80,0 5px 10px #70532624}
+  .site-header .main-nav .nav-link.active{color:#fffdf6;border-color:var(--tab-ink,#596c48);background:linear-gradient(180deg,#ffffff26,#ffffff05 44%,#00000000 48%,#00000016),linear-gradient(135deg,var(--tab-ink,#596c48),color-mix(in srgb,var(--tab-ink,#596c48) 82%,#172118));box-shadow:inset 0 1px 0 #ffffff6b,inset 0 0 0 2px #ffffff26,0 4px 9px #40532f30}
+  .site-header .main-nav .nav-link.active:before{border-color:#fff3ce;opacity:.9}
   .site-header .main-nav .nav-link.active:after{display:none}
   .site-header .main-nav .nav-link:focus-visible{outline:3px solid #aa884b;outline-offset:3px}
+  #homeTiles .home-tile{background:linear-gradient(125deg,#ffffffa6,#ffffff24 47%,#ffffff00 50%),linear-gradient(145deg,var(--tab-top,#fffdf7),var(--tab-mid,#f5eddd) 62%,var(--tab-low,#e8dcc3));border-color:var(--tab-line,#cdb78e);border-radius:11px;box-shadow:inset 0 1px 0 #ffffffe6,inset -4px 0 0 var(--tab-line,#cdb78e),0 4px 10px #70532610;transition:transform .18s,box-shadow .18s}
+  html[dir=ltr] #homeTiles .home-tile{box-shadow:inset 0 1px 0 #ffffffe6,inset 4px 0 0 var(--tab-line,#cdb78e),0 4px 10px #70532610}
+  #homeTiles .home-tile:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 2px #ffffff66,0 6px 15px #70532620}
+  #homeTiles .home-tile strong,#homeTiles .home-tile .home-tile-icon,#homeTiles .home-tile .home-tile-arrow{color:var(--tab-ink,#566a44)}
+  #homeTiles .home-tile small{color:#685c49}
+  #homeTiles .home-tile .home-tile-icon{display:grid;place-items:center;width:48px;height:52px;flex:0 0 48px;border:1px solid #ffffff9c;border-radius:13px;background:linear-gradient(145deg,#ffffffad,#ffffff29);box-shadow:inset 0 1px 0 #ffffffc7,0 3px 7px #715b2d10}
+  #homeTiles .home-tile .home-tile-icon svg{width:37px;height:37px}
 }
 .home-tile-nursery{--tile-surface:#f4e0d5;--tile-line:#d3ae96;--tile-ink:#895c42}
 /* Nursery pairs with memorial, leaving both the same size as the other small tiles. */
