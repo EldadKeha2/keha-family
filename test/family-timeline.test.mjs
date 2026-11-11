@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {familyTimeline,timelineDate,timelineDecade} from '../public/assets/family-timeline-data.mjs';
+import {familyTimeline,timelineDate,timelineDecade,timelineTracks,timelineGeneration,nearestTimelineYear} from '../public/assets/family-timeline-data.mjs';
 import family from '../src/family.mjs';
 import vm from 'node:vm';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
@@ -55,6 +55,39 @@ test('unrecorded, invalid, future and manual-only dates cannot turn into birthda
   assert.deepEqual(timelineDate('1984-02-29'),{year:1984,month:2,day:29,precision:'day'});
 });
 
+test('overlapping birth years stay with their family generation, and descendants share the fourth rail from 1988',()=>{
+  const relatives=[
+    {...family.people.shlomo},{...family.people.yona},
+    {id:'child',generation:2,birthday:'1942'},
+    {...family.people.orit,birthday:'1990'},
+    {...family.people.amit,birthday:'1988'},
+    {id:'same-year',generation:4,birthday:'1988'},
+    {...family.people.rami,birthday:'2024'}
+  ];
+  const model=familyTimeline({people:relatives,wedding:{date:'1938'},today}),tracks=timelineTracks(model);
+  assert.deepEqual(tracks.map(t=>t.generation),[1,2,3,4]);
+  assert.deepEqual(tracks[2].events.map(e=>[e.person.id,e.year]),[['orit',1990]]);
+  assert.equal(tracks[3].start,1988);
+  assert.deepEqual(tracks[3].years,[1988,2024]);
+  assert.deepEqual(tracks[3].events.filter(e=>e.year===1988).map(e=>e.person.id).sort(),['amit','same-year']);
+  assert.equal(tracks[3].events.find(e=>e.person.id==='rami').year,2024);
+  assert.equal(timelineGeneration(family.people.rami),4);
+  assert.deepEqual(tracks[0].events.filter(e=>e.kind!=='birth').map(e=>e.kind),['aliyah','aliyah','wedding']);
+  const births=tracks.flatMap(t=>t.events.filter(e=>e.kind==='birth').map(e=>e.person.id));
+  assert.equal(births.length,model.birthCount);assert.equal(new Set(births).size,model.birthCount);
+  assert.deepEqual(model.chapters.find(c=>c.id==='1980').events.filter(e=>e.kind==='birth').map(e=>e.person.id).sort(),['amit','same-year']);
+  assert.deepEqual(model.chapters.find(c=>c.id==='1990').events.filter(e=>e.kind==='birth').map(e=>e.person.id),['orit']);
+});
+
+test('year jumps clamp to recorded events and empty generations remain usable',()=>{
+  const years=[1988,1990,2004];
+  for(const [target,expected] of [[1800,1988],[1989,1988],[1999,2004],[2100,2004]])assert.equal(nearestTimelineYear(years,target),expected);
+  assert.equal(nearestTimelineYear([],1988),null);
+  const tracks=timelineTracks(familyTimeline({today}));
+  assert.ok(tracks.every(t=>t.years.length===0&&t.events.length===0&&t.end>t.start));
+  assert.equal(tracks[3].start,1988);
+});
+
 test('back from a person or wedding returns to the timeline in phone and desktop history',async()=>{
   for(const phone of [false,true]){
     const browser=browserHistory('https://family.test/?lang=he#timeline'),window={location:browser.location,addEventListener:browser.addEventListener};
@@ -71,7 +104,7 @@ test('the new page is wired into the shared navigation, search and phone home me
   const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   const home=await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8');
   assert.match(html,/data-view="timeline"[^>]*>ציר זמן משפחתי/);
-  assert.match(html,/id="timelineView"/);assert.match(html,/family-timeline\.js\?v=1/);
+  assert.match(html,/id="timelineView"/);assert.match(html,/family-timeline\.js\?v=interactive-generations-v2/);
   assert.match(app,/FamilyTimeline\?\.activate\(state.view\)/);assert.match(app,/FamilyTimeline\?\.search\(state.query\)/);
   assert.match(home,/\['timeline',I18n.t\('ציר זמן משפחתי'\)/);
 });

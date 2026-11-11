@@ -40,3 +40,23 @@ export function familyTimeline({people=[],wedding=null,today=new Date()}={}) {
   for(const event of events)chapterMap.get(timelineDecade(event.year))?.events.push(event);
   return {chapters,events,unknown,marriage,birthCount:events.filter(e=>e.kind==='birth').length};
 }
+
+export function timelineGeneration(person) {
+  if(['yona','shlomo'].includes(person?.id))return 1;
+  const generation=Number(person?.generation);
+  return generation>=4?4:generation===2||generation===3?generation:null;
+}
+
+export function nearestTimelineYear(years,target) {
+  return years.reduce((best,year)=>best===null||Math.abs(year-target)<Math.abs(best-target)?year:best,null);
+}
+
+export function timelineTracks(model) {
+  return [1,2,3,4].map(generation=>{
+    const events=model.events.filter(event=>event.kind==='wedding'?generation===1:timelineGeneration(event.person)===generation);
+    const years=[...new Set(events.map(event=>event.year))].sort((a,b)=>a-b);
+    const start=generation===4?1988:years.length?Math.floor(years[0]/10)*10:1930+(generation-2)*30;
+    const end=Math.max(start+10,Math.ceil((years.at(-1)||start+10)/10)*10);
+    return {generation,events,years,start,end,birthCount:events.filter(event=>event.kind==='birth').length};
+  });
+}
