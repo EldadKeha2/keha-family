@@ -2,7 +2,7 @@
   'use strict';
   const key='familyNavigation';
   const gameIds=['photos','kinship','missing','trivia','chick','differences','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
-  const views=new Set(['home','tree','directory','gallery','calendar','videos','photos','stories','weddings','nostalgia','updates','memorial','person','games','nursery']);
+  const views=new Set(['home','tree','timeline','directory','gallery','calendar','videos','photos','stories','weddings','nostalgia','updates','memorial','person','games','nursery']);
   const root=()=>matchMedia('(max-width:700px)').matches?'#home':'#tree';
   const path=url=>url.pathname+url.search+url.hash;
   const current=()=>new URL(location.href);

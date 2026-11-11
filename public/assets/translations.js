@@ -1,5 +1,8 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "ציר זמן משפחתי":"Family Timeline",
+  "דורות של אנשים ורגעים, עשור אחר עשור":"Generations of people and moments, decade by decade",
+  "חיפוש בשם או בשנת לידה":"Search by name or birth year",
   "הוספת תמונות מהגלריה בנייד":"Add photos from your phone gallery",
   "הוספת תמונות ישירות ממצלמה":"Take a photo with your camera",
   "סדר לפי":"Order by",
