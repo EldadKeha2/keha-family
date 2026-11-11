@@ -100,13 +100,13 @@ function fitEditor(){
 }
 function fitCaption(){
   if(!session||session.mode==='existing')return;const input=get('Caption');
-  input.placeholder=desktop()?tr('מי בתמונה? איפה ומה הסיפור?','Who is pictured? Where was it taken?'):tr('הקלידו תיאור…','Type a description…');
+  input.placeholder=desktop()?tr('מי בתמונה? איפה ומה הסיפור?','Who is pictured? Where was it taken?'):tr('לחצו כאן להקלדת תיאור...','Tap here to enter a description...');
   if(!desktop()){
-    const editing=document.activeElement===input;input.rows=editing?3:1;input.style.removeProperty('height');
+    const editing=document.activeElement===input;input.rows=editing?3:1;input.wrap=editing?'soft':'off';input.style.removeProperty('height');
     if(editing){input.style.height='auto';input.style.height=Math.min(140,Math.max(76,(input.scrollHeight||0)+2))+'px';}
     return;
   }
-  input.rows=1;input.style.height='auto';input.style.height=Math.min(180,Math.max(38,(input.scrollHeight||0)+2))+'px';
+  input.rows=1;input.wrap='soft';input.style.height='auto';input.style.height=Math.min(180,Math.max(38,(input.scrollHeight||0)+2))+'px';
 }
 function revealMetadata(){if(session&&get('Metadata').contains(document.activeElement))document.activeElement.scrollIntoView?.({block:'nearest',behavior:'auto'});}
 function renderMetadata(){
@@ -148,7 +148,6 @@ async function load(){
 function render(){
   const d=draft();if(!d||!source)return;
   const size=rotatedSize(d.width,d.height,d.rotation),viewport=get('Viewport');
-  viewport.style.setProperty('--photo-edit-aspect-ratio',size.width+' / '+size.height);
   const padding=session.mode==='existing'?40:0;
   const fit=Math.min(Math.max(1,viewport.clientWidth-padding)/size.width,Math.max(1,viewport.clientHeight-padding)/size.height,session.mode==='existing'?1:Infinity);
   get('Image').style.width=Math.max(1,size.width*fit)+'px';get('Image').style.height=Math.max(1,size.height*fit)+'px';
