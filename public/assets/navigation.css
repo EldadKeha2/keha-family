@@ -1,4 +1,4 @@
-/* Desktop browsers and installed desktop apps share the same glossy page colors. */
+/* Clean cream navigation, with quiet individual colors on the home cards. */
 @media(min-width:701px){
   #mainNav .nav-link[data-view="tree"],#homeTiles .home-tile-tree{--tab-top:#f1f7e9;--tab-mid:#d2e2be;--tab-low:#b9d098;--tab-line:#a6bc8f;--tab-ink:#496339}
   #mainNav .nav-link[data-view="timeline"],#homeTiles .home-tile-timeline{--tab-top:#eff2fd;--tab-mid:#cdd7ee;--tab-low:#aebfdf;--tab-line:#a0b1cf;--tab-ink:#465d82}
@@ -16,11 +16,11 @@
   #mainNav .nav-link[data-view="memorial"],#homeTiles .home-tile-memorial{--tab-top:#f7f4e9;--tab-mid:#e5dfcb;--tab-low:#d1c6a8;--tab-line:#c1b38f;--tab-ink:#6d6040}
   .site-header .main-nav{gap:10px;align-items:stretch;padding:15px 0 5px;position:relative}
   .site-header .main-nav:before{content:'';position:absolute;top:0;inset-inline:0;height:1px;background:linear-gradient(90deg,transparent,#d0bb91 15%,#d0bb91 85%,transparent)}
-  .site-header .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid var(--tab-line,#cdb78e);border-radius:9px;background:linear-gradient(180deg,#ffffffad 0%,#ffffff3b 43%,#ffffff00 47%,#ffffff00 100%),linear-gradient(135deg,var(--tab-top,#fffdf7),var(--tab-mid,#f5eddd) 57%,var(--tab-low,#e8dcc3));color:var(--tab-ink,#716145);box-shadow:inset 0 1px 0 #ffffffed,inset 0 0 0 2px #ffffff5c,inset 0 -2px 3px #6e532010,0 3px 6px #70532612;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.4;transition:transform .18s,border-color .18s,box-shadow .18s}
-  .site-header .main-nav .nav-link:before{content:'';width:6px;height:6px;border:1px solid var(--tab-ink,#ad8c50);opacity:.65;transform:rotate(45deg);flex-shrink:0}
-  .site-header .main-nav .nav-link:hover{border-color:var(--tab-ink,#9c7c43);transform:translateY(-1px);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 2px #ffffff80,0 5px 10px #70532624}
-  .site-header .main-nav .nav-link.active{color:#fffdf6;border-color:var(--tab-ink,#596c48);background:linear-gradient(180deg,#ffffff26,#ffffff05 44%,#00000000 48%,#00000016),linear-gradient(135deg,var(--tab-ink,#596c48),color-mix(in srgb,var(--tab-ink,#596c48) 82%,#172118));box-shadow:inset 0 1px 0 #ffffff6b,inset 0 0 0 2px #ffffff26,0 4px 9px #40532f30}
-  .site-header .main-nav .nav-link.active:before{border-color:#fff3ce;opacity:.9}
+  .site-header .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid #cdb78e;border-radius:7px;background:#f8f3e7;color:#716145;box-shadow:inset 0 0 0 2px #fffaf0,0 2px 4px #7053260a;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.4;transition:background .18s,border-color .18s,box-shadow .18s}
+  .site-header .main-nav .nav-link:before{content:'';width:6px;height:6px;border:1px solid #ad8c50;transform:rotate(45deg);flex-shrink:0}
+  .site-header .main-nav .nav-link:hover{border-color:#9c7c43;background:#eee4ce;box-shadow:inset 0 0 0 2px #fffaf0,0 3px 9px #70532615}
+  .site-header .main-nav .nav-link.active{color:#fffaf0;border-color:#596c48;background:#596c48;box-shadow:inset 0 0 0 2px #ffffff1c,0 3px 8px #40532f20}
+  .site-header .main-nav .nav-link.active:before{border-color:#ecd4a0}
   .site-header .main-nav .nav-link.active:after{display:none}
   .site-header .main-nav .nav-link:focus-visible{outline:3px solid #aa884b;outline-offset:3px}
   /* Home cards keep a quiet, cream-based tint; the header tabs retain their palette. */
