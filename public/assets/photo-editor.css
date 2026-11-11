@@ -24,6 +24,12 @@
 .photo-edit-footer #photoEditSaveCurrent{min-height:46px}
 @media(min-width:701px){.photo-upload-editor:not(.is-existing){width:min(1040px,calc(100vw - 28px))}.photo-upload-editor:not(.is-existing) .photo-edit-viewport{height:min(45dvh,510px)}}
 @media(max-width:700px){#photoEditTaggingToggle,#photoEditFaceTools,#photoEditTags,#photoEditSaveCurrent,.photo-upload-editor .face-layer{display:none!important}}
+@media(max-width:700px){
+  .photo-upload-editor:not(.is-existing) .photo-edit-pager{justify-content:center}
+  .photo-upload-editor:not(.is-existing) .photo-edit-pager>button{display:none}
+  .photo-upload-editor:not(.is-existing) .photo-edit-date-fields{direction:ltr}
+  #photoUploadEditor[dir=rtl]:not(.is-existing) .photo-edit-date-fields label{direction:rtl}
+}
 .photo-upload-editor *, .photo-upload-editor *::before,.photo-upload-editor *::after{box-sizing:border-box}
 .photo-upload-editor [hidden]{display:none!important}
 .photo-edit-header{display:flex;justify-content:space-between;align-items:center;gap:12px}.photo-edit-header h2{margin:3px 0 0;font-size:26px;line-height:1.3}.photo-edit-eyebrow{font-size:13px;color:#8b5a2c;letter-spacing:.03em}.photo-edit-close{width:44px;height:44px;border:0;background:transparent;color:inherit;font-size:32px;cursor:pointer;flex-shrink:0}
