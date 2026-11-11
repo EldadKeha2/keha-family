@@ -59,22 +59,41 @@ test('desktop descriptions start on one line, expand for longer text and shrink 
 });
 
 test('uploading only the current photo leaves other edits in the wizard and never uploads it twice with Upload all',async()=>{
- const f=fixture(),files=[image('one.jpg'),image('two.jpg'),image('three.jpg')],{result}=await f.begin(files);
+ for(const desktop of [true,false]){
+ const f=fixture({desktop}),files=[image('one.jpg'),image('two.jpg'),image('three.jpg')],{result}=await f.begin(files);
+ assert.equal(f.node('photoEditSaveCurrent').hidden,false);assert.match(f.node('photoEditSave').textContent,/שמירה והעלאה של הכל/);
  await f.click('Next');f.node('photoEditCaption').value='second description';f.node('photoEditCaption').dispatchEvent(new Event('input'));
  await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);assert.equal(f.uploaded[0].file.name,'two.jpg');assert.equal((await details(f.uploaded[0])).metadata.caption,'second description');assert.deepEqual(Buffer.from((await details(f.uploaded[0])).pixels),Buffer.from(await files[1].arrayBuffer()));
  assert.match(f.node('photoEditCounter').textContent,/תמונה 2 מתוך 2/);assert.equal(f.node('photoEditFilename').textContent,'three.jpg');
  await f.click('Save');const remaining=await result;assert.deepEqual(Array.from(remaining,file=>file.name),['one.jpg','three.jpg']);assert.equal(f.node('photoUploadEditor').open,false);
+ }
 });
 test('a failed individual upload keeps the same image and its metadata for retry; cancel never approves the rest',async()=>{
- let fails=true;const f=fixture({onUpload:async()=>{if(fails)throw Error('Network unavailable');}}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
- f.node('photoEditCaption').value='Keep this';f.node('photoEditCaption').dispatchEvent(new Event('input'));await f.click('SaveCurrent');assert.match(f.node('photoEditError').textContent,/Network unavailable/);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditCaption').value,'Keep this');
- fails=false;await f.click('SaveCurrent');assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Cancel');assert.equal(await result,null);assert.equal(f.uploaded.length,2);
-});
-test('Next wraps from last to first, metadata remains per photo, and desktop-only controls stay off phones',async()=>{
  for(const desktop of [true,false]){
-  const f=fixture({desktop}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);assert.equal(f.node('photoEditSaveCurrent').hidden,!desktop);
+ let fails=true;const f=fixture({desktop,onUpload:async()=>{if(fails)throw Error('Network unavailable');}}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ f.node('photoEditCaption').value='Keep this';f.node('photoEditCaption').dispatchEvent(new Event('input'));await f.click('SaveCurrent');assert.match(f.node('photoEditError').textContent,/Network unavailable/);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditCaption').value,'Keep this');
+ assert.match(f.node('photoEditCounter').textContent,/תמונה 1 מתוך 2/);
+ fails=false;await f.click('SaveCurrent');assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Cancel');assert.equal(await result,null);assert.equal(f.uploaded.length,2);
+ }
+});
+test('Next wraps from last to first, metadata remains per photo, and individual upload is available on phones and desktop',async()=>{
+ for(const desktop of [true,false]){
+  const f=fixture({desktop}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);assert.equal(f.node('photoEditSaveCurrent').hidden,false);
   f.node('photoEditCaption').value='first';f.node('photoEditCaption').dispatchEvent(new Event('input'));await f.click('Next');assert.equal(f.node('photoEditCaption').value,'');assert.equal(f.node('photoEditNext').disabled,false);await f.click('Next');assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditCaption').value,'first');await f.click('Cancel');assert.equal(await result,null);
  }
+});
+test('phone individual upload advances and reduces the photo count only after success, while repeated taps cannot upload twice',async()=>{
+ let finishUpload;const f=fixture({desktop:false,onUpload:()=>new Promise(resolve=>{finishUpload=resolve;})}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+ await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);assert.equal(f.node('photoEditSaveCurrent').disabled,true);assert.equal(f.node('photoEditNext').disabled,true);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.match(f.node('photoEditCounter').textContent,/תמונה 1 מתוך 3/);
+ await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);finishUpload();await f.flush();
+ assert.equal(f.node('photoUploadEditor').open,true);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');assert.match(f.node('photoEditCounter').textContent,/תמונה 1 מתוך 2/);assert.equal(f.node('photoEditSaveCurrent').disabled,false);assert.equal(f.node('photoEditSaveCurrent').hidden,false);
+ await f.click('Save');assert.deepEqual(Array.from(await result,file=>file.name),['two.jpg','three.jpg']);assert.equal(f.uploaded.length,1);
+});
+test('uploading the last selected photo continues with the first remaining photo',async()=>{
+ const f=fixture({desktop:false}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+ await f.click('Next');await f.click('Next');await f.click('SaveCurrent');
+ assert.equal(f.uploaded[0].file.name,'three.jpg');assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.match(f.node('photoEditCounter').textContent,/תמונה 1 מתוך 2/);
+ await f.click('Save');assert.deepEqual(Array.from(await result,file=>file.name),['one.jpg','two.jpg']);
 });
 test('draft face names, event labels and completion travel with only the selected image',async()=>{
  const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]),adapter=f.mounts.at(-1).options.adapter;

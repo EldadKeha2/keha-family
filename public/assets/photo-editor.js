@@ -118,8 +118,8 @@ function saveLabel(){
   }
   const count=session.files.filter((file,index)=>!isPhoto(file)||session.drafts.some(item=>item.fileIndex===index)).length;
   get('SaveCurrent').textContent=tr('שמירה והעלאה של תמונה זו','Save and upload this photo');
-  get('SaveCurrent').hidden=!desktop()||!session.onUpload||!draft();get('SaveCurrent').disabled=session.loading||session.saving||!draft();
-  get('Save').textContent=desktop()?tr('שמירה והעלאה של הכל','Save and upload all'):tr('שמירה והעלאה','Save and upload');
+  get('SaveCurrent').hidden=!session.onUpload||!draft();get('SaveCurrent').disabled=session.loading||session.saving||!draft();
+  get('Save').textContent=tr('שמירה והעלאה של הכל','Save and upload all');
   get('Save').textContent+=(count>1?` (${count})`:'');
 }
 async function load(){
@@ -168,7 +168,7 @@ function configure(){
   dialog.setAttribute('aria-describedby',existing?'photoEditHint':'');
   for(const name of ['Close','Cancel']){get(name).setAttribute('aria-label',existing?tr('ביטול העריכה','Cancel editing'):tr('ביטול ההעלאה','Cancel upload'));if(name==='Cancel')get(name).textContent=tr('ביטול','Cancel');}
   get('History').hidden=!existing;dialog.querySelector('.photo-edit-pager').hidden=existing;get('Remove').hidden=existing;
-  get('Metadata').hidden=existing;get('SaveCurrent').hidden=existing||!desktop()||!session.onUpload;get('TaggingToggle').hidden=true;get('FamilyPhotoChoice').hidden=existing||session.scope==='photos';get('Tags').hidden=existing||!desktop();get('UploadStatus').textContent='';renderTagControls();
+  get('Metadata').hidden=existing;get('SaveCurrent').hidden=existing||!session.onUpload;get('TaggingToggle').hidden=true;get('FamilyPhotoChoice').hidden=existing||session.scope==='photos';get('Tags').hidden=existing||!desktop();get('UploadStatus').textContent='';renderTagControls();
   get('Canvas').setAttribute('aria-label',tr('תצוגה מקדימה של התמונה','Photo preview'));
 }
 async function responseJSON(response){
@@ -279,7 +279,7 @@ async function saveCurrent(){
       stopFaces();release();get('Image').hidden=true;get('Metadata').hidden=true;get('Tags').hidden=true;get('FamilyPhotoChoice').hidden=true;get('TaggingToggle').hidden=true;get('Loading').hidden=false;get('Loading').textContent=tr('התמונות הועלו. נותרו קבצים נוספים. ״שמירה והעלאה של הכל״ תעלה אותם.','Photos uploaded. Other files remain. Choose “Save and upload all” to upload them.');
       setBusy(false);for(const name of ['Left','Right','CropToggle','Reset','Full','Remove'])get(name).disabled=true;saveLabel();return;
     }
-    owner.index=Math.min(owner.index,owner.drafts.length-1);await load();
+    owner.index=owner.index%owner.drafts.length;await load();
   }catch(error){await recoverSave(owner,error);}
 }
 async function save(){
