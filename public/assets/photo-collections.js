@@ -10,6 +10,7 @@
   };
   const personName=id=>window.FamilyApp?.nameOf?.(id)||I.personName?.(window.FAMILY_DATA?.people?.[id])||window.FAMILY_DATA?.people?.[id]?.name||id;
   function targets(scope,viewer=false,desktop=false){
+    scope=scope?.replace(/^link:(?=personal:)/,'');
     if(viewer&&desktop&&!scope?.startsWith('personal:')){
       const family={icon:'family',collection:'photos',label:tr('תמונות משפחתיות','Family photos')};
       if(scope?.startsWith('nursery:'))return [family,{icon:'baby',collection:scope,removeOnly:true,label:tr('אלבום התינוקייה של ','Baby album for ')+personName(scope.slice(8))}];
@@ -57,12 +58,13 @@
   }
   function buttons(item,scope,viewer=false,desktop=false){
     const memberships=items.get(item.id)?.collections||item.collections||[item.scope];
-    return targets(scope,viewer,desktop).filter(target=>!viewer||target.icon!=='wedding'||desktop&&target.removeOnly).map(target=>{
+    const personal=scope?.replace(/^link:/,'').startsWith('personal:');
+    return targets(scope,viewer,desktop).filter(target=>!viewer||target.icon!=='wedding'||personal||desktop&&target.removeOnly).map(target=>{
       const active=memberships.includes(target.collection),busy=pending.has(item.id+':'+target.collection);
       const family=target.collection==='photos';
       const label=target.collection?(active?tr('הסרה מ','Remove from '):target.removeOnly?tr('התמונה הוסרה מ','Photo removed from '):tr('הוספה ל','Add to '))+target.label:tr('אין לאדם זה אלבום מתאים: ','No album is available for this person: ')+target.label;
       return `<button type="button" class="photo-collection-button${family?' photo-collection-family':''}${active?' is-linked':''}" data-photo-collection="${safe(target.collection||'')}" data-photo-album-kind="${target.icon}" aria-label="${safe(label)}" title="${safe(label)}" aria-pressed="${active}" ${busy?'aria-busy="true" ':''}${!target.collection||busy||target.removeOnly&&!active?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true">${icons[target.icon]}</svg>${family?`<span class="photo-collection-name">${target.label}</span>`:''}</button>`;
-    }).join('')+(viewer&&(!desktop||scope?.startsWith('personal:'))?weddingControl(item,scope):'');
+    }).join('')+(viewer&&!personal&&!desktop?weddingControl(item,scope):'');
   }
   function controls(item,scope,{viewer=false}={}){
     if(item.kind!=='photo'||!item.id||(!viewer&&!scope?.startsWith('personal:')))return '';
@@ -103,7 +105,7 @@
     window.FamilyPhotoViewerLayout?.sync();
   }
   async function add(button){
-    const group=button.closest('[data-collection-photo]'),id=group?.dataset.collectionPhoto,collection=button.dataset.photoCollection,scope=group?.dataset.collectionScope;
+    const group=button.closest('[data-collection-photo]'),id=group?.dataset.collectionPhoto,collection=button.dataset.photoCollection,scope=group?.dataset.collectionScope?.replace(/^link:(?=personal:)/,'');
     const active=button.getAttribute('aria-pressed')==='true';
     if(!id||!collection||button.disabled)return;
     if(!window.FamilyApp?.apiEnabled){window.FamilyApp?.toast(tr('השמירה אינה זמינה כרגע. נסו לרענן.','Saving is currently unavailable. Please refresh.'));return;}

@@ -8,6 +8,8 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(english=false){
  const document=new EventTarget(),window=new EventTarget(),groups=[],requests=[],messages=[];
  document.querySelectorAll=()=>groups;
+ const viewer={open:true,close(){this.open=false;}};document.getElementById=id=>id==='mediaViewer'?viewer:null;
+ window.location={hash:'#person/tomer'};
  window.FAMILY_DATA={people:{tomer:{id:'tomer'},shani:{id:'shani'},extra:{id:'extra',extra:true}},units:{pair:{id:'u-tomer',people:['tomer','shani']}}};
  window.FamilyApp={apiEnabled:true,getPerson:id=>window.FAMILY_DATA.people[id],toast:message=>messages.push(message)};
  window.FAMILY_API_TOKEN='test-csrf';
@@ -16,10 +18,10 @@ function fixture(english=false){
  const item=(id='one',collections=['gallery'])=>({id,kind:'photo',scope:'gallery',collections});
  const group=(photo=item(),scope='personal:tomer',viewer=false)=>{const node={dataset:{collectionPhoto:photo.id,collectionScope:scope,...(viewer?{collectionViewer:'true'}:{})},innerHTML:window.FamilyPhotoCollections.controls(photo,scope,{viewer})};groups.push(node);return node;};
  const button=(node,collection,pressed=false)=>({dataset:{photoCollection:collection},disabled:false,closest:()=>node,attributes:new Map([['aria-pressed',String(pressed)]]),getAttribute(key){return this.attributes.get(key);},setAttribute(key,value){this.attributes.set(key,value);},removeAttribute(key){this.attributes.delete(key);}});
- const click=target=>{const event=new Event('click');Object.defineProperty(event,'target',{value:{closest:selector=>selector==='[data-photo-collection]'?target:null}});document.dispatchEvent(event);};
+ const click=target=>{const event=new Event('click',{cancelable:true});Object.defineProperty(event,'target',{value:{closest:selector=>selector==='[data-photo-collection]'?target:null}});document.dispatchEvent(event);return event;};
  const respond=async(index,photo,ok=true)=>{const body=JSON.parse(requests[index].options.body);requests[index].resolve({ok,json:async()=>ok?{operation:'collection',scope:body.collection,included:body.included??true,item:photo}:{error:'Connection lost'}});await flush();};
  const selected=(node,collection)=>new RegExp('data-photo-collection="'+collection+'"[^>]*aria-pressed="true"').test(node.innerHTML);
- return {window,document,groups,requests,messages,item,group,button,click,respond,selected};
+ return {window,document,viewer,groups,requests,messages,item,group,button,click,respond,selected};
 }
 test('viewers offer Family photos in both languages while profile thumbnails retain their baby and wedding shortcuts',()=>{
  for(const english of [false,true]){
@@ -35,13 +37,13 @@ test('viewers offer Family photos in both languages while profile thumbnails ret
   assert.equal(f.window.FamilyPhotoCollections.controls({...f.item(),kind:'video'},'personal:tomer'),'');
  }
 });
-test('every personal photo links to the owner wedding, even if the photo has no tags or wedding membership',()=>{
+test('every personal photo toggles the owner wedding album without a navigation link, even before it has wedding membership',()=>{
  for(const english of [false,true]){
   const f=fixture(english);f.window.FAMILY_DATA.people.avigail={id:'avigail',name:'Avigail'};f.window.FAMILY_DATA.people.paul={id:'paul',name:'Paul'};f.window.FAMILY_DATA.units.noble={id:'u-noble',people:['avigail','paul']};
-  for(const scope of ['personal:avigail','link:personal:avigail','nursery:avigail'])for(const photo of [f.item('first'),f.item('second')]){
-   const html=f.window.FamilyPhotoCollections.controls(photo,scope,{viewer:true});assert.match(html,/data-photo-wedding-link href="#weddings\/u-noble"/);assert.doesNotMatch(html,/data-photo-collection="wedding:u-noble"/);assert.doesNotMatch(html,/data-photo-wedding-link[^>]*hidden/);
+  for(const scope of ['personal:avigail','link:personal:avigail'])for(const photo of [f.item('first'),f.item('second')]){
+   const html=f.window.FamilyPhotoCollections.controls(photo,scope,{viewer:true});assert.match(html,/data-photo-collection="wedding:u-noble"/);assert.doesNotMatch(html,/data-photo-wedding-link|href="#weddings|data-photo-wedding-choices/);
   }
-  const unavailable=f.window.FamilyPhotoCollections.controls(f.item(),'personal:extra',{viewer:true});assert.match(unavailable,/data-photo-album-kind="wedding" disabled/);assert.doesNotMatch(unavailable,/data-photo-wedding-link/,'A person without a partner has a dim disabled icon without a link');
+  const unavailable=f.window.FamilyPhotoCollections.controls(f.item(),'personal:extra',{viewer:true});assert.match(unavailable,/data-photo-album-kind="wedding"[^>]*disabled/);assert.doesNotMatch(unavailable,/data-photo-wedding-link/,'A person without a partner has a dim disabled icon without a link');
  }
 });
 test('unmarried couples keep their relationships and get a disabled wedding icon for both partners on desktop and phone markup',()=>{
@@ -51,15 +53,15 @@ test('unmarried couples keep their relationships and get a disabled wedding icon
    f.window.FAMILY_DATA.units[unit]={id:unit,people:ids,hasWedding:false};
    for(const id of ids){f.window.FAMILY_DATA.people[id]={id,name:id};
     for(const scope of ['personal:'+id,'link:personal:'+id,'nursery:'+id]){
-     const html=f.window.FamilyPhotoCollections.controls(f.item(),scope,{viewer:true});assert.match(html,/data-photo-album-kind="wedding" disabled/);assert.doesNotMatch(html,/data-photo-wedding-link|data-photo-wedding-choices/);
+     const html=f.window.FamilyPhotoCollections.controls(f.item(),scope,{viewer:true});assert.match(html,/data-photo-album-kind="wedding"[^>]*disabled/);assert.doesNotMatch(html,/data-photo-wedding-link|data-photo-wedding-choices/);
     }
    }
   }
  }
 });
-test('nursery tooltips identify the profile owner and wedding links identify the actual couple',()=>{
+test('nursery and wedding toggle tooltips identify the profile owner and actual couple',()=>{
  const f=fixture();f.window.FAMILY_DATA.people.tomer.name='תומר';f.window.FAMILY_DATA.people.shani.name='שני';
- const html=f.window.FamilyPhotoCollections.controls(f.item(),'personal:tomer',{viewer:true});assert.match(html,/title="הוספה לאלבום התינוקייה של תומר"/);assert.match(html,/title="עמוד החתונה של תומר ושני"/);
+ const html=f.window.FamilyPhotoCollections.controls(f.item(),'personal:tomer',{viewer:true});assert.match(html,/title="הוספה לאלבום התינוקייה של תומר"/);assert.match(html,/title="הוספה לאלבום החתונה של תומר ושני"/);
 });
 test('desktop shared galleries have only family membership while each event album has its own removal control',async()=>{
  for(const english of [false,true])for(const scope of ['gallery','photos','nursery:tomer','wedding:u-tomer']){
@@ -75,8 +77,19 @@ test('desktop shared galleries have only family membership while each event albu
 });
 test('returning from desktop to phone restores the existing event buttons and leaves profile controls unchanged',()=>{
  const f=fixture(),g=f.group(f.item('one',['gallery','nursery:tomer']),'nursery:tomer',true),profile=f.group(f.item('two'),'personal:tomer',true);
- f.window.FamilyPhotoCollections.setViewerDesktop(true);assert.match(g.innerHTML,/data-photo-collection="nursery:tomer"/);assert.doesNotMatch(g.innerHTML,/data-photo-wedding-link/);assert.match(profile.innerHTML,/data-photo-wedding-link/);
- f.window.FamilyPhotoCollections.setViewerDesktop(false);assert.doesNotMatch(g.innerHTML,/data-photo-collection="nursery:tomer"/);assert.match(g.innerHTML,/data-photo-wedding-link/);assert.match(profile.innerHTML,/data-photo-wedding-link/);
+ f.window.FamilyPhotoCollections.setViewerDesktop(true);assert.match(g.innerHTML,/data-photo-collection="nursery:tomer"/);assert.doesNotMatch(g.innerHTML,/data-photo-wedding-link/);assert.match(profile.innerHTML,/data-photo-collection="wedding:u-tomer"/);assert.doesNotMatch(profile.innerHTML,/data-photo-wedding-link/);
+ f.window.FamilyPhotoCollections.setViewerDesktop(false);assert.doesNotMatch(g.innerHTML,/data-photo-collection="nursery:tomer"/);assert.match(g.innerHTML,/data-photo-wedding-link/);assert.match(profile.innerHTML,/data-photo-collection="wedding:u-tomer"/);assert.doesNotMatch(profile.innerHTML,/data-photo-wedding-link/);
+});
+test('profile wedding saves highlight the current photo and a second tap removes membership while the viewer and route stay open',async()=>{
+ for(const english of [false,true])for(const desktop of [false,true])for(const scope of ['personal:tomer','link:personal:tomer']){
+  const f=fixture(english),g=f.group(f.item(),scope,true);f.window.FamilyPhotoCollections.setViewerDesktop(desktop);
+  assert.match(g.innerHTML,/data-photo-collection="wedding:u-tomer"/);assert.doesNotMatch(g.innerHTML,/data-photo-wedding-link|data-photo-wedding-choices|href="#weddings/);
+  const click=f.click(f.button(g,'wedding:u-tomer'));assert.equal(click.defaultPrevented,true);assert.equal(f.viewer.open,true);assert.equal(f.window.location.hash,'#person/tomer');
+  assert.deepEqual(JSON.parse(f.requests[0].options.body),{collection:'wedding:u-tomer',scope:'personal:tomer',included:true});
+  await f.respond(0,f.item('one',['gallery','wedding:u-tomer']));assert.equal(f.selected(g,'wedding:u-tomer'),true);assert.match(g.innerHTML,/class="photo-collection-button is-linked" data-photo-collection="wedding:u-tomer"/);assert.equal(f.viewer.open,true);
+  f.click(f.button(g,'wedding:u-tomer',true));assert.deepEqual(JSON.parse(f.requests[1].options.body),{collection:'wedding:u-tomer',scope:'personal:tomer',included:false});
+  await f.respond(1,f.item());assert.equal(f.selected(g,'wedding:u-tomer'),false);assert.equal(f.viewer.open,true);assert.equal(f.window.location.hash,'#person/tomer');
+ }
 });
 test('shared viewers omit baby and wedding shortcuts even when tagged people and the photo owner have albums',()=>{
  for(const english of [false,true]){
