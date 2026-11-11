@@ -411,6 +411,18 @@ test('name bubbles and the upload wizard picker also counter native pinch withou
   f.emit(popup.querySelector('[data-face-edit]'),'click');popup=f.find('face-popover face-picker');assert.ok(popup);assert.equal(popup.getBoundingClientRect().width*viewport.scale,280);assert.equal(f.find('face-selection').style.left,first.rect.x*100+'%');f.faces.clear();
  }
 });
+test('upload preview resizing while face controls are still mounting waits for initialization',async()=>{
+ const f=fixture(),adapter={load:async()=>({faces:[]}),mapDetections:faces=>faces,findPeople:async()=>[],enabled:()=>true};
+ const pending=f.mount('early-resize',{adapter,zoom:false});assert.doesNotThrow(()=>f.faces.fit());await pending;
+ assert.ok(f.find('face-hit-buttons'));assert.doesNotThrow(()=>f.faces.fit());f.faces.clear();
+});
+test('a phone tap on an already tagged upload face opens the existing people picker immediately',async()=>{
+ const person={id:'yona',name:'יונה'},named={...first,id:'draft-face',personId:person.id,person},f=fixture();
+ const adapter={load:async()=>({faces:[named]}),mapDetections:faces=>faces,findPeople:async()=>[person],enabled:()=>true};
+ await f.mount('draft-tap',{adapter,zoom:false});const hit=f.find('face-hit-buttons').children[0];
+ f.emit(f.stage,'click',{detail:1,pointerType:'touch',target:hit});await new Promise(resolve=>setImmediate(resolve));
+ const picker=f.find('face-popover face-picker');assert.ok(picker);assert.match(picker.querySelector('[data-face-results]').innerHTML,/יונה/);assert.equal(f.find('face-popover face-name'),undefined);f.faces.clear();
+});
 test('drag scrolling does not create a face, and viewport resizing preserves normalized positions',async()=>{
  const f=fixture([first,second]);await f.mount();const toolbar=f.find('face-zoom-toolbar'),scroll=f.find('face-photo-scroll'),selection=f.find('face-selection');
  f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');f.emit(scroll,'pointerdown');scroll.scrollLeft=100;

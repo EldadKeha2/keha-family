@@ -449,7 +449,7 @@
       if(region){const face=c.faces.find(face=>face.id===region.dataset.faceId&&face.person);if(face){event.preventDefault();c.active=face;dismissFace(c);}return;}
       const keyboard=event.detail===0&&event.target.matches('.face-hit'),known=faceAt(c,event),p=known||keyboard?null:point(c,event);if(!known&&!p)return;
       const area=imageArea(c),face=known||{id:uuid(),rect:c.geom.manualRect(p,area),revision:null};
-      if(!face)return;event.preventDefault();if(c.showRegions&&face.person){c.active=face;dismissFace(c);}else if(face.person&&touchMode(event)&&!keyboard){rememberTabFace(c,face);showLabel(c,face,true);}else openPicker(c,face);
+      if(!face)return;event.preventDefault();if(c.showRegions&&face.person){c.active=face;dismissFace(c);}else if(face.person&&touchMode(event)&&!keyboard&&!c.adapter){rememberTabFace(c,face);showLabel(c,face,true);}else openPicker(c,face);
     });
     on(stage,'pointerdown',event=>{
       if(event.isPrimary===false||c.resizeDrag)return;
@@ -544,5 +544,5 @@
     const c=stage._familyFaceContext;
     return !c||(!(c.zoom>1)&&!c.adjust&&!c.resizeDrag&&!c.saving&&!c.reviewSaving&&!c.popup?.classList.contains('face-picker'));
   }
-  window.FamilyFaces={mount,clear,update,canNavigate,saved,whenReady(stage,image){const c=stage._familyFaceContext;return c?.image===image?c.paintReady:Promise.resolve();},async flush(){await current?.pendingSave;},dismiss(){if(current){stopTabFaces(current);closePopup(current);}},fit(){if(current&&imageWidth(current.image)){fitZoom(current);place(current);}}};
+  window.FamilyFaces={mount,clear,update,canNavigate,saved,whenReady(stage,image){const c=stage._familyFaceContext;return c?.image===image?c.paintReady:Promise.resolve();},async flush(){await current?.pendingSave;},dismiss(){if(current){stopTabFaces(current);closePopup(current);}},fit(){if(current?.initialized&&imageWidth(current.image)){fitZoom(current);place(current);}}};
 })();

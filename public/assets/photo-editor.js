@@ -20,15 +20,15 @@ function renderDraftTags(){
   get('EventTags').innerHTML=(d.metadata.labels||[]).map(label=>`<span>${safe(photoLabelName(label,I.isEnglish))}</span>`).join('');
 }
 function renderTagControls(){
-  const d=draft(),enabled=Boolean(d&&!d.cropping&&desktop()&&session.mode!=='existing');
+  const d=draft(),enabled=Boolean(d&&!d.cropping&&session.mode!=='existing');
   dialog.classList.toggle('is-face-tagging',enabled);get('TaggingToggle').setAttribute('aria-pressed',String(enabled));
 }
 function stopFaces(){if(session?.faceActive){session.faceActive=false;window.FamilyFaces?.clear();}}
 function startFaces(){
   stopFaces();const owner=session,d=draft();
-  if(!owner||owner.mode==='existing'||!desktop()||!d||!source||!window.FamilyFaces)return;
+  if(!owner||owner.mode==='existing'||!d||!source||!window.FamilyFaces)return;
   const adapter=createUploadFaceAdapter(d,{tr,findPeople:(query,preferred)=>window.FamilyTags.findPeople(query,preferred),getPerson:id=>window.FamilyApp?.getPersonSummary?.(id),onChange:()=>{if(session===owner&&draft()===d){renderDraftTags();renderTagControls();}}});
-  adapter.enabled=()=>desktop()&&session===owner&&draft()===d&&!d.cropping&&!owner.loading&&!owner.saving;
+  adapter.enabled=()=>session===owner&&draft()===d&&!d.cropping&&!owner.loading&&!owner.saving;
   owner.faceActive=true;
   window.FamilyFaces.mount(get('Image'),get('Canvas'),{id:d.key,kind:'photo',faceSummary:{reviewed:d.facesComplete}},{adapter,dialog,reviewHost:get('FaceTools'),reviewLabel:true,zoom:false,detectionImage:source}).catch(error=>{if(session===owner&&draft()===d)get('Error').textContent=error.message;});
 }
@@ -96,7 +96,7 @@ function fitEditor(){
   dialog.style.setProperty('--photo-editor-height',(window.visualViewport?.height||window.innerHeight)+'px');
   dialog.style.setProperty('--photo-editor-top',(window.visualViewport?.offsetTop||0)+'px');
   fitCaption();renderTagControls();if(!session.saving)saveLabel();
-  if(desktop()&&!session.faceActive&&source)startFaces();else if(!desktop()&&session.faceActive)stopFaces();
+  if(!session.faceActive&&source)startFaces();
 }
 function fitCaption(){
   if(!session||session.mode==='existing')return;const input=get('Caption');
@@ -148,7 +148,9 @@ async function load(){
 function render(){
   const d=draft();if(!d||!source)return;
   const size=rotatedSize(d.width,d.height,d.rotation),viewport=get('Viewport');
-  const fit=Math.min((viewport.clientWidth-40)/size.width,(viewport.clientHeight-40)/size.height,1);
+  viewport.style.setProperty('--photo-edit-aspect-ratio',size.width+' / '+size.height);
+  const padding=session.mode==='existing'?40:0;
+  const fit=Math.min(Math.max(1,viewport.clientWidth-padding)/size.width,Math.max(1,viewport.clientHeight-padding)/size.height,session.mode==='existing'?1:Infinity);
   get('Image').style.width=Math.max(1,size.width*fit)+'px';get('Image').style.height=Math.max(1,size.height*fit)+'px';
   const canvas=get('Canvas'),scale=Math.min(1,1600/Math.max(size.width,size.height));
   canvas.width=Math.max(1,Math.round(size.width*scale));canvas.height=Math.max(1,Math.round(size.height*scale));

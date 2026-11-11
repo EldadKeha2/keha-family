@@ -8,7 +8,7 @@ import * as faceDraft from '../public/assets/photo-upload-faces.mjs';
 import * as catalog from '../public/assets/photo-labels-catalog.mjs';
 
 const source=(await readFile(new URL('../public/assets/photo-editor.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
-function fixture({desktop=true,english=false,onUpload=async()=>{}}={}){
+function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
  const nodes=new Map(),all=[],mounts=[],uploaded=[],closed=[];
  const people=[{id:'yona',name:'יונה',nameEn:'Yona'},{id:'shlomo',name:'שלמה',nameEn:'Shlomo'}];
  class Node extends EventTarget{
@@ -24,8 +24,8 @@ function fixture({desktop=true,english=false,onUpload=async()=>{}}={}){
   focus(){document.activeElement=this;}
   showModal(){this.open=true;}
   close(){this.open=false;}
-  get clientWidth(){return 1000;}
-  get clientHeight(){return 420;}
+  get clientWidth(){return this.id==='photoEditViewport'?viewportSize.width:1000;}
+  get clientHeight(){return this.id==='photoEditViewport'?viewportSize.height:420;}
   getContext(){return {save(){},scale(){},translate(){},rotate(){},drawImage(){},restore(){}};}
   toBlob(fn,type){fn(new Blob(['rendered pixels'],{type}));}
  }
@@ -34,19 +34,38 @@ function fixture({desktop=true,english=false,onUpload=async()=>{}}={}){
  const window=new EventTarget();window.innerHeight=900;window.createImageBitmap=true;window.FamilyI18n={isEnglish:english,personName:p=>english?p.nameEn||p.name:p.name};
  window.FamilyApp={apiEnabled:true,getPersonSummary:id=>people.find(p=>p.id===id)};window.FamilyTags={findPeople:async query=>people.filter(p=>!query||p.name.includes(query))};
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
- vm.runInNewContext(source,{...core,...metadata,...faceDraft,...catalog,window,document,File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({width:1000,height:800,close(){closed.push(file.name);}})});
+ vm.runInNewContext(source,{...core,...metadata,...faceDraft,...catalog,window,document,File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
  return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();}};
 }
 const image=name=>new File(['original pixels '+name],name,{type:'image/jpeg',lastModified:1234});
 async function details(entry){const bytes=new Uint8Array(await entry.payload.body.arrayBuffer()),n=Number(entry.payload.headers[metadata.PHOTO_METADATA_HEADER]);return {metadata:metadata.decodeUploadMetadata(bytes.subarray(0,n)),pixels:bytes.subarray(n)};}
 
-test('desktop faces can be tagged immediately and resume automatically after cropping or resetting',async()=>{
- const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+test('phone and desktop faces can be tagged immediately and resume automatically after cropping or resetting',async()=>{
+ for(const desktop of [true,false]){
+ const f=fixture({desktop}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
  assert.equal(f.node('photoEditTaggingToggle').hidden,true);assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);assert.equal(f.node('photoUploadEditor').classes.has('is-face-tagging'),true);
  await f.click('CropToggle');assert.equal(f.mounts.at(-1).options.adapter.enabled(),false);assert.equal(f.node('photoUploadEditor').classes.has('is-face-tagging'),false);
  await f.click('Reset');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);assert.equal(f.node('photoUploadEditor').classes.has('is-face-tagging'),true);
- await f.click('Next');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);await f.click('Cancel');assert.equal(await result,null);
+ const active=f.mounts.at(-1);f.window.dispatchEvent(new Event('resize'));assert.equal(f.mounts.at(-1),active,'Keyboard or viewport resizing must not close the current face picker');
+ await f.click('Next');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);assert.equal(active.options.adapter.enabled(),false);await f.click('Cancel');assert.equal(await result,null);
+ }
+});
+test('phone previews use the full available frame for portrait, landscape and small images and retain their aspect on rotation',async()=>{
+ for(const photoSize of [{width:947,height:2048},{width:2048,height:947},{width:160,height:120}]){
+  const frame={width:300,height:650},f=fixture({desktop:false,photoSize,viewportSize:frame}),{result}=await f.begin([image('one.jpg')]);
+  const check=ratio=>{const style=f.node('photoEditImage').style,w=parseFloat(style.width),h=parseFloat(style.height);assert.ok(w<=frame.width+.001&&h<=frame.height+.001);assert.ok(Math.abs(w-frame.width)<.001||Math.abs(h-frame.height)<.001,'At least one image edge must fill its frame');assert.ok(Math.abs(w/h-ratio)<.0001,'The preview must preserve the photo aspect ratio');};
+  check(photoSize.width/photoSize.height);await f.click('Right');check(photoSize.height/photoSize.width);await f.click('Cancel');assert.equal(await result,null);
+ }
+});
+test('phone face choices survive switching photos and rotation and upload with only the photo that was tagged',async()=>{
+ const f=fixture({desktop:false}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ const first=f.mounts.at(-1).options.adapter;await first.findPeople('יונה');await first.save({faceId:'a'.repeat(32),personId:'yona',rect:{x:.2,y:.2,width:.1,height:.15}});
+ await f.click('Next');assert.equal((await f.mounts.at(-1).options.adapter.load()).faces.length,0);
+ await f.click('Previous');assert.equal((await f.mounts.at(-1).options.adapter.load()).faces[0].person.id,'yona');await f.click('Right');
+ const rotated=(await f.mounts.at(-1).options.adapter.load()).faces[0].rect;await f.click('SaveCurrent');const data=(await details(f.uploaded[0])).metadata;
+ assert.equal(data.faces[0].personId,'yona');for(const key of ['x','y','width','height'])assert.ok(Math.abs(data.faces[0].rect[key]-rotated[key])<.00001);
+ await f.click('Save');const remaining=await result;assert.equal(remaining[0].name,'two.jpg');assert.deepEqual((await details({payload:f.api.upload(remaining[0])})).metadata.faces,[]);
 });
 test('descriptions start compact; phone focus expands for editing and blur collapses without losing the uploaded text',async()=>{
  for(const desktop of [true,false]){
