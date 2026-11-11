@@ -547,3 +547,10 @@ test('desktop refresh reloads the current game, person or album URL and cannot b
   }
   const phone=fixture();phone.click(phone.card.querySelector('[data-desktop-refresh]'));assert.equal(phone.reloads.length,0);
 });
+
+test('the native Windows app keeps refresh and omits a redundant browser installation action',()=>{
+  const f=desktopFixture({userAgent:desktopUA+' KehaFamilyDesktop/1.0.0'});
+  assert.equal(f.card.querySelector('[data-desktop-install-action]').hidden,true);
+  assert.equal(f.card.querySelector('[data-desktop-refresh]').hidden,false);
+  assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+});

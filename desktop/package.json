@@ -1,0 +1,37 @@
+{
+  "name": "keha-family-desktop",
+  "version": "1.0.0",
+  "description": "בית משפחת קהא — Windows desktop application",
+  "author": "Eldad Keha",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test ../test/desktop-window-state.test.mjs",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.3.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.eldadkeha.family",
+    "productName": "בית משפחת קהא",
+    "artifactName": "Keha-Family-Setup-${version}.${ext}",
+    "directories": {"output": "dist"},
+    "files": ["main.cjs", "window-state.cjs", "offline.html", "offline.css", "icon.png", "package.json"],
+    "asar": true,
+    "win": {"target": ["nsis"], "icon": "icon.ico", "executableName": "KehaFamily"},
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "בית משפחת קהא",
+      "uninstallDisplayName": "בית משפחת קהא",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

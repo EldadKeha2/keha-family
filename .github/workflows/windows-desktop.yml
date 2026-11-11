@@ -1,0 +1,58 @@
+name: Build Windows desktop app
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/windows-desktop.yml', 'test/desktop-window-state.test.mjs']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: windows-desktop-release
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install pinned build dependencies
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+      - name: Check saved window states
+        working-directory: desktop
+        run: npm test
+      - name: Verify native Windows maximize and fullscreen restoration
+        working-directory: desktop
+        run: npx --no-install electron smoke-test.cjs
+      - name: Build Windows installer
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keha-family-windows
+          path: desktop/dist/*.exe
+          if-no-files-found: error
+      - name: Publish the installer download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content desktop/package.json | ConvertFrom-Json).version
+          $tag = "desktop-v$version"
+          $installer = "desktop/dist/Keha-Family-Setup-$version.exe"
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $installer --clobber --repo $env:GITHUB_REPOSITORY
+          } else {
+            gh release create $tag $installer --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Keha Family for Windows $version" --notes-file desktop/release-notes.md
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'The Windows installer could not be published.' }

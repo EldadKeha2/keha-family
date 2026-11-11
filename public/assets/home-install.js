@@ -15,6 +15,7 @@
   const ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
   const android=/Android/i.test(ua),embedded=/FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(ua);
   const mobileDevice=ios||android||navigator.userAgentData?.mobile===true||/Mobile|Tablet/i.test(ua);
+  const nativeDesktop=/KehaFamilyDesktop\//i.test(ua);
   const url=new URL('/',location.origin),language=window.FamilyI18n?.language;
   if(['he','en-US','en-GB'].includes(language))url.searchParams.set('lang',language);
   url.hash='home';
@@ -113,7 +114,7 @@
     }finally{shareButton.disabled=false;}
   });
 
-  function hasInstalledShortcut(){return installed||relatedInstalled||standaloneQuery.matches||navigator.standalone===true;}
+  function hasInstalledShortcut(){return nativeDesktop||installed||relatedInstalled||standaloneQuery.matches||navigator.standalone===true;}
   function checkInstalledShortcut(){
     if(window.top!==window||typeof navigator.getInstalledRelatedApps!=='function')return Promise.resolve();
     if(installationCheck)return installationCheck;
@@ -132,7 +133,7 @@
     // Keep the phone invitation and desktop actions together in the shared header.
     card.hidden=false;
     button.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);status.hidden=false;
-    desktopButton.hidden=refreshButton.hidden=!desktopView();desktopButton.disabled=busy;
+    desktopButton.hidden=!desktopView()||nativeDesktop;refreshButton.hidden=!desktopView();desktopButton.disabled=busy;
     button.setAttribute('aria-haspopup',isInstalled?'false':'dialog');
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
     button.disabled=busy;
