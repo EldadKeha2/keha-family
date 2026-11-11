@@ -36,7 +36,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{}}={}){
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
  vm.runInNewContext(source,{...core,...metadata,...faceDraft,...catalog,window,document,File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({width:1000,height:800,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
- return {node,mounts,uploaded,window,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();}};
+ return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();}};
 }
 const image=name=>new File(['original pixels '+name],name,{type:'image/jpeg',lastModified:1234});
 async function details(entry){const bytes=new Uint8Array(await entry.payload.body.arrayBuffer()),n=Number(entry.payload.headers[metadata.PHOTO_METADATA_HEADER]);return {metadata:metadata.decodeUploadMetadata(bytes.subarray(0,n)),pixels:bytes.subarray(n)};}
@@ -48,20 +48,24 @@ test('desktop faces can be tagged immediately and resume automatically after cro
  await f.click('Reset');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);assert.equal(f.node('photoUploadEditor').classes.has('is-face-tagging'),true);
  await f.click('Next');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);await f.click('Cancel');assert.equal(await result,null);
 });
-test('desktop descriptions start on one line, expand for longer text and shrink when cleared; phones retain two rows',async()=>{
+test('descriptions start compact; phone focus expands for editing and blur collapses without losing the uploaded text',async()=>{
  for(const desktop of [true,false]){
   const f=fixture({desktop}),{result}=await f.begin([image('one.jpg')]),input=f.node('photoEditCaption');
   Object.defineProperty(input,'scrollHeight',{get(){return this.value.length>80?116:36;}});
-  assert.equal(input.rows,desktop?1:2);input.value='A longer description. '.repeat(12);input.dispatchEvent(new Event('input'));
-  assert.equal(input.rows,desktop?1:2);assert.equal(input.style.height,desktop?'118px':undefined);
-  input.value='';input.dispatchEvent(new Event('input'));assert.equal(input.style.height,desktop?'38px':undefined);await f.click('Cancel');assert.equal(await result,null);
+  assert.equal(input.rows,1);input.value='A longer description. '.repeat(12);input.dispatchEvent(new Event('input'));
+  assert.equal(input.rows,1);assert.equal(input.style.height,desktop?'118px':undefined);
+  if(!desktop){
+   input.focus();input.dispatchEvent(new Event('focus'));assert.equal(input.rows,3);assert.equal(input.style.height,'118px');
+   f.document.activeElement=f.node('photoEditSaveCurrent');input.dispatchEvent(new Event('blur'));assert.equal(input.rows,1);assert.equal(input.style.height,undefined);
+   await f.click('SaveCurrent');assert.equal((await details(f.uploaded[0])).metadata.caption,'A longer description. '.repeat(12));assert.deepEqual(Array.from(await result),[]);
+  }else{input.value='';input.dispatchEvent(new Event('input'));assert.equal(input.style.height,'38px');await f.click('Cancel');assert.equal(await result,null);}
  }
 });
 
 test('uploading only the current photo leaves other edits in the wizard and never uploads it twice with Upload all',async()=>{
  for(const desktop of [true,false]){
  const f=fixture({desktop}),files=[image('one.jpg'),image('two.jpg'),image('three.jpg')],{result}=await f.begin(files);
- assert.equal(f.node('photoEditSaveCurrent').hidden,false);assert.match(f.node('photoEditSave').textContent,/שמירה והעלאה של הכל/);
+ assert.equal(f.node('photoEditSaveCurrent').hidden,false);assert.match(f.node('photoEditSave').textContent,desktop?/שמירה והעלאה של הכל/:/העלאת הכל/);
  await f.click('Next');f.node('photoEditCaption').value='second description';f.node('photoEditCaption').dispatchEvent(new Event('input'));
  await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);assert.equal(f.uploaded[0].file.name,'two.jpg');assert.equal((await details(f.uploaded[0])).metadata.caption,'second description');assert.deepEqual(Buffer.from((await details(f.uploaded[0])).pixels),Buffer.from(await files[1].arrayBuffer()));
  assert.match(f.node('photoEditCounter').textContent,/תמונה 2 מתוך 2/);assert.equal(f.node('photoEditFilename').textContent,'three.jpg');

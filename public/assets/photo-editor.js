@@ -38,7 +38,7 @@ function mount(){
   if(dialog)return;
   dialog=document.createElement('dialog');dialog.id='photoUploadEditor';dialog.className='photo-upload-editor';dialog.dataset.i18nSkip='';dialog.dir=I.isEnglish?'ltr':'rtl';
   dialog.setAttribute('aria-labelledby','photoEditTitle');dialog.setAttribute('aria-describedby','photoEditHint');
-  dialog.innerHTML=`<header class="photo-edit-header"><div><span class="photo-edit-eyebrow" hidden></span><h2 id="photoEditTitle">${tr('אשף העלאה ועריכת תמונות','Photo Upload & Edit Wizard')}</h2></div><button type="button" id="photoEditClose" class="photo-edit-close" aria-label="${tr('ביטול ההעלאה','Cancel upload')}"><span class="photo-edit-close-text" aria-hidden="true">×</span><svg class="photo-edit-close-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m4 4 16 16M20 4 4 20"/></svg></button></header>
+  dialog.innerHTML=`<header class="photo-edit-header"><div><span class="photo-edit-eyebrow" hidden></span><h2 id="photoEditTitle">${tr('אשף העלאת התמונות','Photo Upload Wizard')}</h2></div><button type="button" id="photoEditClose" class="photo-edit-close" aria-label="${tr('ביטול ההעלאה','Cancel upload')}"><span class="photo-edit-close-text" aria-hidden="true">×</span><svg class="photo-edit-close-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m4 4 16 16M20 4 4 20"/></svg></button></header>
     <p id="photoEditHint" class="photo-edit-hint" hidden></p>
     <div id="photoEditHistory" class="photo-edit-history" hidden><label for="photoEditVersion">${tr('גרסאות התמונה','Photo versions')}</label><select id="photoEditVersion"></select><span id="photoEditVersionStatus" role="status"></span></div>
     <nav class="photo-edit-pager" aria-label="${tr('התמונות שנבחרו להעלאה','Photos selected for upload')}"><button type="button" id="photoEditPrevious" class="secondary-button">${tr('הקודמת','Previous')}</button><div><strong id="photoEditCounter" aria-live="polite"></strong><span id="photoEditFilename" dir="auto"></span></div><button type="button" id="photoEditNext" class="secondary-button">${tr('הבאה','Next')}</button></nav>
@@ -63,6 +63,8 @@ function mount(){
   get('Version').addEventListener('change',()=>loadVersion(get('Version').value));
   for(const field of ['day','month','year'])get('Date'+field).addEventListener('input',event=>{const d=draft();if(!d?.metadata)return;d.metadata.date[field]=event.target.value===''?null:Number(event.target.value);d.dateEdited=true;get('DateSource').hidden=true;get('Error').textContent='';});
   get('Caption').addEventListener('input',event=>{if(draft()?.metadata)draft().metadata.caption=event.target.value;fitCaption();});
+  get('Caption').addEventListener('focus',()=>{fitCaption();requestAnimationFrame(revealMetadata);});
+  get('Caption').addEventListener('blur',()=>fitCaption());
   get('FamilyPhoto').addEventListener('change',event=>{if(draft()?.metadata)draft().metadata.familyPhoto=event.target.checked;});
   get('Metadata').addEventListener('focusin',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
   window.addEventListener('resize',fitEditor);window.visualViewport?.addEventListener('resize',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
@@ -93,12 +95,17 @@ function fitEditor(){
   if(!session||!dialog?.open||session.mode==='existing')return;
   dialog.style.setProperty('--photo-editor-height',(window.visualViewport?.height||window.innerHeight)+'px');
   dialog.style.setProperty('--photo-editor-top',(window.visualViewport?.offsetTop||0)+'px');
-  fitCaption();renderTagControls();
+  fitCaption();renderTagControls();if(!session.saving)saveLabel();
   if(desktop()&&!session.faceActive&&source)startFaces();else if(!desktop()&&session.faceActive)stopFaces();
 }
 function fitCaption(){
   if(!session||session.mode==='existing')return;const input=get('Caption');
-  if(!desktop()){input.rows=2;input.style.removeProperty('height');return;}
+  input.placeholder=desktop()?tr('מי בתמונה? איפה ומה הסיפור?','Who is pictured? Where was it taken?'):tr('הקלידו תיאור…','Type a description…');
+  if(!desktop()){
+    const editing=document.activeElement===input;input.rows=editing?3:1;input.style.removeProperty('height');
+    if(editing){input.style.height='auto';input.style.height=Math.min(140,Math.max(76,(input.scrollHeight||0)+2))+'px';}
+    return;
+  }
   input.rows=1;input.style.height='auto';input.style.height=Math.min(180,Math.max(38,(input.scrollHeight||0)+2))+'px';
 }
 function revealMetadata(){if(session&&get('Metadata').contains(document.activeElement))document.activeElement.scrollIntoView?.({block:'nearest',behavior:'auto'});}
@@ -117,9 +124,9 @@ function saveLabel(){
     const d=draft();get('Save').textContent=d&&changed(d.rotation,d.crop)?tr('שמירת גרסה חדשה','Save new version'):d?.baseVersion!==session.expectedVersion?tr('שחזור גרסה זו','Restore this version'):tr('סיום','Done');return;
   }
   const count=session.files.filter((file,index)=>!isPhoto(file)||session.drafts.some(item=>item.fileIndex===index)).length;
-  get('SaveCurrent').textContent=tr('שמירה והעלאה של תמונה זו','Save and upload this photo');
+  get('SaveCurrent').textContent=desktop()?tr('שמירה והעלאה של תמונה זו','Save and upload this photo'):tr('העלאת תמונה זו','Upload this photo');
   get('SaveCurrent').hidden=!session.onUpload||!draft();get('SaveCurrent').disabled=session.loading||session.saving||!draft();
-  get('Save').textContent=tr('שמירה והעלאה של הכל','Save and upload all');
+  get('Save').textContent=desktop()?tr('שמירה והעלאה של הכל','Save and upload all'):tr('העלאת הכל','Upload all');
   get('Save').textContent+=(count>1?` (${count})`:'');
 }
 async function load(){
@@ -163,7 +170,7 @@ function renderCrop(){
 function configure(){
   const existing=session.mode==='existing';dialog.dir=I.isEnglish?'ltr':'rtl';dialog.classList.toggle('is-existing',existing);
   const eyebrow=dialog.querySelector('.photo-edit-eyebrow');eyebrow.hidden=!existing;eyebrow.textContent=existing?tr('המקור והגרסאות נשמרים','Original and previous versions are kept'):'';
-  get('Title').textContent=existing?tr('עריכת תמונה','Edit photo'):tr('אשף העלאה ועריכת תמונות','Photo Upload & Edit Wizard');
+  get('Title').textContent=existing?tr('עריכת תמונה','Edit photo'):tr('אשף העלאת התמונות','Photo Upload Wizard');
   get('Hint').hidden=!existing;get('Hint').textContent=existing?tr('כל שמירה יוצרת גרסה חדשה. בחרו גרסה קודמת לצפייה או לשחזור.','Each save creates a new version. Choose a previous version to view or restore it.') :'';
   dialog.setAttribute('aria-describedby',existing?'photoEditHint':'');
   for(const name of ['Close','Cancel']){get(name).setAttribute('aria-label',existing?tr('ביטול העריכה','Cancel editing'):tr('ביטול ההעלאה','Cancel upload'));if(name==='Cancel')get(name).textContent=tr('ביטול','Cancel');}
