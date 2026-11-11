@@ -23,12 +23,13 @@
   .site-header .main-nav .nav-link.active:before{border-color:#fff3ce;opacity:.9}
   .site-header .main-nav .nav-link.active:after{display:none}
   .site-header .main-nav .nav-link:focus-visible{outline:3px solid #aa884b;outline-offset:3px}
-  #homeTiles .home-tile{background:linear-gradient(125deg,#ffffffa6,#ffffff24 47%,#ffffff00 50%),linear-gradient(145deg,var(--tab-top,#fffdf7),var(--tab-mid,#f5eddd) 62%,var(--tab-low,#e8dcc3));border-color:var(--tab-line,#cdb78e);border-radius:11px;box-shadow:inset 0 1px 0 #ffffffe6,inset -4px 0 0 var(--tab-line,#cdb78e),0 4px 10px #70532610;transition:transform .18s,box-shadow .18s}
-  html[dir=ltr] #homeTiles .home-tile{box-shadow:inset 0 1px 0 #ffffffe6,inset 4px 0 0 var(--tab-line,#cdb78e),0 4px 10px #70532610}
-  #homeTiles .home-tile:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 #fff,inset 0 0 0 2px #ffffff66,0 6px 15px #70532620}
-  #homeTiles .home-tile strong,#homeTiles .home-tile .home-tile-icon,#homeTiles .home-tile .home-tile-arrow{color:var(--tab-ink,#566a44)}
-  #homeTiles .home-tile small{color:#685c49}
-  #homeTiles .home-tile .home-tile-icon{display:grid;place-items:center;width:48px;height:52px;flex:0 0 48px;border:1px solid #ffffff9c;border-radius:13px;background:linear-gradient(145deg,#ffffffad,#ffffff29);box-shadow:inset 0 1px 0 #ffffffc7,0 3px 7px #715b2d10}
+  /* Home cards keep a quiet, cream-based tint; the header tabs retain their palette. */
+  #homeTiles .home-tile{background:linear-gradient(145deg,#fffefb,color-mix(in srgb,var(--tab-mid,#f5eddd) 14%,#fffdf7) 55%,color-mix(in srgb,var(--tab-low,#e8dcc3) 22%,#fffdf7));border-color:color-mix(in srgb,var(--tab-line,#cdb78e) 42%,#e1dac8);border-radius:11px;box-shadow:inset 0 1px 0 #ffffffb3,0 2px 8px #70532606;transition:transform .18s,box-shadow .18s,border-color .18s}
+  html[dir=ltr] #homeTiles .home-tile{box-shadow:inset 0 1px 0 #ffffffb3,0 2px 8px #70532606}
+  #homeTiles .home-tile:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--tab-line,#cdb78e) 65%,#e1dac8);box-shadow:inset 0 1px 0 #fff,0 3px 10px #7053260d}
+  #homeTiles .home-tile strong,#homeTiles .home-tile .home-tile-icon,#homeTiles .home-tile .home-tile-arrow{color:color-mix(in srgb,var(--tab-ink,#566a44) 60%,#657052)}
+  #homeTiles .home-tile small{color:#7c725e}
+  #homeTiles .home-tile .home-tile-icon{display:grid;place-items:center;width:48px;height:52px;flex:0 0 48px;border:1px solid #e5dfcf80;border-radius:13px;background:linear-gradient(145deg,#ffffff80,#ffffff0d);box-shadow:inset 0 1px 0 #ffffff9c}
   #homeTiles .home-tile .home-tile-icon svg{width:37px;height:37px}
 }
 .home-tile-nursery{--tile-surface:#f4e0d5;--tile-line:#d3ae96;--tile-ink:#895c42}
