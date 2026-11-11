@@ -19,7 +19,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={wid
   querySelector(selector){if(selector.startsWith('#'))return node(selector.slice(1));return node(this.id+selector);}
   querySelectorAll(selector){if(selector==='button,input,textarea')return all.filter(n=>['button','input','textarea'].includes(n.tagName));return [];}
   contains(target){return target===this;}
-  closest(selector){return selector==='[data-upload-remove-person]'&&this.dataset.uploadRemovePerson?this:null;}
+  closest(selector){return selector.split(',').some(part=>part===this.tagName||part==='[data-upload-remove-person]'&&this.dataset.uploadRemovePerson||part==='dialog[open]'&&this.tagName==='dialog'&&this.open||part==='[role="dialog"]'&&this.role==='dialog'||part==='[role="textbox"]'&&this.role==='textbox'||part.startsWith('.')&&this.classes.has(part.slice(1)))?this:null;}
   append(...children){for(const child of children)if(child.id)nodes.set(child.id,child);}
   focus(){document.activeElement=this;}
   showModal(){this.open=true;}
@@ -36,7 +36,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={wid
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
  vm.runInNewContext(source,{...core,...metadata,...faceDraft,...catalog,window,document,File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
- return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();}};
+ return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{target=document.body,...flags}={}){const event=new Event('keydown',{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
 }
 const image=name=>new File(['original pixels '+name],name,{type:'image/jpeg',lastModified:1234});
 async function details(entry){const bytes=new Uint8Array(await entry.payload.body.arrayBuffer()),n=Number(entry.payload.headers[metadata.PHOTO_METADATA_HEADER]);return {metadata:metadata.decodeUploadMetadata(bytes.subarray(0,n)),pixels:bytes.subarray(n)};}
@@ -109,6 +109,27 @@ test('Next wraps from last to first, metadata remains per photo, and individual 
   const f=fixture({desktop}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);assert.equal(f.node('photoEditSaveCurrent').hidden,false);
   f.node('photoEditCaption').value='first';f.node('photoEditCaption').dispatchEvent(new Event('input'));await f.click('Next');assert.equal(f.node('photoEditCaption').value,'');assert.equal(f.node('photoEditNext').disabled,false);await f.click('Next');assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditCaption').value,'first');await f.click('Cancel');assert.equal(await result,null);
  }
+});
+test('desktop upload keyboard arrows follow the physical direction in both languages and wrap with each photo draft intact',async()=>{
+ for(const english of [false,true]){
+  const f=fixture({english}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+  f.node('photoEditCaption').value='Keep the first description';f.node('photoEditCaption').dispatchEvent(new Event('input'));
+  assert.equal((await f.key('ArrowRight')).defaultPrevented,true);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');
+  await f.key('ArrowRight');assert.equal(f.node('photoEditFilename').textContent,'three.jpg');
+  await f.key('ArrowRight');assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditCaption').value,'Keep the first description');
+  await f.key('ArrowLeft');assert.equal(f.node('photoEditFilename').textContent,'three.jpg');
+  await f.click('Cancel');assert.equal(await result,null);assert.equal((await f.key('ArrowRight')).defaultPrevented,false);
+ }
+});
+test('upload navigation leaves arrow keys to metadata, face editors, cropping, modifiers and phone layouts',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ for(const target of [f.node('photoEditCaption'),f.node('photoEditDateday'),f.node('photoEditDatemonth'),f.node('photoEditDateyear'),{isContentEditable:true},{closest:()=>({role:'dialog'})},{closest:selector=>selector.includes('.face-selection')?{}:null}]){
+  assert.equal((await f.key('ArrowRight',{target})).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ }
+ for(const flag of ['ctrlKey','metaKey','altKey','shiftKey','isComposing'])assert.equal((await f.key('ArrowRight',{[flag]:true})).defaultPrevented,false);
+ await f.click('CropToggle');assert.equal((await f.key('ArrowRight')).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ await f.click('Reset');await f.key('ArrowRight');assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Cancel');assert.equal(await result,null);
+ const phone=fixture({desktop:false}),pending=await phone.begin([image('one.jpg'),image('two.jpg')]);assert.equal((await phone.key('ArrowRight')).defaultPrevented,false);assert.equal(phone.node('photoEditFilename').textContent,'one.jpg');await phone.click('Cancel');assert.equal(await pending.result,null);
 });
 test('phone individual upload advances and reduces the photo count only after success, while repeated taps cannot upload twice',async()=>{
  let finishUpload;const f=fixture({desktop:false,onUpload:()=>new Promise(resolve=>{finishUpload=resolve;})}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);

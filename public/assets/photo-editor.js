@@ -68,6 +68,7 @@ function mount(){
   get('FamilyPhoto').addEventListener('change',event=>{if(draft()?.metadata)draft().metadata.familyPhoto=event.target.checked;});
   get('Metadata').addEventListener('focusin',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
   window.addEventListener('resize',fitEditor);window.visualViewport?.addEventListener('resize',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
+  window.addEventListener('keydown',keyNavigate);
   const layer=get('CropLayer');layer.addEventListener('pointerdown',pointerStart);layer.addEventListener('pointermove',pointerMove);
   layer.addEventListener('pointerup',pointerEnd);layer.addEventListener('pointercancel',pointerEnd);layer.addEventListener('lostpointercapture',()=>{drag=null;});
   layer.addEventListener('keydown',keyCrop);
@@ -222,6 +223,12 @@ async function loadVersion(id){
   }catch(error){if(session===owner&&sequence===loadId&&error.name!=='AbortError')failLoad(error.message);}
 }
 function navigate(step){if(!session||session.loading||session.saving||!session.drafts.length)return;session.index=(session.index+step+session.drafts.length)%session.drafts.length;load();}
+function keyNavigate(event){
+  if(!session||session.mode==='existing'||!dialog?.open||!desktop()||session.loading||session.saving||session.drafts.length<2||draft()?.cropping||event.defaultPrevented||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||!['ArrowLeft','ArrowRight'].includes(event.key))return;
+  const target=event.target,activeDialog=target?.closest?.('dialog[open],[role="dialog"]');
+  if(activeDialog&&activeDialog!==dialog||target?.isContentEditable||target?.closest?.('input,textarea,select,[role="textbox"],.face-selection,.face-picker'))return;
+  event.preventDefault();event.stopPropagation();navigate(event.key==='ArrowRight'?1:-1);
+}
 function rotate(direction){const d=draft();d.rotation=turns(d.rotation+direction);d.crop=rotateCrop(d.crop,direction);render();startFaces();}
 function pointerStart(event){
   if(!draft()?.cropping||session.loading||session.saving||!event.isPrimary||event.button!==0)return;
