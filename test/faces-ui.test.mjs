@@ -9,7 +9,7 @@ import {createUploadFaceAdapter,faceDraftPeople} from '../public/assets/photo-up
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
  .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
-function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false}={}){
+function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false,visualViewport=null}={}){
  const view={width:desktop?1200:360,height:800,frameHeight:null},created=[];
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
@@ -38,13 +38,14 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
    if(this.className==='face-photo-surface'){const width=parseFloat(this.style.width),height=parseFloat(this.style.height),left=Math.max(0,(view.width-width)/2)-this.parent.scrollLeft,top=100-this.parent.scrollTop;return {x:left,y:top,left,top,width,height};}
    if(this===image)return this.parent?.className==='face-photo-surface'?this.parent.getBoundingClientRect():{x:0,y:100,left:0,top:100,width:360,height:270};
    if(this.classList.contains('face-visible-label'))return {x:0,y:0,left:0,top:0,width:90,height:24};
+   if(this.classList.contains('face-popover')){const scale=Number(this.style.transform?.match(/^scale\(([^)]+)\)$/)?.[1])||1,left=parseFloat(this.style.left)||0,top=parseFloat(this.style.top)||0,width=Math.min(280,parseFloat(this.style.maxWidth)||Infinity)*scale,height=Math.min(240,parseFloat(this.style.maxHeight)||Infinity)*scale;return {x:left,y:top,left,top,width,height};}
    return {x:0,y:0,left:0,top:0,width:280,height:240};
   }
  }
  const root=new Node(),stage=new Node(),image=new Node('img'),dialog=new Node('dialog'),title=new Node('h2'),download=new Node('a'),edit=new Node('button'),footer=new Node(),tagPanel=new Node('section');dialog.open=true;dialog.append(root);root.append(title,stage,footer);footer.append(tagPanel);dialog.queries.set('#mediaTagPanel',tagPanel);title.append(download,edit);stage.append(image);
  Object.assign(image,{naturalWidth:4000,naturalHeight:3000,complete:true});
  const document=new Node();document.body=new Node('body');document.append(document.body);document.body.append(dialog);document.documentElement={get clientWidth(){return view.width;}};document.getElementById=id=>id==='mediaViewerTitle'?title:id==='editOpenedPhoto'?edit:dialog;document.createElement=tag=>new Node(tag);
- const window=new Node();window.navigator=windows?{userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',userAgentData:{mobile:false,platform:'Windows'},maxTouchPoints:10}:{};window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
+ const window=new Node();window.visualViewport=visualViewport;window.navigator=windows?{userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',userAgentData:{mobile:false,platform:'Windows'},maxTouchPoints:10}:{};window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
  let progress,detectionImage,detectionCalls=0;
  const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{detectionCalls++;progress=onProgress;detectionImage=img;return detected;}};
  const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:query=>({matches:query.includes('display-mode')?installed:query.includes('hover:none')?hoverNone||!desktop:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
@@ -379,6 +380,36 @@ test('zoomed and scrolled image coordinates still select each of two tiny neighb
  }
  f.emit(toolbar.querySelector('[data-face-zoom-reset]'),'click');assert.equal(parseFloat(surface.style.width),360);assert.equal(toolbar.querySelector('[data-face-zoom-level]').textContent,'100%');
  f.faces.clear();assert.equal(f.find('face-zoom-toolbar'),undefined);assert.equal(f.image.parent,f.stage);assert.equal(f.stage.classList.contains('has-face-zoom'),false);
+});
+test('phone pinch zoom keeps the picker, people and avatars at a constant screen size above the keyboard',async()=>{
+ const viewport=new EventTarget();Object.assign(viewport,{width:120,height:800/3,scale:3,offsetLeft:120,offsetTop:160});
+ const f=fixture([first],{visualViewport:viewport}),person={id:'yona',name:'יונה',context:'משפחה',profile:'/media/'+'a'.repeat(32)};
+ f.window.FamilyTags.findPeople=async()=>[person];await f.mount();
+ f.emit(f.stage,'click',{detail:0,target:f.find('face-hit-buttons').children[0]});await new Promise(resolve=>setImmediate(resolve));
+ const panel=f.find('face-popover face-picker'),selection=f.find('face-selection'),surface=f.find('face-photo-surface'),photoWidth=surface.style.width;
+ assert.match(panel.querySelector('[data-face-results]').innerHTML,/face-person-avatar/);assert.match(panel.querySelector('[data-face-results]').innerHTML,/thumbnail=1/);
+ const check=()=>{const r=panel.getBoundingClientRect(),s=viewport.scale;assert.ok(Math.abs(r.width*s-280)<.0001,'Picker contents keep their unzoomed screen width');assert.ok(r.left>=viewport.offsetLeft+8/s-.001);assert.ok(r.left+r.width<=viewport.offsetLeft+viewport.width-8/s+.001);assert.ok(r.top>=viewport.offsetTop+8/s-.001);assert.ok(r.top+r.height<=viewport.offsetTop+viewport.height-8/s+.001);assert.equal(selection.style.left,first.rect.x*100+'%');assert.equal(selection.style.width,first.rect.width*100+'%');assert.equal(surface.style.width,photoWidth,'Placing the picker must not reset photo zoom');};
+ check();
+ for(const state of [
+  {scale:5,width:72,height:160,offsetLeft:170,offsetTop:180},
+  {scale:5,width:72,height:38,offsetLeft:170,offsetTop:210},
+  {scale:2,width:180,height:150,offsetLeft:80,offsetTop:240},
+  {scale:1,width:360,height:800,offsetLeft:0,offsetTop:0}
+ ]){Object.assign(viewport,state);viewport.dispatchEvent(new Event('resize'));check();}
+ assert.equal(panel.style.transform,'none');
+ Object.assign(viewport,{scale:2,width:180,height:400,offsetLeft:100,offsetTop:120});viewport.dispatchEvent(new Event('scroll'));check();
+ f.faces.clear();const before={...panel.style};viewport.dispatchEvent(new Event('resize'));assert.deepEqual(panel.style,before,'Closed photos release their viewport listeners');
+});
+test('name bubbles and the upload wizard picker also counter native pinch without changing photo coordinates',async()=>{
+ for(const draft of [false,true]){
+  const viewport=new EventTarget();Object.assign(viewport,{width:90,height:200,scale:4,offsetLeft:140,offsetTop:160});
+  const person={id:'yona',name:'יונה'},named={...first,id:'named',personId:person.id,person},f=fixture([],{visualViewport:viewport});
+  f.window.FamilyI18n.fetch=async()=>Response.json({faces:[named]});
+  const adapter={load:async()=>({faces:[named]}),mapDetections:faces=>faces,findPeople:async()=>[person],enabled:()=>true};
+  await f.mount('pinch-'+draft,draft?{adapter,zoom:false}:{});await new Promise(resolve=>setImmediate(resolve));
+  f.emit(f.find('face-hit-buttons').children[0],'focus');let popup=f.find('face-popover face-name');assert.ok(popup);assert.equal(popup.style.transform,'scale(0.25)');assert.equal(popup.getBoundingClientRect().width*viewport.scale,280);
+  f.emit(popup.querySelector('[data-face-edit]'),'click');popup=f.find('face-popover face-picker');assert.ok(popup);assert.equal(popup.getBoundingClientRect().width*viewport.scale,280);assert.equal(f.find('face-selection').style.left,first.rect.x*100+'%');f.faces.clear();
+ }
 });
 test('drag scrolling does not create a face, and viewport resizing preserves normalized positions',async()=>{
  const f=fixture([first,second]);await f.mount();const toolbar=f.find('face-zoom-toolbar'),scroll=f.find('face-photo-scroll'),selection=f.find('face-selection');

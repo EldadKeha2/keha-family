@@ -116,7 +116,7 @@
     const owned=new Set([c.toolbar,c.missingNote,c.reviewButton,c.reviewStatus,c.regionsButton,c.regionsNote]);
     for(const node of c.dialog.querySelectorAll('.face-zoom-toolbar,.face-missing-note,.face-review-button,.face-review-status,.face-regions-toggle,.face-regions-note'))if(!owned.has(node))node.remove();
   }
-  function viewport(){const v=window.visualViewport;return {left:v?.offsetLeft||0,top:v?.offsetTop||0,width:Math.min(v?.width||innerWidth,document.documentElement.clientWidth||innerWidth),height:v?.height||innerHeight};}
+  function viewport(){const v=window.visualViewport;return {left:v?.offsetLeft||0,top:v?.offsetTop||0,width:Math.min(v?.width||innerWidth,document.documentElement.clientWidth||innerWidth),height:v?.height||innerHeight,scale:Number.isFinite(v?.scale)&&v.scale>0?v.scale:1};}
   function imageArea(c){
     const r=c.image.getBoundingClientRect(),ratio=imageWidth(c.image)/imageHeight(c.image);let width=r.width,height=r.height;
     if(width/height>ratio)width=height*ratio;else height=width/ratio;
@@ -129,13 +129,20 @@
     placeAnnotations(c,image);
     if(c.active&&!c.selection.hidden)Object.assign(c.selection.style,{left:c.active.rect.x*100+'%',top:c.active.rect.y*100+'%',width:c.active.rect.width*100+'%',height:c.active.rect.height*100+'%'});
     if(c.popup&&c.active){
-      const v=viewport(),r=c.popup.getBoundingClientRect(),p=c.geom.popoverPosition(screenFace(c,c.active),{width:r.width||270,height:r.height||180},v);
+      // Native pinch zoom enlarges the document, including fixed elements.
+      // Lay out the popup in screen-sized CSS pixels, then counter-scale only
+      // the popup. Photo pixels, face coordinates and accessibility text sizes
+      // keep their existing zoom behavior.
+      const v=viewport(),scale=v.scale,visible={width:v.width*scale,height:v.height*scale};
+      const onScreen=rect=>({x:(rect.x-v.left)*scale,y:(rect.y-v.top)*scale,width:rect.width*scale,height:rect.height*scale});
+      Object.assign(c.popup.style,{transform:scale===1?'none':`scale(${1/scale})`,maxWidth:Math.max(0,visible.width-16)+'px',maxHeight:Math.max(0,visible.height-16)+'px'});
+      const r=c.popup.getBoundingClientRect(),panel={width:r.width*scale||270,height:r.height*scale||180},p=c.geom.popoverPosition(onScreen(screenFace(c,c.active)),panel,visible);
       if(c.popup.classList.contains('face-name')){
-        const face=screenFace(c,{...c.active,rect:annotationRect(c,c.active)}),left=v.left||0,top=v.top||0,faces=annotationFaces(c,image).map(rect=>({...rect,x:rect.x+image.x-left,y:rect.y+image.y-top}));
-        const placed=c.geom.layoutFaceLabels([{width:r.width||130,height:r.height||30,face:{...face,x:face.x-left,y:face.y-top}}],{width:v.width,height:v.height,faces});
-        if(placed){p.x=placed[0].x+left;p.y=placed[0].y+top;}
+        const face=onScreen(screenFace(c,{...c.active,rect:annotationRect(c,c.active)})),faces=annotationFaces(c,image).map(rect=>onScreen({...rect,x:rect.x+image.x,y:rect.y+image.y}));
+        const placed=c.geom.layoutFaceLabels([{width:panel.width,height:panel.height,face}],{...visible,faces});
+        if(placed){p.x=placed[0].x;p.y=placed[0].y;}
       }
-      Object.assign(c.popup.style,{left:p.x+'px',top:p.y+'px',maxHeight:p.maxHeight+'px',maxWidth:p.width+'px'});
+      Object.assign(c.popup.style,{left:(v.left+p.x/scale)+'px',top:(v.top+p.y/scale)+'px',maxHeight:p.maxHeight+'px',maxWidth:p.width+'px'});
     }
   }
   function visibleFaces(c,reviewed=false){
