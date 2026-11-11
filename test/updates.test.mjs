@@ -198,3 +198,13 @@ test('head requests enforce small rate limits and never report a failed provider
     delete f.env.BREVO_API_KEY;const unconfigured=await f.call(path,{name:'Fifth Name',requestId:'8'.repeat(32)});assert.equal(unconfigured.status,503);assert.notEqual((await unconfigured.json()).sent,true);
   }finally{f.close();}
 });
+
+
+test('year-only weddings never create an anniversary reminder on any day of the year',()=>{
+  const people=[{id:'yehiel',name:'First',deceased:false},{id:'rachel-katan',name:'Second',deceased:false}],weddings=[{id:'u-yehiel',date:'1938'}];
+  for(let day=0;day<366;day++){
+    const date=new Date(Date.UTC(2024,0,1+day)).toISOString().slice(0,10);
+    assert.deepEqual(eventsForDay(date,people,weddings),[]);
+  }
+  assert.equal(eventsForDay('2024-01-01',people,[{id:'u-yehiel',date:'1.1.1938'}])[0].type,'anniversaries');
+});

@@ -20,4 +20,6 @@ for(const [id,nameEn]of Object.entries(englishNames))family.people[id].nameEn=na
 for(const branch of family.branches)branch.titleEn=({harizi:'Harizi',becker:'Becker',keha:'Keha',noble:'Noble',fish:'Fish',bloom:'Bloom'})[branch.id]+' Family';
 // These partners have not had a wedding. Keep their family relationships intact.
 for(const id of ['u-eldad','u-moran'])family.units[id].hasWedding=false;
+// Only the wedding year is known; no calendar day is implied.
+family.units['u-root'].weddingYear=1938;
 export default family;

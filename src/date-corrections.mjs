@@ -12,3 +12,4 @@ export const memorialCorrectionKey='elisheva-memorial-2026-11-03-owner-v1';
 export const memorialCorrections={
   'becker-parent':{birthday:'23.3.1942',deathDate:'8.5.1998',deceased:true}
 };
+export const rootWeddingCorrectionKey='root-wedding-year-1938-owner-2026-11-11-v1';

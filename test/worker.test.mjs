@@ -972,7 +972,7 @@ test('S3 signing scopes requests to the configured private bucket',async()=>{
 test('weddings include all couples and retain valid anniversary dates across restarts',async()=>{
   const f=fixture();try{
     await f.connect();const list=await (await f.call('/api/weddings')).json();assert.equal(list.weddings.length,23);
-    assert.ok(list.weddings.every(item=>item.people.length===2&&item.date===''));
+    assert.ok(list.weddings.every(item=>item.people.length===2&&item.date===(item.id==='u-root'?'1938':'')));
     assert.deepEqual(list.weddings.find(item=>item.id==='u-yehiel').people,['yehiel','rachel-katan']);
     assert.equal((await f.call('/api/weddings/u-naama')).status,404);
     const original=list.weddings.find(item=>item.id==='u-yehiel');
@@ -985,6 +985,18 @@ test('weddings include all couples and retain valid anniversary dates across res
     assert.equal((await f.call('/api/weddings/u-naama/date',{method:'POST',body:{date:'1.1.2000',expectedRevision:'x'}})).status,404);
   }finally{await f.close();}
 });
+test('the grandparents wedding year persists without inventing a day, and later edits survive restarts',async()=>{
+  const f=fixture();try{
+    await f.connect();let root=await (await f.call('/api/weddings/u-root')).json();assert.equal(root.date,'1938');
+    f.restart();root=await (await f.call('/api/weddings/u-root')).json();assert.equal(root.date,'1938');
+    const saved=await f.call('/api/weddings/u-root/date',{method:'POST',body:{date:'1938',expectedRevision:root.revision}});
+    assert.equal(saved.status,200);root=(await saved.json()).wedding;assert.equal(root.date,'1938');
+    for(const date of ['0000','1111',String(new Date().getUTCFullYear()+1),'1938-02'])assert.equal((await f.call('/api/weddings/u-root/date',{method:'POST',body:{date,expectedRevision:root.revision}})).status,400);
+    const cleared=await f.call('/api/weddings/u-root/date',{method:'POST',body:{date:'',expectedRevision:root.revision}});assert.equal(cleared.status,200);
+    f.restart();assert.equal((await (await f.call('/api/weddings/u-root')).json()).date,'');
+  }finally{await f.close();}
+});
+
 test('wedding galleries isolate couples, stream mixed media and retain captions',async()=>{
   const f=fixture();try{
     await f.connect();const root='/api/weddings/u-yehiel',other='/api/weddings/u-bosmat';

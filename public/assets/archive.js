@@ -46,6 +46,7 @@
     app().setView('weddings',false);$('weddingsView').scrollIntoView({block:'start',behavior:'instant'});
   }
   function yearsText(record){
+    if(/^\d{4}$/.test(record?.date||''))return I18n.isEnglish?'Only the year is known':'ידועה רק השנה';
     const years=window.FamilyDates.age(record?.date);if(years===null)return '';
     const pair=pairById.get(record.id),historic=pair?.people.some(id=>family.people[id].deceased);
     if(historic)return years===0?I18n.t('פחות משנה מאז החתונה'):I18n.html`${years} שנים מאז החתונה`;
@@ -76,7 +77,7 @@
     const pair=pairById.get(id),record=details.get(id)||summaries.get(id),changed=$('weddingDetail').dataset.couple!==id;
     $('weddingDetail').dataset.couple=id;
     $('weddingNames').textContent=pairTitle(pair);$('weddingBranch').textContent=branchTitle(pair);
-    $('weddingDateLabel').textContent=record?.date?I18n.t('יום הנישואים · ')+I18n.date(record.date):I18n.t('יום הנישואים עוד לא הוזן');
+    $('weddingDateLabel').textContent=record?.date?(/^\d{4}$/.test(record.date)?(I18n.isEnglish?'Wedding year · ':'שנת הנישואים · '):I18n.t('יום הנישואים · '))+I18n.date(record.date):I18n.t('יום הנישואים עוד לא הוזן');
     $('weddingYears').textContent=yearsText(record);$('editWeddingDate').disabled=!record;
     if(changed){const draft=greetingDrafts.get(id);$('greetingAuthor').value=draft?.author||'';$('greetingBody').value=draft?.body||'';$('greetingError').textContent='';}
     $('saveWeddingGreeting').disabled=greetingPending.has(id);
@@ -216,12 +217,12 @@
     if(!canSave())return;
     if(!summaries.has(id))await refreshWeddings();
     const record=summaries.get(id);if(!record){toast(I18n.t('יום הנישואים לא נטען. נסו לרענן.'));return;}
-    state.editingDate={id,revision:record.revision};const date=window.FamilyDates.parse(record.date);
+    state.editingDate={id,revision:record.revision};const date=/^\d{4}$/.test(record.date)?{year:Number(record.date)}:window.FamilyDates.parse(record.date);
     $('weddingDateCouple').textContent=pairTitle(pairById.get(id));$('weddingDay').value=date?.day||'';$('weddingMonth').value=date?.month||'';$('weddingYear').value=date?.year||'';
-    $('weddingDateError').textContent='';previewDate();$('weddingDateDialog').showModal();
+    $('weddingDateError').textContent='';const hint=$('weddingDatePrecisionHint');if(hint)hint.textContent=I18n.isEnglish?'If only the year is known, leave the day and month blank.':'אם ידועה רק השנה, השאירו את היום והחודש ריקים.';previewDate();$('weddingDateDialog').showModal();
   }
-  const dateInput=()=>`${$('weddingDay').value}.${$('weddingMonth').value}.${$('weddingYear').value}`;
-  function previewDate(){const years=window.FamilyDates.age(dateInput());$('weddingDatePreview').textContent=years===null?'':yearsText({id:state.editingDate?.id,date:dateInput()});}
+  const dateInput=()=>!$('weddingDay').value&&!$('weddingMonth').value?$('weddingYear').value:`${$('weddingDay').value}.${$('weddingMonth').value}.${$('weddingYear').value}`;
+  function previewDate(){if(/^\d{4}$/.test(dateInput())){$('weddingDatePreview').textContent=I18n.isEnglish?'Year only; no anniversary reminder will be sent.':'שנה בלבד; לא תישלח תזכורת יום נישואים.';return;}const years=window.FamilyDates.age(dateInput());$('weddingDatePreview').textContent=years===null?'':yearsText({id:state.editingDate?.id,date:dateInput()});}
   async function saveDate(event,clear=false){
     event.preventDefault();if(!state.editingDate)return;
     const current={...state.editingDate},button=$('saveWeddingDate');button.disabled=true;$('clearWeddingDate').disabled=true;$('weddingDateError').textContent='';

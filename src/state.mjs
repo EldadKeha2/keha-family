@@ -1,9 +1,9 @@
 import family from './family.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
-import {couples,couple,weddingCollection,validCollection} from './weddings.mjs';
+import {couples,couple,weddingCollection,validCollection,weddingDate} from './weddings.mjs';
 import {featuredVideos} from './featured-videos.mjs';
-import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections} from './date-corrections.mjs';
+import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections,rootWeddingCorrectionKey} from './date-corrections.mjs';
 import {biographyDefaults,biographyValue,contentField} from './biography.mjs';
 import {memorialPeriod} from './memorial.mjs';
 import {makeQuiz,makeMissingQuiz} from '../public/assets/quiz.mjs';
@@ -118,7 +118,12 @@ export class FamilyState {
         if(person.birthday!==date){person.birthday=date;this.savePerson(person);}
         this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',correction.key,'applied');
       }
-      for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:'',revision:uid()}));
+      for(const item of couples)this.sql.exec('INSERT OR IGNORE INTO weddings(id,data) VALUES(?,?)',item.id,JSON.stringify({id:item.id,date:item.date,revision:uid()}));
+      if(!this.rows('SELECT value FROM meta WHERE id=?',rootWeddingCorrectionKey).length){
+        const root=JSON.parse(this.rows('SELECT data FROM weddings WHERE id=?','u-root')[0].data);
+        this.sql.exec('UPDATE weddings SET data=? WHERE id=?',JSON.stringify({...root,date:'1938',revision:uid()}),'u-root');
+        this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',rootWeddingCorrectionKey,'applied');
+      }
       // Insert the oldest first because shared albums display the newest row first.
       for(const item of [...featuredVideos].reverse()){
         if(this.rows('SELECT id FROM media_trash WHERE id=?',item.id).length)continue;
@@ -862,9 +867,7 @@ export class FamilyState {
       case 'wedding.date':{
         const old=this.wedding(p.id);
         if(old.revision!==p.expectedRevision)throw new HttpError(409,'יום הנישואים עודכן בינתיים. פתחו שוב את העריכה לפני שמירה.');
-        if(typeof p.date!=='string')throw new HttpError(400,'יש להזין יום נישואים.');
-        const date=p.date.trim()?calendarDate(p.date,'יום נישואים'):'';
-        if(date==='1.1.1111')throw new HttpError(400,'בחרו שנה אמיתית, או סמנו שהתאריך לא ידוע.');
+        const date=weddingDate(p.date);
         this.sql.exec('UPDATE weddings SET data=? WHERE id=?',JSON.stringify({id:p.id,date,revision:uid()}),p.id);
         return {saved:true,wedding:this.wedding(p.id)};
       }

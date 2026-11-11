@@ -6,7 +6,7 @@ import family from '../src/family.mjs';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/archive.js',import.meta.url),'utf8');
-function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddings'}={}){
+function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddings',weddingDate=''}={}){
   const browser=navigation?browserHistory(entryUrl):null;let view=navigation?new URL(entryUrl).hash.slice(1).split('/')[0]:'nostalgia';
   const nodes=new Map(),handlers=new Map(),windowEvents=new Map(),requests=[],intervals=[];
   class Node{
@@ -26,11 +26,11 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
     }
     insertBefore(node,anchor){if(node.parent)node.remove();const at=anchor?this.children.indexOf(anchor):this.children.length;this.children.splice(at,0,node);node.parent=this;}
     remove(){if(this.parent){this.parent.children.splice(this.parent.children.indexOf(this),1);this.parent=null;}}
-    click(){this.clicks++;}
+    click(){this.clicks++;} showModal(){this.open=true;}
   }
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
   const document={activeElement:null,visibilityState:'visible',getElementById:get,createElement:()=>new Node(),querySelector:()=>null,querySelectorAll:()=>[],addEventListener(type,fn){handlers.set(type,fn);}};
-  const window={FAMILY_DATA:navigation?family:{people:{},units:{},branches:[]},FAMILY_API_TOKEN:'test',FamilyDates:{age:()=>null},FamilyTags:{refresh(){}},FamilyMedia:{register(){},controls:()=>''},FamilyI18n:{isEnglish:false,t:String,html:(parts,...values)=>parts.reduce((text,part,i)=>text+part+(values[i]??''),''),mediaName:item=>item.name,error:String,fetch:async path=>{requests.push(path);if(path==='api/weddings')return Response.json({weddings:[]});if(path.startsWith('api/weddings/'))return Response.json({id:path.split('/').pop(),greetings:[],collection:{items,count:items.length}});return Response.json({items,count:items.length});}},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);browser?.addEventListener(type,fn);}};
+  const window={FAMILY_DATA:navigation?family:{people:{},units:{},branches:[]},FAMILY_API_TOKEN:'test',FamilyDates:{age:()=>null},FamilyTags:{refresh(){}},FamilyMedia:{register(){},controls:()=>''},FamilyI18n:{isEnglish:false,t:String,date:String,html:(parts,...values)=>parts.reduce((text,part,i)=>text+part+(values[i]??''),''),mediaName:item=>item.name,error:String,fetch:async path=>{requests.push(path);if(path==='api/weddings')return Response.json({weddings:[]});if(path.startsWith('api/weddings/'))return Response.json({id:path.split('/').pop(),date:weddingDate,revision:'date-revision',greetings:[],collection:{items,count:items.length}});return Response.json({items,count:items.length});}},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);browser?.addEventListener(type,fn);}};
   window.FamilyI18n.branchName=b=>b?.name||'';
   window.FamilyApp={apiEnabled:true,getView:()=>view,nameOf:id=>family.people[id]?.name||id,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyArchive.activate(next);},toast(){}};
   const context=vm.createContext({window,document,location:browser?.location||{hash:'#nostalgia',pathname:'/',search:''},history:browser?.history||{replaceState(){}},URL,setInterval:fn=>intervals.push(fn),clearTimeout(){},setTimeout(){},matchMedia:()=>({matches:false})});
@@ -38,7 +38,7 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
   handlers.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const click=(selector,dataset)=>handlers.get('click')({target:{closest:s=>s===selector?{dataset}:null}});
-  return {browser,window,get view(){return view;},openWedding:id=>click('[data-open-wedding]',{openWedding:id}),back:()=>click('[data-wedding-back]'),nodes,requests,flush,poll:()=>intervals.forEach(fn=>fn()),change:detail=>{for(const fn of windowEvents.get('family-media-changed')||[])fn({detail});},get grid(){return get('nostalgiaGrid');},upload(kind){click('[data-archive-upload]',{archiveUpload:'nostalgia',archiveKind:kind});},filter(kind){click('[data-archive-filter]',{archiveFilter:kind});}};
+  return {browser,window,get view(){return view;},openWedding:id=>click('[data-open-wedding]',{openWedding:id}),editWeddingDate:id=>click('[data-edit-wedding-date]',{editWeddingDate:id}),back:()=>click('[data-wedding-back]'),nodes,requests,flush,poll:()=>intervals.forEach(fn=>fn()),change:detail=>{for(const fn of windowEvents.get('family-media-changed')||[])fn({detail});},get grid(){return get('nostalgiaGrid');},upload(kind){click('[data-archive-upload]',{archiveUpload:'nostalgia',archiveKind:kind});},filter(kind){click('[data-archive-filter]',{archiveFilter:kind});}};
 }
 const item=(kind,n)=>({id:String(n),file:n+'.'+({photo:'jpg',video:'mp4',document:'pdf'}[kind]),filename:'Memory '+n,name:'Memory '+n,kind,src:'/media/'+n,mime:{photo:'image/jpeg',video:'video/mp4',document:'application/pdf'}[kind],size:100});
 
@@ -102,4 +102,14 @@ test('empty nostalgia categories expose upload controls and each picker accepts 
     if(kind==='video')assert.ok(!input.accept.includes('image/'));if(kind==='photo')assert.ok(!input.accept.includes('video/'));
   }
   assert.equal(f.nodes.get('nostalgiaUploadInput').clicks,3);
+});
+
+
+test('a wedding year displays as a year and the editor leaves unknown day and month empty',async()=>{
+  const f=fixture([],{navigation:true,entryUrl:'https://family.test/#weddings/u-root',weddingDate:'1938'});await f.flush();
+  assert.equal(f.nodes.get('weddingDateLabel').textContent,'שנת הנישואים · 1938');
+  assert.equal(f.nodes.get('weddingYears').textContent,'ידועה רק השנה');
+  f.editWeddingDate('u-root');await f.flush();
+  assert.equal(f.nodes.get('weddingDay').value,'');assert.equal(f.nodes.get('weddingMonth').value,'');assert.equal(f.nodes.get('weddingYear').value,1938);
+  assert.match(f.nodes.get('weddingDatePreview').textContent,/לא תישלח תזכורת/);
 });
