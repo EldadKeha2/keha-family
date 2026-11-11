@@ -141,7 +141,8 @@
   #photoUploadEditor:not(.is-existing) .photo-edit-header{gap:8px}
   #photoUploadEditor:not(.is-existing) .photo-edit-header>div{min-width:0;flex:1}
   #photoUploadEditor:not(.is-existing) .photo-edit-header h2{margin:0;font-size:calc(clamp(16px,4.9vw,20px) * var(--a11y-text-scale,1));line-height:1.25;white-space:nowrap}
-  #photoUploadEditor:not(.is-existing) .photo-edit-close{width:32px;height:32px;font-size:28px}
+  #photoUploadEditor:not(.is-existing) .photo-edit-close{display:grid;place-items:center;align-self:flex-start;transform:translateY(-3px);width:32px;height:32px;padding:0;border:1px solid #d0bea0;border-radius:6px;background:#f8f3e8;color:#65563c;font-size:28px;line-height:1}
+  #photoUploadEditor:not(.is-existing) .photo-edit-close:hover{background:#f1e7d4;border-color:#b69a68}
   #photoUploadEditor:not(.is-existing) .photo-edit-pager{margin:5px 0 7px}
   #photoUploadEditor:not(.is-existing) .photo-edit-pager button{min-height:36px;padding:5px 10px}
   #photoUploadEditor:not(.is-existing) .photo-edit-pager strong{font-size:calc(13px * var(--a11y-text-scale,1));white-space:nowrap}
