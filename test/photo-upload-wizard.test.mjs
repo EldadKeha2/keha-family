@@ -77,7 +77,12 @@ test('descriptions start compact; phone focus expands for editing and blur colla
    input.focus();input.dispatchEvent(new Event('focus'));assert.equal(input.rows,3);assert.equal(input.style.height,'118px');
    f.document.activeElement=f.node('photoEditSaveCurrent');input.dispatchEvent(new Event('blur'));assert.equal(input.rows,1);assert.equal(input.style.height,undefined);
    await f.click('SaveCurrent');assert.equal((await details(f.uploaded[0])).metadata.caption,'A longer description. '.repeat(12));assert.deepEqual(Array.from(await result),[]);
-  }else{input.value='';input.dispatchEvent(new Event('input'));assert.equal(input.style.height,'38px');await f.click('Cancel');assert.equal(await result,null);}
+  }else{
+   input.value='';input.dispatchEvent(new Event('input'));assert.equal(input.style.height,'38px');
+   input.style.height='132px';input.value='תיאור קצר';input.dispatchEvent(new Event('input'));input.dispatchEvent(new Event('blur'));f.window.dispatchEvent(new Event('resize'));assert.equal(input.style.height,'132px','Typing, blur and window resizing must preserve the height chosen with the native resize handle');
+   input.style.height='76px';input.dispatchEvent(new Event('input'));assert.equal(input.style.height,'76px','The same handle can also reduce the height');
+   await f.click('Cancel');assert.equal(await result,null);
+  }
  }
 });
 

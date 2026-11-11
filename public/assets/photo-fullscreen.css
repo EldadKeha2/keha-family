@@ -17,7 +17,7 @@
 #mediaViewer .photo-fullscreen-viewer svg{width:20px;height:20px}
 .photo-fullscreen-label{display:none}
 #mediaViewer .photo-fullscreen-viewer .photo-fullscreen-label{display:block;font:calc(9px * var(--a11y-text-scale,1))/1.1 var(--sans);white-space:nowrap}
-#mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer{top:0;right:50%;transform:translateX(50%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:42px;max-width:100%;min-width:0;height:auto;min-height:42px;max-height:calc(var(--personal-zoom-top,76px) - 6px);padding:4px 2px;border:1px solid #cdbd99;border-radius:7px;background:#fcf8ee;color:#61734d;opacity:1}
+#mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer{top:0;left:calc((var(--personal-rail) - 42px)/2);right:auto;transform:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:42px;max-width:none;min-width:42px;height:54px;min-height:54px;max-height:none;padding:4px 2px;border:1px solid #cdbd99;border-radius:7px;background:#fcf8ee;color:#61734d;opacity:1}
 #mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer:hover{background:#f0f3e8;border-color:#a7b58c}
 #mediaViewer.personal-photo-desktop #personalPhotoRight>.photo-fullscreen-viewer svg{width:20px;height:20px;flex:none;stroke-width:1.6;filter:none}
 #mediaViewer.personal-photo-desktop #personalPhotoRight .photo-fullscreen-label{display:block;font:calc(9px * var(--a11y-text-scale,1))/1.15 var(--sans);text-align:center;white-space:normal}

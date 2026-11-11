@@ -116,3 +116,16 @@ test('topic labels precede the desktop actions and people tags, and each newly s
  footer.scrollTop=160;f.viewer.scrollTop=120;f.sync();assert.equal(footer.scrollTop,160,'metadata updates preserve an ongoing footer interaction');
  f.photo('two');f.sync();assert.equal(footer.scrollTop,0);assert.equal(f.viewer.scrollTop,0);f.api.restore();assert.ok(footer.childNodes.indexOf(labels)>footer.childNodes.indexOf(f.get('mediaTagPanel')));
 });
+test('desktop viewport changes preserve side button sizes and reserve separate space for fullscreen, zoom, edit and trash',()=>{
+ const f=fixture();f.sync();const frame=f.get('personalPhotoFrame'),albums=f.get('mediaViewerCollections'),zoom=f.controller.toolbar;
+ for(const [width,height]of [[2000,800],[1400,520],[1024,340],[900,240],[1800,720]]){
+  f.width(width);f.document.documentElement.clientWidth=width;frame.clientWidth=width-28;frame.clientHeight=height;
+  frame.computed={columnGap:'12px',paddingLeft:'16px',paddingRight:'16px',paddingTop:'10px',paddingBottom:'10px'};f.sync();
+  const value=key=>parseFloat(frame.style.getPropertyValue(key)),rail=value('--personal-rail');
+  assert.equal(rail,56,'Browser zoom must not squeeze or enlarge the side buttons as CSS viewport dimensions change');
+  assert.ok(value('--personal-zoom-top')>=66,'Fullscreen retains its own 54px button plus a 12px gap');
+  assert.ok(value('--personal-edit-top')>=value('--personal-zoom-top')+rail*3+24+12);
+  assert.ok(value('--personal-trash-top')>=value('--personal-edit-top')+rail+12);
+  assert.equal(f.get('mediaViewerCollections'),albums);assert.equal(f.controller.toolbar,zoom);
+ }
+});

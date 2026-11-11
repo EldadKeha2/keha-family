@@ -16,22 +16,24 @@
     const padding=(parseFloat(style.paddingLeft)||0)+(parseFloat(style.paddingRight)||0);
     const verticalPadding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
     const height=Math.max(100,(frame.clientHeight||innerHeight*.55)-verticalPadding);
-    const baseRail=Math.max(48,Math.min(76,document.documentElement.clientWidth*.05));
     // Reserve the same viewport for every photo, including while it is loading.
-    // Image dimensions and tag counts must never move the frame or navigation.
-    const rail=Math.min(baseRail,Math.max(28,(height-gap*6)/7));
-    const width=Math.max(1,(frame.clientWidth||document.documentElement.clientWidth)-padding-rail*2-gap*2);
+    // Browser zoom changes the CSS viewport; keep the controls at their normal size.
+    // Short viewports scroll each rail instead of squeezing buttons and their SVGs.
+    const rail=56,railColumn=rail+12;
+    const width=Math.max(1,(frame.clientWidth||document.documentElement.clientWidth)-padding-railColumn*2-gap*2);
     const sizeChanged=[['--personal-photo-width',width],['--personal-photo-height',height]].some(([key,value])=>!frame.style.getPropertyValue(key)||Math.abs(parseFloat(frame.style.getPropertyValue(key))-value)>.5);
     frame.style.setProperty('--personal-rail',rail+'px');frame.style.setProperty('--personal-photo-width',width+'px');frame.style.setProperty('--personal-photo-height',height+'px');
     if(controller&&(changed||sizeChanged))window.FamilyFaces?.fit?.();
     const albumCount=[...albums.querySelectorAll('[data-photo-album-kind]')].filter(button=>!button.hidden).length;
-    const leftHeight=rail*4+gap*3,trashTop=height-rail,editTop=trashTop-gap-rail;
+    const leftHeight=rail*4+gap*3,zoomHeight=rail*3+gap*2;
     const controlsTop=Math.max(0,(height-leftHeight)/2);
+    const zoomTop=Math.max(54+gap,controlsTop);
+    const trashTop=Math.max(height-rail,zoomTop+zoomHeight+gap+rail+gap),editTop=trashTop-gap-rail;
     frame.style.setProperty('--personal-review-top',controlsTop+'px');
     frame.style.setProperty('--personal-albums-top',(controlsTop+rail+gap)+'px');
     frame.style.setProperty('--personal-albums-height',Math.max(0,albumCount*rail+gap*(albumCount-1))+'px');
     frame.style.setProperty('--personal-edit-top',Math.max(0,editTop)+'px');frame.style.setProperty('--personal-trash-top',Math.max(0,trashTop)+'px');
-    frame.style.setProperty('--personal-zoom-top',controlsTop+'px');
+    frame.style.setProperty('--personal-zoom-top',zoomTop+'px');
   }
   function restore(){
     if(!active)return;
