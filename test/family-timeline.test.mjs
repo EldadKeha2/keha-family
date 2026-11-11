@@ -129,7 +129,7 @@ test('the new page is wired into the shared navigation, search and phone home me
   const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   const home=await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8');
   assert.match(html,/data-view="timeline"[^>]*>ציר זמן משפחתי/);
-  assert.match(html,/id="timelineView"/);assert.match(html,/family-timeline\.js\?v=annual-board-v7/);
+  assert.match(html,/id="timelineView"/);assert.match(html,/family-timeline\.js\?v=annual-portraits-v8/);
   assert.match(app,/FamilyTimeline\?\.activate\(state.view\)/);assert.match(app,/FamilyTimeline\?\.search\(state.query\)/);
   assert.match(home,/\['timeline',I18n.t\('ציר זמן משפחתי'\)/);
 });

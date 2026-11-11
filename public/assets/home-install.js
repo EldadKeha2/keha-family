@@ -30,6 +30,7 @@
   const button=card.querySelector('[data-home-install-action]'),status=card.querySelector('[data-home-install-status]');
   const shareButton=card.querySelector('[data-home-install-share]'),shareStatus=card.querySelector('[data-home-install-share-status]');
   const desktopButton=card.querySelector('[data-desktop-install-action]'),refreshButton=card.querySelector('[data-desktop-refresh]');
+  const windowsInstallerLink=document.getElementById('windowsDesktopDownload');
   const desktopView=()=>!mobileDevice&&!phoneQuery.matches;
   function announce(target,message){
     clearTimeout(feedbackTimer);status.textContent='';shareStatus.textContent='';target.textContent=message;
@@ -134,6 +135,7 @@
     card.hidden=false;
     button.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);status.hidden=false;
     desktopButton.hidden=!desktopView()||nativeDesktop;refreshButton.hidden=!desktopView();desktopButton.disabled=busy;
+    if(windowsInstallerLink){windowsInstallerLink.hidden=!desktopView()||nativeDesktop||!/Windows NT/i.test(ua);const label=windowsInstallerLink.querySelector('span');if(label)label.textContent=tr('אפליקציה ל־Windows','Windows app');}
     button.setAttribute('aria-haspopup',isInstalled?'false':'dialog');
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
     button.disabled=busy;

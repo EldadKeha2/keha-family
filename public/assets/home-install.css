@@ -201,3 +201,4 @@
   }
   .home-install-platforms{margin-top:9px;margin-bottom:3px}
 }
+.windows-desktop-download{display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;max-width:100%;margin:14px auto 0;padding:7px 12px;border:1px solid #c7c9aa;border-radius:8px;background:#f4f1e2;color:#687a54;font-size:12px;text-decoration:none}.windows-desktop-download svg{width:18px;height:18px;fill:currentColor;stroke:none}.windows-desktop-download:hover{background:#e8edda}.windows-desktop-download[hidden]{display:none!important}@media(max-width:700px){.windows-desktop-download{display:none!important}}
