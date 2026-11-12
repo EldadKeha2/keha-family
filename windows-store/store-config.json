@@ -1,0 +1,13 @@
+{
+  "identityName": "",
+  "publisher": "",
+  "publisherDisplayName": "Eldad Keha",
+  "displayName": "בית משפחת קהא",
+  "minimumWindowsVersion": "10.0.19041.0",
+  "distribution": {
+    "price": "Free",
+    "audience": "Public audience",
+    "discoverability": "Make this product available but not discoverable in the Store",
+    "acquisition": "Direct link only"
+  }
+}

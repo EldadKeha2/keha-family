@@ -1,0 +1,65 @@
+name: Prepare Microsoft Store package
+on:
+  push:
+    branches: [main]
+    paths: ['windows-store/**', 'desktop/native/**', 'desktop/build-native.ps1', 'desktop/icon.png', '.github/workflows/windows-store.yml']
+  workflow_dispatch:
+    inputs:
+      identity_name:
+        description: 'Package/Identity/Name from Partner Center (empty builds a preview)'
+        type: string
+      publisher:
+        description: 'Package/Identity/Publisher from Partner Center'
+        type: string
+      publisher_display_name:
+        description: 'Package/Properties/PublisherDisplayName from Partner Center'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: windows-store-package
+  cancel-in-progress: false
+jobs:
+  store:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native app and verify its real window
+        run: |
+          ./desktop/build-native.ps1
+          ./desktop/native-smoke-test.ps1
+      - name: Build a validated MSIX preview
+        run: ./windows-store/build-store.ps1 -Preview -SkipNativeBuild
+      - name: Install and launch the MSIX through Windows package activation
+        run: ./windows-store/store-smoke-test.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keha-family-store-preview
+          path: |
+            desktop/dist/store/*-preview.msixupload
+            desktop/dist/store/package-info.json
+            desktop/dist/store/verification.json
+          if-no-files-found: error
+      - name: Build the reserved Store identity when available
+        env:
+          INPUT_IDENTITY_NAME: ${{ inputs.identity_name }}
+          INPUT_PUBLISHER: ${{ inputs.publisher }}
+          INPUT_PUBLISHER_DISPLAY_NAME: ${{ inputs.publisher_display_name }}
+        run: |
+          $config = Get-Content windows-store/store-config.json -Raw | ConvertFrom-Json
+          $identity = if ($env:INPUT_IDENTITY_NAME) { $env:INPUT_IDENTITY_NAME } else { $config.identityName }
+          if (!$identity) { Write-Host 'Preview verified. Store upload awaits the reserved Partner Center identity.'; exit 0 }
+          $arguments = @{ IdentityName=$identity; SkipNativeBuild=$true }
+          if ($env:INPUT_PUBLISHER) { $arguments.Publisher=$env:INPUT_PUBLISHER }
+          if ($env:INPUT_PUBLISHER_DISPLAY_NAME) { $arguments.PublisherDisplayName=$env:INPUT_PUBLISHER_DISPLAY_NAME }
+          ./windows-store/build-store.ps1 @arguments
+      - uses: actions/upload-artifact@v4
+        if: inputs.identity_name != '' || hashFiles('windows-store/store-config.json') != ''
+        with:
+          name: keha-family-store-submission
+          path: desktop/dist/store/Keha-Family-*-x64.msixupload
+          if-no-files-found: ignore

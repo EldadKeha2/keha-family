@@ -19,9 +19,11 @@ namespace KehaFamily {
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr handle);
     [DllImport("user32.dll")] static extern bool ShowWindowAsync(IntPtr handle, int command);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SetCurrentProcessExplicitAppUserModelID(string id);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern int GetCurrentPackageFullName(ref uint length, IntPtr name);
     [STAThread] static int Main(string[] args) {
       Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
-      SetCurrentProcessExplicitAppUserModelID("com.eldadkeha.family");
+      uint packageNameLength = 0;
+      if (GetCurrentPackageFullName(ref packageNameLength, IntPtr.Zero) == 15700) SetCurrentProcessExplicitAppUserModelID("com.eldadkeha.family");
       var smoke = args.Length == 2 && args[0] == "--smoke-test";
       using (var mutex = new Mutex(true, "Local\\KehaFamilyDesktop" + (smoke ? "Smoke" : ""), out var first)) {
         if (!first) { var handle = FindWindow(null, Title); if (IsIconic(handle)) ShowWindowAsync(handle, 9); SetForegroundWindow(handle); return 0; }
@@ -42,7 +44,7 @@ namespace KehaFamily {
     readonly System.Windows.Forms.Timer saveTimer = new System.Windows.Forms.Timer { Interval = 200 };
     readonly Stopwatch startup = Stopwatch.StartNew();
     readonly SavedWindow saved;
-    bool loaded, closing, fullscreen, webFullscreen, fullscreenBeforeWeb, changingWindowMode;
+    bool loaded, closing, fullscreen, webFullscreen, fullscreenBeforeWeb, changingWindowMode, missingRuntime;
     Rectangle normalBounds;
     bool maximizedBeforeFullscreen;
     long shownMs;
@@ -58,7 +60,25 @@ namespace KehaFamily {
       progress.Anchor = AnchorStyles.None;retry.Anchor = AnchorStyles.None;center.Controls.Add(logo);center.Controls.Add(status);center.Controls.Add(progress);center.Controls.Add(retry);loading.Controls.Add(center);
       loading.Resize += (sender, e) => center.Location = new Point((loading.ClientSize.Width - center.Width) / 2, (loading.ClientSize.Height - center.Height) / 2);
       Controls.Add(web);Controls.Add(loading);BuildMenu();Controls.Add(menu);MainMenuStrip = menu;loading.BringToFront();
-      retry.Click += async (sender, e) => { retry.Visible = false;progress.Visible = true;status.Text = "פותחים את הבית שלנו…";if (web.CoreWebView2 != null) { web.BringToFront();loading.Visible = false;web.CoreWebView2.Navigate(Links.Home); } else await InitializeBrowser(); };
+      retry.Click += async (sender, e) => {
+        retry.Visible = false;progress.Visible = true;status.Text = "פותחים את הבית שלנו…";
+        if (missingRuntime) {
+          status.Text = "משלימים את רכיב Microsoft WebView2…";
+          try {
+            await Task.Run(() => {
+              var setup = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MicrosoftEdgeWebview2Setup.exe");
+              if (!File.Exists(setup)) throw new FileNotFoundException("The Microsoft WebView2 setup is missing.");
+              using (var installer = Process.Start(new ProcessStartInfo(setup, "/silent /install") { UseShellExecute = false, CreateNoWindow = true })) {
+                if (!installer.WaitForExit(180000)) { installer.Kill();throw new TimeoutException("WebView2 setup timed out."); }
+                if (installer.ExitCode != 0) throw new InvalidOperationException("WebView2 setup failed: " + installer.ExitCode);
+              }
+            });
+            missingRuntime = false;retry.Text = "ניסיון נוסף";
+          } catch { ShowError("השלמת הרכיב לא הסתיימה. בדקו את החיבור לאינטרנט ונסו שוב.");return; }
+        }
+        if (closing) return;
+        if (web.CoreWebView2 != null) { web.BringToFront();loading.Visible = false;web.CoreWebView2.Navigate(Links.Home); } else await InitializeBrowser();
+      };
       saveTimer.Tick += (sender, e) => { saveTimer.Stop();Persist(); };
       Move += (sender, e) => Remember();Resize += (sender, e) => Remember();
       FormClosing += (sender, e) => { closing = true;saveTimer.Stop();Persist(); };
@@ -127,7 +147,9 @@ namespace KehaFamily {
       } catch (Exception error) {
         if (closing) return;
         if (smoke) { File.WriteAllText(Path.Combine(Path.GetDirectoryName(stateFile), "failure.txt"), error.ToString());ExitCode = 1;Close();return; }
-        ShowError(error is WebView2RuntimeNotFoundException ? "נדרש רכיב Microsoft WebView2. הפעילו שוב את המתקין להשלמתו." : "הפתיחה לא הושלמה. נסו שוב או פתחו את האתר בדפדפן.");
+        missingRuntime = error is WebView2RuntimeNotFoundException;
+        retry.Text = missingRuntime ? "השלמת ההתקנה" : "ניסיון נוסף";
+        ShowError(missingRuntime ? "נדרש רכיב Microsoft WebView2. לחצו להשלמת ההתקנה." : "הפתיחה לא הושלמה. נסו שוב או פתחו את האתר בדפדפן.");
       }
     }
     void ShowError(string message) { if (closing) return;status.Text = message;status.Font = new Font("Segoe UI", 12);progress.Visible = false;retry.Visible = true;loading.Visible = true;loading.BringToFront(); }

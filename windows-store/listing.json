@@ -1,0 +1,20 @@
+{
+  "displayName": "בית משפחת קהא",
+  "categorySuggestion": "Lifestyle",
+  "price": "Free",
+  "visibility": "Unlisted — direct link only",
+  "he-IL": {
+    "shortDescription": "אילן היוחסין, התמונות והזיכרונות של משפחת קהא — בבית אחד.",
+    "description": "הבית הדיגיטלי של משפחת קהא מרכז את אילן היוחסין, דפי בני המשפחה, התמונות, הסרטונים, הסיפורים והזיכרונות המשפחתיים. האפליקציה מציגה את האתר המשפחתי בחלון עצמאי עם הלוגו המשפחתי, נפתחת בחלון מוגדל וזוכרת את מצב החלון האחרון. נדרש חיבור לאינטרנט. האפליקציה מופצת באמצעות קישור ישיר לחנות.",
+    "features": ["אילן יוחסין ודפי בני המשפחה", "גלריות תמונות, סרטונים וסיפורים", "ציר זמן ולוח משפחתי שנתי", "תצוגה בעברית ובאנגלית", "זכירת גודל החלון ומצב מסך מלא"]
+  },
+  "en-US": {
+    "shortDescription": "The Keha family's tree, photos and memories, together in one home.",
+    "description": "The Keha family app brings together the family tree, member profiles, photos, videos, stories and shared memories. It opens the live family website in its own branded Windows window, starts maximized and remembers your previous window and fullscreen settings. An internet connection is required. The app is distributed through a direct Microsoft Store link.",
+    "features": ["Family tree and member profiles", "Photo galleries, videos and stories", "Family timeline and annual family register", "Hebrew and English", "Saved window size and fullscreen settings"]
+  },
+  "runFullTrustJustification": "This is an existing .NET Framework WinForms desktop application using Microsoft Edge WebView2 to display the family website. The desktop capability is needed for its native window, file-picker interactions and per-user WebView2 profile. It runs as the signed-in user without elevation. The remote web page has no host objects, native message bridge or Node integration. Top-level navigation is restricted to the family origin and approved external links open in the default browser.",
+  "privacyPolicyUrl": "",
+  "screenshots": [],
+  "status": "Draft. Requires the owner's Store identity, actual portal visibility settings, privacy-policy URL, screenshots, age-rating answers and Microsoft certification."
+}
