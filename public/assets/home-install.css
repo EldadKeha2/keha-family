@@ -1,8 +1,7 @@
 .home-install[hidden],.home-install [hidden]{display:none!important}
-.home-install-apple-steps ol{display:grid;gap:8px;margin:12px 0 0;padding-inline-start:24px}
-.home-install-apple-steps li{margin:0;padding-inline-start:4px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.5}
-.home-install-apple-steps li strong{display:flex;align-items:center;gap:5px;color:#536b42;font-size:calc(16px * var(--a11y-text-scale,1))}
-.home-install-apple-steps li>span{display:block;margin-top:3px;color:#7a6c50;font-size:calc(12px * var(--a11y-text-scale,1))}
+.home-install-dialog .home-install-apple-steps ol{display:grid;gap:12px;margin:14px 0 0;padding-inline-start:24px}
+.home-install-dialog .home-install-apple-steps li{margin:0;padding-inline-start:4px;color:#536b42;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.7}
+.home-install-apple-steps u{font-weight:600;text-decoration-thickness:1.5px;text-underline-offset:4px}
 .home-install-dialog[data-ios-guide=true] .home-install-yona{height:100px}
 .home-install-dialog[data-ios-guide=true] .home-install-dialog-intro{margin-bottom:5px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.5}
 .home-install-dialog a.home-install-invite-primary{text-align:center;text-decoration:none}
@@ -22,7 +21,7 @@
 .home-install-dialog ol{margin:15px 0 22px;padding-inline-start:25px;font:calc(16px * var(--a11y-text-scale,1))/1.85 var(--sans)}
 .home-install-dialog li{padding-inline-start:3px;margin:10px 0;overflow-wrap:anywhere}
 .home-install-dialog li::marker{color:#70834f;font-weight:700}
-.home-install-share{display:inline-block;box-sizing:border-box;width:18px;height:21px;line-height:16px;text-align:center;border:1.5px solid currentColor;border-top-color:transparent;border-radius:2px;font-weight:700}
+.home-install-apple-steps .home-install-share{display:inline-block;vertical-align:middle;width:22px;height:26px;margin-inline:2px;fill:none;stroke:currentColor}
 .home-install-browser-note{margin:14px 0;padding:12px;border:1px solid #dccaa4;border-radius:7px;background:#f4ecda;font:calc(14px * var(--a11y-text-scale,1))/1.8 var(--sans)}
 .home-install-link-tools{border-top:1px solid #ddd0b2;padding-top:16px}
 .home-install-link-tools button{min-height:44px;width:100%;padding:10px 14px;border:1px solid #b6bfa2;border-radius:7px;background:#eaf0df;color:#536842;font:calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans);white-space:normal}

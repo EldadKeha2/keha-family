@@ -19,11 +19,11 @@
     *{box-sizing:border-box}body{margin:0;min-height:100svh;display:grid;place-items:center;padding:28px 18px;background:radial-gradient(ellipse at 50% 0,#e8eedc 0,transparent 65%),#f7f3e9}
     main{width:min(100%,430px);text-align:center}.logo{width:84px;height:84px;border-radius:23px;box-shadow:0 5px 22px #34533b16}h1{font-size:29px;line-height:1.25;margin:22px 0 12px;font-weight:750}p{font-size:18px;line-height:1.6;margin:10px 0}
     .launch{display:flex;align-items:center;justify-content:center;min-height:58px;margin:24px 0;border-radius:17px;padding:14px 20px;background:#35694e;color:#fff;text-decoration:none;font-size:21px;font-weight:700;box-shadow:0 6px 16px #254c3820}.launch:focus-visible,a:focus-visible{outline:3px solid #b28b40;outline-offset:4px}.launch:active{transform:translateY(1px)}
-    ol{list-style:none;margin:24px 0 18px;padding:0;text-align:start;display:grid;gap:10px}li{display:flex;gap:14px;align-items:center;background:#fff9;border:1px solid #d6dfcf;border-radius:16px;padding:14px 17px;min-height:62px;font-size:19px;line-height:1.35}.number{display:grid;place-items:center;flex:0 0 31px;width:31px;height:31px;background:#e7eddf;border-radius:50%;font-size:17px;font-weight:700}.share{display:inline-block;vertical-align:middle;width:24px;height:27px;stroke:#35694e;stroke-width:1.7;fill:none;margin-inline-end:7px}
+    ol{list-style:none;margin:24px 0 18px;padding:0;text-align:start;display:grid;gap:10px}li{display:flex;gap:14px;align-items:center;background:#fff9;border:1px solid #d6dfcf;border-radius:16px;padding:14px 17px;min-height:62px;font-size:19px;line-height:1.5}li strong{text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:4px}.number{display:grid;place-items:center;flex:0 0 31px;width:31px;height:31px;background:#e7eddf;border-radius:50%;font-size:17px;font-weight:700}.share{display:inline-block;vertical-align:middle;width:24px;height:28px;stroke:currentColor;stroke-width:1.7;fill:none;margin-inline:2px}
     .quiet{font-size:15px;color:#5b6c5e;line-height:1.6}.quiet a{color:#35694e;text-underline-offset:3px}.browse{display:inline-block;color:#35694e;font-size:16px;padding:10px 14px;text-underline-offset:4px}[hidden]{display:none!important}
     @media(prefers-reduced-motion:reduce){.launch:active{transform:none}}
   </style>
-  <script src="/install/safari-launch.js?v=1" defer></script>
+  <script src="/install/safari-launch.js?v=2" defer></script>
 </head>
 <body>
   <main>
@@ -32,9 +32,8 @@
     <p id="intro">פותחים בספארי ומוסיפים פעם אחת:</p>
     <a id="openSafari" class="launch" href="x-safari-https://keha-family.eldadkeha.workers.dev/install/safari?lang=he">פתיחה בספארי</a>
     <ol id="steps" aria-label="הוספה למסך הבית">
-      <li><span class="number" aria-hidden="true">1</span><span><svg class="share" viewBox="0 0 24 28" aria-hidden="true"><path d="M6 11H3v14h18V11h-3M12 18V2m-5 5 5-5 5 5"/></svg><strong id="stepShare">שיתוף</strong></span></li>
-      <li><span class="number" aria-hidden="true">2</span><strong id="stepHome">הוספה למסך הבית</strong></li>
-      <li><span class="number" aria-hidden="true">3</span><strong id="stepAdd">הוסף</strong></li>
+      <li><span class="number" aria-hidden="true">1</span><span><span id="stepShareLead">לחצו על </span><strong id="stepShare">כפתור השיתוף</strong> <svg class="share" viewBox="0 0 24 28" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7.5 9H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-2.5M12 18V2m-5 5 5-5 5 5"/></svg> <span id="stepShareTail">כאן למטה</span></span></li>
+      <li><span class="number" aria-hidden="true">2</span><span><span id="stepHomeLead">לחצו על </span><strong id="stepHome">הוספה למסך הבית</strong></span></li>
     </ol>
     <p class="quiet" id="menuHint">אם ״שיתוף״ מוסתר, הוא נמצא בתפריט הדף של ספארי.</p>
     <p class="quiet" id="safariFallback" hidden><span id="fallbackText">הקישור נפתח בתוך אפליקציה?</span> <a id="fallbackSafari" href="x-safari-https://keha-family.eldadkeha.workers.dev/install/safari?lang=he">פתיחה בספארי</a></p>

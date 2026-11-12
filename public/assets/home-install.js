@@ -26,7 +26,8 @@
   const desktopIcon='<svg class="home-install-icon desktop-shortcut-logo" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4M12 6v7m-3-3 3 3 3-3"/></svg>';
   const bookmarkIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg>';
   const refreshIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5M19.1 9a7.5 7.5 0 0 0-12.4-3L4 9m16 6-2.7 3A7.5 7.5 0 0 1 4.9 15"/></svg>';
-  const shareIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.7 10.5 6.6-4m-6.6 7 6.6 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>';
+  const appleShareIcon='<svg class="home-install-icon home-install-share" viewBox="0 0 24 28" width="24" height="28" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7.5 9H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V11a2 2 0 0 0-2-2h-2.5M12 18V2m-5 5 5-5 5 5"/></svg>';
+  const shareIcon=ios?appleShareIcon:'<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.7 10.5 6.6-4m-6.6 7 6.6 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>';
   card.innerHTML='<div class="home-install-actions" data-home-install-actions><button type="button" data-home-install-action aria-label="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" title="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" aria-haspopup="dialog" aria-controls="homeInstallDialog">'+shortcutIcon+'<span>'+tr('התקן','Install')+'</span></button><button type="button" data-desktop-install-action hidden aria-haspopup="dialog" aria-controls="homeInstallDialog" aria-label="'+tr('התקנה לשולחן העבודה במחשב','Install on desktop')+'" title="'+tr('התקנה לשולחן העבודה במחשב','Install on desktop')+'">'+desktopIcon+'<span>'+tr('התקנה לשולחן העבודה במחשב','Install on desktop')+'</span></button><button type="button" data-desktop-bookmark-action hidden aria-haspopup="dialog" aria-controls="homeInstallDialog" aria-label="'+tr('הוספה למועדפים בדפדפן','Add a browser bookmark')+'" title="'+tr('מועדפים בדפדפן','Browser bookmark')+'">'+bookmarkIcon+'<span>'+tr('מועדפים בדפדפן','Browser bookmark')+'</span></button><button type="button" data-home-install-share aria-label="'+tr('שיתוף האתר','Share website')+'" title="'+tr('שיתוף האתר','Share website')+'">'+shareIcon+'<span>'+tr('שיתוף','Share')+'</span></button><button type="button" data-desktop-refresh hidden aria-label="'+tr('רענון העמוד הנוכחי','Refresh current page')+'" title="'+tr('רענון','Refresh')+'">'+refreshIcon+'<span>'+tr('רענון','Refresh')+'</span></button></div><p class="home-install-status" data-home-install-status role="status" aria-live="polite"></p><p class="home-install-status" data-home-install-share-status role="status" aria-live="polite"></p>';
   const button=card.querySelector('[data-home-install-action]'),status=card.querySelector('[data-home-install-status]');
   const shareButton=card.querySelector('[data-home-install-share]'),shareStatus=card.querySelector('[data-home-install-share-status]');
@@ -55,7 +56,7 @@
   function showDialog(kind,returnFocus){
     dialogKind=kind;dialogReturnFocus=returnFocus;
     dialog.setAttribute('dir',english?'ltr':'rtl');
-    dialog.setAttribute('data-ios-guide',String(ios&&kind==='invite'&&!hasInstalledShortcut()));
+    dialog.setAttribute('data-ios-guide',String(ios&&['invite','install'].includes(kind)&&!hasInstalledShortcut()));
     dialog.querySelector('[data-home-install-close]').addEventListener('click',()=>closeDialog());
     dialog.querySelector('[data-home-install-language]')?.addEventListener('click',()=>{
       const currentKind=dialogKind,currentFocus=dialogReturnFocus;english=!english;
@@ -218,10 +219,9 @@
     if(desktopView()&&!nativeDesktop)void requestDesktopInstallation(desktopShortcutLink);
   });
   refreshButton.addEventListener('click',()=>{if(desktopView())location.reload();});
-  function appleHelp(){return '<div class="home-install-apple-steps" data-home-install-apple-steps>'+steps([
-    '<strong><span class="home-install-share" aria-hidden="true">↑</span> '+tr('שיתוף','Share')+'</strong><span>'+tr('בסרגל של Safari. אם הסמל מוסתר, פתחו את תפריט ⋯ ואז ״שיתוף״.','Use Safari’s toolbar. If the icon is hidden, open the ⋯ page menu, then “Share”.')+'</span>',
-    '<strong>'+tr('הוספה למסך הבית','Add to Home Screen')+'</strong><span>'+tr('בוחרים ברשימת הפעולות של Safari. ייתכן שצריך לגלול ברשימה.','Choose it in Safari’s actions. You may need to scroll down the list.')+'</span>',
-    '<strong>'+tr('הוסף','Add')+'</strong><span>'+tr('משאירים את השם ולוחצים ״הוסף״. האייקון יופיע במסך הבית.','Keep the name and tap “Add”. The icon will appear on your Home Screen.')+'</span>'
+  function appleHelp(){return '<div class="home-install-apple-steps" data-home-install-apple-steps aria-label="'+tr('הוספה למסך הבית דרך Safari','Add to Home Screen in Safari')+'">'+steps([
+    tr('לחצו על <u>כפתור השיתוף</u>','Tap the <u>Share button</u>')+' '+appleShareIcon+' '+tr('כאן למטה','below'),
+    tr('לחצו על <u>הוספה למסך הבית</u>','Tap <u>Add to Home Screen</u>')
   ])+'</div>';}
   function androidHelp(){return steps([
     tr('ב־Chrome פתחו את התפריט ⋮ ובחרו ״התקנת אפליקציה״ או ״הוספה למסך הבית״.','In Chrome, open the ⋮ menu and choose “Install app” or “Add to Home screen”.'),
@@ -242,14 +242,15 @@
       content='<p class="home-install-dialog-intro" data-home-install-invite-installed>'+tr('קיצור הדרך כבר מותקן בטלפון הזה. אפשר להמשיך ישר לאתר.','The shortcut is already installed on this device. You can continue to the website.')+'</p>';
     }else if(ios){
       const browserNote=embedded?'<p class="home-install-browser-note">'+tr('אם ״הוספה למסך הבית״ אינה זמינה כאן, בתפריט האפליקציה בחרו ״פתיחה בדפדפן״.','If “Add to Home Screen” is missing here, use this app’s menu and choose “Open in browser”.')+'</p>':'';
-      content='<p class="home-install-dialog-intro">'+tr('הוספה חד־פעמית דרך Safari. אפשר להשאיר חלון זה פתוח בזמן ההוספה.','Add once through Safari. You can leave this guide open while adding the icon.')+'</p>'+welcomeArt()+browserNote+appleHelp();
+      content=welcomeArt()+browserNote+appleHelp();
     }else{
       content='<p class="home-install-dialog-intro">'+tr('אייקון האתר במסך הבית של הטלפון — המשפחה במרחק נגיעה.','The website icon on your phone’s home screen — your family just a tap away.')+'</p>'+welcomeArt()+'<button type="button" class="home-install-invite-primary" data-home-install-invite-start>'+tr('התקן','Install')+'</button>'+platformLogos()+progressControl()+'<p class="home-install-invite-status" data-home-install-invite-status role="status" aria-live="polite"></p>'+iconConfirmation(true);
     }
     const heading=alreadyInstalled?tr('הבית שלנו כבר אצלכם','Our home is already with you'):ios?tr('מוסיפים למסך הבית','Add to your Home Screen'):tr('התקנת בית משפחת קהא','Install Keha Family Home');
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההזמנה','Close invitation')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+heading+'</h2>'+content+'<button type="button" class="home-install-invite-browse" data-home-install-invite-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
+    const browse=ios&&!alreadyInstalled?'':'<button type="button" class="home-install-invite-browse" data-home-install-invite-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההזמנה','Close invitation')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+heading+'</h2>'+content+browse;
     dialog.querySelector('[data-home-install-invite-start]')?.addEventListener('click',()=>requestInstallation(true));
-    dialog.querySelector('[data-home-install-invite-browse]').addEventListener('click',continueToSite);
+    dialog.querySelector('[data-home-install-invite-browse]')?.addEventListener('click',continueToSite);
     showDialog('invite',returnFocus);update();
   }
   function offerInvitation(){if(!installationInvitation||invitationOffered||!mobileDevice)return;invitationOffered=true;openInvitation();}

@@ -18,6 +18,7 @@
   const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
   const byId = id => document.getElementById(id);
   byId('browse').href = home.href;
+  byId('browse').hidden = ios;
   byId('openSafari').href = safariURL;
   byId('fallbackSafari').href = safariURL;
   if (english) {
@@ -29,9 +30,11 @@
     byId('heading').textContent = 'Your family, on your Home Screen';
     byId('intro').textContent = 'Open in Safari, then add once:';
     byId('openSafari').textContent = 'Open in Safari';
-    byId('stepShare').textContent = 'Share';
+    byId('stepShareLead').textContent = 'Tap the ';
+    byId('stepShare').textContent = 'Share button';
+    byId('stepShareTail').textContent = 'below';
+    byId('stepHomeLead').textContent = 'Tap ';
     byId('stepHome').textContent = 'Add to Home Screen';
-    byId('stepAdd').textContent = 'Add';
     byId('steps').setAttribute('aria-label', 'Add to Home Screen');
     byId('menuHint').textContent = 'If Share is hidden, open Safari’s page menu to find it.';
     byId('fallbackText').textContent = 'Opened inside another app?';

@@ -184,8 +184,17 @@ test('iPhone and touch iPad use Share instructions, while embedded browsers expl
   ]){
     const f=fixture(options);f.click(f.button());await tick();assert.equal(f.dialog.open,true);assert.match(f.dialog.innerHTML,/Safari/);assert.match(f.dialog.innerHTML,/שיתוף/);assert.match(f.dialog.innerHTML,/הוספה למסך הבית/);
     assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.equal(f.dialog.querySelector('[data-home-install-profile]'),null);
+    assert.equal((f.dialog.innerHTML.match(/<li>/g)||[]).length,2);
+    assert.match(f.dialog.innerHTML,/לחצו על <u>כפתור השיתוף<\/u>/);
+    assert.match(f.dialog.innerHTML,/לחצו על <u>הוספה למסך הבית<\/u>/);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-browse]'),null);
+    const shareIcon=f.card.innerHTML.match(/<svg class="home-install-icon home-install-share"[^>]*>[\s\S]*?<\/svg>/)?.[0];
+    assert.ok(shareIcon);assert.ok(f.dialog.innerHTML.includes(shareIcon));
     f.click(f.dialog.querySelector('[data-home-install-language]'));
     assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
+    assert.equal((f.dialog.innerHTML.match(/<li>/g)||[]).length,2);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-browse]'),null);
+    assert.match(f.dialog.innerHTML,/Tap the <u>Share button<\/u>/);
   }
   const embedded=fixture({userAgent:'Mozilla/5.0 (Linux; Android 16) Instagram WhatsApp FBAN/FB4A'});embedded.click(embedded.button());await tick();
   assert.match(embedded.dialog.innerHTML,/Chrome/);assert.match(embedded.dialog.innerHTML,/בדפדפן|דפדפן/);
