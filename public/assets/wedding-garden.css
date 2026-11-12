@@ -57,7 +57,7 @@ body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-
 #weddingDetail .wedding-anniversary{position:relative;z-index:1;gap:16px}
 #weddingDetail .wedding-anniversary>div{font-size:calc(14px * var(--a11y-text-scale,1));gap:3px}
 #weddingDetail .wedding-anniversary strong{font-size:calc(16px * var(--a11y-text-scale,1))}
-@media(min-width:1500px){#weddingGrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(min-width:1500px){#weddingGrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:1100px) and (min-width:701px){#weddingGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){
   #weddingsOverview{padding:0 0 12px}
@@ -98,3 +98,20 @@ body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-
   #weddingDetail .wedding-page-intro>p{font-size:calc(12px * var(--a11y-text-scale,1));margin-bottom:13px}
 }
 @media(prefers-reduced-motion:reduce){#weddingGrid .wedding-card{transition:none}#weddingGrid .wedding-card:hover{transform:none}}
+
+/* Larger, more readable desktop typography; phone sizing stays independent. */
+@media(min-width:701px){
+body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-title h2{font-size:calc(34px * var(--a11y-text-scale,1))}
+#weddingsOverview .wedding-intro h3{font-size:calc(35px * var(--a11y-text-scale,1))}
+#weddingsOverview .wedding-intro p{font-size:calc(16px * var(--a11y-text-scale,1))}
+#weddingsOverview .wedding-intro .small-eyebrow{font-size:calc(14px * var(--a11y-text-scale,1))}
+#weddingsOverview .archive-toolbar,#weddingsOverview .archive-toolbar select{font-size:calc(16px * var(--a11y-text-scale,1))}
+#weddingGrid .wedding-card-open h4{font-size:calc(22px * var(--a11y-text-scale,1));min-height:60px}
+#weddingGrid .wedding-card-open h4 em{font-size:calc(18px * var(--a11y-text-scale,1))}
+#weddingGrid .wedding-card-branch{font-size:calc(14px * var(--a11y-text-scale,1))}
+#weddingGrid .wedding-card-date bdi{font-size:calc(18px * var(--a11y-text-scale,1))}
+#weddingGrid .wedding-card-date small,#weddingGrid .wedding-date-unknown,#weddingGrid .wedding-card-footer{font-size:calc(13px * var(--a11y-text-scale,1))}
+#weddingGrid .wedding-card-footer button{font-size:calc(14px * var(--a11y-text-scale,1))}
+#weddingDetail .wedding-page-intro h3{font-size:calc(38px * var(--a11y-text-scale,1))}
+#weddingDetail .wedding-page-intro>p,#weddingDetail .wedding-anniversary>div{font-size:calc(16px * var(--a11y-text-scale,1))}
+}
