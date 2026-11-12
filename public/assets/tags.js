@@ -4,6 +4,18 @@
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
+  const hebrewKeys={q:'/',w:"'",e:'ק',r:'ר',t:'א',y:'ט',u:'ו',i:'ן',o:'ם',p:'פ',a:'ש',s:'ד',d:'ג',f:'כ',g:'ע',h:'י',j:'ח',k:'ל',l:'ך',';':'ף',z:'ז',x:'ס',c:'ב',v:'ה',b:'נ',n:'מ',m:'צ',',':'ת','.':'ץ','/':'.'};
+  let lastQuery=null,lastVariants=[];
+  function searchVariants(query){
+    if(query===lastQuery)return lastVariants;
+    lastQuery=query;lastVariants=[query];
+    // Preserve the original English search and try the physical Hebrew keys
+    // as an additional interpretation. Convert before dropping punctuation:
+    // comma, semicolon and period are Hebrew letters on this keyboard.
+    const converted=normalize(query.split(' ').map(word=>/[a-z]/i.test(word)?[...word].map(char=>hebrewKeys[char]??char).join(''):word).join(' '));
+    if(converted&&converted!==query)lastVariants.push(converted);
+    return lastVariants;
+  }
   function spellingDistance(a,b,budget=2){
     if(a===b)return 0;if(Math.abs(a.length-b.length)>budget)return budget+1;
     let previous=Array.from({length:b.length+1},(_,index)=>index);
@@ -31,9 +43,8 @@
     }
     return Math.min(whole,words.length<=parts.length?match(0,new Set(),2):3);
   }
-  function matchRank(person,query){
-    if(!query)return 5;
-    const canonical=window.FAMILY_DATA.people[person.id],aliases=[person.name,person.nameEn,canonical?.name,canonical?.nameEn].filter(Boolean).map(normalize),words=query.split(' ');
+  function aliasRank(aliases,query){
+    const words=query.split(' ');
     if(aliases.some(name=>name===query))return 0;
     if(aliases.some(name=>name.split(' ').includes(query)))return 1;
     if(aliases.some(name=>name.startsWith(query)))return 2;
@@ -41,6 +52,14 @@
     if(aliases.some(name=>name.includes(query)))return 4;
     const distance=Math.min(...new Set(aliases.map(name=>spellingRank(name,query,words))));
     return distance<=2?5+distance:Infinity;
+  }
+  function matchRank(person,query){
+    if(!query)return 5;
+    const canonical=window.FAMILY_DATA.people[person.id],aliases=[...new Set([person.name,person.nameEn,canonical?.name,canonical?.nameEn].filter(Boolean).map(normalize))];
+    // A real English spelling wins ties; a correct keyboard interpretation
+    // still ranks above unrelated fuzzy matches. The same two-edit limit
+    // applies independently to each interpretation, never cumulatively.
+    return Math.min(...searchVariants(query).map((value,index)=>aliasRank(aliases,value)+index*.25));
   }
   function personContext(person){
     const data=window.FAMILY_DATA,p=data.people[person.id],unit=data.units?.[p?.unit],parent=unit?.people?.[0]===person.id?data.units[unit.parent]:null;

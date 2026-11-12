@@ -21,6 +21,21 @@ function fixture(respond){
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});
 
+test('Hebrew tagging recognizes English keyboard keys, punctuation letters, capitals and mixed Hebrew input',async()=>{
+ const asaf={id:'qa-asaf',name:'אסף כץ',nameEn:'Asaf Katz',extra:true},f=fixture(()=>Response.json({people:[...Object.values(family.people),asaf]}));
+ for(const [query,id]of [['tkss evt','eldad'],['TKSS EVT','eldad'],['tkss קהא','eldad'],['hubv beta evt','yona'],['ru,h jrhzh','ruti'],['ta; f.','qa-asaf'],['Eldad Keha','eldad'],['Yona Nakash Keha','yona']]){
+  const found=await f.tags.findPeople(query);assert.ok(found.some(person=>person.id===id),query);
+ }
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('keyboard-search'),kind:'video'});const widget=host._tagWidget;
+ widget.query='tkss evt';widget.renderResults(true);assert.match(widget.results.innerHTML,/אלדד קהא/);assert.equal(host.querySelector('[data-tag-add]').hidden,true);f.tags.clearInline(host);
+});
+test('keyboard recovery retains the global two-error limit and gives literal English names priority',async()=>{
+ const literal={id:'qa-literal',name:'טקסס',nameEn:'TKSS',extra:true},f=fixture(()=>Response.json({people:[...Object.values(family.people),literal]}));
+ for(const query of ['tlss evt','tlzs evt'])assert.ok((await f.tags.findPeople(query)).some(person=>person.id==='eldad'),query);
+ assert.equal((await f.tags.findPeople('tlzz evt')).some(person=>person.id==='eldad'),false);
+ const found=await f.tags.findPeople('tkss');assert.equal(found[0].id,'qa-literal');assert.ok(found.some(person=>person.id==='eldad'));
+});
+
 test('tag search tolerates two inserted, missing or replaced letters and excludes three in Hebrew and English',async()=>{
  const person={id:'qa-alexander',name:'אלכסנדר קוגן',nameEn:'Alexander Bennett',extra:true};
  const f=fixture(()=>Response.json({people:[person]}));
