@@ -4,7 +4,8 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../public/assets/portal.js',import.meta.url),'utf8');
-function fixture(prepare,upload,drop,{phone=false,apiEnabled=true}={}){
+const thumbnailSource=await readFile(new URL('../public/assets/photo-thumbnails.js',import.meta.url),'utf8');
+function fixture(prepare,upload,drop,{phone=false,apiEnabled=true,backgroundCopies=false,hidden=false,browsing=false}={}){
   const nodes=new Map(),events=new Map(),sent=[],messages=[],requests=[];
   class Node{
     constructor(){this.handlers=new Map();this.children=[];this.dataset={};this.value='';this.files=[];this.classList={add(){},remove(){},toggle(){}};this.widgets=new Map();}
@@ -17,16 +18,38 @@ function fixture(prepare,upload,drop,{phone=false,apiEnabled=true}={}){
   const empty={items:[],count:0,revision:'test',pagination:{page:1,pages:1,total:0,size:100}};
   const window={FamilyPhotoEditor:{prepare,upload},FAMILY_API_TOKEN:'test-token',FamilyI18n:{isEnglish:false,t:String,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),fetch:async()=>Response.json(empty)},FamilyMedia:{register(){}},FamilyTags:{refresh(){}},FamilyApp:{apiEnabled,getView:()=> 'tree',toast:message=>messages.push(message)},addEventListener(){}};
   window.FamilyI18n.fetch=async(path,options)=>{requests.push({path,options});return Response.json(empty);};
-  const document={getElementById:node,querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(type,fn)=>events.set(type,fn)};
+  const document={hidden,getElementById:node,querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(type,fn)=>events.set(type,fn)};
+  if(backgroundCopies){
+    window.FamilyMedia.isPhotoBrowsing=()=>browsing;
+    vm.runInNewContext(thumbnailSource,{window,document,setTimeout(){},createImageBitmap:()=>new Promise(()=>{})});
+  }
   window.FamilyPhotoDrop=drop;
   class XHR{
     constructor(){this.upload={};this.headers={};}open(method,url){this.url=url;}setRequestHeader(name,value){this.headers[name]=value;}send(file){this.file=file;sent.push(this);}
-    complete(){this.status=201;this.responseText=JSON.stringify({file:'saved.jpg',collection:empty});this.onload();}
+    complete(result={file:'saved.jpg',collection:empty}){this.status=201;this.responseText=JSON.stringify(result);this.onload();}
   }
   vm.runInNewContext(source,{window,document,XMLHttpRequest:XHR,Response,URLSearchParams,console,setInterval(){},setTimeout(){},clearTimeout(){},requestAnimationFrame:fn=>fn(),matchMedia:query=>({matches:phone&&query==='(max-width:700px)'})});events.get('DOMContentLoaded')();
-  return {window,sent,messages,node,requests,flush:()=>new Promise(resolve=>setImmediate(resolve)),tap(selector,dataset){events.get('click')({target:{closest:query=>query===selector?{dataset}:null}});},select(kind,files){const input=node({gallery:'sharedGalleryInput',camera:'sharedGalleryCamera',photos:'sharedPhotosInput',videos:'sharedVideosInput'}[kind]);input.files=files;input.handlers.get('change')();}};
+  return {window,document,sent,messages,node,requests,flush:()=>new Promise(resolve=>setImmediate(resolve)),tap(selector,dataset){events.get('click')({target:{closest:query=>query===selector?{dataset}:null}});},select(kind,files){const input=node({gallery:'sharedGalleryInput',camera:'sharedGalleryCamera',photos:'sharedPhotosInput',videos:'sharedVideosInput'}[kind]);input.files=files;input.handlers.get('change')();}};
 }
 const original={name:'original.png',type:'image/png',size:100},edited={name:'edited.jpg',type:'image/jpeg',size:80};
+
+test('desktop and phone batches keep uploading while hidden, browsing elsewhere or waiting on image decoding',async()=>{
+  for(const phone of [false,true])for(const mode of ['hidden','browsing','minimize-during-copy']){
+    const files=Array.from({length:12},(_,index)=>({name:'photo-'+index+'.jpg',type:'image/jpeg',size:3000000}));
+    const f=fixture(async()=>files,undefined,undefined,{phone,backgroundCopies:true,hidden:mode==='hidden',browsing:mode==='browsing'});
+    f.select('gallery',files);await f.flush();f.window.FamilyPortal.activate('photos');await f.flush();
+    for(const [index,file]of files.entries()){
+      assert.equal(f.sent.length,index+1,`${phone?'Phone':'Desktop'} ${mode}: photo ${index+1} must start without a thumbnail`);
+      assert.match(f.sent[index].url,/collections\/gallery\/upload/);
+      const item={id:'photo-'+index,kind:'photo',file:file.name,src:'/media/'+index,mime:file.type,size:file.size};
+      f.sent[index].complete({file:file.name,collection:{items:[item],revision:String(index)}});
+      if(mode==='minimize-during-copy')f.document.hidden=true;
+      await f.flush();
+    }
+    assert.match(f.node('galleryUploadState').textContent,/12/);
+    assert.equal(f.node('galleryProgress').hidden,true);
+  }
+});
 
 test('phone gallery asks for a source before opening a native picker; cancelling never opens the editor',async()=>{
   let calls=0;const f=fixture(async()=>{calls++;return [];},undefined,undefined,{phone:true});

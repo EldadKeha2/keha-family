@@ -28,13 +28,17 @@
         }
       }
     }catch{}
-    finally{if(job.file)image?.close?.();job.resolve?.();busy=false;watch(document);if(scheduled.size)setTimeout(run,100);}
+    finally{if(job.file)image?.close?.();busy=false;watch(document);if(scheduled.size)setTimeout(run,100);}
   }
   function fromUpload(result,file){
     if(!file?.type?.startsWith('image/')||file.type==='image/gif'||typeof createImageBitmap!=='function')return;
     const items=[...(result.collection?.items||[]),...(result.person?.gallery||[]),...Object.values(result.albums||{}).flatMap(album=>album.items||[])],item=items.find(item=>item.file===result.file)||result.item;
     if(!item||!(item.size>250000)||scheduled.size>=3||attempted.has(item.src)||scheduled.has(item.src))return;
-    return new Promise(resolve=>{scheduled.set(item.src,{item,file,resolve});run();});
+    // Copies are optional background work. Never make the next upload wait for
+    // a visible page, idle browsing, image decoding or canvas encoding. The
+    // bounded queue resumes on visibilitychange; other photos get copies when
+    // their originals are first viewed, through watch()/schedule().
+    scheduled.set(item.src,{item,file});void run();
   }
   // Existing photos acquire their thumbnail the first time their original is
   // read. Later visits to any grid download only the small shared copy.

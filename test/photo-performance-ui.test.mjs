@@ -11,12 +11,27 @@ test('preview preparation uses the small browsing URL and requests the original 
  const preview=window.FamilyPhotoPresentation.prepare(item);await images[0].onload();await preview;assert.equal(images[0].src,'/small-preview');
  const original=window.FamilyPhotoPresentation.prepare(item,'high',true);await images[1].onload();await original;assert.equal(images[1].src,'/large-original');
 });
-test('new uploads prepare copies from the local file before returning the album instead of downloading the original again',async()=>{
+test('new uploads schedule copies from the local file without blocking the album or downloading the original again',async()=>{
  const calls=[],window={FamilyApp:{apiEnabled:true},FAMILY_API_TOKEN:'test',dispatchEvent(){}},item={id:'a',file:'a.png',kind:'photo',src:'/media/a',mime:'image/png',size:3000000};let decoded=0,closed=false;
  const document={hidden:false,querySelectorAll:()=>[],addEventListener(){},createElement(){return{getContext:()=>({drawImage(){}}),toBlob:fn=>fn(new Blob(['copy'],{type:'image/webp'}))};}};
  window.FamilyI18n={fetch:async(path)=>{calls.push(path);return Response.json({item:{...item,thumbnailSrc:'/media/a?thumbnail=1',...(path.includes('/preview?')?{previewSrc:'/media/a?preview=1'}:{})}});}};
  const bitmap={width:6500,height:4100,close(){closed=true;}};vm.runInNewContext(thumbnails,{window,document,Blob,CustomEvent,setTimeout,createImageBitmap:async()=>{decoded++;return bitmap;}});
- const result={file:'a.png',collection:{items:[item]}};await window.FamilyPhotoThumbnails.fromUpload(result,{type:'image/png'});assert.equal(decoded,1);assert.equal(closed,true);assert.equal(calls.length,2);assert.match(result.collection.items[0].thumbnailSrc,/thumbnail/);assert.match(result.collection.items[0].previewSrc,/preview/);
+ const result={file:'a.png',collection:{items:[item]}};assert.equal(window.FamilyPhotoThumbnails.fromUpload(result,{type:'image/png'}),undefined);await new Promise(resolve=>setImmediate(resolve));assert.equal(decoded,1);assert.equal(closed,true);assert.equal(calls.length,2);assert.match(result.collection.items[0].thumbnailSrc,/thumbnail/);assert.match(result.collection.items[0].previewSrc,/preview/);
+});
+test('hidden uploads bound deferred local copies and resume them when the page becomes visible',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const events=new Map(),requests=[];let decoded=0,closed=0;
+ const window={FamilyApp:{apiEnabled:true},FAMILY_API_TOKEN:'test',dispatchEvent(){},FamilyI18n:{fetch:async path=>{requests.push(path);return Response.json({item:{}});}}};
+ const document={hidden:true,querySelectorAll:()=>[],addEventListener:(name,fn)=>events.set(name,fn),createElement:()=>({getContext:()=>({drawImage(){}}),toBlob:fn=>fn(new Blob(['copy'],{type:'image/webp'}))})};
+ vm.runInNewContext(thumbnails,{window,document,Blob,CustomEvent,setTimeout,createImageBitmap:async()=>{decoded++;return{width:6500,height:4100,close(){closed++;}};}});
+ for(let index=0;index<20;index++){
+  const item={id:String(index),file:index+'.jpg',kind:'photo',src:'/media/'+index,mime:'image/jpeg',size:3000000};
+  assert.equal(window.FamilyPhotoThumbnails.fromUpload({file:item.file,item},{type:'image/jpeg'}),undefined);
+ }
+ assert.equal(decoded,0);assert.equal(requests.length,0);
+ document.hidden=false;events.get('visibilitychange')();
+ for(let index=0;index<4;index++){await new Promise(resolve=>setImmediate(resolve));t.mock.timers.tick(100);}
+ assert.equal(decoded,3,'Large batches retain at most three deferred original files for copies');
+ assert.equal(closed,3);assert.equal(requests.length,6,'Each deferred photo still gets its thumbnail and preview');
 });
 test('adjacent preparation deduplicates downloads, decodes before use, bounds memory and respects data saving',async()=>{
  const images=[],navigator={connection:{}},window={};
