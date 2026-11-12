@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#f7f3e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="משפחת קהא">
+  <meta property="og:title" content="בית משפחת קהא במסך הבית שלכם">
+  <meta property="og:description" content="פותחים באייפון ומוסיפים למסך הבית.">
+  <meta property="og:image" content="https://keha-family.eldadkeha.workers.dev/assets/app-icons/icon-512.png">
+  <link rel="icon" href="/assets/app-icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/app-icons/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>בית משפחת קהא</title>
+  <style>
+    :root{color-scheme:light;font-family:Arial,Helvetica,sans-serif;color:#284c3c;background:#f7f3e9;font-synthesis:none}
+    *{box-sizing:border-box}body{margin:0;min-height:100svh;display:grid;place-items:center;padding:28px 18px;background:radial-gradient(ellipse at 50% 0,#e8eedc 0,transparent 65%),#f7f3e9}
+    main{width:min(100%,430px);text-align:center}.logo{width:84px;height:84px;border-radius:23px;box-shadow:0 5px 22px #34533b16}h1{font-size:29px;line-height:1.25;margin:22px 0 12px;font-weight:750}p{font-size:18px;line-height:1.6;margin:10px 0}
+    .launch{display:flex;align-items:center;justify-content:center;min-height:58px;margin:24px 0;border-radius:17px;padding:14px 20px;background:#35694e;color:#fff;text-decoration:none;font-size:21px;font-weight:700;box-shadow:0 6px 16px #254c3820}.launch:focus-visible,a:focus-visible{outline:3px solid #b28b40;outline-offset:4px}.launch:active{transform:translateY(1px)}
+    ol{list-style:none;margin:24px 0 18px;padding:0;text-align:start;display:grid;gap:10px}li{display:flex;gap:14px;align-items:center;background:#fff9;border:1px solid #d6dfcf;border-radius:16px;padding:14px 17px;min-height:62px;font-size:19px;line-height:1.35}.number{display:grid;place-items:center;flex:0 0 31px;width:31px;height:31px;background:#e7eddf;border-radius:50%;font-size:17px;font-weight:700}.share{display:inline-block;vertical-align:middle;width:24px;height:27px;stroke:#35694e;stroke-width:1.7;fill:none;margin-inline-end:7px}
+    .quiet{font-size:15px;color:#5b6c5e;line-height:1.6}.quiet a{color:#35694e;text-underline-offset:3px}.browse{display:inline-block;color:#35694e;font-size:16px;padding:10px 14px;text-underline-offset:4px}[hidden]{display:none!important}
+    @media(prefers-reduced-motion:reduce){.launch:active{transform:none}}
+  </style>
+  <script src="/install/safari-launch.js?v=1" defer></script>
+</head>
+<body>
+  <main>
+    <img class="logo" src="/assets/app-icons/icon-192.png" width="84" height="84" alt="משפחת קהא">
+    <h1 id="heading">האתר המשפחתי<br>במסך הבית שלכם</h1>
+    <p id="intro">פותחים בספארי ומוסיפים פעם אחת:</p>
+    <a id="openSafari" class="launch" href="x-safari-https://keha-family.eldadkeha.workers.dev/install/safari?lang=he">פתיחה בספארי</a>
+    <ol id="steps" aria-label="הוספה למסך הבית">
+      <li><span class="number" aria-hidden="true">1</span><span><svg class="share" viewBox="0 0 24 28" aria-hidden="true"><path d="M6 11H3v14h18V11h-3M12 18V2m-5 5 5-5 5 5"/></svg><strong id="stepShare">שיתוף</strong></span></li>
+      <li><span class="number" aria-hidden="true">2</span><strong id="stepHome">הוספה למסך הבית</strong></li>
+      <li><span class="number" aria-hidden="true">3</span><strong id="stepAdd">הוסף</strong></li>
+    </ol>
+    <p class="quiet" id="menuHint">אם ״שיתוף״ מוסתר, הוא נמצא בתפריט הדף של ספארי.</p>
+    <p class="quiet" id="safariFallback" hidden><span id="fallbackText">הקישור נפתח בתוך אפליקציה?</span> <a id="fallbackSafari" href="x-safari-https://keha-family.eldadkeha.workers.dev/install/safari?lang=he">פתיחה בספארי</a></p>
+    <a class="browse" id="browse" href="/?lang=he#home">כניסה לאתר</a>
+  </main>
+</body>
+</html>
