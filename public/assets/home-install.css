@@ -5,6 +5,7 @@
 .home-install-apple-steps li>span{display:block;margin-top:3px;color:#7a6c50;font-size:calc(12px * var(--a11y-text-scale,1))}
 .home-install-dialog[data-ios-guide=true] .home-install-yona{height:100px}
 .home-install-dialog[data-ios-guide=true] .home-install-dialog-intro{margin-bottom:5px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.5}
+.home-install-dialog a.home-install-invite-primary{text-align:center;text-decoration:none}
 .home-install-dialog[data-ios-guide=true] .home-install-dialog-icon{width:38px;height:38px;margin-block-start:28px}
 .home-install-dialog[data-ios-guide=true] h2{font-size:calc(24px * var(--a11y-text-scale,1));margin-top:8px}
 .home-install-status{position:fixed;z-index:120;inset-inline-start:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:calc(100vw - 36px);margin:0;padding:9px 14px;border:1px solid #c7b894;border-radius:7px;background:#fcf8ed;color:#536442;box-shadow:0 3px 16px #30291820;text-align:center;font:calc(13px * var(--a11y-text-scale,1))/1.6 var(--sans);overflow-wrap:anywhere;pointer-events:none}
@@ -202,3 +203,5 @@
   .home-install-platforms{margin-top:9px;margin-bottom:3px}
 }
 .windows-desktop-download{display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;max-width:100%;margin:14px auto 0;padding:7px 12px;border:1px solid #c7c9aa;border-radius:8px;background:#f4f1e2;color:#687a54;font-size:12px;text-decoration:none}.windows-desktop-download img{width:26px;height:26px;object-fit:contain;border-radius:5px}.windows-desktop-download:hover{background:#e8edda}.windows-desktop-download[hidden]{display:none!important}@media(max-width:700px){.windows-desktop-download{display:none!important}}
+
+.site-footer .privacy-policy-link{display:inline-block;margin:12px 10px 0;color:#737e63;font-size:13px;text-underline-offset:3px}
