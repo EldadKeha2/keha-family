@@ -239,6 +239,47 @@ test('draft face names, event labels and completion travel with only the selecte
  await f.click('SaveCurrent');const saved=(await details(f.uploaded[0])).metadata;assert.equal(saved.faces[0].personId,'yona');assert.deepEqual(saved.labels,['birthdays']);assert.equal(saved.complete,true);
  await f.click('Save');const remaining=await result,payload=f.api.upload(remaining[0]),data=await details({payload});assert.deepEqual(data.metadata.faces,[]);assert.deepEqual(data.metadata.labels,[]);assert.equal(data.metadata.complete,false);
 });
+test('desktop face confirmation uploads once with all edits, then removes the photo and advances after success',async()=>{
+ let finishUpload;
+ const f=fixture({onUpload:()=>new Promise(resolve=>{finishUpload=resolve;})}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+ const adapter=f.mounts.at(-1).options.adapter;
+ f.node('photoEditCaption').value='תיאור לתמונה הראשונה';f.node('photoEditCaption').dispatchEvent(new Event('input'));
+ for(const [part,value]of Object.entries({day:'16',month:'10',year:'1980'})){const input=f.node('photoEditDate'+part);input.value=value;input.dispatchEvent(new Event('input'));}
+ await addLabel(f,'birthdays');
+ await adapter.save({faceId:'b'.repeat(32),personId:'yona',rect:{x:.2,y:.2,width:.1,height:.15}});
+ await Promise.all([adapter.review({complete:true}),adapter.review({complete:true})]);await f.flush();
+ assert.equal(f.uploaded.length,1);assert.equal(f.uploaded[0].file.name,'one.jpg');
+ const saved=(await details(f.uploaded[0])).metadata;
+ assert.equal(saved.complete,true);assert.equal(saved.faces[0].personId,'yona');assert.equal(saved.caption,'תיאור לתמונה הראשונה');assert.deepEqual(saved.date,{day:16,month:10,year:1980});assert.deepEqual(saved.labels,['birthdays']);
+ assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.match(f.node('photoEditCounter').textContent,/תמונה 1 מתוך 3/);assert.equal(f.node('photoEditSaveCurrent').disabled,true);
+ finishUpload();await f.flush();
+ assert.equal(f.node('photoEditFilename').textContent,'two.jpg');assert.match(f.node('photoEditCounter').textContent,/תמונה 1 מתוך 2/);assert.equal(f.mounts.at(-1).item.faceSummary.reviewed,false);
+ await f.click('Save');assert.deepEqual(Array.from(await result,file=>file.name),['two.jpg','three.jpg']);assert.equal(f.uploaded.length,1);
+});
+test('desktop confirmation closes the wizard after the final photo is successfully uploaded',async()=>{
+ const f=fixture(),{result}=await f.begin([image('last.jpg')]);
+ await f.mounts.at(-1).options.adapter.review({complete:true});await f.flush();
+ assert.deepEqual(Array.from(await result),[]);assert.equal(f.node('photoUploadEditor').open,false);assert.equal(f.uploaded.length,1);assert.equal((await details(f.uploaded[0])).metadata.complete,true);
+});
+test('face confirmation leaves failed uploads and invalid dates in place with their edits intact',async()=>{
+ for(const invalid of [false,true]){
+  const f=fixture({onUpload:async()=>{throw Error('Network unavailable');}}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+  f.node('photoEditCaption').value='לשמור את העריכה';f.node('photoEditCaption').dispatchEvent(new Event('input'));
+  if(invalid){const year=f.node('photoEditDateyear');year.value='1800';year.dispatchEvent(new Event('input'));}
+  await f.mounts.at(-1).options.adapter.review({complete:true});await f.flush();
+  assert.equal(f.uploaded.length,invalid?0:1);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.match(f.node('photoEditCounter').textContent,/תמונה 1 מתוך 2/);assert.equal(f.node('photoEditCaption').value,'לשמור את העריכה');
+  if(invalid)assert.equal(f.node('photoEditDateError').hidden,false);else assert.match(f.node('photoEditError').textContent,/Network unavailable/);
+  await f.click('Cancel');assert.equal(await result,null);
+ }
+});
+test('phone confirmation, undo and callbacks belonging to a previous photo do not upload or skip a photo',async()=>{
+ const phone=fixture({desktop:false}),pending=await phone.begin([image('one.jpg'),image('two.jpg')]);
+ await phone.mounts.at(-1).options.adapter.review({complete:true});await phone.flush();assert.equal(phone.uploaded.length,0);assert.equal(phone.node('photoEditFilename').textContent,'one.jpg');await phone.click('Cancel');assert.equal(await pending.result,null);
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]),adapter=f.mounts.at(-1).options.adapter;
+ await Promise.all([adapter.review({complete:true}),adapter.review({complete:false})]);await f.flush();assert.equal(f.uploaded.length,0);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ await f.click('Next');await adapter.review({complete:true});await f.flush();assert.equal(f.uploaded.length,0);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');
+ await f.click('Cancel');assert.equal(await result,null);
+});
 async function addLabel(f,name){
  const input=f.node('photoEditCustomLabelName');input.value=name;input.dispatchEvent(new Event('input'));
  const event=new Event('submit',{cancelable:true});f.node('photoEditCustomLabelForm').dispatchEvent(event);await f.flush();assert.equal(event.defaultPrevented,true);
@@ -271,4 +312,3 @@ test('individual approval validates only its photo, while remaining non-image fi
  const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);await f.click('Next');f.node('photoEditDateyear').value='99';f.node('photoEditDateyear').dispatchEvent(new Event('input'));await f.click('Previous');await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Save');assert.match(f.node('photoEditDateError').textContent,/1910/);await f.click('Cancel');assert.equal(await result,null);
  const mixed=fixture(),other=new File(['document'],'notes.pdf',{type:'application/pdf'}),pending=await mixed.begin([image('only.jpg'),other]);await mixed.click('SaveCurrent');assert.equal(mixed.node('photoUploadEditor').open,true);assert.equal(mixed.node('photoEditLeft').disabled,true);assert.equal(mixed.node('photoEditSaveCurrent').hidden,true);await mixed.click('Save');const remaining=await pending.result;assert.deepEqual(Array.from(remaining,file=>file.name),['notes.pdf']);assert.equal(mixed.uploaded.length,1);
 });
-

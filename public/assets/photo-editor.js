@@ -48,7 +48,13 @@ function stopFaces(){if(session?.faceActive){session.faceActive=false;window.Fam
 function startFaces(){
   stopFaces();const owner=session,d=draft();
   if(!owner||owner.mode==='existing'||!d||!source||!window.FamilyFaces)return;
-  const adapter=createUploadFaceAdapter(d,{tr,findPeople:(query,preferred)=>window.FamilyTags.findPeople(query,preferred),getPerson:id=>window.FamilyApp?.getPersonSummary?.(id),onChange:()=>{if(session===owner&&draft()===d){renderDraftTags();renderTagControls();}}});
+  const adapter=createUploadFaceAdapter(d,{tr,findPeople:(query,preferred)=>window.FamilyTags.findPeople(query,preferred),getPerson:id=>window.FamilyApp?.getPersonSummary?.(id),onChange:result=>{
+    if(session!==owner||draft()!==d)return;
+    renderDraftTags();renderTagControls();
+    if(!result.item.faceSummary?.reviewed||!owner.onUpload||!(window.FamilyPhotoKeyboard?.desktop?.()??desktop()))return;
+    // Let the confirmation finish painting before saving this photo and moving on.
+    queueMicrotask(()=>{if(session===owner&&draft()===d&&d.facesComplete&&!owner.loading&&!owner.saving)void saveCurrent();});
+  }});
   adapter.enabled=()=>session===owner&&draft()===d&&!d.cropping&&!owner.loading&&!owner.saving;
   owner.faceActive=true;
   window.FamilyFaces.mount(get('Image'),get('Canvas'),{id:d.key,kind:'photo',faceSummary:{reviewed:d.facesComplete}},{adapter,dialog,reviewHost:get('FaceTools'),reviewLabel:true,zoom:false,detectionImage:source}).catch(error=>{if(session===owner&&draft()===d)get('Error').textContent=error.message;});
@@ -370,8 +376,9 @@ async function recoverSave(owner,error){
 }
 async function saveCurrent(){
   const owner=session,d=draft();if(!owner||!d||owner.mode==='existing'||owner.loading||owner.saving||!owner.onUpload)return;
-  await window.FamilyFaces?.flush?.();if(session!==owner||owner.saving)return;
+  await window.FamilyFaces?.flush?.();if(session!==owner||draft()!==d||owner.saving)return;
   if(await invalidMetadata(d,owner.index))return;
+  if(session!==owner||draft()!==d||owner.saving)return;
   owner.saving=true;stopFaces();setBusy(true);get('Error').textContent='';
   try{
     const file=await prepareDraft(d);
@@ -438,4 +445,3 @@ function edit(item){
   return new Promise(resolve=>{jobs.push({mode:'existing',item,files:[],drafts:[],resolve});run();});
 }
 window.FamilyPhotoEditor={prepare,edit,upload:file=>photoUploadPayload(file,fileMetadata.get(file))};
-
