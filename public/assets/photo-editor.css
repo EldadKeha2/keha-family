@@ -31,6 +31,8 @@
 .photo-edit-custom-label>div{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .photo-edit-custom-label input{box-sizing:border-box;flex:1 1 180px;min-width:0;width:auto;min-height:40px;padding:7px 10px;border:1px solid #d0c3a1;border-radius:6px;background:#fffdfa;color:#4f5b41;font:16px/1.4 var(--sans)}
 .photo-edit-custom-label button{min-height:40px;white-space:nowrap}
+.photo-upload-editor[dir=rtl] .photo-edit-custom-label input{direction:rtl;text-align:right}
+.photo-upload-editor[dir=ltr] .photo-edit-custom-label input{direction:ltr;text-align:left}
 .photo-edit-label-status{margin:7px 0 0;color:#68794f;font-size:13px;line-height:1.5}
 .photo-edit-upload-status{font-size:13px;color:#52683d;margin:8px 0 0}
 .photo-edit-upload-status:empty{display:none}

@@ -17,6 +17,8 @@
 .photo-custom-label-form{grid-column:1/-1;display:grid;gap:6px;margin:0;padding:9px;border:1px solid #d6c59d;border-radius:6px;background:#fbf7eb}
 .photo-custom-label-form>div{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .photo-custom-label-form input{box-sizing:border-box;flex:1 1 120px;width:auto;min-width:0;height:38px;margin:0;padding:6px 9px;border:1px solid #ccb889;border-radius:5px;background:white;color:#5b542f;font:16px/1.4 var(--sans)}
+html[lang^=he] .photo-custom-label-form input{direction:rtl;text-align:right}
+html[lang^=en] .photo-custom-label-form input{direction:ltr;text-align:left}
 #mediaViewer .photo-custom-label-form button{min-height:38px;padding:6px 10px;border:1px solid #c6b487;border-radius:5px;background:#eee4c9;color:#705b30;font:14px/1.4 var(--sans)}
 #mediaViewer.mobile-photo-frame{max-height:calc(100dvh - 12px);margin:6px auto}
 #mediaViewer.mobile-photo-frame #mediaStage{height:var(--photo-fit-height,min(calc(100vw - 32px),52dvh,440px));min-height:0;overflow:hidden}

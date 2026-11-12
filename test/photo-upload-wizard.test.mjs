@@ -36,7 +36,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={wid
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
  vm.runInNewContext(source,{...core,...metadata,...faceDraft,...catalog,window,document,File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
- return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{target=document.body,...flags}={}){const event=new Event('keydown',{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
+ return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{type='keydown',target=document.body,...flags}={}){const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
 }
 const image=name=>new File(['original pixels '+name],name,{type:'image/jpeg',lastModified:1234});
 async function details(entry){const bytes=new Uint8Array(await entry.payload.body.arrayBuffer()),n=Number(entry.payload.headers[metadata.PHOTO_METADATA_HEADER]);return {metadata:metadata.decodeUploadMetadata(bytes.subarray(0,n)),pixels:bytes.subarray(n)};}
@@ -130,6 +130,25 @@ test('upload navigation leaves arrow keys to metadata, face editors, cropping, m
  await f.click('CropToggle');assert.equal((await f.key('ArrowRight')).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
  await f.click('Reset');await f.key('ArrowRight');assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Cancel');assert.equal(await result,null);
  const phone=fixture({desktop:false}),pending=await phone.begin([image('one.jpg'),image('two.jpg')]);assert.equal((await phone.key('ArrowRight')).defaultPrevented,false);assert.equal(phone.node('photoEditFilename').textContent,'one.jpg');await phone.click('Cancel');assert.equal(await pending.result,null);
+});
+test('a solo Control tap advances on release, wraps, and preserves photo edits while typing',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]),input=f.node('photoEditCaption');input.value='תיאור שנשמר';input.dispatchEvent(new Event('input'));
+ await f.key('Control',{ctrlKey:true,target:input});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');await f.key('Control',{ctrlKey:true,repeat:true,target:input});
+ assert.equal((await f.key('Control',{type:'keyup',target:input})).defaultPrevented,true);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');
+ await f.key('Control',{ctrlKey:true});await f.key('Control',{type:'keyup'});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(input.value,'תיאור שנשמר');await f.click('Cancel');assert.equal(await result,null);
+});
+test('Control combinations, pointer gestures, lost focus and phone layouts never trigger the solo-Control shortcut',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ for(const key of ['c','v','a','+','-','Shift','ArrowRight']){await f.key('Control',{ctrlKey:true});await f.key(key,{ctrlKey:true});assert.equal((await f.key('Control',{type:'keyup'})).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');}
+ for(const type of ['blur','pointerdown','wheel']){await f.key('Control',{ctrlKey:true});f.window.dispatchEvent(new Event(type));await f.key('Control',{type:'keyup'});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');}
+ await f.click('Cancel');assert.equal(await result,null);
+ const phone=fixture({desktop:false}),pending=await phone.begin([image('one.jpg'),image('two.jpg')]);await phone.key('Control',{ctrlKey:true});await phone.key('Control',{type:'keyup'});assert.equal(phone.node('photoEditFilename').textContent,'one.jpg');await phone.click('Cancel');assert.equal(await pending.result,null);
+});
+test('solo Control waits for a pending face tag and cannot skip past a photo chosen while it waits',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);let resolve;
+ f.window.FamilyFaces.flush=()=>new Promise(done=>{resolve=done;});await f.key('Control',{ctrlKey:true});await f.key('Control',{type:'keyup'});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ await f.click('Next');resolve();await f.flush();assert.equal(f.node('photoEditFilename').textContent,'two.jpg');
+ f.window.FamilyFaces.flush=async()=>{};await f.key('Control',{ctrlKey:true});await f.key('Control',{type:'keyup'});assert.equal(f.node('photoEditFilename').textContent,'three.jpg');await f.click('Cancel');assert.equal(await result,null);
 });
 test('phone individual upload advances and reduces the photo count only after success, while repeated taps cannot upload twice',async()=>{
  let finishUpload;const f=fixture({desktop:false,onUpload:()=>new Promise(resolve=>{finishUpload=resolve;})}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);

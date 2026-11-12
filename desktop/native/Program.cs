@@ -110,7 +110,7 @@ namespace KehaFamily {
         if (closing) return;
         await web.EnsureCoreWebView2Async(environment);if (closing) return;
         var core = web.CoreWebView2;core.Settings.AreHostObjectsAllowed = false;core.Settings.IsWebMessageEnabled = false;core.Settings.UserAgent += " KehaFamilyDesktop/2.0.0";
-        core.NavigationStarting += (sender, e) => { if (!Links.Trusted(e.Uri) && !(smoke && e.Uri == "about:blank")) { e.Cancel = true;OpenExternal(e.Uri); } };
+        core.NavigationStarting += (sender, e) => { if (!smoke && !Links.Trusted(e.Uri)) { e.Cancel = true;OpenExternal(e.Uri); } };
         core.NewWindowRequested += (sender, e) => { e.Handled = true;OpenExternal(e.Uri); };
         core.PermissionRequested += (sender, e) => e.State = CoreWebView2PermissionState.Deny;
         core.DOMContentLoaded += (sender, e) => { if (Links.Trusted(core.Source) || smoke) loading.Visible = false; };
@@ -120,6 +120,9 @@ namespace KehaFamily {
           if (e.KeyCode == Keys.F11) { e.Handled = true;e.SuppressKeyPress = true;SetFullscreen(!fullscreen); }
           if (e.KeyCode == Keys.F10) { e.Handled = true;e.SuppressKeyPress = true;menu.Visible = !menu.Visible; }
         };
+        // Make the browser's native child window visible before navigating.
+        // Keeping a WinForms panel in front can leave its renderer occluded.
+        web.BringToFront();loading.Visible = false;
         if (smoke) await VerifyNativeWindow(); else core.Navigate(Links.Home);
       } catch (Exception error) {
         if (closing) return;
@@ -138,7 +141,7 @@ namespace KehaFamily {
       var gone = SavedWindow.Fit(new Rectangle(90000, 90000, 4000, 3000), new[] { area });Check(area.Contains(gone), "Disconnected monitor was not corrected");
       web.CoreWebView2.NavigateToString("<!doctype html><html><body><h1>Keha Family native verification</h1></body></html>");
       for (var i = 0; i < 100; i++) { await Task.Delay(50);if ((await web.ExecuteScriptAsync("document.body && document.body.textContent")).Contains("native verification")) break; }
-      Check((await web.ExecuteScriptAsync("document.body.textContent")).Contains("native verification"), "WebView2 did not render");
+      Check((await web.ExecuteScriptAsync("document.body.textContent")).Contains("native verification"), "WebView2 did not render: " + web.CoreWebView2.Source + " / " + await web.ExecuteScriptAsync("document.documentElement.outerHTML") + " / visible=" + web.Visible + " / size=" + web.Size);
       SetFullscreen(true);Persist();var full = SavedWindow.Read(stateFile);Check(full.Fullscreen && full.Maximized, "Fullscreen state was not persisted");
       using (var restored = new FamilyWindow(stateFile, true, true)) { restored.Show();await Task.Delay(150);Check(restored.fullscreen && restored.FormBorderStyle == FormBorderStyle.None, "Fullscreen was not restored");restored.SetFullscreen(false);Check(restored.WindowState == FormWindowState.Maximized, "Previous maximized state was lost");restored.Close(); }
       SetFullscreen(false);WindowState = FormWindowState.Normal;Bounds = new Rectangle(area.X + 30, area.Y + 30, Math.Min(1000, area.Width - 60), Math.Min(700, area.Height - 60));Remember();Persist();
