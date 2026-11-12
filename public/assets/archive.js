@@ -52,16 +52,21 @@
     if(historic)return years===0?I18n.t('פחות משנה מאז החתונה'):I18n.html`${years} שנים מאז החתונה`;
     return years===0?I18n.t('נשואים פחות משנה'):years===1?I18n.t('נשואים שנה אחת'):I18n.html`נשואים ${years} שנים`;
   }
+  const weddingProfile=id=>app()?.getPersonSummary?.(id)?.profile||'';
+  function weddingPortrait(pair,record){
+    const picture=record?.cover?`<img class="wedding-card-cover" src="${safe(record.cover)}" alt="${safe(pairTitle(pair))}" loading="lazy" decoding="async">`:`<span class="wedding-portraits" aria-hidden="true">${pair.people.map(id=>{const src=weddingProfile(id);return `<span class="wedding-person-initial">${safe(name(id).split(/\s+/).filter(Boolean).map(part=>part[0]).slice(0,2).join(''))}${src?`<img class="wedding-person-photo" src="${safe(src)}" alt="" loading="lazy" decoding="async">`:''}</span>`;}).join('')}</span>`;
+    return `<span class="wedding-card-art${record?.cover?' has-wedding-photo':''}"><span class="wedding-card-picture">${picture}</span><span class="wedding-card-flourish" aria-hidden="true"></span></span>`;
+  }
   function renderWeddings(){
     const query=normalize(state.query),selectedBranch=$('weddingBranchFilter').value;
     const selected=couples.filter(pair=>(selectedBranch==='all'||(pair.branch||'root')===selectedBranch)&&(!query||normalize(pairTitle(pair)+' '+branchTitle(pair)+' '+(summaries.get(pair.id)?.date||'')).includes(query)));
     $('weddingsCount').textContent=I18n.html`${selected.length}${selected.length!==couples.length?I18n.t(' מתוך ')+couples.length:''} ${I18n.isEnglish?I18n.word(selected.length,'couple in the wedding collection','couples in the wedding collection'):I18n.t('זוגות באלבום החתונות')}`;
-    const signature=JSON.stringify(selected.map(pair=>{const item=summaries.get(pair.id);return [pair.id,item?.date,item?.revision,item?.cover,item?.mediaCount,item?.greetingCount];}));
+    const signature=JSON.stringify(selected.map(pair=>{const item=summaries.get(pair.id);return [pair.id,item?.date,item?.revision,item?.cover,item?.mediaCount,item?.greetingCount,...pair.people.map(weddingProfile)];}));
     if($('weddingGrid').dataset.signature===signature)return;
     $('weddingGrid').dataset.signature=signature;
     $('weddingGrid').innerHTML=selected.map(pair=>{
       const record=summaries.get(pair.id),date=record?.date;
-      return I18n.html`<article class="wedding-card"><button class="wedding-card-open" data-open-wedding="${pair.id}" aria-label="עמוד החתונה של ${safe(pairTitle(pair))}">${record?.cover?I18n.html`<img class="wedding-card-cover" src="${safe(record.cover)}" alt="מהחתונה של ${safe(pairTitle(pair))}" loading="lazy">`:''}<span class="wedding-portraits" aria-hidden="true">${pair.people.map(id=>`<span class="wedding-person-initial">${safe(name(id).split(/\s+/).filter(Boolean).map(part=>part[0]).slice(0,2).join(''))}</span>`).join('')}</span><h4><span>${safe(name(pair.people[0]))}${family.people[pair.people[0]].deceased?I18n.t(' ז״ל'):''}</span><em>ו</em><span>${safe(name(pair.people[1]))}${family.people[pair.people[1]].deceased?I18n.t(' ז״ל'):''}</span></h4><span class="wedding-card-branch">${safe(branchTitle(pair))}</span></button><div class="wedding-card-date"><div>${date?`<bdi>${safe(I18n.date(date))}</bdi><small>${safe(yearsText(record))}</small>`:I18n.t('<span class="wedding-date-unknown">יום הנישואים טרם הוזן</span>')}</div><button class="birthday-edit" data-edit-wedding-date="${pair.id}" aria-label="עריכת יום הנישואים של ${safe(pairTitle(pair))}" title="עדכון יום הנישואים" ${record?'':'disabled'}>${pencil}</button></div><div class="wedding-card-footer"><span>${record?.mediaCount||0} ${I18n.isEnglish?I18n.word(record?.mediaCount||0,'memory','memories'):I18n.t('זיכרונות')} · ${record?.greetingCount||0} ${I18n.isEnglish?I18n.word(record?.greetingCount||0,'greeting','greetings'):I18n.t('ברכות')}</span><button data-open-wedding="${pair.id}">לאלבום החתונה ↗</button></div></article>`;
+      return I18n.html`<article class="wedding-card"><button class="wedding-card-open" data-open-wedding="${pair.id}" aria-label="עמוד החתונה של ${safe(pairTitle(pair))}">${weddingPortrait(pair,record)}<h4><span>${safe(name(pair.people[0]))}${family.people[pair.people[0]].deceased?I18n.t(' ז״ל'):''}</span><em>ו</em><span>${safe(name(pair.people[1]))}${family.people[pair.people[1]].deceased?I18n.t(' ז״ל'):''}</span></h4><span class="wedding-card-branch">${safe(branchTitle(pair))}</span></button><div class="wedding-card-date"><div>${date?`<bdi>${safe(I18n.date(date))}</bdi><small>${safe(yearsText(record))}</small>`:I18n.t('<span class="wedding-date-unknown">יום הנישואים טרם הוזן</span>')}</div><button class="birthday-edit" data-edit-wedding-date="${pair.id}" aria-label="עריכת יום הנישואים של ${safe(pairTitle(pair))}" title="עדכון יום הנישואים" ${record?'':'disabled'}>${pencil}</button></div><div class="wedding-card-footer"><span>${record?.mediaCount||0} ${I18n.isEnglish?I18n.word(record?.mediaCount||0,'memory','memories'):I18n.t('זיכרונות')} · ${record?.greetingCount||0} ${I18n.isEnglish?I18n.word(record?.greetingCount||0,'greeting','greetings'):I18n.t('ברכות')}</span><button data-open-wedding="${pair.id}">${I18n.isEnglish?'Open album':'לאלבום'} <span aria-hidden="true">↗</span></button></div></article>`;
     }).join('')||I18n.t('<p class="no-content-match">לא נמצאו זוגות בבחירה הזו. נסו שם אחר או ענף אחר.</p>');
   }
   async function refreshWeddings(){
@@ -307,5 +312,7 @@
     if(/^#(weddings|nostalgia)(\/|$)/.test(location.hash))route();else activate(app().getView());
   }
   window.FamilyArchive={activate,search,acceptDrop,dragOver,acceptPaste};
+  document.addEventListener('error',event=>{if(event.target.matches?.('.wedding-person-photo'))event.target.hidden=true;},true);
+  window.addEventListener('family-profile-changed',()=>{if(state.view==='weddings'&&!state.weddingId)renderWeddings();});
   document.addEventListener('DOMContentLoaded',init);
 })();

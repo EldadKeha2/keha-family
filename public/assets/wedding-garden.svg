@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 130" fill="none">
+  <defs>
+    <linearGradient id="leaf" x2="1" y2="1"><stop stop-color="#a7ad83"/><stop offset="1" stop-color="#667b55"/></linearGradient>
+    <radialGradient id="rose"><stop stop-color="#e9c7b6"/><stop offset="1" stop-color="#f8ece1"/></radialGradient>
+    <g id="bloom" stroke="#c3aa77" stroke-width=".6"><path d="M0-12C8-16 15-7 10-2c11 4 6 16-3 14C0 23-10 16-10 9c-11-1-12-14-3-17C-14-17-3-21 0-12Z" fill="#fffaf1"/><path d="M-1-7c8-3 12 4 6 8 3 8-7 12-10 5-8 0-8-10-1-11" fill="url(#rose)"/><path d="M-2-2c6-6 12 4 4 5-5 3-8-3-3-4"/><circle r="1.5" fill="#be9a57"/></g>
+    <g id="spray"><path d="M149 113C100 120 43 98 20 55M111 109C87 95 68 73 65 49M76 96C50 98 32 86 24 73M51 80C45 60 42 38 47 21" stroke="#9f9c6f" stroke-width="1.4"/>
+      <g fill="url(#leaf)"><path d="M33 72C13 71 9 56 10 47c15 1 24 13 23 25Z"/><path d="M46 87C28 92 12 82 9 73c14-5 30 1 37 14Z"/><path d="M62 98C43 110 28 107 20 100c13-11 28-14 42-2Z"/><path d="M86 108C70 120 52 121 42 116c11-13 30-18 44-8Z"/><path d="M109 113C99 128 80 131 70 126c9-13 26-20 39-13Z"/><path d="M53 84C68 77 67 62 63 53c-12 5-16 20-10 31Z"/><path d="M74 98C89 88 88 74 82 65c-12 6-14 22-8 33Z"/><path d="M95 108C109 100 111 86 106 77c-12 5-17 20-11 31Z"/><path d="M45 51C30 44 29 28 34 20c12 6 15 18 11 31Z"/><path d="M46 40C59 36 64 21 59 11c-12 4-17 17-13 29Z"/><path d="M65 65C76 57 78 43 73 36c-11 5-15 18-8 29Z"/></g>
+      <g stroke="#b9ad81" stroke-width=".7"><path d="m30 65-6-28m4 16L17 34m20 45L7 57m57 38L48 63"/><g fill="#fffdf5"><circle cx="24" cy="35" r="3"/><circle cx="17" cy="32" r="2.5"/><circle cx="8" cy="57" r="3"/><circle cx="49" cy="62" r="2.5"/><circle cx="20" cy="46" r="2"/><circle cx="39" cy="71" r="2.5"/></g></g>
+    </g>
+  </defs>
+  <use href="#spray"/><use href="#spray" transform="translate(300 0) scale(-1 1)"/>
+  <use href="#bloom" transform="translate(102 108) scale(.85) rotate(-16)"/><use href="#bloom" transform="translate(197 108) scale(.85) rotate(20)"/>
+  <use href="#bloom" transform="translate(76 98) scale(.58)"/><use href="#bloom" transform="translate(223 98) scale(.58)"/>
+  <path d="M139 118c-15-18-22-3-9 0l10 2m20-2c15-18 22-3 9 0l-10 2m-10-1-8 11m11-11 8 11" stroke="#c3a269" stroke-width="1.5" stroke-linecap="round"/>
+  <g fill="#c1a365"><path d="m13 17 1.6 4.6L19 23l-4.4 1.6L13 29l-1.4-4.4L7 23l4.6-1.4Z"/><path d="m286 15 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/><circle cx="24" cy="11" r="1.5"/><circle cx="275" cy="8" r="1.2"/></g>
+</svg>

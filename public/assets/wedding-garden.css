@@ -1,0 +1,100 @@
+/* Compact wedding keepsakes: full photographs inside framed portrait medallions. */
+body[data-active-view=weddings]{--wedding-gold:#b89a60;--wedding-ink:#526344;--wedding-line:#e2d5b8}
+#weddingsOverview{position:relative;isolation:isolate;padding:0 4px 16px}
+#weddingsOverview .wedding-intro{display:flex;position:relative;justify-content:center;gap:15px;text-align:center;padding:16px 100px 20px;margin:0 0 12px;min-height:120px;border:0;border-bottom:1px solid var(--wedding-line);border-radius:0;background:radial-gradient(ellipse at bottom,#ede9d577,transparent 70%)}
+#weddingsOverview .wedding-intro:before,#weddingsOverview .wedding-intro:after{content:"";position:absolute;width:135px;height:80px;bottom:7px;background:url("wedding-garden.svg?v=1") center/contain no-repeat;opacity:.7;pointer-events:none}
+#weddingsOverview .wedding-intro:before{inset-inline-start:0;transform:rotate(14deg)}
+#weddingsOverview .wedding-intro:after{inset-inline-end:0;transform:rotate(-14deg)}
+#weddingsOverview .wedding-intro .archive-emblem{width:65px;color:var(--wedding-gold)}
+#weddingsOverview .wedding-intro .archive-emblem svg{height:48px;fill:none;stroke:currentColor;stroke-width:1.2;filter:drop-shadow(0 2px 1px #b59b5820)}
+#weddingsOverview .wedding-intro h3{font-size:calc(29px * var(--a11y-text-scale,1));line-height:1.2;margin:4px 0 7px;color:var(--wedding-ink)}
+#weddingsOverview .wedding-intro p{max-width:550px;font-size:calc(13px * var(--a11y-text-scale,1));line-height:1.6;margin:0;color:#887b62}
+#weddingsOverview .wedding-intro .small-eyebrow{font-size:calc(10px * var(--a11y-text-scale,1));letter-spacing:.06em;color:#9e875c}
+body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-header{padding-top:15px;padding-bottom:13px}
+body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-title h2{font-size:calc(28px * var(--a11y-text-scale,1))}
+body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-title p{display:none}
+#weddingsOverview .archive-toolbar{margin:12px 0 18px;font-size:calc(13px * var(--a11y-text-scale,1));gap:12px}
+#weddingsOverview .archive-toolbar select{min-height:40px;padding:6px 12px;border-radius:22px;background:#fffdf6;font-size:calc(13px * var(--a11y-text-scale,1));border-color:var(--wedding-line)}
+#weddingGrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;align-items:stretch}
+#weddingGrid .wedding-card{display:flex;flex-direction:column;position:relative;overflow:hidden;border:1px solid #d8c8a5;border-radius:18px;background:linear-gradient(155deg,#fffef9,#f8f4e8);box-shadow:0 3px 12px #69572e0a;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+#weddingGrid .wedding-card:before{content:"";position:absolute;inset:5px;border:1px solid #e9dfc9;border-radius:13px;pointer-events:none;z-index:1}
+#weddingGrid .wedding-card:hover{transform:translateY(-3px);border-color:#bfa574;box-shadow:0 8px 22px #69572e15}
+#weddingGrid .wedding-card:focus-within{outline:2px solid #7c8d64;outline-offset:3px}
+#weddingGrid .wedding-card-open{flex:1;display:flex;align-items:center;justify-content:flex-start;min-height:0;padding:15px 14px 10px;background:transparent}
+#weddingGrid .wedding-card-open:after{content:none}
+#weddingGrid .wedding-card-open:focus-visible{outline:none}
+#weddingGrid .wedding-card-art{display:block;position:relative;flex:none;width:184px;height:158px;margin:0 auto 3px}
+#weddingGrid .wedding-card-picture{position:absolute;inset:0 22px 17px;display:flex;align-items:center;justify-content:center;border:1px solid #c9b17c;border-radius:75px 75px 28px 28px;background:linear-gradient(135deg,#faf7ec,#ece9db);box-shadow:0 0 0 3px #fffdf5,0 0 0 4px #d8c8a5,0 4px 10px #5f4d2810;overflow:hidden}
+#weddingGrid .wedding-card-cover{display:block;flex:none;width:100%;height:100%;max-width:100%;object-fit:contain;object-position:center;margin:0;padding:10px;box-sizing:border-box;border-radius:0;background:transparent;filter:none}
+#weddingGrid .wedding-card-flourish{position:absolute;pointer-events:none;inset:auto -8px -2px;height:87px;background:url("wedding-garden.svg?v=1") center bottom/contain no-repeat}
+#weddingGrid .wedding-portraits{display:flex!important;position:relative;width:100%;height:100%;min-height:0;margin:0;padding:14px 0 21px;gap:0;background:none;box-sizing:border-box}
+#weddingGrid .wedding-portraits:before{content:"♡";top:auto;bottom:8px;left:calc(50% - 7px);color:#b99c66;font-size:18px}
+#weddingGrid .wedding-person-initial{position:relative;isolation:isolate;overflow:hidden;flex:none;width:64px;height:76px;border:2px solid #fffdf6;border-radius:50% 50% 44% 44%;outline:1px solid #c9ba92;outline-offset:0;font-size:calc(20px * var(--a11y-text-scale,1));background:linear-gradient(145deg,#e8eddf,#d9dfcc);color:#657552;box-shadow:0 3px 7px #5f4d2815}
+#weddingGrid .wedding-person-initial+ .wedding-person-initial{margin-inline-start:-6px;background:linear-gradient(145deg,#f6eae0,#e8d7c6);color:#94785e;transform:translateY(5px)}
+#weddingGrid .wedding-person-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;border-radius:inherit}
+#weddingGrid .wedding-person-photo[hidden]{display:none}
+#weddingGrid .wedding-card-open h4{display:flex;flex-direction:row;justify-content:center;align-content:center;align-items:baseline;flex-wrap:wrap;gap:0 4px;min-height:48px;width:100%;margin:3px 0 4px;font:calc(18px * var(--a11y-text-scale,1))/1.35 var(--serif);color:var(--wedding-ink)}
+#weddingGrid .wedding-card-open h4 span{max-width:100%;overflow-wrap:anywhere}
+#weddingGrid .wedding-card-open h4 em{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.2;color:#ac925d}
+#weddingGrid .wedding-card-branch{font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.5;color:#897d65}
+#weddingGrid .wedding-card-date{min-height:46px;padding:5px 13px;gap:4px;border-top:1px solid #e9dfc9;background:#f4f0e255}
+#weddingGrid .wedding-card-date>div{gap:0;flex:1;min-width:0}
+#weddingGrid .wedding-card-date bdi{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.5;color:#61714b}
+#weddingGrid .wedding-card-date small,#weddingGrid .wedding-date-unknown{font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.4;color:#938265}
+#weddingGrid .wedding-card-date .birthday-edit{position:relative;z-index:2;flex:none;width:34px;height:36px;min-height:36px;padding:9px;color:#9e875c;border-radius:50%}
+#weddingGrid .wedding-card-date .birthday-edit:hover{background:#e8e6d8}
+#weddingGrid .wedding-card-footer{position:relative;z-index:2;min-height:42px;padding:6px 13px 9px;gap:5px;border:0;color:#9a8a6b;font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.4}
+#weddingGrid .wedding-card-footer>span{min-width:0}
+#weddingGrid .wedding-card-footer button{display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;min-height:30px;padding:3px 10px;border:1px solid #bcc5a8;border-radius:20px;background:#edf0e3;color:#5c704a;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.4;white-space:nowrap}
+#weddingGrid .wedding-card-footer button:hover{background:#e2e9d5;border-color:#9caa82}
+#weddingGrid .no-content-match{grid-column:1/-1}
+#weddingDetail .wedding-page-intro{position:relative;overflow:hidden;padding:24px 24px 22px;border:1px solid var(--wedding-line);border-radius:18px;background:radial-gradient(ellipse at top,#eae8d7aa,transparent 75%),#fdfaf1}
+#weddingDetail .wedding-page-intro:before,#weddingDetail .wedding-page-intro:after{content:"";position:absolute;bottom:-6px;width:170px;height:100px;background:url("wedding-garden.svg?v=1") center/contain no-repeat;opacity:.55;pointer-events:none}
+#weddingDetail .wedding-page-intro:before{inset-inline-start:-30px;transform:rotate(25deg)}
+#weddingDetail .wedding-page-intro:after{inset-inline-end:-30px;transform:rotate(-25deg)}
+#weddingDetail .wedding-page-intro h3{font-size:calc(34px * var(--a11y-text-scale,1));margin:5px 0}
+#weddingDetail .wedding-page-intro>p{font-size:calc(14px * var(--a11y-text-scale,1));margin:4px 0 18px}
+#weddingDetail .wedding-anniversary{position:relative;z-index:1;gap:16px}
+#weddingDetail .wedding-anniversary>div{font-size:calc(14px * var(--a11y-text-scale,1));gap:3px}
+#weddingDetail .wedding-anniversary strong{font-size:calc(16px * var(--a11y-text-scale,1))}
+@media(min-width:1500px){#weddingGrid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media(max-width:1100px) and (min-width:701px){#weddingGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){
+  #weddingsOverview{padding:0 0 12px}
+  body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-title h2{font-size:calc(22px * var(--a11y-text-scale,1))}
+  #weddingsOverview .wedding-intro{display:flex;min-height:0;padding:10px 34px 15px;gap:8px;margin:0 0 7px}
+  #weddingsOverview .wedding-intro .archive-emblem{width:36px}
+  #weddingsOverview .wedding-intro .archive-emblem svg{height:30px}
+  #weddingsOverview .wedding-intro h3{font-size:calc(21px * var(--a11y-text-scale,1));margin:3px 0}
+  #weddingsOverview .wedding-intro p{display:none}
+  #weddingsOverview .wedding-intro .small-eyebrow{font-size:calc(9px * var(--a11y-text-scale,1));letter-spacing:0}
+  #weddingsOverview .wedding-intro:before,#weddingsOverview .wedding-intro:after{width:65px;height:43px;bottom:1px;opacity:.6}
+  #weddingsOverview .wedding-intro:before{inset-inline-start:-10px}
+  #weddingsOverview .wedding-intro:after{inset-inline-end:-10px}
+  #weddingsOverview .archive-toolbar{gap:8px;margin:10px 0 13px;font-size:calc(11px * var(--a11y-text-scale,1))}
+  #weddingsOverview .archive-toolbar select{min-height:38px;max-width:145px;padding:5px 9px;font-size:calc(11px * var(--a11y-text-scale,1))}
+  #weddingGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+  #weddingGrid .wedding-card{border-radius:15px}
+  #weddingGrid .wedding-card:before{inset:4px;border-radius:11px}
+  #weddingGrid .wedding-card-open{padding:13px 8px 7px}
+  #weddingGrid .wedding-card-art{width:138px;max-width:100%;height:123px;margin-bottom:2px}
+  #weddingGrid .wedding-card-picture{inset:0 14px 16px;border-radius:58px 58px 23px 23px}
+  #weddingGrid .wedding-card-cover{width:100%;height:100%;margin:0;padding:8px;background:none}
+  #weddingGrid .wedding-card-flourish{inset:auto -6px 0;height:65px}
+  #weddingGrid .wedding-portraits{width:100%;height:100%;min-height:0;margin:0;padding:10px 0 20px;gap:0;background:none}
+  #weddingGrid .wedding-portraits:before{top:auto;bottom:5px;font-size:15px}
+  #weddingGrid .wedding-person-initial{width:48px;height:60px;font-size:calc(16px * var(--a11y-text-scale,1))}
+  #weddingGrid .wedding-card-open h4{font-size:calc(15px * var(--a11y-text-scale,1));min-height:43px;line-height:1.4;gap:0 3px;margin:2px 0 3px}
+  #weddingGrid .wedding-card-open h4 em{font-size:calc(12px * var(--a11y-text-scale,1))}
+  #weddingGrid .wedding-card-branch{font-size:calc(9px * var(--a11y-text-scale,1))}
+  #weddingGrid .wedding-card-date{min-height:42px;padding:4px 8px;gap:2px}
+  #weddingGrid .wedding-card-date bdi{font-size:calc(12px * var(--a11y-text-scale,1))}
+  #weddingGrid .wedding-card-date small,#weddingGrid .wedding-date-unknown{font-size:calc(9px * var(--a11y-text-scale,1))}
+  #weddingGrid .wedding-card-date .birthday-edit{width:28px;height:34px;min-height:34px;padding:7px}
+  #weddingGrid .wedding-card-footer{justify-content:space-between;gap:3px;min-height:38px;padding:5px 8px 8px;font-size:calc(9px * var(--a11y-text-scale,1))}
+  #weddingGrid .wedding-card-footer button{display:inline-flex;min-height:28px;padding:3px 7px;gap:3px;font-size:calc(10px * var(--a11y-text-scale,1))}
+  #weddingDetail .wedding-page-intro{padding:18px 13px}
+  #weddingDetail .wedding-page-intro h3{font-size:calc(26px * var(--a11y-text-scale,1))}
+  #weddingDetail .wedding-page-intro>p{font-size:calc(12px * var(--a11y-text-scale,1));margin-bottom:13px}
+}
+@media(prefers-reduced-motion:reduce){#weddingGrid .wedding-card{transition:none}#weddingGrid .wedding-card:hover{transform:none}}
