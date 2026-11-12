@@ -1,19 +1,26 @@
-/* Clean cream navigation, with quiet individual colors on the home cards. */
+/* Shared cream home-card palette for desktop, phone home and phone menu. */
+#mainNav .nav-link[data-view="tree"],:is(#homeTiles,#mobileMenuTiles) .home-tile-tree{--tab-top:#f1f7e9;--tab-mid:#d2e2be;--tab-low:#b9d098;--tab-line:#a6bc8f;--tab-ink:#496339}
+#mainNav .nav-link[data-view="timeline"],:is(#homeTiles,#mobileMenuTiles) .home-tile-timeline{--tab-top:#eff2fd;--tab-mid:#cdd7ee;--tab-low:#aebfdf;--tab-line:#a0b1cf;--tab-ink:#465d82}
+#mainNav .nav-link[data-view="directory"],:is(#homeTiles,#mobileMenuTiles) .home-tile-directory{--tab-top:#fff0e8;--tab-mid:#f1cdbd;--tab-low:#e5b29d;--tab-line:#d0aa98;--tab-ink:#7d4c38}
+#mainNav .nav-link[data-view="videos"],:is(#homeTiles,#mobileMenuTiles) .home-tile-videos{--tab-top:#f6eefb;--tab-mid:#decaed;--tab-low:#c2a7d8;--tab-line:#b59ac9;--tab-ink:#654876}
+#mainNav .nav-link[data-view="gallery"],:is(#homeTiles,#mobileMenuTiles) .home-tile-gallery{--tab-top:#eaf9f2;--tab-mid:#beded2;--tab-low:#99c8b6;--tab-line:#99bfae;--tab-ink:#3c6b60}
+#mainNav .nav-link[data-view="calendar"],:is(#homeTiles,#mobileMenuTiles) .home-tile-calendar{--tab-top:#fff8dc;--tab-mid:#f2dea7;--tab-low:#e4c984;--tab-line:#ceb478;--tab-ink:#765b25}
+#mainNav .nav-link[data-view="photos"],:is(#homeTiles,#mobileMenuTiles) .home-tile-photos{--tab-top:#eef6fd;--tab-mid:#cbdfef;--tab-low:#accbe2;--tab-line:#9ebbd1;--tab-ink:#415d72}
+#mainNav .nav-link[data-view="stories"],:is(#homeTiles,#mobileMenuTiles) .home-tile-stories{--tab-top:#fff2df;--tab-mid:#efd5b1;--tab-low:#ddb98a;--tab-line:#ccac7e;--tab-ink:#7c592f}
+#mainNav .nav-link[data-view="weddings"],:is(#homeTiles,#mobileMenuTiles) .home-tile-weddings{--tab-top:#fff0f6;--tab-mid:#f0ccdb;--tab-low:#dfadc3;--tab-line:#d3a2b9;--tab-ink:#82465f}
+#mainNav .nav-link[data-view="nostalgia"],:is(#homeTiles,#mobileMenuTiles) .home-tile-nostalgia{--tab-top:#f7f2e2;--tab-mid:#e2d6b9;--tab-low:#cdbb94;--tab-line:#bdaa83;--tab-ink:#6d5e3d}
+#mainNav .nav-link[data-view="updates"],:is(#homeTiles,#mobileMenuTiles) .home-tile-updates{--tab-top:#edf8fb;--tab-mid:#c6e1e9;--tab-low:#9fc7d4;--tab-line:#98becb;--tab-ink:#456d7c}
+#mainNav .nav-link[data-view="games"],:is(#homeTiles,#mobileMenuTiles) .home-tile-games{--tab-top:#f7edfc;--tab-mid:#e3ccef;--tab-low:#caaaDC;--tab-line:#bb9acc;--tab-ink:#715582}
+#mainNav .nav-link[data-view="nursery"],:is(#homeTiles,#mobileMenuTiles) .home-tile-nursery{--tab-top:#fff4e4;--tab-mid:#f4dbb9;--tab-low:#e8bf93;--tab-line:#d3ae96;--tab-ink:#895c42}
+#mainNav .nav-link[data-view="memorial"],:is(#homeTiles,#mobileMenuTiles) .home-tile-memorial{--tab-top:#f7f4e9;--tab-mid:#e5dfcb;--tab-low:#d1c6a8;--tab-line:#c1b38f;--tab-ink:#6d6040}
+/* The same cream gradients, borders, text and icon frames at every screen size. */
+:is(#homeTiles,#mobileMenuTiles) .home-tile{background:linear-gradient(145deg,#fffefb,color-mix(in srgb,var(--tab-mid,#f5eddd) 14%,#fffdf7) 55%,color-mix(in srgb,var(--tab-low,#e8dcc3) 22%,#fffdf7));border-color:color-mix(in srgb,var(--tab-line,#cdb78e) 42%,#e1dac8);border-radius:11px;box-shadow:inset 0 1px 0 #ffffffb3,0 2px 8px #70532606;transition:transform .18s,box-shadow .18s,border-color .18s}
+:is(#homeTiles,#mobileMenuTiles) .home-tile:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--tab-line,#cdb78e) 65%,#e1dac8);box-shadow:inset 0 1px 0 #fff,0 3px 10px #7053260d}
+:is(#homeTiles,#mobileMenuTiles) .home-tile strong,:is(#homeTiles,#mobileMenuTiles) .home-tile .home-tile-icon,:is(#homeTiles,#mobileMenuTiles) .home-tile .home-tile-arrow{color:color-mix(in srgb,var(--tab-ink,#566a44) 60%,#657052)}
+:is(#homeTiles,#mobileMenuTiles) .home-tile small{color:#7c725e}
+:is(#homeTiles,#mobileMenuTiles) .home-tile .home-tile-icon{display:grid;place-items:center;width:48px;height:52px;flex:0 0 48px;border:1px solid #e5dfcf80;border-radius:13px;background:linear-gradient(145deg,#ffffff80,#ffffff0d);box-shadow:inset 0 1px 0 #ffffff9c}
+:is(#homeTiles,#mobileMenuTiles) .home-tile .home-tile-icon svg{width:37px;height:37px}
 @media(min-width:701px){
-  #mainNav .nav-link[data-view="tree"],#homeTiles .home-tile-tree{--tab-top:#f1f7e9;--tab-mid:#d2e2be;--tab-low:#b9d098;--tab-line:#a6bc8f;--tab-ink:#496339}
-  #mainNav .nav-link[data-view="timeline"],#homeTiles .home-tile-timeline{--tab-top:#eff2fd;--tab-mid:#cdd7ee;--tab-low:#aebfdf;--tab-line:#a0b1cf;--tab-ink:#465d82}
-  #mainNav .nav-link[data-view="directory"],#homeTiles .home-tile-directory{--tab-top:#fff0e8;--tab-mid:#f1cdbd;--tab-low:#e5b29d;--tab-line:#d0aa98;--tab-ink:#7d4c38}
-  #mainNav .nav-link[data-view="videos"],#homeTiles .home-tile-videos{--tab-top:#f6eefb;--tab-mid:#decaed;--tab-low:#c2a7d8;--tab-line:#b59ac9;--tab-ink:#654876}
-  #mainNav .nav-link[data-view="gallery"],#homeTiles .home-tile-gallery{--tab-top:#eaf9f2;--tab-mid:#beded2;--tab-low:#99c8b6;--tab-line:#99bfae;--tab-ink:#3c6b60}
-  #mainNav .nav-link[data-view="calendar"],#homeTiles .home-tile-calendar{--tab-top:#fff8dc;--tab-mid:#f2dea7;--tab-low:#e4c984;--tab-line:#ceb478;--tab-ink:#765b25}
-  #mainNav .nav-link[data-view="photos"],#homeTiles .home-tile-photos{--tab-top:#eef6fd;--tab-mid:#cbdfef;--tab-low:#accbe2;--tab-line:#9ebbd1;--tab-ink:#415d72}
-  #mainNav .nav-link[data-view="stories"],#homeTiles .home-tile-stories{--tab-top:#fff2df;--tab-mid:#efd5b1;--tab-low:#ddb98a;--tab-line:#ccac7e;--tab-ink:#7c592f}
-  #mainNav .nav-link[data-view="weddings"],#homeTiles .home-tile-weddings{--tab-top:#fff0f6;--tab-mid:#f0ccdb;--tab-low:#dfadc3;--tab-line:#d3a2b9;--tab-ink:#82465f}
-  #mainNav .nav-link[data-view="nostalgia"],#homeTiles .home-tile-nostalgia{--tab-top:#f7f2e2;--tab-mid:#e2d6b9;--tab-low:#cdbb94;--tab-line:#bdaa83;--tab-ink:#6d5e3d}
-  #mainNav .nav-link[data-view="updates"],#homeTiles .home-tile-updates{--tab-top:#edf8fb;--tab-mid:#c6e1e9;--tab-low:#9fc7d4;--tab-line:#98becb;--tab-ink:#456d7c}
-  #mainNav .nav-link[data-view="games"],#homeTiles .home-tile-games{--tab-top:#f7edfc;--tab-mid:#e3ccef;--tab-low:#caaaDC;--tab-line:#bb9acc;--tab-ink:#715582}
-  #mainNav .nav-link[data-view="nursery"],#homeTiles .home-tile-nursery{--tab-top:#fff4e4;--tab-mid:#f4dbb9;--tab-low:#e8bf93;--tab-line:#d3ae96;--tab-ink:#895c42}
-  #mainNav .nav-link[data-view="memorial"],#homeTiles .home-tile-memorial{--tab-top:#f7f4e9;--tab-mid:#e5dfcb;--tab-low:#d1c6a8;--tab-line:#c1b38f;--tab-ink:#6d6040}
   .site-header .main-nav{gap:10px;align-items:stretch;padding:15px 0 5px;position:relative}
   .site-header .main-nav:before{content:'';position:absolute;top:0;inset-inline:0;height:1px;background:linear-gradient(90deg,transparent,#d0bb91 15%,#d0bb91 85%,transparent)}
   .site-header .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid #cdb78e;border-radius:7px;background:#f8f3e7;color:#716145;box-shadow:inset 0 0 0 2px #fffaf0,0 2px 4px #7053260a;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.4;transition:background .18s,border-color .18s,box-shadow .18s}
@@ -23,14 +30,6 @@
   .site-header .main-nav .nav-link.active:before{border-color:#ecd4a0}
   .site-header .main-nav .nav-link.active:after{display:none}
   .site-header .main-nav .nav-link:focus-visible{outline:3px solid #aa884b;outline-offset:3px}
-  /* Home cards keep a quiet, cream-based tint; the header tabs retain their palette. */
-  #homeTiles .home-tile{background:linear-gradient(145deg,#fffefb,color-mix(in srgb,var(--tab-mid,#f5eddd) 14%,#fffdf7) 55%,color-mix(in srgb,var(--tab-low,#e8dcc3) 22%,#fffdf7));border-color:color-mix(in srgb,var(--tab-line,#cdb78e) 42%,#e1dac8);border-radius:11px;box-shadow:inset 0 1px 0 #ffffffb3,0 2px 8px #70532606;transition:transform .18s,box-shadow .18s,border-color .18s}
-  html[dir=ltr] #homeTiles .home-tile{box-shadow:inset 0 1px 0 #ffffffb3,0 2px 8px #70532606}
-  #homeTiles .home-tile:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--tab-line,#cdb78e) 65%,#e1dac8);box-shadow:inset 0 1px 0 #fff,0 3px 10px #7053260d}
-  #homeTiles .home-tile strong,#homeTiles .home-tile .home-tile-icon,#homeTiles .home-tile .home-tile-arrow{color:color-mix(in srgb,var(--tab-ink,#566a44) 60%,#657052)}
-  #homeTiles .home-tile small{color:#7c725e}
-  #homeTiles .home-tile .home-tile-icon{display:grid;place-items:center;width:48px;height:52px;flex:0 0 48px;border:1px solid #e5dfcf80;border-radius:13px;background:linear-gradient(145deg,#ffffff80,#ffffff0d);box-shadow:inset 0 1px 0 #ffffff9c}
-  #homeTiles .home-tile .home-tile-icon svg{width:37px;height:37px}
 }
 .home-tile-nursery{--tile-surface:#f4e0d5;--tile-line:#d3ae96;--tile-ink:#895c42}
 /* Nursery pairs with memorial, leaving both the same size as the other small tiles. */
@@ -41,4 +40,4 @@
 #homeTiles .home-tile-memorial .home-tile-icon svg,#mobileMenuTiles .home-tile-memorial .home-tile-icon svg{width:35px;height:35px}
 #homeTiles .home-tile-memorial .home-tile-arrow,#mobileMenuTiles .home-tile-memorial .home-tile-arrow{display:none}
 @media(max-width:430px){#mobileMenuTiles .home-tile-memorial{min-height:81px}}
-@media(prefers-reduced-motion:reduce){.site-header .main-nav .nav-link{transition:none}}
+@media(prefers-reduced-motion:reduce){.site-header .main-nav .nav-link,:is(#homeTiles,#mobileMenuTiles) .home-tile{transition:none}}
