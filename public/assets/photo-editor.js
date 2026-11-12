@@ -63,7 +63,7 @@ function mount(){
     <p id="photoEditHint" class="photo-edit-hint" hidden></p>
     <div id="photoEditHistory" class="photo-edit-history" hidden><label for="photoEditVersion">${tr('גרסאות התמונה','Photo versions')}</label><select id="photoEditVersion"></select><span id="photoEditVersionStatus" role="status"></span></div>
     <nav class="photo-edit-pager" aria-label="${tr('התמונות שנבחרו להעלאה','Photos selected for upload')}"><button type="button" id="photoEditPrevious" class="secondary-button">${tr('הקודמת','Previous')}</button><div><strong id="photoEditCounter" aria-live="polite"></strong><span id="photoEditFilename" dir="auto"></span></div><button type="button" id="photoEditNext" class="secondary-button">${tr('הבאה','Next')}</button></nav>
-    <section id="photoEditMetadata" class="photo-edit-metadata"><div class="photo-edit-date" role="group" aria-labelledby="photoEditDateLabel"><span id="photoEditDateLabel" class="photo-edit-date-label"><span>${tr('תאריך','Photo')}</span> <span>${tr('צילום','date')}</span></span><div class="photo-edit-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoEditDate${field}">${label}<input id="photoEditDate${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off"></label>`).join('')}</div><p id="photoEditDateSource" class="photo-edit-date-source" role="status" hidden></p></div><label class="photo-edit-caption" for="photoEditCaption"><span class="photo-edit-caption-label"><span>${tr('תיאור','Photo')}</span> <span>${tr('התמונה','description')}</span></span><textarea id="photoEditCaption" dir="auto" rows="2" maxlength="5000" placeholder="${tr('לחצו כאן להקלדת תיאור...','Tap here to enter a description...')}" autocomplete="off"></textarea></label></section>
+    <section id="photoEditMetadata" class="photo-edit-metadata"><div class="photo-edit-date" role="group" aria-labelledby="photoEditDateLabel"><span id="photoEditDateLabel" class="photo-edit-date-label"><span>${tr('תאריך','Photo')}</span> <span>${tr('צילום','date')}</span></span><div class="photo-edit-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1910,new Date().getFullYear()]].map(([field,label,min,max])=>`<label for="photoEditDate${field}">${label}<input id="photoEditDate${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" aria-describedby="photoEditDateError" placeholder="—" autocomplete="off"></label>`).join('')}<button type="button" id="photoEditCopyDate" class="photo-edit-copy-date" title="${tr('העתקת התאריך מהתמונה הקודמת','Copy date from previous photo')}" aria-label="${tr('העתקת התאריך מהתמונה הקודמת','Copy date from previous photo')}"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7 2v4m10-4v4M3 9h18m-10 4-3 3 3 3m-3-3h5a3 3 0 0 1 3 3"/></svg></button></div><p id="photoEditDateError" class="photo-edit-date-error" role="alert" hidden></p><p id="photoEditDateSource" class="photo-edit-date-source" role="status" hidden></p></div><label class="photo-edit-caption" for="photoEditCaption"><span class="photo-edit-caption-label"><span>${tr('תיאור','Photo')}</span> <span>${tr('התמונה','description')}</span></span><textarea id="photoEditCaption" dir="auto" rows="2" maxlength="5000" placeholder="${tr('לחצו כאן להקלדת תיאור...','Tap here to enter a description...')}" autocomplete="off"></textarea></label></section>
     <div id="photoEditViewport" class="photo-edit-viewport"><p id="photoEditLoading" role="status"></p><div id="photoEditImage" class="photo-edit-image" hidden><canvas id="photoEditCanvas" role="img" aria-label="${tr('תצוגה מקדימה של התמונה לפני ההעלאה','Photo preview before upload')}"></canvas><div id="photoEditCropLayer" class="photo-edit-crop-layer" hidden><div id="photoEditCrop" class="photo-edit-crop" data-handle="move" tabindex="0" role="group" aria-label="${tr('מסגרת החיתוך. גררו להזזה או השתמשו במקשי החצים.','Crop area. Drag to move or use the arrow keys.')}">${['nw','n','ne','e','se','s','sw','w'].map(handle=>`<button type="button" class="photo-edit-handle handle-${handle}" data-handle="${handle}" aria-label="${handleLabel(handle)}"></button>`).join('')}<span class="photo-edit-thirds" aria-hidden="true"></span></div></div></div></div>
     <div class="photo-edit-toolbar" id="photoEditToolbar"><button type="button" id="photoEditLeft" class="secondary-button"><span class="photo-edit-mobile-icon" aria-hidden="true">↶</span><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg><span class="photo-edit-action-label"><span>${tr('סיבוב','Rotate')}</span> <span>${tr('שמאלה','left')}</span></span></button><button type="button" id="photoEditRight" class="secondary-button"><span class="photo-edit-mobile-icon" aria-hidden="true">↷</span><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10a8 8 0 1 0-1 8M20 4v6h-6"/></svg><span class="photo-edit-action-label"><span>${tr('סיבוב','Rotate')}</span> <span>${tr('ימינה','right')}</span></span></button><button type="button" id="photoEditCropToggle" class="secondary-button" aria-pressed="false"><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v13a2 2 0 0 0 2 2h13M3 6h13a2 2 0 0 1 2 2v13"/></svg><span class="photo-edit-action-label">${tr('חיתוך','Crop')}</span></button><button type="button" id="photoEditReset" class="photo-edit-text-button"><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/><path d="M12 8v4l3 2"/></svg><span class="photo-edit-action-label">${tr('איפוס','Reset')}</span></button><label id="photoEditFamilyPhotoChoice" class="photo-edit-family-choice" for="photoEditFamilyPhoto"><input id="photoEditFamilyPhoto" type="checkbox" aria-label="${tr('הוספה לתמונות משפחתיות','Add to Family photos')}"><span class="photo-edit-family-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="3"/><circle cx="18" cy="7" r="3"/><circle cx="12" cy="13" r="2.5"/><path d="M1 20v-4a5 5 0 0 1 7-4m15 8v-4a5 5 0 0 0-7-4M7 22v-2a5 5 0 0 1 10 0v2"/></svg></span><span class="photo-edit-family-text">${tr('הוספה לתמונות משפחתיות','Add to Family photos')}</span></label><button type="button" id="photoEditTaggingToggle" class="secondary-button" hidden aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M9 8h.01M15 8h.01M9 11a4 4 0 0 0 6 0M3 3h4M3 3v4m18-4h-4m4 0v4M3 21h4m-4 0v-4m18 4h-4m4 0v-4"/></svg><span>${tr('תיוג פנים','Tag faces')}</span></button><span id="photoEditFaceTools" class="photo-edit-face-tools"></span></div>
     <section id="photoEditTags" class="photo-edit-tags" hidden><div id="photoEditPeopleSection"><strong>${tr('אנשים בתמונה','People in this photo')}</strong><div id="photoEditPeopleTags" class="photo-edit-tag-chips"></div></div><details><summary>${tr('אירועים ותגיות','Events and labels')}</summary><div id="photoEditEventChoices" class="photo-edit-event-choices"></div><form id="photoEditCustomLabelForm" class="photo-edit-custom-label"><label for="photoEditCustomLabelName">${tr('תגית נוספת','Another label')}</label><div><input id="photoEditCustomLabelName" type="text" dir="${I.isEnglish?'ltr':'rtl'}" maxlength="60" autocomplete="off" placeholder="${tr('שם התגית החדשה…','New label name…')}"><button type="submit" class="secondary-button">＋ ${tr('הוספת תגית','Add label')}</button></div></form><p id="photoEditLabelStatus" class="photo-edit-label-status" role="status" aria-live="polite" hidden></p></details><div id="photoEditEventTags" class="photo-edit-tag-chips"></div></section><p id="photoEditUploadStatus" class="photo-edit-upload-status" role="status"></p>
@@ -74,6 +74,7 @@ function mount(){
   get('Close').addEventListener('click',cancel);get('Cancel').addEventListener('click',cancel);
   dialog.addEventListener('cancel',event=>{event.preventDefault();cancel();});
   get('Previous').addEventListener('click',()=>navigate(-1));get('Next').addEventListener('click',()=>navigate(1));
+  get('CopyDate').addEventListener('click',copyPreviousDate);
   get('Left').addEventListener('click',()=>rotate(-1));get('Right').addEventListener('click',()=>rotate(1));
   get('CropToggle').addEventListener('click',()=>{draft().cropping=!draft().cropping;if(draft().cropping){draft().tagging=false;window.FamilyFaces?.dismiss?.();}renderCrop();renderTagControls();});
   get('Reset').addEventListener('click',()=>{Object.assign(draft(),{rotation:0,crop:fullCrop(),cropping:false});render();startFaces();});
@@ -85,7 +86,7 @@ function mount(){
   get('CustomLabelName').addEventListener('input',event=>{if(draft()?.metadata){draft().customLabelName=event.target.value;labelStatus();}});
   window.addEventListener('family-photo-label-catalog',()=>{if(session&&session.mode!=='existing')renderEventChoices();});
   get('Version').addEventListener('change',()=>loadVersion(get('Version').value));
-  for(const field of ['day','month','year'])get('Date'+field).addEventListener('input',event=>{const d=draft();if(!d?.metadata)return;d.metadata.date[field]=event.target.value===''?null:Number(event.target.value);d.dateEdited=true;get('DateSource').hidden=true;get('Error').textContent='';});
+  for(const field of ['day','month','year'])get('Date'+field).addEventListener('input',event=>{const d=draft();if(!d?.metadata)return;d.metadata.date[field]=event.target.validity?.badInput?NaN:event.target.value===''?null:Number(event.target.value);d.dateEdited=true;get('DateSource').hidden=true;clearDateError();get('Error').textContent='';});
   get('Caption').addEventListener('input',event=>{if(draft()?.metadata)draft().metadata.caption=event.target.value;fitCaption();});
   get('Caption').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,()=>{
     if(!draft()?.metadata||session.loading||session.saving)return;
@@ -119,7 +120,7 @@ function setBusy(busy){
   // Cancellation is safe while decoding; saving pixels is kept atomic.
   if(!session.saving){get('Close').disabled=false;get('Cancel').disabled=false;}
   get('Previous').disabled=busy||session.drafts.length<2;get('Next').disabled=busy||session.drafts.length<2;
-  get('Version').disabled=busy;
+  get('Version').disabled=busy;renderDateCopy();
 }
 function fitEditor(){
   if(!session||!dialog?.open||session.mode==='existing')return;
@@ -145,9 +146,51 @@ function fitCaption(){
   input.style.height='auto';session.captionAutoHeight=Math.min(180,Math.max(38,(input.scrollHeight||0)+2));input.style.height=session.captionAutoHeight+'px';
 }
 function revealMetadata(){if(session&&get('Metadata').contains(document.activeElement))document.activeElement.scrollIntoView?.({block:'nearest',behavior:'auto'});}
+function dateProblem(d){
+  const date=d.metadata.date,currentYear=new Date().getFullYear();
+  for(const [field,min,max,message]of [
+    ['year',1910,currentYear,tr('השנה בתאריך הצילום חייבת להיות בין 1910 ל־','The photo year must be between 1910 and ')+currentYear+'.'],
+    ['month',1,12,tr('החודש בתאריך הצילום חייב להיות בין 1 ל־12.','The photo month must be between 1 and 12.')],
+    ['day',1,31,tr('היום בתאריך הצילום חייב להיות בין 1 ל־31, בהתאם לחודש.','The photo day must be between 1 and 31, depending on the month.')]
+  ]){
+    const value=date[field];if(value!==null&&value!==undefined&&(!Number.isInteger(value)||value<min||value>max))return {field,message};
+  }
+  if(date.day&&date.month){
+    const max=new Date(Date.UTC(date.year||2000,date.month,0)).getUTCDate();
+    if(date.day>max)return {field:'day',message:tr('תאריך הצילום אינו תקין: בחודש שנבחר יש לכל היותר ','Invalid photo date: the selected month has at most ')+max+tr(' ימים.',' days.')};
+  }
+  return null;
+}
+function clearDateError(){
+  get('DateError').textContent='';get('DateError').hidden=true;
+  for(const field of ['day','month','year'])get('Date'+field).setAttribute('aria-invalid','false');
+}
+function showDateProblem(problem){
+  if(!problem)return false;
+  get('DateError').textContent=problem.message;get('DateError').hidden=false;
+  const input=get('Date'+problem.field);input.setAttribute('aria-invalid','true');input.focus();input.scrollIntoView?.({block:'nearest'});
+  return true;
+}
+function previousPhotoDate(){
+  const current=draft();if(!current?.metadata||session.mode==='existing')return null;
+  // Keep uploaded predecessors available; photos explicitly removed are excluded.
+  const previous=session.dateSources.filter(item=>item.fileIndex<current.fileIndex).at(-1);
+  const date=previous?.metadata.date;
+  return date&&Object.values(date).some(value=>value!==null)&&!dateProblem(previous)?date:null;
+}
+function renderDateCopy(){
+  get('CopyDate').disabled=!session||session.loading||session.saving||!previousPhotoDate();
+}
+function copyPreviousDate(){
+  if(!session||session.loading||session.saving)return;
+  const date=previousPhotoDate();if(!date)return;
+  draft().metadata.date={...date};draft().dateEdited=true;clearDateError();get('Error').textContent='';renderMetadata();
+}
 function renderMetadata(){
   const d=draft();get('Metadata').hidden=session.mode==='existing';if(!d?.metadata||session.mode==='existing')return;
+  clearDateError();
   for(const field of ['day','month','year'])get('Date'+field).value=d.metadata.date[field]??'';
+  get('Dateyear').max=new Date().getFullYear();renderDateCopy();
   get('Caption').value=d.metadata.caption;fitCaption();
   get('FamilyPhotoChoice').hidden=session.scope==='photos';get('FamilyPhoto').checked=d.metadata.familyPhoto;
   renderEventChoices();get('CustomLabelName').value=d.customLabelName||'';labelStatus();
@@ -251,7 +294,7 @@ async function loadVersion(id){
     owner.files=[file];owner.drafts=[{file,fileIndex:0,rotation:0,crop:fullCrop(),cropping:false,...owner.transforms.get(id),baseVersion:id}];owner.index=0;await load();
   }catch(error){if(session===owner&&sequence===loadId&&error.name!=='AbortError')failLoad(error.message);}
 }
-function navigate(step){if(!session||session.loading||session.saving||!session.drafts.length)return;session.index=(session.index+step+session.drafts.length)%session.drafts.length;load();}
+function navigate(step){if(!session||session.loading||session.saving||!session.drafts.length)return;if(step>0&&session.mode!=='existing'&&showDateProblem(dateProblem(draft())))return;session.index=(session.index+step+session.drafts.length)%session.drafts.length;load();}
 function canControlNavigate(){return Boolean(session&&session.mode!=='existing'&&dialog?.open&&!session.loading&&!session.saving&&session.drafts.length>1&&!drag);}
 async function controlNavigate(direction,tap){
   const active=()=>session===tap.owner&&draft()===tap.draft&&canControlNavigate();
@@ -294,7 +337,7 @@ function keyCrop(event){
   draft().crop=moveCrop(draft().crop,handle,direction[0]*step,direction[1]*step);renderCrop();
 }
 function remove(){
-  if(session.loading||session.saving)return;session.drafts.splice(session.index,1);
+  if(session.loading||session.saving)return;const removed=draft();session.dateSources=session.dateSources.filter(item=>item!==removed);session.drafts.splice(session.index,1);
   if(!session.drafts.length){finish(session.files.filter(file=>!isPhoto(file)));return;}
   session.index=Math.min(session.index,session.drafts.length-1);load();
 }
@@ -316,8 +359,11 @@ async function prepareDraft(d){
   fileMetadata.set(file,metadataForDraft(d));return file;
 }
 async function invalidMetadata(d,index){
-  try{normalizeUploadMetadata(d.metadata);return false;}
-  catch{session.index=index;await load();get('Error').textContent=tr('בדקו את תאריך הצילום. אפשר להשאיר כל שדה לא ידוע ריק. התיאור מוגבל ל־5,000 תווים.','Check the photo date. Leave unknown fields blank. Descriptions can be up to 5,000 characters.');get('Dateday').focus();return true;}
+  const problem=dateProblem(d);
+  if(!problem){try{normalizeUploadMetadata(d.metadata);return false;}catch{/* Show metadata errors before any file is uploaded. */}}
+  if(session.index!==index){session.index=index;await load();}
+  if(!showDateProblem(problem)){get('Error').textContent=tr('בדקו את פרטי התמונה. התיאור מוגבל ל־5,000 תווים.','Check the photo details. Descriptions can be up to 5,000 characters.');get('Caption').focus();}
+  return true;
 }
 async function recoverSave(owner,error){
   if(session!==owner)return;owner.saving=false;await load();if(session===owner)get('Error').textContent=error.message||tr('לא ניתן לשמור כרגע. נסו שוב.','Could not save. Please try again.');
@@ -384,7 +430,7 @@ function run(){
 function prepare(input,{scope,onUpload}={}){
   const files=[...input],drafts=files.flatMap((file,fileIndex)=>{if(!isPhoto(file))return [];const inferred=filenamePhotoDate(file.name);return [{key:'upload-'+crypto.randomUUID().replaceAll('-',''),file,fileIndex,faceTags:[],facesComplete:false,tagging:false,rotation:0,crop:fullCrop(),cropping:false,metadata:{date:inferred.date,caption:'',familyPhoto:scope==='photos',labels:[]},dateSource:inferred.status,dateEdited:false}];});
   if(!drafts.length)return Promise.resolve(files);
-  return new Promise(resolve=>{jobs.push({files,drafts,resolve,scope,onUpload});run();});
+  return new Promise(resolve=>{jobs.push({files,drafts,dateSources:[...drafts],resolve,scope,onUpload});run();});
 }
 window.addEventListener('beforeunload',event=>{if(session&&(session.mode!=='existing'||session.saving||session.drafts.some(d=>changed(d.rotation,d.crop)))||jobs.some(job=>job.mode!=='existing')){event.preventDefault();event.returnValue='';}});
 function edit(item){
@@ -392,3 +438,4 @@ function edit(item){
   return new Promise(resolve=>{jobs.push({mode:'existing',item,files:[],drafts:[],resolve});run();});
 }
 window.FamilyPhotoEditor={prepare,edit,upload:file=>photoUploadPayload(file,fileMetadata.get(file))};
+

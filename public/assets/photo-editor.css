@@ -63,11 +63,22 @@
 .photo-edit-date{margin:0;padding:0;border:0;min-width:0}
 .photo-edit-date-label,.photo-edit-caption{padding:0;font:16px/1.4 var(--sans);color:#685c42}
 .photo-edit-date-label{display:block}
-.photo-edit-date-fields{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:8px;margin-top:5px;direction:ltr}
+.photo-edit-date-fields{display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,.75fr) minmax(64px,1.3fr) 36px;gap:8px;margin-top:5px;direction:ltr}
 #photoUploadEditor[dir=rtl] .photo-edit-date-fields label{direction:rtl}
 .photo-edit-date-fields label{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:12px;color:#8a795c}
 .photo-edit-date-fields input,.photo-edit-caption textarea{box-sizing:border-box;min-width:0;width:100%;border:1px solid #d5c9ae;border-radius:6px;background:#fffdf8;color:#554c39;font:16px/1.4 var(--sans);padding:7px 9px}
-.photo-edit-date-fields input{height:41px;text-align:center}
+.photo-edit-date-fields input{height:41px;text-align:center;padding-inline:4px;appearance:textfield;-moz-appearance:textfield}
+.photo-edit-date-fields input::-webkit-inner-spin-button,.photo-edit-date-fields input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.photo-edit-copy-date{display:grid;place-items:center;align-self:end;box-sizing:border-box;width:36px;height:41px;padding:6px;border:1px solid #b7c49d;border-radius:6px;background:#f2f5eb;color:#5f7446;cursor:pointer}
+.photo-edit-copy-date:hover:not(:disabled){background:#e7eedb;border-color:#8da46e}
+.photo-edit-copy-date svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.photo-edit-date-error{grid-column:2;margin:5px 0 0;font:12px/1.45 var(--sans);color:#a12725}
+.photo-edit-date-fields input[aria-invalid=true]{border-color:#b54435;background:#fff8f5}
+@media(max-width:360px){
+  #photoUploadEditor:not(.is-existing) .photo-edit-metadata .photo-edit-date{grid-template-columns:minmax(0,1fr);gap:4px}
+  #photoUploadEditor:not(.is-existing) .photo-edit-metadata .photo-edit-date-label>span{display:inline}
+  #photoUploadEditor:not(.is-existing) .photo-edit-date-error{grid-column:1}
+}
 .photo-edit-caption{display:flex;flex-direction:column;gap:6px;min-width:0}
 .photo-edit-caption textarea{height:68px;min-height:68px;resize:vertical}
 .photo-edit-metadata input:focus-visible,.photo-edit-metadata textarea:focus-visible{outline:2px solid #8b9b67;outline-offset:2px}
@@ -121,7 +132,7 @@
   #photoUploadEditor:not(.is-existing) .photo-edit-date-label{white-space:nowrap;align-self:end;margin-block-end:9px}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields{margin-top:0}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields label{line-height:20px}
-  #photoUploadEditor:not(.is-existing) .photo-edit-date-fields input{height:38px}
+  #photoUploadEditor:not(.is-existing) .photo-edit-date-fields input,#photoUploadEditor:not(.is-existing) .photo-edit-copy-date{height:38px}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-source{grid-column:2}
   #photoUploadEditor:not(.is-existing) .photo-edit-caption{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:start;gap:10px;border-inline-start:1px solid #d7c9ad;padding-inline-start:16px;padding-block-start:23px;align-self:stretch}
   #photoUploadEditor:not(.is-existing) .photo-edit-caption-label{padding-block-start:9px;white-space:nowrap}
@@ -147,8 +158,8 @@
 @media(max-width:700px){
   #photoUploadEditor:not(.is-existing) .photo-edit-pager button{background:#647c4e;border-color:#52683e;color:#fffdf5}
   #photoUploadEditor:not(.is-existing) .photo-edit-pager button:hover:not(:disabled){background:#536b3f}
-  #photoUploadEditor:not(.is-existing) #photoEditCropToggle{background:#f1dfbc;border-color:#c6a46d;color:#6a4c25}
-  #photoUploadEditor:not(.is-existing) #photoEditCropToggle[aria-pressed=true]{background:#e3c58f;border-color:#a77636;color:#493418}
+  #photoUploadEditor:not(.is-existing) #photoEditCropToggle{background:#fffaf0;border-color:#c6a46d;color:#6a4c25}
+  #photoUploadEditor:not(.is-existing) #photoEditCropToggle[aria-pressed=true]{background:#fcf2dc;border-color:#a77636;color:#493418}
   #photoUploadEditor:not(.is-existing) .photo-edit-viewport{flex:1 1 0;width:100%;height:0;min-height:32px;max-height:none;aspect-ratio:auto;background:var(--photo-edit-panel-bg)}
   #photoUploadEditor:not(.is-existing).is-face-tagging .face-hit{outline:none;background:transparent}
   #photoUploadEditor:not(.is-existing) .photo-edit-header{gap:8px}
@@ -163,7 +174,8 @@
   #photoUploadEditor:not(.is-existing) .photo-edit-date{display:grid;grid-template-columns:var(--photo-edit-label-width) minmax(0,1fr);align-items:center;gap:0 8px}
   #photoUploadEditor:not(.is-existing) :is(.photo-edit-date-label,.photo-edit-caption-label){font:calc(13px * var(--a11y-text-scale,1))/1.3 var(--sans);max-width:none}
   #photoUploadEditor:not(.is-existing) :is(.photo-edit-date-label,.photo-edit-caption-label)>span{display:block}
-  #photoUploadEditor:not(.is-existing) .photo-edit-date-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(64px,1.1fr);gap:6px;margin-top:0}
+  #photoUploadEditor:not(.is-existing) .photo-edit-date-fields{grid-template-columns:minmax(0,.75fr) minmax(0,.75fr) minmax(62px,1.1fr) 34px;gap:6px;margin-top:0}
+  #photoUploadEditor:not(.is-existing) .photo-edit-copy-date{width:34px;height:36px;padding:5px}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields label{gap:2px;font-size:calc(11px * var(--a11y-text-scale,1))}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields input{height:36px;padding:5px 4px;appearance:textfield;-moz-appearance:textfield}
   #photoUploadEditor:not(.is-existing) .photo-edit-date-fields input::-webkit-inner-spin-button,#photoUploadEditor:not(.is-existing) .photo-edit-date-fields input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -195,3 +207,4 @@
   #photoUploadEditor:not(.is-existing) .photo-edit-toolbar>button:not([hidden]){gap:3px;padding-inline:2px;font-size:calc(11px * var(--a11y-text-scale,1))}
   #photoUploadEditor:not(.is-existing) .photo-edit-toolbar .photo-edit-desktop-icon{width:16px;height:16px;flex-basis:16px}
 }
+

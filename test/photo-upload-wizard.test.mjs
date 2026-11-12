@@ -53,6 +53,52 @@ test('phone and desktop faces can be tagged immediately and resume automatically
  await f.click('Next');assert.equal(f.mounts.at(-1).options.adapter.enabled(),true);assert.equal(active.options.adapter.enabled(),false);await f.click('Cancel');assert.equal(await result,null);
  }
 });
+
+function enterDate(f,date){
+ for(const field of ['day','month','year']){const input=f.node('photoEditDate'+field);input.value=date[field]??'';input.dispatchEvent(new Event('input'));}
+}
+test('previous-date copy preserves complete and partial dates independently, without copying other photo details',async()=>{
+ for(const desktop of [true,false])for(const english of [true,false]){
+  const f=fixture({desktop,english}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+  assert.equal(f.node('photoEditCopyDate').disabled,true);await f.click('CopyDate');assert.equal(f.node('photoEditDateyear').value,'');
+  enterDate(f,{day:29,month:2,year:2000});f.node('photoEditCaption').value='first only';f.node('photoEditCaption').dispatchEvent(new Event('input'));
+  await f.click('Next');assert.equal(f.node('photoEditCopyDate').disabled,false);await f.click('CopyDate');
+  assert.deepEqual(['day','month','year'].map(field=>f.node('photoEditDate'+field).value),[29,2,2000]);assert.equal(f.node('photoEditCaption').value,'');
+  enterDate(f,{year:1980});await f.click('Previous');assert.equal(f.node('photoEditDateyear').value,2000,'Copied dates must be separate objects');
+  await f.click('Next');await f.click('Next');enterDate(f,{day:12,month:6,year:1990});await f.click('CopyDate');
+  assert.deepEqual(['day','month','year'].map(field=>f.node('photoEditDate'+field).value),['','',1980],'Partial dates clear unknown fields from the target');
+  await f.click('SaveCurrent');assert.deepEqual((await details(f.uploaded[0])).metadata.date,{day:null,month:null,year:1980});
+  assert.equal(f.node('photoEditCopyDate').disabled,true,'Wrapping to the first photo has no predecessor');await f.click('Cancel');await result;
+ }
+});
+test('date copy follows queue order, skips removed photos and retains the date after uploading its predecessor',async()=>{
+ const f=fixture(),{result}=await f.begin([image('01_05_1980.jpg'),image('02_06_1990.jpg'),image('three.jpg')]);
+ await f.click('Next');await f.click('Remove');await f.click('CopyDate');assert.equal(f.node('photoEditDateyear').value,1980);
+ await f.click('Previous');enterDate(f,{day:31,month:12,year:2001});await f.click('SaveCurrent');assert.equal(f.node('photoEditFilename').textContent,'three.jpg');
+ assert.equal(f.node('photoEditCopyDate').disabled,false);await f.click('CopyDate');assert.equal(f.node('photoEditDateyear').value,2001);
+ await f.click('SaveCurrent');assert.deepEqual((await details(f.uploaded[1])).metadata.date,{day:31,month:12,year:2001});assert.deepEqual(Array.from(await result),[]);
+ const empty=fixture(),pending=await empty.begin([image('one.jpg'),image('two.jpg')]);await empty.click('Next');assert.equal(empty.node('photoEditCopyDate').disabled,true);await empty.click('Cancel');await pending.result;
+});
+test('Next validates date ranges and real calendar days without losing the current photo or its draft',async()=>{
+ for(const desktop of [true,false])for(const english of [true,false]){
+  const f=fixture({desktop,english}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]),year=new Date().getFullYear();
+  for(const [date,field]of [[{year:1909},'year'],[{year:year+1},'year'],[{year:0},'year'],[{month:0},'month'],[{month:13},'month'],[{day:0},'day'],[{day:32},'day'],[{day:31,month:4,year:2000},'day'],[{day:29,month:2,year:2001},'day'],[{month:1.5},'month']]){
+   enterDate(f,date);await f.click('Next');assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditDateError').hidden,false);assert.ok(f.node('photoEditDateError').textContent);assert.equal(f.document.activeElement,f.node('photoEditDate'+field));assert.equal(f.node('photoEditDate'+field)['aria-invalid'],'true');
+   await f.click('SaveCurrent');assert.equal(f.uploaded.length,0);await f.click('Save');assert.equal(f.node('photoUploadEditor').open,true);
+  }
+  for(const date of [{year:1910},{year},{day:31,month:1,year:2000},{day:29,month:2,year:2000},{day:29,month:2},{month:12},{}]){
+   enterDate(f,date);assert.equal(f.node('photoEditDateError').hidden,true);await f.click('Next');assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Previous');
+  }
+  await f.click('Cancel');await result;
+ }
+});
+test('keyboard Next validates too, and malformed numeric input is not treated as an unknown date',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ enterDate(f,{year:1909});await f.key('ArrowRight');assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ await f.key('Control',{ctrlKey:true});await f.key('Control',{type:'keyup'});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ enterDate(f,{});const input=f.node('photoEditDatemonth');input.validity={badInput:true};input.value='';input.dispatchEvent(new Event('input'));await f.click('Next');assert.equal(f.node('photoEditDateError').hidden,false);
+ input.validity={badInput:false};input.dispatchEvent(new Event('input'));await f.click('Next');assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Cancel');await result;
+});
 test('phone previews use the full available frame for portrait, landscape and small images and retain their aspect on rotation',async()=>{
  for(const photoSize of [{width:947,height:2048},{width:2048,height:947},{width:160,height:120}]){
   const frame={width:300,height:650},f=fixture({desktop:false,photoSize,viewportSize:frame}),{result}=await f.begin([image('one.jpg')]);
@@ -222,6 +268,7 @@ test('the last individual upload closes the wizard without re-approving a saved 
  const f=fixture(),{result}=await f.begin([image('only.jpg')]);await f.click('SaveCurrent');assert.deepEqual(Array.from(await result),[]);assert.equal(f.uploaded.length,1);
 });
 test('individual approval validates only its photo, while remaining non-image files still require Upload all',async()=>{
- const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);await f.click('Next');f.node('photoEditDateyear').value='99';f.node('photoEditDateyear').dispatchEvent(new Event('input'));await f.click('Next');await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Save');assert.match(f.node('photoEditError').textContent,/תאריך/);await f.click('Cancel');assert.equal(await result,null);
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);await f.click('Next');f.node('photoEditDateyear').value='99';f.node('photoEditDateyear').dispatchEvent(new Event('input'));await f.click('Previous');await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Save');assert.match(f.node('photoEditDateError').textContent,/1910/);await f.click('Cancel');assert.equal(await result,null);
  const mixed=fixture(),other=new File(['document'],'notes.pdf',{type:'application/pdf'}),pending=await mixed.begin([image('only.jpg'),other]);await mixed.click('SaveCurrent');assert.equal(mixed.node('photoUploadEditor').open,true);assert.equal(mixed.node('photoEditLeft').disabled,true);assert.equal(mixed.node('photoEditSaveCurrent').hidden,true);await mixed.click('Save');const remaining=await pending.result;assert.deepEqual(Array.from(remaining,file=>file.name),['notes.pdf']);assert.equal(mixed.uploaded.length,1);
 });
+
