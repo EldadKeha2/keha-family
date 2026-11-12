@@ -40,6 +40,8 @@ jobs:
         run: ./desktop/native-smoke-test.ps1
       - name: Verify the family logo in the installer and app
         run: ./desktop/check-installer-branding.ps1
+      - name: Verify real installation, installed app and desktop shortcut
+        run: ./desktop/install-smoke-test.ps1
       - name: Check the smaller payload
         run: |
           $version = (Get-Content desktop/package.json | ConvertFrom-Json).version

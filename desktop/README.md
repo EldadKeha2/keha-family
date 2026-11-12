@@ -10,7 +10,7 @@ Website content and styling load from the production site on every launch. The n
 
 ## Build
 
-Run `npm ci`, `npm test`, then `npm run dist` inside `desktop/` on Windows with the .NET SDK installed. `build-native.ps1` builds the native host and verifies Microsoft's signature on the bootstrapper. The NSIS packager receives only `dist/native`; Electron is retained as an old development dependency for package identity compatibility and is excluded from the shipped folder. CI checks WebView2 rendering, immediate window display, actual native maximize/fullscreen restoration, installer/app logos, and a 15 MB upper bound before publishing. Ordinary site edits do not rebuild the installer.
+Run `npm ci`, `npm test`, then `npm run dist` inside `desktop/` on Windows with the .NET SDK and PowerShell 7 installed. `build-native.ps1` builds the native host and verifies Microsoft's signature on the bootstrapper. The NSIS packager receives only `dist/native`; Electron is retained as an old development dependency for legacy packager metadata and is excluded from the shipped folder. CI checks WebView2 rendering, immediate window display, actual native maximize/fullscreen restoration, installer/app logos, and a 15 MB upper bound before publishing. Ordinary site edits do not rebuild the installer.
 
 The installer uses a guided setup: the family logo appears in the setup screens, the executable and the shortcuts; the install-folder step shows where the app goes and permits choosing another folder. The build verifies the actual embedded app and installer icons on Windows before publishing.
 

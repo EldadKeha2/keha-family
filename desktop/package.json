@@ -9,7 +9,7 @@
   "scripts": {
     "start": "dotnet run --project native/KehaFamily.csproj",
     "test": "node --test ../test/desktop-window-state.test.mjs",
-    "predist": "powershell -NoProfile -File build-native.ps1",
+    "predist": "pwsh -NoProfile -File build-native.ps1",
     "dist": "electron-builder --prepackaged dist/native --win nsis --x64 --publish never"
   },
   "devDependencies": {
