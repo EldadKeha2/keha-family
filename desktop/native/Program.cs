@@ -58,7 +58,7 @@ namespace KehaFamily {
       progress.Anchor = AnchorStyles.None;retry.Anchor = AnchorStyles.None;center.Controls.Add(logo);center.Controls.Add(status);center.Controls.Add(progress);center.Controls.Add(retry);loading.Controls.Add(center);
       loading.Resize += (sender, e) => center.Location = new Point((loading.ClientSize.Width - center.Width) / 2, (loading.ClientSize.Height - center.Height) / 2);
       Controls.Add(web);Controls.Add(loading);BuildMenu();Controls.Add(menu);MainMenuStrip = menu;loading.BringToFront();
-      retry.Click += async (sender, e) => { retry.Visible = false;progress.Visible = true;status.Text = "פותחים את הבית שלנו…";if (web.CoreWebView2 != null) web.CoreWebView2.Navigate(Links.Home);else await InitializeBrowser(); };
+      retry.Click += async (sender, e) => { retry.Visible = false;progress.Visible = true;status.Text = "פותחים את הבית שלנו…";if (web.CoreWebView2 != null) { web.BringToFront();loading.Visible = false;web.CoreWebView2.Navigate(Links.Home); } else await InitializeBrowser(); };
       saveTimer.Tick += (sender, e) => { saveTimer.Stop();Persist(); };
       Move += (sender, e) => Remember();Resize += (sender, e) => Remember();
       FormClosing += (sender, e) => { closing = true;saveTimer.Stop();Persist(); };
