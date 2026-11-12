@@ -202,7 +202,7 @@
   }
   .home-install-platforms{margin-top:9px;margin-bottom:3px}
 }
-.desktop-shortcut-link{display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;max-width:100%;margin:14px auto 0;padding:7px 12px;border:1px solid #c7c9aa;border-radius:8px;background:#f4f1e2;color:#687a54;font-size:12px;text-decoration:none}.desktop-shortcut-link img{width:26px;height:26px;object-fit:contain;border-radius:5px}.desktop-shortcut-link:hover{background:#e8edda}.desktop-shortcut-link[hidden]{display:none!important}@media(max-width:700px){.desktop-shortcut-link{display:none!important}}
+.desktop-shortcut-link{display:flex;align-items:center;justify-content:center;gap:7px;width:max-content;max-width:100%;margin:14px auto 0;padding:7px 12px;border:1px solid #c7c9aa;border-radius:8px;background:#f4f1e2;color:#687a54;font-size:12px;text-decoration:none}.desktop-shortcut-link svg{width:26px;height:26px;object-fit:contain;border-radius:5px}.desktop-shortcut-link:hover{background:#e8edda}.desktop-shortcut-link[hidden]{display:none!important}@media(max-width:700px){.desktop-shortcut-link{display:none!important}}
 
 .site-footer .privacy-policy-link{display:inline-block;margin:12px 10px 0;color:#737e63;font-size:13px;text-underline-offset:3px}
 

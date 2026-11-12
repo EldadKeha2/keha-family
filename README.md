@@ -276,7 +276,7 @@ Node.js 22 ומעלה: `npm run check`. הבדיקות כוללות גם תיו�
 
 ### Desktop app installation
 
-The desktop header and footer offer **התקנת האפליקציה / Install app** with the family logo. A user click calls `navigator.install()` when supported, or the retained `beforeinstallprompt` event otherwise. The native browser confirmation opens directly; only unavailable installation falls back to a compact message. Browser bookmarks remain a separate action, and mobile installation is retained. No executable download or security-setting changes are offered.
+The desktop header and footer offer **התקנה לשולחן העבודה במחשב / Install on desktop** with a monitor icon. A user click calls `navigator.install()` when supported, or the retained `beforeinstallprompt` event otherwise. The native browser confirmation opens directly; only unavailable installation falls back to a compact message. Browser bookmarks remain a separate action, and mobile installation is retained. No executable download or security-setting changes are offered.
 
 `public/assets/desktop-app.js` fits an installed desktop PWA window to its current display's available work area on launch, using the supported PWA `moveTo` and `resizeTo` APIs. This fills the screen while preserving the title bar and taskbar. Ordinary browser tabs, phones, embedded pages and the separately versioned native app are excluded. The app remains usable if a browser restricts window resizing. No fullscreen permission, offline cache, or service worker is introduced.
 

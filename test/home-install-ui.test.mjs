@@ -514,11 +514,10 @@ test('an unresponsive desktop prompt keeps visible instructions and releases the
   offer.choose('accepted');await tick();assert.equal(f.dialog.open,true);
 });
 
-test('desktop shortcut and refresh controls use the site logo and remain absent from phone and tablet layouts',()=>{
+test('desktop shortcut and refresh controls use desktop labels and remain absent from phone and tablet layouts',()=>{
   for(const english of [false,true]){
     const f=desktopFixture({english}),install=f.card.querySelector('[data-desktop-install-action]'),refresh=f.card.querySelector('[data-desktop-refresh]');
-    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Install app/:/התקנת האפליקציה/);
-    assert.equal(f.card.querySelector('.desktop-shortcut-logo').getAttribute('src'),'assets/app-icons/icon-192.png');
+    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Install on desktop/:/התקנה לשולחן העבודה במחשב/);
     f.resize(true);assert.equal(install.hidden,true);assert.equal(refresh.hidden,true);
     f.resize(false);assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);
   }
@@ -597,7 +596,7 @@ test('modern Windows always offers the browser shortcut regardless of version or
     const f=desktopFixture({english,clientHints});await tick();
     assert.equal(f.windowsLink.hidden,false);
     assert.equal(f.windowsLink.getAttribute('href'),'#install-desktop');
-    assert.equal(f.windowsLink.querySelector('span').textContent,english?'Install app':'התקנת האפליקציה');
+    assert.equal(f.windowsLink.querySelector('span').textContent,english?'Install on desktop':'התקנה לשולחן העבודה במחשב');
     assert.equal(f.click(f.windowsLink).defaultPrevented,true);await tick();
     assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));
     assert.doesNotMatch(f.dialog.innerHTML,/\.exe|Microsoft Store|data-windows-direct-download|data-windows-browser-shortcut/);
