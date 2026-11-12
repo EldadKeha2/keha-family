@@ -32,6 +32,7 @@
       "allowToChangeInstallationDirectory": true,
       "include": "native/dependencies.nsh",
       "differentialPackage": false,
+      "packElevateHelper": false,
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico",
       "installerHeader": "build/installerHeader.bmp",

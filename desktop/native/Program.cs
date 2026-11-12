@@ -70,7 +70,7 @@ namespace KehaFamily {
     void BuildMenu() {
       var app = new ToolStripMenuItem(Program.Title);
       app.DropDownItems.Add("הבית / Home", null, (sender, e) => web.CoreWebView2?.Navigate(Links.Home));
-      app.DropDownItems.Add("רענון / Reload", null, (sender, e) => web.Reload());
+      app.DropDownItems.Add("רענון / Reload", null, (sender, e) => { if (web.CoreWebView2 != null) web.Reload(); });
       app.DropDownItems.Add("הגדלת החלון / Maximize", null, (sender, e) => { SetFullscreen(false);WindowState = FormWindowState.Maximized; });
       app.DropDownItems.Add("מסך מלא / Full screen", null, (sender, e) => SetFullscreen(!fullscreen));
       app.DropDownItems.Add("פתיחה בדפדפן / Open in browser", null, (sender, e) => OpenExternal(Links.Home));
@@ -99,7 +99,7 @@ namespace KehaFamily {
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
       if (keyData == Keys.F11) { SetFullscreen(!fullscreen);return true; }
       if (keyData == Keys.F10 || keyData == Keys.Menu) { menu.Visible = !menu.Visible;return true; }
-      if (keyData == (Keys.Control | Keys.R)) { web.Reload();return true; }
+      if (keyData == (Keys.Control | Keys.R)) { if (web.CoreWebView2 != null) web.Reload();return true; }
       return base.ProcessCmdKey(ref msg, keyData);
     }
     void OpenExternal(string value) { if (Links.External(value)) try { Process.Start(new ProcessStartInfo(value) { UseShellExecute = true }); } catch { } }
