@@ -19,8 +19,20 @@ if ($app.ExitCode -ne 0) { if (Test-Path (Join-Path $state 'failure.txt')) { Get
 $shell = New-Object -ComObject WScript.Shell
 $desktopPaths = @([Environment]::GetFolderPath('DesktopDirectory'), [Environment]::GetFolderPath('CommonDesktopDirectory')) | Select-Object -Unique
 $links = @($desktopPaths | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Filter '*.lnk' } | ForEach-Object { [PSCustomObject]@{ File = $_.FullName; Target = $shell.CreateShortcut($_.FullName).TargetPath } })
-$shortcut = $links | Where-Object { $_.Target -eq $exe } | Select-Object -First 1
-if (!$shortcut) { $links | ConvertTo-Json | Write-Host;Write-Host "Expected target: $exe";throw 'The desktop shortcut is missing or points to the old app.' }
+$shortcut = $links | Where-Object { [IO.Path]::GetFileNameWithoutExtension($_.File) -eq $package.build.nsis.shortcutName } | Select-Object -First 1
+if (!$shortcut) { $links | ConvertTo-Json | Write-Host;throw 'The family desktop shortcut is missing.' }
+# Launch the actual link: shell links with an application ID can have an empty
+# WScript TargetPath, so metadata alone does not prove that the link is broken.
+Start-Process $shortcut.File
+$launched = $null
+for ($attempt = 0; $attempt -lt 100; $attempt++) {
+  $launched = Get-Process -Name KehaFamily -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+  if ($launched) { break }
+  Start-Sleep -Milliseconds 100
+}
+if (!$launched) { $links | ConvertTo-Json | Write-Host;Write-Host "Expected executable: $exe";throw 'The desktop shortcut did not open the installed native app.' }
+$launched.CloseMainWindow() | Out-Null
+if (!$launched.WaitForExit(5000)) { $launched.Kill() }
 $result = Get-Content (Join-Path $state 'result.json') -Raw | ConvertFrom-Json
 $report = [ordered]@{ installerBytes = (Get-Item $installer).Length; installationMs = $installMs; windowShownMs = $result.shownMs; browserReadyMs = $result.browserReadyMs; installedAppVerified = $true; desktopShortcutVerified = $true }
 $report | ConvertTo-Json | Set-Content (Join-Path $env:RUNNER_TEMP 'keha-install-result.json')
