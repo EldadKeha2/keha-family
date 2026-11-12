@@ -16,10 +16,10 @@ export function transformedUploadFaces(d){
   });
 }
 export function createUploadFaceAdapter(d,{findPeople,getPerson,onChange=()=>{},tr=(he,en)=>en}){
-  d.faceTags??=[];d.ignoredFaces??=[];d.facesComplete??=false;const roster=new Map(faceDraftPeople(d).map(person=>[person.id,person]));
+  d.faceTags??=[];d.ignoredFaces??=[];d.unassignedFaces??=[];d.facesComplete??=false;const roster=new Map(faceDraftPeople(d).map(person=>[person.id,person]));
   const faces=()=>d.faceTags.map(face=>({...face,personId:face.person.id,rect:turnRect(face.rect,d.rotation)}));
   const item=()=>({id:d.key,kind:'photo',tags:faceDraftPeople(d),tagsRevision:String(d.faceRevision||0),faceSummary:{reviewed:d.facesComplete}});
-  const snapshot=()=>({item:item(),faces:faces(),ignoredFaces:d.ignoredFaces.map(rect=>turnRect(rect,d.rotation))});
+  const snapshot=()=>({item:item(),faces:faces(),unassignedFaces:d.unassignedFaces.map(rect=>({rect:turnRect(rect,d.rotation)})),ignoredFaces:d.ignoredFaces.map(rect=>turnRect(rect,d.rotation))});
   const changed=face=>{d.faceRevision=(d.faceRevision||0)+1;const result={...snapshot(),face:face?faces().find(saved=>saved.id===face.id):null};onChange(result);return result;};
   async function search(query,preferred=[]){
     const found=await findPeople(query,preferred);for(const person of found)roster.set(person.id,person);
@@ -29,7 +29,7 @@ export function createUploadFaceAdapter(d,{findPeople,getPerson,onChange=()=>{},
   return {load:async()=>snapshot(),findPeople:search,mapDetections:found=>found.map(face=>({...face,rect:turnRect(face.rect,d.rotation)})),
     async save(input){
       const previous=d.faceTags.find(face=>face.id===input.faceId);
-      if(input.personId===null){if(previous&&!d.ignoredFaces.some(rect=>labelledRegion(rect,previous.rect)))d.ignoredFaces.push(previous.rect);d.faceTags=d.faceTags.filter(face=>face.id!==input.faceId);d.facesComplete=false;return changed(null);}
+      if(input.personId===null){if(previous&&!d.unassignedFaces.some(rect=>labelledRegion(rect,previous.rect)))d.unassignedFaces.push(previous.rect);d.faceTags=d.faceTags.filter(face=>face.id!==input.faceId);d.facesComplete=false;return changed(null);}
       let person;
       if(input.name!==undefined){
         const name=String(input.name).trim().replace(/\s+/g,' ');if(!name||name.length>120)throw Error(tr('יש להזין שם באורך של עד 120 תווים.','Enter a name (up to 120 characters).'));
@@ -41,6 +41,7 @@ export function createUploadFaceAdapter(d,{findPeople,getPerson,onChange=()=>{},
       if(!previous&&d.faceTags.length>=150)throw Error(tr('אפשר לתייג עד 150 אזורי פנים בתמונה.','A photo can have up to 150 face tags.'));
       roster.set(person.id,person);const face={id:input.faceId,person,rect:turnRect(input.rect,-d.rotation),revision:id()};
       d.ignoredFaces=d.ignoredFaces.filter(rect=>!labelledRegion(rect,face.rect));
+      d.unassignedFaces=d.unassignedFaces.filter(rect=>!labelledRegion(rect,face.rect));
       d.faceTags=d.faceTags.filter(saved=>saved.id!==face.id);d.faceTags.push(face);d.facesComplete=false;return changed(face);
     },
     async ignore({rect,ignored,faceId}){const original=turnRect(rect,-d.rotation);if(ignored){if(!d.ignoredFaces.some(other=>labelledRegion(other,original)))d.ignoredFaces.push(original);d.faceTags=d.faceTags.filter(face=>faceId?face.id!==faceId:!labelledRegion(original,face.rect));d.facesComplete=false;}else d.ignoredFaces=d.ignoredFaces.filter(other=>!labelledRegion(other,original));return changed(null);},

@@ -7,7 +7,7 @@
   const labels=new Map();let current=null,retained=null,serial=0,geometry=null,touchUntil=0;
   const controlRoots=['toolbar','missingNote','reviewButton','reviewStatus','regionsButton','regionsNote'];
   function releaseControls(){if(retained){for(const key of controlRoots)retained.controls[key]?.remove();retained=null;}}
-  const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,time:Date.now(),tagsRevision:item?.tagsRevision,photoRevision:item?.photoRevision||'original',reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
+  const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[],unassignedFaces=labels.get(id)?.unassignedFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,unassignedFaces,time:Date.now(),tagsRevision:item?.tagsRevision,photoRevision:item?.photoRevision||'original',reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
   const helpers=()=>geometry||=import('./face-geometry.mjs?v=10');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   const touchMode=event=>event?.pointerType?['touch','pen'].includes(event.pointerType):event?.sourceCapabilities?.firesTouchEvents||Date.now()<touchUntil||matchMedia('(hover:none), (max-width:700px)').matches;
@@ -40,7 +40,10 @@
     if(!response.ok)throw Error(I.error(result.error)||tr('תיוג הפנים לא נשמר.','The face tag was not saved.'));return result;
   }
   function announce(c,message){if(live(c))c.status.textContent=message;}
-  function changed(c,result){if(c.adapter){c.item={...c.item,...result.item};c.reviewed=Boolean(c.item.faceSummary?.reviewed);}else window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));}
+  function changed(c,result){
+    if(result.unassignedFaces)c.retained=result.unassignedFaces.map(face=>({...face,id:c.retained.find(previous=>c.geom.sameRegion(previous.rect,face.rect))?.id||c.detected.find(previous=>c.geom.sameRegion(previous.rect,face.rect))?.id||uuid()}));
+    if(c.adapter){c.item={...c.item,...result.item};c.reviewed=Boolean(c.item.faceSummary?.reviewed);}else window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+  }
   function closePopup(c){
     clearTimeout(c.labelTimer);c.labelTimer=null;const popup=c.popup;c.popup=null;c.active=null;popup?.remove();if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
   }
@@ -146,8 +149,9 @@
     }
   }
   function visibleFaces(c,reviewed=false){
-    const dismissed=c.pendingDismiss,saved=dismissed?c.saved.filter(face=>dismissed.person?face.id!==dismissed.id:!c.geom.labelledRegion(dismissed.rect,face.rect)):c.saved,ignored=dismissed?[...c.ignored,dismissed.rect]:c.ignored;
-    return c.geom.mergeFaces(saved,(reviewed?[]:c.detected).filter(face=>!ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));
+    const dismissed=c.pendingDismiss,unassigned=c.pendingUnassign,saved=c.saved.filter(face=>(!dismissed||(dismissed.person?face.id!==dismissed.id:!c.geom.labelledRegion(dismissed.rect,face.rect)))&&(!unassigned||face.id!==unassigned.id)),ignored=dismissed?[...c.ignored,dismissed.rect]:c.ignored;
+    const detected=[...c.detected];for(const face of [...c.retained,...(unassigned?[{id:unassigned.id,rect:unassigned.rect}]:[])])if(!detected.some(previous=>c.geom.sameRegion(previous.rect,face.rect)))detected.push(face);
+    return c.geom.mergeFaces(saved,(reviewed?[]:detected).filter(face=>!ignored.some(rect=>c.geom.labelledRegion(rect,face.rect))));
   }
   const annotationRect=(c,face)=>c.geom.annotationFaceRect(face,c.saved);
   function annotationFaces(c,image){return visibleFaces(c).map(face=>{const r=annotationRect(c,face);return {x:r.x*image.width,y:r.y*image.height,width:r.width*image.width,height:r.height*image.height};});}
@@ -295,9 +299,9 @@
   async function load(c,force=false){
     if(c.adapter){const result=await c.adapter.load();if(!live(c))return;changed(c,result);c.ignored=result.ignoredFaces||[];c.ready=true;apply(c,result.faces);return;}
     const cached=labels.get(c.item.id);
-    if(!force&&cached&&cached.tagsRevision===c.item.tagsRevision&&cached.reviewed===Boolean(c.item.faceSummary?.reviewed)&&Date.now()-cached.time<30000){c.reviewed=cached.reviewed;c.ignored=cached.ignoredFaces||[];if(!c.detected.length)c.detected=cached.detectedFaces.map(face=>({...face,id:uuid()}));apply(c,cached.faces);c.ready=true;return;}
+    if(!force&&cached&&cached.tagsRevision===c.item.tagsRevision&&cached.reviewed===Boolean(c.item.faceSummary?.reviewed)&&Date.now()-cached.time<30000){c.reviewed=cached.reviewed;c.retained=(cached.unassignedFaces||[]).map(face=>({...face,id:uuid()}));c.ignored=cached.ignoredFaces||[];if(!c.detected.length)c.detected=cached.detectedFaces.map(face=>({...face,id:uuid()}));apply(c,cached.faces);c.ready=true;return;}
     const result=await request('api/media/'+c.item.id+'/faces',{signal:c.events.signal});
-    if(!live(c))return;const priorRevision=c.item.tagsRevision,priorReview=c.reviewed;if(result.item){c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);}c.ignored=result.ignoredFaces||[];remember(c.item.id,result.faces,result.item,result.detectedFaces,c.ignored);if(!c.detected.length)c.detected=(result.detectedFaces||[]).map(face=>({...face,id:uuid()}));c.ready=true;c.loadError=false;apply(c,result.faces);
+    if(!live(c))return;const priorRevision=c.item.tagsRevision,priorReview=c.reviewed;if(result.item){c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);}c.retained=(result.unassignedFaces||[]).map(face=>({...face,id:uuid()}));c.ignored=result.ignoredFaces||[];remember(c.item.id,result.faces,result.item,result.detectedFaces,c.ignored,result.unassignedFaces);if(!c.detected.length)c.detected=(result.detectedFaces||[]).map(face=>({...face,id:uuid()}));c.ready=true;c.loadError=false;apply(c,result.faces);
     if(result.item&&(result.item.tagsRevision!==priorRevision||c.reviewed!==priorReview))window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',scope:result.item.scope,item:result.item,faces:result.faces}}));
   }
   function showLabel(c,face,touch,feedback=false){
@@ -361,7 +365,8 @@
       const stored=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));if(stored){c.active=preserveRect?{...stored,rect:face.rect}:stored;place(c);}
     }catch(error){if(live(c)&&c.popup===panel)panel.querySelector('[data-face-status]').textContent=tr('לא ניתן לקרוא את תיוגי הפנים כרגע. סגרו ונסו שוב.','Face labels are currently unavailable. Close and try again.');}
   }
-  function dismissFace(c){const pending=ignore(c);c.pendingSave=pending;return pending;}
+  function dismissFace(c){return c.active?.person?save(c,{personId:null}):ignoreDetection(c);}
+  function ignoreDetection(c){const pending=ignore(c);c.pendingSave=pending;return pending;}
   async function ignore(c){
     if(!live(c)||c.saving||!c.active)return;const face={...c.active};c.saving=true;
     // Remove the selected region and rebuild both number sets in this frame.
@@ -383,14 +388,17 @@
   function save(c,selection){const pending=saveFace(c,selection);c.pendingSave=pending;return pending;}
   async function saveFace(c,selection){
     if(!live(c)||c.saving||!c.active)return;const panel=c.popup,face={...c.active};c.saving=true;
+    const removing=selection?.personId===null;
+    if(removing){c.pendingUnassign=face;c.reviewed=false;closePopup(c);paint(c);}
     if(panel){panel.querySelector('[data-face-status]').textContent=tr('שומר את התיוג…','Saving the tag…');for(const control of panel.querySelectorAll('button,input'))control.disabled=true;}
     try{
       await c.loading;if(!c.adapter)await window.FamilyTags.flush(c.item.id);if(!live(c))return;
       const known=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));
       const payload={faceId:known?.id||face.id,...selection,rect:face.rect,expectedRevision:known?.revision||null},result=c.adapter?await c.adapter.save(payload):await request('api/media/'+c.item.id+'/faces/save',{method:'POST',body:JSON.stringify(payload)});
-      if(!c.adapter)remember(c.item.id,result.faces,result.item);changed(c,result);
+      changed(c,result);c.pendingUnassign=null;
+      if(!c.adapter)remember(c.item.id,result.faces,result.item,c.detected,result.ignoredFaces,c.retained);
       if(live(c)){c.saving=false;if(result.ignoredFaces)c.ignored=result.ignoredFaces;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face){showLabel(c,result.face,touchMode(),true);if(c.tabFace){rememberTabFace(c,result.face);focusTabFace(c,result.face);}}}
-    }catch(error){if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const control of panel.querySelectorAll('button,input'))control.disabled=false;}}
+    }catch(error){if(live(c)&&removing){c.pendingUnassign=null;c.reviewed=Boolean(c.item.faceSummary?.reviewed);paint(c);announce(c,error.message);window.FamilyApp?.toast?.(error.message);}else if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const control of panel.querySelectorAll('button,input'))control.disabled=false;}}
     finally{c.saving=false;}
   }
   function point(c,event,clamp=false){if(!imageWidth(c.image))return null;const r=imageArea(c);if(!clamp&&(event.clientX<r.x||event.clientX>r.x+r.width||event.clientY<r.y||event.clientY>r.y+r.height))return null;return {x:Math.max(0,Math.min(1,(event.clientX-r.x)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.y)/r.height))};}
@@ -405,7 +413,7 @@
     if(current)clear();stage._familyFaceContext?.dispose();if(item.kind!=='photo'||!item.id||!window.FamilyApp?.apiEnabled){clear();return;}
     if(retained&&(adapter||retained.stage!==stage||retained.dialog!==dialog||retained.reviewLabel!==reviewLabel||retained.zoomEnabled!==zoom))releaseControls();
     const controls=retained?.controls;retained=null;
-    const c={serial:++serial,stage,image,item,adapter,highlightMissing,reviewHost,reviewLabel,zoomEnabled:zoom,reviewed:Boolean(item.faceSummary?.reviewed),dialog,events:new AbortController(),saved:[],detected:[],ignored:[],adjusted:new Map(),faces:[],active:null,popup:null,ready:false,searchSequence:0,saving:false,adjust:false,drag:null,skipClick:false,...controls};current=c;stage._familyFaceContext=c;c.dispose=()=>dispose(c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:true}}));
+    const c={serial:++serial,stage,image,item,adapter,highlightMissing,reviewHost,reviewLabel,zoomEnabled:zoom,reviewed:Boolean(item.faceSummary?.reviewed),dialog,events:new AbortController(),saved:[],detected:[],retained:[],ignored:[],adjusted:new Map(),faces:[],active:null,popup:null,ready:false,searchSequence:0,saving:false,adjust:false,drag:null,skipClick:false,...controls};current=c;stage._familyFaceContext=c;c.dispose=()=>dispose(c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:true}}));
     c.paintReady=new Promise(resolve=>{c.resolvePaint=resolve;});
     c.geom=await helpers();if(!live(c))return;
     c.layer=document.createElement('div');c.layer.className='face-layer';c.hits=document.createElement('div');c.hits.className='face-image-area';c.buttons=document.createElement('div');c.buttons.className='face-hit-buttons';c.annotations=document.createElement('div');c.annotations.className='face-visible-labels';c.annotationNodes=[];c.selection=document.createElement('div');c.selection.className='face-selection';c.selection.hidden=true;c.annotationTarget=document.createElement('span');c.annotationTarget.className='face-label-target';c.annotationTarget.hidden=true;c.annotationTarget.setAttribute('aria-hidden','true');c.hits.append(c.buttons,c.annotations,c.selection,c.annotationTarget);c.layer.append(c.hits);
@@ -524,8 +532,8 @@
     window.addEventListener('family-photo-overlays-changed',event=>{const c=current;if(c?.item.id===event.detail.id){paintAnnotations(c);if(c.hits)place(c);}});
     window.addEventListener('family-media-changed',event=>{
       const result=event.detail,id=result.item?.id;if(!id)return;
-      if(result.faces)remember(id,result.faces,result.item,result.detectedFaces,result.ignoredFaces);else if(['tags','untag','retag','delete','restore','photo-edit'].includes(result.operation))labels.delete(id);
-      const c=current;if(!c||c.item.id!==id)return;c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);if(result.operation==='face-review'){labels.delete(id);paint(c);}
+      if(result.faces)remember(id,result.faces,result.item,result.detectedFaces,result.ignoredFaces,result.unassignedFaces);else if(['tags','untag','retag','delete','restore','photo-edit'].includes(result.operation))labels.delete(id);
+      const c=current;if(!c||c.item.id!==id)return;if(result.unassignedFaces)c.retained=result.unassignedFaces.map(face=>({...face,id:c.retained.find(previous=>c.geom.sameRegion(previous.rect,face.rect))?.id||c.detected.find(previous=>c.geom.sameRegion(previous.rect,face.rect))?.id||uuid()}));c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);if(result.operation==='face-review'){labels.delete(id);paint(c);}
       if(result.ignoredFaces){c.ignored=result.ignoredFaces;paint(c);}
       if(result.operation==='face-ignore'&&result.detectedFaces){for(const face of result.detectedFaces)if(!c.detected.some(previous=>c.geom.sameRegion(previous.rect,face.rect)))c.detected.push({...face,id:uuid()});paint(c);}
       else if(result.detectedFaces){c.detected=result.detectedFaces.map(face=>({...face,id:c.detected.find(previous=>c.geom.sameRegion(previous.rect,face.rect))?.id||uuid()}));paint(c);}

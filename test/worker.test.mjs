@@ -573,7 +573,7 @@ test('a face label atomically adds an ordinary tag, preserves other people, and 
   const response=await f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId,personId:'yona',rect,expectedRevision:null}});assert.equal(response.status,200);const result=await response.json();
   assert.equal(result.operation,'faces');assert.deepEqual(result.item.tags.map(p=>p.id),['yona','shlomo']);assert.equal(result.face.person.id,'yona');assert.deepEqual(result.face.rect,rect);assert.equal(result.face.id,faceId);
   for(const id of ['yona','shlomo']){const person=await(await f.call('/api/people/'+id+'/page')).json();assert.equal(person.albums.photos.items[0].id,item.id);}
-  f.restart();const saved=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(saved.faces[0].id,faceId);assert.equal(saved.faces[0].person.nameEn,'Yona Nakash');
+  f.restart();const saved=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(saved.faces[0].id,faceId);assert.equal(saved.faces[0].person.nameEn,family.people.yona.nameEn);
   const backup=await(await f.call('/api/export')).json();assert.equal(backup.faceTags[0].mediaId,item.id);assert.equal(backup.faceTags[0].personId,'yona');assert.equal(f.objects.size,1,'Face coordinates must not duplicate photo files');
  }finally{await f.close();}
 });
@@ -733,7 +733,7 @@ test('renaming canonical people on startup has bounded work independent of thous
   assert.ok(writes<200,'A rename must not write each tagged album: '+writes);assert.ok(returnedRows<500,'Startup must not read every tagged image: '+returnedRows);
   assert.ok(!queries.some(q=>/JOIN media_tags/.test(q)),'A canonical rename must not traverse media-tag links');
   assert.deepEqual(f.database.prepare('SELECT id,data FROM media ORDER BY id').all(),mediaBefore);assert.deepEqual(f.database.prepare('SELECT media_id,person_id FROM media_tags ORDER BY media_id,person_id').all(),tagsBefore);
-  const page=await(await f.call('/api/people/yona/page')).json();assert.equal(page.person.nameEn,'Yona Nakash');assert.equal(page.person.profile,item.src);assert.equal(page.person.about,'Saved biography');assert.equal(page.person.birthday,'16.10.1921');assert.equal(page.person.photoCount,3001);
+  const page=await(await f.call('/api/people/yona/page')).json();assert.equal(page.person.nameEn,family.people.yona.nameEn);assert.equal(page.person.profile,item.src);assert.equal(page.person.about,'Saved biography');assert.equal(page.person.birthday,'16.10.1921');assert.equal(page.person.photoCount,3001);
  }finally{await f.close();}
 });
 test('a quota failure during initialization is safely reported, does not repeat initialization and recovers after UTC reset',async t=>{
@@ -1714,7 +1714,22 @@ test('removing a duplicate face preserves the other occurrence, rejects stale re
   result=await(await remove(second.revision)).json();assert.deepEqual(result.faces.map(face=>face.id),[first.id]);assert.deepEqual(result.item.tags.map(person=>person.id),['maya']);assert.equal(result.item.faceSummary.total,2);assert.equal(result.item.faceSummary.unmatched,1);
   await saveGalleryScan(f,item);f.restart();result=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(result.faces.length,1);assert.equal(result.detectedFaces.length,2);assert.deepEqual((await(await f.call('/api/media/'+other.id+'/faces')).json()).ignoredFaces,[]);
   result=await(await save('3'.repeat(32),'shlomo',second.rect)).json();assert.deepEqual(result.ignoredFaces,[]);assert.deepEqual(new Set(result.item.tags.map(person=>person.id)),new Set(['maya','shlomo']));assert.equal(result.item.faceSummary.total,3);
-  const replacement=result.face;result=await(await save(replacement.id,null,replacement.rect,replacement.revision)).json();assert.equal(result.ignoredFaces.length,1);assert.deepEqual(result.item.tags.map(person=>person.id),['maya']);assert.equal(result.item.faceSummary.total,2);assert.deepEqual(result.faces.map(face=>face.id),[first.id]);
+  const replacement=result.face;result=await(await save(replacement.id,null,replacement.rect,replacement.revision)).json();assert.equal(result.ignoredFaces.length,0);assert.deepEqual(result.unassignedFaces,[{rect:replacement.rect}]);assert.deepEqual(result.item.tags.map(person=>person.id),['maya']);assert.equal(result.item.faceSummary.total,3);assert.deepEqual(result.faces.map(face=>face.id),[first.id]);
+ }finally{await f.close();}
+});
+
+test('removing a mistaken face name preserves a clickable region without claiming a completed neural scan',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await galleryPhoto(f,'Correct-manual-face.jpg'),rect={x:.25,y:.2,width:.1,height:.15};
+  const save=(faceId,personId,expectedRevision=null)=>f.call('/api/media/'+item.id+'/faces/save',{method:'POST',body:{faceId,personId,rect,expectedRevision}});
+  const labelled=await(await save('a'.repeat(32),'yona')).json();
+  let response=await save(labelled.face.id,null,'stale');assert.equal(response.status,409);
+  response=await save(labelled.face.id,null,labelled.face.revision);assert.equal(response.status,200);let state=await response.json();assert.deepEqual(state.faces,[]);assert.deepEqual(state.item.tags,[]);assert.deepEqual(state.ignoredFaces,[]);assert.deepEqual(state.unassignedFaces,[{rect}]);assert.equal(state.item.faceSummary.scanned,false);assert.equal(state.item.faceSummary.unmatched,1);
+  f.restart();state=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.deepEqual(state.detectedFaces,[{rect}]);assert.deepEqual(state.unassignedFaces,[{rect}]);assert.equal(state.item.faceSummary.scanned,false);
+  await saveGalleryScan(f,item,[{rect:{x:.7,y:.2,width:.1,height:.15},score:.9}]);state=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(state.detectedFaces.length,2,'A later scan must keep the manually retained face');
+  state=await(await save('b'.repeat(32),'shlomo')).json();assert.deepEqual(state.unassignedFaces,[]);assert.deepEqual(state.item.tags.map(person=>person.id),['shlomo']);assert.equal(state.faces[0].personId,'shlomo');
+  state=await(await save(state.face.id,null,state.face.revision)).json();const ignore=await f.call('/api/media/'+item.id+'/faces/ignore',{method:'POST',body:{rect,ignored:true,photoRevision:'original'}});assert.equal(ignore.status,200);
+  f.restart();state=await(await f.call('/api/media/'+item.id+'/faces')).json();assert.equal(state.detectedFaces.length,1,'Explicitly ignoring the detection still removes the face region');assert.deepEqual(state.ignoredFaces,[rect]);
  }finally{await f.close();}
 });
 

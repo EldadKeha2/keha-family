@@ -228,7 +228,13 @@ export class FamilyState {
     const faces=this.faces(item.id,true),previous=faces.find(face=>face.id===p.faceId);
     if((previous?.revision||null)!==p.expectedRevision)throw new HttpError(409,'תיוג הפנים עודכן בינתיים. פתחו אותו מחדש לפני שמירה.');
     if(p.personId===null&&p.name===undefined){
-      if(previous)return {...this.ignoreFace({id:item.id,rect:previous.rect,ignored:true,photoRevision:item.photoRevision||'original',faceId:previous.id,expectedRevision:previous.revision}),operation:'faces',face:null};
+      if(previous){
+        this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,previous.id);
+        this.setUnassignedFace(item,previous.rect,true);const ignoredFaces=this.setIgnoredFace(item,previous.rect,false);
+        const result=this.removeUnusedFaceTag(item,previous.personId);
+        this.touchTags(item.id);this.touchMedia(item);
+        return {...result,saved:true,operation:'faces',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),unassignedFaces:this.unassignedFaces(item),ignoredFaces,face:null};
+      }
       return {saved:true,operation:'faces',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),face:null};
     }
     if(p.name!==undefined?(p.personId!==undefined||typeof p.name!=='string'):typeof p.personId!=='string')throw new HttpError(400,'בחרו אדם מהרשימה או הזינו שם חדש.');
@@ -246,16 +252,29 @@ export class FamilyState {
     const now=new Date().toISOString(),face={id:p.faceId,rect,personId,revision:uid(),createdAt:previous?.createdAt||now,updatedAt:now};
     // An explicit new label can reuse a previously dismissed position.
     const ignoredFaces=this.setIgnoredFace(item,rect,false);
+    this.setUnassignedFace(item,rect,false);
     for(const old of replaced)this.sql.exec('DELETE FROM media_faces WHERE media_id=? AND id=?',item.id,old.id);
     this.sql.exec('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?) ON CONFLICT(media_id,id) DO UPDATE SET person_id=excluded.person_id,data=excluded.data',item.id,face.id,face.personId,JSON.stringify(face));
     this.touchTags(item.id);this.touchMedia(item);
-    const saved=this.faces(item.id);return {...result,taggedPeople:[result.taggedPeople.at(-1)],item:this.mediaPublic(item),operation:'faces',faces:saved,ignoredFaces,face:saved.find(item=>item.id===face.id)};
+    const saved=this.faces(item.id);return {...result,taggedPeople:[result.taggedPeople.at(-1)],item:this.mediaPublic(item),operation:'faces',faces:saved,unassignedFaces:this.unassignedFaces(item),ignoredFaces,face:saved.find(item=>item.id===face.id)};
   }
   faceScan(item){
     const row=this.rows('SELECT * FROM media_face_scans WHERE media_id=? AND photo_revision=? AND version=?',item.id,item.photoRevision||'original',FACE_SCAN_VERSION)[0];
     return row?{...JSON.parse(row.data),total:row.face_count,unmatched:row.unmatched_count}:null;
   }
   ignoredFaces(item){const row=this.rows('SELECT data FROM media_face_ignores WHERE media_id=? AND photo_revision=?',item.id,item.photoRevision||'original')[0];return row?JSON.parse(row.data):[];}
+  unassignedFaces(item){
+    return (item.unassignedFaces?.[item.photoRevision||'original']||[]).map(rect=>({rect}));
+  }
+  setUnassignedFace(item,rect,keep){
+    const revision=item.photoRevision||'original',previous=item.unassignedFaces?.[revision]||[],matches=other=>sameFaceRegion(other,rect);
+    const faces=keep?(previous.some(matches)?previous:[...previous,rect]):previous.filter(other=>!matches(other));
+    if(faces.length>FACE_LIMIT)throw new HttpError(400,'אפשר לשמור עד 150 אזורי פנים בתמונה.');
+    if(JSON.stringify(faces)===JSON.stringify(previous))return;
+    item.unassignedFaces={...item.unassignedFaces,[revision]:faces};
+    this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);
+  }
+  detectedFaces(item,faces=this.faceScan(item)?.faces||[]){return withoutIgnored(detectionRegions([...faces,...this.unassignedFaces(item)]),this.ignoredFaces(item));}
   setIgnoredFace(item,rect,value){
     const previous=this.ignoredFaces(item),matching=previous.filter(other=>withoutIgnored([{rect}],[other]).length===0);
     const ignored=value?(matching.length?previous:[...previous,rect]):previous.filter(other=>!matching.includes(other));
@@ -275,14 +294,15 @@ export class FamilyState {
     for(const personId of new Set(removed.map(face=>face.personId))){const result=this.removeUnusedFaceTag(item,personId);for(const id of result?.affectedPersonIds||[])affectedPersonIds.add(id);}
     if(removed.length)this.touchTags(item.id);
     this.recountFaces(item.id);this.touchMedia(item);
-    return {saved:true,operation:'face-ignore',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:withoutIgnored(this.faceScan(item)?.faces||[],ignored),ignoredFaces:ignored,affectedPersonIds:[...affectedPersonIds]};
+    return {saved:true,operation:'face-ignore',scope:this.mediaScope(item),item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:this.detectedFaces(item),ignoredFaces:ignored,affectedPersonIds:[...affectedPersonIds]};
   }
   faceSummary(item){
     const scan=this.faceScan(item),reviewed=Boolean(this.rows('SELECT media_id FROM media_face_reviews WHERE media_id=? AND photo_revision=? AND tags_revision=?',item.id,item.photoRevision||'original',this.tagsRevision(item.id))[0]);
     if(reviewed)return {total:scan?.total??this.faces(item.id).length,unmatched:0,partial:false,scanned:Boolean(scan),reviewed:true};
     const tagged=this.tagIds(item.id).length;
-    if(!scan&&!tagged)return null;
-    return {total:scan?.total??null,unmatched:scan?.unmatched??null,partial:tagged>0,scanned:Boolean(scan),reviewed:false};
+    const retained=this.unassignedFaces(item);if(!scan&&!tagged&&!retained.length)return null;
+    const coverage=retained.length?faceCoverage(this.faces(item.id),this.detectedFaces(item),tagged):null;
+    return {total:coverage?.total??scan?.total??null,unmatched:coverage?.unmatched??scan?.unmatched??null,partial:tagged>0,scanned:Boolean(scan),reviewed:false};
   }
   reviewFaces(p){
     const item=this.photo(p.id);
@@ -295,7 +315,7 @@ export class FamilyState {
   }
   recountFaces(id){
     const row=this.rows('SELECT data FROM media_face_scans WHERE media_id=?',id)[0];if(!row)return;
-    const coverage=faceCoverage(this.faces(id),withoutIgnored(JSON.parse(row.data).faces,this.ignoredFaces(this.media(id))),this.tagIds(id).length);
+    const coverage=faceCoverage(this.faces(id),this.detectedFaces(this.media(id),JSON.parse(row.data).faces),this.tagIds(id).length);
     this.sql.exec('UPDATE media_face_scans SET face_count=?,unmatched_count=? WHERE media_id=?',coverage.total,coverage.unmatched,id);
   }
   saveFaceScan(p){
@@ -308,7 +328,7 @@ export class FamilyState {
     })),previous=this.faceScan(item);
     // Concurrent visitors must not replace a complete index with a smaller scan.
     const combined=previous?detectionRegions([...previous.faces,...faces]):faces;
-    const visible=withoutIgnored(combined,this.ignoredFaces(item)),data={faces:combined,scannedAt:new Date().toISOString()},coverage=faceCoverage(this.faces(item.id),visible,this.tagIds(item.id).length);
+    const visible=this.detectedFaces(item,combined),data={faces:combined,scannedAt:new Date().toISOString()},coverage=faceCoverage(this.faces(item.id),visible,this.tagIds(item.id).length);
     if(!previous||JSON.stringify(previous.faces)!==JSON.stringify(combined)){
       this.sql.exec('INSERT INTO media_face_scans(media_id,photo_revision,version,data,face_count,unmatched_count) VALUES(?,?,?,?,?,?) ON CONFLICT(media_id) DO UPDATE SET photo_revision=excluded.photo_revision,version=excluded.version,data=excluded.data,face_count=excluded.face_count,unmatched_count=excluded.unmatched_count',item.id,p.photoRevision,FACE_SCAN_VERSION,JSON.stringify(data),coverage.total,coverage.unmatched);
       for(const kind of this.mediaCollections(item))this.touch(kind);
@@ -668,7 +688,7 @@ export class FamilyState {
       case 'gallery.face.scan':return this.galleryFaceScan(p);
       case 'media.face.scan.save':return this.saveFaceScan(p);
       case 'media.face.review':return this.reviewFaces(p);
-      case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');const ignoredFaces=this.ignoredFaces(item);return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:withoutIgnored(this.faceScan(item)?.faces||[],ignoredFaces),ignoredFaces};}
+      case 'media.faces':{const item=this.media(p.id);if(mediaKind(item)!=='photo')throw new HttpError(400,'אפשר לתייג פנים בתמונות בלבד.');const ignoredFaces=this.ignoredFaces(item);return {mediaId:item.id,item:this.mediaPublic(item),faces:this.faces(item.id),detectedFaces:this.detectedFaces(item),unassignedFaces:this.unassignedFaces(item),ignoredFaces};}
       case 'media.face.ignore':return this.ignoreFace(p);
       case 'media.face.save':return this.saveFace(p);
       case 'photo.labels.catalog':{
