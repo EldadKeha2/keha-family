@@ -274,8 +274,10 @@ Node.js 22 ומעלה: `npm run check`. הבדיקות כוללות גם תיו�
 
 במצב הסינון לחיצה על תמונה בוחרת אותה או מבטלת את הבחירה. סמל העין פותח אותה לצפייה. ״בחר הכל״ קורא רשימת מזהים מכל העמודים; הבחירה נשמרת בדפדוף ומתאפסת כשמשנים סינון או חיפוש. כפתורי ההורדה נמצאים מעל הגריד ומתחתיו. השרת מזרים את קובצי התמונות הנוכחיים כ־ZIP64 ישירות להורדה, ללא עותק ZIP באחסון וללא טעינת כל התמונות לזיכרון הדפדפן. שמות קבצים ממוספרים שומרים על תמונות בעלות אותו שם. תמונה שנמחקה מבטלת את הבקשה במקום להישמט בשקט מהחבילה. בדיקות השיוך וההורדה נמצאות ב־`test/gallery-family.test.mjs` וב־`test/worker.test.mjs`.
 
-### Desktop website shortcut
+### Desktop app installation
 
-The desktop header and footer offer **הוסף קיצור דרך / Add shortcut** with the family logo. Both use the browser's retained shortcut prompt when available and otherwise show the existing browser-specific instructions. The website no longer offers the EXE or Microsoft Store distribution choices and no longer requests Windows version or CPU client hints. Mobile installation and existing native-app refresh behavior are retained. The separately versioned native app sources and historical releases remain available in the repository.
+The desktop header and footer offer **התקנת האפליקציה / Install app** with the family logo. A user click calls `navigator.install()` when supported, or the retained `beforeinstallprompt` event otherwise. The native browser confirmation opens directly; only unavailable installation falls back to a compact message. Browser bookmarks remain a separate action, and mobile installation is retained. No executable download or security-setting changes are offered.
+
+`public/assets/desktop-app.js` fits an installed desktop PWA window to its current display's available work area on launch, using the supported PWA `moveTo` and `resizeTo` APIs. This fills the screen while preserving the title bar and taskbar. Ordinary browser tabs, phones, embedded pages and the separately versioned native app are excluded. The app remains usable if a browser restricts window resizing. No fullscreen permission, offline cache, or service worker is introduced.
 
 `public/privacy.html` contains the Hebrew and English privacy policy and is linked from the site footer for the Windows Store submission and site visitors. It describes the existing public family content, local face detection, storage, optional email delivery and correction/removal contact.

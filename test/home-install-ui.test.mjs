@@ -25,8 +25,8 @@ const assertSuccess=f=>{
 
 // Only controller-facing DOM APIs are modeled. Native dialog focus containment,
 // operating-system install prompts and phone layout are checked in the browser.
-function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing',fullscreen='missing'}={}){
-  const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[],reloads=[],fullscreenCalls=[];
+function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing',webInstall='missing'}={}){
+  const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[],reloads=[],webInstallCalls=[];
   const timers=new Map();let clock=0,nextTimer=0;
   const schedule=(fn,delay=0)=>{const id=++nextTimer;timers.set(id,{fn,at:clock+Math.max(0,Number(delay)||0)});return id;};
   const advanceTime=async milliseconds=>{
@@ -82,12 +82,12 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   const card=new Element('section'),dialog=new Element('dialog');nodes.set('homeInstall',card);nodes.set('homeInstallDialog',dialog);
   const windowsLink=new Element('a');windowsLink.setAttribute('href','#install-desktop');windowsLink.children.set('span',new Element('span'));nodes.set('desktopShortcutLink',windowsLink);
   document.documentElement=new Element('html');document.documentElement.lang=english?'en-US':'he';
-  if(fullscreen!=='missing')document.documentElement.requestFullscreen=()=>{fullscreenCalls.push(true);if(fullscreen==='blocked')return Promise.reject(Error('Fullscreen denied'));document.fullscreenElement=document.documentElement;return Promise.resolve();};
   document.getElementById=id=>nodes.get(id)||null;
   const window=new EventTarget();window.top=iframe?{}:window;window.FamilyI18n={isEnglish:english,language:english?'en-US':'he'};
   const queries=new Map();
   const matchMedia=query=>{if(!queries.has(query)){const media=new EventTarget();media.matches=query.includes('display-mode')?standalone:mobile;queries.set(query,media);}return queries.get(query);};
   const navigator={userAgent,maxTouchPoints,standalone:iosStandalone,userAgentData:{mobile:userAgentMobile}};
+  if(webInstall!=='missing')navigator.install=()=>{webInstallCalls.push(true);if(webInstall==='works')return Promise.resolve({manifestId:'https://family.example/'});const error=Error('Install unavailable');error.name=webInstall;return Promise.reject(error);};
   if(clientHints!=='missing')navigator.userAgentData.getHighEntropyValues=async()=>{if(clientHints==='denied')throw Error('Client hints unavailable');return clientHints;};
   if(installedRelated!=='missing')navigator.getInstalledRelatedApps=async()=>{relatedCalls.push(true);if(installedRelated==='throw')throw Error('Detection unavailable');return typeof installedRelated==='function'?installedRelated():installedRelated;};
   if(share!=='missing')navigator.share=async payload=>{shared.push(payload);if(share!=='works'){const error=Error('Share unavailable');error.name=share;throw error;}};
@@ -99,7 +99,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   const ready=()=>{document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';};
   vm.runInContext(source,context);if(autoReady)ready();
   const button=()=>card.querySelector('[data-home-install-action]');
-  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,reloads,windowsLink,fullscreenCalls,
+  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,reloads,windowsLink,webInstallCalls,
     click(element){const event=new Event('click',{cancelable:true});element.dispatchEvent(event);return event;},
     resize(value){const media=matchMedia('(max-width: 700px)');media.matches=value;media.dispatchEvent(new Event('change'));},
     standalone(value){const media=matchMedia('(display-mode: standalone)');media.matches=value;media.dispatchEvent(new Event('change'));},
@@ -508,8 +508,8 @@ test('desktop header and footer respond immediately when installed-app detection
 
 test('an unresponsive desktop prompt keeps visible instructions and releases the busy button',async()=>{
   const f=desktopFixture(),offer=f.offer({choicePending:true}),button=f.card.querySelector('[data-desktop-install-action]');
-  f.click(button);assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);
-  assert.equal(f.dialog.querySelector('[data-desktop-install-instructions]').hidden,false);
+  f.click(button);assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);
+  assert.ok(f.card.querySelector('[data-home-install-status]').textContent);
   await f.advanceTime(8000);assert.equal(button.disabled,false);assert.equal(f.dialog.open,true);
   offer.choose('accepted');await tick();assert.equal(f.dialog.open,true);
 });
@@ -517,7 +517,7 @@ test('an unresponsive desktop prompt keeps visible instructions and releases the
 test('desktop shortcut and refresh controls use the site logo and remain absent from phone and tablet layouts',()=>{
   for(const english of [false,true]){
     const f=desktopFixture({english}),install=f.card.querySelector('[data-desktop-install-action]'),refresh=f.card.querySelector('[data-desktop-refresh]');
-    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Desktop shortcut/:/קיצור לשולחן העבודה/);
+    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Install app/:/התקנת האפליקציה/);
     assert.equal(f.card.querySelector('.desktop-shortcut-logo').getAttribute('src'),'assets/app-icons/icon-192.png');
     f.resize(true);assert.equal(install.hidden,true);assert.equal(refresh.hidden,true);
     f.resize(false);assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);
@@ -535,14 +535,14 @@ test('desktop native installation uses one user click and one retained offer wit
   f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.match(f.card.querySelector('[data-home-install-status]').textContent,/ההתקנה הושלמה/);
   f.click(button);assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);
   assert.equal(f.dialog.querySelector('[data-desktop-native-start]').hidden,true);
-  assert.match(f.dialog.innerHTML,/ליצירת סמל בשולחן העבודה/);
+  assert.match(f.dialog.innerHTML,/האפליקציה כבר מותקנת/);
 });
 
 test('desktop dismissal and an unavailable native prompt leave useful computer instructions in both languages',async()=>{
   for(const english of [false,true]){
     const f=desktopFixture({english}),offer=f.offer(),button=f.card.querySelector('[data-desktop-install-action]');
     f.click(button);await tick();assert.equal(offer.calls,1);f.click(button);await tick();assert.equal(f.dialog.open,true);
-    assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));assert.match(f.dialog.innerHTML,/Chrome/);
+    assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));assert.doesNotMatch(f.dialog.innerHTML,/<ol>|<li>/);
     assert.doesNotMatch(f.dialog.innerHTML,/Android|iPhone|iPad/);if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
     f.click(f.dialog.querySelector('[data-home-install-close]'));assert.equal(f.document.activeElement,button);
   }
@@ -556,12 +556,12 @@ test('a late desktop install offer is available directly inside the open instruc
 });
 
 test('desktop help follows Edge and Safari and installed-app detection keeps desktop-icon instructions available',async()=>{
-  for(const [userAgent,expected,absent]of [[desktopUA+' Edg/141.0',/Edge/,/Safari|Android/],['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Safari/605.1.15',/Dock/,/Chrome|Android/]]){
+  for(const [userAgent,expected,absent]of [[desktopUA+' Edg/141.0',/Install app/,/Safari|Android/],['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Safari/605.1.15',/Dock/,/Chrome|Android/]]){
     const f=desktopFixture({userAgent});f.click(f.card.querySelector('[data-desktop-install-action]'));await tick();assert.match(f.dialog.innerHTML,expected);assert.doesNotMatch(f.dialog.innerHTML,absent);
   }
   const installed=desktopFixture({installedRelated:[{platform:'webapp',id:'https://family.example/'}]});await tick();const offer=installed.offer();
   installed.click(installed.card.querySelector('[data-desktop-install-action]'));await tick();assert.equal(offer.calls,0);assert.equal(installed.dialog.open,true);
-  assert.equal(installed.dialog.querySelector('[data-desktop-install-instructions]').hidden,false);
+  assert.equal(installed.dialog.querySelector('[data-desktop-install-instructions]').hidden,true);
 });
 
 test('desktop refresh reloads the current game, person or album URL and cannot be invoked from mobile',()=>{
@@ -597,7 +597,7 @@ test('modern Windows always offers the browser shortcut regardless of version or
     const f=desktopFixture({english,clientHints});await tick();
     assert.equal(f.windowsLink.hidden,false);
     assert.equal(f.windowsLink.getAttribute('href'),'#install-desktop');
-    assert.equal(f.windowsLink.querySelector('span').textContent,english?'Desktop shortcut':'קיצור לשולחן העבודה');
+    assert.equal(f.windowsLink.querySelector('span').textContent,english?'Install app':'התקנת האפליקציה');
     assert.equal(f.click(f.windowsLink).defaultPrevented,true);await tick();
     assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));
     assert.doesNotMatch(f.dialog.innerHTML,/\.exe|Microsoft Store|data-windows-direct-download|data-windows-browser-shortcut/);
@@ -608,7 +608,7 @@ test('modern Windows always offers the browser shortcut regardless of version or
 test('the desktop footer uses the same browser prompt as the logo button without navigating to a download',async()=>{
   const f=desktopFixture(),offer=f.offer({outcome:'accepted'});
   assert.equal(f.click(f.windowsLink).defaultPrevented,true);await tick();assert.equal(offer.calls,1);
-  assert.equal(f.dialog.open,true);assert.equal(f.location.hash,'#games');
+  assert.equal(f.dialog.open,false);assert.equal(f.location.hash,'#games');
 });
 
 test('the footer shortcut is available on desktop browsers and hidden on phones and inside the native app',()=>{
@@ -640,19 +640,31 @@ test('bookmark instructions translate without changing actions and cannot open o
   }
 });
 
-test('desktop full screen uses a real click, closes the guide only after success and preserves the current URL',async()=>{
-  const f=desktopFixture({fullscreen:'works'}),current=f.location.href;
-  f.click(f.card.querySelector('[data-desktop-install-action]'));assert.equal(f.fullscreenCalls.length,0);
-  const action=f.dialog.querySelector('[data-desktop-fullscreen]');assert.ok(action);f.click(action);
-  assert.equal(f.fullscreenCalls.length,1);await tick();assert.equal(f.dialog.open,false);assert.equal(f.document.fullscreenElement,f.document.documentElement);
-  assert.equal(f.location.href,current);assert.equal(f.assignments.length,0);
+test('the modern browser install API opens directly from one click without a custom instruction dialog',async()=>{
+  for(const footer of [false,true]){
+    const f=desktopFixture({webInstall:'works'}),offer=f.offer();assert.equal(f.webInstallCalls.length,0);
+    f.click(footer?f.windowsLink:f.card.querySelector('[data-desktop-install-action]'));
+    assert.equal(f.webInstallCalls.length,1);assert.equal(offer.calls,0);assert.equal(f.dialog.open,false);
+    await tick();assert.equal(f.card.querySelector('[data-desktop-install-action]').disabled,false);
+    assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'האפליקציה מוכנה');
+  }
 });
 
-test('unsupported or denied full screen keeps instructions visible with a usable keyboard fallback',async()=>{
-  for(const fullscreen of ['missing','blocked'])for(const english of [false,true]){
-    const f=desktopFixture({fullscreen,english});f.click(f.card.querySelector('[data-desktop-install-action]'));
-    assert.match(f.dialog.innerHTML,/F11/);f.click(f.dialog.querySelector('[data-desktop-fullscreen]'));await tick();assert.equal(f.dialog.open,true);
-    assert.ok(f.dialog.querySelector('[data-home-install-help-status]').textContent);assert.notEqual(f.document.fullscreenElement,f.document.documentElement);
+test('canceling browser installation stays silent and an unsupported modern API preserves the retained offer',async()=>{
+  const cancelled=desktopFixture({webInstall:'AbortError'});cancelled.click(cancelled.card.querySelector('[data-desktop-install-action]'));await tick();
+  assert.equal(cancelled.dialog.open,false);assert.equal(cancelled.card.querySelector('[data-home-install-status]').textContent,'');
+  const f=desktopFixture({webInstall:'NotSupportedError'}),offer=f.offer();f.click(f.card.querySelector('[data-desktop-install-action]'));await tick();
+  assert.equal(f.webInstallCalls.length,1);assert.equal(offer.calls,0);assert.equal(f.dialog.open,true);
+  assert.doesNotMatch(f.dialog.innerHTML,/<ol>|<li>|F11|העברה, שמירה ושיתוף/);
+  f.click(f.dialog.querySelector('[data-desktop-native-start]'));assert.equal(offer.calls,1);await tick();assert.equal(f.webInstallCalls.length,1);
+});
+
+test('the desktop install fallback stays short in both languages and the browser API cannot be used from a phone',async()=>{
+  for(const english of [false,true]){
+    const f=desktopFixture({english});f.click(f.card.querySelector('[data-desktop-install-action]'));
+    assert.doesNotMatch(f.dialog.innerHTML,/<ol>|<li>|F11|data-desktop-fullscreen/);
+    assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));
     if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
   }
+  const phone=fixture({webInstall:'works'});phone.click(phone.card.querySelector('[data-desktop-install-action]'));await tick();assert.equal(phone.webInstallCalls.length,0);assert.equal(phone.dialog.open,false);
 });
