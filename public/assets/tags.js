@@ -4,6 +4,33 @@
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
+  function spellingDistance(a,b,budget=2){
+    if(a===b)return 0;if(Math.abs(a.length-b.length)>budget)return budget+1;
+    let previous=Array.from({length:b.length+1},(_,index)=>index);
+    for(let row=1;row<=a.length;row++){
+      const next=[row];let minimum=row;
+      for(let column=1;column<=b.length;column++){
+        next[column]=Math.min(next[column-1]+1,previous[column]+1,previous[column-1]+(a[row-1]===b[column-1]?0:1));minimum=Math.min(minimum,next[column]);
+      }
+      if(minimum>budget)return budget+1;previous=next;
+    }
+    return previous[b.length];
+  }
+  function spellingRank(name,query,words){
+    const parts=name.split(' '),whole=spellingDistance(query,name);if(!whole)return 0;
+    // One shared two-letter budget covers the entire query, even when the
+    // first name and surname are entered in a different order. Each name word
+    // can be used once, so a repeated query word cannot reuse a single match.
+    function match(index,used,budget){
+      if(index===words.length)return 0;let best=budget+1;
+      for(let slot=0;slot<parts.length;slot++)if(!used.has(slot)){
+        const distance=spellingDistance(words[index],parts[slot],budget);if(distance>budget)continue;
+        used.add(slot);best=Math.min(best,distance+match(index+1,used,budget-distance));used.delete(slot);
+      }
+      return best;
+    }
+    return Math.min(whole,words.length<=parts.length?match(0,new Set(),2):3);
+  }
   function matchRank(person,query){
     if(!query)return 5;
     const canonical=window.FAMILY_DATA.people[person.id],aliases=[person.name,person.nameEn,canonical?.name,canonical?.nameEn].filter(Boolean).map(normalize),words=query.split(' ');
@@ -11,7 +38,9 @@
     if(aliases.some(name=>name.split(' ').includes(query)))return 1;
     if(aliases.some(name=>name.startsWith(query)))return 2;
     if(aliases.some(name=>words.every(word=>name.split(' ').some(part=>part.startsWith(word)))))return 3;
-    return aliases.some(name=>name.includes(query))?4:Infinity;
+    if(aliases.some(name=>name.includes(query)))return 4;
+    const distance=Math.min(...new Set(aliases.map(name=>spellingRank(name,query,words))));
+    return distance<=2?5+distance:Infinity;
   }
   function personContext(person){
     const data=window.FAMILY_DATA,p=data.people[person.id],unit=data.units?.[p?.unit],parent=unit?.people?.[0]===person.id?data.units[unit.parent]:null;
@@ -149,7 +178,7 @@
       this.results.innerHTML=names.slice(0,150).map(person=>`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}><span><strong>${safe(I18n.personName(person))}</strong><small>${safe(personContext(person))}</small></span></label>`).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
       this.results.scrollTop=position;
       this.host.querySelector('[data-tag-search-count]').textContent=this.inline&&!query?'':I18n.html`${names.length} ${I18n.isEnglish?I18n.word(names.length,'name in the list','names in the list'):I18n.t('שמות ברשימה')}`;
-      const add=this.host.querySelector('[data-tag-add]');add.hidden=!this.store.ready||!query||names.length>0||[...selected.values()].some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalize(alias)===query));add.textContent=I18n.t('＋ הוספת השם ״')+this.query.trim()+'״';this.version=rosterVersion;
+      const add=this.host.querySelector('[data-tag-add]');add.hidden=!this.store.ready||!query||names.some(person=>matchRank(person,query)<=4)||[...selected.values()].some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalize(alias)===query));add.textContent=I18n.t('＋ הוספת השם ״')+this.query.trim()+'״';this.version=rosterVersion;
     }
     render(){
       if(!this.host.isConnected)return;

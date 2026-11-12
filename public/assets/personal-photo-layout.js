@@ -95,7 +95,7 @@
       arrange(editDock,[$('editOpenedPhoto')]);arrange(reviewDock,[controller?.reviewButton]);
       const sharing=$('mediaShareActions'),copy=$('copyMediaLink'),download=$('mediaOriginal');
       move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
-      move(sharing,below,feedback);move($('openedCaptionForm'),below,feedback);
+      move(sharing,below,feedback);move($('openedCaptionForm'),actions,primary);
       const footer=viewer.querySelector('.media-viewer-footer');
       move($('mediaPhotoLabels'),footer,below);
       move(controller?.labelList,footer,$('mediaTagPanel'));

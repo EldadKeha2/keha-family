@@ -1,6 +1,6 @@
 // One English label per stable person ID; Hebrew names and album identities stay intact.
 export const englishNames={
-  "yona": "Yona Nakash",
+  "yona": "Yona Nakash Keha",
   "shlomo": "Shlomo Keha",
   "ruti": "Ruth Harizi",
   "avishai": "Avishai Harizi",

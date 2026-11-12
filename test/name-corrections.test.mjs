@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import family from '../src/family.mjs';
 import {correctNamedContent,matchingPeople} from '../src/name-corrections.mjs';
 
+test('Yona has both surnames in both languages and old names still identify her existing profile',()=>{
+ assert.equal(family.people.yona.name,'יונה נקאש קהא');assert.equal(family.people.yona.lastName,'נקאש קהא');assert.equal(family.people.yona.nameEn,'Yona Nakash Keha');
+ const roster=[{id:'extra-old',name:'יונה נקאש'},family.people.yona];
+ for(const name of ['יונה נקאש','יונה נקאש קהא','Yona Nakash','Yona Nakash Keha'])assert.deepEqual(matchingPeople(roster,name).map(p=>p.id),['yona']);
+ const old={key:'photos/יונה_נקאש.jpg',file:'Yona_Nakash.jpg',folder:'001_יונה_נקאש',caption:'יונה נקאש ושלמה קהא',nameEn:'Yona Nakash',filename:'יונה_נקאש.jpg',options:['Yona Nakash','יונה נקאש קהא']};
+ const corrected=correctNamedContent(old);assert.equal(corrected.caption,'יונה נקאש קהא ושלמה קהא');assert.equal(corrected.nameEn,'Yona Nakash Keha');assert.equal(corrected.filename,'יונה_נקאש_קהא.jpg');assert.deepEqual(corrected.options,['Yona Nakash Keha','יונה נקאש קהא']);
+ for(const key of ['key','file','folder'])assert.equal(corrected[key],old[key]);assert.deepEqual(correctNamedContent(corrected),corrected);
+});
+
 test('the surname correction changes display text while preserving storage references and other Harizi relatives',()=>{
   const source={id:'Roei_Harizi',key:'photos/רועי_חריזי.jpg',file:'Roei_Harizi.jpg',folder:'020_רועי_חריזי',url:'https://example.com/Roei_Harizi',filename:'רועי_חריזי.jpg',caption:'עם רועי חריזי ורותי חריזי',aboutEn:'Roei Harizi and Ruth Harizi',options:['Roi Harizi','Ruth Harizi'],faces:[{personId:'roi',rect:{x:.1,y:.2,width:.3,height:.4}}]};
   const result=correctNamedContent(source);

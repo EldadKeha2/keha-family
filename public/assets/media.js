@@ -9,6 +9,7 @@
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
   const desktopPhotoInput=()=>window.FamilyPhotoPresentation?.desktop?.()===true||navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||'');
+  const inlinePhotoCaption=()=>current()?.kind==='photo'&&!state.fullscreen&&(window.FamilyPhotoKeyboard?.desktop?.()??desktopPhotoInput());
   function photoIndex(direction,wrap=true,from=state.index){
     for(let distance=1;distance<=state.items.length;distance++){
       const index=from+direction*distance;
@@ -132,7 +133,7 @@
     profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);profileButton.title=profileLabel;
     if(selected&&!albumCover){const undoLabel=tr('זו תמונת הפרופיל. לחצו לביטול הבחירה ולחזרה לתמונה הקודמת','Current profile picture. Click to undo this selection and restore the previous photo');profileButton.title=undoLabel;profileButton.setAttribute('aria-label',undoLabel);}
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
-    $('openedCaptionForm').hidden=!captionEditing;
+    captionControls();
     const page=albumPages.get(state.scope),total=page?.total??state.items.length,offset=page?(page.page-1)*page.size:0;
     $('mediaStage').classList.toggle('photo-swipe-enabled',item.kind==='photo'&&total>1&&!state.paging);
     $('mediaViewerCounter').textContent=`${offset+state.index+1} / ${total}`;
@@ -247,6 +248,10 @@
   function openFrom(scope,id){const items=albums.get(scope)||[];return open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
   async function step(direction,{native=false,instant=false,queued=false,effect=null}={}){
     if(!current())return;
+    if(inlinePhotoCaption()&&captionEditing){
+      const owner={session:state.session,navigation:state.navigation,id:identity(current())};
+      if(!await saveOpenedCaption()||owner.session!==state.session||owner.navigation!==state.navigation||owner.id!==identity(current()||{}))return;
+    }
     state.photoActivity=Date.now();
     if(state.paging){
       if(!queued||!state.pageRequest)return;
@@ -347,6 +352,20 @@
     restoringLink=href;
     try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));const loaded=registeredLink(id);if(loaded)open(loaded.items,loaded.index,loaded.scope);else open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
+  function captionControls(){
+    const inline=inlinePhotoCaption(),input=$('openedCaptionText'),form=$('openedCaptionForm');
+    $('mediaViewer').classList.toggle('media-caption-inline',inline);$('editOpenedCaption').hidden=inline;
+    form.hidden=!(inline||captionEditing);
+    if(!captionEditing){expectedCaption=current()?.caption||'';input.value=expectedCaption;$('openedCaptionError').textContent='';}
+    form.querySelector('label').textContent=inline?tr('תיאור התמונה','Photo description'):tr('כיתוב לתמונה או לקובץ','Photo or file description');
+    input.placeholder=tr('הוספת תיאור לתמונה…','Add a photo description…');input.rows=inline?2:3;
+  }
+  function beginCaptionEdit(preserveValue=false){
+    const item=current();if(!item||captionEditing)return;
+    captionEditing=true;captionEditor++;captionSave=null;expectedCaption=item.caption||'';
+    if(!preserveValue)$('openedCaptionText').value=expectedCaption;
+    $('openedCaptionError').textContent='';$('openedCaptionForm').hidden=false;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;
+  }
   function saveOpenedCaption(event){
     event?.preventDefault();const item=current();if(!item||!captionEditing)return Promise.resolve(false);
     if(captionSave?.editor===captionEditor)return captionSave.promise;
@@ -365,7 +384,7 @@
             expectedCaption=result.item?.caption??caption;
             if(input.value!==caption)continue;
           }
-          captionEditing=false;$('openedCaptionForm').hidden=true;notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));return true;
+          captionEditing=false;captionControls();notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));return true;
         }
         return false;
       }catch(error){if(active())$('openedCaptionError').textContent=error.message;return false;}
@@ -404,8 +423,9 @@
       try{const result=await window.FamilyPhotoEditor.edit({...item});if(!result)return;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));notify(tr('התמונה נשמרה. הגרסאות הקודמות זמינות בעורך ✓','Photo saved. Previous versions are available in the editor ✓'));}
       catch(error){notify(error.message);}
     });
-    $('editOpenedCaption').addEventListener('click',()=>{const item=current();if(!item)return;captionEditing=true;captionEditor++;captionSave=null;expectedCaption=item.caption||'';$('openedCaptionText').value=expectedCaption;$('openedCaptionError').textContent='';$('openedCaptionForm').hidden=false;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;$('openedCaptionText').focus();});
-    $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionEditor++;captionSave=null;$('openedCaptionForm').hidden=true;});
+    $('editOpenedCaption').addEventListener('click',()=>{beginCaptionEdit();$('openedCaptionText').focus();});
+    $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionEditor++;captionSave=null;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;captionControls();});
+    $('openedCaptionText').addEventListener('input',()=>{if(inlinePhotoCaption())beginCaptionEdit(true);});
     $('openedCaptionForm').addEventListener('submit',saveOpenedCaption);
     $('openedCaptionText').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,saveOpenedCaption));
     window.FamilyPhotoKeyboard?.bindNavigation({available:canControlNavigate,capture:()=>({session:state.session,navigation:state.navigation,id:identity(current())}),navigate:controlNavigate});

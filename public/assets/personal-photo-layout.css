@@ -111,11 +111,22 @@
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback:empty{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback>[hidden]{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback>:not([hidden]){display:block;margin:6px 0;white-space:normal;font-size:14px}
- #mediaViewer.personal-photo-desktop #openedCaptionForm{margin:12px 0}
+ #mediaViewer.personal-photo-desktop #openedCaptionForm{margin:0 0 8px}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit) [hidden]{display:none}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit) button:disabled{opacity:.55;cursor:wait}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit,#personalPhotoZoom) button:focus-visible{outline:2px solid #8d9d70;outline-offset:3px}
 }
+#mediaViewer.media-caption-inline #editOpenedCaption{display:none}
+#mediaViewer.media-caption-inline #openedCaptionForm{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px;max-width:100%;direction:rtl}
+html[dir=ltr] #mediaViewer.media-caption-inline #openedCaptionForm{direction:ltr}
+#mediaViewer.media-caption-inline #openedCaptionForm>label{grid-column:1/-1;color:#686b51;font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans)}
+#mediaViewer.media-caption-inline #openedCaptionText{grid-column:1/-1;box-sizing:border-box;width:100%;min-width:0;min-height:66px;margin:0;padding:9px 11px;border:1px solid #cfc5aa;border-radius:8px;background:#fffdf6;color:#454b38;font:calc(16px * var(--a11y-text-scale,1))/1.45 var(--sans);text-align:start;resize:vertical}
+#mediaViewer.media-caption-inline #openedCaptionText:focus-visible{outline:2px solid #8d9d70;outline-offset:2px}
+#mediaViewer.media-caption-inline #openedCaptionForm>p{grid-column:1/-1;margin:0}
+#mediaViewer.media-caption-inline #openedCaptionError:empty{display:none}
+#mediaViewer.media-caption-inline #openedCaptionForm>button{min-height:30px;margin:0;padding:5px 12px;border-radius:7px;font:calc(13px * var(--a11y-text-scale,1))/1.3 var(--sans)}
+#mediaViewer.media-caption-inline #openedCaptionForm>[type=submit]{grid-column:2;background:#62734c;color:#fffdf7;border:1px solid #62734c}
+#mediaViewer.media-caption-inline #cancelOpenedCaption{grid-column:3;background:#faf7ee;color:#727858;border:1px solid #cfc5aa}
 @media(min-width:701px) and (max-height:760px){
  #mediaViewer.personal-photo-desktop{--personal-header-height:72px;--personal-footer-height:min(330px,calc(100dvh - 330px))}
  #mediaViewer.personal-photo-desktop .media-viewer-header{padding-block:5px}

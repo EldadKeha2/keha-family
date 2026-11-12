@@ -87,10 +87,10 @@ export class FamilyState {
         this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
-        const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn||(p.id==='roi'&&(person.firstName!==p.firstName||person.lastName!==p.lastName));
+        const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn||(['roi','yona'].includes(p.id)&&(person.firstName!==p.firstName||person.lastName!==p.lastName));
         if(nameChanged||Boolean(person.extended)!==Boolean(p.extended)||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)||(p.aliyahMonth&&person.aliyahMonth!==p.aliyahMonth)){
           person.name=p.name;person.nameEn=p.nameEn;person.extended=Boolean(p.extended);person.deceased=Boolean(p.deceased);
-          if(p.id==='roi'){person.firstName=p.firstName;person.lastName=p.lastName;}
+          if(['roi','yona'].includes(p.id)){person.firstName=p.firstName;person.lastName=p.lastName;}
           if(person.deathDate===undefined)person.deathDate=p.deathDate||null;
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
           if(p.aliyahMonth)person.aliyahMonth=p.aliyahMonth;
@@ -144,7 +144,7 @@ export class FamilyState {
     // This one-time pass updates authored text, including deleted photos and history,
     // without retagging, copying or rewriting any binary photo.
     for(const table of ['people','media','media_trash','photo_versions','stories','weddings','greetings','trivia_questions']){
-      for(const row of this.rows('SELECT rowid AS row_id,data FROM '+table+' WHERE data LIKE ? OR data LIKE ?','%חריזי%','%Harizi%')){
+      for(const row of this.rows('SELECT rowid AS row_id,data FROM '+table+' WHERE data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%')){
         const previous=JSON.parse(row.data),item=correctNamedContent(previous);
         if(JSON.stringify(item)===JSON.stringify(previous))continue;
         if(table==='people'){this.savePerson(item);continue;}
@@ -156,7 +156,7 @@ export class FamilyState {
       }
     }
     for(const table of ['jachnun_scores','rex_scores','neto_tetris_scores','ruti_house_scores','quiz_scores']){
-      for(const row of this.rows('SELECT id,name FROM '+table+' WHERE name LIKE ? OR name LIKE ?','%חריזי%','%Harizi%')){
+      for(const row of this.rows('SELECT id,name FROM '+table+' WHERE name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%')){
         const name=correctPersonName(row.name);if(name!==row.name)this.sql.exec('UPDATE '+table+' SET name=? WHERE id=?',name,row.id);
       }
     }

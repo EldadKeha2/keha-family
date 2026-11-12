@@ -629,6 +629,25 @@ function captionServer(f,{fail=false}={}){
  };
  return saved;
 }
+test('desktop photo descriptions are ready to type without a click, remain open after Enter, and reset for the next photo',async()=>{
+ for(const scope of ['gallery','photos','personal:ora','wedding:parents','nursery:ora','nostalgia']){
+  const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f);f.window.FamilyMedia.open([{...f.photo('a'),caption:'Previous description'},f.photo('b')],0,scope);
+  assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.get('editOpenedCaption').hidden,true);assert.equal(f.get('openedCaptionText').value,'Previous description');
+  f.get('openedCaptionText').value='Direct typing';f.get('openedCaptionText').handlers.get('input')();captionEnter(f);await keyboardFlush();
+  assert.equal(saved.length,1);assert.equal(saved[0].expectedCaption,'Previous description');assert.equal(f.get('openedCaptionForm').hidden,false);
+  f.get('openedCaptionText').value='Another edit';f.get('openedCaptionText').handlers.get('input')();captionEnter(f);await keyboardFlush();assert.equal(saved.length,2);assert.equal(saved[1].expectedCaption,'Direct typing');
+  await f.window.FamilyMedia.step(1);assert.equal(f.get('openedCaptionText').value,'');assert.equal(f.get('openedCaptionForm').hidden,false);f.close();
+ }
+ const phone=fixture();phone.navigator.userAgent='Android Mobile';phone.open();assert.equal(phone.get('openedCaptionForm').hidden,true);assert.equal(phone.get('editOpenedCaption').hidden,false);phone.close();
+});
+test('desktop caption drafts save before the Next button and remain available if saving fails',async()=>{
+ for(const fail of [false,true]){
+  const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f,{fail});f.window.FamilyMedia.open(['a','b'].map(f.photo),0,'photos');
+  f.get('openedCaptionText').value='Draft before next';f.get('openedCaptionText').handlers.get('input')();await f.window.FamilyMedia.step(1);assert.equal(saved.length,1);
+  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');if(fail)assert.equal(f.get('openedCaptionText').value,'Draft before next');
+  f.get('cancelOpenedCaption').handlers.get('click')();assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.get('openedCaptionText').value,f.window.FamilyMedia.current().caption||'');f.close();
+ }
+});
 test('gallery Control and Shift+Control navigate from every focused control across family, personal and archive albums',async()=>{
  for(const scope of ['gallery','photos','personal:ora','wedding:parents','nursery:ora','nostalgia']){
   const f=fixture();f.navigator.userAgent='Windows NT 10.0';f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);
@@ -646,7 +665,7 @@ test('gallery Enter saves multiline descriptions for photos, films and documents
   const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f);f.window.FamilyMedia.open([{...f.photo(),kind}],0,'photos');
   f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='שורה ראשונה\nSecond line';
   assert.equal(captionEnter(f,{shiftKey:true}).defaultPrevented,false);assert.equal(captionEnter(f,{isComposing:true}).defaultPrevented,false);assert.equal(saved.length,0);
-  assert.equal(captionEnter(f).defaultPrevented,true);captionEnter(f,{repeat:true});await keyboardFlush();assert.equal(saved.length,1);assert.equal(saved[0].caption,'שורה ראשונה\nSecond line');assert.equal(f.get('openedCaptionForm').hidden,true);assert.equal(f.window.FamilyMedia.current().caption,'שורה ראשונה\nSecond line');
+  assert.equal(captionEnter(f).defaultPrevented,true);captionEnter(f,{repeat:true});await keyboardFlush();assert.equal(saved.length,1);assert.equal(saved[0].caption,'שורה ראשונה\nSecond line');assert.equal(f.get('openedCaptionForm').hidden,kind!=='photo');assert.equal(f.window.FamilyMedia.current().caption,'שורה ראשונה\nSecond line');
   f.get('editOpenedCaption').handlers.get('click')();f.navigator.userAgent='Android Mobile';f.get('openedCaptionText').value='Phone';assert.equal(captionEnter(f).defaultPrevented,false);assert.equal(saved.length,1);f.close();
  }
 });
@@ -655,7 +674,7 @@ test('Control saves an open gallery caption before moving and retains the editor
   const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f,{fail});f.window.FamilyMedia.open(['a','b'].map(f.photo),0,'photos');
   f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='Keep this description';
   await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');await keyboardFlush();assert.equal(saved.length,1);assert.equal(saved[0].path,'api/media/a/caption');
-  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');assert.equal(f.get('openedCaptionForm').hidden,!fail);
+  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');assert.equal(f.get('openedCaptionForm').hidden,false);
   if(fail){assert.equal(f.get('openedCaptionText').value,'Keep this description');assert.equal(f.get('openedCaptionError').textContent,'Try again');}
   else{await modifier(f,'Control',{ctrlKey:true,shiftKey:true});await modifier(f,'Control',{shiftKey:true},'keyup');assert.equal(f.window.FamilyMedia.current().caption,'Keep this description');}
   f.close();
@@ -673,7 +692,7 @@ test('editing while a caption request is pending saves the final text without du
  f.window.FamilyI18n.fetch=(_path,options)=>{saved.push(JSON.parse(options.body));return new Promise(resolve=>finish=()=>resolve(Response.json({operation:'caption',scope:'gallery',item:{...f.photo(),caption:saved.at(-1).caption}})));};
  f.get('openedCaptionText').value='First draft';captionEnter(f);captionEnter(f);assert.equal(saved.length,1);
  f.get('openedCaptionText').value='Final draft';finish();await keyboardFlush();assert.equal(saved.length,2);assert.equal(saved[1].caption,'Final draft');assert.equal(saved[1].expectedCaption,'First draft');
- finish();await keyboardFlush();assert.equal(f.get('openedCaptionForm').hidden,true);assert.equal(f.window.FamilyMedia.current().caption,'Final draft');f.close();
+ finish();await keyboardFlush();assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.window.FamilyMedia.current().caption,'Final draft');f.close();
 });
 test('gallery shortcuts preserve copy/paste and stay inactive behind upload/date dialogs and on phones',async()=>{
  const f=fixture();f.navigator.userAgent='Windows NT 10.0';f.window.FamilyMedia.open(['a','b'].map(f.photo),0,'photos');

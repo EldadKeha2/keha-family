@@ -21,6 +21,25 @@ function fixture(respond){
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});
 
+test('tag search tolerates two inserted, missing or replaced letters and excludes three in Hebrew and English',async()=>{
+ const person={id:'qa-alexander',name:'אלכסנדר קוגן',nameEn:'Alexander Bennett',extra:true};
+ const f=fixture(()=>Response.json({people:[person]}));
+ for(const query of ['אלכסנדז','אלכסנזז','אלכסדר','אלכדר','אלכסנדדר','אלכסנדדדר','alexanxer','alexanxxr','alexandr','alexndr','alexandder','alexanddder','alexanxer bennetx','bennetx alexanxer']){
+  assert.ok((await f.tags.findPeople(query)).some(p=>p.id===person.id),query);
+ }
+ for(const query of ['אלכסזזז','אלדר','אלכסנדדדדר','alexanxxx','alexnd','alexandddder','alexanxxr bennetx']){
+  assert.equal((await f.tags.findPeople(query)).some(p=>p.id===person.id),false,query);
+ }
+});
+test('exact tag names precede one and two letter matches, and fuzzy suggestions still allow adding a distinct name',async()=>{
+ const people=[{id:'qa-exact',name:'Alexander',extra:true},{id:'qa-one',name:'Alexanxer',extra:true},{id:'qa-two',name:'Alexanxxr',extra:true}];
+ const f=fixture(()=>Response.json({people})),found=await f.tags.findPeople('Alexander',['qa-two']);
+ assert.deepEqual(Array.from(found.filter(p=>p.id.startsWith('qa-')),p=>p.id),['qa-exact','qa-one','qa-two']);
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('fuzzy-search'),kind:'video'});const widget=host._tagWidget;
+ widget.query='Alexandxr';widget.renderResults(true);assert.match(widget.results.innerHTML,/qa-exact/);assert.equal(host.querySelector('[data-tag-add]').hidden,false);
+ f.tags.clearInline(host);
+});
+
 test('a saved face immediately updates the ordinary tagging widget and survives reopening a stale gallery card',()=>{
  const f=fixture(),host=new NodeStub();f.tags.mountInline(host,photo('a'));
  f.emit({operation:'faces',item:{...photo('a'),tags:[family.people.yona],tagsRevision:'face-label'}});
