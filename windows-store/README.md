@@ -17,7 +17,7 @@ Anyone who receives or discovers the direct listing URL can view and install the
 
 ## Account and package identity
 
-Start the free account registration at <https://storedeveloper.microsoft.com/>. The owner completes Microsoft sign-in, identity verification and the developer agreement. Reserve the app name **בית משפחת קהא**. Do not submit a discoverable public listing.
+The owner completed free account registration, identity verification and reserved **KehaFamily**, Store ID **9MTDJ73268RR**. `store-config.json` contains the exact package identity supplied from Partner Center. The native window keeps its existing Hebrew family title. Do not submit a discoverable public listing.
 
 Open Product management > Product identity and copy these exact, case-sensitive values into `store-config.json` (or the manual workflow inputs):
 

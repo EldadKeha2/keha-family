@@ -1,8 +1,8 @@
 {
-  "identityName": "",
-  "publisher": "",
-  "publisherDisplayName": "Eldad Keha",
-  "displayName": "בית משפחת קהא",
+  "identityName": "EldadKeha.KehaFamily",
+  "publisher": "CN=7502B911-7163-4C04-A70D-3083BACA575C",
+  "publisherDisplayName": "EldadKeha",
+  "displayName": "KehaFamily",
   "minimumWindowsVersion": "10.0.19041.0",
   "distribution": {
     "price": "Free",
