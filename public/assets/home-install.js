@@ -30,9 +30,7 @@
   const button=card.querySelector('[data-home-install-action]'),status=card.querySelector('[data-home-install-status]');
   const shareButton=card.querySelector('[data-home-install-share]'),shareStatus=card.querySelector('[data-home-install-share-status]');
   const desktopButton=card.querySelector('[data-desktop-install-action]'),refreshButton=card.querySelector('[data-desktop-refresh]');
-  const windowsInstallerLink=document.getElementById('windowsDesktopDownload');
-  const windowsNativeURL=windowsInstallerLink?.getAttribute('href')||'';
-  const windowsRoute=()=>window.FamilyWindowsInstall?.current||{windows:/Windows NT/i.test(ua),route:'options'};
+  const desktopShortcutLink=document.getElementById('desktopShortcutLink');
   const desktopView=()=>!mobileDevice&&!phoneQuery.matches;
   function announce(target,message){
     clearTimeout(feedbackTimer);status.textContent='';shareStatus.textContent='';target.textContent=message;
@@ -59,7 +57,7 @@
     dialog.querySelector('[data-home-install-language]')?.addEventListener('click',()=>{
       const currentKind=dialogKind,currentFocus=dialogReturnFocus;english=!english;
       invitationURL.searchParams.set('lang',english?'en-US':'he');
-      if(currentKind==='invite')openInvitation(currentFocus);else if(currentKind==='install')openHelp(currentFocus);else if(currentKind==='desktop-install')openDesktopHelp(currentFocus);else if(currentKind==='windows-options')openWindowsOptions(currentFocus);else if(currentKind==='success')openSuccess(currentFocus);
+      if(currentKind==='invite')openInvitation(currentFocus);else if(currentKind==='install')openHelp(currentFocus);else if(currentKind==='desktop-install')openDesktopHelp(currentFocus);else if(currentKind==='success')openSuccess(currentFocus);
     });
     dialog.querySelector('[data-home-install-check-icon]')?.addEventListener('click',()=>completeInstallation(true));
     if(!dialog.open){
@@ -137,12 +135,10 @@
     card.hidden=false;
     button.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);status.hidden=false;
     desktopButton.hidden=!desktopView()||nativeDesktop;refreshButton.hidden=!desktopView();desktopButton.disabled=busy;
-    if(windowsInstallerLink){
-      const route=windowsRoute();windowsInstallerLink.hidden=!desktopView()||nativeDesktop||!route.windows;
-      windowsInstallerLink.setAttribute('href',route.route==='store'?window.FamilyWindowsInstall.distribution.storeURL:route.route==='native'?windowsNativeURL:'#install-desktop');
-      windowsInstallerLink.setAttribute('aria-haspopup',['shortcut','options'].includes(route.route)?'dialog':'false');
-      const label=windowsInstallerLink.querySelector('span');
-      if(label)label.textContent=route.route==='shortcut'?tr('קיצור דרך למחשב','Desktop shortcut'):route.route==='options'?tr('התקנה ל־Windows','Windows installation'):route.route==='store'?tr('התקנה דרך Microsoft Store','Install from Microsoft Store'):tr('אפליקציה ל־Windows','Windows app');
+    if(desktopShortcutLink){
+      desktopShortcutLink.hidden=!desktopView()||nativeDesktop;
+      const label=desktopShortcutLink.querySelector('span');
+      if(label)label.textContent=tr('הוסף קיצור דרך','Add shortcut');
     }
     button.setAttribute('aria-haspopup',isInstalled?'false':'dialog');
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
@@ -173,12 +169,6 @@
     if(message)status.textContent=message;
   }
   function steps(items){return '<ol>'+items.map(item=>'<li>'+item+'</li>').join('')+'</ol>';}
-  function openWindowsOptions(returnFocus=windowsInstallerLink){
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירה','Close')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('בית משפחת קהא במחשב','Keha Family on your computer')+'</h2><p class="home-install-dialog-intro">'+tr('בחרו כיצד לפתוח את הבית המשפחתי מהמחשב שלכם.','Choose how to open your family home on this computer.')+'</p><a class="home-install-invite-primary" data-windows-direct-download href="'+escape(windowsNativeURL)+'">'+tr('הורדת האפליקציה למחשב','Download the Windows app')+'</a><p class="home-install-dialog-intro">'+tr('Windows 10 מגרסה 1709 ומעלה או Windows 11, במחשב 64 ביט.','Windows 10 version 1709 or later, or Windows 11, on a 64-bit PC.')+'</p><button type="button" class="home-install-invite-browse" data-windows-browser-shortcut>'+tr('הוספת קיצור דרך לאתר','Add a website shortcut')+'</button>';
-    dialog.querySelector('[data-windows-direct-download]').addEventListener('click',()=>closeDialog());
-    dialog.querySelector('[data-windows-browser-shortcut]').addEventListener('click',()=>{closeDialog();void requestDesktopInstallation(windowsInstallerLink);});
-    showDialog('windows-options',returnFocus);
-  }
   function openDesktopHelp(returnFocus=desktopButton){
     let help;const legacyWindows=/Windows NT (?:5|6)\./i.test(ua);
     if(/Edg\//.test(ua))help=steps([
@@ -212,14 +202,10 @@
     }catch{openDesktopHelp(returnFocus);}finally{busy=false;update();}
   }
   desktopButton.addEventListener('click',()=>requestDesktopInstallation());
-  windowsInstallerLink?.addEventListener('click',event=>{
-    if(!desktopView()||nativeDesktop){event.preventDefault();return;}
-    const route=windowsRoute().route;
-    if(route==='native'||route==='store')return;
+  desktopShortcutLink?.addEventListener('click',event=>{
     event.preventDefault();
-    if(route==='shortcut')void requestDesktopInstallation(windowsInstallerLink);else if(route==='options')openWindowsOptions();
+    if(desktopView()&&!nativeDesktop)void requestDesktopInstallation(desktopShortcutLink);
   });
-  void window.FamilyWindowsInstall?.ready.then(()=>update());
   refreshButton.addEventListener('click',()=>{if(desktopView())location.reload();});
   function appleHelp(){return '<div class="home-install-apple-steps" data-home-install-apple-steps>'+steps([
     '<strong><span class="home-install-share" aria-hidden="true">↑</span> '+tr('שיתוף','Share')+'</strong><span>'+tr('בסרגל של Safari. אם הסמל מוסתר, פתחו את תפריט ⋯ ואז ״שיתוף״.','Use Safari’s toolbar. If the icon is hidden, open the ⋯ page menu, then “Share”.')+'</span>',

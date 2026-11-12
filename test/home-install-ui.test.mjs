@@ -4,7 +4,6 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../public/assets/home-install.js',import.meta.url),'utf8');
-const windowsSource=await readFile(new URL('../public/assets/windows-install.js',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const decodeHTML=value=>value.replace(/&(amp|lt|gt|quot|#39);/g,(_,entity)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[entity]));
 const assertNoInstallationCopy=dialog=>{
@@ -81,7 +80,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
     get innerHTML(){return this.html||'';}
   }
   const card=new Element('section'),dialog=new Element('dialog');nodes.set('homeInstall',card);nodes.set('homeInstallDialog',dialog);
-  const windowsLink=new Element('a');windowsLink.setAttribute('href','https://downloads.example/Keha-Family.exe');windowsLink.children.set('span',new Element('span'));nodes.set('windowsDesktopDownload',windowsLink);
+  const windowsLink=new Element('a');windowsLink.setAttribute('href','#install-desktop');windowsLink.children.set('span',new Element('span'));nodes.set('desktopShortcutLink',windowsLink);
   document.documentElement=new Element('html');document.documentElement.lang=english?'en-US':'he';
   document.getElementById=id=>nodes.get(id)||null;
   const window=new EventTarget();window.top=iframe?{}:window;window.FamilyI18n={isEnglish:english,language:english?'en-US':'he'};
@@ -97,7 +96,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   if(recordNavigation)location.assign=value=>assignments.push(String(value));
   const context=vm.createContext({window,document,navigator,location,matchMedia,URL,URLSearchParams,Event,console,setTimeout:schedule,clearTimeout:id=>timers.delete(id)});
   const ready=()=>{document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';};
-  vm.runInContext(windowsSource,context);vm.runInContext(source,context);if(autoReady)ready();
+  vm.runInContext(source,context);if(autoReady)ready();
   const button=()=>card.querySelector('[data-home-install-action]');
   return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,reloads,windowsLink,
     click(element){const event=new Event('click',{cancelable:true});element.dispatchEvent(event);return event;},
@@ -558,8 +557,8 @@ test('the native Windows app keeps refresh and omits a redundant browser install
   assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
 });
 
-test('Windows 7 and 8 downloads open the browser shortcut and preserve return focus',async()=>{
-  for(const nt of ['6.1','6.2','6.3'])for(const english of [false,true]){
+test('Windows desktop shortcuts open the browser help and preserve return focus',async()=>{
+  for(const nt of ['6.1','6.2','6.3','10.0'])for(const english of [false,true]){
     const f=desktopFixture({userAgent:`Mozilla/5.0 (Windows NT ${nt}; Win64; x64) Chrome/109.0.0.0`,english});
     assert.equal(f.windowsLink.hidden,false);
     assert.equal(f.windowsLink.getAttribute('href'),'#install-desktop');
@@ -570,23 +569,26 @@ test('Windows 7 and 8 downloads open the browser shortcut and preserve return fo
   }
 });
 
-test('modern compatible Windows uses a normal download while missing details open a localized choice',async()=>{
-  const known=desktopFixture({clientHints:{platform:'Windows',platformVersion:'13.0.0',bitness:'64',architecture:'x86'}});await tick();
-  assert.equal(known.windowsLink.getAttribute('href'),'https://downloads.example/Keha-Family.exe');
-  assert.equal(known.click(known.windowsLink).defaultPrevented,false);
-  assert.equal(known.dialog.open,false);assert.equal(known.windowsLink.hasAttribute('download'),false);
-  for(const english of [false,true])for(const clientHints of ['missing','denied']){
+test('modern Windows always offers the browser shortcut regardless of version or client-hint availability',async()=>{
+  for(const english of [false,true])for(const clientHints of ['missing','denied',{platform:'Windows',platformVersion:'13.0.0',bitness:'64',architecture:'x86'},{platform:'Windows',platformVersion:'10.0.0',bitness:'32',architecture:'x86'},{platform:'Windows',platformVersion:'13.0.0',bitness:'64',architecture:'arm'}]){
     const f=desktopFixture({english,clientHints});await tick();
-    assert.equal(f.click(f.windowsLink).defaultPrevented,true);
-    assert.equal(f.dialog.querySelector('[data-windows-direct-download]').getAttribute('href'),'https://downloads.example/Keha-Family.exe');
-    assert.ok(f.dialog.querySelector('[data-windows-browser-shortcut]'));
+    assert.equal(f.windowsLink.hidden,false);
+    assert.equal(f.windowsLink.getAttribute('href'),'#install-desktop');
+    assert.equal(f.windowsLink.querySelector('span').textContent,english?'Add shortcut':'הוסף קיצור דרך');
+    assert.equal(f.click(f.windowsLink).defaultPrevented,true);await tick();
+    assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));
+    assert.doesNotMatch(f.dialog.innerHTML,/\.exe|Microsoft Store|data-windows-direct-download|data-windows-browser-shortcut/);
     if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
-    f.click(f.dialog.querySelector('[data-windows-browser-shortcut]'));await tick();assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));
   }
 });
 
-test('32-bit Windows gets a shortcut and native apps, phones and non-Windows desktops hide the Windows download',async()=>{
-  const x86=desktopFixture({clientHints:{platform:'Windows',platformVersion:'10.0.0',bitness:'32',architecture:'x86'}});await tick();
-  assert.equal(x86.windowsLink.getAttribute('href'),'#install-desktop');
-  for(const f of [fixture(),desktopFixture({userAgent:desktopUA+' KehaFamilyDesktop/2.0.0'}),desktopFixture({userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X)'})])assert.equal(f.windowsLink.hidden,true);
+test('the desktop footer uses the same browser prompt as the logo button without navigating to a download',async()=>{
+  const f=desktopFixture(),offer=f.offer({outcome:'accepted'});
+  assert.equal(f.click(f.windowsLink).defaultPrevented,true);await tick();assert.equal(offer.calls,1);
+  assert.equal(f.dialog.open,false);assert.equal(f.location.hash,'#games');
+});
+
+test('the footer shortcut is available on desktop browsers and hidden on phones and inside the native app',()=>{
+  for(const f of [fixture(),desktopFixture({userAgent:desktopUA+' KehaFamilyDesktop/2.0.0'})])assert.equal(f.windowsLink.hidden,true);
+  for(const userAgent of [desktopUA,'Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605.1.15','Mozilla/5.0 (X11; Linux x86_64) Chrome/141.0.0.0'])assert.equal(desktopFixture({userAgent}).windowsLink.hidden,false);
 });
