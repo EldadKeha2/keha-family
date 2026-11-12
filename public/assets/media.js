@@ -43,7 +43,7 @@
     if($('mediaViewer').open)show(state.index,{image});return true;
   }
   const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
-  let noticeTimer,expectedCaption='',captionEditing=false;
+  let noticeTimer,expectedCaption='',captionEditing=false,captionEditor=0,captionSave=null;
   let renderedVersion=null,instagramPrepared={key:null,file:null};
   let restoringLink='',photoSwipe=null,faceTimer=null;
   const tr=(he,en)=>I18n.isEnglish?en:he;
@@ -198,7 +198,7 @@
     const handoff=native?window.FamilyPhotoPresentation?.holdNative?.($('mediaStage'),image):null;
     const ghost=!instant&&!native&&direction&&current()?.kind==='photo'?window.FamilyPhotoPresentation?.snapshot($('mediaStage')):null;
     state.index=(index+state.items.length)%state.items.length;
-    const item=current();state.activeId=identity(item);captionEditing=false;clearStage({preserveHandoff:Boolean(handoff),nextItem:item});renderedVersion=versionKey(item);metadata();
+    const item=current();state.activeId=identity(item);captionEditing=false;captionEditor++;captionSave=null;clearStage({preserveHandoff:Boolean(handoff),nextItem:item});renderedVersion=versionKey(item);metadata();
     if($('mediaViewer').open)syncMediaRoute(item,true);
     const stage=$('mediaStage');stage.classList.toggle('is-video',item.kind==='video');stage.classList.toggle('is-document',item.kind==='document');
     if(item.provider==='youtube'&&/^[\w-]{11}$/.test(item.youtubeId)){
@@ -347,10 +347,43 @@
     restoringLink=href;
     try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));const loaded=registeredLink(id);if(loaded)open(loaded.items,loaded.index,loaded.scope);else open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
-  async function saveOpenedCaption(event){
-    event.preventDefault();const item=current();if(!item)return;
-    const button=$('openedCaptionForm').querySelector('[type=submit]');button.disabled=true;$('openedCaptionError').textContent='';
-    try{const response=await I18n.fetch('api/media/'+item.id+'/caption',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({caption:$('openedCaptionText').value,expectedCaption})});const result=await response.json();if(!response.ok)throw Error(I18n.error(result.error));captionEditing=false;$('openedCaptionForm').hidden=true;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));}catch(error){$('openedCaptionError').textContent=error.message;}finally{button.disabled=false;}
+  function saveOpenedCaption(event){
+    event?.preventDefault();const item=current();if(!item||!captionEditing)return Promise.resolve(false);
+    if(captionSave?.editor===captionEditor)return captionSave.promise;
+    const owner={editor:captionEditor,session:state.session,id:identity(item)},input=$('openedCaptionText'),button=$('openedCaptionForm').querySelector('[type=submit]');
+    const active=()=>$('mediaViewer').open&&owner.session===state.session&&owner.editor===captionEditor&&identity(current()||{})===owner.id&&captionEditing;
+    button.disabled=true;$('openedCaptionError').textContent='';captionSave=owner;
+    owner.promise=(async()=>{
+      try{
+        while(active()){
+          const caption=input.value;
+          if(caption!==expectedCaption){
+            const response=await I18n.fetch('api/media/'+item.id+'/caption',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({caption,expectedCaption})}),result=await response.json();
+            if(!response.ok)throw Error(I18n.error(result.error));
+            window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+            if(!active())return false;
+            expectedCaption=result.item?.caption??caption;
+            if(input.value!==caption)continue;
+          }
+          captionEditing=false;$('openedCaptionForm').hidden=true;notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));return true;
+        }
+        return false;
+      }catch(error){if(active())$('openedCaptionError').textContent=error.message;return false;}
+      finally{if(captionSave===owner){captionSave=null;button.disabled=false;}}
+    })();
+    return owner.promise;
+  }
+  function canControlNavigate(){
+    return Boolean($('mediaViewer').open&&current()&&!state.deleting&&(state.items.length>1||(albumPages.get(state.scope)?.total||0)>1)&&!document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open]'));
+  }
+  async function controlNavigate(direction,owner){
+    const active=()=>owner.session===state.session&&owner.navigation===state.navigation&&owner.id===identity(current()||{})&&canControlNavigate();
+    if(!active())return;
+    try{
+      await window.FamilyFaces?.flush?.();if(!active())return;
+      if(captionEditing&&!await saveOpenedCaption())return;
+      if(active())await step(direction,{instant:true,queued:true});
+    }catch(error){if(active())notify(error.message||tr('לא ניתן להשלים את התיוג כרגע.','The tag could not be completed.'));}
   }
   function init(){
     const stage=$('mediaStage');
@@ -371,9 +404,11 @@
       try{const result=await window.FamilyPhotoEditor.edit({...item});if(!result)return;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));notify(tr('התמונה נשמרה. הגרסאות הקודמות זמינות בעורך ✓','Photo saved. Previous versions are available in the editor ✓'));}
       catch(error){notify(error.message);}
     });
-    $('editOpenedCaption').addEventListener('click',()=>{const item=current();if(!item)return;captionEditing=true;expectedCaption=item.caption||'';$('openedCaptionText').value=expectedCaption;$('openedCaptionError').textContent='';$('openedCaptionForm').hidden=false;$('openedCaptionText').focus();});
-    $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;$('openedCaptionForm').hidden=true;});
+    $('editOpenedCaption').addEventListener('click',()=>{const item=current();if(!item)return;captionEditing=true;captionEditor++;captionSave=null;expectedCaption=item.caption||'';$('openedCaptionText').value=expectedCaption;$('openedCaptionError').textContent='';$('openedCaptionForm').hidden=false;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;$('openedCaptionText').focus();});
+    $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionEditor++;captionSave=null;$('openedCaptionForm').hidden=true;});
     $('openedCaptionForm').addEventListener('submit',saveOpenedCaption);
+    $('openedCaptionText').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,saveOpenedCaption));
+    window.FamilyPhotoKeyboard?.bindNavigation({available:canControlNavigate,capture:()=>({session:state.session,navigation:state.navigation,id:identity(current())}),navigate:controlNavigate});
     $('shareMediaInstagram').addEventListener('click',shareInstagram);
     $('shareMediaMessenger').addEventListener('click',async event=>{
       const item=current();if(!item){event.preventDefault();return;}const url=shareURL(item),title=item.caption||I18n.mediaName(item)||'Keha Family';

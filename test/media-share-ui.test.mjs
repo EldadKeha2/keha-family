@@ -8,6 +8,7 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 const source=await readFile(new URL('../public/assets/media.js',import.meta.url),'utf8');
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
+const keyboardSource=await readFile(new URL('../public/assets/photo-keyboard.js',import.meta.url),'utf8');
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
@@ -37,7 +38,7 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:tag=>new Node(tag),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
   if(browser)window.addEventListener=browser.addEventListener;
   const context=vm.createContext({window,document,location,navigator,File,Blob,URL,CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
-  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(presentationSource,context);vm.runInContext(swipeSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
+  if(browser)vm.runInContext(navigationSource,context);vm.runInContext(keyboardSource,context);vm.runInContext(presentationSource,context);vm.runInContext(swipeSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();
   const photo=(id='a')=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Family photo',filename:'memory.jpg',tags:[]});
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
@@ -609,4 +610,74 @@ test('desktop header captions follow photo navigation and both screen sizes reta
     f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaHeaderCaption').textContent,'');assert.equal(f.get('mediaViewerCaption').textContent,'','Moving to an uncaptioned photo clears the previous description everywhere');
     assert.equal(f.get('openedProfilePhoto').hidden,true,'The shared gallery does not offer profile selection');
   }
+});
+
+const keyboardFlush=()=>new Promise(resolve=>setImmediate(resolve));
+async function modifier(f,key,flags={},type='keydown'){
+ const event={type,key,defaultPrevented:false,preventDefault(){this.defaultPrevented=true;},stopPropagation(){},...flags};
+ f.window.dispatchEvent(event);await keyboardFlush();return event;
+}
+function captionEnter(f,flags={}){
+ const event={key:'Enter',defaultPrevented:false,preventDefault(){this.defaultPrevented=true;},stopPropagation(){},...flags};
+ f.get('openedCaptionText').handlers.get('keydown')(event);return event;
+}
+function captionServer(f,{fail=false}={}){
+ const saved=[];f.window.FamilyI18n.error=value=>value;
+ f.window.FamilyI18n.fetch=async(path,options)=>{
+  const payload=JSON.parse(options.body);saved.push({path,...payload});
+  return Response.json(fail?{error:'Try again'}:{operation:'caption',scope:'photos',item:{...f.window.FamilyMedia.current(),caption:payload.caption}},{status:fail?409:200});
+ };
+ return saved;
+}
+test('gallery Control and Shift+Control navigate from every focused control across family, personal and archive albums',async()=>{
+ for(const scope of ['gallery','photos','personal:ora','wedding:parents','nursery:ora','nostalgia']){
+  const f=fixture();f.navigator.userAgent='Windows NT 10.0';f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,scope);
+  for(const target of [{tagName:'TEXTAREA'},{tagName:'INPUT',type:'number'},{role:'textbox',isContentEditable:true},{role:'dialog',className:'face-picker'},{tagName:'BUTTON'}]){
+   await modifier(f,'Control',{ctrlKey:true,target});await modifier(f,'Control',{target},'keyup');assert.equal(f.window.FamilyMedia.current().id,'b');
+   await modifier(f,'Shift',{shiftKey:true,target});await modifier(f,'Control',{ctrlKey:true,shiftKey:true,target});await modifier(f,'Control',{shiftKey:true,target},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');
+   await modifier(f,'Control',{ctrlKey:true,target});await modifier(f,'Shift',{ctrlKey:true,shiftKey:true,target});await modifier(f,'Shift',{ctrlKey:true,target},'keyup');await modifier(f,'Control',{target},'keyup');assert.equal(f.window.FamilyMedia.current().id,'c');
+   await modifier(f,'Control',{ctrlKey:true,target});await modifier(f,'Control',{target},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');
+  }
+  f.close();
+ }
+});
+test('gallery Enter saves multiline descriptions for photos, films and documents; Shift+Enter and phone Enter remain newlines',async()=>{
+ for(const kind of ['photo','video','document']){
+  const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f);f.window.FamilyMedia.open([{...f.photo(),kind}],0,'photos');
+  f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='שורה ראשונה\nSecond line';
+  assert.equal(captionEnter(f,{shiftKey:true}).defaultPrevented,false);assert.equal(captionEnter(f,{isComposing:true}).defaultPrevented,false);assert.equal(saved.length,0);
+  assert.equal(captionEnter(f).defaultPrevented,true);captionEnter(f,{repeat:true});await keyboardFlush();assert.equal(saved.length,1);assert.equal(saved[0].caption,'שורה ראשונה\nSecond line');assert.equal(f.get('openedCaptionForm').hidden,true);assert.equal(f.window.FamilyMedia.current().caption,'שורה ראשונה\nSecond line');
+  f.get('editOpenedCaption').handlers.get('click')();f.navigator.userAgent='Android Mobile';f.get('openedCaptionText').value='Phone';assert.equal(captionEnter(f).defaultPrevented,false);assert.equal(saved.length,1);f.close();
+ }
+});
+test('Control saves an open gallery caption before moving and retains the editor and photo when saving fails',async()=>{
+ for(const fail of [false,true]){
+  const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f,{fail});f.window.FamilyMedia.open(['a','b'].map(f.photo),0,'photos');
+  f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='Keep this description';
+  await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');await keyboardFlush();assert.equal(saved.length,1);assert.equal(saved[0].path,'api/media/a/caption');
+  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');assert.equal(f.get('openedCaptionForm').hidden,!fail);
+  if(fail){assert.equal(f.get('openedCaptionText').value,'Keep this description');assert.equal(f.get('openedCaptionError').textContent,'Try again');}
+  else{await modifier(f,'Control',{ctrlKey:true,shiftKey:true});await modifier(f,'Control',{shiftKey:true},'keyup');assert.equal(f.window.FamilyMedia.current().caption,'Keep this description');}
+  f.close();
+ }
+});
+test('gallery navigation waits for face saves and cannot move a newer photo or a reopened album after a delayed save',async()=>{
+ const f=fixture();f.navigator.userAgent='Windows NT 10.0';f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');let finish;
+ f.window.FamilyFaces={mount(){},clear(){},update(){},flush:()=>new Promise(resolve=>finish=resolve)};
+ await modifier(f,'Control',{ctrlKey:true,shiftKey:true});await modifier(f,'Control',{shiftKey:true},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');
+ f.get('mediaNext').handlers.get('click')();finish();await keyboardFlush();assert.equal(f.window.FamilyMedia.current().id,'b');
+ await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');f.close();f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');finish();await keyboardFlush();assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+});
+test('editing while a caption request is pending saves the final text without duplicate requests or losing the draft',async()=>{
+ const f=fixture();f.navigator.userAgent='Windows NT 10.0';f.open();f.get('editOpenedCaption').handlers.get('click')();let finish;const saved=[];
+ f.window.FamilyI18n.fetch=(_path,options)=>{saved.push(JSON.parse(options.body));return new Promise(resolve=>finish=()=>resolve(Response.json({operation:'caption',scope:'gallery',item:{...f.photo(),caption:saved.at(-1).caption}})));};
+ f.get('openedCaptionText').value='First draft';captionEnter(f);captionEnter(f);assert.equal(saved.length,1);
+ f.get('openedCaptionText').value='Final draft';finish();await keyboardFlush();assert.equal(saved.length,2);assert.equal(saved[1].caption,'Final draft');assert.equal(saved[1].expectedCaption,'First draft');
+ finish();await keyboardFlush();assert.equal(f.get('openedCaptionForm').hidden,true);assert.equal(f.window.FamilyMedia.current().caption,'Final draft');f.close();
+});
+test('gallery shortcuts preserve copy/paste and stay inactive behind upload/date dialogs and on phones',async()=>{
+ const f=fixture();f.navigator.userAgent='Windows NT 10.0';f.window.FamilyMedia.open(['a','b'].map(f.photo),0,'photos');
+ for(const key of ['c','v','a','Tab','+']){await modifier(f,'Control',{ctrlKey:true,shiftKey:true});await modifier(f,key,{ctrlKey:true,shiftKey:true});await modifier(f,'Control',{shiftKey:true},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');}
+ f.document.querySelector=()=>({open:true});await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');
+ f.document.querySelector=()=>null;f.navigator.userAgent='Android Mobile';await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
 });

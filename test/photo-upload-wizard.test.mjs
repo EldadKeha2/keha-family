@@ -8,6 +8,7 @@ import * as faceDraft from '../public/assets/photo-upload-faces.mjs';
 import * as catalog from '../public/assets/photo-labels-catalog.mjs';
 
 const source=(await readFile(new URL('../public/assets/photo-editor.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
+const keyboardSource=await readFile(new URL('../public/assets/photo-keyboard.js',import.meta.url),'utf8');
 function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
  const nodes=new Map(),all=[],mounts=[],uploaded=[],closed=[];
  const people=[{id:'yona',name:'יונה',nameEn:'Yona'},{id:'shlomo',name:'שלמה',nameEn:'Shlomo'}];
@@ -22,6 +23,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={wid
   closest(selector){return selector.split(',').some(part=>part===this.tagName||part==='[data-upload-remove-person]'&&this.dataset.uploadRemovePerson||part==='dialog[open]'&&this.tagName==='dialog'&&this.open||part==='[role="dialog"]'&&this.role==='dialog'||part==='[role="textbox"]'&&this.role==='textbox'||part.startsWith('.')&&this.classes.has(part.slice(1)))?this:null;}
   append(...children){for(const child of children)if(child.id)nodes.set(child.id,child);}
   focus(){document.activeElement=this;}
+  blur(){document.activeElement=document.body;this.dispatchEvent(new Event('blur'));}
   showModal(){this.open=true;}
   close(){this.open=false;}
   get clientWidth(){return this.id==='photoEditViewport'?viewportSize.width:1000;}
@@ -34,7 +36,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={wid
  const window=new EventTarget();window.innerHeight=900;window.createImageBitmap=true;window.FamilyI18n={isEnglish:english,personName:p=>english?p.nameEn||p.name:p.name};
  window.FamilyApp={apiEnabled:true,getPersonSummary:id=>people.find(p=>p.id===id)};window.FamilyTags={findPeople:async query=>people.filter(p=>!query||p.name.includes(query))};
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
- vm.runInNewContext(source,{...core,...metadata,...faceDraft,...catalog,window,document,File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
+ vm.runInNewContext(keyboardSource+'\n'+source,{...core,...metadata,...faceDraft,...catalog,window,document,navigator:{userAgent:desktop?'Windows NT 10.0':'Android Mobile'},File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
  return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{type='keydown',target=document.body,...flags}={}){const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
 }
@@ -139,10 +141,30 @@ test('a solo Control tap advances on release, wraps, and preserves photo edits w
 });
 test('Control combinations, pointer gestures, lost focus and phone layouts never trigger the solo-Control shortcut',async()=>{
  const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
- for(const key of ['c','v','a','+','-','Shift','ArrowRight']){await f.key('Control',{ctrlKey:true});await f.key(key,{ctrlKey:true});assert.equal((await f.key('Control',{type:'keyup'})).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');}
+ for(const key of ['c','v','a','+','-','ArrowRight']){await f.key('Control',{ctrlKey:true});await f.key(key,{ctrlKey:true});assert.equal((await f.key('Control',{type:'keyup'})).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');}
  for(const type of ['blur','pointerdown','wheel']){await f.key('Control',{ctrlKey:true});f.window.dispatchEvent(new Event(type));await f.key('Control',{type:'keyup'});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');}
  await f.click('Cancel');assert.equal(await result,null);
  const phone=fixture({desktop:false}),pending=await phone.begin([image('one.jpg'),image('two.jpg')]);await phone.key('Control',{ctrlKey:true});await phone.key('Control',{type:'keyup'});assert.equal(phone.node('photoEditFilename').textContent,'one.jpg');await phone.click('Cancel');assert.equal(await pending.result,null);
+});
+test('Control with Shift moves backward from caption, date, label and face inputs in either modifier order',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+ for(const target of [f.node('photoEditCaption'),f.node('photoEditDateyear'),f.node('photoEditCustomLabelName'),{isContentEditable:true},{closest:()=>({role:'dialog'})}]){
+  await f.key('Shift',{shiftKey:true,target});await f.key('Control',{ctrlKey:true,shiftKey:true,target});await f.key('Control',{type:'keyup',shiftKey:true,target});assert.equal(f.node('photoEditFilename').textContent,'three.jpg');
+  await f.key('Control',{ctrlKey:true,target});await f.key('Shift',{ctrlKey:true,shiftKey:true,target});await f.key('Shift',{type:'keyup',ctrlKey:true,target});await f.key('Control',{type:'keyup',target});assert.equal(f.node('photoEditFilename').textContent,'two.jpg');
+  await f.click('Next');assert.equal(f.node('photoEditFilename').textContent,'three.jpg');await f.click('Next');
+ }
+ await f.click('Cancel');assert.equal(await result,null);
+});
+test('Enter commits the upload description without uploading; Shift+Enter and phone Enter retain multiline input',async()=>{
+ for(const desktop of [true,false]){
+  const f=fixture({desktop}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]),input=f.node('photoEditCaption');
+  input.focus();input.value='שורה ראשונה\nSecond line';input.dispatchEvent(new Event('input'));
+  const enter=flags=>{const event=new Event('keydown',{cancelable:true});Object.assign(event,{key:'Enter',...flags});input.dispatchEvent(event);return event;};
+  assert.equal(enter({shiftKey:true}).defaultPrevented,false);assert.equal(enter({isComposing:true}).defaultPrevented,false);
+  assert.equal(enter({}).defaultPrevented,desktop);assert.equal(f.uploaded.length,0);assert.equal(f.document.activeElement===input,!desktop);
+  await f.click('Next');await f.click('Previous');assert.equal(input.value,'שורה ראשונה\nSecond line');
+  await f.click('SaveCurrent');assert.equal((await details(f.uploaded[0])).metadata.caption,'שורה ראשונה\nSecond line');await f.click('Cancel');await result;
+ }
 });
 test('solo Control waits for a pending face tag and cannot skip past a photo chosen while it waits',async()=>{
  const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);let resolve;

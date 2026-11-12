@@ -360,6 +360,7 @@
     });
     document.addEventListener('change',event=>{if(event.target.matches('[data-gallery-sort]')){sortGallery(event.target.value);return;}if(!event.target.matches('[data-gallery-size]'))return;galleryPage.size=Number(event.target.value);galleryPage.page=1;refreshCollection('gallery',true);});
     document.addEventListener('input',event=>{if(event.target.matches('textarea[data-shared-file]'))editCaption(event.target);if(event.target.closest('#birthdayForm'))previewBirthday();});
+    document.addEventListener('keydown',event=>{if(event.target.matches('textarea[data-shared-file]'))window.FamilyPhotoKeyboard?.saveDescription(event,()=>saveCaption(captionKey(event.target.dataset.sharedKind,event.target.dataset.sharedFile)));});
     document.addEventListener('focusout',event=>{if(event.target.matches('textarea[data-shared-file]')&&event.target.dataset.captionInline===undefined)saveCaption(captionKey(event.target.dataset.sharedKind,event.target.dataset.sharedFile));});
     for(const[kind,ids]of Object.entries({photos:['sharedPhotosInput','sharedPhotosCamera'],videos:['sharedVideosInput','sharedVideosCamera'],gallery:['sharedGalleryInput','sharedGalleryCamera']}))for(const id of ids)$(id).addEventListener('change',()=>{if($(id).files.length)addFiles(kind,$(id).files);$(id).value='';});
     $('galleryUploadSource').addEventListener('click',event=>{

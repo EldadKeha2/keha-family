@@ -9,7 +9,7 @@ const safe=value=>String(value??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&l
 const desktop=()=>matchMedia('(min-width:701px)').matches;
 const jobs=[];
 const fileMetadata=new WeakMap();
-let session=null,dialog,source=null,sourceUrl=null,loadId=0,drag=null,controlTap=null;
+let session=null,dialog,source=null,sourceUrl=null,loadId=0,drag=null;
 const get=id=>document.getElementById('photoEdit'+id);
 const draft=()=>session?.drafts[session.index];
 
@@ -62,7 +62,7 @@ function mount(){
   dialog.innerHTML=`<header class="photo-edit-header"><div class="photo-edit-heading"><span class="section-diamond photo-edit-emblem" aria-hidden="true">◇</span><div><span class="photo-edit-eyebrow" hidden></span><h2 id="photoEditTitle">${tr('אשף העלאת התמונות','Photo Upload Wizard')}</h2></div></div><button type="button" id="photoEditClose" class="photo-edit-close" aria-label="${tr('ביטול ההעלאה','Cancel upload')}"><span class="photo-edit-close-text" aria-hidden="true">×</span><svg class="photo-edit-close-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m4 4 16 16M20 4 4 20"/></svg></button></header>
     <p id="photoEditHint" class="photo-edit-hint" hidden></p>
     <div id="photoEditHistory" class="photo-edit-history" hidden><label for="photoEditVersion">${tr('גרסאות התמונה','Photo versions')}</label><select id="photoEditVersion"></select><span id="photoEditVersionStatus" role="status"></span></div>
-    <nav class="photo-edit-pager" aria-label="${tr('התמונות שנבחרו להעלאה','Photos selected for upload')}"><button type="button" id="photoEditPrevious" class="secondary-button">${tr('הקודמת','Previous')}</button><div><strong id="photoEditCounter" aria-live="polite"></strong><span id="photoEditFilename" dir="auto"></span></div><button type="button" id="photoEditNext" class="secondary-button" title="${tr('התמונה הבאה · Ctrl','Next photo · Ctrl')}">${tr('הבאה','Next')}</button></nav>
+    <nav class="photo-edit-pager" aria-label="${tr('התמונות שנבחרו להעלאה','Photos selected for upload')}"><button type="button" id="photoEditPrevious" class="secondary-button">${tr('הקודמת','Previous')}</button><div><strong id="photoEditCounter" aria-live="polite"></strong><span id="photoEditFilename" dir="auto"></span></div><button type="button" id="photoEditNext" class="secondary-button">${tr('הבאה','Next')}</button></nav>
     <section id="photoEditMetadata" class="photo-edit-metadata"><div class="photo-edit-date" role="group" aria-labelledby="photoEditDateLabel"><span id="photoEditDateLabel" class="photo-edit-date-label"><span>${tr('תאריך','Photo')}</span> <span>${tr('צילום','date')}</span></span><div class="photo-edit-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoEditDate${field}">${label}<input id="photoEditDate${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off"></label>`).join('')}</div><p id="photoEditDateSource" class="photo-edit-date-source" role="status" hidden></p></div><label class="photo-edit-caption" for="photoEditCaption"><span class="photo-edit-caption-label"><span>${tr('תיאור','Photo')}</span> <span>${tr('התמונה','description')}</span></span><textarea id="photoEditCaption" dir="auto" rows="2" maxlength="5000" placeholder="${tr('לחצו כאן להקלדת תיאור...','Tap here to enter a description...')}" autocomplete="off"></textarea></label></section>
     <div id="photoEditViewport" class="photo-edit-viewport"><p id="photoEditLoading" role="status"></p><div id="photoEditImage" class="photo-edit-image" hidden><canvas id="photoEditCanvas" role="img" aria-label="${tr('תצוגה מקדימה של התמונה לפני ההעלאה','Photo preview before upload')}"></canvas><div id="photoEditCropLayer" class="photo-edit-crop-layer" hidden><div id="photoEditCrop" class="photo-edit-crop" data-handle="move" tabindex="0" role="group" aria-label="${tr('מסגרת החיתוך. גררו להזזה או השתמשו במקשי החצים.','Crop area. Drag to move or use the arrow keys.')}">${['nw','n','ne','e','se','s','sw','w'].map(handle=>`<button type="button" class="photo-edit-handle handle-${handle}" data-handle="${handle}" aria-label="${handleLabel(handle)}"></button>`).join('')}<span class="photo-edit-thirds" aria-hidden="true"></span></div></div></div></div>
     <div class="photo-edit-toolbar" id="photoEditToolbar"><button type="button" id="photoEditLeft" class="secondary-button"><span class="photo-edit-mobile-icon" aria-hidden="true">↶</span><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg><span class="photo-edit-action-label"><span>${tr('סיבוב','Rotate')}</span> <span>${tr('שמאלה','left')}</span></span></button><button type="button" id="photoEditRight" class="secondary-button"><span class="photo-edit-mobile-icon" aria-hidden="true">↷</span><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10a8 8 0 1 0-1 8M20 4v6h-6"/></svg><span class="photo-edit-action-label"><span>${tr('סיבוב','Rotate')}</span> <span>${tr('ימינה','right')}</span></span></button><button type="button" id="photoEditCropToggle" class="secondary-button" aria-pressed="false"><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v13a2 2 0 0 0 2 2h13M3 6h13a2 2 0 0 1 2 2v13"/></svg><span class="photo-edit-action-label">${tr('חיתוך','Crop')}</span></button><button type="button" id="photoEditReset" class="photo-edit-text-button"><svg class="photo-edit-desktop-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/><path d="M12 8v4l3 2"/></svg><span class="photo-edit-action-label">${tr('איפוס','Reset')}</span></button><label id="photoEditFamilyPhotoChoice" class="photo-edit-family-choice" for="photoEditFamilyPhoto"><input id="photoEditFamilyPhoto" type="checkbox" aria-label="${tr('הוספה לתמונות משפחתיות','Add to Family photos')}"><span class="photo-edit-family-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="3"/><circle cx="18" cy="7" r="3"/><circle cx="12" cy="13" r="2.5"/><path d="M1 20v-4a5 5 0 0 1 7-4m15 8v-4a5 5 0 0 0-7-4M7 22v-2a5 5 0 0 1 10 0v2"/></svg></span><span class="photo-edit-family-text">${tr('הוספה לתמונות משפחתיות','Add to Family photos')}</span></label><button type="button" id="photoEditTaggingToggle" class="secondary-button" hidden aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="6"/><path d="M9 8h.01M15 8h.01M9 11a4 4 0 0 0 6 0M3 3h4M3 3v4m18-4h-4m4 0v4M3 21h4m-4 0v-4m18 4h-4m4 0v-4"/></svg><span>${tr('תיוג פנים','Tag faces')}</span></button><span id="photoEditFaceTools" class="photo-edit-face-tools"></span></div>
@@ -87,15 +87,17 @@ function mount(){
   get('Version').addEventListener('change',()=>loadVersion(get('Version').value));
   for(const field of ['day','month','year'])get('Date'+field).addEventListener('input',event=>{const d=draft();if(!d?.metadata)return;d.metadata.date[field]=event.target.value===''?null:Number(event.target.value);d.dateEdited=true;get('DateSource').hidden=true;get('Error').textContent='';});
   get('Caption').addEventListener('input',event=>{if(draft()?.metadata)draft().metadata.caption=event.target.value;fitCaption();});
+  get('Caption').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,()=>{
+    if(!draft()?.metadata||session.loading||session.saving)return;
+    draft().metadata.caption=get('Caption').value;get('Caption').blur();
+  }));
   get('Caption').addEventListener('focus',()=>{fitCaption();requestAnimationFrame(revealMetadata);});
   get('Caption').addEventListener('blur',()=>fitCaption());
   get('FamilyPhoto').addEventListener('change',event=>{if(draft()?.metadata)draft().metadata.familyPhoto=event.target.checked;});
   get('Metadata').addEventListener('focusin',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
   window.addEventListener('resize',fitEditor);window.visualViewport?.addEventListener('resize',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
   window.addEventListener('keydown',keyNavigate);
-  window.addEventListener('keydown',event=>{if(event.key!=='Control')controlTap=null;},{capture:true});
-  window.addEventListener('keyup',controlReleased);
-  for(const event of ['blur','pointerdown','wheel'])window.addEventListener(event,()=>{controlTap=null;},{passive:true,capture:true});
+  window.FamilyPhotoKeyboard?.bindNavigation({available:canControlNavigate,capture:()=>({owner:session,draft:draft()}),navigate:controlNavigate});
   const layer=get('CropLayer');layer.addEventListener('pointerdown',pointerStart);layer.addEventListener('pointermove',pointerMove);
   layer.addEventListener('pointerup',pointerEnd);layer.addEventListener('pointercancel',pointerEnd);layer.addEventListener('lostpointercapture',()=>{drag=null;});
   layer.addEventListener('keydown',keyCrop);
@@ -250,19 +252,14 @@ async function loadVersion(id){
   }catch(error){if(session===owner&&sequence===loadId&&error.name!=='AbortError')failLoad(error.message);}
 }
 function navigate(step){if(!session||session.loading||session.saving||!session.drafts.length)return;session.index=(session.index+step+session.drafts.length)%session.drafts.length;load();}
-function canControlNavigate(event){
-  if(!session||session.mode==='existing'||!dialog?.open||!desktop()||session.loading||session.saving||session.drafts.length<2||drag||event.defaultPrevented||event.isComposing||event.metaKey||event.altKey||event.shiftKey)return false;
-  const active=event.target?.closest?.('dialog[open],[role="dialog"]');return !active||active===dialog;
-}
-function controlReleased(event){
-  const tap=controlTap;controlTap=null;
-  if(event.key!=='Control'||event.ctrlKey||!tap||tap.owner!==session||tap.draft!==draft()||!canControlNavigate(event))return;
-  event.preventDefault();event.stopPropagation();
-  void(async()=>{try{await window.FamilyFaces?.flush?.();if(session===tap.owner&&draft()===tap.draft&&canControlNavigate({...event,defaultPrevented:false,target:event.target}))navigate(1);}catch(error){if(session===tap.owner)get('Error').textContent=error.message||tr('לא ניתן להשלים את התיוג כרגע.','The tag could not be completed.');}})();
+function canControlNavigate(){return Boolean(session&&session.mode!=='existing'&&dialog?.open&&!session.loading&&!session.saving&&session.drafts.length>1&&!drag);}
+async function controlNavigate(direction,tap){
+  const active=()=>session===tap.owner&&draft()===tap.draft&&canControlNavigate();
+  if(!active())return;
+  try{await window.FamilyFaces?.flush?.();if(active())navigate(direction);}
+  catch(error){if(active())get('Error').textContent=error.message||tr('לא ניתן להשלים את התיוג כרגע.','The tag could not be completed.');}
 }
 function keyNavigate(event){
-  if(event.key==='Control'){if(!event.repeat)controlTap=canControlNavigate(event)?{owner:session,draft:draft()}:null;return;}
-  controlTap=null;
   if(!session||session.mode==='existing'||!dialog?.open||!desktop()||session.loading||session.saving||session.drafts.length<2||draft()?.cropping||event.defaultPrevented||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||!['ArrowLeft','ArrowRight'].includes(event.key))return;
   const target=event.target,activeDialog=target?.closest?.('dialog[open],[role="dialog"]');
   if(activeDialog&&activeDialog!==dialog||target?.isContentEditable||target?.closest?.('input,textarea,select,[role="textbox"],.face-selection,.face-picker'))return;
@@ -377,7 +374,7 @@ async function saveExisting(){
 }
 function cancel(){if(session?.saving)return;finish(null);}
 function finish(files){
-  if(!session)return;const resolve=session.resolve,focus=session.focus;session.abort?.abort();stopFaces();session=null;++loadId;drag=null;controlTap=null;release();dialog.close();
+  if(!session)return;const resolve=session.resolve,focus=session.focus;session.abort?.abort();stopFaces();session=null;++loadId;drag=null;release();dialog.close();
   get('Canvas').width=get('Canvas').height=1;resolve(files);focus?.focus?.({preventScroll:true});queueMicrotask(run);
 }
 function run(){

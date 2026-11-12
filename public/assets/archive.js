@@ -278,6 +278,7 @@
       const photo=event.target.closest('[data-archive-photo]');if(photo){const key=scope(),items=(collections.get(key)?.items||[]).filter(item=>item.kind==='photo');app().openSharedGallery(items,items.findIndex(item=>item.file===photo.dataset.archivePhoto));}
     });
     document.addEventListener('input',event=>{if(event.target.matches('[data-archive-caption]'))editCaption(event.target);if(event.target.closest('#weddingDateForm'))previewDate();if(event.target.closest('#weddingGreetingForm'))rememberGreeting();});
+    document.addEventListener('keydown',event=>{if(event.target.matches('[data-archive-caption]'))window.FamilyPhotoKeyboard?.saveDescription(event,()=>saveCaption(draftKey(event.target.dataset.archiveScope,event.target.dataset.archiveCaption)));});
     document.addEventListener('focusout',event=>{if(event.target.matches('[data-archive-caption]'))saveCaption(draftKey(event.target.dataset.archiveScope,event.target.dataset.archiveCaption));});
     for(const id of ['weddingUploadInput','nostalgiaUploadInput'])$(id).addEventListener('change',()=>addFiles($(id).dataset.scope,$(id).files));
     for(const id of ['weddingDropzone','nostalgiaDropzone'])$(id).addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(id).contains(event.relatedTarget))$(id).classList.remove('drag-over');});

@@ -511,6 +511,7 @@
     if(!event.target.closest('.search-wrap'))$('searchResults').hidden=true;
   });
   document.addEventListener('input',event=>{if(event.target.matches('textarea[data-caption-file]'))editCaption(event.target);});
+  document.addEventListener('keydown',event=>{if(event.target.matches('textarea[data-caption-file]'))window.FamilyPhotoKeyboard?.saveDescription(event,()=>saveCaption(keyFor(event.target.dataset.owner,event.target.dataset.captionFile)));});
   document.addEventListener('focusout',event=>{if(event.target.matches('textarea[data-caption-file]'))saveCaption(keyFor(event.target.dataset.owner,event.target.dataset.captionFile));});
   document.addEventListener('paste',event=>{
     if (!$('personDialog').open) {if(!window.FamilyArchive?.acceptPaste(event))window.FamilyPortal?.acceptPaste(event);return;}
