@@ -156,8 +156,8 @@
     }
     if(dialog.open&&dialogKind==='desktop-install'){
       const action=dialog.querySelector('[data-desktop-native-start]'),instructions=dialog.querySelector('[data-desktop-install-instructions]');
-      if(action){action.hidden=!installPrompt;action.disabled=busy;}
-      if(instructions)instructions.hidden=Boolean(installPrompt);
+      if(action){action.hidden=!installPrompt||isInstalled;action.disabled=busy;}
+      if(instructions)instructions.hidden=false;
     }
     const waiting=installState==='requesting'||installState==='pending',message=installMessage();
     if(dialog.open&&['invite','install'].includes(dialogKind)){
@@ -184,22 +184,27 @@
       tr('אשרו ״הוסף״. לוגו האתר יופיע ב־Dock ובתיקיית היישומים.','Confirm Add. The website’s logo appears in the Dock and Applications folder.')
     ]);
     else help='<p>'+tr('להוספת קיצור עם לוגו האתר, פתחו את האתר ב־Chrome או ב־Edge במחשב ובחרו באפשרות ההתקנה בתפריט הדפדפן.','To add a shortcut with the website’s logo, open this site in Chrome or Edge on your computer and choose the browser’s install option.')+'</p>';
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('קיצור דרך למחשב','Add a desktop shortcut')+'</h2><button type="button" class="home-install-invite-primary" data-desktop-native-start hidden>'+tr('הוסף קיצור דרך','Add shortcut')+'</button><div data-desktop-install-instructions>'+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>';
+    const intro=hasInstalledShortcut()?tr('האתר כבר נוסף לדפדפן. ליצירת סמל בשולחן העבודה פעלו לפי ההנחיות.','The website is already added to your browser. Follow these steps to create a desktop icon.'):tr('לוגו המשפחה בשולחן העבודה, לפתיחה מהירה של האתר.','Add the family logo to your desktop for quick access to the website.');
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('קיצור דרך למחשב','Add a desktop shortcut')+'</h2><p class="home-install-dialog-intro">'+intro+'</p><button type="button" class="home-install-invite-primary" data-desktop-native-start hidden>'+tr('הוסף קיצור דרך','Add shortcut')+'</button><div data-desktop-install-instructions>'+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>';
     dialog.querySelector('[data-desktop-native-start]').addEventListener('click',()=>requestDesktopInstallation(returnFocus));showDialog('desktop-install',returnFocus);update();
   }
   async function requestDesktopInstallation(returnFocus=desktopButton){
     if(!desktopView()||busy)return;
-    if(hasInstalledShortcut()){announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));return;}
-    if(!installPrompt){
-      await checkInstalledShortcut();
-      if(hasInstalledShortcut())announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));else openDesktopHelp(returnFocus);return;
-    }
+    // Respond in this click, even when installed-app detection never settles.
+    // An installed browser app does not guarantee an icon on the desktop.
+    openDesktopHelp(returnFocus);
+    if(hasInstalledShortcut()||!installPrompt){void checkInstalledShortcut();return;}
     const prompt=installPrompt;installPrompt=null;busy=true;update();
+    let promptTimer;
     try{
       // Use the retained event synchronously within this click's user activation.
-      await prompt.prompt();const choice=await prompt.userChoice;
+      const choice=await Promise.race([
+        (async()=>{await prompt.prompt();return prompt.userChoice;})(),
+        new Promise(resolve=>{promptTimer=setTimeout(()=>resolve({outcome:'unavailable'}),8000);})
+      ]);
       if(choice?.outcome==='accepted'&&!hasInstalledShortcut())announce(status,tr('הבקשה אושרה. הדפדפן משלים את ההתקנה.','Request approved. Your browser is finishing the installation.'));
-    }catch{openDesktopHelp(returnFocus);}finally{busy=false;update();}
+      else if(choice?.outcome==='unavailable')announce(status,tr('אפשר להוסיף את הקיצור דרך תפריט הדפדפן, לפי ההנחיות בחלון.','You can add the shortcut from your browser menu using the steps in this window.'));
+    }catch{openDesktopHelp(returnFocus);}finally{clearTimeout(promptTimer);busy=false;update();}
   }
   desktopButton.addEventListener('click',()=>requestDesktopInstallation());
   desktopShortcutLink?.addEventListener('click',event=>{

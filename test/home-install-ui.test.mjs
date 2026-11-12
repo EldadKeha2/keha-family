@@ -494,6 +494,25 @@ test('phone shortcut and share toolbar has one header location rather than a dup
 const desktopUA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36';
 const desktopFixture=options=>fixture({userAgent:desktopUA,mobile:false,...options});
 
+test('desktop header and footer respond immediately when installed-app detection never returns',()=>{
+  for(const footer of [false,true]){
+    const f=desktopFixture({installedRelated:()=>new Promise(()=>{})});
+    const action=footer?f.windowsLink:f.card.querySelector('[data-desktop-install-action]');
+    f.click(action);
+    assert.equal(f.dialog.open,true,'The click must show help before waiting for the browser');
+    assert.equal(f.dialog.querySelector('[data-desktop-install-instructions]').hidden,false);
+    assert.equal(f.card.querySelector('[data-desktop-install-action]').disabled,false);
+  }
+});
+
+test('an unresponsive desktop prompt keeps visible instructions and releases the busy button',async()=>{
+  const f=desktopFixture(),offer=f.offer({choicePending:true}),button=f.card.querySelector('[data-desktop-install-action]');
+  f.click(button);assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);
+  assert.equal(f.dialog.querySelector('[data-desktop-install-instructions]').hidden,false);
+  await f.advanceTime(8000);assert.equal(button.disabled,false);assert.equal(f.dialog.open,true);
+  offer.choose('accepted');await tick();assert.equal(f.dialog.open,true);
+});
+
 test('desktop shortcut and refresh controls use the site logo and remain absent from phone and tablet layouts',()=>{
   for(const english of [false,true]){
     const f=desktopFixture({english}),install=f.card.querySelector('[data-desktop-install-action]'),refresh=f.card.querySelector('[data-desktop-refresh]');
@@ -513,7 +532,9 @@ test('desktop native installation uses one user click and one retained offer wit
   offer.choose();await tick();assert.equal(button.disabled,false);assert.match(f.card.querySelector('[data-home-install-status]').textContent,/הדפדפן משלים/);
   assert.doesNotMatch(f.card.querySelector('[data-home-install-status]').textContent,/ההתקנה הושלמה/);
   f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.match(f.card.querySelector('[data-home-install-status]').textContent,/ההתקנה הושלמה/);
-  f.click(button);assert.equal(offer.calls,1);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+  f.click(button);assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);
+  assert.equal(f.dialog.querySelector('[data-desktop-native-start]').hidden,true);
+  assert.match(f.dialog.innerHTML,/ליצירת סמל בשולחן העבודה/);
 });
 
 test('desktop dismissal and an unavailable native prompt leave useful computer instructions in both languages',async()=>{
@@ -533,12 +554,13 @@ test('a late desktop install offer is available directly inside the open instruc
   f.window.dispatchEvent(new Event('appinstalled'));assert.equal(f.dialog.open,false);
 });
 
-test('desktop help follows Edge and Safari and installed-app detection never prompts for another install',async()=>{
+test('desktop help follows Edge and Safari and installed-app detection keeps desktop-icon instructions available',async()=>{
   for(const [userAgent,expected,absent]of [[desktopUA+' Edg/141.0',/Edge/,/Safari|Android/],['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) Safari/605.1.15',/Dock/,/Chrome|Android/]]){
     const f=desktopFixture({userAgent});f.click(f.card.querySelector('[data-desktop-install-action]'));await tick();assert.match(f.dialog.innerHTML,expected);assert.doesNotMatch(f.dialog.innerHTML,absent);
   }
   const installed=desktopFixture({installedRelated:[{platform:'webapp',id:'https://family.example/'}]});await tick();const offer=installed.offer();
-  installed.click(installed.card.querySelector('[data-desktop-install-action]'));await tick();assert.equal(offer.calls,0);assert.equal(installed.dialog.open,false);
+  installed.click(installed.card.querySelector('[data-desktop-install-action]'));await tick();assert.equal(offer.calls,0);assert.equal(installed.dialog.open,true);
+  assert.equal(installed.dialog.querySelector('[data-desktop-install-instructions]').hidden,false);
 });
 
 test('desktop refresh reloads the current game, person or album URL and cannot be invoked from mobile',()=>{
@@ -585,7 +607,7 @@ test('modern Windows always offers the browser shortcut regardless of version or
 test('the desktop footer uses the same browser prompt as the logo button without navigating to a download',async()=>{
   const f=desktopFixture(),offer=f.offer({outcome:'accepted'});
   assert.equal(f.click(f.windowsLink).defaultPrevented,true);await tick();assert.equal(offer.calls,1);
-  assert.equal(f.dialog.open,false);assert.equal(f.location.hash,'#games');
+  assert.equal(f.dialog.open,true);assert.equal(f.location.hash,'#games');
 });
 
 test('the footer shortcut is available on desktop browsers and hidden on phones and inside the native app',()=>{
