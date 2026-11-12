@@ -24,12 +24,14 @@
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const shortcutIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="2" width="12" height="20" rx="2"/><path d="M8 18h4M19 5v8m-4-4h8"/></svg>';
   const desktopIcon='<img class="desktop-shortcut-logo" src="assets/app-icons/icon-192.png" width="24" height="24" alt="" aria-hidden="true">';
+  const bookmarkIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg>';
   const refreshIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5M19.1 9a7.5 7.5 0 0 0-12.4-3L4 9m16 6-2.7 3A7.5 7.5 0 0 1 4.9 15"/></svg>';
   const shareIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.7 10.5 6.6-4m-6.6 7 6.6 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>';
-  card.innerHTML='<div class="home-install-actions" data-home-install-actions><button type="button" data-home-install-action aria-label="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" title="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" aria-haspopup="dialog" aria-controls="homeInstallDialog">'+shortcutIcon+'<span>'+tr('התקן','Install')+'</span></button><button type="button" data-desktop-install-action hidden aria-haspopup="dialog" aria-controls="homeInstallDialog" aria-label="'+tr('הוספת קיצור דרך למחשב עם לוגו האתר','Add a desktop shortcut with the website logo')+'" title="'+tr('הוסף קיצור דרך','Add shortcut')+'">'+desktopIcon+'<span>'+tr('הוסף קיצור דרך','Add shortcut')+'</span></button><button type="button" data-home-install-share aria-label="'+tr('שיתוף האתר','Share website')+'" title="'+tr('שיתוף האתר','Share website')+'">'+shareIcon+'<span>'+tr('שיתוף','Share')+'</span></button><button type="button" data-desktop-refresh hidden aria-label="'+tr('רענון העמוד הנוכחי','Refresh current page')+'" title="'+tr('רענון','Refresh')+'">'+refreshIcon+'<span>'+tr('רענון','Refresh')+'</span></button></div><p class="home-install-status" data-home-install-status role="status" aria-live="polite"></p><p class="home-install-status" data-home-install-share-status role="status" aria-live="polite"></p>';
+  card.innerHTML='<div class="home-install-actions" data-home-install-actions><button type="button" data-home-install-action aria-label="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" title="'+tr('התקן קיצור דרך לאתר','Install site shortcut')+'" aria-haspopup="dialog" aria-controls="homeInstallDialog">'+shortcutIcon+'<span>'+tr('התקן','Install')+'</span></button><button type="button" data-desktop-install-action hidden aria-haspopup="dialog" aria-controls="homeInstallDialog" aria-label="'+tr('הוספת קיצור דרך למחשב עם לוגו האתר','Add a desktop shortcut with the website logo')+'" title="'+tr('קיצור לשולחן העבודה','Desktop shortcut')+'">'+desktopIcon+'<span>'+tr('קיצור לשולחן העבודה','Desktop shortcut')+'</span></button><button type="button" data-desktop-bookmark-action hidden aria-haspopup="dialog" aria-controls="homeInstallDialog" aria-label="'+tr('הוספה למועדפים בדפדפן','Add a browser bookmark')+'" title="'+tr('מועדפים בדפדפן','Browser bookmark')+'">'+bookmarkIcon+'<span>'+tr('מועדפים בדפדפן','Browser bookmark')+'</span></button><button type="button" data-home-install-share aria-label="'+tr('שיתוף האתר','Share website')+'" title="'+tr('שיתוף האתר','Share website')+'">'+shareIcon+'<span>'+tr('שיתוף','Share')+'</span></button><button type="button" data-desktop-refresh hidden aria-label="'+tr('רענון העמוד הנוכחי','Refresh current page')+'" title="'+tr('רענון','Refresh')+'">'+refreshIcon+'<span>'+tr('רענון','Refresh')+'</span></button></div><p class="home-install-status" data-home-install-status role="status" aria-live="polite"></p><p class="home-install-status" data-home-install-share-status role="status" aria-live="polite"></p>';
   const button=card.querySelector('[data-home-install-action]'),status=card.querySelector('[data-home-install-status]');
   const shareButton=card.querySelector('[data-home-install-share]'),shareStatus=card.querySelector('[data-home-install-share-status]');
   const desktopButton=card.querySelector('[data-desktop-install-action]'),refreshButton=card.querySelector('[data-desktop-refresh]');
+  const bookmarkButton=card.querySelector('[data-desktop-bookmark-action]');
   const desktopShortcutLink=document.getElementById('desktopShortcutLink');
   const desktopView=()=>!mobileDevice&&!phoneQuery.matches;
   function announce(target,message){
@@ -57,7 +59,7 @@
     dialog.querySelector('[data-home-install-language]')?.addEventListener('click',()=>{
       const currentKind=dialogKind,currentFocus=dialogReturnFocus;english=!english;
       invitationURL.searchParams.set('lang',english?'en-US':'he');
-      if(currentKind==='invite')openInvitation(currentFocus);else if(currentKind==='install')openHelp(currentFocus);else if(currentKind==='desktop-install')openDesktopHelp(currentFocus);else if(currentKind==='success')openSuccess(currentFocus);
+      if(currentKind==='invite')openInvitation(currentFocus);else if(currentKind==='install')openHelp(currentFocus);else if(currentKind==='desktop-install')openDesktopHelp(currentFocus);else if(currentKind==='bookmark')openBookmarkHelp(currentFocus);else if(currentKind==='success')openSuccess(currentFocus);
     });
     dialog.querySelector('[data-home-install-check-icon]')?.addEventListener('click',()=>completeInstallation(true));
     if(!dialog.open){
@@ -134,11 +136,11 @@
     // Keep the phone invitation and desktop actions together in the shared header.
     card.hidden=false;
     button.hidden=!(phoneQuery.matches||navigator.userAgentData?.mobile);status.hidden=false;
-    desktopButton.hidden=!desktopView()||nativeDesktop;refreshButton.hidden=!desktopView();desktopButton.disabled=busy;
+    desktopButton.hidden=!desktopView()||nativeDesktop;bookmarkButton.hidden=!desktopView()||nativeDesktop;refreshButton.hidden=!desktopView();desktopButton.disabled=busy;
     if(desktopShortcutLink){
       desktopShortcutLink.hidden=!desktopView()||nativeDesktop;
       const label=desktopShortcutLink.querySelector('span');
-      if(label)label.textContent=tr('הוסף קיצור דרך','Add shortcut');
+      if(label)label.textContent=tr('קיצור לשולחן העבודה','Desktop shortcut');
     }
     button.setAttribute('aria-haspopup',isInstalled?'false':'dialog');
     card.querySelector('[data-home-install-actions]').setAttribute('data-installed',String(isInstalled));
@@ -169,6 +171,25 @@
     if(message)status.textContent=message;
   }
   function steps(items){return '<ol>'+items.map(item=>'<li>'+item+'</li>').join('')+'</ol>';}
+  function openBookmarkHelp(returnFocus=bookmarkButton){
+    if(!desktopView()||nativeDesktop)return;
+    const shortcut=/Macintosh|Mac OS X/.test(ua)?'⌘ + D':'Ctrl + D';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('מועדפים בדפדפן','Browser bookmark')+'</h2><p class="home-install-dialog-intro">'+tr('שמרו את העמוד במועדפים, לפתיחה מהירה מתוך הדפדפן.','Save this page as a bookmark for quick access from your browser.')+'</p><div class="home-install-bookmark-shortcut" data-desktop-bookmark-shortcut><kbd dir="ltr">'+shortcut+'</kbd></div>'+steps([tr('לחצו על צירוף המקשים שמופיע למעלה, או על הכוכב שבשורת הכתובת.','Press the shortcut shown above, or select the star in the address bar.'),tr('בחרו ״סרגל הסימניות״ או ״סרגל המועדפים״ ואשרו את השמירה.','Choose the Bookmarks bar or Favorites bar and confirm the save.')])+'<p class="home-install-invite-note">'+tr('הדפדפן פותח את חלון השמירה. האתר אינו מוסיף סימנייה באופן אוטומטי.','Your browser opens the save dialog. This website does not add a bookmark automatically.')+'</p>';
+    showDialog('bookmark',returnFocus);
+  }
+  function fullscreenHelp(){
+    const shortcut=/Macintosh|Mac OS X/.test(ua)?'Control + ⌘ + F':'F11';
+    return '<div class="home-install-fullscreen-tools"><button type="button" class="home-install-invite-browse" data-desktop-fullscreen>'+tr('מסך מלא עכשיו','Full screen now')+'</button><p class="home-install-invite-note">'+tr('מסך מלא מופעל אחרי פתיחת האתר. אפשר גם ללחוץ על ','Full screen is enabled after opening the website. You can also press ')+'<kbd dir="ltr">'+shortcut+'</kbd>.</p></div>';
+  }
+  function requestDesktopFullscreen(){
+    if(!desktopView())return;
+    const fallback=()=>announce(status,tr('אפשר לעבור למסך מלא דרך תפריט הדפדפן או באמצעות קיצור המקשים שמופיע בחלון.','Use your browser menu or the keyboard shortcut shown in this window to enter full screen.'));
+    if(typeof document.documentElement.requestFullscreen!=='function'){fallback();return;}
+    try{
+      // A real click supplies the activation required by the browser.
+      Promise.resolve(document.documentElement.requestFullscreen()).then(()=>{if(dialogKind==='desktop-install')closeDialog();},fallback);
+    }catch{fallback();}
+  }
   function openDesktopHelp(returnFocus=desktopButton){
     let help;const legacyWindows=/Windows NT (?:5|6)\./i.test(ua);
     if(/Edg\//.test(ua))help=steps([
@@ -185,8 +206,9 @@
     ]);
     else help='<p>'+tr('להוספת קיצור עם לוגו האתר, פתחו את האתר ב־Chrome או ב־Edge במחשב ובחרו באפשרות ההתקנה בתפריט הדפדפן.','To add a shortcut with the website’s logo, open this site in Chrome or Edge on your computer and choose the browser’s install option.')+'</p>';
     const intro=hasInstalledShortcut()?tr('האתר כבר נוסף לדפדפן. ליצירת סמל בשולחן העבודה פעלו לפי ההנחיות.','The website is already added to your browser. Follow these steps to create a desktop icon.'):tr('לוגו המשפחה בשולחן העבודה, לפתיחה מהירה של האתר.','Add the family logo to your desktop for quick access to the website.');
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('קיצור דרך למחשב','Add a desktop shortcut')+'</h2><p class="home-install-dialog-intro">'+intro+'</p><button type="button" class="home-install-invite-primary" data-desktop-native-start hidden>'+tr('הוסף קיצור דרך','Add shortcut')+'</button><div data-desktop-install-instructions>'+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>';
-    dialog.querySelector('[data-desktop-native-start]').addEventListener('click',()=>requestDesktopInstallation(returnFocus));showDialog('desktop-install',returnFocus);update();
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('קיצור דרך למחשב','Add a desktop shortcut')+'</h2><p class="home-install-dialog-intro">'+intro+'</p><button type="button" class="home-install-invite-primary" data-desktop-native-start hidden>'+tr('הוסף קיצור דרך','Add shortcut')+'</button><div data-desktop-install-instructions>'+help+'</div>'+fullscreenHelp()+'<p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>';
+    dialog.querySelector('[data-desktop-native-start]').addEventListener('click',()=>requestDesktopInstallation(returnFocus));
+    dialog.querySelector('[data-desktop-fullscreen]').addEventListener('click',()=>requestDesktopFullscreen());showDialog('desktop-install',returnFocus);update();
   }
   async function requestDesktopInstallation(returnFocus=desktopButton){
     if(!desktopView()||busy)return;
@@ -207,6 +229,7 @@
     }catch{openDesktopHelp(returnFocus);}finally{clearTimeout(promptTimer);busy=false;update();}
   }
   desktopButton.addEventListener('click',()=>requestDesktopInstallation());
+  bookmarkButton.addEventListener('click',()=>openBookmarkHelp());
   desktopShortcutLink?.addEventListener('click',event=>{
     event.preventDefault();
     if(desktopView()&&!nativeDesktop)void requestDesktopInstallation(desktopShortcutLink);

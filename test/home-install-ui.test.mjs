@@ -25,8 +25,8 @@ const assertSuccess=f=>{
 
 // Only controller-facing DOM APIs are modeled. Native dialog focus containment,
 // operating-system install prompts and phone layout are checked in the browser.
-function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing'}={}){
-  const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[],reloads=[];
+function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing',fullscreen='missing'}={}){
+  const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[],reloads=[],fullscreenCalls=[];
   const timers=new Map();let clock=0,nextTimer=0;
   const schedule=(fn,delay=0)=>{const id=++nextTimer;timers.set(id,{fn,at:clock+Math.max(0,Number(delay)||0)});return id;};
   const advanceTime=async milliseconds=>{
@@ -82,6 +82,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   const card=new Element('section'),dialog=new Element('dialog');nodes.set('homeInstall',card);nodes.set('homeInstallDialog',dialog);
   const windowsLink=new Element('a');windowsLink.setAttribute('href','#install-desktop');windowsLink.children.set('span',new Element('span'));nodes.set('desktopShortcutLink',windowsLink);
   document.documentElement=new Element('html');document.documentElement.lang=english?'en-US':'he';
+  if(fullscreen!=='missing')document.documentElement.requestFullscreen=()=>{fullscreenCalls.push(true);if(fullscreen==='blocked')return Promise.reject(Error('Fullscreen denied'));document.fullscreenElement=document.documentElement;return Promise.resolve();};
   document.getElementById=id=>nodes.get(id)||null;
   const window=new EventTarget();window.top=iframe?{}:window;window.FamilyI18n={isEnglish:english,language:english?'en-US':'he'};
   const queries=new Map();
@@ -98,7 +99,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   const ready=()=>{document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';};
   vm.runInContext(source,context);if(autoReady)ready();
   const button=()=>card.querySelector('[data-home-install-action]');
-  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,reloads,windowsLink,
+  return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,reloads,windowsLink,fullscreenCalls,
     click(element){const event=new Event('click',{cancelable:true});element.dispatchEvent(event);return event;},
     resize(value){const media=matchMedia('(max-width: 700px)');media.matches=value;media.dispatchEvent(new Event('change'));},
     standalone(value){const media=matchMedia('(display-mode: standalone)');media.matches=value;media.dispatchEvent(new Event('change'));},
@@ -516,7 +517,7 @@ test('an unresponsive desktop prompt keeps visible instructions and releases the
 test('desktop shortcut and refresh controls use the site logo and remain absent from phone and tablet layouts',()=>{
   for(const english of [false,true]){
     const f=desktopFixture({english}),install=f.card.querySelector('[data-desktop-install-action]'),refresh=f.card.querySelector('[data-desktop-refresh]');
-    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Add shortcut/:/הוסף קיצור דרך/);
+    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Desktop shortcut/:/קיצור לשולחן העבודה/);
     assert.equal(f.card.querySelector('.desktop-shortcut-logo').getAttribute('src'),'assets/app-icons/icon-192.png');
     f.resize(true);assert.equal(install.hidden,true);assert.equal(refresh.hidden,true);
     f.resize(false);assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);
@@ -596,7 +597,7 @@ test('modern Windows always offers the browser shortcut regardless of version or
     const f=desktopFixture({english,clientHints});await tick();
     assert.equal(f.windowsLink.hidden,false);
     assert.equal(f.windowsLink.getAttribute('href'),'#install-desktop');
-    assert.equal(f.windowsLink.querySelector('span').textContent,english?'Add shortcut':'הוסף קיצור דרך');
+    assert.equal(f.windowsLink.querySelector('span').textContent,english?'Desktop shortcut':'קיצור לשולחן העבודה');
     assert.equal(f.click(f.windowsLink).defaultPrevented,true);await tick();
     assert.ok(f.dialog.querySelector('[data-desktop-install-instructions]'));
     assert.doesNotMatch(f.dialog.innerHTML,/\.exe|Microsoft Store|data-windows-direct-download|data-windows-browser-shortcut/);
@@ -613,4 +614,45 @@ test('the desktop footer uses the same browser prompt as the logo button without
 test('the footer shortcut is available on desktop browsers and hidden on phones and inside the native app',()=>{
   for(const f of [fixture(),desktopFixture({userAgent:desktopUA+' KehaFamilyDesktop/2.0.0'})])assert.equal(f.windowsLink.hidden,true);
   for(const userAgent of [desktopUA,'Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605.1.15','Mozilla/5.0 (X11; Linux x86_64) Chrome/141.0.0.0'])assert.equal(desktopFixture({userAgent}).windowsLink.hidden,false);
+});
+
+
+test('desktop bookmark and desktop shortcut are separate actions with keyboard help and independent focus',async()=>{
+  for(const [userAgent,key]of [[desktopUA,'Ctrl + D'],['Mozilla/5.0 (Macintosh; Intel Mac OS X) Chrome/141.0','⌘ + D']])for(const english of [false,true]){
+    const f=desktopFixture({userAgent,english}),bookmark=f.card.querySelector('[data-desktop-bookmark-action]'),offer=f.offer();
+    assert.equal(bookmark.hidden,false);assert.notEqual(bookmark,f.card.querySelector('[data-desktop-install-action]'));
+    f.click(bookmark);assert.equal(f.dialog.open,true);assert.match(f.dialog.innerHTML,/data-desktop-bookmark-shortcut/);
+    assert.ok(f.dialog.innerHTML.includes(key));assert.equal(offer.calls,0);
+    assert.equal(f.dialog.querySelector('[data-desktop-native-start]'),null);assert.equal(f.dialog.querySelector('[data-desktop-fullscreen]'),null);
+    assert.equal(f.copied.length,0);assert.equal(f.shared.length,0);
+    if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
+    f.click(f.dialog.querySelector('[data-home-install-close]'));assert.equal(f.document.activeElement,bookmark);
+    f.click(f.card.querySelector('[data-desktop-install-action]'));assert.equal(offer.calls,1);await tick();
+  }
+});
+
+test('bookmark instructions translate without changing actions and cannot open on mobile or in the native app',()=>{
+  const f=desktopFixture();f.click(f.card.querySelector('[data-desktop-bookmark-action]'));
+  f.click(f.dialog.querySelector('[data-home-install-language]'));assert.equal(f.dialog.getAttribute('dir'),'ltr');
+  assert.match(f.dialog.innerHTML,/Browser bookmark/);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
+  for(const mobile of [fixture(),fixture({mobile:false}),desktopFixture({userAgent:desktopUA+' KehaFamilyDesktop/2.0.0'})]){
+    const button=mobile.card.querySelector('[data-desktop-bookmark-action]');assert.equal(button.hidden,true);mobile.click(button);assert.equal(mobile.dialog.open,false);
+  }
+});
+
+test('desktop full screen uses a real click, closes the guide only after success and preserves the current URL',async()=>{
+  const f=desktopFixture({fullscreen:'works'}),current=f.location.href;
+  f.click(f.card.querySelector('[data-desktop-install-action]'));assert.equal(f.fullscreenCalls.length,0);
+  const action=f.dialog.querySelector('[data-desktop-fullscreen]');assert.ok(action);f.click(action);
+  assert.equal(f.fullscreenCalls.length,1);await tick();assert.equal(f.dialog.open,false);assert.equal(f.document.fullscreenElement,f.document.documentElement);
+  assert.equal(f.location.href,current);assert.equal(f.assignments.length,0);
+});
+
+test('unsupported or denied full screen keeps instructions visible with a usable keyboard fallback',async()=>{
+  for(const fullscreen of ['missing','blocked'])for(const english of [false,true]){
+    const f=desktopFixture({fullscreen,english});f.click(f.card.querySelector('[data-desktop-install-action]'));
+    assert.match(f.dialog.innerHTML,/F11/);f.click(f.dialog.querySelector('[data-desktop-fullscreen]'));await tick();assert.equal(f.dialog.open,true);
+    assert.ok(f.dialog.querySelector('[data-home-install-help-status]').textContent);assert.notEqual(f.document.fullscreenElement,f.document.documentElement);
+    if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
+  }
 });

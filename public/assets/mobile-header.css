@@ -1,7 +1,7 @@
 /* Keep the phone's family-home masthead quiet and in one physical row. */
 .header-preferences{display:contents}
 .site-header .home-install{display:none}
-.site-header [data-desktop-install-action],.site-header [data-desktop-refresh]{display:none}
+.site-header [data-desktop-install-action],.site-header [data-desktop-bookmark-action],.site-header [data-desktop-refresh]{display:none}
 @media(min-width:701px){
   .site-header .home-install:not([hidden]){display:flex;align-items:center;flex:0 0 auto;max-width:100%;margin:0;padding:0;border:0;background:none}
   .site-header .home-install-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;max-width:100%}
