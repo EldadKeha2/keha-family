@@ -25,20 +25,27 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Install pinned build dependencies
         working-directory: desktop
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: npm ci --no-audit --no-fund
       - name: Check saved window states
         working-directory: desktop
         run: npm test
-      - name: Verify native Windows maximize and fullscreen restoration
-        working-directory: desktop
-        run: npx --no-install electron smoke-test.cjs
       - name: Build Windows installer
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist
+      - name: Verify native WebView2, immediate window display and saved states
+        run: ./desktop/native-smoke-test.ps1
       - name: Verify the family logo in the installer and app
         run: ./desktop/check-installer-branding.ps1
+      - name: Check the smaller payload
+        run: |
+          $version = (Get-Content desktop/package.json | ConvertFrom-Json).version
+          $bytes = (Get-Item "desktop/dist/Keha-Family-Setup-$version.exe").Length
+          if ($bytes -gt 15MB) { throw 'The installer exceeds the lightweight size budget.' }
+          Write-Host "Windows installer size: $bytes bytes"
       - uses: actions/upload-artifact@v4
         with:
           name: keha-family-windows

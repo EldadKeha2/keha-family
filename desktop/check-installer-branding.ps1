@@ -4,7 +4,7 @@ $package = Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw | ConvertFr
 $expected = New-Object System.Drawing.Icon((Join-Path $PSScriptRoot 'icon.ico'), 32, 32)
 $expectedImage = $expected.ToBitmap()
 try {
-  foreach ($filename in @("dist/Keha-Family-Setup-$($package.version).exe", 'dist/win-unpacked/KehaFamily.exe')) {
+  foreach ($filename in @("dist/Keha-Family-Setup-$($package.version).exe", 'dist/native/KehaFamily.exe')) {
     $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Join-Path $PSScriptRoot $filename))
     if ($null -eq $icon) { throw "Missing family icon: $filename" }
     $raw = $icon.ToBitmap()

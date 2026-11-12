@@ -8,3 +8,5 @@ __pycache__/
 coverage/
 desktop/dist/
 desktop/build/
+desktop/native/bin/
+desktop/native/obj/

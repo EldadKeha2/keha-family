@@ -1,16 +1,16 @@
 {
   "name": "keha-family-desktop",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "בית משפחת קהא — Windows desktop application",
   "author": "Eldad Keha",
   "license": "UNLICENSED",
   "private": true,
   "main": "main.cjs",
   "scripts": {
-    "start": "electron .",
+    "start": "dotnet run --project native/KehaFamily.csproj",
     "test": "node --test ../test/desktop-window-state.test.mjs",
-    "predist": "powershell -NoProfile -File installer-branding.ps1",
-    "dist": "electron-builder --win nsis --x64 --publish never"
+    "predist": "powershell -NoProfile -File build-native.ps1",
+    "dist": "electron-builder --prepackaged dist/native --win nsis --x64 --publish never"
   },
   "devDependencies": {
     "electron": "45.3.0",
@@ -23,12 +23,15 @@
     "directories": {"output": "dist"},
     "files": ["main.cjs", "window-state.cjs", "offline.html", "offline.css", "icon.png", "package.json"],
     "asar": true,
+    "compression": "normal",
     "win": {"target": ["nsis"], "icon": "icon.ico", "executableName": "KehaFamily"},
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowElevation": false,
       "allowToChangeInstallationDirectory": true,
+      "include": "native/dependencies.nsh",
+      "differentialPackage": false,
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico",
       "installerHeader": "build/installerHeader.bmp",
