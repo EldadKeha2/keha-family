@@ -33,7 +33,7 @@
     byId('stepShareLead').textContent = 'Tap the ';
     byId('stepShare').textContent = 'Share button';
     byId('stepShareTail').textContent = 'below';
-    byId('stepHomeLead').textContent = 'Tap ';
+    byId('stepHomeLead').textContent = 'Scroll down and tap ';
     byId('stepHome').textContent = 'Add to Home Screen';
     byId('steps').setAttribute('aria-label', 'Add to Home Screen');
     byId('menuHint').textContent = 'If Share is hidden, open Safari’s page menu to find it.';

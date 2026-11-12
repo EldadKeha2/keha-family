@@ -186,7 +186,7 @@ test('iPhone and touch iPad use Share instructions, while embedded browsers expl
     assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.equal(f.dialog.querySelector('[data-home-install-profile]'),null);
     assert.equal((f.dialog.innerHTML.match(/<li>/g)||[]).length,2);
     assert.match(f.dialog.innerHTML,/לחצו על <u>כפתור השיתוף<\/u>/);
-    assert.match(f.dialog.innerHTML,/לחצו על <u>הוספה למסך הבית<\/u>/);
+    assert.match(f.dialog.innerHTML,/גללו מטה ולחצו על <u>הוספה למסך הבית<\/u>/);
     assert.equal(f.dialog.querySelector('[data-home-install-invite-browse]'),null);
     const shareIcon=f.card.innerHTML.match(/<svg class="home-install-icon home-install-share"[^>]*>[\s\S]*?<\/svg>/)?.[0];
     assert.ok(shareIcon);assert.ok(f.dialog.innerHTML.includes(shareIcon));

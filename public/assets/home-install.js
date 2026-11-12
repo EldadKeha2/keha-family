@@ -221,7 +221,7 @@
   refreshButton.addEventListener('click',()=>{if(desktopView())location.reload();});
   function appleHelp(){return '<div class="home-install-apple-steps" data-home-install-apple-steps aria-label="'+tr('הוספה למסך הבית דרך Safari','Add to Home Screen in Safari')+'">'+steps([
     tr('לחצו על <u>כפתור השיתוף</u>','Tap the <u>Share button</u>')+' '+appleShareIcon+' '+tr('כאן למטה','below'),
-    tr('לחצו על <u>הוספה למסך הבית</u>','Tap <u>Add to Home Screen</u>')
+    tr('גללו מטה ולחצו על <u>הוספה למסך הבית</u>','Scroll down and tap <u>Add to Home Screen</u>')
   ])+'</div>';}
   function androidHelp(){return steps([
     tr('ב־Chrome פתחו את התפריט ⋮ ובחרו ״התקנת אפליקציה״ או ״הוספה למסך הבית״.','In Chrome, open the ⋮ menu and choose “Install app” or “Add to Home screen”.'),
