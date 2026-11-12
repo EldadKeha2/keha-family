@@ -31,6 +31,10 @@ jobs:
       - name: Check saved window states
         working-directory: desktop
         run: npm test
+      - name: Confirm the native executable packaging metadata
+        working-directory: desktop
+        run: |
+          node -e "const fs=require('node:fs');for(const name of ['app-builder-lib/out/appInfo.js','app-builder-lib/out/targets/nsis/NsisTarget.js']){const s=fs.readFileSync(require.resolve(name),'utf8');for(const line of s.split('\n'))if(/productFilename\s*=|executableName|APP_EXECUTABLE_FILENAME|APP_FILENAME:/.test(line))console.log(name+': '+line.trim())}"
       - name: Build Windows installer
         working-directory: desktop
         env:

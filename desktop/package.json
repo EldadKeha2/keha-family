@@ -19,6 +19,7 @@
   "build": {
     "appId": "com.eldadkeha.family",
     "productName": "בית משפחת קהא",
+    "executableName": "KehaFamily",
     "artifactName": "Keha-Family-Setup-${version}.${ext}",
     "directories": {"output": "dist"},
     "files": ["main.cjs", "window-state.cjs", "offline.html", "offline.css", "icon.png", "package.json"],
