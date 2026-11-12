@@ -37,6 +37,8 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist
+      - name: Verify the family logo in the installer and app
+        run: ./desktop/check-installer-branding.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: keha-family-windows

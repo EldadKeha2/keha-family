@@ -10,4 +10,6 @@ Website content and styling load from the production site on every launch. The n
 
 Run `npm ci`, `npm test`, then `npm run dist` inside `desktop/` on Windows. The `Build Windows desktop app` workflow also checks real Windows maximize/fullscreen behavior before packaging the NSIS installer and publishing its GitHub download. Desktop source changes trigger this build; ordinary site edits do not rebuild the installer.
 
-The first trial installer is unsigned. It is installed per-user and does not request administrator rights. Remote pages have no Node integration, preload bridge, webview support or filesystem API. Navigation is restricted to the live family origin; approved sharing/video links open in the system browser. No system, storage or certificate protections are disabled.
+The installer uses a guided setup: the family logo appears in the setup screens, the executable and the shortcuts; the install-folder step shows where the app goes and permits choosing another folder. The website’s `/install/windows/` page explains the browser download location and the Downloads shortcut (Ctrl+J). The build verifies the actual embedded app and installer icons on Windows before publishing.
+
+The trial installer is unsigned. It is installed per-user and does not request administrator rights. Remote pages have no Node integration, preload bridge, webview support or filesystem API. Navigation is restricted to the live family origin; approved sharing/video links open in the system browser. No system, storage or certificate protections are disabled.
