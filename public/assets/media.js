@@ -44,7 +44,7 @@
     if($('mediaViewer').open)show(state.index,{image});return true;
   }
   const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
-  let noticeTimer,expectedCaption='',captionEditing=false,captionEditor=0,captionSave=null;
+  let noticeTimer,expectedCaption='',captionEditing=false,captionEditor=0,captionSave=null,captionLocked=false;
   let renderedVersion=null,instagramPrepared={key:null,file:null};
   let restoringLink='',photoSwipe=null,faceTimer=null;
   const tr=(he,en)=>I18n.isEnglish?en:he;
@@ -199,7 +199,7 @@
     const handoff=native?window.FamilyPhotoPresentation?.holdNative?.($('mediaStage'),image):null;
     const ghost=!instant&&!native&&direction&&current()?.kind==='photo'?window.FamilyPhotoPresentation?.snapshot($('mediaStage')):null;
     state.index=(index+state.items.length)%state.items.length;
-    const item=current();state.activeId=identity(item);captionEditing=false;captionEditor++;captionSave=null;clearStage({preserveHandoff:Boolean(handoff),nextItem:item});renderedVersion=versionKey(item);metadata();
+    const item=current();state.activeId=identity(item);captionEditing=false;captionLocked=false;captionEditor++;captionSave=null;clearStage({preserveHandoff:Boolean(handoff),nextItem:item});renderedVersion=versionKey(item);metadata();
     if($('mediaViewer').open)syncMediaRoute(item,true);
     const stage=$('mediaStage');stage.classList.toggle('is-video',item.kind==='video');stage.classList.toggle('is-document',item.kind==='document');
     if(item.provider==='youtube'&&/^[\w-]{11}$/.test(item.youtubeId)){
@@ -356,15 +356,17 @@
     const inline=inlinePhotoCaption(),input=$('openedCaptionText'),form=$('openedCaptionForm');
     $('mediaViewer').classList.toggle('media-caption-inline',inline);$('editOpenedCaption').hidden=inline;
     form.hidden=!(inline||captionEditing);
+    input.readOnly=inline&&captionLocked;form.classList.toggle('caption-saved',input.readOnly);
     if(!captionEditing){expectedCaption=current()?.caption||'';input.value=expectedCaption;$('openedCaptionError').textContent='';}
     form.querySelector('label').textContent=inline?tr('תיאור התמונה','Photo description'):tr('כיתוב לתמונה או לקובץ','Photo or file description');
-    input.placeholder=tr('הוספת תיאור לתמונה…','Add a photo description…');input.rows=inline?2:3;
+    input.setAttribute('dir',I18n.isEnglish?'ltr':'rtl');
+    input.placeholder=tr('הקלידו כאן תיאור...','Type a description here...');input.rows=inline?2:3;
   }
   function beginCaptionEdit(preserveValue=false){
     const item=current();if(!item||captionEditing)return;
-    captionEditing=true;captionEditor++;captionSave=null;expectedCaption=item.caption||'';
+    captionEditing=true;captionLocked=false;captionEditor++;captionSave=null;expectedCaption=item.caption||'';
     if(!preserveValue)$('openedCaptionText').value=expectedCaption;
-    $('openedCaptionError').textContent='';$('openedCaptionForm').hidden=false;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;
+    $('openedCaptionError').textContent='';captionControls();$('openedCaptionForm').querySelector('[type=submit]').disabled=false;
   }
   function saveOpenedCaption(event){
     event?.preventDefault();const item=current();if(!item||!captionEditing)return Promise.resolve(false);
@@ -384,7 +386,7 @@
             expectedCaption=result.item?.caption??caption;
             if(input.value!==caption)continue;
           }
-          captionEditing=false;captionControls();notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));return true;
+          captionEditing=false;captionLocked=inlinePhotoCaption();captionControls();if(captionLocked)input.blur?.();notify(tr('הכיתוב נשמר ✓','Caption saved ✓'));return true;
         }
         return false;
       }catch(error){if(active())$('openedCaptionError').textContent=error.message;return false;}
@@ -424,7 +426,8 @@
       catch(error){notify(error.message);}
     });
     $('editOpenedCaption').addEventListener('click',()=>{beginCaptionEdit();$('openedCaptionText').focus();});
-    $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionEditor++;captionSave=null;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;captionControls();});
+    $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionLocked=false;captionEditor++;captionSave=null;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;captionControls();});
+    $('openedCaptionText').addEventListener('click',()=>{if(inlinePhotoCaption()&&captionLocked){beginCaptionEdit(true);$('openedCaptionText').focus();}});
     $('openedCaptionText').addEventListener('input',()=>{if(inlinePhotoCaption())beginCaptionEdit(true);});
     $('openedCaptionForm').addEventListener('submit',saveOpenedCaption);
     $('openedCaptionText').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,saveOpenedCaption));

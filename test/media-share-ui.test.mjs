@@ -22,7 +22,8 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
     replaceChildren(...nodes){this.content=nodes;}
     append(...nodes){for(const node of nodes)node.parentNode=this;this.content.push(...nodes);}
     remove(){this.isConnected=false;if(this.parentNode)this.parentNode.content=this.parentNode.content.filter(node=>node!==this);this.parentNode=null;}
-    focus(){}
+    focus(){document.activeElement=this;}
+    blur(){if(document.activeElement===this)document.activeElement=null;}
     select(){}
     load(){}
     showModal(){this.open=true;}
@@ -607,6 +608,8 @@ test('desktop header captions follow photo navigation and both screen sizes reta
     assert.equal(f.get('mediaHeaderCaption').textContent,'A family memory');assert.equal(f.get('mediaViewerCaption').textContent,'A family memory');
     assert.equal(f.get('editOpenedCaption').querySelector('[data-media-caption-desktop]').textContent,english?'Add a photo description':'להוספת תיאור לתמונה');
     assert.equal(f.get('editOpenedCaption').querySelector('[data-media-caption-mobile]').textContent,english?'Add a description':'הוסף תיאור לתמונה');
+    assert.equal(f.get('openedCaptionText').getAttribute('dir'),english?'ltr':'rtl');
+    assert.equal(f.get('openedCaptionText').placeholder,english?'Type a description here...':'הקלידו כאן תיאור...');
     f.get('mediaNext').handlers.get('click')();assert.equal(f.get('mediaHeaderCaption').textContent,'');assert.equal(f.get('mediaViewerCaption').textContent,'','Moving to an uncaptioned photo clears the previous description everywhere');
     assert.equal(f.get('openedProfilePhoto').hidden,true,'The shared gallery does not offer profile selection');
   }
@@ -633,10 +636,12 @@ test('desktop photo descriptions are ready to type without a click, remain open 
  for(const scope of ['gallery','photos','personal:ora','wedding:parents','nursery:ora','nostalgia']){
   const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f);f.window.FamilyMedia.open([{...f.photo('a'),caption:'Previous description'},f.photo('b')],0,scope);
   assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.get('editOpenedCaption').hidden,true);assert.equal(f.get('openedCaptionText').value,'Previous description');
-  f.get('openedCaptionText').value='Direct typing';f.get('openedCaptionText').handlers.get('input')();captionEnter(f);await keyboardFlush();
+  f.get('openedCaptionText').focus();f.get('openedCaptionText').value='Direct typing';f.get('openedCaptionText').handlers.get('input')();captionEnter(f);await keyboardFlush();
   assert.equal(saved.length,1);assert.equal(saved[0].expectedCaption,'Previous description');assert.equal(f.get('openedCaptionForm').hidden,false);
+  assert.equal(f.get('openedCaptionText').readOnly,true);assert.notEqual(f.document.activeElement,f.get('openedCaptionText'));assert.equal(f.get('mediaHeaderCaption').textContent,'Direct typing');
+  f.get('openedCaptionText').handlers.get('click')();assert.equal(f.get('openedCaptionText').readOnly,false);assert.equal(f.document.activeElement,f.get('openedCaptionText'));
   f.get('openedCaptionText').value='Another edit';f.get('openedCaptionText').handlers.get('input')();captionEnter(f);await keyboardFlush();assert.equal(saved.length,2);assert.equal(saved[1].expectedCaption,'Direct typing');
-  await f.window.FamilyMedia.step(1);assert.equal(f.get('openedCaptionText').value,'');assert.equal(f.get('openedCaptionForm').hidden,false);f.close();
+  await f.window.FamilyMedia.step(1);assert.equal(f.get('openedCaptionText').value,'');assert.equal(f.get('openedCaptionText').readOnly,false);assert.equal(f.get('openedCaptionForm').hidden,false);f.close();
  }
  const phone=fixture();phone.navigator.userAgent='Android Mobile';phone.open();assert.equal(phone.get('openedCaptionForm').hidden,true);assert.equal(phone.get('editOpenedCaption').hidden,false);phone.close();
 });
