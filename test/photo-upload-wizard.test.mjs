@@ -152,6 +152,31 @@ test('draft face names, event labels and completion travel with only the selecte
  await f.click('SaveCurrent');const saved=(await details(f.uploaded[0])).metadata;assert.equal(saved.faces[0].personId,'yona');assert.deepEqual(saved.labels,['birthdays']);assert.equal(saved.complete,true);
  await f.click('Save');const remaining=await result,payload=f.api.upload(remaining[0]),data=await details({payload});assert.deepEqual(data.metadata.faces,[]);assert.deepEqual(data.metadata.labels,[]);assert.equal(data.metadata.complete,false);
 });
+async function addLabel(f,name){
+ const input=f.node('photoEditCustomLabelName');input.value=name;input.dispatchEvent(new Event('input'));
+ const event=new Event('submit',{cancelable:true});f.node('photoEditCustomLabelForm').dispatchEvent(event);await f.flush();assert.equal(event.defaultPrevented,true);
+}
+test('custom upload labels stay with their photo, survive navigation and travel in the actual upload metadata',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]),name='מפגש משפחתי, חוף <ים>',id=catalog.photoLabelFromName(name);
+ await addLabel(f,name);assert.match(f.node('photoEditEventTags').innerHTML,/חוף &lt;ים&gt;/);assert.doesNotMatch(f.node('photoEditEventTags').innerHTML,/<ים>/);assert.match(f.node('photoEditEventChoices').innerHTML,/חוף &lt;ים&gt;/);
+ const input=f.node('photoEditCustomLabelName');input.value='טיוטה לתמונה הראשונה';input.dispatchEvent(new Event('input'));
+ await f.click('Next');assert.equal(f.node('photoEditEventTags').innerHTML,'');assert.equal(input.value,'');assert.ok(f.node('photoEditEventChoices').innerHTML.includes(id),'The label is available for another photo without being selected automatically');
+ await f.click('Previous');assert.equal(input.value,'טיוטה לתמונה הראשונה');assert.match(f.node('photoEditEventTags').innerHTML,/חוף &lt;ים&gt;/);
+ await f.click('SaveCurrent');assert.deepEqual((await details(f.uploaded[0])).metadata.labels,[id]);assert.equal(input.value,'');
+ await f.click('Save');const remaining=await result;assert.deepEqual((await details({payload:f.api.upload(remaining[0])})).metadata.labels,[]);
+});
+test('adding an existing upload label selects it once and invalid names retain their draft without damaging selections',async()=>{
+ const f=fixture({english:true}),{result}=await f.begin([image('one.jpg')]);
+ await addLabel(f,'Birthdays');await addLabel(f,'ימי הולדת');await addLabel(f,'  FAMILY   REUNION  ');await addLabel(f,'family reunion');
+ await addLabel(f,' ');assert.match(f.node('photoEditLabelStatus').textContent,/up to 60/);assert.equal(f.node('photoEditCustomLabelName').value,' ');
+ await f.click('SaveCurrent');const labels=(await details(f.uploaded[0])).metadata.labels;assert.equal(labels.length,2);assert.equal(labels[0],'birthdays');assert.equal(catalog.photoLabelKey(labels[1]),catalog.photoLabelKey(catalog.photoLabelFromName('Family reunion')));assert.deepEqual(Array.from(await result),[]);
+});
+test('the upload wizard rejects a 33rd label without silently dropping any of the first 32',async()=>{
+ const f=fixture(),{result}=await f.begin([image('one.jpg')]);
+ for(let index=0;index<32;index++)await addLabel(f,'טיול '+index);
+ await addLabel(f,'תגית נוספת מעבר למגבלה');assert.match(f.node('photoEditLabelStatus').textContent,/32/);assert.equal(f.node('photoEditCustomLabelName').value,'תגית נוספת מעבר למגבלה');
+ await f.click('SaveCurrent');const labels=(await details(f.uploaded[0])).metadata.labels;assert.equal(labels.length,32);assert.equal(labels.includes(catalog.photoLabelFromName('טיול 0')),true);assert.equal(labels.includes(catalog.photoLabelFromName('טיול 31')),true);assert.deepEqual(Array.from(await result),[]);
+});
 test('the last individual upload closes the wizard without re-approving a saved file',async()=>{
  const f=fixture(),{result}=await f.begin([image('only.jpg')]);await f.click('SaveCurrent');assert.deepEqual(Array.from(await result),[]);assert.equal(f.uploaded.length,1);
 });
