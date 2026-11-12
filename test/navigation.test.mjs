@@ -34,7 +34,7 @@ test('a reload preserves the entry and Back/Forward never grows history',async()
 });
 
 test('on-page parent buttons consume their existing parent entry rather than adding a return loop',async()=>{
-  for(const [child,parent]of [['#games/soup','#games'],['#weddings/u-root','#weddings'],['#nursery/yona','#nursery']]){
+  for(const [child,parent]of [['#games/soup','#games'],['#weddings/u-root','#weddings'],['#nursery/yona','#nursery'],['#memorial/yona','#memorial']]){
     const f=fixture('https://family.test/?lang=he'+child,{phone:true}),length=f.history.length;
     assert.equal(f.nav.returnTo(parent),true);await f.flush();assert.equal(f.location.hash,parent);
     assert.equal(f.history.length,length);f.history.back();await f.flush();assert.equal(f.location.hash,'#home');

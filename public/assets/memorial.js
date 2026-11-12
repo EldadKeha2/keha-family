@@ -4,25 +4,38 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let visitor;try{visitor=localStorage.getItem('keha-candle-visitor');}catch{}
   if(!/^[a-f0-9]{32}$/.test(visitor||'')){visitor=crypto.randomUUID().replaceAll('-','');try{localStorage.setItem('keha-candle-visitor',visitor);}catch{}}
-  let ready=false,view='tree',candles={},loaded=false,loading=false,error='',lastLoaded=0,day='';const pending=new Set();
+  let ready=false,view='tree',candles={},loaded=false,loading=false,error='',lastLoaded=0,day='',focusedPerson=null;const pending=new Set();
+  function linkedPerson(){
+    const parts=location.hash.slice(1).split('/');if(parts[0]!=='memorial'||parts.length!==2)return null;
+    try{return decodeURIComponent(parts[1])||null;}catch{return null;}
+  }
+  function focusLinkedPerson(){
+    const id=linkedPerson();if(!loaded||!id||focusedPerson===id)return;
+    requestAnimationFrame(()=>{
+      if(view!=='memorial'||linkedPerson()!==id||focusedPerson===id)return;
+      const card=[...$('memorialContent').querySelectorAll('[data-remembrance]')].find(card=>card.dataset.remembrance===id);if(!card)return;
+      focusedPerson=id;card.scrollIntoView({block:'center'});card.focus({preventScroll:true});
+    });
+  }
   const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const date=value=>value&&value!=='1.1.1111'?I.date(value):tr('טרם הוזן','Not yet recorded');
   const deathOrder=person=>{const parsed=window.FamilyDates.parse(person.deathDate);return parsed&&parsed.year!==1111?Number(parsed.date):Infinity;};
   function card(person){
     const p=app().getPersonSummary(person.id),name=I.personName(p),initials=name.split(/\s+/).filter(Boolean).map(p=>p[0]).slice(0,2).join(''),c=candles[p.id],isLit=Boolean(c?.lit);
-    return `<article class="remembrance-card${isLit?' candle-is-lit':''}" data-remembrance="${safe(p.id)}"><a class="remembrance-portrait" href="#person/${encodeURIComponent(p.id)}" aria-label="${tr('לעמוד הזיכרונות של','Memories of')} ${safe(name)}">${p.profile?`<img src="${safe(p.profile)}" alt="${safe(name)}" loading="lazy">`:`<span class="remembrance-initials">${safe(initials)}</span>`}</a><div class="remembrance-card-body"><span class="remembrance-blessing">${tr('זכרם לברכה','In loving memory')}</span><h3><a href="#person/${encodeURIComponent(p.id)}">${safe(name)}</a></h3><dl class="remembrance-dates"><div><dt>${tr('לידה','Born')}</dt><dd><bdi>${safe(date(p.birthday))}</bdi></dd></div><span aria-hidden="true">—</span><div><dt>${tr('פטירה','Died')}</dt><dd><bdi>${safe(date(p.deathDate))}</bdi></dd></div></dl><div class="remembrance-candle" aria-hidden="true"><span class="candle-halo"></span><span class="candle-flame"></span><span class="candle-wick"></span><span class="candle-wax"></span><span class="candle-base"></span></div><p class="remembrance-count" aria-live="polite"><strong>${c?c.count.toLocaleString(I.locale):'—'}</strong> ${tr('נרות הודלקו לזכרם','candles lit in their memory')}</p><button class="remembrance-light" type="button" data-light-candle="${safe(p.id)}" aria-pressed="${isLit}" ${!loaded||pending.has(p.id)||isLit?'disabled':''}>${pending.has(p.id)?tr('מדליק…','Lighting…'):isLit?tr('הנר שלך דולק לזכרם','Your candle is lit in their memory'):tr('הדלקת נר לזכרם','Light a candle in their memory')}</button><a class="remembrance-memories-link" href="#person/${encodeURIComponent(p.id)}">${tr('אל הזיכרונות והתמונות','Visit their memories and photos')} <span aria-hidden="true">${I.isEnglish?'→':'←'}</span></a></div></article>`;
+    return `<article class="remembrance-card${isLit?' candle-is-lit':''}${linkedPerson()===p.id?' is-remembrance-target':''}" data-remembrance="${safe(p.id)}" tabindex="-1" aria-label="${safe(name)}"><a class="remembrance-portrait" href="#person/${encodeURIComponent(p.id)}" aria-label="${tr('לעמוד הזיכרונות של','Memories of')} ${safe(name)}">${p.profile?`<img src="${safe(p.profile)}" alt="${safe(name)}" loading="lazy">`:`<span class="remembrance-initials">${safe(initials)}</span>`}</a><div class="remembrance-card-body"><span class="remembrance-blessing">${tr('זכרם לברכה','In loving memory')}</span><h3><a href="#person/${encodeURIComponent(p.id)}">${safe(name)}</a></h3><dl class="remembrance-dates"><div><dt>${tr('לידה','Born')}</dt><dd><bdi>${safe(date(p.birthday))}</bdi></dd></div><span aria-hidden="true">—</span><div><dt>${tr('פטירה','Died')}</dt><dd><bdi>${safe(date(p.deathDate))}</bdi></dd></div></dl><div class="remembrance-candle" aria-hidden="true"><span class="candle-halo"></span><span class="candle-flame"></span><span class="candle-wick"></span><span class="candle-wax"></span><span class="candle-base"></span></div><p class="remembrance-count" aria-live="polite"><strong>${c?c.count.toLocaleString(I.locale):'—'}</strong> ${tr('נרות הודלקו לזכרם','candles lit in their memory')}</p><button class="remembrance-light" type="button" data-light-candle="${safe(p.id)}" aria-pressed="${isLit}" ${!loaded||pending.has(p.id)||isLit?'disabled':''}>${pending.has(p.id)?tr('מדליק…','Lighting…'):isLit?tr('הנר שלך דולק לזכרם','Your candle is lit in their memory'):tr('הדלקת נר לזכרם','Light a candle in their memory')}</button><a class="remembrance-memories-link" href="#person/${encodeURIComponent(p.id)}">${tr('אל הזיכרונות והתמונות','Visit their memories and photos')} <span aria-hidden="true">${I.isEnglish?'→':'←'}</span></a></div></article>`;
   }
   function render(){
     if(!ready||view!=='memorial')return;
     const people=app().getPeople().map(p=>app().getPersonSummary(p.id)).filter(p=>p.deceased).sort((a,b)=>deathOrder(a)-deathOrder(b));
     $('memorialContent').innerHTML=`<header class="remembrance-intro"><span class="remembrance-flower" aria-hidden="true">❖</span><p class="small-eyebrow">${tr('בלב המשפחה, תמיד','Always in the heart of the family')}</p><h2>${tr('מדליקים נר לזכרם','Lighting a candle in their memory')}</h2><p>${tr('האנשים שלימדו אותנו אהבה, והזיכרונות שממשיכים איתנו.','The people who taught us love, and the memories we carry with us.')}</p><span class="remembrance-intro-line" aria-hidden="true"></span></header><p class="remembrance-status" role="status">${safe(error||(!loaded?tr('טוען את ספירת הנרות…','Loading candle counts…'):''))}${error?` <button type="button" data-candle-retry>${tr('ניסיון נוסף','Try again')}</button>`:''}</p><div class="remembrance-grid">${people.map(card).join('')}</div><p class="remembrance-closing">${tr('מה שהשאירו בלבנו, ממשיך לחיות בינינו.','What they left in our hearts lives on among us.')}</p><p class="visually-hidden" id="memorialCandleStatus" role="status" aria-live="polite"></p>`;
+    focusLinkedPerson();
   }
   async function load(){
     if(loading)return;loading=true;
     try{const response=await I.fetch('api/memorial',{cache:'no-store',headers:{'X-Candle-Visitor':visitor}}),result=await response.json();if(!response.ok)throw Error(I.error(result.error));candles=result.candles;loaded=true;error='';lastLoaded=Date.now();day=today();}
     catch(e){error=e.message||tr('לא ניתן לטעון את ספירת הנרות כרגע.','Candle counts are currently unavailable.');}finally{loading=false;render();}
   }
-  function activate(next){view=next;$('memorialView').hidden=next!=='memorial';render();if(ready&&next==='memorial'&&Date.now()-lastLoaded>30000)load();}
+  function activate(next){if(next!==view)focusedPerson=null;view=next;$('memorialView').hidden=next!=='memorial';render();if(ready&&next==='memorial'&&Date.now()-lastLoaded>30000)load();}
   function init(){
     ready=true;activate(app().getView());
     $('memorialContent').addEventListener('click',async event=>{
@@ -34,6 +47,7 @@
       if(!error&&$('memorialCandleStatus'))$('memorialCandleStatus').textContent=tr('הודלק נר לזכר ','A candle was lit in memory of ')+app().nameOf(id);
     });
     window.addEventListener('family-people-loaded',render);window.addEventListener('family-person-changed',render);
+    const routeChanged=()=>{focusedPerson=null;render();};window.addEventListener('hashchange',routeChanged);window.addEventListener('popstate',routeChanged);
     document.addEventListener('visibilitychange',()=>{if(view==='memorial'&&document.visibilityState==='visible'&&Date.now()-lastLoaded>30000)load();});
     setInterval(()=>{if(view==='memorial'&&document.visibilityState==='visible'&&day&&today()!==day)load();},60000);
   }

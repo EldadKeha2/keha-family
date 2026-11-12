@@ -82,14 +82,21 @@ function subscriptionFooter(language,manageLink,unsubscribeLink){
   const en=language!=='he';
   return `<div style="font-size:14px;line-height:2"><a href="${escape(manageLink)}" style="color:#4e6741;font-weight:bold">${en?'Update preferences':'עדכון העדפות'}</a> · <a href="${escape(unsubscribeLink)}" style="color:#765640;font-weight:bold">${en?'Unsubscribe':'הסרה מרשימת התפוצה'}</a></div>${en?'Both links open your private subscription page on the family website.':'שני הקישורים מובילים לעמוד ניהול ההרשמה האישי באתר המשפחה.'}`;
 }
-export function eventEmail(language,events,manageLink,unsubscribeLink){
+export function eventEmail(language,events,manageLink,unsubscribeLink,siteOrigin=manageLink){
   const en=language!=='he',subject=events.length===1?(events[0].type==='birthdays'?(en?'🎂 A family birthday today':'🎂 יום הולדת במשפחה היום'):events[0].type==='anniversaries'?(en?'💐 A family anniversary today':'💐 יום נישואים במשפחה היום'):(en?'🕯 In loving memory':'🕯 זוכרים באהבה')):(en?'Today in the Keha family':'היום במשפחת קהא');
   const lines=[],cards=events.map(event=>{
     const names=event.names.map(p=>en?p.nameEn||p.name:p.name).join(en?' & ':' ו'),memorial=event.type==='memorials',wedding=event.type==='anniversaries';
     const title=memorial?(en?'In loving memory':'זוכרים באהבה'):wedding?(en?'Happy anniversary!':'יום נישואים שמח!'):(en?'Happy birthday!':'יום הולדת שמח!');
     const body=memorial?(en?`${event.years} years have passed. Forever in our hearts.`:`${event.years} שנים לפטירה. תמיד בלב שלנו.`):wedding?(en?`${event.years} years together. Wishing you love, happiness and many more shared memories.`:`${event.years} שנות אהבה. מאחלים עוד הרבה אושר ורגעים משותפים.`):(en?`Celebrating ${event.years} today! Wishing you health, joy and a year full of wonderful moments.`:`חוגגים היום ${event.years}! מאחלים בריאות, שמחה ושנה מלאה ברגעים יפים.`);
-    lines.push(title+' '+names+'\n'+body);
-    return `<div style="padding:24px 16px;text-align:center;margin:0 0 20px;border:1px solid ${memorial?'#d4c9b7':'#dac99e'};border-radius:12px;background:${memorial?'#f3efe7':'#fcf0da'}"><div style="font-size:38px;letter-spacing:5px">${memorial?'🕯':wedding?'💐 💛 💐':'🎈 🎈 🎂 🎈 🎈'}</div><h2 style="font-size:25px;color:${memorial?'#61574a':'#7d5a36'}">${title}</h2><h3 style="font-size:22px">${escape(names)}</h3><p style="font-size:16px;line-height:1.9">${escape(body)}</p>${memorial?'':'<div style="font-size:25px">'+(wedding?'✨ 💕 ✨':'🎉 🎁 🎈 🎉')+'</div>'}</div>`;
+    let candleLink='',candleLabel='';
+    if(memorial){
+      const url=new URL('/',siteOrigin),id=event.id||event.names[0]?.id;
+      url.searchParams.set('lang',language);url.hash='memorial'+(id?'/'+encodeURIComponent(id):'');candleLink=url.href;
+      const gender=event.names[0]?.gender;
+      candleLabel=en?'Light a candle in their memory':gender==='f'?'הדלקת נר לזכרה':gender==='m'?'הדלקת נר לזכרו':'הדלקת נר זיכרון';
+    }
+    lines.push(title+' '+names+'\n'+body+(memorial?'\n'+candleLabel+': '+candleLink:''));
+    return `<div style="padding:24px 16px;text-align:center;margin:0 0 20px;border:1px solid ${memorial?'#d4c9b7':'#dac99e'};border-radius:12px;background:${memorial?'#f3efe7':'#fcf0da'}"><div style="font-size:38px;letter-spacing:5px">${memorial?'🕯':wedding?'💐 💛 💐':'🎈 🎈 🎂 🎈 🎈'}</div><h2 style="font-size:25px;color:${memorial?'#61574a':'#7d5a36'}">${title}</h2><h3 style="font-size:22px">${escape(names)}</h3><p style="font-size:16px;line-height:1.9">${escape(body)}</p>${memorial?button(candleLink,candleLabel):'<div style="font-size:25px">'+(wedding?'✨ 💕 ✨':'🎉 🎁 🎈 🎉')+'</div>'}</div>`;
   }).join('');
   const footer=subscriptionFooter(language,manageLink,unsubscribeLink)+`<br>${en?'You are receiving this because you confirmed your subscription.':'המייל נשלח כי אישרתם הרשמה לעדכונים.'}`;
   return {subject,html:shell(language,subject,cards,footer),text:subject+'\n\n'+lines.join('\n\n')+'\n\n'+(en?'Manage preferences: ':'ניהול העדכונים: ')+manageLink+'\n'+(en?'Unsubscribe: ':'הסרה: ')+unsubscribeLink};
@@ -250,7 +257,7 @@ export class FamilyUpdates {
       const data=await this.decrypt(row.data),selected=matchingEvents(events,data.preferences);if(!selected.length)continue;
       let job=this.rows('SELECT * FROM deliveries WHERE id=? AND day=?',row.id,time.day)[0];
       if(job?.status==='sent'||job?.status==='cancelled')continue;
-      if(!job){const links=this.links(data),envelope=await this.encrypt({email:data.email,message:eventEmail(data.language,selected,links.manage,links.unsubscribe),oneClick:links.oneClick});this.sql.exec("INSERT OR IGNORE INTO deliveries(id,day,status,data,revision) VALUES(?,?,'pending',?,?)",row.id,time.day,envelope,row.revision);job=this.rows('SELECT * FROM deliveries WHERE id=? AND day=?',row.id,time.day)[0];}
+      if(!job){const links=this.links(data),envelope=await this.encrypt({email:data.email,message:eventEmail(data.language,selected,links.manage,links.unsubscribe,this.env.SITE_ORIGIN),oneClick:links.oneClick});this.sql.exec("INSERT OR IGNORE INTO deliveries(id,day,status,data,revision) VALUES(?,?,'pending',?,?)",row.id,time.day,envelope,row.revision);job=this.rows('SELECT * FROM deliveries WHERE id=? AND day=?',row.id,time.day)[0];}
       jobs.push(job);
     }
     let sent=0;
@@ -288,8 +295,9 @@ export async function updatesRoute(request,env,db){
   if(path==='/api/updates/config'&&request.method==='GET')return json({enabled:updatesConfigured(env),sender:'Keha Family',hour:9,timeZone:'Asia/Jerusalem'});
   if(path==='/api/updates/preview'&&request.method==='GET'){
     const type=['birthdays','anniversaries','memorials'].includes(url.searchParams.get('type'))?url.searchParams.get('type'):'birthdays',language=langs.has(url.searchParams.get('lang'))?url.searchParams.get('lang'):'he';
-    const names=[{name:'בן משפחה',nameEn:'A family member'}];if(type==='anniversaries')names.push({name:'בת משפחה',nameEn:'A family member'});
-    const message=eventEmail(language,[{type,names,years:type==='birthdays'?40:10}],'#updates','#updates');
+    let names=[{name:'בן משפחה',nameEn:'A family member'}];if(type==='anniversaries')names.push({name:'בת משפחה',nameEn:'A family member'});
+    if(type==='memorials'){const person=(await db('dates',{})).people.find(person=>person.deceased&&!person.extra);if(person)names=[person];}
+    const message=eventEmail(language,[{type,id:names[0].id,names,years:type==='birthdays'?40:10}],'#updates','#updates',env.SITE_ORIGIN||url.origin);
     return new Response(message.html,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"}});
   }
   const action=path.slice('/api/updates/'.length);

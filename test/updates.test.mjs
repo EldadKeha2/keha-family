@@ -160,8 +160,30 @@ test('a failed daily send is retried with exactly the same payload and idempoten
 test('recurrences handle leap days, memorials, unknown dates, full names and language safely',()=>{
  const people=[{id:'a',name:'<script>alert(1)</script>',nameEn:'Alice',birthday:'29.2.2000'},{id:'b',name:'זיכרון',nameEn:'Memory',deceased:true,birthday:'28.2.1960',deathDate:'28.2.2020'}];
  const events=eventsForDay('2026-02-28',people,[]);assert.deepEqual(events.map(e=>e.type),['birthdays','memorials']);assert.equal(events[0].years,26);
- const html=eventEmail('he',events,'https://example.com','https://example.com').html;assert.match(html,/&lt;script&gt;/);assert.ok(!html.includes('<script>'));assert.match(html,/🕯/);assert.match(eventEmail('en-GB',events,'#','#').html,/Alice/);
+ const html=eventEmail('he',events,'https://example.com','https://example.com').html;assert.match(html,/&lt;script&gt;/);assert.ok(!html.includes('<script>'));assert.match(html,/🕯/);assert.match(eventEmail('en-GB',events,'#','#','https://family.example').html,/Alice/);
  assert.equal(localDay(new Date('2026-11-03T00:00:00Z')).hour,2);
+});
+
+test('each memorial has its own bilingual candle link in HTML and plain text without subscription tokens',()=>{
+ const events=[{type:'memorials',id:'yona',years:16,names:[{id:'yona',name:'יונה נקאש',nameEn:'Yona Nakash',gender:'f'}]},{type:'birthdays',id:'birthday',years:40,names:[{name:'יום הולדת',nameEn:'Birthday'}]},{type:'memorials',id:'shlomo',years:30,names:[{id:'shlomo',name:'שלמה קהא',nameEn:'Shlomo Keha',gender:'m'}]}];
+ for(const language of ['he','en-US','en-GB']){
+  const mail=eventEmail(language,events,'https://private.example/?token=secret#updates/manage/private','#unsubscribe','https://family.example/');
+  const links=[...mail.html.matchAll(/href="([^"]+)"/g)].map(match=>match[1]).filter(link=>link.includes('#memorial/'));
+  assert.deepEqual(links.map(link=>new URL(link).hash),['#memorial/yona','#memorial/shlomo']);
+  for(const link of links){const url=new URL(link);assert.equal(url.origin,'https://family.example');assert.equal(url.searchParams.get('lang'),language);assert.equal(url.searchParams.has('token'),false);assert.ok(mail.text.includes(link));assert.ok(!link.includes('private'));}
+  assert.match(mail.html,language==='he'?/הדלקת נר לזכרה/:/Light a candle in their memory/);if(language==='he')assert.match(mail.html,/הדלקת נר לזכרו/);
+ }
+});
+
+test('scheduled memorial reminders and previews include the actual person link in either email transport',async()=>{
+ for(const provider of ['resend','brevo']){
+  const f=fixture(provider);try{
+   await f.confirm();const dates=f.state.run('dates',{});await f.updates.dispatch({...dates,now:Date.parse('2026-11-12T07:00:00Z')});
+   const mail=f.messages.at(-1).body,html=mail.html||mail.htmlContent,text=mail.text||mail.textContent;assert.match(html,/https:\/\/family\.example\/\?lang=he#memorial\/shlomo/);assert.match(text,/#memorial\/shlomo/);
+   const before=f.messages.length,response=await f.call('/api/updates/preview?type=memorials&lang=en-US');assert.equal(response.status,200);
+   const preview=await response.text();assert.match(preview,/Light a candle in their memory/);assert.match(preview,/https:\/\/family\.example\/\?lang=en-US#memorial\/[a-z-]+/);assert.equal(f.messages.length,before,'Previewing a reminder never sends email');
+  }finally{f.close();}
+ }
 });
 
 test('Brevo supports the free-plan sender transport while retaining the same private opt-in flow',async()=>{

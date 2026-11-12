@@ -7,6 +7,8 @@ body[data-active-view="memorial"] .search-wrap{display:none}
 .remembrance-intro-line{display:block;width:70px;height:1px;background:#c7b78f;margin:26px auto 0}
 .remembrance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:26px;max-width:1050px;margin:auto}
 .remembrance-card{border:1px solid #ded5c0;border-radius:140px 140px 18px 18px;background:linear-gradient(#faf8f1,#fffefb);padding:22px 18px 24px;text-align:center;position:relative;overflow:hidden;box-shadow:0 7px 24px #51452907;transition:box-shadow .4s,border-color .4s}
+.remembrance-card.is-remembrance-target{border-color:#a58a50;box-shadow:0 0 0 3px #cbb77b42,0 8px 30px #7c633519;scroll-margin-block:110px}
+.remembrance-card.is-remembrance-target:focus{outline:2px solid #9c824d;outline-offset:4px}
 .remembrance-portrait{display:flex;align-items:center;justify-content:center;width:174px;height:196px;border-radius:90px 90px 12px 12px;overflow:hidden;margin:auto;background:#eae7db;border:5px solid #fffdf8;outline:1px solid #d4c8ab;box-shadow:0 4px 18px #4b3e2310;text-decoration:none}
 .remembrance-portrait img{width:100%;height:100%;object-fit:cover;filter:saturate(.7)}
 .remembrance-initials{font-size:calc(52px * var(--a11y-text-scale,1));font-weight:400;color:#8b8b78}

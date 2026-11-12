@@ -24,7 +24,7 @@
     const next=new URL(url);
     if(next.searchParams.has('media')){next.searchParams.delete('media');return next;}
     const [view,id]=next.hash.slice(1).split('/');
-    if(id&&['games','weddings','nursery','updates'].includes(view))next.hash='#'+view;
+    if(id&&['games','weddings','nursery','updates','memorial'].includes(view))next.hash='#'+view;
     else if(view==='person'&&id)next.hash='#directory';
     else if(views.has(view)&&next.hash!==root()&&view!=='home'&&view!=='tree')next.hash=root();
     else return null;
