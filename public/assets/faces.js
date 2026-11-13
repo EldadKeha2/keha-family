@@ -386,7 +386,7 @@
     const bubble=document.createElement('div');bubble.className='face-popover face-name';bubble.setAttribute('role','group');bubble.setAttribute('aria-label',tr('מי בתמונה','Who is in the photo'));bubble.dir=I.isEnglish?'ltr':'rtl';
     bubble.innerHTML=nameHTML(face,!c.adapter&&!feedback)+(touch&&!feedback?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:'');if(!feedback)bindProfile(c,bubble,face);
     if(feedback||touch)bubble.dataset.timedLabel='true';if(feedback){bubble.dataset.tagFeedback='true';bubble.style.pointerEvents='none';}
-    if(touch&&!feedback&&desktopResize())c.selection.hidden=false;
+    if(touch&&!feedback)c.selection.hidden=false;
     bubble.addEventListener('pointerenter',()=>keepLabel(c));
     bubble.addEventListener('pointerleave',event=>{if(!touchMode(event))dismissLabelSoon(c);});
     bubble.addEventListener('focusin',()=>keepLabel(c));
@@ -498,10 +498,10 @@
     c.paintReady=new Promise(resolve=>{c.resolvePaint=resolve;});
     c.geom=await helpers();if(!live(c))return;
     c.layer=document.createElement('div');c.layer.className='face-layer';c.hits=document.createElement('div');c.hits.className='face-image-area';c.buttons=document.createElement('div');c.buttons.className='face-hit-buttons';c.annotations=document.createElement('div');c.annotations.className='face-visible-labels';c.annotationNodes=[];c.selection=document.createElement('div');c.selection.className='face-selection';c.selection.hidden=true;c.annotationTarget=document.createElement('span');c.annotationTarget.className='face-label-target';c.annotationTarget.hidden=true;c.annotationTarget.setAttribute('aria-hidden','true');c.hits.append(c.buttons,c.annotations,c.selection,c.annotationTarget);c.advanceButton=document.createElement('button');c.advanceButton.type='button';c.advanceButton.className='face-advance-button';c.advanceButton.hidden=true;c.advanceButton.setAttribute('aria-label',tr('פתיחת תיבת התיוג לפנים המסומנות','Open names for the selected face'));c.advanceButton.setAttribute('aria-keyshortcuts','ArrowDown');c.advanceButton.title=tr('פתיחת תיבת התיוג (↓)','Open face labels (↓)');c.advanceButton.innerHTML='<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7 5 5 5-5"/></svg>';c.hits.append(c.advanceButton);c.advanceButton.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openQueuedFace(c);},{signal:c.events.signal});c.layer.append(c.hits);
-    if(desktopResize()){
-      c.selection.dataset.faceResizable='true';
-      for(const handle of ['nw','n','ne','e','se','s','sw','w']){const node=document.createElement('button');node.type='button';node.className='face-resize-handle face-handle-'+handle;node.dataset.faceHandle=handle;node.setAttribute('aria-label',tr('שינוי גודל מסגרת הפנים','Resize face frame'));node.addEventListener('keydown',event=>{if(!c.active||c.saving||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();event.stopPropagation();const r=c.active.rect,area=imageArea(c),step=event.shiftKey?10:1,p={x:handle.includes('w')?r.x:r.x+r.width,y:handle.includes('n')?r.y:r.y+r.height};p.x+=(event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0)/area.width;p.y+=(event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0)/area.height;resized(c,{...c.active,rect:c.geom.resizeFaceRect(r,handle,p)});});c.selection.append(node);}
-    }
+    // Touch uses the same frame geometry and thin stroke as desktop; only the
+    // invisible hit area around each handle is larger for an accurate grip.
+    c.selection.dataset.faceResizable='true';
+    for(const handle of ['nw','n','ne','e','se','s','sw','w']){const node=document.createElement('button');node.type='button';node.className='face-resize-handle face-handle-'+handle;node.dataset.faceHandle=handle;node.setAttribute('aria-label',tr('שינוי גודל מסגרת הפנים','Resize face frame'));node.addEventListener('keydown',event=>{if(!c.active||c.saving||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key))return;event.preventDefault();event.stopPropagation();const r=c.active.rect,area=imageArea(c),step=event.shiftKey?10:1,p={x:handle.includes('w')?r.x:r.x+r.width,y:handle.includes('n')?r.y:r.y+r.height};p.x+=(event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0)/area.width;p.y+=(event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0)/area.height;resized(c,{...c.active,rect:c.geom.resizeFaceRect(r,handle,p)});});c.selection.append(node);}
     c.guide=document.createElement('div');c.guide.className='face-adjust-guide';c.guide.hidden=true;c.guide.innerHTML=`<span>${tr('סמנו מסביב לפנים בעזרת גרירה','Drag around the face')}</span><button type="button">${tr('ביטול','Cancel')}</button>`;c.guide.querySelector('button').addEventListener('click',()=>closePopup(c));c.layer.append(c.guide);
     c.status=document.createElement('p');c.status.className='visually-hidden';c.status.setAttribute('role','status');c.status.setAttribute('aria-live','polite');c.labelList=document.createElement('div');c.labelList.className='face-label-list';c.labelList.hidden=true;c.labelList.setAttribute('aria-label',tr('שמות לפי המספרים על הפנים','Names matching the numbered faces'));stage.append(c.layer,c.status,c.labelList);stage.classList.add('has-face-layer');
     if(highlightMissing){if(!c.missingNote){c.missingNote=document.createElement('p');c.missingNote.className='face-missing-note';c.missingNote.setAttribute('role','status');stage.before(c.missingNote);}}else{c.missingNote?.remove();c.missingNote=null;}
@@ -545,7 +545,7 @@
       if(['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents)touchUntil=Date.now()+1200;
       c.pressClickUntil=0;cancelPress(c);
       const handle=event.target.closest('[data-face-handle]');
-      if(handle&&desktopResize()&&c.active&&!c.saving&&!c.reviewSaving&&!(c.adapter&&!c.adapter.enabled())&&!(event.button>0)){
+      if(handle&&c.active&&!c.saving&&!c.reviewSaving&&!(c.adapter&&!c.adapter.enabled())&&!(event.button>0)){
         const p=point(c,event,true);if(!p)return;event.preventDefault();
         const edge=handle.dataset.faceHandle,rect={...c.active.rect};
         c.resizeDrag={pointerId:event.pointerId,handle:edge,rect,offset:{x:(edge.includes('w')?rect.x:rect.x+rect.width)-p.x,y:(edge.includes('n')?rect.y:rect.y+rect.height)-p.y}};

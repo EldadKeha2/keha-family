@@ -586,14 +586,51 @@ test('desktop frame handles save new geometry with the same person, face identit
  assert.ok(Math.abs(requests[0].rect.width-.13)<1e-10);assert.ok(Math.abs(requests[0].rect.height-.19)<1e-10);assert.deepEqual(original.rect,{x:.3,y:.2,width:.1,height:.15});
  assert.equal(f.find('face-hit-buttons').children.length,1);f.faces.clear();
 });
-test('desktop resizing works after zoom and late detections keep the adjusted box; phones have no resize handles',async()=>{
+test('desktop resizing works after zoom and late detections keep the adjusted box',async()=>{
  const f=fixture([first,second],{desktop:true});await f.mount();const toolbar=f.find('face-zoom-toolbar');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
  const area=f.image.getBoundingClientRect(),selection=f.find('face-selection');f.emit(f.stage,'click',{detail:1,clientX:area.left+.506*area.width,clientY:area.top+.408*area.height});
  const handle=selection.children.find(node=>node.dataset.faceHandle==='nw');
  f.emit(f.stage,'pointerdown',{target:handle,pointerId:1,clientX:area.left+.5*area.width,clientY:area.top+.4*area.height});
  f.emit(f.stage,'pointermove',{target:handle,pointerId:1,clientX:area.left+.497*area.width,clientY:area.top+.395*area.height});f.emit(f.stage,'pointerup',{target:handle,pointerId:1});await new Promise(resolve=>setImmediate(resolve));
  const width=parseFloat(selection.style.width);assert.ok(Math.abs(width-1.5)<1e-8);f.progress([first,second]);assert.ok(Math.abs(parseFloat(f.find('face-hit-buttons').children[0].style.width)-1.5)<1e-8);
- f.faces.clear();const phone=fixture([first]);await phone.mount();assert.equal(phone.find('face-selection').children.length,0);phone.faces.clear();
+ f.faces.clear();
+});
+test('phones resize a new manual frame by touch, enlarge and shrink it after zoom, then save the chosen person',async()=>{
+ for(const userAgent of ['Mozilla/5.0 (Linux; Android 16) Mobile','Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X)'])for(const upload of [false,true]){
+  const viewport=new EventTarget();Object.assign(viewport,{width:360,height:800,scale:1,offsetLeft:0,offsetTop:0});
+  const f=fixture([],{visualViewport:viewport}),person={id:'yona',name:'יונה'},requests=[];let saved=[];
+  f.window.navigator={userAgent,maxTouchPoints:5};
+  const snapshot=()=>({item:{id:'manual-phone',kind:'photo',tags:[person]},faces:saved});
+  const persist=async payload=>{requests.push(payload);const face={id:payload.faceId,rect:payload.rect,personId:person.id,person,revision:'r1'};saved=[face];return {...snapshot(),face};};
+  f.window.FamilyTags.findPeople=async()=>[person];
+  f.window.FamilyI18n.fetch=async(path,options)=>path.endsWith('/save')?Response.json(await persist(JSON.parse(options.body))):Response.json(snapshot());
+  const adapter=upload?{enabled:()=>true,load:async()=>snapshot(),findPeople:async()=>[person],mapDetections:found=>found,save:persist}:null;
+  await f.mount('manual-phone',{adapter},{tags:[person]});
+  f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');
+  viewport.scale=3;viewport.width=120;viewport.height=800/3;viewport.dispatchEvent(new Event('resize'));
+  const area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{target:f.image,detail:1,pointerType:'touch',clientX:area.left+.6*area.width,clientY:area.top+.5*area.height});
+  const selection=f.find('face-selection');assert.equal(selection.hidden,false);assert.equal(selection.children.length,8);
+  const rect=()=>({x:parseFloat(selection.style.left)/100,y:parseFloat(selection.style.top)/100,width:parseFloat(selection.style.width)/100,height:parseFloat(selection.style.height)/100});
+  const original=rect();let expected=original;
+  for(const [edge,dx,dy]of [['se',.08,.06],['w',.02,0],['n',0,.015]]){
+   const handle=selection.children.find(node=>node.dataset.faceHandle===edge),x=edge.includes('w')?expected.x:expected.x+expected.width,y=edge.includes('n')?expected.y:expected.y+expected.height;
+   const p={target:handle,pointerId:7,isPrimary:true,pointerType:'touch',button:0,clientX:area.left+x*area.width+5,clientY:area.top+y*area.height+5};
+   assert.equal(f.emit(f.stage,'pointerdown',p).defaultPrevented,true);assert.equal(f.faces.canNavigate(f.stage),false);
+   f.emit(f.stage,'pointermove',{...p,pointerId:8,clientX:p.clientX+100});f.emit(f.stage,'pointerup',{...p,pointerId:8});assert.equal(f.stage.classList.contains('face-resizing'),true);
+   f.emit(f.stage,'pointermove',{...p,clientX:p.clientX+dx*area.width,clientY:p.clientY+dy*area.height});
+   f.emit(f.stage,'pointerup',p);await new Promise(resolve=>setImmediate(resolve));
+   expected=geometryModule.resizeFaceRect(expected,edge,{x:x+dx,y:y+dy});
+   for(const key of Object.keys(expected))assert.ok(Math.abs(rect()[key]-expected[key])<1e-10,edge+' '+key);
+   assert.equal(requests.length,0,'An unnamed frame stays local until a person is selected');
+   assert.ok(parseFloat(selection.style.getPropertyValue('--face-stroke'))*viewport.scale<=1.2);
+  }
+  assert.ok(expected.width>original.width);assert.ok(expected.height>original.height);
+  const panel=f.find('face-popover face-picker'),host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;
+  host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];f.emit(panel.querySelector('input'),'input');await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();
+  assert.equal(requests.length,1);assert.equal(requests[0].personId,person.id);assert.equal(requests[0].expectedRevision,null);
+  for(const key of Object.keys(expected))assert.ok(Math.abs(requests[0].rect[key]-expected[key])<1e-10);
+  assert.equal(f.find('face-hit-buttons').children.length,1);f.faces.clear();
+ }
 });
 test('Windows touch apps keep frame handles with no hover, narrow windows and any last pointer',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
@@ -618,13 +655,15 @@ test('Windows touch apps keep frame handles with no hover, narrow windows and an
   await f.mount('next-windows-photo');assert.equal(f.find('face-selection').children.length,8);f.faces.clear();
  }
 });
-test('cancelling a Windows touch resize keeps the saved frame unchanged',async()=>{
- const original={id:'saved',rect:{x:.3,y:.2,width:.1,height:.15},personId:'yona',person:{id:'yona',name:'יונה'}},f=fixture([],{desktop:true,windows:true,hoverNone:true}),writes=[];
+test('cancelling a touch resize keeps the saved frame unchanged on phones and Windows',async()=>{
+ for(const options of [{desktop:false},{desktop:true,windows:true,hoverNone:true}]){
+ const original={id:'saved',rect:{x:.3,y:.2,width:.1,height:.15},personId:'yona',person:{id:'yona',name:'יונה'}},f=fixture([],options),writes=[];
  f.window.FamilyI18n.fetch=async(path,options)=>{if(options?.body)writes.push(path);return Response.json({faces:[original]});};await f.mount();
  const hit=f.find('face-hit-buttons').children[0],area=f.image.getBoundingClientRect();f.emit(f.stage,'click',{target:hit,detail:1,pointerType:'touch'});
- const handle=f.find('face-selection').children.find(node=>node.dataset.faceHandle==='se'),p={target:handle,pointerId:1,pointerType:'touch',clientX:area.left+.4*area.width,clientY:area.top+.35*area.height};
+ assert.equal(f.find('face-selection').hidden,false);const handle=f.find('face-selection').children.find(node=>node.dataset.faceHandle==='se'),p={target:handle,pointerId:1,pointerType:'touch',clientX:area.left+.4*area.width,clientY:area.top+.35*area.height};
  f.emit(f.stage,'pointerdown',p);f.emit(f.stage,'pointermove',{...p,clientX:area.left+.5*area.width});f.emit(f.stage,'pointercancel',p);f.emit(f.stage,'pointerup',p);await f.faces.flush();
  assert.equal(writes.length,0);assert.deepEqual(original.rect,{x:.3,y:.2,width:.1,height:.15});assert.equal(f.stage.classList.contains('face-resizing'),false);f.faces.clear();
+ }
 });
 test('ignoring one false detection disappears immediately, stays hidden after reopening and has no Undo control',async()=>{
  const f=fixture([first,second]),requests=[];let ignored=[];
