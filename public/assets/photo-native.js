@@ -47,8 +47,12 @@
       const page=Math.round(viewport.scrollLeft/b.width);
       if(page===1)return;if(Math.abs(viewport.scrollLeft-page*b.width)>2)return;
       if(!enabled()){viewport.scrollLeft=b.width;return;}
+      // Browser momentum/restoration can snap to the other pane. A completed
+      // finger stroke owns Next/Previous, just like the manual swipe handler.
+      const target=b.releasedPage!=null&&Date.now()-b.releasedAt<750?b.releasedPage:page;
       clearTimeout(b.releaseTimer);b.releasedPage=null;b.locked=true;viewport.style.overflowX='hidden';
-      const direction=page<1?1:-1;
+      if(target!==page)viewport.scrollLeft=target*b.width;
+      const direction=target<1?1:-1;
       Promise.resolve(step(direction,{native:true})).finally(()=>{if(active===b&&!busy?.()){b.locked=false;viewport.style.overflowX='';viewport.scrollLeft=b.width;}});
     };
     // Native scrollend waits for the finger and momentum to finish. Only older

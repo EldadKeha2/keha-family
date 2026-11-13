@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../public/assets/photo-native.js',import.meta.url),'utf8');
+const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 function fixture({mobile=false,english=false,supported=true,scrollEnd=false,width=mobile?360:800}={}){
  class Node{
   constructor(){this.nodeType=1;this.children=[];this.handlers=new Map();this.clientWidth=width;this.scrollLeft=0;this.className='';this.parent=null;this.style={};if(scrollEnd)this.onscrollend=null;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)};}
@@ -13,10 +14,10 @@ function fixture({mobile=false,english=false,supported=true,scrollEnd=false,widt
   remove(){if(this.parent){this.parent.children=this.parent.children.filter(x=>x!==this);this.parent=null;}}
   querySelector(selector){if(selector==='.face-photo-scroll')return this.children.flatMap(n=>[n,...n.children.flatMap(c=>[c,...c.children])]).find(n=>n.className==='face-photo-scroll')||null;return null;}
  }
- const stage=new Node(),scroll=new Node(),window={},document={createElement:()=>new Node()},calls=[];scroll.className='face-photo-scroll';stage.append(scroll);let enabled=true;
- vm.runInNewContext(source,{window,document,navigator:{userAgent:mobile?'Android':'Windows NT'},CSS:{supports:()=>supported},matchMedia:()=>({matches:mobile}),setTimeout,clearTimeout});
+ const events=new Map(),stage=new Node(),scroll=new Node(),window={addEventListener(){}},document={createElement:()=>new Node(),addEventListener:(type,handler)=>events.set(type,handler)},calls=[];scroll.className='face-photo-scroll';stage.append(scroll);let enabled=true;
+ const context=vm.createContext({window,document,navigator:{userAgent:mobile?'Android':'Windows NT'},CSS:{supports:()=>supported},matchMedia:()=>({matches:mobile}),setTimeout,clearTimeout});vm.runInContext(source,context);vm.runInContext(swipeSource,context);
  const options={previous:{kind:'photo',previewSrc:'/prev-small'},next:{kind:'photo',previewSrc:'/next-small'},isEnglish:english,enabled:()=>enabled,step(direction,opts){calls.push({direction,native:opts.native});window.FamilyPhotoNative.reset(stage);}};
- return {api:window.FamilyPhotoNative,stage,scroll,calls,options,disable(){enabled=false;}};
+ return {api:window.FamilyPhotoNative,swipe:window.FamilyPhotoSwipe,events,stage,scroll,calls,options,disable(){enabled=false;}};
 }
 test('phone and desktop native scrolling selects the adjacent photo once in either language and restores the face scroller',async()=>{
  for(const mobile of [false,true])for(const english of [true,false])for(const page of [0,2]){
@@ -56,6 +57,22 @@ test('a released native flick is counted before a second stroke interrupts its u
   assert.equal(f.api.claim(f.stage),'queued');assert.deepEqual(f.calls,[{direction:dx>0?1:-1,native:true}]);await new Promise(resolve=>setImmediate(resolve));
  }
  const f=fixture({mobile:true,scrollEnd:true});f.api.mount(f.stage,f.options);f.stage.children[0].handlers.get('scrollend')();assert.equal(f.api.claim(f.stage),'native','Returning to center without a released swipe never selects another photo');f.api.reset();
+});
+test('phone pointer and touch swipes follow the finger even when the browser snaps to the opposite photo',async()=>{
+ for(const english of [false,true])for(const stream of ['pointer','touch'])for(const dx of [-120,120])for(const opposite of [false,true]){
+  const f=fixture({mobile:true,english,scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+  f.swipe.bind(f.stage,{enabled:f.options.enabled,step:f.options.step,claim:()=>f.api.claim(f.stage),nativeEnd:dx=>f.api.note(f.stage,dx)});
+  const target={closest:()=>null},pointer=(type,x)=>{const event={pointerId:7,pointerType:'touch',isPrimary:true,button:0,clientX:x,clientY:100,target,cancelable:true,preventDefault(){}};(type==='pointerdown'?f.stage.handlers:f.events).get(type)(event);};
+  const touch=(type,x)=>{const point={identifier:7,clientX:x,clientY:100,target},event={touches:type==='touchend'?[]:[point],changedTouches:[point],target,cancelable:true,preventDefault(){}};(type==='touchstart'?f.stage.handlers:f.events).get(type)(event);};
+  pointer('pointerdown',180);
+  if(stream==='touch'){touch('touchstart',180);pointer('pointercancel',180);touch('touchmove',180+dx);}
+  else pointer('pointermove',180+dx);
+  const expected=dx>0?1:-1,page=(expected>0)!==opposite?0:2;strip.scrollLeft=page*360;
+  if(stream==='touch')touch('touchend',180+dx);else pointer('pointerup',180+dx);
+  strip.handlers.get('scrollend')();pointer('pointerup',180+dx);strip.handlers.get('scrollend')();
+  await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.calls,[{direction:expected,native:true}],`${english?'English':'Hebrew'} ${stream}: right is Next, left is Previous, once`);
+  assert.equal(strip.scrollLeft,(expected>0?0:2)*360,'The visible pane agrees with the selected photo');
+ }
 });
 test('released touch swipes still select a neighbour when native scrolling is cancelled or reports no completion',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
