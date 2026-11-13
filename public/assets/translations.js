@@ -658,6 +658,7 @@ window.FAMILY_TRANSLATIONS={
   "שירות המייל הגיע למגבלת שליחה זמנית. נסו שוב מאוחר יותר.": "The email service has reached a temporary sending limit. Please try again later.",
   "מכסת השליחה היומית התמלאה. נסו שוב מחר.": "The daily email limit has been reached. Please try again tomorrow.",
   "הגלריה המשפחתית": "Family Gallery",
+  "גלריה משפחתית": "Family Gallery",
   "עמוד אישי": "Personal page",
   "סיפור חיים, תמונות וזיכרונות": "A life story, photos and memories",
   "לא מפספסים אירוע משפחתי": "Remember every family occasion",
