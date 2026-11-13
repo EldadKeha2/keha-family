@@ -28,7 +28,7 @@
     const response=await I18n.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
     if(response.status===304)return null;
     let result;try{result=await response.json();}catch{throw Error(I18n.t('לא התקבלה תשובה מהשרת. נסו לרענן את הדף.'));}
-    if(!response.ok)throw Error(I18n.error(result.error)||I18n.t('לא ניתן לשמור את השינוי.'));return result;
+    if(!response.ok)throw Object.assign(Error(I18n.error(result.error)||I18n.t('לא ניתן לשמור את השינוי.')),{status:response.status,code:result.code});return result;
   }
   const post=(path,body)=>request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   function setStatus(id,message='',failed=false){$(id).textContent=message;$(id).classList.toggle('failed',failed);}
@@ -195,6 +195,7 @@
     $(id+'Dropzone').classList.toggle('uploading',Boolean(item?.active));
   }
   function sendFile(key,file,onProgress){
+    if(key==='nostalgia'&&file.size>90*1024*1024&&(/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name)))return sendLargeVideo(file,onProgress);
     return new Promise((resolve,reject)=>{
       const xhr=new XMLHttpRequest();xhr.open('POST',base(key)+'/upload?filename='+encodeURIComponent(file.name));
       xhr.setRequestHeader('X-Family-Token',window.FAMILY_API_TOKEN);xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
@@ -202,6 +203,35 @@
       xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(I18n.t('לא התקבל אישור שמירה. נסו לרענן.')));return;}if(xhr.status>=200&&xhr.status<300)Promise.resolve(window.FamilyPhotoThumbnails?.fromUpload?.(result,file)).then(()=>resolve(result),()=>resolve(result));else reject(Error(I18n.error(result.error)||I18n.t('הקובץ לא נשמר.')));};
       xhr.onerror=()=>reject(Error(I18n.t('ההעלאה נקטעה. בדקו את החיבור ונסו שוב.')));xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));const payload=window.FamilyPhotoEditor?.upload?.(file)||{body:file};for(const [name,value]of Object.entries(payload.headers||{}))xhr.setRequestHeader(name,value);xhr.send(payload.body);
     });
+  }
+  async function retryVideo(action){
+    for(let attempt=0;;attempt++){
+      try{return await action();}
+      catch(error){if(attempt>=2||!(error.retryable||error instanceof TypeError||error.status>=500||error.code==='VIDEO_INCOMPLETE'))throw error;await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)));}
+    }
+  }
+  function sendVideoPart(session,number,blob,onProgress){
+    return new Promise((resolve,reject)=>{
+      const xhr=new XMLHttpRequest();xhr.open('POST','api/nostalgia/multipart/part');xhr.timeout=180000;
+      for(const [name,value]of Object.entries({'X-Family-Token':window.FAMILY_API_TOKEN,'X-Upload-Session':session,'X-Upload-Part':String(number),'Content-Type':'application/octet-stream'}))xhr.setRequestHeader(name,value);
+      xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(event.loaded);};
+      xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Object.assign(Error(I18n.isEnglish?'The upload was not acknowledged. Please try again.':'לא התקבל אישור להעלאה. נסו שוב.'),{retryable:xhr.status>=500}));return;}if(xhr.status>=200&&xhr.status<300)resolve(result);else reject(Object.assign(Error(I18n.error(result.error)||I18n.t('הקובץ לא נשמר.')),{status:xhr.status,code:result.code}));};
+      const interrupted=()=>reject(Object.assign(Error(I18n.t('ההעלאה נקטעה. בדקו את החיבור ונסו שוב.')),{retryable:true}));
+      xhr.onerror=interrupted;xhr.ontimeout=interrupted;xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));xhr.send(blob);
+    });
+  }
+  async function sendLargeVideo(file,onProgress){
+    const head=new Uint8Array(await file.slice(0,128).arrayBuffer());
+    const upload=await post('api/nostalgia/multipart/start',{filename:file.name,size:file.size,head:btoa(String.fromCharCode(...head))});
+    try{
+      for(let offset=0,number=1;offset<file.size;offset+=upload.partSize,number++){
+        const part=file.slice(offset,Math.min(file.size,offset+upload.partSize));
+        await retryVideo(()=>sendVideoPart(upload.session,number,part,loaded=>onProgress(Math.min(99,Math.floor((offset+loaded)/file.size*100)))));
+        onProgress(Math.min(99,Math.floor((offset+part.size)/file.size*100)));
+      }
+      onProgress(100);
+      return await retryVideo(()=>post('api/nostalgia/multipart/complete',{session:upload.session}));
+    }catch(error){await post('api/nostalgia/multipart/abort',{session:upload.session}).catch(()=>{});throw error;}
   }
   function applyUploaded(key,result){collections.set(key,result.collection);
         if(key!=='nostalgia'){const id=key.slice(8),record=details.get(id);if(record){record.collection=result.collection;record.mediaCount=result.collection.count;record.cover=result.collection.items.find(item=>item.kind==='photo')?.src||null;summaries.set(id,record);}}
@@ -223,7 +253,7 @@
       const {key,file}=jobs.shift(),status=uploadStates.get(key);status.active=true;status.percent=0;status.message=I18n.t('מעלה ')+file.name+'…';updateUploadUI(key);
       try{
         const video=/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name),photo=/^image\//i.test(file.type)||/\.(jpe?g|png|gif|webp|avif)$/i.test(file.name);
-        const maximum=video?90:photo?50:10;if(file.size>maximum*1024*1024)throw Error(I18n.html`אפשר להעלות ${video?I18n.t('סרטון'):photo?I18n.t('תמונה'):I18n.t('מסמך')} עד ${maximum}MB.`);
+        const maximum=video?(key==='nostalgia'?500:90):photo?50:10;if(file.size>maximum*1024*1024)throw Error(I18n.html`אפשר להעלות ${video?I18n.t('סרטון'):photo?I18n.t('תמונה'):I18n.t('מסמך')} עד ${maximum}MB.`);
         const result=await sendFile(key,file,percent=>{status.percent=percent;status.message=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הזיכרון…'):I18n.html`מעלה ${file.name} · ${percent}%`;updateUploadUI(key);});
         applyUploaded(key,result);status.saved++;
       }catch(error){status.failed++;toast(file.name+': '+error.message);status.lastError=error.message;}

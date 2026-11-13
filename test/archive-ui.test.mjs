@@ -6,7 +6,7 @@ import family from '../src/family.mjs';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/archive.js',import.meta.url),'utf8');
-function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddings',weddingDate=''}={}){
+function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddings',weddingDate='',uploadTransport=null}={}){
   const browser=navigation?browserHistory(entryUrl):null;let view=navigation?new URL(entryUrl).hash.slice(1).split('/')[0]:'nostalgia';
   const nodes=new Map(),handlers=new Map(),windowEvents=new Map(),requests=[],intervals=[];
   class Node{
@@ -30,10 +30,10 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
   }
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
   const document={activeElement:null,visibilityState:'visible',getElementById:get,createElement:()=>new Node(),querySelector:()=>null,querySelectorAll:()=>[],addEventListener(type,fn){handlers.set(type,fn);}};
-  const window={FAMILY_DATA:navigation?family:{people:{},units:{},branches:[]},FAMILY_API_TOKEN:'test',FamilyDates:{age:()=>null},FamilyTags:{refresh(){}},FamilyMedia:{register(){},controls:()=>''},FamilyI18n:{isEnglish:false,t:String,date:String,html:(parts,...values)=>parts.reduce((text,part,i)=>text+part+(values[i]??''),''),mediaName:item=>item.name,error:String,fetch:async path=>{requests.push(path);if(path==='api/weddings')return Response.json({weddings:[]});if(path.startsWith('api/weddings/'))return Response.json({id:path.split('/').pop(),date:weddingDate,revision:'date-revision',greetings:[],collection:{items,count:items.length}});return Response.json({items,count:items.length});}},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);browser?.addEventListener(type,fn);}};
+  const window={FAMILY_DATA:navigation?family:{people:{},units:{},branches:[]},FAMILY_API_TOKEN:'test',FamilyDates:{age:()=>null},FamilyTags:{refresh(){}},FamilyMedia:{register(){},controls:()=>''},FamilyI18n:{isEnglish:false,t:String,date:String,html:(parts,...values)=>parts.reduce((text,part,i)=>text+part+(values[i]??''),''),mediaName:item=>item.name,error:String,fetch:async(path,options)=>{requests.push(path);if(uploadTransport?.fetch){const response=await uploadTransport.fetch(path,options);if(response)return response;}if(path==='api/weddings')return Response.json({weddings:[]});if(path.startsWith('api/weddings/'))return Response.json({id:path.split('/').pop(),date:weddingDate,revision:'date-revision',greetings:[],collection:{items,count:items.length}});return Response.json({items,count:items.length});}},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);browser?.addEventListener(type,fn);}};
   window.FamilyI18n.branchName=b=>b?.name||'';
   window.FamilyApp={apiEnabled:true,getView:()=>view,nameOf:id=>family.people[id]?.name||id,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyArchive.activate(next);},toast(){}};
-  const context=vm.createContext({window,document,location:browser?.location||{hash:'#nostalgia',pathname:'/',search:''},history:browser?.history||{replaceState(){}},URL,setInterval:fn=>intervals.push(fn),clearTimeout(){},setTimeout(){},matchMedia:()=>({matches:false})});
+  const context=vm.createContext({window,document,location:browser?.location||{hash:'#nostalgia',pathname:'/',search:''},history:browser?.history||{replaceState(){}},URL,setInterval:fn=>intervals.push(fn),clearTimeout(){},setTimeout(){},matchMedia:()=>({matches:false}),...(uploadTransport?{XMLHttpRequest:uploadTransport.XMLHttpRequest,btoa,Uint8Array,setTimeout:fn=>{fn();return 0;}}:{})});
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);
   handlers.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
@@ -41,6 +41,30 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
   return {browser,window,get view(){return view;},openWedding:id=>click('[data-open-wedding]',{openWedding:id}),editWeddingDate:id=>click('[data-edit-wedding-date]',{editWeddingDate:id}),back:()=>click('[data-wedding-back]'),nodes,requests,flush,poll:()=>intervals.forEach(fn=>fn()),change:detail=>{for(const fn of windowEvents.get('family-media-changed')||[])fn({detail});},get grid(){return get('nostalgiaGrid');},upload(kind){click('[data-archive-upload]',{archiveUpload:'nostalgia',archiveKind:kind});},filter(kind){click('[data-archive-filter]',{archiveFilter:kind});}};
 }
 const item=(kind,n)=>({id:String(n),file:n+'.'+({photo:'jpg',video:'mp4',document:'pdf'}[kind]),filename:'Memory '+n,name:'Memory '+n,kind,src:'/media/'+n,mime:{photo:'image/jpeg',video:'video/mp4',document:'application/pdf'}[kind],size:100});
+
+test('a nostalgia video over 90MB uses bounded parts, retries a transient failed part, and publishes only after completion',async()=>{
+ const size=90*1024*1024+12345,partSize=8*1024*1024,requests=[],parts=[],attempts=new Map(),film={...item('video',99),size};
+ class XHR{
+  constructor(){this.upload={};this.headers={};}open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}
+  send(blob){
+   const number=Number(this.headers['X-Upload-Part']);attempts.set(number,(attempts.get(number)||0)+1);parts.push({number,size:blob.size,url:this.url});
+   assert.equal(this.method,'POST');assert.equal(this.headers['X-Family-Token'],'test');assert.equal(this.headers['X-Upload-Session'],'signed-test-session');
+   this.upload.onprogress({lengthComputable:true,loaded:blob.size,total:blob.size});
+   this.status=number===2&&attempts.get(number)===1?502:200;this.responseText=JSON.stringify(this.status===502?{error:'Try again',code:'VIDEO_PART_FAILED'}:{saved:true,part:number});queueMicrotask(()=>this.onload());
+  }
+ }
+ const f=fixture([],{uploadTransport:{XMLHttpRequest:XHR,fetch:async(path,options)=>{
+  if(!path.includes('/multipart/'))return null;requests.push(path);const body=JSON.parse(options.body);
+  if(path.endsWith('/start')){assert.equal(body.size,size);assert.equal(body.filename,'Large family film.mp4');assert.ok(body.head.length);return Response.json({session:'signed-test-session',partSize,parts:Math.ceil(size/partSize)});}
+  assert.ok(path.endsWith('/complete'));assert.equal(body.session,'signed-test-session');return Response.json({saved:true,file:film.file,collection:{items:[film],count:1}});
+ }}});await f.flush();
+ const file={name:'Large family film.mp4',type:'video/mp4',size,slice(start,end){const bytes=new Uint8Array(Math.min(128,end-start));return {size:end-start,arrayBuffer:async()=>bytes.buffer};}};
+ assert.equal(f.window.FamilyArchive.acceptDrop({dataTransfer:{files:[file]}}),true);
+ for(let turn=0;turn<30&&!f.nodes.get('nostalgiaUploadState').textContent.includes('נשמרו');turn++)await f.flush();
+ assert.deepEqual(requests,['api/nostalgia/multipart/start','api/nostalgia/multipart/complete']);assert.equal(attempts.get(2),2);
+ const unique=parts.filter((part,index)=>parts.findIndex(p=>p.number===part.number)===index);assert.equal(unique.reduce((n,p)=>n+p.size,0),size);assert.ok(unique.every(p=>p.size<=partSize));
+ assert.ok(parts.every(p=>p.url==='api/nostalgia/multipart/part'));assert.match(f.nodes.get('nostalgiaUploadState').textContent,/1 קבצים נשמרו/);assert.equal(f.grid.children.filter(n=>n.dataset.mediaKind==='video').length,1);
+});
 
 test('nostalgia films keep a recording-date editor below each player without treating upload time as the recording date',async()=>{
   const film={...item('video',1),uploadedAt:'2026-11-13T12:00:00.000Z'},f=fixture([film]);await f.flush();
@@ -128,3 +152,4 @@ test('a wedding year displays as a year and the editor leaves unknown day and mo
   assert.equal(f.nodes.get('weddingDay').value,'');assert.equal(f.nodes.get('weddingMonth').value,'');assert.equal(f.nodes.get('weddingYear').value,1938);
   assert.match(f.nodes.get('weddingDatePreview').textContent,/לא תישלח תזכורת/);
 });
+

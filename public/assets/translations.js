@@ -1,5 +1,24 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "האחסון לא אישר את העלאת הסרטון. אפשר לנסות שוב":"Storage did not confirm the video upload. Please try again",
+  "האחסון לא התחיל את העלאת הסרטון. נסו שוב":"Storage did not start the video upload. Please try again",
+  "חלק מהסרטון לא נשמר. אפשר לנסות שוב":"Part of the video was not saved. Please try again",
+  "לא התקבלה רשימת חלקים מלאה. נסו שוב":"The complete list of video parts was not received. Please try again",
+  "לא התקבל אישור להשלמת הסרטון. נסו שוב":"Video completion was not confirmed. Please try again",
+  "לא ניתן לבטל את העלאת הסרטון כרגע":"The video upload cannot be cancelled right now",
+  "אישור ההעלאה אינו תקין. בחרו את הסרטון מחדש":"The upload confirmation is invalid. Select the video again",
+  "אישור ההעלאה אינו תקין":"The upload confirmation is invalid",
+  "אישור ההעלאה פג. בחרו את הסרטון מחדש":"The upload confirmation has expired. Select the video again",
+  "הסרטון השתנה. בחרו אותו מחדש":"The video has changed. Select it again",
+  "גודל הסרטון שנשמר אינו תואם למקור. נסו שוב":"The saved video size does not match the original. Please try again",
+  "אפשר להעלות סרטון נוסטלגיה עד 500MB":"Nostalgia videos can be up to 500MB",
+  "לא התקבלה תחילת הסרטון. בחרו אותו מחדש":"The start of the video was not received. Select it again",
+  "מספר החלק אינו תקין":"Invalid video part number",
+  "גודל החלק אינו מתאים לסרטון":"The part size does not match the video",
+  "החלק לא התקבל במלואו. נסו שוב":"The complete video part was not received. Please try again",
+  "תחילת הקובץ אינה תואמת לסרטון שנבחר":"The start of the file does not match the selected video",
+  "הסרטון עדיין לא התקבל במלואו. נסו שוב":"The complete video has not been received yet. Please try again",
+  "הסרטון עדיין אינו זמין באחסון. נסו שוב":"The video is not available in storage yet. Please try again",
   "שומר מסך משפחתי":"Family Screensaver",
   "כל המשפחה, זיכרון אחרי זיכרון":"The whole family, one memory at a time",
   "ציר זמן משפחתי":"Family Timeline",
@@ -815,4 +834,5 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
  'יש לרענן את הדף לפני ההורדה.':'Refresh the page before downloading.'
 });
 Object.assign(window.FAMILY_TRANSLATIONS,{'לא נמצאו תמונות בסינון הזה':'No photos match these filters','אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':'Choose another person or family, or reset the filters.'});
+
 

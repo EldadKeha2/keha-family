@@ -60,6 +60,19 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('large nostalgia video routes retain the existing origin and write-marker checks and reject oversized sessions before storage',async()=>{
+ const f=fixture();try{
+  await f.connect();
+  for(const action of ['start','part','complete','abort']){
+   assert.equal((await f.call('/api/nostalgia/multipart/'+action,{method:'POST',body:{},clientHeaders:false})).status,403);
+   assert.equal((await f.call('/api/nostalgia/multipart/'+action,{method:'POST',body:{},headers:{Origin:'https://another.example'}})).status,403);
+  }
+  const before=f.network.length;
+  const response=await f.call('/api/nostalgia/multipart/start',{method:'POST',body:{filename:'film.mp4',size:LIMITS.nostalgiaVideo+1,head:video.subarray(0,128).toString('base64')}});
+  assert.equal(response.status,413);assert.equal(f.network.length,before);
+  const setup=await(await f.call('/api/setup')).json();assert.equal(setup.limits.nostalgiaVideo,500*1024*1024);assert.equal(setup.limits.video,90*1024*1024);
+ }finally{await f.close();}
+});
 test('the background asset queue prepares all albums without exposing names or storage keys, and previews preserve originals and modification order',async()=>{
  const f=fixture();try{
   await f.connect();const a=await taggedUpload(f,'/api/collections/gallery'),b=await taggedUpload(f,'/api/collections/photos');
@@ -1884,3 +1897,4 @@ test('ZIP downloads stream exactly the selected gallery photos, deduplicate name
   await f.call('/api/media/'+a.id+'/delete',{method:'POST',body:{scope:'gallery'}});assert.equal((await download([a.id,b.id])).status,409);
  }finally{await f.close();}
 });
+

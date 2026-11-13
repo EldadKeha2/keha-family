@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
+import {multipartVideo} from './video-multipart.mjs';
 import {recycleRoute} from './recycle-route.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
@@ -11,7 +12,7 @@ import {zipStream} from './zip.mjs';
 import {PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES,decodeUploadMetadata} from '../public/assets/photo-upload-metadata.mjs';
 export {FamilyState} from './state.mjs';
 export {FamilyUpdates} from './updates.mjs';
-export const LIMITS={photo:50*1024*1024,video:90*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
+export const LIMITS={photo:50*1024*1024,video:90*1024*1024,nostalgiaVideo:500*1024*1024,story:22*1024*1024,attachment:10*1024*1024,attachmentTotal:20*1024*1024};
 // Public visitors receive this request marker with the page. It is not a password.
 export const PUBLIC_WRITE_TOKEN='family-public-v1';
 
@@ -350,6 +351,7 @@ export default {
           if(action==='greetings')return json(await db('greeting.add',{id,author:body.author,body:body.body}),201);
           return json(await db('media.caption',{kind,file:body.file,caption:body.caption}));
         }
+        if((match=/^\/api\/nostalgia\/multipart\/(start|part|complete|abort)$/.exec(path)))return await multipartVideo(request,env,db,ctx,{action:match[1],sniff,limit:LIMITS.nostalgiaVideo});
         if((match=/^\/api\/nostalgia\/(upload|caption)$/.exec(path))){
           if(match[1]==='upload')return await upload(request,env,db,ctx,{category:'nostalgia',mixed:true});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:'nostalgia',file:body.file,caption:body.caption}));
