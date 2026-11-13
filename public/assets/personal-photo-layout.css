@@ -60,16 +60,16 @@
  #mediaViewer.personal-photo-desktop #mediaTagPanel :is(.tag-autosave-status,.tag-error-actions){grid-column:1/-1}
  #mediaViewer.personal-photo-desktop .photo-moment-row,#mediaViewer.personal-photo-desktop .media-viewer-tools{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoBelow{padding-top:6px}
- #mediaViewer.personal-photo-desktop #personalPhotoDetails{display:grid;grid-template-columns:minmax(210px,380px) minmax(260px,480px);justify-content:space-between;align-items:center;gap:clamp(28px,5vw,90px);max-width:var(--personal-details-width);margin:0 auto 8px;direction:ltr}
- #mediaViewer.personal-photo-desktop #personalPhotoInformation{padding:0}
- #mediaViewer.personal-photo-desktop #personalPhotoInformation .photo-moment-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;width:100%;margin:0;direction:rtl}
+ #mediaViewer.personal-photo-desktop #personalPhotoDetails{display:flex;flex-direction:column;gap:10px;max-width:var(--personal-details-width);margin:0 auto 8px;direction:ltr}
+ #mediaViewer.personal-photo-desktop #personalPhotoInformation{padding:0;width:100%}
+ #mediaViewer.personal-photo-desktop #personalPhotoInformation .photo-moment-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:8px;width:min(700px,100%);margin:0 auto;direction:rtl}
  html[dir=ltr] #mediaViewer.personal-photo-desktop #personalPhotoInformation .photo-moment-tools{direction:ltr}
  #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-button,.face-regions-toggle){display:flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;width:auto;min-width:0;min-height:36px;padding:5px 8px;border-radius:8px;font:calc(clamp(12px,1.05vw,15px) * var(--a11y-text-scale,1))/1.35 var(--sans);white-space:normal}
  #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-label,.face-regions-text){display:inline;min-width:0}
  #mediaViewer.personal-photo-desktop #editPhotoDate{display:grid;grid-template-columns:auto auto;column-gap:7px;row-gap:2px;align-content:center}
  #mediaViewer.personal-photo-desktop #editPhotoDate .photo-taken-date{grid-column:1/-1;font-size:12px;text-align:center;white-space:normal}
- #mediaViewer.personal-photo-desktop #personalPhotoActions{display:block;padding:0}
- #mediaViewer.personal-photo-desktop #personalPhotoPrimary{display:grid;grid-template-columns:minmax(0,280px);justify-content:end;gap:8px;min-width:0;direction:ltr}
+ #mediaViewer.personal-photo-desktop #personalPhotoActions{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(280px,1.4fr);grid-template-rows:auto auto;align-items:stretch;gap:8px 12px;padding:0;width:100%;direction:ltr}
+ #mediaViewer.personal-photo-desktop #personalPhotoPrimary{display:grid;grid-column:2;grid-row:1;grid-template-columns:minmax(0,280px);justify-content:end;gap:8px;min-width:0;direction:ltr}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #openedProfilePhoto{grid-column:1;grid-row:1}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #mediaViewerDelete{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary #editOpenedCaption{grid-column:1;grid-row:2}
@@ -111,7 +111,7 @@
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback:empty{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback>[hidden]{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoFeedback>:not([hidden]){display:block;margin:6px 0;white-space:normal;font-size:14px}
- #mediaViewer.personal-photo-desktop #openedCaptionForm{margin:0 0 8px}
+ #mediaViewer.personal-photo-desktop #openedCaptionForm{grid-column:2;grid-row:2;min-width:0;margin:0}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit) [hidden]{display:none}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit) button:disabled{opacity:.55;cursor:wait}
  #mediaViewer.personal-photo-desktop :is(#personalPhotoPrimary,#personalPhotoReview,#personalPhotoEdit,#personalPhotoZoom) button:focus-visible{outline:2px solid #8d9d70;outline-offset:3px}
@@ -156,3 +156,8 @@ html[dir=ltr] #mediaViewer.media-caption-inline #openedCaptionForm{direction:ltr
 @keyframes phone-swipe-finger{0%,15%{transform:translateX(-7px);opacity:.65}65%,85%{transform:translateX(7px);opacity:1}100%{transform:translateX(-7px);opacity:.65}}
 @media(min-width:701px){.phone-swipe-hint{display:none}}
 @media(prefers-reduced-motion:reduce){.phone-swipe-hint .swipe-hint-hand{animation:none}}
+
+@media(min-width:701px){
+ #mediaViewer.personal-photo-desktop #photoInlineDateForm{grid-column:1;grid-row:2;min-width:0;margin:0;align-self:stretch}
+ #mediaViewer.personal-photo-desktop #editPhotoDate[hidden]{display:none!important}
+}

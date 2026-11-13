@@ -206,7 +206,7 @@ function renderMetadata(){
 }
 function saveLabel(){
   if(session.mode==='existing'){
-    const d=draft();get('Save').textContent=d&&changed(d.rotation,d.crop)?tr('שמירת גרסה חדשה','Save new version'):d?.baseVersion!==session.expectedVersion?tr('שחזור גרסה זו','Restore this version'):tr('סיום','Done');return;
+    get('Save').textContent=tr('לסיום ושמירה','Finish and save');return;
   }
   const count=session.files.filter((file,index)=>!isPhoto(file)||session.drafts.some(item=>item.fileIndex===index)).length;
   get('SaveCurrent').textContent=desktop()?tr('שמירה והעלאה של תמונה זו','Save and upload this photo'):tr('העלאת תמונה זו','Upload this photo');

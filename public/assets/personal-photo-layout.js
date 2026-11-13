@@ -39,6 +39,7 @@
   function restore(){
     if(!active)return;
     window.FamilyPhotoCollections?.setViewerDesktop?.(false);
+    window.FamilyPhotoDate?.setDesktopInline?.(false);
     for(const [node,anchor]of [...moved].reverse()){
       if(anchor.isConnected&&node.isConnected)anchor.replaceWith(node);else anchor.remove();
     }
@@ -80,6 +81,7 @@
       if(!active)create();
       if(scope.startsWith('personal:'))viewer.classList.remove('personal-photo-shared');else viewer.classList.add('personal-photo-shared');
       window.FamilyPhotoCollections?.setViewerDesktop?.(true);
+      window.FamilyPhotoDate?.setDesktopInline?.(true);
       for(const [node,anchor]of moved)if(!anchor.isConnected){anchor.remove();moved.delete(node);}
       const changed=controller!==faces;controller=faces?.item?.id===item.id&&faces.dialog===viewer?faces:null;
       move($('mediaHeaderCaption'),heading,counter);
@@ -96,7 +98,7 @@
       arrange(editDock,[$('editOpenedPhoto')]);arrange(reviewDock,[controller?.reviewButton]);
       const sharing=$('mediaShareActions'),copy=$('copyMediaLink'),download=$('mediaOriginal');
       move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
-      move(sharing,below,feedback);move($('openedCaptionForm'),actions,primary);
+      move(sharing,below,feedback);arrange(actions,[primary,$('photoInlineDateForm'),$('openedCaptionForm')]);arrange(details,[actions,info]);
       const footer=viewer.querySelector('.media-viewer-footer');
       move($('mediaPhotoLabels'),footer,below);
       move(controller?.labelList,footer,$('mediaTagPanel'));

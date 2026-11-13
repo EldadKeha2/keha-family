@@ -41,9 +41,10 @@ function fixture({width=1400,ua='Windows NT 10.0; Win64; x64',mobile=false,touch
  const moment=add('photoMomentTools',momentRow);add('editPhotoDate',moment,'button');add('dateText',moment,'time','photo-taken-date');add('togglePhotoNames',moment,'button');add('togglePhotoAges',moment,'button');
  const tools=add('tools',footer),manage=add('manage',tools);add('mediaViewerDelete',manage,'button');add('openedProfilePhoto',manage,'button');add('editOpenedCaption',tools,'button');add('openedCaptionForm',tools,'form');
  const share=add('mediaShareActions',tools);for(const id of ['shareMediaWhatsApp','shareMediaFacebook','shareMediaMessenger','shareMediaInstagram','shareMediaEmail','copyMediaLink'])add(id,share,'button');
+ const inlineDate=add('photoInlineDateForm',document.body,'form');inlineDate.hidden=true;
  const tags=add('mediaTagPanel',footer);tags.textContent='Existing people tags';
  add('mediaPhotoLabels',footer).textContent='Existing topic labels';const labelList=add('faceLabelList',stage);labelList.hidden=true;
- const window={FamilyI18n:{isEnglish:english},FamilyMedia:{current:()=>current},FamilyPhotoViewerLayout:{sync(){}},FamilyFaces:{fit(){fits++;}}};
+ const window={FamilyI18n:{isEnglish:english},FamilyMedia:{current:()=>current},FamilyPhotoViewerLayout:{sync(){}},FamilyFaces:{fit(){fits++;}},FamilyPhotoDate:{setDesktopInline(enabled){inlineDate.hidden=!enabled;}}};
  vm.runInNewContext(source,{document,window,innerHeight:900,getComputedStyle:node=>node.computed||{},navigator:{userAgent:ua,userAgentData:{mobile},maxTouchPoints:touch,standalone:installed},matchMedia:query=>({get matches(){return query.includes('width')?width<=700:installed;}})});
  const controller={item:current,dialog:viewer,toolbar,regionsButton:region,regionsNote:regionNote,reviewButton:review,reviewStatus:status,labelList};
  const api=window.FamilyPersonalPhotoLayout;
@@ -72,16 +73,18 @@ test('personal desktop groups retain actual controls, requested physical order, 
   assert.deepEqual(f.get('personalPhotoPrimary').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['mediaViewerDelete','openedProfilePhoto','editOpenedCaption']);
   assert.deepEqual(f.get('collectionGroup').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['album-family','album-baby','album-wedding']);
   assert.equal(f.get('photoMomentTools').parentNode.id,'personalPhotoInformation');assert.equal(f.controller.regionsButton.parentNode.id,'photoMomentTools');assert.equal(download.parentNode.id,'mediaShareActions');assert.equal(f.get('mediaShareActions').parentNode.id,'personalPhotoBelow');
+  const actions=f.get('personalPhotoActions'),order=actions.childNodes;assert.ok(order.indexOf(f.get('personalPhotoPrimary'))<order.indexOf(f.get('openedCaptionForm')));assert.equal(f.get('photoInlineDateForm').parentNode,actions);assert.equal(f.get('photoInlineDateForm').hidden,false);
   assert.equal(f.get('personalPhotoCounter').textContent,english?'Photo 1 of 12':'תמונה 1 מתוך 12');assert.equal(f.document.activeElement,names);
   download.click();names.click();deleteButton.click();assert.equal(clicks,3);
   const reset=f.get('zoom-reset');let resetClicks=0;reset.addEventListener('click',()=>resetClicks++);reset.disabled=false;f.sync();f.get('personalPhotoFit').click();assert.equal(resetClicks,1);assert.equal(f.fits,1);
  }
 });
 test('a phone resize restores the original controls and ordering and a desktop resize can reapply once',()=>{
- const f=fixture(),keys=['mediaStage','mediaOriginal','mediaViewerCollections','mediaHeaderCaption','photoMomentTools','regions','toolbar','review','editOpenedPhoto','mediaViewerDelete','openedProfilePhoto','editOpenedCaption','openedCaptionForm','mediaPhotoLabels','faceLabelList'];
+ const f=fixture(),keys=['mediaStage','mediaOriginal','mediaViewerCollections','mediaHeaderCaption','photoMomentTools','regions','toolbar','review','editOpenedPhoto','mediaViewerDelete','openedProfilePhoto','editOpenedCaption','openedCaptionForm','mediaPhotoLabels','faceLabelList','photoInlineDateForm'];
  const parents=new Map(keys.map(id=>[id,f.get(id).parentNode]));f.sync();f.width(390);f.sync();
  assert.equal(f.get('personalPhotoFrame'),null);assert.equal(f.viewer.classList.contains('personal-photo-desktop'),false);assert.equal(f.viewer.getAttribute('aria-labelledby'),'mediaViewerTitle');
  for(const id of keys)assert.equal(f.get(id).parentNode,parents.get(id),id);
+ assert.equal(f.get('photoInlineDateForm').hidden,true);
  assert.deepEqual(f.get('collectionGroup').childNodes.filter(n=>n.tagName!=='COMMENT').map(n=>n.id),['album-family','album-baby','album-wedding']);
  f.width(1400);f.sync();f.sync();assert.equal(f.get('mediaOriginal').parentNode.id,'mediaShareActions');f.api.restore();assert.equal(f.get('mediaOriginal').parentNode,parents.get('mediaOriginal'));
 });

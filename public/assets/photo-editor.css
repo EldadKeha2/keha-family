@@ -211,4 +211,7 @@
 
 #photoUploadEditor .photo-edit-save-copy{min-height:46px;background:#e3f0ff;border-color:#82aee0;color:#175493;font-weight:600;line-height:1.4}
 #photoUploadEditor .photo-edit-save-copy:hover:not(:disabled){background:#cfe4fc;border-color:#4c85c5}
-@media(max-width:600px){#photoUploadEditor.is-existing .photo-edit-footer{display:grid;grid-template-columns:minmax(0,1fr) auto}#photoUploadEditor.is-existing #photoEditSave{min-width:0}#photoUploadEditor.is-existing #photoEditCancel{grid-column:2;grid-row:1}#photoUploadEditor.is-existing .photo-edit-save-copy{grid-column:1/-1;white-space:normal}}
+#photoUploadEditor.is-existing .photo-edit-footer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;direction:ltr}
+#photoUploadEditor.is-existing #photoEditSaveCopy{grid-column:2;grid-row:1;min-width:0;white-space:normal}
+#photoUploadEditor.is-existing #photoEditCancel{grid-column:1;grid-row:1;min-width:0}
+#photoUploadEditor.is-existing #photoEditSave{grid-column:1/-1;grid-row:2;min-width:0;width:100%}

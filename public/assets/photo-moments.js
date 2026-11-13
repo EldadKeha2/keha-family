@@ -5,6 +5,56 @@ const calendar='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" wi
 const ages='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r="3"/><path d="M2 20v-3a6 6 0 0 1 9-5"/><circle cx="16.5" cy="16.5" r="5.5"/><path d="M16.5 13v3.5l2 1"/></svg>';
 const names='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r="3"/><path d="M2 20v-3a6 6 0 0 1 10-4M15 5h7m-7 4h5m-3 6h5m-7 4h7"/></svg>';
 let item=null,showNames=false,showAges=false,editing=null,saving=false;
+let inlineEnabled=false;
+const inlineDrafts=new Map(),dateFields=['day','month','year'];
+
+function inlineDraft(){
+  if(!item?.id||item.kind!=='photo')return null;
+  let draft=inlineDrafts.get(item.id);
+  if(!draft||!draft.dirty&&!draft.pending){
+    draft={id:item.id,revision:item.takenDateRevision||'empty',values:photoDate(item.takenDate),dirty:false,error:'',status:draft?.status||''};inlineDrafts.set(item.id,draft);
+  }
+  return draft;
+}
+function renderInlineDate(){
+  const form=$('photoInlineDateForm');if(!form)return;
+  form.hidden=!inlineEnabled||!item?.id||item.kind!=='photo';
+  const dateButton=$('editPhotoDate');if(dateButton)dateButton.hidden=inlineEnabled;
+  if(form.hidden)return;
+  const draft=inlineDraft(),disabled=Boolean(draft.pending)||!window.FamilyApp?.apiEnabled;
+  form.dir=I.isEnglish?'ltr':'rtl';
+  for(const field of dateFields){const input=$('photoInlineDate'+field);if(input.value!==String(draft.values[field]??''))input.value=draft.values[field]??'';input.disabled=disabled;}
+  $('photoInlineDateSave').disabled=disabled||!draft.dirty;
+  $('photoInlineDateError').textContent=draft.error;$('photoInlineDateStatus').textContent=draft.pending?tr('שומר…','Saving…'):draft.status;
+}
+function setDesktopInline(enabled){inlineEnabled=Boolean(enabled);renderInlineDate();}
+async function persistDate(target,date){
+  const response=await I.fetch('api/media/'+target.id+'/photo-date',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({date,expectedRevision:target.revision})});
+  let result;try{result=await response.json();}catch{throw Error(tr('תאריך הצילום לא נשמר. נסו שוב.','The photo date was not saved. Please try again.'));}
+  if(!response.ok){
+    if(response.status===409){
+      const latest=await I.fetch('api/media/'+target.id+'/view',{cache:'no-store'});
+      const fresh=latest.ok?await latest.json():null;
+      if(fresh)window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'photo-date',...fresh}}));
+      const error=Error(tr('התאריך עודכן בינתיים. פתחו את התמונה מחדש לפני השמירה.','The photo date changed. Reopen the photo before saving.'));error.latest=fresh?.item;throw error;
+    }
+    throw Error(I.error(result.error)||tr('תאריך הצילום לא נשמר. נסו שוב.','The photo date was not saved. Please try again.'));
+  }
+  window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));return result;
+}
+async function saveInlineDate(event){
+  event?.preventDefault();const draft=inlineDraft();if(!inlineEnabled||!draft?.dirty)return true;if(draft.pending)return draft.pending;
+  let date;
+  try{date=photoDate(Object.fromEntries(dateFields.map(field=>[field,draft.values[field]===''||draft.values[field]===null?null:Number(draft.values[field])])));}
+  catch{draft.error=tr('התאריך אינו תקין. אפשר להשאיר שדות לא ידועים ריקים.','Invalid date. Leave unknown fields blank.');renderInlineDate();return false;}
+  draft.error='';draft.status='';
+  draft.pending=(async()=>{
+    try{
+      const result=await persistDate(draft,date);draft.values=photoDate(result.item?.takenDate||date);draft.revision=result.item?.takenDateRevision||draft.revision;draft.dirty=false;draft.status=tr('נשמר ✓','Saved ✓');return true;
+    }catch(error){draft.error=error.message;draft.conflict=Boolean(error.latest);if(item?.id!==draft.id)window.FamilyApp?.toast?.(error.message);return false;}
+    finally{draft.pending=null;renderInlineDate();}
+  })();renderInlineDate();return draft.pending;
+}
 
 function ageFor(person,photo){
   const birthday=person?.birthday??photo.tags?.find(tag=>tag.id===person?.id)?.birthday??window.FamilyApp?.getPersonSummary?.(person?.id)?.birthday??window.FamilyApp?.getPerson?.(person?.id)?.birthday;
@@ -48,12 +98,13 @@ function render(){
     if(date){if(!time){time=document.createElement('time');time.className='photo-taken-date';dateButton.append(time);}time.textContent=date;}else time?.remove();
   }else host.innerHTML=`<button id="editPhotoDate" class="photo-moment-button${date?' has-date':''}" type="button" aria-haspopup="dialog" aria-controls="photoDateDialog" aria-label="${dateLabel}${date?': '+safe(date):''}" title="${dateLabel}${date?': '+safe(date):''}" ${window.FamilyApp?.apiEnabled?'':'disabled'}>${calendar}<span class="photo-moment-label">${dateLabel}</span></button>${date?`<time class="photo-taken-date">${safe(date)}</time>`:''}<button id="togglePhotoNames" class="photo-moment-button photo-name-toggle" type="button" aria-pressed="${showNames}" aria-label="${nameLabel}" title="${nameLabel}">${names}<span class="photo-moment-label">${nameLabel}</span></button><button id="togglePhotoAges" class="photo-moment-button photo-age-toggle" type="button" aria-pressed="${showAges&&known}" aria-label="${ageHelp}" title="${ageHelp}" ${known?'':'disabled'}>${ages}<span class="photo-moment-label">${ageLabel}</span></button>`;
   if(['editPhotoDate','togglePhotoNames','togglePhotoAges'].includes(focused))$(focused)?.focus({preventScroll:true});
+  renderInlineDate();
   refreshAges();
   window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:item.id,...overlays(item.id)}}));
   window.FamilyPhotoViewerLayout?.sync();
 }
 function mount(photo){
-  if(item?.id!==photo.id){showNames=false;showAges=false;}
+  if(item?.id!==photo.id){showNames=false;showAges=false;if(inlineDrafts.get(photo.id)?.conflict)inlineDrafts.delete(photo.id);}
   item=photo;if(!item.takenDate?.year)showAges=false;render();
 }
 function openDate(){
@@ -76,17 +127,7 @@ async function saveDate(event){
   const target={...editing};saving=true;$('photoDateError').textContent='';
   $('photoDateForm').querySelectorAll('button,input').forEach(control=>{control.disabled=true;});
   try{
-    const response=await I.fetch('api/media/'+target.id+'/photo-date',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({date,expectedRevision:target.revision})});
-    let result;try{result=await response.json();}catch{throw Error(tr('תאריך הצילום לא נשמר. נסו שוב.','The photo date was not saved. Please try again.'));}
-    if(!response.ok){
-      if(response.status===409){
-        const latest=await I.fetch('api/media/'+target.id+'/view',{cache:'no-store'});
-        if(latest.ok)window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'photo-date',...(await latest.json())}}));
-        throw Error(tr('התאריך עודכן בינתיים. סגרו ופתחו את העריכה מחדש.','The photo date changed. Close and reopen the editor.'));
-      }
-      throw Error(I.error(result.error)||tr('תאריך הצילום לא נשמר. נסו שוב.','The photo date was not saved. Please try again.'));
-    }
-    window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+    await persistDate(target,date);
     $('photoDateDialog').close();window.FamilyApp?.toast(tr('תאריך הצילום נשמר ✓','Photo date saved ✓'));
   }catch(error){$('photoDateError').textContent=error.message;}
   finally{saving=false;$('photoDateForm').querySelectorAll('button,input').forEach(control=>{control.disabled=false;});}
@@ -96,6 +137,11 @@ function init(){
   const dialog=document.createElement('dialog');dialog.id='photoDateDialog';dialog.className='portal-dialog photo-date-dialog';dialog.setAttribute('aria-labelledby','photoDateTitle');dialog.setAttribute('data-i18n-skip','');
   dialog.innerHTML=`<h2 id="photoDateTitle">${tr('מתי התמונה צולמה?','When was this photo taken?')}</h2><p id="photoDateHint">${tr('מזינים רק מה שידוע. אפשר לשמור יום, חודש או שנה בנפרד.','Enter what you know. Day, month and year are all optional.')}</p><form id="photoDateForm" aria-describedby="photoDateHint"><div class="photo-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoDate${field}">${label}<input id="photoDate${field}" name="${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off"></label>`).join('')}</div><p id="photoDateError" class="form-error" role="alert"></p><div class="photo-date-actions"><button type="submit" class="primary-button">${tr('שמירה','Save')}</button><button id="cancelPhotoDate" type="button" class="secondary-button">${tr('ביטול','Cancel')}</button><button id="clearPhotoDate" type="button">${tr('ניקוי התאריך','Clear date')}</button></div></form>`;
   document.body.append(dialog);
+  const inline=document.createElement('form');inline.id='photoInlineDateForm';inline.className='photo-inline-date-form';inline.hidden=true;inline.setAttribute('data-i18n-skip','');
+  inline.innerHTML=`<strong class="photo-inline-date-title">${calendar}<span>${tr('תאריך צילום','Photo date')}</span></strong><div class="photo-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoInlineDate${field}">${label}<input id="photoInlineDate${field}" name="${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off" aria-describedby="photoInlineDateError"></label>`).join('')}</div><p id="photoInlineDateError" class="form-error" role="alert"></p><button id="photoInlineDateSave" type="submit" class="primary-button">${tr('שמירת התאריך','Save date')}</button><span id="photoInlineDateStatus" role="status" aria-live="polite"></span>`;
+  document.body.append(inline);inline.addEventListener('submit',saveInlineDate);
+  for(const field of dateFields)$('photoInlineDate'+field).addEventListener('input',event=>{const draft=inlineDraft();if(!draft||draft.pending)return;draft.values[field]=event.target.validity?.badInput?NaN:event.target.value;draft.dirty=true;draft.error='';draft.status='';renderInlineDate();});
+  inline.addEventListener('focusout',event=>{if(event.relatedTarget&&!inline.contains(event.relatedTarget))void saveInlineDate();});
   $('photoMomentTools').addEventListener('click',event=>{
     if(event.target.closest('#editPhotoDate'))openDate();
     else if(event.target.closest('#togglePhotoNames')){showNames=!showNames;render();}
@@ -111,5 +157,5 @@ function init(){
   window.addEventListener('family-media-changed',event=>{const photo=event.detail.item;if(photo?.id===item?.id){item={...item,...photo};if(!item.takenDate?.year)showAges=false;render();}});
   if(viewer.open&&window.FamilyMedia?.current?.())mount(window.FamilyMedia.current());
 }
-window.FamilyPhotoDate={mount,decorate,ageFor,overlays};
+window.FamilyPhotoDate={mount,decorate,ageFor,overlays,setDesktopInline};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

@@ -322,7 +322,7 @@ test('every gallery editor offers the separate-photo action on phone and desktop
    requests.push({path,options});return Response.json(saved,{status:201});
   }}),pending=f.api.edit({id:'a',kind:'photo',scope});for(let i=0;i<10&&f.node('photoEditSaveCopy').disabled;i++)await f.flush();
   assert.equal(f.node('photoEditSaveCopy').hidden,false);assert.equal(f.node('photoEditSaveCopy').disabled,false);assert.equal(f.node('photoEditSaveCopy').textContent,english?'Save as a separate photo':'שמור כתמונה נפרדת');
-  await f.click('Right');await f.click('SaveCopy');assert.deepEqual(await pending,saved);assert.equal(requests.length,1);
+  assert.equal(f.node('photoEditSave').textContent,english?'Finish and save':'לסיום ושמירה');await f.click('Right');assert.equal(f.node('photoEditSave').textContent,english?'Finish and save':'לסיום ושמירה');await f.click('SaveCopy');assert.deepEqual(await pending,saved);assert.equal(requests.length,1);
   const query=new URL(requests[0].path,'https://family.test').searchParams;assert.equal(query.get('saveAs'),'copy');assert.equal(query.get('rotation'),'1');assert.equal(query.get('baseVersion'),'original');assert.equal(await requests[0].options.body.text(),'rendered pixels');
   assert.equal(f.node('photoUploadEditor').open,false);
   const upload=await f.begin([image('new.jpg')]);assert.equal(f.node('photoEditSaveCopy').hidden,true);await f.click('Cancel');await upload.result;

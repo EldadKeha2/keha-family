@@ -31,3 +31,15 @@ html[dir=rtl] .photo-date-fields label{direction:rtl}
   .photo-taken-date{font-size:calc(12px * var(--a11y-text-scale,1))}
   .photo-date-dialog{padding:24px 20px}
 }
+
+.photo-inline-date-form[hidden]{display:none!important}
+.photo-inline-date-form{box-sizing:border-box;display:grid;grid-template-columns:auto minmax(0,1fr);align-content:start;align-items:center;gap:6px 8px;padding:10px 12px;border:1px solid #e1d8c3;border-radius:8px;background:#f4f2e8;color:#686b51}
+.photo-inline-date-title{grid-column:1/-1;display:flex;align-items:center;gap:6px;font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans)}
+.photo-inline-date-title svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.photo-inline-date-form .photo-date-fields{grid-column:1/-1;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr);gap:7px;direction:ltr}
+.photo-inline-date-form .photo-date-fields label{gap:3px;font-size:calc(12px * var(--a11y-text-scale,1));text-align:center}
+.photo-inline-date-form .photo-date-fields input{min-height:36px;padding:4px;font-size:calc(17px * var(--a11y-text-scale,1))}
+.photo-inline-date-form .form-error{grid-column:1/-1;margin:0;font-size:13px}
+.photo-inline-date-form .form-error:empty{display:none}
+.photo-inline-date-form button{min-height:30px;margin:0;padding:5px 10px;font:calc(13px * var(--a11y-text-scale,1))/1.3 var(--sans)}
+#photoInlineDateStatus{min-width:0;font:calc(12px * var(--a11y-text-scale,1))/1.3 var(--sans);color:#65784e}
