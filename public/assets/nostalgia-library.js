@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id),I=window.FamilyI18n,english=I.isEnglish;
   const tr=(he,en)=>english?en:he,safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
-  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',uploadChoice:'',assignId:null,newEventAssignId:null,hoverTimer:null,closing:false};
+  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',uploadChoice:'',assignId:null,newEventAssignId:null,hoverTimer:null,closeTimer:null,closing:false};
   const eventName=event=>english?(event.nameEn||event.name):event.name;
   const categoryName=category=>english?(category.nameEn||category.name):category.name;
   const eventsText=n=>english?`${n} ${n===1?'event':'events'}`:n===1?'אירוע אחד':`${n} אירועים`;
@@ -70,20 +70,21 @@
     $('nostalgiaCategoryTitle').textContent=categoryName(category);
     $('nostalgiaCategoryDescription').textContent=tr('בחרו אירוע, או החליקו כדי לפגוש זיכרונות נוספים.','Choose an event, or swipe to discover more memories.');
     const rail=$('nostalgiaEventRail'),events=matchingEvents(category.id),signature=JSON.stringify(events);if(rail.dataset.signature===category.id+signature)return;rail.dataset.signature=category.id+signature;
-    const scroll=rail.scrollLeft;
+    const categoryChanged=rail.dataset.categoryId!==category.id,scroll=categoryChanged?0:rail.scrollLeft;
+    rail.dataset.categoryId=category.id;
     rail.innerHTML=events.map((event,index)=>`<div class="nostalgia-event-slot" style="--event-index:${Math.min(index,6)}"><button type="button" class="nostalgia-event-card theme-${safe(category.color)}" data-nostalgia-event="${safe(event.id)}"><span class="nostalgia-event-cover">${eventCover(event,category)}<span class="nostalgia-film-edge" aria-hidden="true"></span></span><span class="nostalgia-event-card-body"><span class="nostalgia-event-date">${dateText(event.date)?safe(dateText(event.date)):tr('מן האלבום המשפחתי','From the family album')}</span><strong>${safe(eventName(event))}</strong><span>${videosText(event.videoCount)}</span><small>${event.location?safe(event.location):tr('פותחים את האלבום','Open the album')} <b aria-hidden="true">↗</b></small></span></button></div>`).join('')+`<div class="nostalgia-event-slot"><button type="button" class="nostalgia-event-card nostalgia-add-event" data-nostalgia-new-event="${safe(category.id)}"><span class="nostalgia-plus-orbit" aria-hidden="true">＋</span><strong>${tr('עוד אירוע לספרייה','Another event for the library')}</strong><small>${tr('נותנים שם, ומוסיפים זיכרונות','Give it a name, then add memories')}</small></button></div>`;
-    rail.scrollLeft=scroll;
+    const behavior=rail.style.scrollBehavior;rail.style.scrollBehavior='auto';rail.scrollLeft=scroll;rail.style.scrollBehavior=behavior;
   }
   function openCategory(id){
-    if(!state.library?.categories.some(c=>c.id===id))return;
+    if($('nostalgiaView')?.hidden||!state.library?.categories.some(c=>c.id===id))return;
     const dialog=$('nostalgiaCategoryDialog');if(document.querySelector('dialog[open]')&&!dialog.open)return;
-    clearTimeout(state.hoverTimer);state.categoryId=id;state.closing=false;renderCategory();
+    clearTimeout(state.hoverTimer);clearTimeout(state.closeTimer);state.closeTimer=null;state.categoryId=id;state.closing=false;dialog.classList.remove('is-closing');renderCategory();
     if(!dialog.open){dialog.classList.remove('is-ready','is-closing');dialog.showModal();const paint=window.requestAnimationFrame||((fn)=>setTimeout(fn,0));paint(()=>paint(()=>dialog.classList.add('is-ready')));}
   }
   function closeCategory(immediate=false){
     const dialog=$('nostalgiaCategoryDialog');clearTimeout(state.hoverTimer);if(!dialog?.open)return;
-    if(immediate||matchMedia('(prefers-reduced-motion: reduce)').matches){dialog.close();return;}
-    if(state.closing)return;state.closing=true;dialog.classList.add('is-closing');setTimeout(()=>{if(dialog.open)dialog.close();state.closing=false;},170);
+    if(immediate||matchMedia('(prefers-reduced-motion: reduce)').matches){clearTimeout(state.closeTimer);state.closeTimer=null;state.closing=false;dialog.close();return;}
+    if(state.closing)return;state.closing=true;dialog.classList.add('is-closing');state.closeTimer=setTimeout(()=>{state.closeTimer=null;if(dialog.open)dialog.close();state.closing=false;},170);
   }
   async function action(name,body){return window.FamilyArchive.nostalgiaAction(name,body);}
   function categoryOptions(selected){return state.library.categories.map(c=>`<option value="${safe(c.id)}" ${c.id===selected?'selected':''}>${safe(categoryName(c))}</option>`).join('');}
@@ -153,7 +154,7 @@
     $('nostalgiaEventForm').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{const date=Object.fromEntries(['day','month','year'].map(part=>[part,$('nostalgiaEvent'+part).value?Number($('nostalgiaEvent'+part).value):null]));const result=await action('event',{id:form.dataset.eventId||undefined,expectedRevision:form.dataset.revision||undefined,categoryId:$('nostalgiaEventCategory').value,name:$('nostalgiaEventName').value,location:$('nostalgiaEventLocation').value,date});$('nostalgiaEventDialog').close();if(state.newEventAssignId){await action('assign',{id:state.newEventAssignId,add:[result.event.id]});$('nostalgiaAssignDialog').close();state.newEventAssignId=null;}navigate(result.event.id);}catch(error){$('nostalgiaEventError').textContent=I.error(error.message);}finally{button.disabled=false;}});
     $('nostalgiaNewCategoryForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type=submit]');button.disabled=true;try{const result=await action('category',{name:$('nostalgiaNewCategoryName').value});$('nostalgiaNewCategoryDialog').close();openCategory(result.category.id);}catch(error){$('nostalgiaNewCategoryError').textContent=I.error(error.message);}finally{button.disabled=false;}});
     $('nostalgiaAssignForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type=submit]');button.disabled=true;try{const current=allItems().find(item=>item.id===state.assignId)?.nostalgiaEventIds||[],wanted=[...$('nostalgiaAssignChoices').querySelectorAll('input:checked')].map(input=>input.value);await action('assign',{id:state.assignId,add:wanted.filter(id=>!current.includes(id)),remove:current.filter(id=>!wanted.includes(id))});$('nostalgiaAssignDialog').close();}catch(error){$('nostalgiaAssignError').textContent=I.error(error.message);}finally{button.disabled=false;}});
-    for(const event of ['hashchange','popstate'])window.addEventListener(event,()=>{if(/^#nostalgia(?:\/|$)/.test(location.hash))window.FamilyArchive?.renderNostalgia?.();});
+    for(const event of ['hashchange','popstate'])window.addEventListener(event,()=>{if(/^#nostalgia(?:\/|$)/.test(location.hash))window.FamilyArchive?.renderNostalgia?.();else closeCategory(true);});
   }
   window.FamilyNostalgia={select,decorateCard,viewItems,acceptDrop,uploadEventId:()=>$('nostalgiaUploadEvent')?.value||null};
   document.addEventListener('DOMContentLoaded',init);
