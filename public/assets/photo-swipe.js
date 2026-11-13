@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,photoButtons=false}){
+  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,photoButtons=false}){
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null;
     const navigate=(dx,options)=>{const action=dx>0?right:left;return action?action(options):step(dx>0?1:-1,options);};
     const idle=new Set(),finished=()=>{for(const resolve of idle)resolve();idle.clear();};
@@ -14,6 +14,7 @@
       if(Date.now()-start.time<=4000&&Math.abs(dx)>=distance&&Math.abs(dx)>=Math.abs(dy)*1.5){blockClick();nativeEnd?.(dx);}
     };
     document.addEventListener('pointerdown',event=>{
+      if(touchOnly())return;
       if(gesture&&event.pointerId!==gesture.id){blockClick();reset();}
     },{capture:true,passive:true});
     const begin=event=>{
@@ -29,7 +30,9 @@
       if(!isMouse&&typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       gesture.mode=mode;gesture.mouse=isMouse;return mode;
     };
-    stage.addEventListener('pointerdown',begin,{capture:true,passive:true});
+    // Phone browsers report both PointerEvents and TouchEvents for one finger.
+    // Let the real touch stream own the complete stroke, including its release.
+    stage.addEventListener('pointerdown',event=>{if(!touchOnly())begin(event);},{capture:true,passive:true});
     const moved=event=>{
       const g=gesture;if(!g||event.pointerId!==g.id)return;
       if(!enabled()||g.mouse&&event.buttons===0){if(g.dragged)blockClick();reset();return;}
@@ -50,7 +53,7 @@
       blockClick();if(event.cancelable)event.preventDefault();
       move?.(dx,{queued:g.mode==='queued'});
     };
-    document.addEventListener('pointermove',moved,{capture:true,passive:false});
+    document.addEventListener('pointermove',event=>{if(!touchOnly())moved(event);},{capture:true,passive:false});
     const released=event=>{
       const g=gesture;if(!g){if(nativePointer?.id===event.pointerId){nativeEnded(nativePointer,event);nativePointer=null;}return;}if(event.pointerId!==g.id)return;
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
@@ -62,8 +65,8 @@
       // Use the gallery's actual Next/Previous actions for physical gestures.
       navigate(dx,{dragX:dx,queued:true,...(g.mode==='queued'?{native:true}:{})});
     };
-    document.addEventListener('pointerup',released,{capture:true,passive:false});
-    document.addEventListener('pointercancel',event=>{if(gesture?.id===event.pointerId){blockClick();reset(true);}},{capture:true,passive:true});
+    document.addEventListener('pointerup',event=>{if(!touchOnly())released(event);},{capture:true,passive:false});
+    document.addEventListener('pointercancel',event=>{if(!touchOnly()&&gesture?.id===event.pointerId){blockClick();reset(true);}},{capture:true,passive:true});
     // Some Windows touch browsers interrupt the pointer stream when their
     // native photo scroller claims a gesture. Keep a single-touch fallback;
     // only one stream can finish a swipe, so normal phones never advance twice.

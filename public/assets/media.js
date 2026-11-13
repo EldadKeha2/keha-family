@@ -9,6 +9,7 @@
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
   const desktopPhotoInput=()=>window.FamilyPhotoPresentation?.desktop?.()===true||navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||'');
+  const phoneTouchInput=()=>!desktopPhotoInput()&&'ontouchstart' in window;
   const inlinePhotoCaption=()=>current()?.kind==='photo'&&!state.fullscreen&&(window.FamilyPhotoKeyboard?.desktop?.()??desktopPhotoInput());
   function photoIndex(direction,wrap=true,from=state.index){
     for(let distance=1;distance<=state.items.length;distance++){
@@ -418,12 +419,18 @@
   }
   function init(){
     const stage=$('mediaStage');
-    const previousPhoto=options=>step(-1,options),nextPhoto=options=>step(1,options);
+    const previousPhoto=()=>step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true}),nextPhoto=()=>step(1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true});
+    const swipePhoto=(direction,options)=>{
+      if(!phoneTouchInput())return step(direction,options);
+      const button=$(direction>0?'mediaNext':'mediaPrevious');
+      if(button.disabled){window.FamilyPhotoPresentation?.settle();return;}
+      button.click();
+    };
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
-      enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:()=> 'queued',
+      enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,touchOnly:phoneTouchInput,claim:()=> 'queued',
       vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
-      step,right:nextPhoto,left:previousPhoto,
+      step,right:options=>swipePhoto(1,options),left:options=>swipePhoto(-1,options),
       move:(dx,{queued=false}={})=>{
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}
         const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=dx>0?1:-1,next=photoNeighbour(direction,from);
@@ -481,7 +488,7 @@
       const remove=event.target.closest('[data-media-delete]');if(remove)requestDelete(remove.dataset.mediaScope,remove.dataset.mediaDelete);
     });
     $('closeMediaViewer').addEventListener('click',()=>$('mediaViewer').close());
-    $('mediaPrevious').addEventListener('click',()=>previousPhoto({instant:window.FamilyPhotoPresentation?.desktop?.()}));$('mediaNext').addEventListener('click',()=>nextPhoto({instant:window.FamilyPhotoPresentation?.desktop?.()}));
+    $('mediaPrevious').addEventListener('click',previousPhoto);$('mediaNext').addEventListener('click',nextPhoto);
     $('mediaViewerDelete').addEventListener('click',()=>requestDelete(state.scope,current()?.id));
     $('confirmMediaDelete').addEventListener('click',confirmDelete);
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
