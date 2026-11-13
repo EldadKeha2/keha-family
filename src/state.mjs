@@ -87,10 +87,10 @@ export class FamilyState {
         this.sql.exec('INSERT OR IGNORE INTO people(id,data) VALUES(?,?)',p.id,JSON.stringify({id:p.id,name:p.name,birthday:p.birthday||'1.1.1111',profileId:null,revision:uid()}));
         // Names come from the family tree; keep birthdays and uploaded albums intact.
         const person=this.person(p.id);
-        const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn||(['roi','yona'].includes(p.id)&&(person.firstName!==p.firstName||person.lastName!==p.lastName));
+        const nameChanged=person.name!==p.name||person.nameEn!==p.nameEn||(['roi','yona','matthew-robin','lily'].includes(p.id)&&(person.firstName!==p.firstName||person.lastName!==p.lastName));
         if(nameChanged||Boolean(person.extended)!==Boolean(p.extended)||person.deceased!==Boolean(p.deceased)||person.deathDate===undefined||(p.aliyahYear&&person.aliyahYear!==p.aliyahYear)||(p.aliyahMonth&&person.aliyahMonth!==p.aliyahMonth)){
           person.name=p.name;person.nameEn=p.nameEn;person.extended=Boolean(p.extended);person.deceased=Boolean(p.deceased);
-          if(['roi','yona'].includes(p.id)){person.firstName=p.firstName;person.lastName=p.lastName;}
+          if(['roi','yona','matthew-robin','lily'].includes(p.id)){person.firstName=p.firstName;person.lastName=p.lastName;}
           if(person.deathDate===undefined)person.deathDate=p.deathDate||null;
           if(p.aliyahYear)person.aliyahYear=p.aliyahYear;
           if(p.aliyahMonth)person.aliyahMonth=p.aliyahMonth;
