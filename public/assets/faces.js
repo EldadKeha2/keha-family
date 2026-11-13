@@ -45,6 +45,8 @@
     if(c.adapter){c.item={...c.item,...result.item};c.reviewed=Boolean(c.item.faceSummary?.reviewed);}else window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
   }
   function closePopup(c){
+    clearHoverLabel(c);
+    for(const button of c.buttons?.children||[])button.classList.remove('face-editor-active');
     clearTimeout(c.labelTimer);c.labelTimer=null;const popup=c.popup;c.popup=null;c.active=null;popup?.remove();if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
   }
   const sameTabFace=(c,a,b)=>a.id===b.id||c.geom.sameRegion(a.rect,b.rect);
@@ -131,7 +133,23 @@
     if(c.labelTimer||!c.popup?.classList.contains('face-name'))return;const bubble=c.popup;
     c.labelTimer=setTimeout(()=>{c.labelTimer=null;if(live(c)&&c.popup===bubble&&!bubble.contains(document.activeElement))closePopup(c);},250);
   }
+  function clearHoverLabel(c){clearTimeout(c.hoverLabelTimer);c.hoverLabelTimer=null;c.hoverPopup?.remove();c.hoverPopup=null;c.hoverFace=null;}
+  function keepHoverLabel(c){clearTimeout(c.hoverLabelTimer);c.hoverLabelTimer=null;}
+  function dismissHoverLabelSoon(c){
+    if(c.hoverLabelTimer||!c.hoverPopup)return;const bubble=c.hoverPopup;
+    c.hoverLabelTimer=setTimeout(()=>{c.hoverLabelTimer=null;if(live(c)&&c.hoverPopup===bubble&&!bubble.contains(document.activeElement))clearHoverLabel(c);},250);
+  }
+  function showHoverLabel(c,face){
+    if(!live(c)||!face.person||c.adjust||c.resizeDrag||c.saving||c.reviewSaving)return;
+    if(c.hoverFace?.id===face.id&&c.hoverPopup){keepHoverLabel(c);return;}
+    clearHoverLabel(c);c.hoverFace=face;
+    const bubble=document.createElement('div');bubble.className='face-popover face-name face-hover-name';bubble.setAttribute('role','group');bubble.setAttribute('aria-label',tr('מי בתמונה','Who is in the photo'));bubble.dir=I.isEnglish?'ltr':'rtl';bubble.innerHTML=nameHTML(face,!c.adapter);bindProfile(c,bubble,face);
+    bubble.addEventListener('pointerenter',()=>keepHoverLabel(c));bubble.addEventListener('pointerleave',()=>dismissHoverLabelSoon(c));
+    bubble.addEventListener('focusin',()=>keepHoverLabel(c));bubble.addEventListener('focusout',event=>{if(!bubble.contains(event.relatedTarget))dismissHoverLabelSoon(c);});
+    c.hoverPopup=bubble;c.dialog.append(bubble);place(c);
+  }
   function dispose(c,{preserveControls=false}={}){
+    clearHoverLabel(c);
     clearTimeout(c.detectionTimer);
     c.resolvePaint?.();
     window.FamilyPhotoNative?.reset(c.stage);
@@ -166,34 +184,44 @@
     return {x:r.left+(r.width-width)/2,y:r.top+(r.height-height)/2,width,height};
   }
   function screenFace(c,face){const image=imageArea(c),r=face.rect;return {x:image.x+r.x*image.width,y:image.y+r.y*image.height,width:r.width*image.width,height:r.height*image.height};}
+  function styleFrame(c,face,node){
+    const rect=screenFace(c,face),scale=viewport().scale,size=Math.min(rect.width,rect.height)*scale;
+    node.style.setProperty('--face-stroke',(Math.max(.65,Math.min(1.1,size*.014))/scale)+'px');
+    node.style.setProperty('--face-radius',(Math.max(2,Math.min(4,size*.08))/scale)+'px');
+    node.style.setProperty('--face-handle-size',(Math.max(4,Math.min(7,size*.16))/scale)+'px');
+  }
   function place(c){
     if(!live(c)||!imageWidth(c.image))return;const image=imageArea(c),stage=(c.surface||c.stage).getBoundingClientRect();
     Object.assign(c.hits.style,{left:(image.x-stage.left)+'px',top:(image.y-stage.top)+'px',width:image.width+'px',height:image.height+'px'});
     placeAnnotations(c,image);
-    if(c.active&&!c.selection.hidden)Object.assign(c.selection.style,{left:c.active.rect.x*100+'%',top:c.active.rect.y*100+'%',width:c.active.rect.width*100+'%',height:c.active.rect.height*100+'%'});
-    if(c.popup&&c.active){
+    for(const [index,face]of c.faces.entries()){const button=c.buttons.children[index];if(button?.dataset.faceId===face.id){styleFrame(c,face,button);button.classList.toggle('face-editor-active',Boolean(c.active?.id===face.id&&!c.selection.hidden));}}
+    if(c.active&&!c.selection.hidden){Object.assign(c.selection.style,{left:c.active.rect.x*100+'%',top:c.active.rect.y*100+'%',width:c.active.rect.width*100+'%',height:c.active.rect.height*100+'%'});styleFrame(c,c.active,c.selection);}
+    if(c.popup&&c.active)placePopup(c,c.popup,c.active);
+    if(c.hoverPopup&&c.hoverFace)placePopup(c,c.hoverPopup,c.hoverFace,[c.popup]);
+  }
+  function placePopup(c,popup,active,avoid=[]){
       // Native pinch zoom enlarges the document, including fixed elements.
       // Lay out the popup in screen-sized CSS pixels, then counter-scale only
       // the popup. Photo pixels, face coordinates and accessibility text sizes
       // keep their existing zoom behavior.
       const v=viewport(),scale=v.scale,visible={width:v.width*scale,height:v.height*scale};
       const onScreen=rect=>({x:(rect.x-v.left)*scale,y:(rect.y-v.top)*scale,width:rect.width*scale,height:rect.height*scale});
-      Object.assign(c.popup.style,{transform:scale===1?'none':`scale(${1/scale})`,maxWidth:Math.max(0,visible.width-16)+'px',maxHeight:Math.max(0,visible.height-16)+'px'});
-      const r=c.popup.getBoundingClientRect(),panel={width:r.width*scale||270,height:r.height*scale||180},selected=onScreen(screenFace(c,c.active));
-      const faceOnScreen=c.popup.classList.contains('face-picker')?c.geom.labelFaceBounds(selected):selected;
+      Object.assign(popup.style,{transform:scale===1?'none':`scale(${1/scale})`,maxWidth:Math.max(0,visible.width-16)+'px',maxHeight:Math.max(0,visible.height-16)+'px'});
+      const r=popup.getBoundingClientRect(),panel={width:r.width*scale||270,height:r.height*scale||180},selected=onScreen(screenFace(c,active));
+      const faceOnScreen=popup.classList.contains('face-picker')?c.geom.labelFaceBounds(selected):selected;
       let p=c.geom.popoverPosition(faceOnScreen,panel,visible);
-      if(c.popup.classList.contains('face-picker')){
-        Object.assign(c.popup.style,{maxWidth:p.width+'px',maxHeight:p.maxHeight+'px'});
-        const fitted=c.popup.getBoundingClientRect();
+      if(popup.classList.contains('face-picker')){
+        Object.assign(popup.style,{maxWidth:p.width+'px',maxHeight:p.maxHeight+'px'});
+        const fitted=popup.getBoundingClientRect();
         p=c.geom.popoverPosition(faceOnScreen,{width:fitted.width*scale,height:fitted.height*scale},visible);
       }
-      if(c.popup.classList.contains('face-name')){
-        const face=onScreen(screenFace(c,{...c.active,rect:annotationRect(c,c.active)})),faces=annotationFaces(c,image).map(rect=>onScreen({...rect,x:rect.x+image.x,y:rect.y+image.y}));
+      if(popup.classList.contains('face-name')){
+        const image=imageArea(c),face=onScreen(screenFace(c,{...active,rect:annotationRect(c,active)})),faces=annotationFaces(c,image).map(rect=>onScreen({...rect,x:rect.x+image.x,y:rect.y+image.y}));
+        for(const node of avoid.filter(Boolean)){const rect=node.getBoundingClientRect();faces.push(onScreen({x:rect.left,y:rect.top,width:rect.width,height:rect.height}));}
         const placed=c.geom.layoutFaceLabels([{width:panel.width,height:panel.height,face}],{...visible,faces});
         if(placed){p.x=placed[0].x;p.y=placed[0].y;}
       }
-      Object.assign(c.popup.style,{left:(v.left+p.x/scale)+'px',top:(v.top+p.y/scale)+'px',maxHeight:p.maxHeight+'px',maxWidth:p.width+'px'});
-    }
+      Object.assign(popup.style,{left:(v.left+p.x/scale)+'px',top:(v.top+p.y/scale)+'px',maxHeight:p.maxHeight+'px',maxWidth:p.width+'px'});
   }
   function visibleFaces(c,reviewed=false){
     const dismissed=c.pendingDismiss,unassigned=c.pendingUnassign,saved=c.saved.filter(face=>(!dismissed||(dismissed.person?face.id!==dismissed.id:!c.geom.labelledRegion(dismissed.rect,face.rect)))&&(!unassigned||face.id!==unassigned.id)),ignored=dismissed?[...c.ignored,dismissed.rect]:c.ignored;
@@ -308,8 +336,8 @@
       Object.assign(button.style,{left:face.rect.x*100+'%',top:face.rect.y*100+'%',width:face.rect.width*100+'%',height:face.rect.height*100+'%'});
       if(!existing){
       const labelled=()=>c.faces.find(face=>face.id===button.dataset.faceId);
-      button.addEventListener('pointerenter',event=>{const face=labelled();if(!c.showRegions&&!touchMode(event)&&face?.person&&!c.popup?.classList.contains('face-picker'))showLabel(c,face,false);},{signal:c.events.signal});
-      button.addEventListener('pointerleave',event=>{if(!touchMode(event)&&c.popup?.classList.contains('face-name')&&!c.popup.contains(event.relatedTarget))dismissLabelSoon(c);},{signal:c.events.signal});
+      button.addEventListener('pointerenter',event=>{const face=labelled();if((!c.showRegions||c.popup?.classList.contains('face-picker'))&&!touchMode(event)&&face?.person)showLabel(c,face,false);},{signal:c.events.signal});
+      button.addEventListener('pointerleave',event=>{if(touchMode(event))return;if(c.hoverFace?.id===button.dataset.faceId&&!c.hoverPopup?.contains(event.relatedTarget))dismissHoverLabelSoon(c);if(c.popup?.classList.contains('face-name')&&!c.popup.contains(event.relatedTarget))dismissLabelSoon(c);},{signal:c.events.signal});
       button.addEventListener('focus',()=>{const face=labelled();if(!c.press&&!c.showRegions&&face?.person&&!c.popup?.classList.contains('face-picker'))showLabel(c,face,touchMode());},{signal:c.events.signal});
       button.addEventListener('blur',event=>{if(!c.popup?.dataset.timedLabel&&!c.popup?.contains(event.relatedTarget)&&c.popup?.classList.contains('face-name'))closePopup(c);},{signal:c.events.signal});
       }
@@ -340,6 +368,7 @@
     if(c.annotationFace){const entry=c.annotationNodes.find(entry=>entry.face.id===c.annotationFace.id);if(entry){c.annotationFace=entry.face;renderAnnotationHighlight(c);}else clearAnnotation(c,true);}
   }
   function apply(c,faces){
+    if(c.hoverFace&&!faces.some(face=>face.id===c.hoverFace.id&&face.person))clearHoverLabel(c);
     c.saved=faces;if(c.active){const updated=faces.find(face=>face.id===c.active.id);if(updated)c.active=updated;else if(c.active.person&&!c.saving)closePopup(c);}
     paint(c);
   }
@@ -352,6 +381,7 @@
     if(result.item&&(result.item.tagsRevision!==priorRevision||c.reviewed!==priorReview))window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',scope:result.item.scope,item:result.item,faces:result.faces}}));
   }
   function showLabel(c,face,touch,feedback=false){
+    if(!touch&&!feedback&&c.popup?.classList.contains('face-picker')){showHoverLabel(c,face);return;}
     if(!live(c)||!face.person||(!feedback&&c.popup?.dataset.tagFeedback&&c.active?.id===face.id))return;if(c.queuedFace)stopTabFaces(c);closePopup(c);c.active=face;
     const bubble=document.createElement('div');bubble.className='face-popover face-name';bubble.setAttribute('role','group');bubble.setAttribute('aria-label',tr('מי בתמונה','Who is in the photo'));bubble.dir=I.isEnglish?'ltr':'rtl';
     bubble.innerHTML=nameHTML(face,!c.adapter&&!feedback)+(touch&&!feedback?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:'');if(!feedback)bindProfile(c,bubble,face);
@@ -405,7 +435,7 @@
     input.addEventListener('keydown',event=>{if(event.isComposing)return;if(event.key==='Escape'){event.preventDefault();event.stopPropagation();stopTabFaces(c);closePopup(c);}if(event.key==='ArrowDown'){event.preventDefault();panel.querySelector(choices)?.focus();}if(event.key==='Enter'){event.preventDefault();event.stopPropagation();const options=[...panel.querySelectorAll(choices)];if(options.length===1)options[0].click();else options[0]?.focus();}});
     panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();stopTabFaces(c);closePopup(c);}else if(['ArrowDown','ArrowUp'].includes(event.key)&&event.target.matches(choices)){event.preventDefault();const buttons=[...panel.querySelectorAll(choices)],index=buttons.indexOf(event.target);buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}});
     panel.querySelector('[data-face-close]').addEventListener('click',()=>{stopTabFaces(c);closePopup(c);});
-    panel.querySelector('[data-face-adjust]').addEventListener('click',()=>{panel.remove();c.popup=null;c.active={...c.active,rect:{...c.active.rect}};c.adjust=true;c.guide.hidden=false;c.stage.classList.add('face-adjusting');place(c);});
+    panel.querySelector('[data-face-adjust]').addEventListener('click',()=>{clearHoverLabel(c);panel.remove();c.popup=null;c.active={...c.active,rect:{...c.active.rect}};c.adjust=true;c.guide.hidden=false;c.stage.classList.add('face-adjusting');place(c);});
     panel.querySelector('[data-face-remove]')?.addEventListener('click',()=>dismissFace(c));
     panel.querySelector('[data-face-ignore]')?.addEventListener('click',()=>dismissFace(c));
     input.focus({preventScroll:true});results(c,'');
@@ -536,10 +566,11 @@
     on(stage,'pointerup',event=>{released(event);if(c.resizeDrag){if(event.pointerId!==c.resizeDrag.pointerId)return;event.preventDefault();resized(c,c.active);return;}if(!c.adjust||!c.drag)return;event.preventDefault();c.drag=null;c.adjust=false;c.skipClick=true;stage.classList.remove('face-adjusting');c.guide.hidden=true;const face=c.active;openPicker(c,face,{preserveRect:true});});
     on(stage,'pointercancel',event=>{cancelPress(c);if(c.resizeDrag&&event.pointerId!==c.resizeDrag.pointerId)return;if(c.adjust||c.resizeDrag){c.drag=null;closePopup(c);}});
     on(stage,'contextmenu',event=>{if(c.press||Date.now()<(c.pressClickUntil||0))event.preventDefault();});
-    on(document,'pointerdown',event=>{if(c.press&&event.pointerId!==c.press.id)cancelPress(c);if(!c.popup?.contains(event.target)&&!stage.contains(event.target)){stopTabFaces(c);if(c.popup)closePopup(c);}},{capture:true});
-    on(document,'focusin',event=>{if(c.tabFace&&!c.popup?.contains(event.target)&&!stage.contains(event.target))stopTabFaces(c);});
+    on(document,'pointerdown',event=>{if(c.press&&event.pointerId!==c.press.id)cancelPress(c);if(!c.popup?.contains(event.target)&&!c.hoverPopup?.contains(event.target)&&!stage.contains(event.target)){stopTabFaces(c);if(c.popup)closePopup(c);}},{capture:true});
+    on(document,'focusin',event=>{if(c.tabFace&&!c.popup?.contains(event.target)&&!c.hoverPopup?.contains(event.target)&&!stage.contains(event.target))stopTabFaces(c);});
     on(document,'pointermove',moved,{capture:true,passive:true});on(document,'pointerup',released);on(document,'pointercancel',()=>cancelPress(c));
     on(document,'pointermove',event=>{if(!c.active||!c.popup?.classList.contains('face-name')||touchMode(event))return;const r=screenFace(c,c.active);if(c.popup.contains(event.target)||(event.clientX>=r.x&&event.clientX<=r.x+r.width&&event.clientY>=r.y&&event.clientY<=r.y+r.height))keepLabel(c);else dismissLabelSoon(c);},{passive:true});
+    on(document,'pointermove',event=>{if(!c.hoverPopup||!c.hoverFace||touchMode(event))return;const r=screenFace(c,c.hoverFace);if(c.hoverPopup.contains(event.target)||(event.clientX>=r.x&&event.clientX<=r.x+r.width&&event.clientY>=r.y&&event.clientY<=r.y+r.height))keepHoverLabel(c);else dismissHoverLabelSoon(c);},{passive:true});
     on(document,'keydown',event=>{
       if(event.key==='Shift'){
         if(!event.repeat)c.shiftTap=!event.defaultPrevented&&!event.isComposing&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&canStartFaceSequence(c,event.target);
@@ -562,7 +593,7 @@
       if(event.key!=='Shift'||!tapped||event.defaultPrevented||event.isComposing||event.shiftKey||event.ctrlKey||event.metaKey||event.altKey)return;
       if(startFaceSequence(c,event.target)){event.preventDefault();event.stopPropagation();}
     },{capture:true});
-    for(const type of ['blur','pointerdown','wheel'])on(window,type,()=>{c.shiftTap=false;},{capture:true,passive:true});
+    for(const type of ['blur','pointerdown','wheel'])on(window,type,()=>{c.shiftTap=false;if(type==='blur')clearHoverLabel(c);},{capture:true,passive:true});
     on(c.dialog,'scroll',()=>place(c),{passive:true});
     on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>{if(c.popup?.classList.contains('face-picker')&&c.active)revealFace(c,c.active);place(c);});on(window.visualViewport,'scroll',()=>place(c));}
     if(typeof ResizeObserver!=='undefined'){c.resize=new ResizeObserver(()=>place(c));c.resize.observe(image);c.resize.observe(stage);}

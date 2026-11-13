@@ -12,7 +12,7 @@ const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url
 function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false,visualViewport=null}={}){
  const view={width:desktop?1200:360,height:800,frameHeight:null},created=[];
  class Node extends EventTarget{
-  constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
+  constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={setProperty(key,value){this[key]=value;},getPropertyValue(key){return this[key]||'';}};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
   get parentNode(){return this.parent;}
   get isConnected(){return this===document||Boolean(this.parent?.isConnected);}
   get classList(){return {toggle:(value,force)=>{const enabled=force??!this.className.split(' ').includes(value);this.classList[enabled?'add':'remove'](value);return enabled;},contains:value=>this.className.split(' ').includes(value),add:(...values)=>{this.className=[...new Set([...this.className.split(' '),...values])].join(' ');},remove:(...values)=>{this.className=this.className.split(' ').filter(x=>!values.includes(x)).join(' ');}};}
@@ -892,4 +892,47 @@ test('Shift also advances through already tagged faces once and stops after the 
   const panel=f.find('face-popover face-picker');assert.ok(panel);assert.equal(f.find('face-selection').style.left,face.rect.x*100+'%');const host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson='yona';host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];f.emit(panel.querySelector('input'),'input');await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();
  }
  assert.equal(f.find('face-popover face-picker'),undefined,'The last tagged face ends the sequence without restarting at the first');f.faces.clear();
+});
+
+test('hovering a saved face keeps the other face picker, search, focus and keyboard sequence intact',async()=>{
+ const person={id:'yona',name:'יונה'},saved={...first,id:'saved-hover',personId:'yona',person},f=fixture([second],{desktop:true}),writes=[];
+ f.window.FamilyI18n.fetch=async(path,options)=>{if(options?.method==='POST')writes.push({path,options});return Response.json({faces:[saved]});};await f.mount('hover-with-picker',{highlightMissing:true},{scope:'gallery'});
+ const hits=f.find('face-hit-buttons').children,known=hits.find(hit=>hit.dataset.faceId===saved.id),unknown=hits.find(hit=>hit!==known);f.emit(f.stage,'click',{target:unknown,detail:0});
+ const picker=f.find('face-popover face-picker'),input=picker.querySelector('input'),active=f.stage._familyFaceContext.active.id;input.value='חיפוש שלא הסתיים';input.focus();
+ f.emit(known,'pointerenter',{pointerType:'mouse'});const info=f.find('face-popover face-name face-hover-name');assert.ok(info);assert.match(info.innerHTML,/יונה/);assert.doesNotMatch(info.innerHTML,/data-face-remove|data-face-edit/);
+ assert.equal(f.find('face-popover face-picker'),picker);assert.equal(f.stage._familyFaceContext.active.id,active);assert.equal(input.value,'חיפוש שלא הסתיים');assert.equal(f.document.activeElement,input);assert.equal(writes.length,0);
+ f.emit(f.document,'keydown',{key:'Tab',target:input});assert.equal(f.find('face-popover face-name face-hover-name'),undefined);assert.ok(f.find('face-popover face-picker'));assert.equal(f.stage._familyFaceContext.active.personId,'yona');f.faces.clear();
+});
+test('a temporary hover label can be read and dismissed without closing the picker and is removed with its photo',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const person={id:'yona',name:'יונה'},saved={...first,id:'saved-hover',personId:'yona',person},f=fixture([second],{desktop:true});f.window.FamilyI18n.fetch=async()=>Response.json({faces:[saved]});await f.mount();
+ const hits=f.find('face-hit-buttons').children,known=hits.find(hit=>hit.dataset.faceId===saved.id);f.emit(f.stage,'click',{target:hits.find(hit=>hit!==known),detail:0});const picker=f.find('face-popover face-picker');f.emit(known,'pointerenter',{pointerType:'mouse'});let info=f.find('face-popover face-name face-hover-name');
+ f.emit(known,'pointerleave',{pointerType:'mouse',relatedTarget:info});f.emit(info,'pointerenter',{pointerType:'mouse'});t.mock.timers.tick(500);assert.equal(f.find('face-popover face-name face-hover-name'),info);
+ f.emit(info,'pointerleave',{pointerType:'mouse'});t.mock.timers.tick(249);assert.equal(f.find('face-popover face-name face-hover-name'),info);t.mock.timers.tick(1);assert.equal(f.find('face-popover face-name face-hover-name'),undefined);assert.equal(f.find('face-popover face-picker'),picker);
+ f.emit(known,'pointerenter',{pointerType:'mouse'});assert.ok(f.find('face-popover face-name face-hover-name'));f.faces.clear();t.mock.timers.tick(500);assert.equal(f.find('face-popover face-name face-hover-name'),undefined);
+});
+test('upload hover information never redirects a pending tag to the person being inspected',async()=>{
+ const person={id:'yona',name:'יונה'},draft={key:'hover-upload',rotation:0,faceTags:[{...first,id:'already-tagged',personId:'yona',person}],facesComplete:false},adapter=createUploadFaceAdapter(draft,{findPeople:async()=>[person],getPerson:()=>person}),f=fixture([second],{desktop:true,windows:true,hoverNone:true});adapter.enabled=()=>true;
+ f.window.FamilyI18n.fetch=async()=>{throw Error('Upload hover and tags must remain local');};await f.mount(draft.key,{adapter});f.emit(f.find('face-regions-toggle'),'click');
+ const hits=f.find('face-hit-buttons').children,known=hits.find(hit=>hit.dataset.faceId==='already-tagged'),unknown=hits.find(hit=>hit!==known);f.emit(f.stage,'click',{target:unknown,detail:0});
+ const picker=f.find('face-popover face-picker'),host=picker.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson='yona';host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];
+ f.emit(known,'pointerenter',{pointerType:'mouse'});assert.ok(f.find('face-popover face-name face-hover-name'));await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();
+ assert.equal(draft.faceTags.length,2);assert.ok(draft.faceTags.some(face=>Math.abs(face.rect.x-second.rect.x)<1e-9));assert.equal(f.find('face-popover face-name face-hover-name'),undefined);f.faces.clear();
+});
+test('touch hover does not open a second label over an active face picker',async()=>{
+ const saved={...first,id:'known',personId:'yona',person:{id:'yona',name:'יונה'}},f=fixture([second]);f.window.FamilyI18n.fetch=async()=>Response.json({faces:[saved]});await f.mount();const hits=f.find('face-hit-buttons').children;f.emit(f.stage,'click',{target:hits.find(hit=>hit.dataset.faceId!==saved.id),detail:0});const picker=f.find('face-popover face-picker');f.emit(hits.find(hit=>hit.dataset.faceId===saved.id),'pointerenter',{pointerType:'touch'});assert.equal(f.find('face-popover face-name face-hover-name'),undefined);assert.equal(f.find('face-popover face-picker'),picker);f.faces.clear();
+});
+test('small and large face frames keep their exact bounds and a thin screen-sized stroke through image and pinch zoom',async()=>{
+ for(const options of [{desktop:true},{desktop:false},{desktop:true,windows:true,hoverNone:true}]){
+  const viewport=new EventTarget();Object.assign(viewport,{width:360,height:800,scale:1,offsetLeft:0,offsetTop:0});const f=fixture([],{...options,visualViewport:viewport}),person={id:'yona',name:'יונה'},small={id:'small',rect:{x:.15,y:.2,width:.02,height:.03},personId:'yona',person},large={id:'large',rect:{x:.55,y:.35,width:.2,height:.25},personId:'yona',person},original=JSON.stringify([small,large]);f.window.FamilyI18n.fetch=async()=>Response.json({faces:[small,large]});await f.mount('frame-sizes',{}, {faceSummary:{reviewed:true}});await new Promise(resolve=>setImmediate(resolve));
+  const toolbar=f.find('face-zoom-toolbar'),hits=f.find('face-hit-buttons').children;
+  for(const scale of [1,2,4]){
+   viewport.scale=scale;viewport.width=360/scale;viewport.height=800/scale;viewport.dispatchEvent(new Event('resize'));
+   for(let zoom=0;zoom<3;zoom++){
+    for(const face of [small,large]){const hit=hits.find(hit=>hit.dataset.faceId===face.id);assert.equal(hit.style.left,face.rect.x*100+'%');assert.equal(hit.style.width,face.rect.width*100+'%');const stroke=parseFloat(hit.style.getPropertyValue('--face-stroke'))*scale;assert.ok(stroke>=.6&&stroke<=1.2);assert.ok(parseFloat(hit.style.getPropertyValue('--face-handle-size'))*scale<=7.1);}
+    f.emit(f.stage,'click',{target:hits.find(hit=>hit.dataset.faceId===small.id),detail:0});const selection=f.find('face-selection');assert.equal(selection.style.width,small.rect.width*100+'%');assert.equal(selection.style.height,small.rect.height*100+'%');assert.ok(parseFloat(selection.style.getPropertyValue('--face-stroke'))*scale<=1.2);assert.equal(hits.find(hit=>hit.dataset.faceId===small.id).classList.contains('face-editor-active'),true);
+    f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
+   }
+  }
+  assert.equal(JSON.stringify([small,large]),original);f.faces.clear();
+ }
 });
