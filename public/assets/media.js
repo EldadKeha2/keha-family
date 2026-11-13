@@ -418,11 +418,12 @@
   }
   function init(){
     const stage=$('mediaStage');
+    const previousPhoto=options=>step(-1,options),nextPhoto=options=>step(1,options);
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
       enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:()=> 'queued',
       vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
-      step,
+      step,right:nextPhoto,left:previousPhoto,
       move:(dx,{queued=false}={})=>{
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}
         const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=dx>0?1:-1,next=photoNeighbour(direction,from);
@@ -480,7 +481,7 @@
       const remove=event.target.closest('[data-media-delete]');if(remove)requestDelete(remove.dataset.mediaScope,remove.dataset.mediaDelete);
     });
     $('closeMediaViewer').addEventListener('click',()=>$('mediaViewer').close());
-    $('mediaPrevious').addEventListener('click',()=>step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.()}));$('mediaNext').addEventListener('click',()=>step(1,{instant:window.FamilyPhotoPresentation?.desktop?.()}));
+    $('mediaPrevious').addEventListener('click',()=>previousPhoto({instant:window.FamilyPhotoPresentation?.desktop?.()}));$('mediaNext').addEventListener('click',()=>nextPhoto({instant:window.FamilyPhotoPresentation?.desktop?.()}));
     $('mediaViewerDelete').addEventListener('click',()=>requestDelete(state.scope,current()?.id));
     $('confirmMediaDelete').addEventListener('click',confirmDelete);
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());

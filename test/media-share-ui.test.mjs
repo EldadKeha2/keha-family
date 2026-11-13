@@ -219,6 +219,20 @@ test('a pending neighbour cannot overwrite a later gallery page selected by anot
  const pending=f.window.FamilyMedia.step(1);await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.window.FamilyMedia.photoState().pageLoading,false);
  finish(f.document.createElement('img'));await pending;assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
 });
+test('physical right and left gestures call explicit Next and Previous actions instead of adapting step signs',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const stream of ['pointer','touch','wheel']){
+  const f=fixture(),stage=f.get('mediaStage'),calls=[];stage.clientWidth=360;
+  f.window.FamilyPhotoSwipe.bind(stage,{enabled:()=>true,mouse:()=>true,right:()=>calls.push('next'),left:()=>calls.push('previous'),step:()=>calls.push('legacy-step')});
+  const stroke=dx=>{
+   if(stream==='pointer'){swipe(f,dx);return;}
+   if(stream==='wheel'){stage.handlers.get('wheel')({deltaX:dx,deltaY:0,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){}});t.mock.timers.tick(120);return;}
+   const touch=(type,x)=>{const point={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[point],changedTouches:[point],target:point.target,cancelable:true,preventDefault(){}};(type==='touchstart'?stage.handlers:f.events).get(type)(event);};
+   touch('touchstart',180);touch('touchmove',180+dx);touch('touchend',180+dx);
+  };
+  stroke(120);stroke(-120);assert.deepEqual(calls,['next','previous'],stream);
+ }
+});
 test('touch swipes navigate every photo album in both languages and on wide touch screens',()=>{
  for(const english of [false,true])for(const width of [360,1440])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nostalgia','nursery:ruti']){
   const f=fixture({english});f.get('mediaStage').clientWidth=width;
