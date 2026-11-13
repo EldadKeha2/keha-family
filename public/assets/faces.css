@@ -88,7 +88,6 @@
 :is(#mediaViewer,#photoUploadEditor) .face-person-option:hover,:is(#mediaViewer,#photoUploadEditor) .face-person-option:focus-visible,:is(#mediaViewer,#photoUploadEditor) .face-person-option[aria-selected=true]{background:#eff3e6}
 .face-person-option>span:last-child{display:flex;flex-direction:column;min-width:0;gap:2px}
 .face-person-option strong{font-weight:500;font-size:calc(14px * var(--a11y-text-scale,1));overflow-wrap:anywhere}
-.face-person-option small{font-size:calc(11px * var(--a11y-text-scale,1));color:#928164;line-height:1.35}
 :is(#mediaViewer,#photoUploadEditor) .face-add-name{background:#f1f4e9;border-top:1px solid #cbd3bb}
 :is(#mediaViewer,#photoUploadEditor) .face-add-name strong{font-weight:600}
 .face-person-check{display:grid;place-items:center;width:21px;height:21px;flex:0 0 21px;color:#859067;border:1px solid #cbd3bb;border-radius:4px;background:#f6f6eb}
@@ -129,7 +128,7 @@
 .face-resizing{user-select:none}.face-resizing .face-selection{cursor:grabbing}
 @media(any-pointer:coarse){.face-selection[data-face-resizable] .face-resize-handle{width:32px;height:32px}}
 
-/* The next unlabelled face is selected without opening its editor. */
+/* Manual fallback when a selected face's editor cannot open yet. */
 .face-advance-button{position:absolute;z-index:12;display:flex;align-items:center;justify-content:center;width:34px;height:25px;min-height:0;padding:3px 7px;border:1px solid #b8c69c;border-radius:0 0 10px 10px;background:#f8f5e9;color:#546c40;box-shadow:0 2px 7px #243b2440;transform:translate(-50%,4px);pointer-events:auto;touch-action:manipulation}
 .face-advance-button[hidden]{display:none!important}
 .face-advance-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}

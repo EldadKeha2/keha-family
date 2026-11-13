@@ -59,10 +59,24 @@ export function chooseFace(faces,point,size){
 export function manualRect(point,size){const width=Math.min(.3,Math.max(.0005,32/size.width)),height=Math.min(.4,Math.max(.0005,32/size.height));return clampRect({x:Math.max(0,Math.min(1-width,point.x-width/2)),y:Math.max(0,Math.min(1-height,point.y-height/2)),width,height});}
 export function popoverPosition(face,panel,viewport){
   const gap=8,pad=8,left=viewport.left||0,top=viewport.top||0,right=left+viewport.width,bottom=top+viewport.height;
-  const width=Math.min(panel.width,viewport.width-2*pad),height=Math.min(panel.height,viewport.height-2*pad);
-  let x=face.x+face.width+gap,y=face.y;
-  if(x+width>right-pad){if(face.x-gap-width>=left+pad)x=face.x-gap-width;else{x=face.x+face.width/2-width/2;y=face.y+face.height+gap;}}
-  return {x:Math.max(left+pad,Math.min(right-width-pad,x)),y:Math.max(top+pad,Math.min(bottom-height-pad,y)),width,maxHeight:viewport.height-2*pad};
+  const width=Math.max(0,Math.min(panel.width,viewport.width-2*pad)),height=Math.max(0,Math.min(panel.height,viewport.height-2*pad));
+  const x0=left+pad,y0=top+pad,x1=right-pad,y1=bottom-pad,clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  // Choose free space around the whole face instead of clamping a panel back
+  // over it when the keyboard or a screen edge leaves too little room.
+  const regions=[
+    {side:'right',x:Math.max(x0,face.x+face.width+gap),y:y0,right:x1,bottom:y1},
+    {side:'left',x:x0,y:y0,right:Math.min(x1,face.x-gap),bottom:y1},
+    {side:'below',x:x0,y:Math.max(y0,face.y+face.height+gap),right:x1,bottom:y1},
+    {side:'above',x:x0,y:y0,right:x1,bottom:Math.min(y1,face.y-gap)}
+  ].map(r=>({...r,width:Math.max(0,r.right-r.x),height:Math.max(0,r.bottom-r.y)})).filter(r=>r.width>0&&r.height>0);
+  let region=regions.find(r=>r.width>=width&&r.height>=height);
+  if(!region){
+    const usable=regions.filter(r=>r.width>=Math.min(width,140)&&r.height>=Math.min(height,140));
+    region=(usable.length?usable:regions).sort((a,b)=>Math.min(b.width,width)*Math.min(b.height,height)-Math.min(a.width,width)*Math.min(a.height,height))[0];
+  }
+  if(!region)return {x:x0,y:y0,width,maxHeight:Math.max(0,viewport.height-2*pad)};
+  const w=Math.min(width,region.width),h=Math.min(height,region.height),horizontal=['left','right'].includes(region.side);
+  return {x:horizontal?(region.side==='left'?region.right-w:region.x):clamp(face.x+face.width/2-w/2,region.x,region.right-w),y:horizontal?clamp(face.y,region.y,region.bottom-h):region.side==='above'?region.bottom-h:region.y,width:w,maxHeight:region.height};
 }
 
 // Protect the whole head, with extra room above the model's face rectangle.

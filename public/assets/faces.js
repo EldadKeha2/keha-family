@@ -8,7 +8,7 @@
   const controlRoots=['toolbar','missingNote','reviewButton','reviewStatus','regionsButton','regionsNote'];
   function releaseControls(){if(retained){for(const key of controlRoots)retained.controls[key]?.remove();retained=null;}}
   const remember=(id,faces,item,detectedFaces=labels.get(id)?.detectedFaces||[],ignoredFaces=labels.get(id)?.ignoredFaces||[],unassignedFaces=labels.get(id)?.unassignedFaces||[])=>{labels.set(id,{faces,detectedFaces,ignoredFaces,unassignedFaces,time:Date.now(),tagsRevision:item?.tagsRevision,photoRevision:item?.photoRevision||'original',reviewed:Boolean(item?.faceSummary?.reviewed)});if(labels.size>128)labels.delete(labels.keys().next().value);};
-  const helpers=()=>geometry||=import('./face-geometry.mjs?v=10');
+  const helpers=()=>geometry||=import('./face-geometry.mjs?v=11');
   const uuid=()=>crypto.randomUUID?crypto.randomUUID().replaceAll('-',''):[...crypto.getRandomValues(new Uint8Array(16))].map(byte=>byte.toString(16).padStart(2,'0')).join('');
   const touchMode=event=>event?.pointerType?['touch','pen'].includes(event.pointerType):event?.sourceCapabilities?.firesTouchEvents||Date.now()<touchUntil||matchMedia('(hover:none), (max-width:700px)').matches;
   // Editing capabilities belong to the device, not its most recent pointer.
@@ -71,13 +71,17 @@
     const button=[...c.buttons.children].find(node=>node.dataset.faceId===face.id);
     button?.focus({preventScroll:true});button?.scrollIntoView?.({block:'nearest',inline:'nearest'});
   }
-  function advanceAfterSave(c,saved){
+  function revealFace(c,face){
+    const button=[...c.buttons.children].find(node=>node.dataset.faceId===face.id);
+    button?.scrollIntoView?.({block:'nearest',inline:'nearest'});
+  }
+  function advanceUnlabelledFace(c,saved){
     const order=tabFaces(c),index=order.findIndex(face=>sameTabFace(c,face,saved));
     for(let offset=1;offset<order.length;offset++){
       const candidate=order[(index+offset+order.length)%order.length],next=c.faces.find(face=>!face.person&&sameTabFace(c,face,candidate));
       if(!next||sameTabFace(c,next,saved))continue;
-      closePopup(c);c.queuedFace=next;c.tabFace=next;paintTabFace(c);focusTabFace(c,next);
-      announce(c,tr('התיוג נשמר. הפנים הבאות ללא שם מסומנות.','Label saved. The next unlabelled face is selected.'));return true;
+      closePopup(c);c.queuedFace=next;c.tabFace=next;paintTabFace(c);revealFace(c,next);openQueuedFace(c);
+      announce(c,tr('הפנים הבאות ללא שם מוכנות לתיוג.','The next unlabelled face is ready to tag.'));return true;
     }
     return false;
   }
@@ -157,7 +161,14 @@
       const v=viewport(),scale=v.scale,visible={width:v.width*scale,height:v.height*scale};
       const onScreen=rect=>({x:(rect.x-v.left)*scale,y:(rect.y-v.top)*scale,width:rect.width*scale,height:rect.height*scale});
       Object.assign(c.popup.style,{transform:scale===1?'none':`scale(${1/scale})`,maxWidth:Math.max(0,visible.width-16)+'px',maxHeight:Math.max(0,visible.height-16)+'px'});
-      const r=c.popup.getBoundingClientRect(),panel={width:r.width*scale||270,height:r.height*scale||180},p=c.geom.popoverPosition(onScreen(screenFace(c,c.active)),panel,visible);
+      const r=c.popup.getBoundingClientRect(),panel={width:r.width*scale||270,height:r.height*scale||180},selected=onScreen(screenFace(c,c.active));
+      const faceOnScreen=c.popup.classList.contains('face-picker')?c.geom.labelFaceBounds(selected):selected;
+      let p=c.geom.popoverPosition(faceOnScreen,panel,visible);
+      if(c.popup.classList.contains('face-picker')){
+        Object.assign(c.popup.style,{maxWidth:p.width+'px',maxHeight:p.maxHeight+'px'});
+        const fitted=c.popup.getBoundingClientRect();
+        p=c.geom.popoverPosition(faceOnScreen,{width:fitted.width*scale,height:fitted.height*scale},visible);
+      }
       if(c.popup.classList.contains('face-name')){
         const face=onScreen(screenFace(c,{...c.active,rect:annotationRect(c,c.active)})),faces=annotationFaces(c,image).map(rect=>onScreen({...rect,x:rect.x+image.x,y:rect.y+image.y}));
         const placed=c.geom.layoutFaceLabels([{width:panel.width,height:panel.height,face}],{...visible,faces});
@@ -354,8 +365,8 @@
     try{
       const people=await (c.adapter?.findPeople||window.FamilyTags.findPeople)(query,(c.item.tags||[]).map(person=>person.id));if(!live(c)||c.saving||c.popup!==panel||sequence!==c.searchSequence)return;
       const name=String(query).trim().replace(/\s+/g,' '),key=normalizeName(name),exact=people.some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalizeName(alias)===key));
-      host.innerHTML=people.map(person=>`<button class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="${person.id===c.active?.personId}">${personAvatar(person)}<span><strong dir="auto">${safe(I.personName(person))}</strong><small>${safe(person.context)}</small></span></button>`).join('')||`<p class="face-no-results">${tr('לא נמצא שם מתאים. אפשר להוסיף שם חדש.','No matching name. You can add a new name.')}</p>`;
-      if(key&&!exact)host.innerHTML+=`<button class="face-person-option face-add-name" type="button" role="option" data-face-add aria-selected="false"><span class="face-person-check" aria-hidden="true">＋</span><span><strong dir="auto">${tr('הוספת השם ״','Add “')}${safe(name)}${tr('״','”')}</strong><small>${tr('תיוג הפנים בשם חדש','Tag this face with a new name')}</small></span></button>`;
+      host.innerHTML=people.map(person=>`<button class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="${person.id===c.active?.personId}">${personAvatar(person)}<span><strong dir="auto">${safe(I.personName(person))}</strong></span></button>`).join('')||`<p class="face-no-results">${tr('לא נמצא שם מתאים. אפשר להוסיף שם חדש.','No matching name. You can add a new name.')}</p>`;
+      if(key&&!exact)host.innerHTML+=`<button class="face-person-option face-add-name" type="button" role="option" data-face-add aria-selected="false"><span class="face-person-check" aria-hidden="true">＋</span><span><strong dir="auto">${tr('הוספת השם ״','Add “')}${safe(name)}${tr('״','”')}</strong></span></button>`;
       for(const button of host.querySelectorAll('[data-face-person]'))button.addEventListener('click',()=>save(c,{personId:button.dataset.facePerson}));
       host.querySelector('[data-face-add]')?.addEventListener('click',()=>save(c,{name}));place(c);
       host.setAttribute('aria-busy','false');
@@ -363,6 +374,7 @@
   }
   async function openPicker(c,face,{preserveRect=false}={}){
     if(!live(c)||c.saving)return;c.queuedFace=null;if(c.advanceButton)c.advanceButton.hidden=true;closePopup(c);c.active=face;c.selection.hidden=false;rememberTabFace(c,face);
+    revealFace(c,face);
     if(c.loadError){c.loadError=false;c.loading=load(c,true).catch(error=>{c.loadError=true;throw error;});c.loading.catch(()=>{});}
     const panel=document.createElement('div');panel.className='face-popover face-picker';panel.setAttribute('role','dialog');panel.setAttribute('aria-label',tr('תיוג פנים בתמונה','Tag a face in the photo'));panel.dir=I.isEnglish?'ltr':'rtl';
     panel.innerHTML=`<header><strong>${tr('מי בתמונה?','Who is this?')}</strong><button type="button" data-face-close aria-label="${tr('סגירה','Close')}">×</button></header>${face.person?`<p class="face-current-name" dir="auto">${safe(photoName(face))}</p>`:''}<label class="visually-hidden" for="facePersonSearch">${tr('חיפוש או הוספת שם','Search or add a name')}</label><input id="facePersonSearch" type="search" autocomplete="off" maxlength="120" placeholder="${tr('חפשו או הוסיפו שם…','Search or add a name…')}" aria-controls="facePersonResults" aria-autocomplete="list"><div id="facePersonResults" class="face-person-results" data-face-results role="listbox" aria-label="${tr('שמות לתיוג הפנים','Names for this face')}"></div><p class="face-save-status" data-face-status role="status"></p><div class="face-picker-actions"><button type="button" data-face-adjust>${tr('דיוק אזור הפנים','Adjust face area')}</button>${face.person?`<button type="button" data-face-remove>${tr('הסרת התיוג הזה','Remove this tag')}</button>`:`<button type="button" data-face-ignore>${tr('התעלמות מהזיהוי הזה','Ignore this detection')}</button>`}</div>`;
@@ -387,13 +399,14 @@
   function ignoreDetection(c){const pending=ignore(c);c.pendingSave=pending;return pending;}
   async function ignore(c){
     if(!live(c)||c.saving||!c.active)return;const face={...c.active};c.saving=true;
+    const order=tabFaces(c);if(!order.some(previous=>sameTabFace(c,previous,face)))order.push(face);
     // Remove the selected region and rebuild both number sets in this frame.
     c.pendingDismiss=face;closePopup(c);paint(c);
     try{
       await c.loading;if(!c.adapter)await window.FamilyTags.flush(c.item.id);if(!live(c))return;
       const payload={rect:face.rect,ignored:true,photoRevision:c.item.photoRevision||'original',...(face.person?{faceId:face.id,expectedRevision:face.revision}: {})},result=c.adapter?await c.adapter.ignore(payload):await request('api/media/'+c.item.id+'/faces/ignore',{method:'POST',body:JSON.stringify(payload)});
       changed(c,result);
-      if(live(c)){c.pendingDismiss=null;c.ignored=result.ignoredFaces||[];apply(c,result.faces);announce(c,tr('הסימון והתיוג הוסרו.','Face marker and label removed.'));}
+      if(live(c)){c.saving=false;c.pendingDismiss=null;c.ignored=result.ignoredFaces||[];apply(c,result.faces);announce(c,tr('הסימון והתיוג הוסרו.','Face marker and label removed.'));advanceUnlabelledFace(c,face);}
     }catch(error){if(live(c)){c.pendingDismiss=null;paint(c);announce(c,error.message);window.FamilyApp?.toast?.(error.message);}}
     finally{c.saving=false;}
   }
@@ -416,7 +429,7 @@
       const payload={faceId:known?.id||face.id,...selection,rect:face.rect,expectedRevision:known?.revision||null},result=c.adapter?await c.adapter.save(payload):await request('api/media/'+c.item.id+'/faces/save',{method:'POST',body:JSON.stringify(payload)});
       changed(c,result);c.pendingUnassign=null;
       if(!c.adapter)remember(c.item.id,result.faces,result.item,c.detected,result.ignoredFaces,c.retained);
-      if(live(c)){c.saving=false;if(result.ignoredFaces)c.ignored=result.ignoredFaces;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face&&!(advance&&advanceAfterSave(c,result.face))){showLabel(c,result.face,touchMode(),true);if(c.tabFace){rememberTabFace(c,result.face);focusTabFace(c,result.face);}}}
+      if(live(c)){c.saving=false;if(result.ignoredFaces)c.ignored=result.ignoredFaces;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face&&!(advance&&advanceUnlabelledFace(c,result.face))){showLabel(c,result.face,touchMode(),true);if(c.tabFace){rememberTabFace(c,result.face);focusTabFace(c,result.face);}}}
     }catch(error){if(live(c)&&removing){c.pendingUnassign=null;c.reviewed=Boolean(c.item.faceSummary?.reviewed);paint(c);announce(c,error.message);window.FamilyApp?.toast?.(error.message);}else if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const control of panel.querySelectorAll('button,input'))control.disabled=false;}}
     finally{c.saving=false;}
   }
@@ -523,7 +536,7 @@
       event.preventDefault();event.stopPropagation();button.click();
     },{capture:true});
     on(c.dialog,'scroll',()=>place(c),{passive:true});
-    on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>place(c));on(window.visualViewport,'scroll',()=>place(c));}
+    on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>{if(c.popup?.classList.contains('face-picker')&&c.active)revealFace(c,c.active);place(c);});on(window.visualViewport,'scroll',()=>place(c));}
     if(typeof ResizeObserver!=='undefined'){c.resize=new ResizeObserver(()=>place(c));c.resize.observe(image);c.resize.observe(stage);}
     c.loading=load(c).catch(error=>{c.loadError=true;if(error.name!=='AbortError')announce(c,tr('אפשר להוסיף תיוג פנים אחרי שהחיבור יחזור.','Face tags can be added when the connection returns.'));throw error;});c.loading.catch(()=>{});
     const imageReady=()=>new Promise(resolve=>{if(imageWidth(image)&&(image.complete||image.tagName?.toLowerCase()==='canvas'))resolve();else on(image,'load',resolve,{once:true});});

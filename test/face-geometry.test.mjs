@@ -93,6 +93,18 @@ test('the name picker prefers the right of a face and stays within narrow or key
   const p=popoverPosition(face,{width:280,height:340},viewport);assert.ok(p.x>=8);assert.ok(p.x+p.width<=viewport.width-8);assert.ok(p.y>=(viewport.top||0)+8);assert.ok(p.y+Math.min(340,p.maxHeight)<=(viewport.top||0)+viewport.height-8);
  }
 });
+test('the picker uses space beside, above or below a face without covering any of it, including above a phone keyboard',()=>{
+ const panel={width:280,height:340};
+ for(const viewport of [{width:1200,height:800},{width:360,height:800},{width:360,height:280},{width:320,height:568},{width:812,height:375},{width:375,height:280,top:120}]){
+  const left=viewport.left||0,top=viewport.top||0;
+  for(const [x,y]of [[left+8,top+8],[left+viewport.width-78,top+8],[left+viewport.width/2-35,top+viewport.height-78],[left+viewport.width/2-35,top+viewport.height/2-35]]){
+   const face={x,y,width:70,height:70},p=popoverPosition(face,panel,viewport),box={x:p.x,y:p.y,width:p.width,height:Math.min(panel.height,p.maxHeight)};
+   assert.ok(p.x>=left+8&&p.x+p.width<=left+viewport.width-8);
+   assert.ok(p.y>=top+8&&p.y+box.height<=top+viewport.height-8);
+   assert.equal(intersection(box,face),0,JSON.stringify({viewport,face,box}));
+  }
+ }
+});
 test('a manually selected face at an image edge remains a valid server rectangle',()=>{
  for(const size of [{width:250,height:700},{width:900,height:250}])for(const point of [{x:0,y:0},{x:1,y:1},{x:.5,y:.5}])assert.doesNotThrow(()=>faceRect(manualRect(point,size)));
 });
