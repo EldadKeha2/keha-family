@@ -121,6 +121,19 @@ test('grid and viewer use the same outward-arrow fullscreen symbol',()=>{
  const f=fixture(),viewerIcon=f.find('photo-fullscreen-viewer').innerHTML.split('</svg>')[0];
  assert.equal(f.opener._photoFullscreenLaunch.innerHTML.split('</svg>')[0],viewerIcon);
 });
+test('all fullscreen views offer independent labels and ages without resetting playback or transition choices',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture(),updates=[];f.window.FamilyFullscreenFaces={mount(){},clear(){},configure:value=>updates.push(value)};f.media.current().takenDate={year:1980};
+ f.api.enter();await f.flush();f.find('photo-fullscreen-effects').click();f.find('photo-fullscreen-speed').value='2';f.emit(f.find('photo-fullscreen-speed'),'change');f.api.play();
+ f.find('photo-fullscreen-names').click();f.find('photo-fullscreen-ages').click();assert.equal(updates.at(-1).showNames,true);assert.equal(updates.at(-1).showAges,true);
+ assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'true');t.mock.timers.tick(2000);await f.flush();
+ assert.equal(f.media.current().id,'b');assert.ok(f.stepOptions.at(-1).effect);assert.equal(f.find('photo-fullscreen-ages').disabled,true);assert.equal(f.api.options().showAges,true,'The age preference survives an undated photo');f.api.exit();
+});
+test('loading another branch pauses the timer and navigation until its photos are ready without changing speed or effects',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.enter();await f.flush();f.api.play();
+ f.api.setAlbumStatus(true,'Loading family');assert.equal(f.api.isBlocked(),true);assert.equal(f.find('photo-fullscreen-next').disabled,true);t.mock.timers.tick(20000);assert.equal(f.steps.length,0);
+ f.api.setAlbumStatus(false);t.mock.timers.tick(4000);await f.flush();assert.equal(f.media.current().id,'b');f.api.exit();assert.equal(f.api.isBlocked(),false);
+});
 test('slideshow speed changes replace the active timer and still wait for loaded photos',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.enter();await f.flush();const speed=f.find('photo-fullscreen-speed');f.find('photo-fullscreen-play').click();
  for(const value of [.25,.5,1,1.5,2]){

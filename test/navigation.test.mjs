@@ -10,6 +10,13 @@ function fixture(href,{phone=false}={}){
   const reload=()=>vm.runInContext(navigationSource,context);
   reload();return {...browser,window,reload,nav:window.FamilyNavigation};
 }
+test('a shared family screensaver tab has a home parent and returns with the selected language',async()=>{
+ for(const phone of [false,true]){
+  const f=fixture('https://family.test/?lang=en-GB#screensaver',{phone});
+  assert.equal(f.location.hash,'#screensaver');f.nav.back();await f.flush();
+  assert.equal(f.location.hash,phone?'#home':'#tree');assert.equal(new URL(f.location.href).searchParams.get('lang'),'en-GB');
+ }
+});
 
 test('all direct game links have a lobby parent on desktop and in a phone app, including legacy links',async()=>{
   const ids=fixture('https://family.test/#games').nav.gameIds;

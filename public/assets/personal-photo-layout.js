@@ -98,7 +98,7 @@
       arrange(editDock,[$('editOpenedPhoto')]);arrange(reviewDock,[controller?.reviewButton]);
       const sharing=$('mediaShareActions'),copy=$('copyMediaLink'),download=$('mediaOriginal');
       move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
-      move(sharing,below,feedback);arrange(actions,[primary,$('photoInlineDateForm'),$('openedCaptionForm')]);arrange(details,[actions,info]);
+      move(sharing,below,feedback);arrange(actions,[primary,info,$('photoInlineDateForm'),$('openedCaptionForm')]);arrange(details,[actions]);
       const footer=viewer.querySelector('.media-viewer-footer');
       move($('mediaPhotoLabels'),footer,below);
       move(controller?.labelList,footer,$('mediaTagPanel'));

@@ -17,7 +17,7 @@
   .family-photo-caption{display:block}
   .family-photo-caption [hidden]{display:none}
   .family-photo-caption-preview{display:flex;align-items:center;gap:6px;min-height:34px}
-  .family-photo-caption-preview p{flex:1;min-width:0;margin:0;color:#655f4f;font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+  .family-photo-caption-preview p{flex:1;min-width:0;margin:0;color:#4b483a;font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
   .family-photo-caption-preview p.is-empty{color:#a0947c;font-size:calc(13px * var(--a11y-text-scale,1))}
   .family-photo-caption-edit{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border:1px solid transparent;border-radius:5px;color:#8c7e60;background:transparent}
   .family-photo-caption-edit:hover{color:#566b43;background:#f0f2e7;border-color:#dde2cc}

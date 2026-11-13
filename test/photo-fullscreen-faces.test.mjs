@@ -11,7 +11,7 @@ function fixture({read=async()=>faces,naturalWidth=1000,naturalHeight=600}={}){
   setAttribute(name,value){this[name]=value;}
   append(...nodes){for(const node of nodes){node.parent=this;this.children.push(node);}}
   remove(){this.isConnected=false;if(this.parent)this.parent.children=this.parent.children.filter(node=>node!==this);}
-  getBoundingClientRect(){return this.className==='photo-fullscreen-face-label'?{left:0,top:0,width:120,height:34}:{left:0,top:0,width:1000,height:600};}
+  getBoundingClientRect(){return this.className?.split(' ').includes('photo-fullscreen-face-label')?{left:0,top:0,width:120,height:34}:{left:0,top:0,width:1000,height:600};}
   querySelector(selector){return this.children.find(node=>node.className===selector.slice(1))||null;}
  }
  const stage=new Node(),image=new Node(),window=new EventTarget(),document=new EventTarget(),requests=[];image.naturalWidth=naturalWidth;image.naturalHeight=naturalHeight;let busy=false;
@@ -19,7 +19,7 @@ function fixture({read=async()=>faces,naturalWidth=1000,naturalHeight=600}={}){
  vm.runInNewContext(source,{window,document,AbortController,Date,setTimeout,clearTimeout});
  const api=window.FamilyFullscreenFaces,item=id=>({id,kind:'photo',tags:[]});
  const pointer=(type,x=500,y=240,pointerType='mouse',extra={})=>{const event=new Event(type);for(const [key,value]of Object.entries({clientX:x,clientY:y,pointerType,pointerId:1,buttons:0,...extra}))Object.defineProperty(event,key,{value});stage.dispatchEvent(event);return event;};
- return {api,window,document,stage,image,requests,pointer,item,busy(value){busy=value;},mount(id='a'){api.mount(stage,image,item(id));},bubble:()=>stage.querySelector('.photo-fullscreen-face-label'),outline:()=>stage.querySelector('.photo-fullscreen-face-outline')};
+ return {api,window,document,stage,image,requests,pointer,item,busy(value){busy=value;},mount(id='a',extra={}){api.mount(stage,image,{...item(id),...extra});},bubble:()=>stage.querySelector('.photo-fullscreen-face-label'),outline:()=>stage.querySelector('.photo-fullscreen-face-outline')};
 }
 test('fullscreen hover displays saved names, replaces the previous label and never labels an unnamed face',async()=>{
  const f=fixture();f.mount();await flush();f.pointer('pointermove');assert.equal(f.bubble().textContent,'יונה');assert.equal(f.bubble().hidden,false);assert.equal(f.outline().style.left,'400px');
@@ -47,4 +47,14 @@ test('late face requests and old input handlers cannot label a different photo o
 test('names remain text and a failed saved-label request leaves photo input usable',async()=>{
  const f=fixture({read:async()=>[{...faces[0],person:{name:'<script>Family name</script>'}}]});f.mount();await flush();f.pointer('pointermove');assert.equal(f.bubble().textContent,'<script>Family name</script>');f.api.clear();
  const failed=fixture({read:async()=>{throw Error('Offline');}});failed.mount();await flush();assert.equal(failed.pointer('pointerup').defaultPrevented,false);assert.equal(failed.bubble().hidden,true);failed.api.clear();
+});
+test('persistent names and photo ages are independent, follow each image and resize, and never invent unknown ages',async()=>{
+ const f=fixture(),ages=[];f.window.FamilyPhotoDate={ageFor(person,item){ages.push({person,item});return person.id==='yona'&&item.takenDate?.year?{text:'58'}:null;}};
+ const labels=()=>f.stage.children.filter(node=>node.className?.includes('photo-fullscreen-person-label'));
+ f.api.configure({showNames:true,showAges:true});f.mount('old',{takenDate:{year:1980}});await flush();
+ assert.deepEqual(labels().map(node=>node.textContent),['יונה · גיל 58','שלמה']);assert.ok(ages.every(call=>call.item.id==='old'));
+ f.api.configure({showNames:false});assert.deepEqual(labels().map(node=>node.textContent),['גיל 58']);
+ const old=labels()[0];f.window.dispatchEvent(new Event('resize'));assert.equal(old.isConnected,false);assert.equal(labels().length,1);
+ f.mount('undated');assert.equal(labels().length,0);await flush();assert.equal(labels().length,0,'Unknown photo dates have no age label');
+ f.api.configure({showNames:true});assert.deepEqual(labels().map(node=>node.textContent),['יונה','שלמה']);f.api.clear();assert.equal(f.stage.children.length,0);
 });

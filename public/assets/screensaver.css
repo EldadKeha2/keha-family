@@ -1,0 +1,23 @@
+.screensaver-view{padding-block:4px 20px}
+.screensaver-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.screensaver-family{display:flex;align-items:center;gap:10px;color:#64734f;font:calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.screensaver-family select{box-sizing:border-box;min-height:44px;max-width:100%;padding:7px 12px;border:1px solid #c9b68f;border-radius:8px;background:#fffdf6;color:#526441;font:inherit;cursor:pointer}
+.screensaver-label-options{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:#7b6c51;font-size:calc(14px * var(--a11y-text-scale,1))}
+.screensaver-label-options label{display:flex;align-items:center;gap:7px;min-height:44px;cursor:pointer}
+.screensaver-label-options input{width:18px;height:18px;accent-color:#647c4e}
+.screensaver-frame{position:relative;isolation:isolate;display:grid;place-items:center;min-height:360px;height:clamp(360px,54dvh,640px);overflow:hidden;border:1px solid #bfa774;border-radius:14px;background:radial-gradient(ellipse at 50% 35%,#293526,#10180f);box-shadow:0 8px 30px #56432c17,inset 0 0 0 5px #bfa77424}
+.screensaver-frame>#screensaverPreview{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:.85}
+.screensaver-invitation{position:relative;z-index:1;align-self:end;width:100%;box-sizing:border-box;text-align:center;padding:70px 20px 27px;color:#fff9e7;background:linear-gradient(transparent,#0a1009ed);text-shadow:0 2px 8px #0008}
+.screensaver-invitation>span{color:#d8c39b;font-size:20px;letter-spacing:7px}
+.screensaver-invitation h3{font:calc(30px * var(--a11y-text-scale,1))/1.4 var(--serif);margin:8px 0 17px;color:#fff9e7}
+.screensaver-invitation .primary-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:10px 24px;background:#718956;border-color:#a1b187;color:#fffdf2;box-shadow:0 3px 15px #0004;font-size:calc(16px * var(--a11y-text-scale,1));text-shadow:none}
+.screensaver-invitation .primary-button:hover{background:#819966}.screensaver-invitation .primary-button:disabled{opacity:.45;cursor:default}
+.screensaver-invitation button svg{width:20px;height:20px;fill:currentColor}
+.screensaver-placeholder{position:absolute;inset:25px 18px 170px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:14px;color:#d5cbb2;font:calc(15px * var(--a11y-text-scale,1))/1.7 var(--sans)}
+.screensaver-placeholder img{opacity:.7}.screensaver-placeholder p{margin:0;max-width:370px}
+.screensaver-preview-caption{margin:12px 0 0;text-align:center;font:calc(14px * var(--a11y-text-scale,1))/1.7 var(--sans);color:#7d735d;overflow-wrap:anywhere}
+.screensaver-footer{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;padding-top:17px;font:calc(14px * var(--a11y-text-scale,1))/1.7 var(--sans);color:#687755}
+.screensaver-footer p{margin:0;margin-inline-start:auto;color:#938467;font-size:calc(13px * var(--a11y-text-scale,1))}
+.screensaver-view [hidden]{display:none!important}
+body[data-active-view=screensaver] .workspace-actions{display:none}
+@media(max-width:700px){.screensaver-toolbar{gap:6px}.screensaver-family{gap:8px;font-size:14px}.screensaver-family select{max-width:225px}.screensaver-label-options{gap:16px;font-size:13px}.screensaver-frame{height:55dvh;min-height:340px;border-radius:10px}.screensaver-invitation h3{font-size:26px}.screensaver-footer p{margin-inline-start:0;width:100%}}

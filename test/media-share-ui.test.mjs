@@ -751,8 +751,8 @@ test('desktop photo descriptions are ready to type without a click, remain open 
   assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.get('editOpenedCaption').hidden,true);assert.equal(f.get('openedCaptionText').value,'Previous description');
   f.get('openedCaptionText').focus();f.get('openedCaptionText').value='Direct typing';f.get('openedCaptionText').handlers.get('input')();captionEnter(f);await keyboardFlush();
   assert.equal(saved.length,1);assert.equal(saved[0].expectedCaption,'Previous description');assert.equal(f.get('openedCaptionForm').hidden,false);
-  assert.equal(f.get('openedCaptionText').readOnly,true);assert.notEqual(f.document.activeElement,f.get('openedCaptionText'));assert.equal(f.get('mediaHeaderCaption').textContent,'Direct typing');
-  f.get('openedCaptionText').handlers.get('click')();assert.equal(f.get('openedCaptionText').readOnly,false);assert.equal(f.document.activeElement,f.get('openedCaptionText'));
+  assert.equal(f.get('openedCaptionText').readOnly,true);assert.notEqual(f.document.activeElement,f.get('openedCaptionText'));assert.equal(f.get('mediaHeaderCaption').textContent,'Direct typing');assert.equal(f.get('editSavedCaption').hidden,false);
+  f.get('editSavedCaption').click();assert.equal(f.get('openedCaptionText').readOnly,false);assert.equal(f.get('openedCaptionText').value,'Direct typing');assert.equal(f.document.activeElement,f.get('openedCaptionText'));assert.equal(f.get('editSavedCaption').hidden,true);
   f.get('openedCaptionText').value='Another edit';f.get('openedCaptionText').handlers.get('input')();captionEnter(f);await keyboardFlush();assert.equal(saved.length,2);assert.equal(saved[1].expectedCaption,'Direct typing');
   await f.window.FamilyMedia.step(1);assert.equal(f.get('openedCaptionText').value,'');assert.equal(f.get('openedCaptionText').readOnly,false);assert.equal(f.get('openedCaptionForm').hidden,false);f.close();
  }

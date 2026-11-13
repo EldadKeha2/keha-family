@@ -1,5 +1,7 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "שומר מסך משפחתי":"Family Screensaver",
+  "כל המשפחה, זיכרון אחרי זיכרון":"The whole family, one memory at a time",
   "ציר זמן משפחתי":"Family Timeline",
   "דורות של אנשים ורגעים, עשור אחר עשור":"Generations of people and moments, decade by decade",
   "חיפוש בשם או בשנת לידה":"Search by name or birth year",

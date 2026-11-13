@@ -274,6 +274,7 @@
   }
   function openFrom(scope,id){const items=albums.get(scope)||[];return open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
   async function step(direction,{native=false,instant=false,queued=false,effect=null}={}){
+    if(state.fullscreen&&window.FamilyPhotoFullscreen?.isBlocked?.())return;
     if(!current())return;hideSwipeHint();
     if(inlinePhotoCaption()&&captionEditing){
       const owner={session:state.session,navigation:state.navigation,id:identity(current())};
@@ -382,6 +383,7 @@
     $('mediaViewer').classList.toggle('media-caption-inline',inline);$('editOpenedCaption').hidden=inline;
     form.hidden=!(inline||captionEditing);
     input.readOnly=inline&&captionLocked;form.classList.toggle('caption-saved',input.readOnly);
+    const editSaved=$('editSavedCaption');if(editSaved){editSaved.hidden=!input.readOnly;editSaved.title=tr('עריכת התיאור','Edit description');editSaved.setAttribute('aria-label',editSaved.title);}
     if(!captionEditing){expectedCaption=current()?.caption||'';input.value=expectedCaption;$('openedCaptionError').textContent='';}
     form.querySelector('label').textContent=inline?tr('תיאור התמונה','Photo description'):tr('כיתוב לתמונה או לקובץ','Photo or file description');
     input.setAttribute('dir',I18n.isEnglish?'ltr':'rtl');
@@ -464,6 +466,7 @@
       catch(error){notify(error.message);}
     });
     $('editOpenedCaption').addEventListener('click',()=>{beginCaptionEdit();$('openedCaptionText').focus();});
+    $('editSavedCaption')?.addEventListener('click',()=>{beginCaptionEdit(true);$('openedCaptionText').focus();});
     $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionLocked=false;captionEditor++;captionSave=null;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;captionControls();});
     $('openedCaptionText').addEventListener('click',()=>{if(inlinePhotoCaption()&&captionLocked){beginCaptionEdit(true);$('openedCaptionText').focus();}});
     $('openedCaptionText').addEventListener('input',()=>{if(inlinePhotoCaption())beginCaptionEdit(true);});
@@ -518,7 +521,7 @@
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
     $('mediaViewer').addEventListener('close',()=>{hideSwipeHint();const returnPage=state.returnPage;state.returnPage=null;state.session++;state.navigation++;state.paging=false;state.pageTarget=null;state.pageRequest=null;state.photoLoading=false;state.photoTarget=null;state.fullscreen=false;$('mediaViewer').classList.toggle('photo-fullscreen',false);window.FamilyPhotoFullscreen?.closed();instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(returnPage&&state.scope==='gallery'&&(window.FamilyPortal?.galleryQuery?.().page??albumPages.get('gallery')?.page)!==returnPage)window.FamilyPortal?.pageGallery?.(returnPage)?.catch?.(()=>notify(tr('לא ניתן לחזור לעמוד התמונות כרגע.','The original photo page could not be restored.')));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
-      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open]')||event.target.closest('input,textarea'))return;
+      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open]')||event.target.closest('input,textarea,select'))return;
       if(event.key==='ArrowLeft'){event.preventDefault();step(-1);}
       if(event.key==='ArrowRight'){event.preventDefault();step(1);}
     });
