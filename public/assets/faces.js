@@ -336,19 +336,21 @@
   function showLabel(c,face,touch,feedback=false){
     if(!live(c)||!face.person||(!feedback&&c.popup?.dataset.tagFeedback&&c.active?.id===face.id))return;if(c.queuedFace)stopTabFaces(c);closePopup(c);c.active=face;
     const bubble=document.createElement('div');bubble.className='face-popover face-name';bubble.setAttribute('role','group');bubble.setAttribute('aria-label',tr('מי בתמונה','Who is in the photo'));bubble.dir=I.isEnglish?'ltr':'rtl';
-    bubble.innerHTML=nameHTML(face,!c.adapter&&!feedback)+(touch&&!feedback?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:'');if(!feedback)bindProfile(c,bubble,face);
+    bubble.innerHTML=nameHTML(face,!c.adapter&&!feedback)+(touch&&!feedback?`<button type="button" data-face-edit aria-label="${tr('עריכת תיוג הפנים','Edit face tag')}">✎</button>`:'')+(!feedback?`<button type="button" data-face-remove aria-label="${safe(tr('הסרת התיוג של ','Remove tag for ')+photoName(face))}">${tr('הסרת התיוג','Remove tag')}</button>`:'');if(!feedback)bindProfile(c,bubble,face);
     if(feedback||touch)bubble.dataset.timedLabel='true';if(feedback){bubble.dataset.tagFeedback='true';bubble.style.pointerEvents='none';}
     if(touch&&!feedback&&desktopResize())c.selection.hidden=false;
     bubble.addEventListener('pointerenter',()=>keepLabel(c));
     bubble.addEventListener('pointerleave',event=>{if(!touchMode(event))dismissLabelSoon(c);});
     bubble.addEventListener('focusin',()=>keepLabel(c));
     bubble.addEventListener('focusout',event=>{if(c.popup===bubble&&!bubble.contains(event.relatedTarget))closePopup(c);});
-    if(touch&&!feedback){
-      const edit=bubble.querySelector('[data-face-edit]');
+    if(!feedback){
+      const bindAction=(selector,action)=>{const button=bubble.querySelector(selector);
       // Keep the label mounted from pointer press through click, including when
-      // a touch browser does not transfer focus to the pencil button.
-      edit.addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();if(c.popup===bubble){clearTimeout(c.labelTimer);c.labelTimer=null;}});
-      edit.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();if(live(c)&&c.popup===bubble)openPicker(c,face);});
+      // a touch browser does not transfer focus to an action button.
+      button.addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();if(c.popup===bubble){clearTimeout(c.labelTimer);c.labelTimer=null;}});
+      button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();if(live(c)&&c.popup===bubble&&(!c.adapter||c.adapter.enabled()))action();});};
+      if(touch)bindAction('[data-face-edit]',()=>openPicker(c,face));
+      bindAction('[data-face-remove]',()=>dismissFace(c));
     }
     c.popup=bubble;c.dialog.append(bubble);place(c);if(feedback||touch)c.labelTimer=setTimeout(()=>{if(live(c)&&c.popup===bubble)closePopup(c);},feedback?500:2000);
   }
@@ -422,7 +424,7 @@
     if(advance&&selection?.personId!==null){const order=tabFaces(c);if(!order.some(previous=>sameTabFace(c,previous,face)))order.push(face);}
     const removing=selection?.personId===null;
     if(removing){c.pendingUnassign=face;c.reviewed=false;closePopup(c);paint(c);}
-    if(panel){panel.querySelector('[data-face-status]').textContent=tr('שומר את התיוג…','Saving the tag…');for(const control of panel.querySelectorAll('button,input'))control.disabled=true;}
+    if(panel){const status=panel.querySelector('[data-face-status]');if(status)status.textContent=tr('שומר את התיוג…','Saving the tag…');for(const control of panel.querySelectorAll('button,input'))control.disabled=true;}
     try{
       await c.loading;if(!c.adapter)await window.FamilyTags.flush(c.item.id);if(!live(c))return;
       const known=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));

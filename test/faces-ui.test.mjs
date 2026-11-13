@@ -359,6 +359,32 @@ test('face names open real profiles on desktop and touch; free names and unknown
  }
 });
 
+test('saved face bubbles always remove the selected tag directly, including from that person’s profile gallery',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const desktop of [false,true])for(const duplicate of [false,true])for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
+  const f=fixture([],{desktop}),person={id:'yona',name:'יונה'},otherPerson=duplicate?person:{id:'shlomo',name:'שלמה'},selected={id:'selected',revision:'face-1',rect:{x:.1,y:.2,width:.1,height:.1},personId:person.id,person},other={id:'other',revision:'other-1',rect:{x:.7,y:.2,width:.1,height:.1},personId:otherPerson.id,person:otherPerson},requests=[],opened=[];let saved=[selected,other];
+  f.window.FamilyApp.getPerson=()=>person;f.window.FamilyApp.openPerson=id=>opened.push(id);
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(path.endsWith('/save')){requests.push(JSON.parse(options.body));saved=[other];return Response.json({operation:'faces',scope,item:{id:'direct-remove',kind:'photo',scope,tags:[otherPerson],tagsRevision:'t2'},faces:saved,unassignedFaces:[{rect:selected.rect}],ignoredFaces:[]});}
+   return Response.json({faces:saved});
+  };
+  await f.mount('direct-remove',{}, {scope,tags:[person,otherPerson],tagsRevision:'t1'});const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===selected.id);
+  if(desktop)f.emit(hit,'focus');else f.emit(f.stage,'click',{detail:1,target:hit});
+  const bubble=f.find('face-popover face-name');assert.match(bubble.innerHTML,/data-face-remove[^>]*>הסרת התיוג<\/button>/);const remove=bubble.querySelector('[data-face-remove]'),query=bubble.querySelector.bind(bubble);bubble.querySelector=selector=>selector==='[data-face-status]'?null:query(selector);
+  f.emit(remove,'pointerdown',{pointerType:desktop?'mouse':'touch'});t.mock.timers.tick(2300);assert.equal(f.find('face-popover face-name'),bubble,'The action must survive its press through the click');f.emit(remove,'click');await f.faces.flush();
+  assert.equal(requests.length,1,scope);assert.equal(requests[0].personId,null);assert.equal(requests[0].faceId,selected.id);assert.equal(requests[0].expectedRevision,'face-1');assert.deepEqual(opened,[]);
+  const remaining=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===other.id);assert.ok(remaining);assert.match(remaining['aria-label'],new RegExp(otherPerson.name),'Another occurrence of the same person retains its tag');assert.equal(f.find('face-popover face-name'),undefined);f.emit(remove,'click');await f.faces.flush();assert.equal(requests.length,1,'A detached old button cannot remove another face');f.faces.clear();
+ }
+});
+test('a failed direct removal in a profile gallery restores the saved face and reports the failure',async()=>{
+ for(const desktop of [false,true]){
+  const f=fixture([],{desktop}),person={id:'yona',name:'יונה'},face={...first,id:'named',revision:'current',personId:person.id,person},errors=[];let requests=0;
+  f.window.FamilyApp.toast=message=>errors.push(message);f.window.FamilyI18n.fetch=async path=>{if(path.endsWith('/save')){requests++;return Response.json({error:'Connection lost'},{status:503});}return Response.json({faces:[face]});};
+  await f.mount('failed-direct',{}, {scope:'personal:yona',tags:[person]});f.emit(f.find('face-hit-buttons').children[0],'focus');const bubble=f.find('face-popover face-name');f.emit(bubble.querySelector('[data-face-remove]'),'click');await f.faces.flush();
+  assert.equal(requests,1);assert.equal(errors.length,1);assert.match(errors[0],/Connection lost/);assert.match(f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===face.id)['aria-label'],/יונה/);f.faces.clear();
+ }
+});
+
 test('editing an existing face survives focus leaving its former name bubble on desktop and touch',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const desktop of [false,true]){

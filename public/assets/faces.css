@@ -69,12 +69,13 @@
 .face-selection{position:absolute;border:2px dashed #f5dca3;border-radius:5px;box-shadow:0 0 0 1px #50603c88;pointer-events:none}
 :is(#mediaViewer,#photoUploadEditor) .face-hit.face-tab-current{outline:2px solid #f5dca3;outline-offset:2px;box-shadow:0 0 0 3px #304a36b3}
 .face-popover{position:fixed;z-index:30;max-width:calc(100vw - 16px);transform-origin:top left;box-sizing:border-box;border:1px solid #b8a078;border-radius:9px;background:#fffdf6;color:#4e583e;box-shadow:0 8px 30px #3f352b33;font:calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans);overflow:auto;overscroll-behavior:contain;text-align:start}
-.face-name{display:flex;align-items:center;gap:9px;padding:8px 12px;width:max-content;max-width:260px;background:#f2f5e8;border-color:#a6b58d;box-shadow:0 4px 13px #39452b35;pointer-events:auto}
+.face-name{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:8px 12px;width:max-content;max-width:260px;background:#f2f5e8;border-color:#a6b58d;box-shadow:0 4px 13px #39452b35;pointer-events:auto}
 .face-name>span,.face-name>.face-profile-link{font-weight:600;overflow-wrap:anywhere}
 .face-profile-link{color:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer;touch-action:manipulation}
 .face-profile-link:hover{color:#314520}
 .face-profile-link:focus-visible{outline:2px solid #647d48;outline-offset:4px;border-radius:2px}
 :is(#mediaViewer,#photoUploadEditor) .face-name button{pointer-events:auto;min-width:36px;min-height:36px;padding:3px;border:1px solid #c5ceb5;border-radius:6px;font-size:calc(19px * var(--a11y-text-scale,1));line-height:1;background:#fffdf4;flex-shrink:0}
+:is(#mediaViewer,#photoUploadEditor) .face-name [data-face-remove]{padding:5px 8px;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.3;color:#944f40;border-color:#d5b9ab}
 .face-picker{width:280px;padding:10px}
 .face-picker .face-tab-help{margin:8px 0 0;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.5;color:#64714e}
 .face-picker>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
