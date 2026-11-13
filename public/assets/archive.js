@@ -166,7 +166,7 @@
     window.FamilyTags.refresh(grid,items);
     if(selection&&grid.contains(active)){active.focus({preventScroll:true});active.setSelectionRange(...selection);}
     const nostalgia=key==='nostalgia',empty=$(nostalgia?'nostalgiaEmpty':'weddingMediaEmpty');empty.hidden=nostalgia||collection.items.length>0;
-    $(nostalgia?'nostalgiaCount':'weddingMediaCount').textContent=I18n.html`${items.length}${items.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?I18n.word(items.length,'memory','memories'):I18n.t('זיכרונות')}`;
+    $(nostalgia?'nostalgiaCount':'weddingMediaCount').textContent=I18n.html`${items.length}${!nostalgia&&items.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?I18n.word(items.length,'memory','memories'):I18n.t('זיכרונות')}`;
     $(nostalgia?'nostalgiaFilters':'weddingMediaFilters').querySelectorAll('[data-archive-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.archiveFilter===filter)));
     updateUploadUI(key);
   }
