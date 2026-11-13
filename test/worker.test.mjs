@@ -60,6 +60,16 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('Tal and Tedi family wedding video belongs to their couple page and keeps its family-video title',async()=>{
+ const f=fixture();try{
+  await f.connect();const wedding=await(await f.call('/api/weddings/u-tidhar')).json();
+  const film=wedding.collection.items.find(item=>item.youtubeId==='iPhMBV5eMnQ');assert.ok(film);assert.equal(film.provider,'youtube');assert.equal(film.kind,'video');assert.match(film.name,/סרטון המשפחה/);assert.match(film.nameEn,/Family video/);
+  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).collection.items.some(item=>item.id===film.id),false);
+  const memory='אני זוכר את הריקוד המשפחתי ואת הצחוק סביב השולחן.';
+  const response=await f.call('/api/weddings/u-tidhar/greetings',{method:'POST',body:{author:'בדיקת זיכרון',body:memory}});assert.equal(response.status,201);
+  f.restart();const saved=await(await f.call('/api/weddings/u-tidhar')).json();assert.equal(saved.greetings[0].body,memory);assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).greetingCount,0);
+ }finally{await f.close();}
+});
 test('large nostalgia video routes retain the existing origin and write-marker checks and reject oversized sessions before storage',async()=>{
  const f=fixture();try{
   await f.connect();

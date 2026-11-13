@@ -1,5 +1,18 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "שתפו זיכרון מהחתונה":"Share a wedding memory",
+  "הרגעים שנשארו איתנו":"The moments that stayed with us",
+  "זיכרונות וברכות מהחתונה":"Wedding memories and wishes",
+  "מה אתם זוכרים מהחתונה":"What do you remember from the wedding",
+  "רגע מצחיק, מפגש מרגש או סיפור קטן. גם משפט אחד הוא זיכרון ששווה לשמור":"A funny moment, a moving encounter or a small story. Even one sentence is a memory worth keeping",
+  "מי משתף":"Who is sharing",
+  "הזיכרון או הברכה שלכם":"Your memory or wishes",
+  "ספרו על רגע מהחתונה, אפילו במשפט אחד. אפשר גם להשאיר ברכה לזוג":"Share a wedding moment, even in one sentence. You can also leave wishes for the couple",
+  "הוספת זיכרון או ברכה":"Add a memory or wishes",
+  "זיכרונות וברכות":"Memories and wishes",
+  "הזיכרון הראשון עוד לפנינו":"Be the first to share a memory",
+  "שתפו משהו שאתם זוכרים מהחתונה. זיכרון קצר או ברכה יישארו כאן לצד האלבום":"Share something you remember from the wedding. Your short memory or wishes will stay here alongside the album",
+  "הזיכרון או הברכה נוספו לעמוד החתונה":"Your memory or wishes were added to the wedding page",
   "האחסון לא אישר את העלאת הסרטון. אפשר לנסות שוב":"Storage did not confirm the video upload. Please try again",
   "האחסון לא התחיל את העלאת הסרטון. נסו שוב":"Storage did not start the video upload. Please try again",
   "חלק מהסרטון לא נשמר. אפשר לנסות שוב":"Part of the video was not saved. Please try again",

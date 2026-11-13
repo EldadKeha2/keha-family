@@ -16,4 +16,11 @@ export const weddingVideos=[{
   filename:'סרט החתונה של שני ותומר',file:'c4a2b35148764fea96ea4dbd8d29b901',
   category:'wedding:u-tomer',provider:'youtube',kind:'video',mime:'video/youtube',
   size:0,caption:'',createdAt:'2026-11-13T00:00:00.000Z'
+},{
+  id:'40e5d94bd0d44e28b8f27066ae0e42ea',youtubeId:'iPhMBV5eMnQ',
+  name:'סרטון המשפחה לחתונה של טל ותדהר',nameEn:'Family video for Tal and Tedi’s wedding',
+  filename:'סרטון המשפחה לחתונה של טל ותדהר',file:'40e5d94bd0d44e28b8f27066ae0e42ea',
+  category:'wedding:u-tidhar',provider:'youtube',kind:'video',mime:'video/youtube',
+  size:0,caption:'',createdAt:'2026-11-13T00:00:00.000Z'
 }];
+

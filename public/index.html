@@ -63,7 +63,7 @@
   <script src="assets/maintenance.js" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
-  <script src="assets/translations.js?v=nostalgia-large-video-v4" defer></script>
+  <script src="assets/translations.js?v=wedding-memories-v5" defer></script>
   <script src="assets/i18n.js?v=paging-labels-v1" defer></script>
   <script src="assets/photo-keyboard.js?v=desktop-captions-navigation-v1" defer></script>
   <script src="assets/photo-editor.js?v=finish-and-save-v20" type="module"></script>
@@ -94,7 +94,7 @@
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
   <script src="assets/people.js?v=circular-photo-pages-v2" defer></script>
   <script src="assets/biography.js" type="module"></script>
-  <script src="assets/archive.js?v=nostalgia-large-video-v10" defer></script>
+  <script src="assets/archive.js?v=wedding-memories-v11" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/family-timeline.js?v=annual-portraits-v8" type="module"></script>
   <script src="assets/home.js?v=family-screensaver-tile-v3" defer></script>
@@ -217,13 +217,13 @@
           </div>
           <article id="weddingDetail" hidden>
             <div class="wedding-backbar"><button class="secondary-button" data-wedding-back>→ כל החתונות</button><span id="weddingBranch"></span><button class="quiet-button archive-share" id="shareWedding">העתקת הקישור לעמוד ↗</button></div>
-            <header class="wedding-page-intro"><span class="small-eyebrow">החתונה שלנו</span><h3 id="weddingNames"></h3><p>התמונות, הקולות והמילים ששמרנו מהיום הזה</p><div class="wedding-anniversary"><div><span id="weddingDateLabel"></span><strong id="weddingYears"></strong></div><button class="secondary-button" id="editWeddingDate">✎ עדכון יום הנישואים</button></div></header>
+            <header class="wedding-page-intro"><span class="small-eyebrow">החתונה שלנו</span><h3 id="weddingNames"></h3><p>התמונות, הקולות והמילים ששמרנו מהיום הזה</p><div class="wedding-anniversary"><div><span id="weddingDateLabel"></span><strong id="weddingYears"></strong></div><button class="secondary-button" id="editWeddingDate">✎ עדכון יום הנישואים</button></div><p><button type="button" class="secondary-button" data-share-wedding-memory aria-controls="weddingGreetingForm">שתפו זיכרון מהחתונה</button></p></header>
             <section class="wedding-album" aria-labelledby="weddingAlbumTitle"><div class="archive-section-heading"><div><span class="small-eyebrow">כל רגע, זיכרון משותף</span><h4 id="weddingAlbumTitle">האלבום של החתונה</h4></div><span id="weddingMediaCount"></span></div>
               <div class="archive-filters" id="weddingMediaFilters" aria-label="סינון אלבום החתונה"><button data-archive-filter="all" aria-pressed="true">הכול</button><button data-archive-filter="photo" aria-pressed="false">תמונות</button><button data-archive-filter="video" aria-pressed="false">סרטונים</button><button data-archive-filter="document" aria-pressed="false">ברכות ומסמכים</button></div>
               <div class="shared-media-grid mixed-media-grid" id="weddingMediaGrid"></div><div class="archive-empty" id="weddingMediaEmpty"><span aria-hidden="true">✧</span><h4>האלבום מחכה לרגע הראשון</h4><p>הוסיפו תמונות וסרטונים מהחתונה, או ברכה ששמרתם במגירה.</p></div>
               <div class="collection-upload archive-dropzone" id="weddingDropzone"><div><span class="small-eyebrow">מוסיפים לאלבום של הזוג</span><h3>הייתם שם? שתפו זיכרון</h3><p>תמונות עד 50MB · סרטונים עד 90MB · מסמכים עד 10MB<br>אפשר לבחור כמה קבצים יחד או לגרור לכאן.</p></div><div class="upload-buttons"><button class="primary-button" data-archive-upload="wedding">＋ העלאת תמונות, סרטונים וברכות</button></div><div class="collection-upload-state" id="weddingUploadState" role="status"></div><progress id="weddingProgress" max="100" value="0" hidden aria-label="התקדמות ההעלאה לאלבום החתונה"></progress></div>
             </section>
-            <section class="wedding-greetings" aria-labelledby="weddingGreetingsTitle"><div class="archive-section-heading"><div><span class="small-eyebrow">מילים שמלוות את הדרך</span><h4 id="weddingGreetingsTitle">ברכות שנשארות בלב</h4></div><span id="weddingGreetingsCount"></span></div><div class="greetings-layout"><form id="weddingGreetingForm" class="greeting-form"><h5>כותבים ברכה לזוג</h5><label>ממי הברכה?<input name="author" id="greetingAuthor" maxlength="100" autocomplete="name" placeholder="השם שלכם, אם תרצו"></label><label>הברכה שלכם<textarea dir="auto" name="body" id="greetingBody" rows="5" maxlength="10000" placeholder="זיכרון קטן מהחתונה, איחול או כמה מילים מהלב…" required></textarea></label><p class="form-error" id="greetingError" role="alert"></p><button class="primary-button" id="saveWeddingGreeting" type="submit">שמירת הברכה</button></form><div id="weddingGreetingList" class="greeting-list"></div></div></section>
+            <section class="wedding-greetings" aria-labelledby="weddingGreetingsTitle"><div class="archive-section-heading"><div><span class="small-eyebrow">הרגעים שנשארו איתנו</span><h4 id="weddingGreetingsTitle">זיכרונות וברכות מהחתונה</h4></div><span id="weddingGreetingsCount"></span></div><div class="greetings-layout"><form id="weddingGreetingForm" class="greeting-form"><h5>מה אתם זוכרים מהחתונה?</h5><p>רגע מצחיק, מפגש מרגש או סיפור קטן. גם משפט אחד הוא זיכרון ששווה לשמור.</p><label>מי משתף?<input name="author" id="greetingAuthor" maxlength="100" autocomplete="name" placeholder="השם שלכם, אם תרצו"></label><label>הזיכרון או הברכה שלכם<textarea dir="auto" name="body" id="greetingBody" rows="4" maxlength="10000" placeholder="ספרו על רגע מהחתונה, אפילו במשפט אחד. אפשר גם להשאיר ברכה לזוג." required></textarea></label><p class="form-error" id="greetingError" role="alert"></p><button class="primary-button" id="saveWeddingGreeting" type="submit">הוספת זיכרון או ברכה</button></form><div id="weddingGreetingList" class="greeting-list"></div></div></section>
           </article>
         </section>
         <section id="nostalgiaView" class="portal-view nostalgia-view" aria-label="פינת הנוסטלגיה" hidden>

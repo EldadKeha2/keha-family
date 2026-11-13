@@ -89,8 +89,8 @@
     $('weddingYears').textContent=yearsText(record);$('editWeddingDate').disabled=!record;
     if(changed){const draft=greetingDrafts.get(id);$('greetingAuthor').value=draft?.author||'';$('greetingBody').value=draft?.body||'';$('greetingError').textContent='';}
     $('saveWeddingGreeting').disabled=greetingPending.has(id);
-    const greetings=details.get(id)?.greetings||[];$('weddingGreetingsCount').textContent=I18n.html`${greetings.length} ${I18n.isEnglish?I18n.word(greetings.length,'greeting','greetings'):I18n.t('ברכות')}`;
-    $('weddingGreetingList').innerHTML=greetings.map(item=>`<article class="greeting-card"><p dir="auto">${safe(item.body)}</p><footer><strong dir="auto">${safe(item.author)}</strong><time datetime="${safe(item.createdAt)}">${safe(new Date(item.createdAt).toLocaleDateString(I18n.locale))}</time></footer></article>`).join('')||I18n.t('<div class="archive-empty"><h4>הברכה הראשונה עוד לפנינו</h4><p>כתבו איחול, ספרו על רגע מהחתונה או שלחו כמה מילים של אהבה.</p></div>');
+    const greetings=details.get(id)?.greetings||[];$('weddingGreetingsCount').textContent=I18n.html`${greetings.length} ${I18n.isEnglish?I18n.word(greetings.length,'memory or greeting','memories and greetings'):I18n.t('זיכרונות וברכות')}`;
+    $('weddingGreetingList').innerHTML=greetings.map(item=>`<article class="greeting-card"><p dir="auto">${safe(item.body)}</p><footer><strong dir="auto">${safe(item.author)}</strong><time datetime="${safe(item.createdAt)}">${safe(new Date(item.createdAt).toLocaleDateString(I18n.locale))}</time></footer></article>`).join('')||I18n.t('<div class="archive-empty"><h4>הזיכרון הראשון עוד לפנינו</h4><p>שתפו משהו שאתם זוכרים מהחתונה. זיכרון קצר או ברכה יישארו כאן לצד האלבום.</p></div>');
     renderCollection('wedding:'+id);
   }
   async function refreshWedding(id){
@@ -286,7 +286,7 @@
     try{
       await post('api/weddings/'+encodeURIComponent(id)+'/greetings',body);
       const current=greetingDrafts.get(id);if(current?.body===body.body&&current?.author===body.author){greetingDrafts.delete(id);if(state.weddingId===id)$('weddingGreetingForm').reset();}
-      await refreshWedding(id);toast(I18n.t('הברכה נוספה לעמוד החתונה ✓'));
+      await refreshWedding(id);toast(I18n.t('הזיכרון או הברכה נוספו לעמוד החתונה ✓'));
     }catch(error){if(state.weddingId===id)$('greetingError').textContent=error.message;else toast(error.message);}
     finally{greetingPending.delete(id);if(state.weddingId===id)$('saveWeddingGreeting').disabled=false;}
   }
@@ -316,6 +316,7 @@
     $('weddingBranchFilter').insertAdjacentHTML('beforeend',I18n.t('<option value="root">השורשים של כולנו</option>')+family.branches.map(branch=>`<option value="${branch.id}">${safe(I18n.branchName(branch))}</option>`).join(''));
     document.addEventListener('click',event=>{
       const open=event.target.closest('[data-open-wedding]');if(open){openWedding(open.dataset.openWedding);return;}
+      if(event.target.closest('[data-share-wedding-memory]')){$('weddingGreetingsTitle').scrollIntoView({block:'start'});$('greetingBody').focus({preventScroll:true});return;}
       if(event.target.closest('[data-wedding-back]')){if(!window.FamilyNavigation?.returnTo('#weddings'))openWedding(null);return;}
       const date=event.target.closest('[data-edit-wedding-date]');if(date){openDate(date.dataset.editWeddingDate);return;}
       if(event.target.closest('#editWeddingDate')){openDate(state.weddingId);return;}
