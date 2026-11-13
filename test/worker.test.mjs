@@ -322,8 +322,9 @@ test('malformed upload metadata is rejected before creating a file or media reco
  }finally{await f.close();}
 });
 
-async function photoEdit(f,item,{expectedVersion='original',baseVersion=expectedVersion,rotation=1,crop={x:0,y:0,width:1,height:1},bytes=Buffer.concat([photo,Buffer.from('edited')]),clientHeaders=true}={}){
+async function photoEdit(f,item,{expectedVersion='original',baseVersion=expectedVersion,rotation=1,crop={x:0,y:0,width:1,height:1},bytes=Buffer.concat([photo,Buffer.from('edited')]),clientHeaders=true,asCopy=false}={}){
   const query=new URLSearchParams({expectedVersion,baseVersion,rotation,crop:JSON.stringify(crop),filename:'edited.jpg'});
+  if(asCopy)query.set('saveAs','copy');
   return f.call('/api/media/'+item.id+'/edit?'+query,{method:'POST',body:bytes,clientHeaders,headers:{'Content-Type':'image/jpeg','Content-Length':String(bytes.length)}});
 }
 test('photo capture dates save independently, survive restart and editing, and reach every album and export',async()=>{
@@ -377,6 +378,46 @@ test('editing one photo keeps its original bytes, profile, tags, captions and al
   assert.equal(f.objects.size,2);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,7);
   f.restart();const history=await(await f.call('/api/media/'+item.id+'/versions')).json();assert.equal(history.versions.length,2);assert.equal(history.currentVersion,saved.currentVersion);
   assert.equal((await(await f.call('/api/export')).json()).photoVersions.length,2);
+ }finally{await f.close();}
+});
+test('saving a separate photo preserves every album, personal tag and metadata without changing the original or its history',async()=>{
+ const f=fixture();try{
+  await f.connect();const paths=['/api/collections/gallery/upload','/api/collections/photos/upload','/api/people/yona/photos','/api/nursery/yona/upload','/api/weddings/u-tomer/upload','/api/nostalgia/upload'];
+  for(const path of paths){
+   const uploaded=await(await uploadWithDetails(f,path,{date:{year:1986},caption:'Keep me',labels:['birthdays']})).json(),original=(uploaded.collection?.items||uploaded.person.gallery).find(item=>item.file===uploaded.file);
+   await setTags(f,original,['yona','tomer']);
+   await f.call('/api/media/'+original.id+'/collections',{method:'POST',body:{collection:'photos',scope:original.scope}});
+   await f.call('/api/people/yona/profile',{method:'POST',body:{file:original.file}});
+   await f.call('/api/media/'+original.id+'/faces/save',{method:'POST',body:{faceId:'e'.repeat(32),personId:'yona',rect:{x:.1,y:.2,width:.2,height:.3},expectedRevision:null}});
+   const before=(await(await f.call('/api/media/'+original.id+'/faces')).json()).item;
+   await f.call('/api/media/'+original.id+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:before.tagsRevision}});
+   const sourceBefore=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(original.id).data);
+   const response=await photoEdit(f,original,{asCopy:true});assert.equal(response.status,201,await response.clone().text());const result=await response.json(),copy=result.item;
+   assert.equal(result.operation,'photo-copy');assert.equal(result.sourceId,original.id);assert.notEqual(copy.id,original.id);assert.notEqual(copy.file,original.file);assert.notEqual(copy.src,original.src);
+   assert.equal(copy.caption,'Keep me');assert.equal(copy.takenDate.year,1986);assert.deepEqual(copy.labels,['birthdays']);assert.deepEqual(copy.tags.map(p=>p.id),before.tags.map(p=>p.id));assert.deepEqual(new Set(copy.collections),new Set(before.collections));assert.equal(copy.faceSummary.reviewed,true);
+   assert.equal(copy.thumbnailSrc,undefined);assert.equal(copy.previewSrc,undefined);assert.equal(copy.photoRevision,undefined);
+   for(const collection of Object.values(result.albumUpdates))assert.ok(collection.items.some(item=>item.id===copy.id));
+   for(const id of ['yona','tomer'])assert.ok(result.people[id].gallery.some(item=>item.id===copy.id));assert.equal(result.people.yona.profile,original.src);
+   const faces=await(await f.call('/api/media/'+copy.id+'/faces')).json();assert.equal(faces.faces.length,1);assert.ok(Math.abs(faces.faces[0].rect.x-.5)<1e-9);assert.notEqual(faces.faces[0].id,'e'.repeat(32));
+   assert.deepEqual(JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(original.id).data),sourceBefore);
+   assert.deepEqual(Buffer.from(await(await f.call(original.src)).arrayBuffer()),photo);assert.deepEqual(Buffer.from(await(await f.call(copy.src)).arrayBuffer()),Buffer.concat([photo,Buffer.from('edited')]));
+   assert.equal((await(await f.call('/api/media/'+original.id+'/versions')).json()).versions.length,1);assert.equal((await(await f.call('/api/media/'+copy.id+'/versions')).json()).versions.length,1);
+   const edited=await(await photoEdit(f,copy)).json();assert.equal(edited.item.id,copy.id);assert.equal((await(await f.call('/api/media/'+original.id+'/versions')).json()).currentVersion,'original');
+  }
+  f.restart();assert.equal((await(await f.call('/api/collections/gallery')).json()).count,2);
+ }finally{await f.close();}
+});
+test('separate copies of historical versions use their face positions and remain independent through source deletion',async()=>{
+ const f=fixture();try{
+  await f.connect();const original=await taggedUpload(f);await setTags(f,original,['yona']);
+  const rect={x:.1,y:.2,width:.2,height:.3};await f.call('/api/media/'+original.id+'/faces/save',{method:'POST',body:{faceId:'e'.repeat(32),personId:'yona',rect,expectedRevision:null}});
+  const edited=await(await photoEdit(f,original)).json();
+  const copied=await photoEdit(f,original,{asCopy:true,rotation:0,baseVersion:'original',expectedVersion:edited.currentVersion,bytes:photo});assert.equal(copied.status,201);const copy=(await copied.json()).item;
+  for(const [key,value]of Object.entries((await(await f.call('/api/media/'+copy.id+'/faces')).json()).faces[0].rect))assert.ok(Math.abs(value-rect[key])<1e-9);
+  assert.equal((await(await f.call('/api/media/'+original.id+'/versions')).json()).currentVersion,edited.currentVersion);
+  assert.equal((await photoEdit(f,original,{asCopy:true})).status,409);assert.equal((await photoEdit(f,original,{asCopy:true,expectedVersion:edited.currentVersion,clientHeaders:false})).status,403);
+  assert.equal((await f.call('/api/media/'+original.id+'/delete',{method:'POST',body:{scope:original.scope}})).status,200);
+  f.restart();assert.deepEqual(Buffer.from(await(await f.call(copy.src)).arrayBuffer()),photo);assert.equal((await(await f.call('/api/media/'+copy.id+'/versions')).json()).versions.length,1);
  }finally{await f.close();}
 });
 test('restoring an older photo preserves later versions and restores its face coordinates',async()=>{

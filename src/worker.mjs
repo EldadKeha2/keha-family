@@ -152,12 +152,12 @@ async function editPhoto(request,env,db,ctx,id){
   await db('photo.prepare',change);
   const media=await streamUpload(request,LIMITS.photo);let format;
   try{format=sniff(media.head);}catch(error){await media.body.cancel();throw error;}
-  const versionId=uid(),version={id:versionId,key:'photo-versions/'+id+'/'+versionId+format.ext,mime:format.mime,size:media.size,filename:filename(params.get('filename'))};
+  const asCopy=params.get('saveAs')==='copy',versionId=uid(),version={id:versionId,key:(asCopy?'photo-copies/':'photo-versions/'+id+'/')+versionId+format.ext,mime:format.mime,size:media.size,filename:filename(params.get('filename'))};
   let body=media.body,transfer=Promise.resolve();
   if(typeof FixedLengthStream!=='undefined'){const fixed=new FixedLengthStream(media.size);transfer=body.pipeTo(fixed.writable);body=fixed.readable;transfer.catch(()=>{});}
   try{await Promise.all([putObject(env,version.key,body,media.size,format.mime),transfer]);}
   catch(error){ctx.waitUntil(deleteObject(env,version.key).catch(()=>{}));throw error;}
-  try{return json(await db('photo.save',{...change,version}),201);}
+  try{return json(await db(asCopy?'photo.copy':'photo.save',{...change,version}),201);}
   catch(error){
     // A known transaction rejection cannot reference this unique staged file.
     // Keep bytes after an uncertain state-service failure: its commit may have succeeded.

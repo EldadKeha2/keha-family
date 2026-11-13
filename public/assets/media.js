@@ -455,7 +455,12 @@
     $('editOpenedPhoto')?.addEventListener('click',async()=>{
       const item=current();if(!item||item.kind!=='photo')return;
       if(!app()?.apiEnabled||!window.FamilyPhotoEditor?.edit){notify(tr('העורך אינו זמין כרגע. נסו לרענן.','The editor is unavailable. Please refresh.'));return;}
-      try{const result=await window.FamilyPhotoEditor.edit({...item});if(!result)return;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));notify(tr('התמונה נשמרה. הגרסאות הקודמות זמינות בעורך ✓','Photo saved. Previous versions are available in the editor ✓'));}
+      try{
+        const result=await window.FamilyPhotoEditor.edit({...item});if(!result)return;
+        window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+        if(result.operation==='photo-copy')for(const [scope,collection]of Object.entries(result.albumUpdates||{}))if(scope!==result.scope)window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{...result,scope,collection,people:undefined,person:undefined}}));
+        notify(result.operation==='photo-copy'?tr('נשמרה תמונה נפרדת באותם אלבומים ✓','A separate photo was saved in the same albums ✓'):tr('התמונה נשמרה. הגרסאות הקודמות זמינות בעורך ✓','Photo saved. Previous versions are available in the editor ✓'));
+      }
       catch(error){notify(error.message);}
     });
     $('editOpenedCaption').addEventListener('click',()=>{beginCaptionEdit();$('openedCaptionText').focus();});
@@ -490,7 +495,9 @@
     window.addEventListener('family-thumbnail-ready',event=>{const item=event.detail.item;if(item)for(const items of albums.values())for(const photo of items)if(photo.id===item.id){photo.thumbnailSrc=item.thumbnailSrc;photo.thumbnailSize=item.thumbnailSize;photo.previewSrc=item.previewSrc||photo.previewSrc;photo.previewSize=item.previewSize||photo.previewSize;}});
     window.addEventListener('family-media-changed',event=>{const result=event.detail;if(result.collection&&'cover' in result.collection)albumCovers.set(result.scope,result.collection.cover);if(!result.item)return;for(const [scope,items]of [...albums]){
       const albumRemoval=result.operation==='collection'&&result.included===false&&scope===result.scope&&/^(nursery|wedding):/.test(scope);
-      const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope)||albumRemoval,updated=items.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);
+      const copied=result.operation==='photo-copy'&&!items.some(item=>item.id===result.item.id)&&items.some(item=>item.id===result.sourceId);
+      const sourceItems=copied?items.flatMap(item=>item.id===result.sourceId?[item,result.item]:[item]):items;
+      const remove=result.operation==='delete'||(result.operation==='untag'&&scope===result.contextScope)||albumRemoval,updated=sourceItems.filter(item=>!(remove&&item.id===result.item.id)).map(item=>item.id===result.item.id?{...item,...result.item}:item);
       // The visible photo may already be absent from the filtered album. Keep
       // its latest metadata, and pin it through every subsequent tag/scan event.
       if(!remove&&state.scope===scope&&state.activeId===result.item.id)state.items=state.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);

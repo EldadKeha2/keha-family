@@ -27,7 +27,7 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
   querySelectorAll(selector){const nodes=[...this.children,...this.queries.values()];return nodes.flatMap(node=>[...(node.matches(selector)?[node]:[]),...node.querySelectorAll(selector)]);}
   contains(node){return node===this||[...this.children,...this.queries.values()].some(child=>child.contains(node));}
   closest(selector){return this.matches(selector)?this:this.parent?.closest(selector)||null;}
-  matches(selector){return selector.split(',').some(value=>{value=value.trim();if(value.startsWith('.'))return this.classList.contains(value.slice(1));if(value==='[data-face-handle]')return Boolean(this.dataset.faceHandle);if(value==='dialog[open]')return this.tagName.toLowerCase()==='dialog'&&this.open;if(value==='[hidden]')return this.hidden;if(value==='[inert]')return Boolean(this.inert);if(value==='[aria-hidden="true"]')return this['aria-hidden']==='true';if(value==='[role="textbox"]')return this.role==='textbox';return ['input','textarea','select'].includes(value)&&this.tagName.toLowerCase()===value;});}
+  matches(selector){return selector.split(',').some(value=>{value=value.trim();if(value.startsWith('#'))return this.id===value.slice(1);if(value.startsWith('.'))return this.classList.contains(value.slice(1));if(value==='[data-face-handle]')return Boolean(this.dataset.faceHandle);if(value==='dialog[open]')return this.tagName.toLowerCase()==='dialog'&&this.open;if(value==='[hidden]')return this.hidden;if(value==='[inert]')return Boolean(this.inert);if(value==='[aria-hidden="true"]')return this['aria-hidden']==='true';if(value==='[role="textbox"]')return this.role==='textbox';return ['input','textarea','select'].includes(value)&&this.tagName.toLowerCase()===value;});}
   focus(){document.activeElement=this;}
   click(){this.dispatchEvent(new Event('click',{cancelable:true}));}
   getClientRects(){return this.closest('[hidden]')?[]:[this.getBoundingClientRect()];}
@@ -825,4 +825,71 @@ test('the upload wizard removes dashed tags from the rotated draft without makin
  f.window.FamilyI18n.fetch=async()=>{throw Error('A draft must not use the media API');};await f.mount(d.key,{adapter,reviewHost:f.title,reviewLabel:true,zoom:false});const toggle=f.find('face-regions-toggle');assert.equal(toggle.parent,f.title);assert.equal(f.find('face-regions-text').textContent,'הצג אזורים מתויגים');f.emit(toggle,'click');
  const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId==='two');assert.notEqual(hit.style.left,second.rect.x*100+'%');enabled=false;f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(d.faceTags.length,2);
  enabled=true;f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(d.faceTags.length,2);f.emit(f.find('face-popover face-picker').querySelector('[data-face-remove]'),'click');assert.equal(f.find('face-hit-buttons').children.length,2);await f.faces.flush();assert.equal(changed,1);assert.equal(d.faceTags.length,1);assert.equal(d.faceTags[0].id,'one');assert.deepEqual(d.ignoredFaces,[]);assert.deepEqual(d.unassignedFaces,[second.rect]);assert.equal(faceDraftPeople(d).length,1);assert.equal(d.facesComplete,false);assert.equal(toggle['aria-pressed'],'true');f.faces.clear();
+});
+
+test('upload backslash confirms all faces from date and description fields in Hebrew and English keyboard layouts',async()=>{
+ for(const code of ['Backslash','IntlBackslash']){
+  const f=fixture([],{desktop:true}),draft={key:'upload-metadata',rotation:0,faceTags:[],facesComplete:false},adapter=createUploadFaceAdapter(draft,{findPeople:async()=>[],getPerson:()=>null});adapter.enabled=()=>true;
+  f.dialog.id='photoUploadEditor';const metadata=f.document.createElement('section');metadata.id='photoEditMetadata';f.dialog.append(metadata);
+  f.window.FamilyI18n.fetch=async()=>{throw Error('An upload draft must not write to the media API');};await f.mount(draft.key,{adapter,dialog:f.dialog,reviewHost:f.title,zoom:false});
+  for(const id of ['photoEditDateday','photoEditDatemonth','photoEditDateyear','photoEditCaption']){
+   const input=f.document.createElement(id==='photoEditCaption'?'textarea':'input');input.id=id;input.value=id==='photoEditCaption'?'משפחה':'1990';metadata.append(input);input.focus();
+   for(const complete of [true,false]){
+    const event=f.emit(f.document,'keydown',{key:'\\',code,target:input});assert.equal(event.defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(draft.facesComplete,complete);assert.equal(f.find('face-review-button')['aria-pressed'],String(complete));
+   }
+   input.remove();
+  }
+  const event=f.emit(f.document,'keydown',{key:'ש',code,target:f.stage});assert.equal(event.defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(draft.facesComplete,true,'The physical key works regardless of the selected keyboard language');
+  const search=f.document.createElement('input');f.dialog.append(search);assert.equal(f.emit(f.document,'keydown',{key:'\\',code,target:search}).defaultPrevented,false,'Typing outside upload metadata stays available');
+  adapter.enabled=()=>false;assert.equal(f.emit(f.document,'keydown',{key:'\\',code,target:f.stage}).defaultPrevented,false);f.faces.clear();
+ }
+});
+
+test('a standalone desktop Shift starts at the first unlabelled face and saved names keep advancing in upload and gallery sessions',async()=>{
+ for(const upload of [true,false]){
+  const f=fixture([first,second],{desktop:true}),person={id:'yona',name:'יונה'},saved=[{id:'labelled',rect:{x:.05,y:.1,width:.1,height:.1},personId:'yona',person}];let adapter;
+  if(upload){
+   const draft={key:'shift-draft',rotation:0,faceTags:saved.map(face=>({...face})),facesComplete:false};adapter=createUploadFaceAdapter(draft,{findPeople:async()=>[person],getPerson:()=>person});adapter.enabled=()=>true;
+  }else f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(path.endsWith('/save')){const input=JSON.parse(options.body),face={id:'new-shift-face',rect:input.rect,personId:'yona',person,revision:'new'};saved.push(face);return Response.json({faces:saved,face});}return Response.json({faces:saved});
+  };
+  f.window.FamilyTags.findPeople=async()=>[person];await f.mount('shift-start',{...(adapter?{adapter,dialog:f.dialog,reviewHost:f.title}:{}),highlightMissing:!upload},{scope:'gallery',faceSummary:{partial:true}});
+  const field=f.document.createElement('input');f.dialog.append(field);field.focus();
+  assert.equal(f.emit(f.document,'keydown',{key:'Shift',shiftKey:true,target:field}).defaultPrevented,false);assert.equal(f.find('face-popover face-picker'),undefined,'A modifier must wait for release so key combinations retain their behavior');
+  assert.equal(f.emit(f.document,'keyup',{key:'Shift',target:field}).defaultPrevented,true);
+  const panel=f.find('face-popover face-picker'),selection=f.find('face-selection');assert.ok(panel);assert.equal(f.document.activeElement,panel.querySelector('input'));assert.equal(selection.style.left,first.rect.x*100+'%');
+  const host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson='yona';host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();
+  assert.equal(f.find('face-selection').style.left,second.rect.x*100+'%');assert.ok(f.find('face-popover face-picker'));f.faces.clear();
+ }
+});
+test('Shift opens the first saved face in a fully tagged photo and resets for each newly opened picture',async()=>{
+ const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'};
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces:[{...first,id:'first-saved',personId:'yona',person},{...second,id:'second-saved',personId:'yona',person}]});
+ for(const id of ['fully-tagged-one','fully-tagged-two']){
+  await f.mount(id,{}, {scope:'gallery',faceSummary:{reviewed:true}});await new Promise(resolve=>setImmediate(resolve));f.emit(f.document,'keydown',{key:'Shift',shiftKey:true,target:f.stage});assert.equal(f.emit(f.document,'keyup',{key:'Shift',target:f.stage}).defaultPrevented,true);
+  assert.equal(f.find('face-selection').style.left,first.rect.x*100+'%');assert.ok(f.find('face-popover face-picker'));f.faces.clear();
+ }
+});
+test('Shift combinations, drags, unavailable contexts and phones never start a face sequence',async()=>{
+ const f=fixture([first],{desktop:true});await f.mount('shift-guards',{}, {scope:'gallery'});
+ const press=()=>f.emit(f.document,'keydown',{key:'Shift',shiftKey:true,target:f.stage}),release=()=>f.emit(f.document,'keyup',{key:'Shift',target:f.stage});
+ for(const key of ['Control','Enter','Tab','A','ArrowLeft','ArrowRight']){press();f.emit(f.document,'keydown',{key,shiftKey:true,target:f.stage});assert.equal(release().defaultPrevented,false);assert.equal(f.find('face-popover face-picker'),undefined);}
+ for(const type of ['pointerdown','wheel','blur']){press();f.emit(f.window,type);assert.equal(release().defaultPrevented,false);}
+ for(const flags of [{ctrlKey:true},{metaKey:true},{altKey:true},{isComposing:true},{repeat:true}]){f.emit(f.document,'keydown',{key:'Shift',shiftKey:true,target:f.stage,...flags});assert.equal(release().defaultPrevented,false);}
+ const other=f.document.createElement('dialog'),field=f.document.createElement('input');other.open=true;other.append(field);f.document.body.append(other);f.emit(f.document,'keydown',{key:'Shift',shiftKey:true,target:field});assert.equal(f.emit(f.document,'keyup',{key:'Shift',target:field}).defaultPrevented,false);other.remove();
+ press();await f.mount('another-photo',{}, {scope:'gallery'});assert.equal(release().defaultPrevented,false,'Releasing a modifier on the next photo cannot open its face picker');f.faces.clear();
+ const phone=fixture([first]);await phone.mount();phone.emit(phone.document,'keydown',{key:'Shift',shiftKey:true,target:phone.stage});assert.equal(phone.emit(phone.document,'keyup',{key:'Shift',target:phone.stage}).defaultPrevented,false);phone.faces.clear();
+});
+
+test('Shift also advances through already tagged faces once and stops after the last face',async()=>{
+ const f=fixture([],{desktop:true}),person={id:'yona',name:'יונה'};let saved=[{...first,id:'all-first',personId:'yona',person,revision:'one'},{...second,id:'all-second',personId:'yona',person,revision:'two'}];
+ f.window.FamilyTags.findPeople=async()=>[person];f.window.FamilyI18n.fetch=async(path,options)=>{
+  if(path.endsWith('/save')){const input=JSON.parse(options.body),face={...saved.find(face=>face.id===input.faceId),revision:'updated'};saved=saved.map(old=>old.id===face.id?face:old);return Response.json({faces:saved,face});}return Response.json({faces:saved});
+ };
+ await f.mount('full-shift-sequence',{}, {scope:'gallery',faceSummary:{reviewed:true}});await new Promise(resolve=>setImmediate(resolve));f.emit(f.document,'keydown',{key:'Shift',shiftKey:true,target:f.stage});f.emit(f.document,'keyup',{key:'Shift',target:f.stage});
+ for(const face of [first,second]){
+  const panel=f.find('face-popover face-picker');assert.ok(panel);assert.equal(f.find('face-selection').style.left,face.rect.x*100+'%');const host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson='yona';host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];f.emit(panel.querySelector('input'),'input');await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();
+ }
+ assert.equal(f.find('face-popover face-picker'),undefined,'The last tagged face ends the sequence without restarting at the first');f.faces.clear();
 });

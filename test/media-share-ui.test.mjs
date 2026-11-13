@@ -819,6 +819,16 @@ test('gallery shortcuts preserve copy/paste and stay inactive behind upload/date
  f.document.querySelector=()=>null;f.navigator.userAgent='Android Mobile';await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
 });
 
+test('saving a separate photo keeps the source visible and adds the copy to navigation and every affected album',async()=>{
+ const f=fixture(),photo=f.photo('a'),copy=f.photo('b'),events=[];f.window.FamilyMedia.register('photos',[photo]);f.window.FamilyMedia.open([photo],0,'gallery');
+ f.window.addEventListener('family-media-changed',event=>events.push(event.detail));
+ f.window.FamilyPhotoEditor={edit:async()=>({operation:'photo-copy',scope:'gallery',sourceId:'a',item:copy,albumUpdates:{gallery:{items:[copy,photo]},photos:{items:[copy,photo]}}})};
+ const previous=f.get('mediaStage').content[0];await f.get('editOpenedPhoto').handlers.get('click')();
+ assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,photo.src);assert.equal(f.get('mediaStage').content[0],previous);assert.equal(f.window.FamilyMedia.lookup('gallery','b').src,copy.src);assert.equal(f.window.FamilyMedia.lookup('photos','b').src,copy.src);
+ assert.deepEqual(events.map(event=>event.scope),['gallery','photos']);assert.match(f.get('mediaViewerNotice').content[0].textContent,/נפרדת/);
+ f.close();f.window.FamilyMedia.openFrom('gallery','b');assert.equal(f.get('mediaOriginal').href,copy.src);
+});
+
 test('phones show a right-hand swipe hint only on the first opened photo per album and dismiss it on navigation',async()=>{
  const f=fixture();f.navigator.userAgent='Android Mobile';const items=[f.photo('hint-a'),f.photo('hint-b')],hint=()=>f.get('mediaStage').content.find(node=>node.className==='phone-swipe-hint');
  f.window.FamilyMedia.open(items,1,'photos');assert.ok(hint());f.window.FamilyMedia.setFullscreen(true);assert.ok(hint(),'The same first-photo hint survives entering fullscreen');await f.window.FamilyMedia.step(1);assert.equal(hint(),undefined);f.close();f.window.FamilyMedia.open(items,0,'photos');assert.equal(hint(),undefined);f.close();

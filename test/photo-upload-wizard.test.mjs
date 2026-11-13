@@ -9,7 +9,7 @@ import * as catalog from '../public/assets/photo-labels-catalog.mjs';
 
 const source=(await readFile(new URL('../public/assets/photo-editor.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 const keyboardSource=await readFile(new URL('../public/assets/photo-keyboard.js',import.meta.url),'utf8');
-function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
+function fixture({desktop=true,english=false,onUpload=async()=>{},fetch:fetcher,photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
  const nodes=new Map(),all=[],mounts=[],uploaded=[],closed=[];
  const people=[{id:'yona',name:'יונה',nameEn:'Yona'},{id:'shlomo',name:'שלמה',nameEn:'Shlomo'}];
  class Node extends EventTarget{
@@ -22,6 +22,7 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={wid
   contains(target){return target===this;}
   closest(selector){return selector.split(',').some(part=>part===this.tagName||part==='[data-upload-remove-person]'&&this.dataset.uploadRemovePerson||part==='dialog[open]'&&this.tagName==='dialog'&&this.open||part==='[role="dialog"]'&&this.role==='dialog'||part==='[role="textbox"]'&&this.role==='textbox'||part.startsWith('.')&&this.classes.has(part.slice(1)))?this:null;}
   append(...children){for(const child of children)if(child.id)nodes.set(child.id,child);}
+  replaceChildren(){}
   focus(){document.activeElement=this;}
   blur(){document.activeElement=document.body;this.dispatchEvent(new Event('blur'));}
   showModal(){this.open=true;}
@@ -33,10 +34,10 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},photoSize={wid
  }
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node('div',id));return nodes.get(id);};
  const document={activeElement:null,getElementById:node,createElement:tag=>new Node(tag),body:new Node()};
- const window=new EventTarget();window.innerHeight=900;window.createImageBitmap=true;window.FamilyI18n={isEnglish:english,personName:p=>english?p.nameEn||p.name:p.name};
+ const window=new EventTarget();window.innerHeight=900;window.createImageBitmap=true;window.FamilyI18n={isEnglish:english,personName:p=>english?p.nameEn||p.name:p.name,fetch:fetcher,error:String};
  window.FamilyApp={apiEnabled:true,getPersonSummary:id=>people.find(p=>p.id===id)};window.FamilyTags={findPeople:async query=>people.filter(p=>!query||p.name.includes(query))};
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
- vm.runInNewContext(keyboardSource+'\n'+source,{...core,...metadata,...faceDraft,...catalog,window,document,navigator:{userAgent:desktop?'Windows NT 10.0':'Android Mobile'},File,Blob,URL,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
+ vm.runInNewContext(keyboardSource+'\n'+source,{...core,...metadata,...faceDraft,...catalog,window,document,navigator:{userAgent:desktop?'Windows NT 10.0':'Android Mobile'},File,Blob,URL,URLSearchParams,AbortController,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
  return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{type='keydown',target=document.body,...flags}={}){const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
 }
@@ -311,4 +312,29 @@ test('the last individual upload closes the wizard without re-approving a saved 
 test('individual approval validates only its photo, while remaining non-image files still require Upload all',async()=>{
  const f=fixture(),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);await f.click('Next');f.node('photoEditDateyear').value='99';f.node('photoEditDateyear').dispatchEvent(new Event('input'));await f.click('Previous');await f.click('SaveCurrent');assert.equal(f.uploaded.length,1);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Save');assert.match(f.node('photoEditDateError').textContent,/1910/);await f.click('Cancel');assert.equal(await result,null);
  const mixed=fixture(),other=new File(['document'],'notes.pdf',{type:'application/pdf'}),pending=await mixed.begin([image('only.jpg'),other]);await mixed.click('SaveCurrent');assert.equal(mixed.node('photoUploadEditor').open,true);assert.equal(mixed.node('photoEditLeft').disabled,true);assert.equal(mixed.node('photoEditSaveCurrent').hidden,true);await mixed.click('Save');const remaining=await pending.result;assert.deepEqual(Array.from(remaining,file=>file.name),['notes.pdf']);assert.equal(mixed.uploaded.length,1);
+});
+
+test('every gallery editor offers the separate-photo action on phone and desktop in both languages and uploads the visible edit',async()=>{
+ for(const desktop of [true,false])for(const english of [true,false])for(const scope of ['gallery','photos','personal:yona','nursery:yona','wedding:u-tomer','nostalgia']){
+  const requests=[],saved={saved:true,operation:'photo-copy',sourceId:'a',item:{id:'b'}},f=fixture({desktop,english,fetch:async(path,options)=>{
+   if(path.endsWith('/versions'))return Response.json({currentVersion:'original',versions:[{id:'original',current:true,original:true,filename:'photo.jpg',mime:'image/jpeg',src:'/media/a?version=original'}]});
+   if(path.startsWith('/media/'))return new Response(image('photo.jpg'),{headers:{'Content-Type':'image/jpeg'}});
+   requests.push({path,options});return Response.json(saved,{status:201});
+  }}),pending=f.api.edit({id:'a',kind:'photo',scope});for(let i=0;i<10&&f.node('photoEditSaveCopy').disabled;i++)await f.flush();
+  assert.equal(f.node('photoEditSaveCopy').hidden,false);assert.equal(f.node('photoEditSaveCopy').disabled,false);assert.equal(f.node('photoEditSaveCopy').textContent,english?'Save as a separate photo':'שמור כתמונה נפרדת');
+  await f.click('Right');await f.click('SaveCopy');assert.deepEqual(await pending,saved);assert.equal(requests.length,1);
+  const query=new URL(requests[0].path,'https://family.test').searchParams;assert.equal(query.get('saveAs'),'copy');assert.equal(query.get('rotation'),'1');assert.equal(query.get('baseVersion'),'original');assert.equal(await requests[0].options.body.text(),'rendered pixels');
+  assert.equal(f.node('photoUploadEditor').open,false);
+  const upload=await f.begin([image('new.jpg')]);assert.equal(f.node('photoEditSaveCopy').hidden,true);await f.click('Cancel');await upload.result;
+ }
+});
+test('separate-photo saving prevents duplicate clicks and preserves the edit after a failed request',async()=>{
+ let resolveRequest,fail=true;const requests=[],f=fixture({fetch:async(path,options)=>{
+  if(path.endsWith('/versions'))return Response.json({currentVersion:'original',versions:[{id:'original',current:true,original:true,mime:'image/jpeg',src:'/media/a?version=original'}]});
+  if(path.startsWith('/media/'))return new Response(image('photo.jpg'));
+  requests.push({path,options});if(fail)return new Promise(resolve=>{resolveRequest=resolve;});return Response.json({operation:'photo-copy',item:{id:'b'}});
+ }}),pending=f.api.edit({id:'a',kind:'photo'});for(let i=0;i<10&&f.node('photoEditSaveCopy').disabled;i++)await f.flush();assert.equal(f.node('photoEditSaveCopy').disabled,false,f.node('photoEditError').textContent);await f.click('Right');await f.click('SaveCopy');await f.click('SaveCopy');
+ assert.equal(requests.length,1);assert.equal(f.node('photoEditSaveCopy').disabled,true);resolveRequest(Response.json({error:'Network unavailable'},{status:503}));await f.flush();
+ assert.equal(f.node('photoUploadEditor').open,true);assert.equal(f.node('photoEditSaveCopy').disabled,false);assert.match(f.node('photoEditError').textContent,/Network unavailable/);assert.equal(f.node('photoEditSaveCopy').textContent,'שמור כתמונה נפרדת');
+ fail=false;await f.click('SaveCopy');assert.equal((await pending).operation,'photo-copy');assert.equal(new URL(requests[1].path,'https://family.test').searchParams.get('rotation'),'1');
 });

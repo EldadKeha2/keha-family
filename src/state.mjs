@@ -649,6 +649,22 @@ export class FamilyState {
         if(!version||typeof version.id!=='string'||!/^[a-f0-9]{32}$/.test(version.id)||!version.key?.startsWith('photo-versions/'+item.id+'/'+version.id+'.'))throw new HttpError(400,'גרסת התמונה אינה תקינה.');
         return this.savePhotoVersion(item,{...version,edit:{...edit,baseVersion:base.id}},transformPhotoFaces(base.faces,edit));
       }
+      case 'photo.copy':{
+        const {item,base,edit}=this.preparePhoto(p),version=p.version;
+        if(!version||typeof version.id!=='string'||!/^[a-f0-9]{32}$/.test(version.id)||!version.key?.startsWith('photo-copies/'+version.id+'.'))throw new HttpError(400,'פרטי התמונה הנפרדת אינם תקינים.');
+        const now=new Date().toISOString(),copy={id:version.id,category:item.category,personId:item.personId||null,filename:version.filename,name:item.name,...(item.nameEn?{nameEn:item.nameEn}:{}),file:(item.category==='personal'?'gallery/':'')+version.key.slice('photo-copies/'.length),key:version.key,mime:version.mime,kind:'photo',size:version.size,caption:item.caption||'',takenDate:photoDate(item.takenDate),takenDateRevision:uid(),labels:photoLabels(item.labels),createdAt:now};
+        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',copy.id,copy.category,copy.personId,JSON.stringify(copy));
+        this.sql.exec('INSERT INTO media_collections(media_id,collection,added_at) SELECT ?,collection,? FROM media_collections WHERE media_id=?',copy.id,now,item.id);
+        this.sql.exec('INSERT INTO media_tags(media_id,person_id) SELECT ?,person_id FROM media_tags WHERE media_id=? ORDER BY rowid',copy.id,item.id);
+        for(const input of transformPhotoFaces(base.faces,edit)){
+          const face={...input,id:uid(),revision:uid(),createdAt:now,updatedAt:now};
+          this.sql.exec('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?)',copy.id,face.id,face.personId,JSON.stringify(face));
+        }
+        this.touchTags(copy.id);
+        if(base.id===(item.photoRevision||'original')&&this.rows('SELECT media_id FROM media_face_reviews WHERE media_id=? AND photo_revision=? AND tags_revision=?',item.id,base.id,this.tagsRevision(item.id))[0])this.sql.exec('INSERT INTO media_face_reviews(media_id,photo_revision,tags_revision,completed_at) VALUES(?,?,?,?)',copy.id,'original',this.tagsRevision(copy.id),now);
+        this.touchMedia(copy);
+        return {...this.mediaChanged(copy,'photo-copy'),sourceId:item.id,albumUpdates:Object.fromEntries(this.mediaCollections(copy).map(kind=>[kind,this.collection(kind)]))};
+      }
       case 'photo.restore':{
         const item=this.photo(p.id);if(p.expectedVersion!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה נערכה בינתיים. פתחו את העורך מחדש לפני שחזור.');
         const version=this.photoVersion(item,p.versionId);if(version.id===(item.photoRevision||'original'))return {saved:true,...this.photoVersions(item)};

@@ -75,7 +75,7 @@ function mount(){
     <section id="photoEditTags" class="photo-edit-tags" hidden><div id="photoEditPeopleSection"><strong>${tr('אנשים בתמונה','People in this photo')}</strong><div id="photoEditPeopleTags" class="photo-edit-tag-chips"></div></div><details><summary>${tr('אירועים ותגיות','Events and labels')}</summary><div id="photoEditEventChoices" class="photo-edit-event-choices"></div><form id="photoEditCustomLabelForm" class="photo-edit-custom-label"><label for="photoEditCustomLabelName">${tr('תגית נוספת','Another label')}</label><div><input id="photoEditCustomLabelName" type="text" dir="${I.isEnglish?'ltr':'rtl'}" maxlength="60" autocomplete="off" placeholder="${tr('שם התגית החדשה…','New label name…')}"><button type="submit" class="secondary-button">＋ ${tr('הוספת תגית','Add label')}</button></div></form><p id="photoEditLabelStatus" class="photo-edit-label-status" role="status" aria-live="polite" hidden></p></details><div id="photoEditEventTags" class="photo-edit-tag-chips"></div></section><p id="photoEditUploadStatus" class="photo-edit-upload-status" role="status"></p>
     <div id="photoEditCropHelp" class="photo-edit-crop-help" hidden><p>${tr('גררו את פינות המסגרת לחיתוך, או את המרכז להזזה. במקלדת: חצים; Shift לצעד גדול.','Drag the corners to crop, or the centre to move. Keyboard: arrows; Shift for a larger step.')}</p><button type="button" id="photoEditFull" class="photo-edit-text-button">${tr('החזרת התמונה המלאה','Use full photo')}</button></div>
     <div id="photoEditInfo" class="photo-edit-info"><span id="photoEditDimensions" dir="ltr" aria-live="polite"></span><span id="photoEditAnimation"></span></div><p id="photoEditError" class="photo-edit-error" role="alert"></p>
-    <footer class="photo-edit-footer"><button type="button" id="photoEditSaveCurrent" class="secondary-button" hidden></button><button type="button" id="photoEditSave" class="primary-button"></button><button type="button" id="photoEditCancel" class="secondary-button">${tr('ביטול ההעלאה','Cancel upload')}</button><button type="button" id="photoEditRemove" class="photo-edit-remove" aria-label="${tr('הסרת התמונה הנוכחית מההעלאה','Remove the current photo from this upload')}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/></svg><span>${tr('הסרת תמונה','Remove photo')}</span></button></footer>`;
+    <footer class="photo-edit-footer"><button type="button" id="photoEditSaveCurrent" class="secondary-button" hidden></button><button type="button" id="photoEditSave" class="primary-button"></button><button type="button" id="photoEditSaveCopy" class="secondary-button photo-edit-save-copy" hidden></button><button type="button" id="photoEditCancel" class="secondary-button">${tr('ביטול ההעלאה','Cancel upload')}</button><button type="button" id="photoEditRemove" class="photo-edit-remove" aria-label="${tr('הסרת התמונה הנוכחית מההעלאה','Remove the current photo from this upload')}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/></svg><span>${tr('הסרת תמונה','Remove photo')}</span></button></footer>`;
   document.body.append(dialog);
   get('Close').addEventListener('click',cancel);get('Cancel').addEventListener('click',cancel);
   dialog.addEventListener('cancel',event=>{event.preventDefault();cancel();});
@@ -85,7 +85,7 @@ function mount(){
   get('CropToggle').addEventListener('click',()=>{draft().cropping=!draft().cropping;if(draft().cropping){draft().tagging=false;window.FamilyFaces?.dismiss?.();}renderCrop();renderTagControls();});
   get('Reset').addEventListener('click',()=>{Object.assign(draft(),{rotation:0,crop:fullCrop(),cropping:false});render();startFaces();});
   get('Full').addEventListener('click',()=>{draft().crop=fullCrop();renderCrop();});
-  get('Remove').addEventListener('click',remove);get('Save').addEventListener('click',save);get('SaveCurrent').addEventListener('click',saveCurrent);
+  get('Remove').addEventListener('click',remove);get('Save').addEventListener('click',save);get('SaveCurrent').addEventListener('click',saveCurrent);get('SaveCopy').addEventListener('click',()=>saveExisting(true));
   get('PeopleTags').addEventListener('click',event=>{const button=event.target.closest('[data-upload-remove-person]');if(!button||session.saving)return;const d=draft();d.faceTags=d.faceTags.filter(face=>face.person.id!==button.dataset.uploadRemovePerson);d.facesComplete=false;renderDraftTags();startFaces();});
   get('EventChoices').addEventListener('change',event=>{const label=event.target.dataset.uploadLabel;if(!label||!draft()?.metadata||session.loading||session.saving)return;const labels=new Set(draft().metadata.labels||[]);if(event.target.checked&&labels.size>=MAX_PHOTO_LABELS&&!labels.has(label)){event.target.checked=false;labelStatus(tr('אפשר לבחור עד 32 תגיות לתמונה.','You can choose up to 32 labels per photo.'));return;}if(event.target.checked)labels.add(label);else labels.delete(label);draft().metadata.labels=photoLabels([...labels]);labelStatus();renderDraftTags();});
   get('CustomLabelForm').addEventListener('submit',addUploadLabel);
@@ -227,7 +227,7 @@ async function load(){
   }catch{
     if(id!==loadId)return;release();setBusy(false);get('Loading').hidden=true;
     get('Error').textContent=tr('לא ניתן לפתוח את התמונה הזו. הסירו אותה מההעלאה או בחרו קובץ JPG, PNG או WebP.','This photo could not be opened. Remove it from this upload or choose a JPG, PNG or WebP file.');
-    for(const name of ['Save','SaveCurrent','Left','Right','CropToggle','Reset','TaggingToggle'])get(name).disabled=true;
+    for(const name of ['Save','SaveCopy','SaveCurrent','Left','Right','CropToggle','Reset','TaggingToggle'])get(name).disabled=true;
   }
 }
 function render(){
@@ -259,10 +259,11 @@ function configure(){
   const existing=session.mode==='existing';dialog.dir=I.isEnglish?'ltr':'rtl';dialog.classList.toggle('is-existing',existing);
   const eyebrow=dialog.querySelector('.photo-edit-eyebrow');eyebrow.hidden=!existing;eyebrow.textContent=existing?tr('המקור והגרסאות נשמרים','Original and previous versions are kept'):'';
   get('Title').textContent=existing?tr('עריכת תמונה','Edit photo'):tr('אשף העלאת התמונות','Photo Upload Wizard');
-  get('Hint').hidden=!existing;get('Hint').textContent=existing?tr('כל שמירה יוצרת גרסה חדשה. בחרו גרסה קודמת לצפייה או לשחזור.','Each save creates a new version. Choose a previous version to view or restore it.') :'';
+  get('Hint').hidden=!existing;get('Hint').textContent=existing?tr('אפשר לשמור גרסה חדשה או תמונה נפרדת. הגרסאות הקודמות זמינות לצפייה ולשחזור.','Save a new version or a separate photo. Previous versions remain available to view or restore.') :'';
   dialog.setAttribute('aria-describedby',existing?'photoEditHint':'');
   for(const name of ['Close','Cancel']){get(name).setAttribute('aria-label',existing?tr('ביטול העריכה','Cancel editing'):tr('ביטול ההעלאה','Cancel upload'));if(name==='Cancel')get(name).textContent=tr('ביטול','Cancel');}
   get('History').hidden=!existing;dialog.querySelector('.photo-edit-pager').hidden=existing;get('Remove').hidden=existing;
+  get('SaveCopy').hidden=!existing;get('SaveCopy').textContent=tr('שמור כתמונה נפרדת','Save as a separate photo');
   get('Metadata').hidden=existing;get('SaveCurrent').hidden=existing||!session.onUpload;get('TaggingToggle').hidden=true;get('FamilyPhotoChoice').hidden=existing||session.scope==='photos';get('Tags').hidden=existing||!desktop();get('UploadStatus').textContent='';renderTagControls();
   get('Canvas').setAttribute('aria-label',tr('תצוגה מקדימה של התמונה','Photo preview'));
 }
@@ -272,7 +273,7 @@ async function responseJSON(response){
 }
 function failLoad(message){
   if(!session)return;setBusy(false);get('Loading').hidden=true;get('Error').textContent=message;
-  for(const name of ['Save','Left','Right','CropToggle','Reset','Version'])get(name).disabled=true;
+  for(const name of ['Save','SaveCopy','Left','Right','CropToggle','Reset','Version'])get(name).disabled=true;
 }
 async function loadHistory(){
   const owner=session;owner.abort=new AbortController();owner.transforms=new Map();
@@ -408,21 +409,23 @@ async function save(){
     finish(owner.files.flatMap((file,index)=>isPhoto(file)?(prepared.has(index)?[prepared.get(index)]:[]):[file]));
   }catch(error){await recoverSave(owner,error);}
 }
-async function saveExisting(){
-  const owner=session,d=draft(),modified=changed(d.rotation,d.crop);
-  if(!modified&&d.baseVersion===owner.expectedVersion){finish(null);return;}
-  owner.saving=true;setBusy(true);get('Error').textContent='';get('Save').textContent=tr('שומר…','Saving…');
+async function saveExisting(asCopy=false){
+  const owner=session,d=draft();if(!owner||owner.mode!=='existing'||!d||owner.loading||owner.saving)return;
+  const modified=changed(d.rotation,d.crop);
+  if(!asCopy&&!modified&&d.baseVersion===owner.expectedVersion){finish(null);return;}
+  owner.saving=true;setBusy(true);get('Error').textContent='';get(asCopy?'SaveCopy':'Save').textContent=tr('שומר…','Saving…');
   try{
     let response;
-    if(!modified)response=await I.fetch('api/media/'+owner.item.id+'/versions/'+d.baseVersion+'/restore',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({expectedVersion:owner.expectedVersion})});
+    if(!modified&&!asCopy)response=await I.fetch('api/media/'+owner.item.id+'/versions/'+d.baseVersion+'/restore',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({expectedVersion:owner.expectedVersion})});
     else{
-      release();source=await decode(d.file);Object.assign(d,dimensions(source));const file=await encode(d,source);
+      let file=d.file;if(modified){release();source=await decode(d.file);Object.assign(d,dimensions(source));file=await encode(d,source);}
       const query=new URLSearchParams({expectedVersion:owner.expectedVersion,baseVersion:d.baseVersion,rotation:d.rotation,crop:JSON.stringify(d.crop),filename:file.name});
+      if(asCopy)query.set('saveAs','copy');
       response=await I.fetch('api/media/'+owner.item.id+'/edit?'+query,{method:'POST',headers:{'Content-Type':file.type,'X-Family-Token':window.FAMILY_API_TOKEN},body:file});
     }
     const result=await responseJSON(response);finish(result);
   }catch(error){
-    owner.saving=false;await load();if(session===owner)get('Error').textContent=error.message||tr('לא ניתן לשמור כרגע. נסו שוב.','The photo could not be saved. Please try again.');
+    owner.saving=false;await load();if(session===owner){get('SaveCopy').textContent=tr('שמור כתמונה נפרדת','Save as a separate photo');get('Error').textContent=error.message||tr('לא ניתן לשמור כרגע. נסו שוב.','The photo could not be saved. Please try again.');}
   }
 }
 function cancel(){if(session?.saving)return;finish(null);}
