@@ -53,9 +53,22 @@
     const distance=Math.min(...new Set(aliases.map(name=>spellingRank(name,query,words))));
     return distance<=2?5+distance:Infinity;
   }
+  const tagAliases={tidhar:['תדי','טדי']};
+  function personPriority(person){
+    const canonical=window.FAMILY_DATA.people[person.id]||person;
+    if(canonical.extended||person.extended)return 6;
+    if(canonical.extra||person.extra)return 7;
+    const generation=Number(canonical.generation??person.generation);
+    return generation>=1&&generation<=5?generation:6;
+  }
+  function comparePeople(a,b,query,preferred=new Set()){
+    // Explicit nicknames identify their intended person before fuzzy matches.
+    const nickname=p=>tagAliases[p.id]?.includes(query)?0:1;
+    return nickname(a)-nickname(b)||personPriority(a)-personPriority(b)||matchRank(a,query)-matchRank(b,query)||(preferred.has(b.id)-preferred.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale);
+  }
   function matchRank(person,query){
     if(!query)return 5;
-    const canonical=window.FAMILY_DATA.people[person.id],aliases=[...new Set([person.name,person.nameEn,canonical?.name,canonical?.nameEn].filter(Boolean).map(normalize))];
+    const canonical=window.FAMILY_DATA.people[person.id],aliases=[...new Set([person.name,person.nameEn,canonical?.name,canonical?.nameEn,...(tagAliases[person.id]||[])].filter(Boolean).map(normalize))];
     // A real English spelling wins ties; a correct keyboard interpretation
     // still ranks above unrelated fuzzy matches. The same two-edit limit
     // applies independently to each interpretation, never cumulatively.
@@ -191,7 +204,7 @@
     }
     renderResults(resetScroll=false){
       if(this.photoOnly)return;
-      const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>Number.isFinite(matchRank(person,query))).sort((a,b)=>matchRank(a,query)-matchRank(b,query)||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale));
+      const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>Number.isFinite(matchRank(person,query))).sort((a,b)=>comparePeople(a,b,query));
       this.results.hidden=this.inline&&!query;
       const position=resetScroll?0:this.results.scrollTop;
       this.results.innerHTML=names.slice(0,150).map(person=>`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}><span><strong>${safe(I18n.personName(person))}</strong><small>${safe(personContext(person))}</small></span></label>`).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
@@ -257,7 +270,7 @@
   for(const person of Object.values(window.FAMILY_DATA.people))addPerson(person);rosterTime=Date.now();
   async function findPeople(query='',preferred=[]){
     await loadRoster(!rosterFetched);const normalized=normalize(query),first=new Set(preferred);
-    return [...roster.values()].filter(person=>Number.isFinite(matchRank(person,normalized))).sort((a,b)=>matchRank(a,normalized)-matchRank(b,normalized)||(first.has(b.id)-first.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale)).slice(0,50).map(person=>({...person,context:personContext(person)}));
+    return [...roster.values()].filter(person=>Number.isFinite(matchRank(person,normalized))).sort((a,b)=>comparePeople(a,b,normalized,first)).slice(0,50).map(person=>({...person,context:personContext(person)}));
   }
   async function flush(id){
     const store=stores.get(id);if(!store)return;

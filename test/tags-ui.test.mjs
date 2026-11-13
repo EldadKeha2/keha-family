@@ -29,11 +29,11 @@ test('Hebrew tagging recognizes English keyboard keys, punctuation letters, capi
  const host=new NodeStub();f.tags.mountInline(host,{...photo('keyboard-search'),kind:'video'});const widget=host._tagWidget;
  widget.query='tkss evt';widget.renderResults(true);assert.match(widget.results.innerHTML,/אלדד קהא/);assert.equal(host.querySelector('[data-tag-add]').hidden,true);f.tags.clearInline(host);
 });
-test('keyboard recovery retains the global two-error limit and gives literal English names priority',async()=>{
+test('keyboard recovery retains the global two-error limit while family members precede extra names',async()=>{
  const literal={id:'qa-literal',name:'טקסס',nameEn:'TKSS',extra:true},f=fixture(()=>Response.json({people:[...Object.values(family.people),literal]}));
  for(const query of ['tlss evt','tlzs evt'])assert.ok((await f.tags.findPeople(query)).some(person=>person.id==='eldad'),query);
  assert.equal((await f.tags.findPeople('tlzz evt')).some(person=>person.id==='eldad'),false);
- const found=await f.tags.findPeople('tkss');assert.equal(found[0].id,'qa-literal');assert.ok(found.some(person=>person.id==='eldad'));
+ const found=await f.tags.findPeople('tkss');assert.ok(found.findIndex(person=>person.id==='eldad')<found.findIndex(person=>person.id==='qa-literal'));
 });
 
 test('tag search tolerates two inserted, missing or replaced letters and excludes three in Hebrew and English',async()=>{
@@ -97,10 +97,10 @@ test('rapid selections batch by image and collapse repeated changes to the same 
  assert.equal(f.requests.length,0);await store.run();assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/image-a/tags/patch');
  assert.deepEqual(f.requests[0].body.changes.map(c=>[c.personId,c.tagged]),[['shlomo',true],['yona',false]]);f.tags.clearInline(host);
 });
-test('exact first names rank before embedded matches, reset search scroll, and show family context',()=>{
+test('generation priority precedes name match quality, resets search scroll, and shows family context',()=>{
   const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('search-image'),kind:'video'});const widget=host._tagWidget;
   widget.results.scrollTop=500;widget.query='שי';widget.renderResults(true);
-  assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="shay"')<html.indexOf('data-tag-person="avishai"'));assert.match(html,/הורים:/);
+  assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="avishai"')<html.indexOf('data-tag-person="shay"'));assert.match(html,/הורים:/);
   widget.query='מתן';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="matan-g"/);assert.match(widget.results.innerHTML,/data-tag-person="matan-f"/);assert.match(widget.results.innerHTML,/גבי/);assert.match(widget.results.innerHTML,/תומר/);f.tags.clearInline(host);
 });
 test('video tagging retains its compact search field without repeated help text',()=>{
@@ -131,4 +131,24 @@ test('photos keep existing and new face names without a separate search box; vid
  f.emit({operation:'faces',item:{...photo('face-only'),tags:[family.people.shlomo,family.people.yona],tagsRevision:'face-r2'}});assert.match(host._tagWidget.selectedHost.innerHTML,/שלמה/);assert.match(host._tagWidget.selectedHost.innerHTML,/יונה/);
  const removed=[];host._tagWidget.store.enqueue=(person,tagged)=>removed.push([person.id,tagged]);const click=new Event('click');Object.defineProperty(click,'target',{value:{closest:selector=>selector==='[data-remove-person-tag]'?{dataset:{removePersonTag:'yona'}}:null}});host.dispatchEvent(click);assert.deepEqual(removed,[['yona',false]]);
  f.tags.clearInline(host);const video={...photo('video'),kind:'video'};f.tags.mountInline(host,video);assert.match(host.innerHTML,/<input[^>]+type="search"/);assert.match(f.tags.controls(video),/data-edit-media-tags/);f.tags.clearInline(host);
+});
+
+
+test('tag suggestions prioritize generations, extended family, then acquaintances in both pickers',async()=>{
+ const people=[...Array.from({length:5},(_,i)=>({id:'priority-'+(5-i),name:'Priority '+(5-i),generation:5-i})),{id:'priority-extended',name:'Priority',extended:true},{id:'priority-friend',name:'Priority',extra:true}];
+ const f=fixture(()=>Response.json({people}));
+ const results=await f.tags.findPeople('Priority',['priority-friend']);
+ const expected=['priority-1','priority-2','priority-3','priority-4','priority-5','priority-extended','priority-friend'];
+ assert.deepEqual(Array.from(results,p=>p.id),expected);
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('priority'),kind:'video'});const widget=host._tagWidget;widget.query='Priority';widget.renderResults(true);
+ const html=widget.results.innerHTML;for(let i=1;i<expected.length;i++)assert.ok(html.indexOf(expected[i-1])<html.indexOf(expected[i]));f.tags.clearInline(host);
+});
+
+test('both Hebrew nicknames lead directly to Tidhar Fish in face and ordinary tagging',async()=>{
+ const f=fixture(()=>Response.json({people:Object.values(family.people)}));
+ for(const query of ['תדי','טדי']){
+  assert.equal((await f.tags.findPeople(query))[0].id,'tidhar');
+  const host=new NodeStub();f.tags.mountInline(host,{...photo('nickname-'+query),kind:'video'});const widget=host._tagWidget;widget.query=query;widget.renderResults(true);
+  assert.match(widget.results.innerHTML,/tidhar/);f.tags.clearInline(host);
+ }
 });
