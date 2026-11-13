@@ -117,6 +117,8 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
   if(category==='videos'&&!['family','special-birthdays'].includes(videoCategory))throw new HttpError(400,'קטגוריית הסרטון אינה מוכרת.');
   if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני העלאת קבצים.');
   if(personId)await db('person',{id:personId});
+  const eventId=category==='nostalgia'?new URL(request.url).searchParams.get('event'):null;
+  if(eventId)await db('nostalgia.event',{id:eventId});
   const media=await streamUpload(request,mediaType==='document'?LIMITS.attachment:mixed||category==='videos'||mediaType==='video'?LIMITS.video:LIMITS.photo,true);
   const id=uid(),original=filename(new URL(request.url).searchParams.get('filename'));
   let format,metadata=null;
@@ -132,6 +134,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
   const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:category.startsWith('nursery:')?['nursery',category.slice(8)]:[category,personId||'shared'];
   const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,id+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
   if(category==='videos')item.videoCategory=videoCategory;
+  if(eventId)item.nostalgiaEventIds=[eventId];
   if(metadata){item.caption=metadata.caption;item.takenDate=metadata.date;item.takenDateRevision=uid();if(metadata.labels)item.labels=metadata.labels;}
   let transfer=Promise.resolve(),body=media.body;
   if(typeof FixedLengthStream!=='undefined'){
@@ -352,6 +355,7 @@ export default {
           return json(await db('media.caption',{kind,file:body.file,caption:body.caption}));
         }
         if((match=/^\/api\/nostalgia\/multipart\/(start|part|complete|abort)$/.exec(path)))return await multipartVideo(request,env,db,ctx,{action:match[1],sniff,limit:LIMITS.nostalgiaVideo});
+        if((match=/^\/api\/nostalgia\/(category|event|assign)$/.exec(path))){const body=await readJSON(request,16000);return json(await db({'category':'nostalgia.category.save',event:'nostalgia.event.save',assign:'nostalgia.assign'}[match[1]],body));}
         if((match=/^\/api\/nostalgia\/(upload|caption)$/.exec(path))){
           if(match[1]==='upload')return await upload(request,env,db,ctx,{category:'nostalgia',mixed:true});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:'nostalgia',file:body.file,caption:body.caption}));
@@ -390,3 +394,4 @@ export default {
     ctx.waitUntil(dispatchUpdates(env,db,controller.scheduledTime||Date.now()));
   }
 };
+

@@ -112,7 +112,8 @@
   function renderCollection(key){
     if(scope()!==key)return;
     const collection=collections.get(key)||{items:[]},filter=filters.get(key)||'all',query=normalize(state.query);
-    const items=collection.items.filter(item=>(filter==='all'||item.kind===filter)&&(!query||normalize(item.name+' '+item.caption+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
+    let items=collection.items.filter(item=>(filter==='all'||item.kind===filter)&&(!query||normalize(item.name+' '+item.caption+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
+    if(key==='nostalgia'&&window.FamilyNostalgia&&collection.library)items=window.FamilyNostalgia.select(collection,{query,filter});
     window.FamilyMedia.register(key,items,{cover:collection.cover});
     const grid=$(gridId(key)),sameScope=grid.dataset.scope===key;
     const oldCards=new Map((sameScope?[...grid.children]:[]).filter(card=>card.dataset.mediaFile).map(card=>[card.dataset.mediaFile,card]));
@@ -141,7 +142,7 @@
       const draft=drafts.get(draftKey(key,item.file)),area=card.querySelector('textarea');
       if(area&&area!==document.activeElement)area.value=draft?.dirty?draft.value:item.caption||'';
       const dateLabel=card.querySelector('[data-archive-date-label]');if(dateLabel)dateLabel.textContent=captureLabel(item);
-      card.dataset.mediaKind=item.kind;cards.push(card);
+      card.dataset.mediaKind=item.kind;if(key==='nostalgia')window.FamilyNostalgia?.decorateCard?.(card,item);cards.push(card);
     }
     if(key==='nostalgia'){
       const groups=[],kinds=filter==='all'?['video','photo','document']:[filter];
@@ -194,10 +195,10 @@
     $(id+'UploadState').textContent=item?.message||'';$(id+'Progress').hidden=!item?.active;$(id+'Progress').value=item?.percent||0;
     $(id+'Dropzone').classList.toggle('uploading',Boolean(item?.active));
   }
-  function sendFile(key,file,onProgress){
-    if(key==='nostalgia'&&file.size>90*1024*1024&&(/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name)))return sendLargeVideo(file,onProgress);
+  function sendFile(key,file,onProgress,eventId=null){
+    if(key==='nostalgia'&&file.size>90*1024*1024&&(/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name)))return sendLargeVideo(file,onProgress,eventId);
     return new Promise((resolve,reject)=>{
-      const xhr=new XMLHttpRequest();xhr.open('POST',base(key)+'/upload?filename='+encodeURIComponent(file.name));
+      const xhr=new XMLHttpRequest();xhr.open('POST',base(key)+'/upload?filename='+encodeURIComponent(file.name)+(eventId?'&event='+encodeURIComponent(eventId):''));
       xhr.setRequestHeader('X-Family-Token',window.FAMILY_API_TOKEN);xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
       xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded/event.total*100));};
       xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(I18n.t('לא התקבל אישור שמירה. נסו לרענן.')));return;}if(xhr.status>=200&&xhr.status<300)Promise.resolve(window.FamilyPhotoThumbnails?.fromUpload?.(result,file)).then(()=>resolve(result),()=>resolve(result));else reject(Error(I18n.error(result.error)||I18n.t('הקובץ לא נשמר.')));};
@@ -220,9 +221,9 @@
       xhr.onerror=interrupted;xhr.ontimeout=interrupted;xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));xhr.send(blob);
     });
   }
-  async function sendLargeVideo(file,onProgress){
+  async function sendLargeVideo(file,onProgress,eventId=null){
     const head=new Uint8Array(await file.slice(0,128).arrayBuffer());
-    const upload=await post('api/nostalgia/multipart/start',{filename:file.name,size:file.size,head:btoa(String.fromCharCode(...head))});
+    const upload=await post('api/nostalgia/multipart/start',{filename:file.name,size:file.size,head:btoa(String.fromCharCode(...head)),...(eventId?{eventId}:{})});
     try{
       for(let offset=0,number=1;offset<file.size;offset+=upload.partSize,number++){
         const part=file.slice(offset,Math.min(file.size,offset+upload.partSize));
@@ -236,25 +237,25 @@
   function applyUploaded(key,result){collections.set(key,result.collection);
         if(key!=='nostalgia'){const id=key.slice(8),record=details.get(id);if(record){record.collection=result.collection;record.mediaCount=result.collection.count;record.cover=result.collection.items.find(item=>item.kind==='photo')?.src||null;summaries.set(id,record);}}
         if(scope()===key)renderCollection(key);}
-  async function addFiles(key,input){
+  async function addFiles(key,input,{eventId=key==='nostalgia'?window.FamilyNostalgia?.uploadEventId?.():null}={}){
     if(!key||!canSave())return;
     let files=[...input];if(!files.length)return;
     if(files.some(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name))){
-      try{files=await window.FamilyPhotoEditor.prepare(files,{scope:key,onUpload:async(file,progress)=>{const result=await sendFile(key,file,progress);applyUploaded(key,result);}});}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+      try{files=await window.FamilyPhotoEditor.prepare(files,{scope:key,onUpload:async(file,progress)=>{const result=await sendFile(key,file,progress,eventId);applyUploaded(key,result);}});}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
       if(!files?.length)return;
     }
     const item=uploadStates.get(key);
     const status=item?.pending?item:{saved:0,failed:0,pending:0,message:'',active:false,percent:0};status.pending+=files.length;uploadStates.set(key,status);
-    jobs.push(...files.map(file=>({key,file})));runUploads();
+    jobs.push(...files.map(file=>({key,file,eventId})));runUploads();
   }
   async function runUploads(){
     if(state.uploading)return;state.uploading=true;
     try{while(jobs.length){
-      const {key,file}=jobs.shift(),status=uploadStates.get(key);status.active=true;status.percent=0;status.message=I18n.t('מעלה ')+file.name+'…';updateUploadUI(key);
+      const {key,file,eventId}=jobs.shift(),status=uploadStates.get(key);status.active=true;status.percent=0;status.message=I18n.t('מעלה ')+file.name+'…';updateUploadUI(key);
       try{
         const video=/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name),photo=/^image\//i.test(file.type)||/\.(jpe?g|png|gif|webp|avif)$/i.test(file.name);
         const maximum=video?(key==='nostalgia'?500:90):photo?50:10;if(file.size>maximum*1024*1024)throw Error(I18n.html`אפשר להעלות ${video?I18n.t('סרטון'):photo?I18n.t('תמונה'):I18n.t('מסמך')} עד ${maximum}MB.`);
-        const result=await sendFile(key,file,percent=>{status.percent=percent;status.message=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הזיכרון…'):I18n.html`מעלה ${file.name} · ${percent}%`;updateUploadUI(key);});
+        const result=await sendFile(key,file,percent=>{status.percent=percent;status.message=percent===100?I18n.t('ההעלאה הסתיימה, שומר את הזיכרון…'):I18n.html`מעלה ${file.name} · ${percent}%`;updateUploadUI(key);},eventId);
         applyUploaded(key,result);status.saved++;
       }catch(error){status.failed++;toast(file.name+': '+error.message);status.lastError=error.message;}
       finally{status.pending--;status.active=false;status.message=I18n.html`${status.saved} קבצים נשמרו${status.saved?' ✓':''}${status.failed?' · '+status.failed+I18n.t(' לא נשמרו: ')+status.lastError:''}`;updateUploadUI(key);}
@@ -304,7 +305,7 @@
     for(const [key,draft]of drafts)if(draft.dirty)saveCaption(key);
   }
   function search(query){state.query=query;if(state.view==='weddings'&&!state.weddingId)renderWeddings();else if(scope())renderCollection(scope());}
-  function acceptDrop(event){const key=scope();if(!key||document.querySelector('dialog[open]'))return false;$(prefix(key)+'Dropzone').classList.remove('drag-over');addFiles(key,event.dataTransfer.files);return true;}
+  function acceptDrop(event){const key=scope();if(key==='nostalgia'&&window.FamilyNostalgia?.acceptDrop?.(event))return true;if(!key||document.querySelector('dialog[open]'))return false;$(prefix(key)+'Dropzone').classList.remove('drag-over');addFiles(key,event.dataTransfer.files);return true;}
   function dragOver(){const key=scope();if(key&&!document.querySelector('dialog[open]'))$(prefix(key)+'Dropzone').classList.add('drag-over');}
   function acceptPaste(event){
     const key=scope();if(!key||document.querySelector('dialog[open]')||event.target.closest('textarea,input'))return false;
@@ -320,7 +321,7 @@
       if(event.target.closest('[data-wedding-back]')){if(!window.FamilyNavigation?.returnTo('#weddings'))openWedding(null);return;}
       const date=event.target.closest('[data-edit-wedding-date]');if(date){openDate(date.dataset.editWeddingDate);return;}
       if(event.target.closest('#editWeddingDate')){openDate(state.weddingId);return;}
-      const upload=event.target.closest('[data-archive-upload]');if(upload){if(!canSave())return;const key=scope();if(!key)return;const input=$(prefix(key)+'UploadInput');const kind=upload.dataset.archiveKind;input.accept=kind==='photo'?'image/jpeg,image/png,image/webp,image/gif,image/avif':kind==='video'?'video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm':kind==='document'?'.pdf,.doc,.docx,.txt,.md':'image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm,.pdf,.doc,.docx,.txt,.md';input.dataset.scope=key;input.value='';input.click();return;}
+      const upload=event.target.closest('[data-archive-upload]');if(upload){if(!canSave())return;const key=scope();if(!key)return;const input=$(prefix(key)+'UploadInput');const kind=upload.dataset.archiveKind;input.accept=kind==='photo'?'image/jpeg,image/png,image/webp,image/gif,image/avif':kind==='video'?'video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm':kind==='document'?'.pdf,.doc,.docx,.txt,.md':'image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm,.pdf,.doc,.docx,.txt,.md';input.dataset.scope=key;input.dataset.eventId=key==='nostalgia'?(window.FamilyNostalgia?.uploadEventId?.()||''):'';input.value='';input.click();return;}
       const filter=event.target.closest('[data-archive-filter]');if(filter){const key=scope();if(key){filters.set(key,filter.dataset.archiveFilter);renderCollection(key);}return;}
       const capture=event.target.closest('[data-archive-date]');if(capture){const memory=collections.get(scope())?.items.find(item=>item.id===capture.dataset.archiveDate);if(memory)window.FamilyPhotoDate?.open(memory);return;}
       const save=event.target.closest('[data-save-archive-caption]');if(save){saveCaption(draftKey(save.dataset.archiveScope,save.dataset.saveArchiveCaption));return;}
@@ -329,7 +330,7 @@
     document.addEventListener('input',event=>{if(event.target.matches('[data-archive-caption]'))editCaption(event.target);if(event.target.closest('#weddingDateForm'))previewDate();if(event.target.closest('#weddingGreetingForm'))rememberGreeting();});
     document.addEventListener('keydown',event=>{if(event.target.matches('[data-archive-caption]'))window.FamilyPhotoKeyboard?.saveDescription(event,()=>saveCaption(draftKey(event.target.dataset.archiveScope,event.target.dataset.archiveCaption)));});
     document.addEventListener('focusout',event=>{if(event.target.matches('[data-archive-caption]'))saveCaption(draftKey(event.target.dataset.archiveScope,event.target.dataset.archiveCaption));});
-    for(const id of ['weddingUploadInput','nostalgiaUploadInput'])$(id).addEventListener('change',()=>addFiles($(id).dataset.scope,$(id).files));
+    for(const id of ['weddingUploadInput','nostalgiaUploadInput'])$(id).addEventListener('change',()=>addFiles($(id).dataset.scope,$(id).files,{eventId:$(id).dataset.eventId||null}));
     for(const id of ['weddingDropzone','nostalgiaDropzone'])$(id).addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(id).contains(event.relatedTarget))$(id).classList.remove('drag-over');});
     $('weddingBranchFilter').addEventListener('change',renderWeddings);$('weddingDateForm').addEventListener('submit',saveDate);$('clearWeddingDate').addEventListener('click',event=>saveDate(event,true));$('weddingGreetingForm').addEventListener('submit',saveGreeting);
     window.addEventListener('family-media-changed',event=>{
@@ -355,8 +356,9 @@
     document.addEventListener('visibilitychange',refresh);setInterval(refresh,30000);
     if(/^#(weddings|nostalgia)(\/|$)/.test(location.hash))route();else activate(app().getView());
   }
-  window.FamilyArchive={activate,search,acceptDrop,dragOver,acceptPaste};
+  window.FamilyArchive={activate,search,acceptDrop,dragOver,acceptPaste,renderNostalgia:()=>renderCollection('nostalgia'),uploadToNostalgia:(files,eventId)=>addFiles('nostalgia',files,{eventId}),nostalgiaAction:async(action,body)=>{const result=await post('api/nostalgia/'+action,body);if(result.collection)applyUploaded('nostalgia',result);return result;}};
   document.addEventListener('error',event=>{if(event.target.matches?.('.wedding-person-photo'))event.target.hidden=true;},true);
   window.addEventListener('family-profile-changed',()=>{if(state.view==='weddings'&&!state.weddingId)renderWeddings();});
   document.addEventListener('DOMContentLoaded',init);
 })();
+

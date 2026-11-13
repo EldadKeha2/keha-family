@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="assets/readable.css?v=search-portraits-v2">
   <link rel="stylesheet" href="assets/gallery.css?v=a11y1">
   <link rel="stylesheet" href="assets/portal.css?v=mobile-upload-source-v1">
+  <link rel="stylesheet" href="assets/nostalgia-library.css?v=1">
   <link rel="stylesheet" href="assets/archive.css?v=nostalgia-films-v6">
   <link rel="stylesheet" href="assets/wedding-garden.css?v=2">
   <link rel="stylesheet" href="assets/media.css?v=precision-touch-v4">
@@ -94,7 +95,8 @@
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
   <script src="assets/people.js?v=circular-photo-pages-v2" defer></script>
   <script src="assets/biography.js" type="module"></script>
-  <script src="assets/archive.js?v=wedding-memories-v11" defer></script>
+  <script src="assets/nostalgia-library.js?v=1" defer></script>
+  <script src="assets/archive.js?v=nostalgia-library-v12" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/family-timeline.js?v=annual-portraits-v8" type="module"></script>
   <script src="assets/home.js?v=family-screensaver-tile-v3" defer></script>
@@ -227,7 +229,9 @@
           </article>
         </section>
         <section id="nostalgiaView" class="portal-view nostalgia-view" aria-label="פינת הנוסטלגיה" hidden>
-          <header class="archive-intro nostalgia-intro"><span class="archive-emblem" aria-hidden="true">❖</span><div><span class="small-eyebrow">מהאלבום, מהמגירה, מהלב</span><h3>זיכרונות שמחזירים אותנו הביתה</h3><p>תמונה ישנה, סרט משפחתי או מכתב בכתב יד. הדברים הקטנים שמספרים מאיפה באנו.</p></div></header>
+          <div id="nostalgiaLibraryHome" data-i18n-skip></div>
+          <header id="nostalgiaEventHeader" class="nostalgia-event-header" data-i18n-skip hidden></header>
+          <header id="nostalgiaFeedIntro" class="nostalgia-feed-intro" data-i18n-skip></header>
           <div class="nostalgia-upload-actions" aria-label="הוספת זיכרונות"><button type="button" class="primary-button" data-archive-upload="nostalgia" data-archive-kind="photo">＋ העלאת תמונות</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="video">＋ העלאת סרטונים</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="document">＋ העלאת מסמכים</button></div><p class="archive-status" id="nostalgiaStatus" role="status"></p>
           <div class="archive-toolbar"><span id="nostalgiaCount" role="status"></span><div class="archive-filters" id="nostalgiaFilters" aria-label="סינון זיכרונות"><button data-archive-filter="all" aria-pressed="true">כל הזיכרונות</button><button data-archive-filter="photo" aria-pressed="false">תמונות</button><button data-archive-filter="video" aria-pressed="false">סרטונים</button><button data-archive-filter="document" aria-pressed="false">מסמכים</button></div></div>
           <div class="shared-media-grid mixed-media-grid" id="nostalgiaGrid"></div><div class="archive-empty" id="nostalgiaEmpty"><span aria-hidden="true">▧</span><h4>לכל זיכרון יש מקום כאן</h4><p>יש לכם צילום ישן, סרט מהילדות או מסמך משפחתי?<br>העלו אותו והוסיפו כמה מילים על מי, מתי ואיפה.</p></div>
@@ -277,3 +281,4 @@
   <input type="file" id="nurseryCameraInput" accept="image/*" capture="environment" hidden>
 </body>
 </html>
+

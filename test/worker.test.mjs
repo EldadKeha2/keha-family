@@ -60,6 +60,43 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('nostalgia event folders keep explicit uploads, partial dates, multiple event tags and unclassified uploads durable without duplicating bytes',async()=>{
+ const f=fixture();try{
+  await f.connect();let catalog=await(await f.call('/api/nostalgia')).json();assert.equal(catalog.library.categories.length,6);
+  const ora=catalog.library.events.find(e=>e.id==='ora-release-1988');assert.equal(ora.name,'מסיבת השחרור של אורה');assert.deepEqual(ora.date,{day:12,month:7,year:1988});assert.equal(ora.location,'דשא בית זקס, גבעת ברנר');
+  const response=await f.call('/api/nostalgia/upload?filename=Ora-part-1.mp4&event=ora-release-1988',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}});assert.equal(response.status,201);
+  const assigned=(await response.json()).collection.items[0];assert.deepEqual(assigned.nostalgiaEventIds,['ora-release-1988']);assert.deepEqual(assigned.takenDate,{day:12,month:7,year:1988});
+  const looseResponse=await f.call('/api/nostalgia/upload?filename='+encodeURIComponent('מסיבת השחרור של אורה - ללא שיוך.mp4'),{method:'POST',body:video,headers:{'Content-Length':String(video.length)}});
+  const loose=(await looseResponse.json()).collection.items[0];assert.deepEqual(loose.nostalgiaEventIds,[],'Future uploads are never guessed from a filename');
+  await f.call('/api/media/'+loose.id+'/tag',{method:'POST',body:{personId:'tomer',tagged:true}});
+  const tagged=await(await f.call('/api/nostalgia/assign',{method:'POST',body:{id:loose.id,add:['moran-bar-mitzvah','amir-tomer-gulf-war']}})).json();assert.equal(tagged.collection.library.events.find(e=>e.id==='moran-bar-mitzvah').videoCount,1);assert.ok(tagged.item.tags.some(p=>p.id==='tomer'));assert.equal(f.objects.size,2);
+  await f.call('/api/nostalgia/assign',{method:'POST',body:{id:loose.id,add:['moran-bar-mitzvah'],remove:['amir-tomer-gulf-war']}});
+  f.restart();catalog=await(await f.call('/api/nostalgia')).json();assert.deepEqual(catalog.items.find(i=>i.id===loose.id).nostalgiaEventIds,['moran-bar-mitzvah']);assert.equal(catalog.library.events.find(e=>e.id==='ora-release-1988').videoCount,1);
+  await f.call('/api/nostalgia/assign',{method:'POST',body:{id:loose.id,remove:['moran-bar-mitzvah']}});f.restart();assert.deepEqual((await(await f.call('/api/nostalgia')).json()).items.find(i=>i.id===loose.id).nostalgiaEventIds,[]);
+ }finally{await f.close();}
+});
+test('nostalgia categories and event metadata are editable, backed up, protected against stale changes and validated before binary uploads',async()=>{
+ const f=fixture();try{
+  await f.connect();for(const action of ['category','event','assign'])assert.equal((await f.call('/api/nostalgia/'+action,{method:'POST',body:{},clientHeaders:false})).status,403);
+  let response=await f.call('/api/nostalgia/category',{method:'POST',body:{name:'טיולים משפחתיים'}});assert.equal(response.status,200);const category=(await response.json()).category;
+  assert.equal((await f.call('/api/nostalgia/category',{method:'POST',body:{name:'טיולים משפחתיים'}})).status,409);
+  response=await f.call('/api/nostalgia/event',{method:'POST',body:{categoryId:category.id,name:'טיול לצפון',date:{year:1992},location:'הגליל'}});assert.equal(response.status,200);const event=(await response.json()).event;
+  response=await f.call('/api/nostalgia/event',{method:'POST',body:{id:event.id,expectedRevision:event.revision,categoryId:category.id,name:'טיול משפחתי לצפון',date:{year:1992},location:'הגליל'}});assert.equal(response.status,200);
+  assert.equal((await f.call('/api/nostalgia/event',{method:'POST',body:{id:event.id,expectedRevision:event.revision,categoryId:category.id,name:'שם ישן'}})).status,409);
+  assert.equal((await f.call('/api/nostalgia/event',{method:'POST',body:{categoryId:category.id,name:'תאריך שגוי',date:{day:31,month:2,year:1992}}})).status,400);
+  const before=f.network.length;assert.equal((await f.call('/api/nostalgia/upload?filename=a.mp4&event=not-an-event',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).status,404);assert.equal(f.network.length,before);
+  assert.equal((await f.call('/api/nostalgia/multipart/start',{method:'POST',body:{filename:'a.mp4',size:video.length,head:video.subarray(0,128).toString('base64'),eventId:'not-an-event'}})).status,404);assert.equal(f.network.length,before);
+  f.restart();const library=(await(await f.call('/api/nostalgia')).json()).library;assert.equal(library.categories.find(c=>c.id===category.id).name,'טיולים משפחתיים');assert.equal(library.events.find(e=>e.id===event.id).name,'טיול משפחתי לצפון');
+  const backup=await(await f.call('/api/export')).json();assert.equal(backup.nostalgiaLibrary.events.find(e=>e.id===event.id).date.year,1992);
+ }finally{await f.close();}
+});
+test('historical nostalgia grouping runs once and never restores an event tag that a visitor removed',async()=>{
+ const f=fixture();try{
+  await f.connect();const response=await f.call('/api/nostalgia/upload?filename='+encodeURIComponent('יום הולדת רחלי+יום העצמאות-קטע 1.mp4'),{method:'POST',body:video,headers:{'Content-Length':String(video.length)}});const item=(await response.json()).collection.items[0];
+  f.database.prepare('DELETE FROM meta WHERE id=?').run('nostalgia-library-v1');f.restart();let current=(await(await f.call('/api/nostalgia')).json()).items.find(i=>i.id===item.id);assert.deepEqual(current.nostalgiaEventIds,['independence-1996']);
+  await f.call('/api/nostalgia/assign',{method:'POST',body:{id:item.id,remove:['independence-1996']}});f.restart();current=(await(await f.call('/api/nostalgia')).json()).items.find(i=>i.id===item.id);assert.deepEqual(current.nostalgiaEventIds,[]);
+ }finally{await f.close();}
+});
 test('Tal and Tedi family wedding video belongs to their couple page and keeps its family-video title',async()=>{
  const f=fixture();try{
   await f.connect();const wedding=await(await f.call('/api/weddings/u-tidhar')).json();
@@ -1907,4 +1944,5 @@ test('ZIP downloads stream exactly the selected gallery photos, deduplicate name
   await f.call('/api/media/'+a.id+'/delete',{method:'POST',body:{scope:'gallery'}});assert.equal((await download([a.id,b.id])).status,409);
  }finally{await f.close();}
 });
+
 

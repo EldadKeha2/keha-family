@@ -18,7 +18,7 @@ async function readSession(env,token,limit){
   if(!Number.isSafeInteger(session.expires)||session.expires<Date.now())throw new HttpError(410,'אישור ההעלאה פג. בחרו את הסרטון מחדש.');
   return session;
 }
-function mediaItem(session){return {id:session.id,category:'nostalgia',personId:null,filename:session.filename,name:session.filename.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:session.id+session.ext,key:session.key,mime:session.mime,kind:'video',size:session.size,caption:'',createdAt:session.createdAt};}
+function mediaItem(session){return {id:session.id,category:'nostalgia',personId:null,filename:session.filename,name:session.filename.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:session.id+session.ext,key:session.key,mime:session.mime,kind:'video',size:session.size,caption:'',createdAt:session.createdAt,nostalgiaEventIds:session.eventId?[session.eventId]:[],...(session.eventDate?{takenDate:session.eventDate}:{})};}
 async function existingItem(db,session){
   let item;try{item=await db('media.get',{id:session.id});}catch(error){if(error.status===404)return null;throw error;}
   if(item.key!==session.key||item.size!==session.size)throw new HttpError(409,'הסרטון השתנה. בחרו אותו מחדש.');
@@ -41,9 +41,10 @@ export async function multipartVideo(request,env,db,ctx,{action,sniff,limit}){
     const body=await readJSON(request,4096),size=body.size;
     if(!Number.isSafeInteger(size)||size<1||size>limit)throw new HttpError(413,'אפשר להעלות סרטון נוסטלגיה עד 500MB.');
     let head;try{if(typeof body.head!=='string'||body.head.length>172)throw Error();head=Uint8Array.from(atob(body.head),c=>c.charCodeAt(0));}catch{throw new HttpError(400,'לא התקבלה תחילת הסרטון. בחרו אותו מחדש.');}
+    const event=body.eventId?await db('nostalgia.event',{id:body.eventId}):null;
     const format=sniff(head,true),id=uid(),filename=nameOf(body.filename),key='nostalgia/shared/'+id+format.ext;
     const uploadId=await createMultipartUpload(env,key,format.mime);
-    const session={version:1,id,key,filename,size,mime:format.mime,ext:format.ext,uploadId,partSize:VIDEO_PART_SIZE,createdAt:new Date().toISOString(),expires:Date.now()+SESSION_LIFETIME};
+    const session={version:1,id,key,filename,size,mime:format.mime,ext:format.ext,uploadId,partSize:VIDEO_PART_SIZE,createdAt:new Date().toISOString(),expires:Date.now()+SESSION_LIFETIME,eventId:event?.id||null,eventDate:event?.date||null};
     return json({session:await signSession(env,session),partSize:VIDEO_PART_SIZE,parts:Math.ceil(size/VIDEO_PART_SIZE)},201);
   }
   const body=action==='part'?null:await readJSON(request,14000);
@@ -82,3 +83,4 @@ export async function multipartVideo(request,env,db,ctx,{action,sniff,limit}){
   }
   return saved(db,session);
 }
+

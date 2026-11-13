@@ -43,6 +43,7 @@ function fixture(){
     return new Response(null,{status:302,headers:{Location:'https://cdn.example'+url.pathname}});
   };
   async function db(action,p){
+    if(action==='nostalgia.event'){if(p.id!=='ora-release-1988')throw new HttpError(404,'Missing event');return {id:p.id,date:{day:12,month:7,year:1988}};}
     if(action==='media.get'){if(!catalog.has(p.id))throw new HttpError(404,'Missing');return catalog.get(p.id);}
     if(action==='media.add'){if(failDatabase){failDatabase--;throw new HttpError(503,'Temporarily unavailable');}assert.ok(!catalog.has(p.item.id));catalog.set(p.item.id,p.item);return {saved:true};}
     if(action==='collection')return {items:[...catalog.values()],count:catalog.size};
@@ -70,6 +71,15 @@ test('multipart joins out-of-order pieces into the exact original video, publish
     const stored=[...f.objects.values()][0];assert.equal(createHash('sha256').update(stored).digest('hex'),createHash('sha256').update(bytes).digest('hex'));
     const item=[...f.catalog.values()][0];assert.equal(item.mime,'video/mp4');assert.equal(item.size,bytes.length);assert.equal(item.takenDate,undefined);assert.equal(item.name,'יום הולדת רחלי - קטע 1');
     assert.equal((await f.call('complete',{session:upload.session})).status,200);assert.equal(f.catalog.size,1);assert.equal(f.completions,1);
+  }finally{f.close();}
+});
+test('multipart event selection is signed, inherits the event date and survives completion retries',async()=>{
+  const f=fixture();try{
+    const bytes=movie(1024),upload=await(await f.call('start',{filename:'מסיבת השחרור של אורה - קטע 1.mp4',size:bytes.length,head:head.toString('base64'),eventId:'ora-release-1988'})).json();
+    const [payload,mac]=upload.session.split('.'),claim=JSON.parse(Buffer.from(payload,'base64'));claim.eventId='another-event';
+    await assert.rejects(f.part(Buffer.from(JSON.stringify(claim)).toString('base64')+'.'+mac,1,bytes),e=>e.status===403);
+    await f.part(upload.session,1,bytes);await f.call('complete',{session:upload.session});await f.call('complete',{session:upload.session});
+    const item=[...f.catalog.values()][0];assert.deepEqual(item.nostalgiaEventIds,['ora-release-1988']);assert.deepEqual(item.takenDate,{day:12,month:7,year:1988});assert.equal(f.catalog.size,1);assert.equal(f.completions,1);
   }finally{f.close();}
 });
 test('multipart rejects forged and expired sessions, invalid video bytes, missing bytes and parts outside the declared file',async()=>{

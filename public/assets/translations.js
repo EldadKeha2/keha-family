@@ -1,5 +1,18 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "ספריית האירועים עדיין אינה זמינה. נסו לרענן":"The event library is not available yet. Please refresh",
+  "האירוע לא נמצא. בחרו אירוע מהרשימה":"Event not found. Choose an event from the list",
+  "האירוע לא נמצא":"Event not found",
+  "בחרו עד 30 אירועים לפריט":"Choose up to 30 events per memory",
+  "אפשר ליצור עד 40 קטגוריות":"You can create up to 40 categories",
+  "כבר קיימת קטגוריה בשם הזה":"A category with this name already exists",
+  "פרטי האירוע עודכנו בינתיים. פתחו את העריכה מחדש":"The event was updated. Open the editor again",
+  "בחרו קטגוריה לאירוע":"Choose a category for the event",
+  "תאריך האירוע אינו תקין":"The event date is invalid",
+  "כבר קיים אירוע בשם הזה בקטגוריה":"An event with this name already exists in this category",
+  "ספריית האירועים מלאה":"The event library is full",
+  "אפשר לשייך כאן פריטים מפינת הנוסטלגיה בלבד":"Only Nostalgia memories can be assigned here",
+  "בחרו אירועים תקינים":"Choose valid events",
   "שתפו זיכרון מהחתונה":"Share a wedding memory",
   "הרגעים שנשארו איתנו":"The moments that stayed with us",
   "זיכרונות וברכות מהחתונה":"Wedding memories and wishes",
@@ -847,5 +860,6 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
  'יש לרענן את הדף לפני ההורדה.':'Refresh the page before downloading.'
 });
 Object.assign(window.FAMILY_TRANSLATIONS,{'לא נמצאו תמונות בסינון הזה':'No photos match these filters','אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':'Choose another person or family, or reset the filters.'});
+
 
 
