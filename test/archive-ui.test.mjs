@@ -42,6 +42,15 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
 }
 const item=(kind,n)=>({id:String(n),file:n+'.'+({photo:'jpg',video:'mp4',document:'pdf'}[kind]),filename:'Memory '+n,name:'Memory '+n,kind,src:'/media/'+n,mime:{photo:'image/jpeg',video:'video/mp4',document:'application/pdf'}[kind],size:100});
 
+test('wedding films show a site-styled poster without a YouTube link or player before opening',async()=>{
+  const film={...item('video',1),provider:'youtube',youtubeId:'RrK53SZJJs8',poster:'https://i.ytimg.com/vi/RrK53SZJJs8/hqdefault.jpg',watchUrl:'https://www.youtube.com/watch?v=RrK53SZJJs8'};
+  const f=fixture([film],{navigation:true,entryUrl:'https://family.test/#weddings/u-tomer'});await f.flush();
+  const grid=f.nodes.get('weddingMediaGrid'),card=grid.children.find(node=>node.dataset.mediaKind==='video');
+  assert.ok(card);assert.match(card.innerHTML,/class="archive-video-poster"/);assert.match(card.innerHTML,/data-media-open="1" data-media-scope="wedding:u-tomer"/);
+  assert.match(card.innerHTML,/loading="lazy"/);assert.match(card.innerHTML,/aria-label="ניגון Memory 1"/);
+  assert.doesNotMatch(card.innerHTML,/<iframe|<video|<source|youtube\.com|YouTube|youtube-play/);
+  f.poll();await f.flush();assert.equal(grid.children.find(node=>node.dataset.mediaKind==='video'),card);
+});
 test('nostalgia separates images, films and documents and preserves a playing video through refreshes',async()=>{
   const f=fixture([item('video',1),item('photo',2),item('document',3)]);await f.flush();
   assert.deepEqual(f.requests,['api/nostalgia']);

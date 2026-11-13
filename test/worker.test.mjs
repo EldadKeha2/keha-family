@@ -6,6 +6,7 @@ import worker,{FamilyState,LIMITS,sniff} from '../src/worker.mjs';
 import {signedRequest} from '../src/hf.mjs';
 import {fail,sha256,uid} from '../src/http.mjs';
 import family from '../src/family.mjs';
+import {featuredVideos,weddingVideos} from '../src/featured-videos.mjs';
 import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
 import {photoUploadPayload,PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES} from '../public/assets/photo-upload-metadata.mjs';
 import {nameCorrectionKey} from '../src/name-corrections.mjs';
@@ -375,7 +376,7 @@ test('editing one photo keeps its original bytes, profile, tags, captions and al
   assert.deepEqual(Buffer.from(await(await f.call(saved.item.src)).arrayBuffer()),Buffer.concat([photo,Buffer.from('edited')]));
   for(const kind of ['gallery','photos']){const album=await(await f.call('/api/collections/'+kind)).json();assert.equal(album.count,1);assert.equal(album.items[0].src,saved.item.src);}
   const album=await(await f.call('/api/people/tomer/page')).json();assert.equal(album.person.profile,saved.item.src);assert.equal(album.albums.photos.items[0].src,saved.item.src);
-  assert.equal(f.objects.size,2);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,7);
+  assert.equal(f.objects.size,2);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,featuredVideos.length+weddingVideos.length+1);
   f.restart();const history=await(await f.call('/api/media/'+item.id+'/versions')).json();assert.equal(history.versions.length,2);assert.equal(history.currentVersion,saved.currentVersion);
   assert.equal((await(await f.call('/api/export')).json()).photoVersions.length,2);
  }finally{await f.close();}
@@ -475,8 +476,8 @@ test('photo album shortcuts link the original to family photos, its own nursery 
   assert.equal((await(await f.call('/api/collections/gallery')).json()).count,1);
   assert.equal((await(await f.call('/api/nursery')).json()).albums.tomer.count,1);
   assert.equal((await(await f.call('/api/nursery/tomer')).json()).count,1);
-  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,1);
-  assert.equal(f.objects.size,1);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,7,'Memberships never duplicate a media record');
+  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).collection.items.filter(item=>item.kind==='photo').length,1);
+  assert.equal(f.objects.size,1);assert.equal(f.database.prepare('SELECT count(*) AS n FROM media').get().n,featuredVideos.length+weddingVideos.length+1,'Memberships never duplicate a media record');
   assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections').get().n,3);
   assert.equal((await(await f.call('/api/export')).json()).mediaCollections.length,3);
   const caption=await f.call('/api/weddings/u-tomer/caption',{method:'POST',body:{file:item.file,caption:'One original, shared description'}});assert.equal(caption.status,200);
@@ -521,7 +522,7 @@ for(const target of ['nursery:tomer','wedding:u-tomer'])for(const origin of ['ga
   assert.equal((await change(target,false,'personal:shani')).status,400);assert.equal((await change(target,false,'personal:tomer',{clientHeaders:false})).status,403);
   const versions=(await(await f.call('/api/media/'+item.id+'/versions')).json()).versions.length,objects=f.objects.size;
   const response=await change(target,false);assert.equal(response.status,200,await response.clone().text());const removed=await response.json();
-  assert.equal(removed.included,false);assert.equal(removed.collection.count,0);assert.equal(removed.item.collections.includes(target),false);assert.equal(removed.item.collections.includes(other),true);
+  assert.equal(removed.included,false);assert.equal(removed.collection.items.filter(item=>item.kind==='photo').length,0);assert.equal(removed.item.collections.includes(target),false);assert.equal(removed.item.collections.includes(other),true);
   assert.equal(removed.item.collections.includes('photos'),origin==='photos');assert.equal(removed.item.id,item.id);assert.equal(removed.item.src,item.src);assert.deepEqual(removed.item.tags,item.tags);
   assert.equal((await(await change(target,false)).json()).collection.revision,removed.collection.revision);
   f.restart();const current=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;assert.equal(current.collections.includes(target),false);assert.equal(current.collections.includes(other),true);
@@ -599,11 +600,11 @@ test('album membership survives deletion and undo while native album photos are 
   assert.equal((await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:'photos'}})).status,200);
   assert.equal((await(await f.call('/api/nursery/tomer')).json()).count,0);
   assert.equal((await(await f.call('/api/nursery')).json()).albums.tomer,undefined);
-  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,0);
+  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).collection.items.filter(item=>item.kind==='photo').length,0);
   assert.equal((await f.call('/api/nursery/tomer',{headers:{'If-None-Match':before.headers.get('ETag')}})).status,200);
   assert.equal((await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:'photos'}})).status,200);
   assert.equal((await(await f.call('/api/nursery/tomer')).json()).count,1);
-  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,1);
+  assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).collection.items.filter(item=>item.kind==='photo').length,1);
   assert.equal(f.objects.size,1);
  }finally{await f.close();}
 });
@@ -1110,6 +1111,23 @@ test('Yona death information is visible in family data and preserves existing bi
     assert.equal((await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.2015',expectedBirthday:person.birthday}})).status,400);
     const response=await f.ownerBirthday('/api/people/yona/birthday',{method:'POST',body:{birthday:'1.1.1930',expectedBirthday:person.birthday}});assert.equal(response.status,200);
     f.restart();const restored=await (await f.call('/api/people/yona')).json();assert.equal(restored.birthday,'1.1.1930');assert.equal(restored.deathDate,'16.6.2010');
+  }finally{await f.close();}
+});
+test('Shani and Tomer wedding film stays external, belongs only to their album and respects deletion across restarts',async()=>{
+  const f=fixture();try{
+    await f.connect();const wedding=await(await f.call('/api/weddings/u-tomer')).json();
+    assert.equal(wedding.mediaCount,1);const film=wedding.collection.items[0];
+    assert.equal(film.youtubeId,'RrK53SZJJs8');assert.equal(film.provider,'youtube');assert.equal(film.kind,'video');assert.equal(film.scope,'wedding:u-tomer');assert.equal(film.size,0);
+    assert.deepEqual(film.collections,['wedding:u-tomer']);assert.equal(wedding.cover,null);
+    assert.equal((await(await f.call('/api/weddings/u-amir')).json()).mediaCount,0);
+    assert.equal((await(await f.call('/api/collections/videos')).json()).count,6);
+    const response=await f.call(film.src);assert.equal(response.status,302);assert.equal(response.headers.get('Location'),'https://www.youtube.com/watch?v=RrK53SZJJs8');
+    assert.equal(f.objects.size,0);assert.equal(f.network.length,0,'No video file is uploaded or fetched by the site');
+    f.restart();assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,1);
+    assert.equal((await f.call('/api/media/'+film.id+'/delete',{method:'POST',body:{scope:'wedding:u-tomer'}})).status,200);
+    f.restart();assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,0,'A deployment must not restore a deleted wedding film');
+    assert.equal((await f.call('/api/media/'+film.id+'/restore',{method:'POST',body:{scope:'wedding:u-tomer'}})).status,200);
+    f.restart();assert.equal((await(await f.call('/api/weddings/u-tomer')).json()).mediaCount,1);
   }finally{await f.close();}
 });
 test('special birthdays contain six unique YouTube videos and deletions survive deployment',async()=>{

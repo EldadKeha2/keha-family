@@ -2,7 +2,7 @@ import family from './family.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection,weddingDate} from './weddings.mjs';
-import {featuredVideos} from './featured-videos.mjs';
+import {featuredVideos,weddingVideos} from './featured-videos.mjs';
 import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections,rootWeddingCorrectionKey} from './date-corrections.mjs';
 import {biographyDefaults,biographyValue,contentField} from './biography.mjs';
 import {memorialPeriod} from './memorial.mjs';
@@ -125,10 +125,10 @@ export class FamilyState {
         this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',rootWeddingCorrectionKey,'applied');
       }
       // Insert the oldest first because shared albums display the newest row first.
-      for(const item of [...featuredVideos].reverse()){
+      for(const item of [...featuredVideos,...weddingVideos].reverse()){
         if(this.rows('SELECT id FROM media_trash WHERE id=?',item.id).length)continue;
         if(this.rows('SELECT id FROM media WHERE id=?',item.id).length){const old=this.media(item.id);if(old.nameEn!==item.nameEn){old.nameEn=item.nameEn;this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(old),old.id);labelsChanged=true;}continue;}
-        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,NULL,?)',item.id,item.category,JSON.stringify(item));this.touch('videos');
+        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,NULL,?)',item.id,item.category,JSON.stringify(item));this.touch(item.category);
       }
       if(labelsChanged){
         // Invalidate each person's cache once. Never visit or retag every photo on startup.
