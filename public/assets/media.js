@@ -66,7 +66,8 @@
     for(const scope of scopes){const items=albums.get(scope)||[],index=items.findIndex(item=>identity(item)===id);if(index>=0)return {scope,items,index};}
     return null;
   }
-  function register(scope,items,{retainCurrent=false,pagination,cover}={}){
+  function register(scope,items,{retainCurrent=false,advanceRemoved=false,pagination,cover}={}){
+    const previousPage=albumPages.get(scope);
     albums.set(scope,items);
     if(cover!==undefined)albumCovers.set(scope,cover);
     if(pagination){
@@ -86,12 +87,23 @@
       let idle=state.pageNative||state.pageQueued?photoSwipe?.whenIdle?.():null;
       if(idle)state.pageRender=(async()=>{do{await idle;idle=photoSwipe?.whenIdle?.();}while(idle);render();})();else render();return;
     }
-    const id=state.activeId,active=current();let index=items.findIndex(item=>identity(item)===id);
+    const id=state.activeId,active=current(),nextIds=advanceRemoved?state.items.slice(state.index+1).map(identity):[];
+    const previousPosition=((previousPage?.page||1)-1)*(previousPage?.size||state.items.length)+state.index;
+    let index=items.findIndex(item=>identity(item)===id);
     // Keep the photo being tagged open even after it leaves the untagged filter.
     if(retainCurrent&&!state.deleting&&index<0&&active){items=[...items];index=Math.min(state.index,items.length);items.splice(index,0,active);}
     state.items=items;
     if(!items.length){$('mediaViewer').close();return;}
-    if(index<0)show(Math.min(state.index,items.length-1));
+    if(index<0){
+      const successor=nextIds.map(id=>items.findIndex(item=>identity(item)===id)).find(index=>index>=0);
+      if(successor!==undefined)show(successor);
+      // Completion removes the current photo. Preserve its old successor's
+      // identity; after the final photo, continue at the start of the category.
+      else if(advanceRemoved&&previousPosition>=(pagination?.total??items.length)){
+        if(pagination?.page>1&&pagination.pages>1&&window.FamilyPortal?.pageGallery){state.index=items.length-1;void step(1);}
+        else show(0);
+      }else show(Math.min(state.index,items.length-1));
+    }
     // Compare with the pixels actually mounted in the viewer: mutation events
     // may already have merged the new source into the active item's metadata.
     else {state.index=index;if(renderedVersion!==versionKey(items[index]))show(index);else metadata();}

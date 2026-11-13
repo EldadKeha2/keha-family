@@ -141,6 +141,30 @@ test('completion keeps partial selected, advances to its next photo and puts onl
  assert.deepEqual({...f.window.FamilyPortal.galleryQuery()},query);assert.equal(f.filters[2].getAttribute('aria-pressed'),'true');assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/b');assert.deepEqual(f.cards,['b.jpg']);assert.equal(f.get('mediaViewerCounter').textContent,'1 / 1');
  f.close();await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().filter,'partial');f.filter('complete');await f.flush();assert.deepEqual(f.cards,['a.jpg']);
 });
+test('completing a filtered photo always selects its successor, including page edges and the final photo',async()=>{
+ for(const phone of [false,true])for(const filter of ['untagged','partial'])for(const [count,current,next]of [[3,1,2],[3,2,0],[205,99,100],[205,204,0],[201,200,0]]){
+  const items=Array.from({length:count},(_,i)=>photo(String(i),filter==='partial'?[{id:'person-0'}]:[]));
+  const f=fixture(items,{phone});await f.flush();f.filter(filter);await f.flush();await f.window.FamilyPortal.sortGallery('taken-asc');
+  const page=Math.floor(current/100)+1;if(page>1)await f.window.FamilyPortal.pageGallery(page);
+  const query={...f.window.FamilyPortal.galleryQuery()};f.open(String(current));f.review(String(current));await f.flush();
+  const message=filter+' '+(phone?'phone':'desktop')+' '+current+' of '+count;
+  assert.equal(f.get('mediaViewer').open,true,message);
+  assert.equal(f.get('mediaOriginal').href,'/media/'+next,message);
+  assert.equal(f.get('mediaViewerCounter').textContent,(next>current?next:next+1)+' / '+(count-1),message);
+  assert.equal(f.window.FamilyPortal.galleryQuery().filter,query.filter,message);
+  assert.equal(f.window.FamilyPortal.galleryQuery().sort,query.sort,message);
+  assert.equal(f.window.FamilyPortal.galleryQuery().seed,query.seed,message);
+  assert.equal(f.server[current].faceSummary.reviewed,true,message);f.close();
+ }
+});
+test('completion follows the original next photo when earlier photos also leave the untagged category',async()=>{
+ for(const phone of [false,true]){
+  const f=fixture(['a','b','c','d'].map(id=>photo(id)),{phone});await f.flush();f.filter('untagged');await f.flush();
+  f.open('a');f.change('a');f.get('mediaNext').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/b');
+  f.review('b');await f.flush();assert.deepEqual(f.cards,['c.jpg','d.jpg']);assert.equal(f.get('mediaOriginal').href,'/media/c');
+  assert.equal(f.get('mediaViewerCounter').textContent,'1 / 2');assert.equal(f.window.FamilyPortal.galleryQuery().filter,'untagged');f.close();
+ }
+});
 test('undo keeps complete selected and advances or closes without sending the visitor to another category',async()=>{
  const items=[photo('a',[{id:'person-0'}]),photo('b',[{id:'person-0'}])];for(const item of items){item.faceSummary.reviewed=true;item.faceSummary.partial=false;}
  const f=fixture(items);await f.flush();f.filter('complete');await f.flush();f.open('a');f.review('a',false);await f.flush();assert.equal(f.filters[3].getAttribute('aria-pressed'),'true');assert.deepEqual(f.cards,['b.jpg']);assert.equal(f.get('mediaOriginal').href,'/media/b');
