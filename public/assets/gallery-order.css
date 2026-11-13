@@ -1,3 +1,6 @@
+/* Keep the visible row order aligned with every +1 photo navigation action. */
+#sharedGalleryGrid{direction:ltr;grid-auto-flow:row}
+html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
 .gallery-header-upload,.gallery-page-size-mobile{display:none}
 .gallery-pager-wrap{position:relative;display:flow-root}
 .gallery-mobile-filter-dock{display:none}
