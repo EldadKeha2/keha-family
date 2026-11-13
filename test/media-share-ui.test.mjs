@@ -133,14 +133,16 @@ test('paginated gallery loop keeps boundary previews and swipes through a single
   const f=fixture({english}),pages=[['a','b'].map(f.photo),['c'].map(f.photo)],visits=[],previews=[];
   f.navigator.userAgent='Android';f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;
   f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});
-  f.window.FamilyPhotoNative={mount:(_stage,options)=>previews.push(options),reset(){},claim:()=> 'queued'};
+  f.window.FamilyPhotoPresentation.dragQueued=(_stage,dx,photos)=>previews.push({dx,...photos});
   const register=page=>f.window.FamilyMedia.register('gallery',pages[page-1],{pagination:{page,pages:2,total:3,size:2,filter:'partial',sort:'random',seed:7}});
   f.window.FamilyPortal={pageGallery:async page=>{visits.push(page);register(page);}};
   register(1);f.window.FamilyMedia.openFrom('gallery','a');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
-  await f.window.FamilyMedia.step(-1);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(previews.at(-1).next?.id,'a','The next preview at the end of the album is its first photo');
-  swipe(f,120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 3');assert.equal(previews.at(-1).previous?.id,'c');
-  swipe(f,-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');assert.deepEqual(visits,[2,1,2]);
-  register(1);f.window.FamilyMedia.register('gallery',pages[0],{pagination:{page:1,pages:2,total:3,size:2,filter:'all',sort:'random',seed:8}});f.window.FamilyMedia.openFrom('gallery','a');assert.equal(previews.at(-1).previous,null,'A different filter or random order must not reuse the previous album boundary');f.close();
+  await f.window.FamilyMedia.step(-1);assert.equal(f.window.FamilyMedia.current().id,'c');
+  pointer(f,'pointerdown',200);pointer(f,'pointermove',340);assert.equal(previews.at(-1).next?.id,'a','The rightward preview at the end of the album is its first photo');pointer(f,'pointerup',340);
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 3');
+  pointer(f,'pointerdown',200);pointer(f,'pointermove',80);assert.equal(previews.at(-1).next?.id,'c','The leftward preview at the start is the final photo');pointer(f,'pointerup',80);
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');assert.deepEqual(visits,[2,1,2]);
+  register(1);f.window.FamilyMedia.register('gallery',pages[0],{pagination:{page:1,pages:2,total:3,size:2,filter:'all',sort:'random',seed:8}});f.window.FamilyMedia.openFrom('gallery','a');pointer(f,'pointerdown',200);pointer(f,'pointermove',80);assert.equal(previews.at(-1).next,null,'A different filter or random order must not reuse the previous album boundary');pointer(f,'pointercancel',80);f.close();
  }
 });
 test('a committed swipe holds its offset while the next photo loads instead of springing back',async()=>{
@@ -224,6 +226,20 @@ test('touch swipes navigate every photo album in both languages and on wide touc
   swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/b',scope);
   swipe(f,-120);assert.equal(f.get('mediaOriginal').href,'/media/a',scope);
   swipe(f,-120);assert.equal(f.get('mediaOriginal').href,'/media/c','Previous wraps just like its arrow');
+ }
+});
+test('on phones a right swipe moves from the first row rightmost photo to the second row leftmost, exactly like Next',async()=>{
+ for(const userAgent of ['Android','iPhone','iPad'])for(const english of [false,true])for(const fullscreen of [false,true])for(const stream of ['pointer','touch','both'])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nursery:ruti','nostalgia']){
+  const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=360;f.navigator.userAgent=userAgent;f.window.FamilyPhotoPresentation.desktop=()=>false;
+  const photos=['row1-left','row1-middle','row1-right','row2-left','row2-middle','row2-right'].map(f.photo),native={mounts:0,claims:0,ends:0};
+  f.window.FamilyPhotoNative={mount(){native.mounts++;},reset(){},claim(){native.claims++;return 'native';},note(_stage,dx){native.ends++;f.window.FamilyMedia.step(dx>0?-1:1,{native:true});}};
+  f.window.FamilyMedia.open(photos,2,scope);if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  await f.get('mediaNext').handlers.get('click')();const next=f.window.FamilyMedia.current().id;assert.equal(next,'row2-left');await f.get('mediaPrevious').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,'row1-right');
+  const touch=(type,x)=>{const point={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[point],changedTouches:[point],target:point.target,cancelable:true,preventDefault(){}};(type==='touchstart'?stage.handlers:f.events).get(type)(event);};
+  const stroke=dx=>{if(stream==='pointer'){swipe(f,dx);return;}pointer(f,'pointerdown',180);touch('touchstart',180);if(stream==='touch')pointer(f,'pointercancel',180);else pointer(f,'pointermove',180+dx);touch('touchmove',180+dx);if(stream==='both')pointer(f,'pointerup',180+dx);touch('touchend',180+dx);pointer(f,'pointerup',180+dx);};
+  stroke(120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,next,`${userAgent} ${stream} ${scope}: right must select row 2 left, never row 1 middle`);assert.equal(f.get('mediaViewerCounter').textContent,'4 / 6');
+  stroke(-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'row1-right');
+  f.window.FamilyMedia.refreshPhotoPresentation();assert.deepEqual(native,{mounts:0,claims:0,ends:0},'Browser scroll callbacks cannot select a different neighbour');f.close();
  }
 });
 test('taps, short drags, vertical scrolling and gestures over controls leave the photo in place',()=>{
@@ -377,11 +393,10 @@ test('mixed Windows pointer and touch streams finish a swipe even without pointe
   pointer(f,'pointerdown',350);touch('touchstart',350);touch('touchmove',200);touch('touchend',200);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
  }
 });
-test('a second stroke can finish the first native snap before scrollend, even with fully prepared neighbours',async()=>{
- const f=fixture();f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.preload=()=>{};
- f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});let first,claimed=false;
- f.window.FamilyPhotoNative={mount(){},reset(){},claim(){if(!claimed){claimed=true;first=f.window.FamilyMedia.step(1,{native:true});}return 'queued';}};
- pointer(f,'pointerdown',200);assert.equal(f.window.FamilyMedia.current().id,'a');pointer(f,'pointermove',340);pointer(f,'pointerup',340);await first;
+test('a prepared phone Next followed by a rightward stroke selects the following photo without moving on contact',async()=>{
+ const f=fixture();f.navigator.userAgent='Android';f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.preload=()=>{};
+ f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});await f.get('mediaNext').handlers.get('click')();
+ pointer(f,'pointerdown',200);assert.equal(f.window.FamilyMedia.current().id,'b');pointer(f,'pointermove',340);pointer(f,'pointerup',340);
  assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
 });
 test('a native gallery page arriving under the next stroke keeps the touch target until release, then advances again',async()=>{
@@ -391,10 +406,12 @@ test('a native gallery page arriving under the next stroke keeps the touch targe
  const first=f.window.FamilyMedia.step(1,{native:true});pointer(f,'pointerdown',200);pointer(f,'pointermove',340);finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'b');
  pointer(f,'pointerup',340);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.get('mediaViewerCounter').textContent,'4 / 4');f.close();
 });
-test('the first native touch stays with browser scrolling and cannot also trigger fallback navigation',()=>{
- const f=fixture(),notes=[];f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoNative={mount(){},reset(){},claim:()=> 'native',note:(_stage,dx)=>notes.push(dx)};
- const touch=(type,x)=>{const p={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[p],changedTouches:[p],target:p.target,cancelable:true,preventDefault(){this.prevented=true;}};(type==='touchstart'?f.get('mediaStage').handlers:f.events).get(type)(event);return event;};
- pointer(f,'pointerdown',200);touch('touchstart',200);pointer(f,'pointercancel',200);assert.equal(touch('touchmove',340).prevented,undefined);assert.deepEqual(notes,[]);touch('touchend',340);assert.deepEqual(notes,[140]);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+test('phones retain browser vertical scrolling and pinch zoom while horizontal strokes select one photo',()=>{
+ const f=fixture();f.navigator.userAgent='Android';f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+ assert.equal(f.get('mediaStage').classList.contains('photo-manual-swipes'),false,'Phone touch-action keeps pan-y and pinch-zoom');
+ pointer(f,'pointerdown',200,200);assert.equal(pointer(f,'pointermove',203,120).prevented,undefined);pointer(f,'pointerup',203,120);assert.equal(f.window.FamilyMedia.current().id,'a');
+ pointer(f,'pointerdown',100);pointer(f,'pointermove',150);pointer(f,'pointerdown',200,100,{pointerId:2,isPrimary:false});pointer(f,'pointerup',240);assert.equal(f.window.FamilyMedia.current().id,'a','A pinch cannot become a photo swipe');
+ swipe(f,120);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
 });
 test('Windows touch browsing owns horizontal swipes in every album and fullscreen even in a narrow app window',()=>{
  for(const width of [400,1440])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){

@@ -301,14 +301,12 @@
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open]')&&(window.FamilyFaces?.canNavigate?.(stage)??true);
   }
   function refreshPhotoPresentation(){
-    const stage=$('mediaStage'),manual=desktopPhotoInput();
-    stage.classList.toggle('photo-manual-swipes',manual);
-    // Desktop/Windows uses the same immediate drag layers for trackpad, mouse
-    // and screen touch. A second horizontal scroller can steal the first touch
-    // before its initial snap/layout has settled; do not mount it in this mode.
-    if(manual){window.FamilyPhotoNative?.reset(stage);return;}
-    if(!window.FamilyPhotoNative||state.photoLoading||state.paging)return;
-    window.FamilyPhotoNative.mount($('mediaStage'),{previous:photoNeighbour(-1),next:photoNeighbour(1),enabled:canNavigatePhoto,busy:()=>state.photoLoading||state.paging,step});
+    const stage=$('mediaStage');
+    // All devices use the same physical swipe and album order as Next/Previous.
+    // Phones retain native vertical scrolling and pinch zoom; only desktop
+    // touch needs its vertical movement handled by the pointer controller.
+    stage.classList.toggle('photo-manual-swipes',desktopPhotoInput());
+    window.FamilyPhotoNative?.reset(stage);
   }
   function requestDelete(scope,id){
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
@@ -422,7 +420,7 @@
     const stage=$('mediaStage');
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
-      enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:()=>desktopPhotoInput()?'queued':window.FamilyPhotoNative?.claim?.(stage)||'manual',nativeEnd:dx=>window.FamilyPhotoNative?.note?.(stage,dx),
+      enabled:()=>canNavigatePhoto({pending:true}),mouse:desktopPhotoInput,claim:()=> 'queued',
       vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
       step,
       move:(dx,{queued=false}={})=>{
