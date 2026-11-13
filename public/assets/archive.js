@@ -132,7 +132,11 @@
         if(key==='nostalgia'&&item.kind==='video')card.insertAdjacentHTML('afterbegin',`<header class="nostalgia-video-heading"><span class="small-eyebrow">${I18n.isEnglish?'From our family films':'מהסרטים המשפחתיים שלנו'}</span><h4>${safe(I18n.mediaName(item))}</h4></header>`);
         if(key==='nostalgia'&&item.kind==='video')card.insertAdjacentHTML('beforeend',`<button type="button" class="archive-capture-date" data-archive-date="${safe(item.id)}" aria-label="${I18n.isEnglish?'Edit recording date':'עריכת תאריך הצילום'}" aria-haspopup="dialog" aria-controls="photoDateDialog">${captureCalendar}<span data-archive-date-label>${safe(captureLabel(item))}</span>${pencil}</button>`);
         if(item.provider==='youtube')card.querySelector('.archive-video-poster img')?.addEventListener('error',event=>{event.currentTarget.hidden=true;});
-        else if(item.kind==='video')card.querySelector('video').addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;},true);
+        else if(item.kind==='video'){
+          const player=card.querySelector('video'),note=card.querySelector('.video-codec-note');
+          player.addEventListener('error',()=>{note.hidden=false;},true);
+          for(const event of ['loadeddata','canplay'])player.addEventListener(event,()=>{note.hidden=true;});
+        }
       }
       const draft=drafts.get(draftKey(key,item.file)),area=card.querySelector('textarea');
       if(area&&area!==document.activeElement)area.value=draft?.dirty?draft.value:item.caption||'';
