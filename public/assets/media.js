@@ -9,6 +9,8 @@
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
   const desktopPhotoInput=()=>window.FamilyPhotoPresentation?.desktop?.()===true||navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||'');
+  const phonePhotoInput=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
+  const swipeDirection=direction=>phonePhotoInput()?-direction:direction;
   const phoneTouchInput=()=>!desktopPhotoInput()&&'ontouchstart' in window;
   const inlinePhotoCaption=()=>current()?.kind==='photo'&&!state.fullscreen&&(window.FamilyPhotoKeyboard?.desktop?.()??desktopPhotoInput());
   function photoIndex(direction,wrap=true,from=state.index){
@@ -421,6 +423,7 @@
     const stage=$('mediaStage');
     const previousPhoto=()=>step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true}),nextPhoto=()=>step(1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true});
     const swipePhoto=(direction,options)=>{
+      direction=swipeDirection(direction);
       if(!phoneTouchInput())return step(direction,options);
       const button=$(direction>0?'mediaNext':'mediaPrevious');
       if(button.disabled){window.FamilyPhotoPresentation?.settle();return;}
@@ -433,7 +436,7 @@
       step,right:options=>swipePhoto(1,options),left:options=>swipePhoto(-1,options),
       move:(dx,{queued=false}={})=>{
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}
-        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=dx>0?1:-1,next=photoNeighbour(direction,from);
+        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=swipeDirection(dx>0?1:-1),next=photoNeighbour(direction,from);
         window.FamilyPhotoPresentation?.dragQueued?.(stage,dx,{current:state.items[from],next});
       },cancel:()=>window.FamilyPhotoPresentation?.settle()
     });

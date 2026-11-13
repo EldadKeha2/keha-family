@@ -122,6 +122,19 @@ function finger(f,type,x,y=100,count=1){
  (type==='touchstart'?f.get('mediaStage').handlers:f.events).get(type)(event);return event;
 }
 
+test('the reversed phone gesture takes the pool child to the mother and child, matching Next rather than the vintage couple',async()=>{
+ for(const english of [false,true])for(const fullscreen of [false,true])for(const touchscreen of [false,true]){
+  const f=fixture({english,touchscreen}),stage=f.get('mediaStage'),previews=[];stage.clientWidth=360;f.navigator.userAgent='Android';
+  f.window.FamilyMedia.open(['vintage-couple','pool-child','mother-and-child'].map(f.photo),1,'gallery');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  f.window.FamilyPhotoPresentation.dragQueued=(_stage,_dx,photos)=>previews.push(photos.next?.id);
+  await f.get('mediaNext').click();assert.equal(f.window.FamilyMedia.current().id,'mother-and-child');await f.get('mediaPrevious').click();assert.equal(f.window.FamilyMedia.current().id,'pool-child');
+  await f.get('mediaPrevious').click();assert.equal(f.window.FamilyMedia.current().id,'vintage-couple');await f.get('mediaNext').click();assert.equal(f.window.FamilyMedia.current().id,'pool-child');
+  if(touchscreen){finger(f,'touchstart',280);finger(f,'touchmove',100);}else{pointer(f,'pointerdown',280);pointer(f,'pointermove',100);}
+  assert.equal(previews.at(-1),'mother-and-child','The corrected gesture preview must be the same neighbour as Next');
+  if(touchscreen)finger(f,'touchend',100);else pointer(f,'pointerup',100);
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'mother-and-child');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');f.close();
+ }
+});
 test('phone TouchEvents activate the actual Next and Previous buttons once, independently of compatibility pointer coordinates',async()=>{
  for(const userAgent of ['Mozilla/5.0 (Linux; Android 16; MTN-NX1M) AppleWebKit/537.36 Chrome/141.0.0.0 Mobile Safari/537.36','iPhone','iPad'])for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nursery:ruti','nostalgia'])for(const order of ['pointer-first','touch-first','pointer-cancel','touch-only']){
   const f=fixture({english,touchscreen:true}),stage=f.get('mediaStage');stage.clientWidth=360;f.navigator.userAgent=userAgent;
@@ -135,29 +148,29 @@ test('phone TouchEvents activate the actual Next and Previous buttons once, inde
    finger(f,'touchend',180+dx);
    if(order!=='touch-only')pointer(f,'pointerup',180-dx);
   };
-  stroke(120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,next,`${userAgent} ${scope} ${order}: the actual finger must select the same photo as Next`);assert.equal(f.get('mediaNext').clicks,1);assert.equal(f.get('mediaPrevious').clicks,0);
-  stroke(-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'row1-right');assert.equal(f.get('mediaPrevious').clicks,1);assert.equal(f.get('mediaNext').clicks,1);f.close();
+  stroke(-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,next,`${userAgent} ${scope} ${order}: the actual finger must select the same photo as Next`);assert.equal(f.get('mediaNext').clicks,1);assert.equal(f.get('mediaPrevious').clicks,0);
+  stroke(120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'row1-right');assert.equal(f.get('mediaPrevious').clicks,1);assert.equal(f.get('mediaNext').clicks,1);f.close();
  }
 });
 test('phone button navigation waits for an active finger before painting a pending image, and the release clicks Next only once',async()=>{
  const f=fixture({touchscreen:true}),loads=new Map();f.navigator.userAgent='Android';f.get('mediaStage').clientWidth=360;f.window.FamilyPhotoPresentation.preload=()=>{};f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'gallery');
  f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.set(item.id,resolve));
- const first=f.get('mediaNext').click();finger(f,'touchstart',180);finger(f,'touchmove',300);loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a','Loading must not replace the image or its touch target under an active finger');
- finger(f,'touchend',300);assert.deepEqual([...loads.keys()],['b','c']);loads.get('c')(null);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaNext').clicks,2);f.close();
+ const first=f.get('mediaNext').click();finger(f,'touchstart',180);finger(f,'touchmove',60);loads.get('b')(null);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a','Loading must not replace the image or its touch target under an active finger');
+ finger(f,'touchend',60);assert.deepEqual([...loads.keys()],['b','c']);loads.get('c')(null);await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaNext').clicks,2);f.close();
 });
-test('the phone touch owner preserves vertical scroll, pinch zoom and cancellation, then accepts a fresh rightward flick',()=>{
+test('the phone touch owner preserves vertical scroll, pinch zoom and cancellation, then accepts a fresh navigation flick',()=>{
  const f=fixture({touchscreen:true});f.navigator.userAgent='Android';f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'gallery');
  finger(f,'touchstart',180,200);assert.equal(finger(f,'touchmove',182,80).prevented,undefined);finger(f,'touchend',182,80);assert.equal(f.window.FamilyMedia.current().id,'a');
  finger(f,'touchstart',180);finger(f,'touchmove',230);finger(f,'touchstart',230,100,2);finger(f,'touchend',330);assert.equal(f.window.FamilyMedia.current().id,'a');
  finger(f,'touchstart',180);finger(f,'touchmove',300);f.events.get('touchcancel')();finger(f,'touchend',300);assert.equal(f.window.FamilyMedia.current().id,'a');
- finger(f,'touchstart',180);finger(f,'touchend',300);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.get('mediaNext').clicks,1);f.close();
+ finger(f,'touchstart',180);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.get('mediaNext').clicks,1);f.close();
 });
 test('a phone swipe during a disabled page-change button cannot queue a second photo beyond the Next button target',async()=>{
  const f=fixture({touchscreen:true}),pagination={page:1,pages:2,size:2,total:4};f.navigator.userAgent='Android';f.get('mediaStage').clientWidth=360;let finish,settled=0;
  f.window.FamilyPhotoPresentation.settle=()=>{settled++;};f.window.FamilyMedia.register('gallery',['a','b'].map(f.photo),{pagination});f.window.FamilyMedia.openFrom('gallery','b');settled=0;
  f.window.FamilyPortal={pageGallery:page=>new Promise(resolve=>{finish=()=>{f.window.FamilyMedia.register('gallery',['c','d'].map(f.photo),{pagination:{...pagination,page}});resolve();};})};
- const first=f.get('mediaNext').click();assert.equal(f.get('mediaNext').disabled,true);finger(f,'touchstart',180);finger(f,'touchmove',300);finger(f,'touchend',300);assert.equal(f.get('mediaNext').clicks,1);assert.equal(settled,1);
- finish();await first;assert.equal(f.window.FamilyMedia.current().id,'c');finger(f,'touchstart',180);finger(f,'touchend',300);assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.get('mediaNext').clicks,2);f.close();
+ const first=f.get('mediaNext').click();assert.equal(f.get('mediaNext').disabled,true);finger(f,'touchstart',180);finger(f,'touchmove',60);finger(f,'touchend',60);assert.equal(f.get('mediaNext').clicks,1);assert.equal(settled,1);
+ finish();await first;assert.equal(f.window.FamilyMedia.current().id,'c');finger(f,'touchstart',180);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.get('mediaNext').clicks,2);f.close();
 });
 test('touch gestures and buttons loop both ways in every photo viewer, including fullscreen',async()=>{
  for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ora','wedding:parents','nursery:ora','nostalgia','home:photos']){
@@ -182,11 +195,11 @@ test('paginated gallery loop keeps boundary previews and swipes through a single
   f.window.FamilyPortal={pageGallery:async page=>{visits.push(page);register(page);}};
   register(1);f.window.FamilyMedia.openFrom('gallery','a');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
   await f.window.FamilyMedia.step(-1);assert.equal(f.window.FamilyMedia.current().id,'c');
-  pointer(f,'pointerdown',200);pointer(f,'pointermove',340);assert.equal(previews.at(-1).next?.id,'a','The rightward preview at the end of the album is its first photo');pointer(f,'pointerup',340);
+  pointer(f,'pointerdown',200);pointer(f,'pointermove',80);assert.equal(previews.at(-1).next?.id,'a','The phone Next preview at the end of the album is its first photo');pointer(f,'pointerup',80);
   await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 3');
-  pointer(f,'pointerdown',200);pointer(f,'pointermove',80);assert.equal(previews.at(-1).next?.id,'c','The leftward preview at the start is the final photo');pointer(f,'pointerup',80);
+  pointer(f,'pointerdown',200);pointer(f,'pointermove',340);assert.equal(previews.at(-1).next?.id,'c','The phone Previous preview at the start is the final photo');pointer(f,'pointerup',340);
   await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');assert.deepEqual(visits,[2,1,2]);
-  register(1);f.window.FamilyMedia.register('gallery',pages[0],{pagination:{page:1,pages:2,total:3,size:2,filter:'all',sort:'random',seed:8}});f.window.FamilyMedia.openFrom('gallery','a');pointer(f,'pointerdown',200);pointer(f,'pointermove',80);assert.equal(previews.at(-1).next,null,'A different filter or random order must not reuse the previous album boundary');pointer(f,'pointercancel',80);f.close();
+  register(1);f.window.FamilyMedia.register('gallery',pages[0],{pagination:{page:1,pages:2,total:3,size:2,filter:'all',sort:'random',seed:8}});f.window.FamilyMedia.openFrom('gallery','a');pointer(f,'pointerdown',200);pointer(f,'pointermove',340);assert.equal(previews.at(-1).next,null,'A different filter or random order must not reuse the previous album boundary');pointer(f,'pointercancel',340);f.close();
  }
 });
 test('a committed swipe holds its offset while the next photo loads instead of springing back',async()=>{
@@ -286,7 +299,7 @@ test('touch swipes navigate every photo album in both languages and on wide touc
   swipe(f,-120);assert.equal(f.get('mediaOriginal').href,'/media/c','Previous wraps just like its arrow');
  }
 });
-test('on phones a right swipe moves from the first row rightmost photo to the second row leftmost, exactly like Next',async()=>{
+test('the reversed phone gesture follows row-major Next across pointer and touch fallbacks',async()=>{
  for(const userAgent of ['Android','iPhone','iPad'])for(const english of [false,true])for(const fullscreen of [false,true])for(const stream of ['pointer','touch','both'])for(const scope of ['gallery','photos','personal:ruti','wedding:parents','nursery:ruti','nostalgia']){
   const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=360;f.navigator.userAgent=userAgent;f.window.FamilyPhotoPresentation.desktop=()=>false;
   const photos=['row1-left','row1-middle','row1-right','row2-left','row2-middle','row2-right'].map(f.photo),native={mounts:0,claims:0,ends:0};
@@ -295,8 +308,8 @@ test('on phones a right swipe moves from the first row rightmost photo to the se
   await f.get('mediaNext').handlers.get('click')();const next=f.window.FamilyMedia.current().id;assert.equal(next,'row2-left');await f.get('mediaPrevious').handlers.get('click')();assert.equal(f.window.FamilyMedia.current().id,'row1-right');
   const touch=(type,x)=>{const point={identifier:9,clientX:x,clientY:100,target:{closest:()=>null}},event={touches:type==='touchend'?[]:[point],changedTouches:[point],target:point.target,cancelable:true,preventDefault(){}};(type==='touchstart'?stage.handlers:f.events).get(type)(event);};
   const stroke=dx=>{if(stream==='pointer'){swipe(f,dx);return;}pointer(f,'pointerdown',180);touch('touchstart',180);if(stream==='touch')pointer(f,'pointercancel',180);else pointer(f,'pointermove',180+dx);touch('touchmove',180+dx);if(stream==='both')pointer(f,'pointerup',180+dx);touch('touchend',180+dx);pointer(f,'pointerup',180+dx);};
-  stroke(120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,next,`${userAgent} ${stream} ${scope}: right must select row 2 left, never row 1 middle`);assert.equal(f.get('mediaViewerCounter').textContent,'4 / 6');
-  stroke(-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'row1-right');
+  stroke(-120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,next,`${userAgent} ${stream} ${scope}: the reversed phone gesture must select the same row-major successor as Next`);assert.equal(f.get('mediaViewerCounter').textContent,'4 / 6');
+  stroke(120);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'row1-right');
   f.window.FamilyMedia.refreshPhotoPresentation();assert.deepEqual(native,{mounts:0,claims:0,ends:0},'Browser scroll callbacks cannot select a different neighbour');f.close();
  }
 });
@@ -451,10 +464,10 @@ test('mixed Windows pointer and touch streams finish a swipe even without pointe
   pointer(f,'pointerdown',350);touch('touchstart',350);touch('touchmove',200);touch('touchend',200);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
  }
 });
-test('a prepared phone Next followed by a rightward stroke selects the following photo without moving on contact',async()=>{
+test('a prepared phone Next followed by the reversed phone stroke selects the following photo without moving on contact',async()=>{
  const f=fixture();f.navigator.userAgent='Android';f.window.FamilyPhotoPresentation.desktop=()=>false;f.get('mediaStage').clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');f.window.FamilyPhotoPresentation.preload=()=>{};
  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});await f.get('mediaNext').handlers.get('click')();
- pointer(f,'pointerdown',200);assert.equal(f.window.FamilyMedia.current().id,'b');pointer(f,'pointermove',340);pointer(f,'pointerup',340);
+ pointer(f,'pointerdown',200);assert.equal(f.window.FamilyMedia.current().id,'b');pointer(f,'pointermove',80);pointer(f,'pointerup',80);
  assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
 });
 test('a native gallery page arriving under the next stroke keeps the touch target until release, then advances again',async()=>{
@@ -469,7 +482,7 @@ test('phones retain browser vertical scrolling and pinch zoom while horizontal s
  assert.equal(f.get('mediaStage').classList.contains('photo-manual-swipes'),false,'Phone touch-action keeps pan-y and pinch-zoom');
  pointer(f,'pointerdown',200,200);assert.equal(pointer(f,'pointermove',203,120).prevented,undefined);pointer(f,'pointerup',203,120);assert.equal(f.window.FamilyMedia.current().id,'a');
  pointer(f,'pointerdown',100);pointer(f,'pointermove',150);pointer(f,'pointerdown',200,100,{pointerId:2,isPrimary:false});pointer(f,'pointerup',240);assert.equal(f.window.FamilyMedia.current().id,'a','A pinch cannot become a photo swipe');
- swipe(f,120);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+ swipe(f,-120);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
 });
 test('Windows touch browsing owns horizontal swipes in every album and fullscreen even in a narrow app window',()=>{
  for(const width of [400,1440])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti','nostalgia','home:photos']){
