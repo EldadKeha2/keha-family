@@ -60,9 +60,10 @@ async function detailedFaces(bitmap,onProgress){
       const faces=await scan(false);
       // A second viewpoint helps asymmetric occlusion and verifies weak faces.
       if(faces.length||pass===1)await scan(true);
-      // Coarse rotated views discover tilted infants and occluded pairs before
-      // local verification. Fine upright tiles keep the usual fast detail pass.
-      if(Math.max(region.width,region.height)>=Math.min(1024,Math.max(size.width,size.height)))for(const angle of [-Math.PI/3,Math.PI/3,-Math.PI/6,Math.PI/6])await scan(false,angle);
+      // A tilted head can be too weak in the full image but clear in a fine
+      // crop. Scan fine crops too; retain the same landmark/confidence checks.
+      const coarse=Math.max(region.width,region.height)>=Math.min(1024,Math.max(size.width,size.height));
+      for(const angle of (coarse?[-Math.PI/3,Math.PI/3,-Math.PI/6,Math.PI/6]:[-Math.PI/3,Math.PI/3]))await scan(false,angle);
     }
     return candidates;
   }finally{tile.width=tile.height=1;}

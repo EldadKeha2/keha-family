@@ -76,3 +76,28 @@ test('the worker finds close small faces through fine crops, projects coordinate
  for(const target of targets)assert.ok(final.faces.some(face=>Math.abs(face.rect.x-target.x/width)<1e-9&&Math.abs(face.rect.width-target.width/width)<1e-9),'Every face keeps its original normalized coordinates');
  assert.equal(final.faces.length,3,'A cascade-only hand or fabric proposal cannot become a face without neural confirmation');assert.equal(final.galleryFaces.length,3,'Fallback-only ornament detections must not make a fully tagged photo partial');for(const target of targets)assert.ok(final.galleryFaces.some(face=>Math.abs(face.rect.x-target.x/width)<1e-9),'Nearby tiny faces remain in the gallery evidence');assert.ok(messages.some(message=>message.partial&&message.faces.length>0));
 });
+
+test('a tilted face missed in the full photo is discovered by rotated fine crops',async()=>{
+ const workerSource=(await readFile(new URL('../public/assets/face-detection-worker.mjs',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'').replaceAll('import.meta.url',JSON.stringify('https://family.example/assets/face-detection-worker.mjs'))+'\nglobalThis.scanDetail=detailedFaces;';
+ const width=624,height=800,face={rect:{x:450/width,y:425/height,width:130/width,height:110/height},score:.9,landmarks:[[475,450],[490,440],[478,469],[495,485],[510,475]].map(([x,y])=>({x:x/width,y:y/height}))};
+ let fineRotations=0;
+ class Canvas{
+  constructor(w,h){this.width=w;this.height=h;this.angle=0;}
+  getContext(){return {clearRect(){},translate(){},scale(){},save:()=>{this.saved=this.angle;},restore:()=>{this.angle=this.saved;},rotate:a=>{this.angle+=a;},drawImage:(bitmap,...args)=>{this.crop=args;this.drawAngle=this.angle;}};}
+ }
+ const createYuNet=async()=>({detect:async tile=>{
+  const [x,y,w,h,,,dw,dh]=tile.crop;
+  if(w!==384||h!==384||Math.abs(tile.drawAngle+Math.PI/3)>1e-8)return [];
+  fineRotations++;
+  if(x!==240||y!==208)return [];
+  // Isolate the crop scan schedule; rotation geometry has separate YuNet tests.
+  return [{...face,rect:{x:(face.rect.x*width-x)*dw/w,y:(face.rect.y*height-y)*dh/h,width:face.rect.width*width*dw/w,height:face.rect.height*height*dh/h},landmarks:face.landmarks.map(p=>({x:(p.x*width-x)*dw/w,y:(p.y*height-y)*dh/h}))}];
+ }});
+ const context=vm.createContext({self:{fetch(){},location:{href:"https://family.example/assets/face-detection-worker.mjs",origin:"https://family.example"}},URL,OffscreenCanvas:Canvas,createYuNet,detectionRegions,confirmYuNet,projectYuNet,unrotateYuNet:face=>face,STRONG_FACE_SCORE});
+ vm.runInContext(workerSource,context);const progress=[];
+ const proposals=await context.scanDetail({width,height},faces=>progress.push(faces));
+ assert.ok(fineRotations>=6,'Overlapping fine crops receive the tilt pass');
+ assert.equal(proposals.length,1);assert.ok(progress.some(faces=>faces.length===1));
+ assert.ok(Math.abs(proposals[0].rect.x-face.rect.x)<1e-9);
+ assert.ok(Math.abs(proposals[0].rect.y-face.rect.y)<1e-9);
+});
