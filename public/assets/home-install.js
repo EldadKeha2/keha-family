@@ -12,7 +12,7 @@
   const card=document.getElementById('homeInstall'),dialog=document.getElementById('homeInstallDialog');
   if(!card||!dialog)return;
   let english=Boolean(window.FamilyI18n?.isEnglish);const tr=(he,en)=>english?en:he;
-  const ua=navigator.userAgent||'',ios=/iPhone|iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
+  const ua=navigator.userAgent||'',iphone=/iPhone/i.test(ua)&&!/iPad|iPod/i.test(ua),ios=iphone||/iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
   const android=/Android/i.test(ua),embedded=/FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(ua);
   const mobileDevice=ios||android||navigator.userAgentData?.mobile===true||/Mobile|Tablet/i.test(ua);
   const nativeDesktop=/KehaFamilyDesktop\//i.test(ua);
@@ -220,8 +220,8 @@
   });
   refreshButton.addEventListener('click',()=>{if(desktopView())location.reload();});
   function appleHelp(){return '<div class="home-install-apple-steps" data-home-install-apple-steps aria-label="'+tr('הוספה למסך הבית דרך Safari','Add to Home Screen in Safari')+'">'+steps([
-    tr('לחצו על <u>כפתור השיתוף</u>','Tap the <u>Share button</u>')+' '+appleShareIcon+' '+tr('כאן למטה','below'),
-    tr('גללו מטה ולחצו על <u>הוספה למסך הבית</u>','Scroll down and tap <u>Add to Home Screen</u>')
+    (iphone?tr('לחצו על <strong>כפתור השיתוף</strong>','Tap the <strong>Share button</strong>'):tr('לחצו על <strong>שיתוף</strong>','Tap <strong>Share</strong>'))+' '+appleShareIcon+(iphone?tr(' בתחתית המסך',' at the bottom of the screen'):''),
+    tr('ואז גללו מטה ולחצו על <strong>הוספה למסך הבית</strong>','Then scroll down and tap <strong>Add to Home Screen</strong>')
   ])+'</div>';}
   function androidHelp(){return steps([
     tr('ב־Chrome פתחו את התפריט ⋮ ובחרו ״התקנת אפליקציה״ או ״הוספה למסך הבית״.','In Chrome, open the ⋮ menu and choose “Install app” or “Add to Home screen”.'),

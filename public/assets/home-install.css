@@ -1,7 +1,7 @@
 .home-install[hidden],.home-install [hidden]{display:none!important}
 .home-install-dialog .home-install-apple-steps ol{display:grid;gap:12px;margin:14px 0 0;padding-inline-start:24px}
 .home-install-dialog .home-install-apple-steps li{margin:0;padding-inline-start:4px;color:#536b42;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.7}
-.home-install-apple-steps u{font-weight:600;text-decoration-thickness:1.5px;text-underline-offset:4px}
+.home-install-apple-steps strong{font-weight:800;text-decoration:none}
 .home-install-dialog[data-ios-guide=true] .home-install-yona{height:100px}
 .home-install-dialog[data-ios-guide=true] .home-install-dialog-intro{margin-bottom:5px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.5}
 .home-install-dialog a.home-install-invite-primary{text-align:center;text-decoration:none}

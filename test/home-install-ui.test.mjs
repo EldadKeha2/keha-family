@@ -180,13 +180,23 @@ test('unavailable native prompt opens manual help and re-enables the trigger',as
 test('iPhone and touch iPad use Share instructions, while embedded browsers explain opening the full browser',async()=>{
   for(const options of [
     {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit Safari/604.1'},
+    {userAgent:'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit Safari/604.1'},
+    {userAgent:'Mozilla/5.0 (iPod; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit Safari/604.1'},
     {userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit Safari/605.1',maxTouchPoints:5}
   ]){
     const f=fixture(options);f.click(f.button());await tick();assert.equal(f.dialog.open,true);assert.match(f.dialog.innerHTML,/Safari/);assert.match(f.dialog.innerHTML,/שיתוף/);assert.match(f.dialog.innerHTML,/הוספה למסך הבית/);
     assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.equal(f.dialog.querySelector('[data-home-install-profile]'),null);
     assert.equal((f.dialog.innerHTML.match(/<li>/g)||[]).length,2);
-    assert.match(f.dialog.innerHTML,/לחצו על <u>כפתור השיתוף<\/u>/);
-    assert.match(f.dialog.innerHTML,/גללו מטה ולחצו על <u>הוספה למסך הבית<\/u>/);
+    const iphone=/\(iPhone;/.test(options.userAgent);
+    if(iphone){
+      assert.match(f.dialog.innerHTML,/לחצו על <strong>כפתור השיתוף<\/strong>/);
+      assert.match(f.dialog.innerHTML,/בתחתית המסך/);
+    }else{
+      assert.match(f.dialog.innerHTML,/לחצו על <strong>שיתוף<\/strong>/);
+      assert.doesNotMatch(f.dialog.innerHTML,/בתחתית המסך/);
+    }
+    assert.match(f.dialog.innerHTML,/ואז גללו מטה ולחצו על <strong>הוספה למסך הבית<\/strong>/);
+    assert.doesNotMatch(f.dialog.innerHTML,/<u\b|כאן למטה/);
     assert.equal(f.dialog.querySelector('[data-home-install-invite-browse]'),null);
     const shareIcon=f.card.innerHTML.match(/<svg class="home-install-icon home-install-share"[^>]*>[\s\S]*?<\/svg>/)?.[0];
     assert.ok(shareIcon);assert.ok(f.dialog.innerHTML.includes(shareIcon));
@@ -194,7 +204,14 @@ test('iPhone and touch iPad use Share instructions, while embedded browsers expl
     assert.ok(f.dialog.querySelector('[data-home-install-apple-steps]'));assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
     assert.equal((f.dialog.innerHTML.match(/<li>/g)||[]).length,2);
     assert.equal(f.dialog.querySelector('[data-home-install-invite-browse]'),null);
-    assert.match(f.dialog.innerHTML,/Tap the <u>Share button<\/u>/);
+    if(iphone){
+      assert.match(f.dialog.innerHTML,/Tap the <strong>Share button<\/strong>/);
+      assert.match(f.dialog.innerHTML,/at the bottom of the screen/);
+    }else{
+      assert.match(f.dialog.innerHTML,/Tap <strong>Share<\/strong>/);
+      assert.doesNotMatch(f.dialog.innerHTML,/at the bottom of the screen/);
+    }
+    assert.match(f.dialog.innerHTML,/Then scroll down and tap <strong>Add to Home Screen<\/strong>/);
   }
   const embedded=fixture({userAgent:'Mozilla/5.0 (Linux; Android 16) Instagram WhatsApp FBAN/FB4A'});embedded.click(embedded.button());await tick();
   assert.match(embedded.dialog.innerHTML,/Chrome/);assert.match(embedded.dialog.innerHTML,/בדפדפן|דפדפן/);
