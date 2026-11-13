@@ -62,9 +62,11 @@
     return generation>=1&&generation<=5?generation:6;
   }
   function comparePeople(a,b,query,preferred=new Set()){
-    // Explicit nicknames identify their intended person before fuzzy matches.
+    // The six main branches stay ahead of similar extended-family and friend
+    // names. Within each group, spelling wins before generation breaks ties.
+    const group=p=>Math.max(0,personPriority(p)-5);
     const nickname=p=>tagAliases[p.id]?.includes(query)?0:1;
-    return nickname(a)-nickname(b)||personPriority(a)-personPriority(b)||matchRank(a,query)-matchRank(b,query)||(preferred.has(b.id)-preferred.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale);
+    return group(a)-group(b)||nickname(a)-nickname(b)||matchRank(a,query)-matchRank(b,query)||personPriority(a)-personPriority(b)||(preferred.has(b.id)-preferred.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale);
   }
   function matchRank(person,query){
     if(!query)return 5;

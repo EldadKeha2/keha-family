@@ -97,10 +97,10 @@ test('rapid selections batch by image and collapse repeated changes to the same 
  assert.equal(f.requests.length,0);await store.run();assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/image-a/tags/patch');
  assert.deepEqual(f.requests[0].body.changes.map(c=>[c.personId,c.tagged]),[['shlomo',true],['yona',false]]);f.tags.clearInline(host);
 });
-test('generation priority precedes name match quality, resets search scroll, and shows family context',()=>{
+test('name similarity precedes generation, resets search scroll, and shows family context',()=>{
   const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('search-image'),kind:'video'});const widget=host._tagWidget;
   widget.results.scrollTop=500;widget.query='שי';widget.renderResults(true);
-  assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="avishai"')<html.indexOf('data-tag-person="shay"'));assert.match(html,/הורים:/);
+  assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="shay"')<html.indexOf('data-tag-person="avishai"'));assert.match(html,/הורים:/);
   widget.query='מתן';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="matan-g"/);assert.match(widget.results.innerHTML,/data-tag-person="matan-f"/);assert.match(widget.results.innerHTML,/גבי/);assert.match(widget.results.innerHTML,/תומר/);f.tags.clearInline(host);
 });
 test('video tagging retains its compact search field without repeated help text',()=>{
@@ -142,6 +142,24 @@ test('tag suggestions prioritize generations, extended family, then acquaintance
  assert.deepEqual(Array.from(results,p=>p.id),expected);
  const host=new NodeStub();f.tags.mountInline(host,{...photo('priority'),kind:'video'});const widget=host._tagWidget;widget.query='Priority';widget.renderResults(true);
  const html=widget.results.innerHTML;for(let i=1;i<expected.length;i++)assert.ok(html.indexOf(expected[i-1])<html.indexOf(expected[i]));f.tags.clearInline(host);
+});
+
+test('an exact Amit match comes before older-generation lookalikes in face and ordinary tagging',async()=>{
+ const f=fixture(()=>Response.json({people:Object.values(family.people)}));
+ for(const query of ['עמית','Amit']){
+  const found=await f.tags.findPeople(query,['amir','tammy']);assert.equal(found[0].id,'amit',query);
+  const host=new NodeStub();f.tags.mountInline(host,{...photo('amit-'+query),kind:'video'});const widget=host._tagWidget;widget.query=query;widget.renderResults(true);
+  assert.equal(widget.results.innerHTML.match(/data-tag-person="([^"]+)"/)?.[1],'amit',query);f.tags.clearInline(host);
+ }
+});
+
+test('main-branch Ben stays before exact extended-family and acquaintance Chen matches',async()=>{
+ const extra=[{id:'qa-extended-chen',name:'חן',extended:true},{id:'qa-friend-chen',name:'חן',extra:true}];
+ const f=fixture(()=>Response.json({people:[...Object.values(family.people),...extra]})),found=await f.tags.findPeople('חן',['qa-friend-chen']);
+ const index=id=>found.findIndex(person=>person.id===id);assert.ok(index('ben')>=0);assert.ok(index('qa-extended-chen')>=0);assert.ok(index('qa-friend-chen')>=0);
+ assert.ok(index('ben')<index('qa-extended-chen'));assert.ok(index('qa-extended-chen')<index('qa-friend-chen'));
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('ben-chen'),kind:'video'});const widget=host._tagWidget;widget.query='חן';widget.renderResults(true);
+ const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="ben"')<html.indexOf('data-tag-person="qa-extended-chen"'));assert.ok(html.indexOf('data-tag-person="qa-extended-chen"')<html.indexOf('data-tag-person="qa-friend-chen"'));f.tags.clearInline(host);
 });
 
 test('both Hebrew nicknames lead directly to Tidhar Fish in face and ordinary tagging',async()=>{
