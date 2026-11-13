@@ -48,6 +48,7 @@
       prepare(next,'high')?.catch(()=>{});
     }
     const offset=Math.max(-stage.clientWidth,Math.min(stage.clientWidth,dx));
+    queuedDrag.dx=offset;
     queuedDrag.outgoing.style.transform='translateX('+offset+'px)';queuedDrag.incoming.style.transform='translateX('+(offset-direction*stage.clientWidth)+'px)';
   }
   function clearHandoff(token=handoff){if(token&&handoff===token){handoff=null;token.node.remove();}}
@@ -87,10 +88,10 @@
   }
   function snapshot(stage){
     const image=photoImage(stage);if(!image?.getBoundingClientRect||!image.naturalWidth||!image.animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return null;
-    const r=image.getBoundingClientRect(),s=stage.getBoundingClientRect(),ghost=document.createElement('div');
+    const queued=queuedDrag?.stage===stage?queuedDrag:null,s=stage.getBoundingClientRect(),r=queued?s:image.getBoundingClientRect(),ghost=document.createElement('div');
     ghost.className='media-slide-outgoing';ghost.setAttribute('aria-hidden','true');
-    ghost.swipeOffset=dragged?.stage===stage?dragged.dx||0:0;
-    Object.assign(ghost.style,{position:'absolute',left:r.left-s.left+'px',top:r.top-s.top+'px',width:r.width+'px',height:r.height+'px',backgroundImage:'url('+JSON.stringify(image.currentSrc||image.src)+')',backgroundSize:'contain',backgroundPosition:'center',backgroundColor:stage.closest?.('#photoFullscreenRoot')?'#08090b':'',backgroundRepeat:'no-repeat',pointerEvents:'none',zIndex:'6'});
+    ghost.swipeOffset=queued?queued.dx||0:dragged?.stage===stage?dragged.dx||0:0;ghost.queuedSwipe=Boolean(queued);
+    Object.assign(ghost.style,{position:'absolute',left:r.left-s.left+'px',top:r.top-s.top+'px',width:r.width+'px',height:r.height+'px',backgroundImage:queued?queued.outgoing.style.backgroundImage:'url('+JSON.stringify(image.currentSrc||image.src)+')',backgroundSize:'contain',backgroundPosition:'center',backgroundColor:stage.closest?.('#photoFullscreenRoot')?'#08090b':'',backgroundRepeat:'no-repeat',pointerEvents:'none',zIndex:'6'});
     return ghost;
   }
   function slide(stage,ghost,direction){
@@ -102,9 +103,11 @@
     const incoming=document.createElement('div');incoming.className='media-slide-incoming';incoming.setAttribute('aria-hidden','true');
     Object.assign(incoming.style,{position:'absolute',inset:'0',backgroundImage:'url('+JSON.stringify(image.currentSrc||image.src)+')',backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',backgroundColor:typeof getComputedStyle==='function'?getComputedStyle(stage).backgroundColor:'#ede5d4',pointerEvents:'none',zIndex:'7',willChange:'transform'});
     ghost.style.willChange='transform';
-    const distance=stage.clientWidth*direction,offset=ghost.swipeOffset||0,id=++serial;stage.classList.add('photo-slide-running');stage.append(ghost,incoming);
+    // Finish the physical drag from its last pixels. Album direction can be
+    // reversed on phones, so it must not restart the slide from the other side.
+    const offset=ghost.swipeOffset||0,distance=stage.clientWidth*(offset?-Math.sign(offset):direction),start=ghost.queuedSwipe?offset:0,id=++serial;stage.classList.add('photo-slide-running');stage.append(ghost,incoming);
     const options={duration:Math.max(90,160*(1-Math.min(.6,Math.abs(offset)/stage.clientWidth))),easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};
-    const animations=[ghost.animate([{transform:'translateX(0)'},{transform:'translateX('+(-distance-offset)+'px)'}],options),incoming.animate([{transform:'translateX('+(distance+offset)+'px)'},{transform:'translateX(0)'}],options)];
+    const animations=[ghost.animate([{transform:start?'translateX('+start+'px)':'translateX(0)'},{transform:'translateX('+(-distance-offset+start)+'px)'}],options),incoming.animate([{transform:'translateX('+(distance+offset)+'px)'},{transform:'translateX(0)'}],options)];
     const finish=()=>{if(motion?.id!==id)return;cancel();window.FamilyFaces?.fit();window.FamilyMedia?.refreshPhotoPresentation?.();};
     motion={id,stage,ghost,incoming,animations,timer:setTimeout(finish,220)};
     Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(finish);

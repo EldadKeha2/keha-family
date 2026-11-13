@@ -122,6 +122,31 @@ function finger(f,type,x,y=100,count=1){
  (type==='touchstart'?f.get('mediaStage').handlers:f.events).get(type)(event);return event;
 }
 
+test('phone swipe release continues the visible previews from the finger position without restarting from the opposite side',async()=>{
+ for(const english of [false,true])for(const fullscreen of [false,true])for(const dx of [-120,120])for(const delayed of [false,true]){
+  const f=fixture({english,touchscreen:true}),stage=f.get('mediaStage'),animations=[],create=f.document.createElement;
+  f.navigator.userAgent='Android';stage.clientWidth=360;stage.getBoundingClientRect=()=>({left:0,top:0,width:360,height:400});
+  f.document.createElement=tag=>{const node=create(tag);node.getBoundingClientRect=stage.getBoundingClientRect;if(tag==='img')node.naturalWidth=1200;
+   node.animate=(frames,options)=>{const animation={owner:node,frames,options,finished:new Promise(()=>{}),cancel(){}};animations.push(animation);return animation;};return node;};
+  f.window.FamilyMedia.open(['previous','current','next'].map(f.photo),1,'gallery');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  finger(f,'touchstart',180);finger(f,'touchmove',180+dx);
+  const preview=stage.content.find(node=>node.className==='photo-queued-drag'),outgoing=preview.content[0],incoming=preview.content[1],target=dx<0?'next':'previous';
+  const outgoingStart=outgoing.style.transform,incomingStart=incoming.style.transform;let finish;
+  if(delayed)f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>{finish=resolve;});
+  finger(f,'touchend',180+dx);
+  if(delayed){assert.equal(f.window.FamilyMedia.current().id,'current');assert.equal(stage.content.includes(preview),true,'Keep the partial previews visible while the selected photo loads');finish(Object.assign(f.document.createElement('img'),{src:'/media/'+target}));}
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.window.FamilyMedia.current().id,target,'Keep the corrected phone Next/Previous mapping');
+  assert.equal(animations.length,2,'Finish one slide instead of starting another transition');
+  assert.equal(animations[0].frames[0].transform,outgoingStart,'The outgoing photo must not jump back to the centre on release');
+  assert.equal(animations[1].frames[0].transform,incomingStart,'The incoming photo must stay on the same side as its drag preview');
+  assert.equal(animations[0].frames.at(-1).transform,'translateX('+(Math.sign(dx)*360)+'px)');
+  assert.equal(animations[1].frames.at(-1).transform,'translateX(0)');
+  assert.match(animations[0].owner.style.backgroundImage,/\/media\/current/);assert.match(animations[1].owner.style.backgroundImage,new RegExp('/media/'+target));
+  assert.equal(stage.content.includes(preview),false);f.close();
+ }
+});
+
 test('the reversed phone gesture takes the pool child to the mother and child, matching Next rather than the vintage couple',async()=>{
  for(const english of [false,true])for(const fullscreen of [false,true])for(const touchscreen of [false,true]){
   const f=fixture({english,touchscreen}),stage=f.get('mediaStage'),previews=[];stage.clientWidth=360;f.navigator.userAgent='Android';
