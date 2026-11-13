@@ -13,7 +13,7 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
     constructor(){this.dataset={};this.children=[];this.className='';this.innerHTML='';this.value='';this.textContent='';this.parent=null;this.widgets=new Map();this.clicks=0;this.classList={add(){},remove(){},toggle(){}};}
     get firstElementChild(){return this.children[0]||null;}
     get nextElementSibling(){return this.parent?.children[this.parent.children.indexOf(this)+1]||null;}
-    addEventListener(){} setAttribute(){} insertAdjacentHTML(){} contains(){return false;} scrollIntoView(){}
+    addEventListener(){} setAttribute(){} insertAdjacentHTML(position,html){if(position==='afterbegin')this.innerHTML=html+this.innerHTML;else if(position==='beforeend')this.innerHTML+=html;} contains(){return false;} scrollIntoView(){}
     querySelectorAll(){return [];}
     querySelector(selector){
       const match=/^\[data-nostalgia-(kind|empty)="([^"]+)"\]$/.exec(selector);
@@ -42,6 +42,12 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
 }
 const item=(kind,n)=>({id:String(n),file:n+'.'+({photo:'jpg',video:'mp4',document:'pdf'}[kind]),filename:'Memory '+n,name:'Memory '+n,kind,src:'/media/'+n,mime:{photo:'image/jpeg',video:'video/mp4',document:'application/pdf'}[kind],size:100});
 
+test('nostalgia films keep a recording-date editor below each player without treating upload time as the recording date',async()=>{
+  const film={...item('video',1),uploadedAt:'2026-11-13T12:00:00.000Z'},f=fixture([film]);await f.flush();
+  const card=f.grid.children.find(node=>node.dataset.mediaKind==='video');assert.match(card.className,/nostalgia-video-card/);assert.match(card.innerHTML,/תאריך צילום טרם צוין/);assert.doesNotMatch(card.innerHTML,/2026/);assert.match(card.innerHTML,/data-archive-date="1"/);
+  const player=card.querySelector('video');f.change({operation:'photo-date',scope:'nostalgia',item:{...film,takenDate:{year:1994},takenDateRevision:'saved'}});assert.equal(f.grid.children.find(node=>node.dataset.mediaKind==='video'),card);assert.equal(card.querySelector('video'),player);
+});
+
 test('wedding films show a site-styled poster without a YouTube link or player before opening',async()=>{
   const film={...item('video',1),provider:'youtube',youtubeId:'RrK53SZJJs8',poster:'https://i.ytimg.com/vi/RrK53SZJJs8/hqdefault.jpg',watchUrl:'https://www.youtube.com/watch?v=RrK53SZJJs8'};
   const f=fixture([film],{navigation:true,entryUrl:'https://family.test/#weddings/u-tomer'});await f.flush();
@@ -54,8 +60,8 @@ test('wedding films show a site-styled poster without a YouTube link or player b
 test('nostalgia separates images, films and documents and preserves a playing video through refreshes',async()=>{
   const f=fixture([item('video',1),item('photo',2),item('document',3)]);await f.flush();
   assert.deepEqual(f.requests,['api/nostalgia']);
-  assert.deepEqual(f.grid.children.filter(n=>n.dataset.nostalgiaKind).map(n=>n.dataset.nostalgiaKind),['photo','video','document']);
-  assert.deepEqual(f.grid.children.filter(n=>n.dataset.mediaKind).map(n=>n.dataset.mediaKind),['photo','video','document']);
+  assert.deepEqual(f.grid.children.filter(n=>n.dataset.nostalgiaKind).map(n=>n.dataset.nostalgiaKind),['video','photo','document']);
+  assert.deepEqual(f.grid.children.filter(n=>n.dataset.mediaKind).map(n=>n.dataset.mediaKind),['video','photo','document']);
   const video=f.grid.children.find(n=>n.dataset.mediaKind==='video'),player=video.querySelector('video');
   f.filter('all');assert.equal(f.grid.children.find(n=>n.dataset.mediaKind==='video'),video);assert.equal(video.querySelector('video'),player);
   f.filter('video');assert.equal(f.grid.children.filter(n=>n.dataset.mediaKind).length,1);assert.equal(f.grid.children.find(n=>n.dataset.mediaKind),video);

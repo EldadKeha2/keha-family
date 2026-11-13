@@ -351,15 +351,28 @@ test('photo capture dates save independently, survive restart and editing, and r
   saved=(await(await save({},saved.takenDateRevision)).json()).item;assert.deepEqual(saved.takenDate,{day:null,month:null,year:null});
  }finally{await f.close();}
 });
-test('photo capture dates validate partial dates and reject unauthorized, stale, missing and non-photo writes',async()=>{
+test('capture dates validate partial dates and reject unauthorized, stale and missing writes',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f),clip=await taggedUpload(f,'/api/collections/videos',video,'film.mp4');
   const save=(id,date,extra={})=>f.call('/api/media/'+id+'/photo-date',{method:'POST',body:{date,expectedRevision:'empty'},...extra});
   for(const date of [{day:31,month:4},{day:29,month:2,year:1900},{month:0},{year:'1980'},undefined,null])assert.equal((await save(item.id,date)).status,400);
   assert.equal((await save(item.id,{year:1980},{clientHeaders:false})).status,403);
-  assert.equal((await save(clip.id,{year:1980})).status,400);
+  assert.equal((await save(clip.id,{year:1980})).status,200);
   assert.equal((await save('f'.repeat(32),{year:1980})).status,404);
   assert.equal((await save(item.id,{day:29,month:2})).status,200);
+ }finally{await f.close();}
+});
+test('nostalgia video dates and people persist in the original archive, personal video albums and export',async()=>{
+ const f=fixture();try{
+  await f.connect();const clip=await taggedUpload(f,'/api/nostalgia',video,'old-family-film.mp4'),extended=Object.values(family.people).find(person=>person.extended);
+  await setTags(f,clip,['yona',extended.id]);
+  const response=await f.call('/api/media/'+clip.id+'/photo-date',{method:'POST',body:{date:{year:1994},expectedRevision:'empty'}});assert.equal(response.status,200);
+  const saved=await response.json();assert.equal(saved.scope,'nostalgia');assert.deepEqual(saved.item.takenDate,{day:null,month:null,year:1994});assert.equal(saved.item.kind,'video');
+  f.restart();
+  for(const id of ['yona',extended.id]){const page=await(await f.call('/api/people/'+id+'/page')).json();assert.equal(page.albums.videos.total,1);assert.equal(page.albums.videos.items[0].id,clip.id);assert.equal(page.albums.videos.items[0].takenDate.year,1994);}
+  const album=await(await f.call('/api/nostalgia')).json();assert.equal(album.items[0].id,clip.id);assert.equal(album.items[0].takenDate.year,1994);assert.equal(f.objects.size,1,'Tagging reuses the original film');
+  assert.equal((await f.call('/api/media/'+clip.id+'/photo-date',{method:'POST',body:{date:{year:1995},expectedRevision:'empty'}})).status,409);
+  assert.equal((await(await f.call('/api/export')).json()).media.find(item=>item.id===clip.id).takenDate.year,1994);
  }finally{await f.close();}
 });
 test('editing one photo keeps its original bytes, profile, tags, captions and album membership',async()=>{

@@ -6,6 +6,32 @@
 .archive-video-play svg{width:25px;height:25px;fill:currentColor;stroke:none}
 .archive-video-poster:hover .archive-video-play{background:#425832}
 .archive-video-poster:focus-visible{outline:3px solid #8c713f;outline-offset:-3px}
+/* Keep each family film, its people, description and capture date together. */
+#nostalgiaView .nostalgia-intro{padding:22px 28px;margin-top:8px;background:radial-gradient(ellipse at top right,#e8e7d5,transparent 75%),#fcf8ed}
+#nostalgiaView .nostalgia-intro .archive-emblem{font-size:48px;width:64px}
+#nostalgiaView .nostalgia-intro h3{font-size:calc(31px * var(--a11y-text-scale,1))}
+#nostalgiaGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-items:start}
+#nostalgiaGrid .nostalgia-media-heading{margin-top:0;padding-top:12px}
+.nostalgia-video-card{display:flex;flex-direction:column;border:1px solid #dcd0b6;border-radius:14px;background:#fffdf6;overflow:hidden;box-shadow:0 4px 18px #5f4f270a}
+.nostalgia-video-heading{order:0;padding:16px 18px 13px;background:linear-gradient(120deg,#f4efe1,#fcfaf2)}
+.nostalgia-video-heading .small-eyebrow{font-size:calc(11px * var(--a11y-text-scale,1));color:#9a8055}
+.nostalgia-video-heading h4{font:calc(22px * var(--a11y-text-scale,1))/1.4 var(--serif);color:#536344;margin:4px 0 0;overflow-wrap:anywhere}
+.nostalgia-video-card>.video-frame,.nostalgia-video-card>.archive-video-poster{order:1}
+.nostalgia-video-card>.video-frame{margin:0;aspect-ratio:4/3;background:#242b21}
+.nostalgia-video-card>.video-frame video{display:block;width:100%;height:100%;object-fit:contain}
+.nostalgia-video-card>.media-file-name,.nostalgia-video-card>.video-file-info>span{display:none}
+.nostalgia-video-card>.archive-capture-date{order:2;align-self:flex-start;display:flex;align-items:center;gap:7px;min-height:40px;margin:10px 16px 2px;padding:7px 10px;border:1px solid #d9cfb8;border-radius:7px;background:#f8f5e9;color:#776b4e;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);text-align:start}
+.archive-capture-date svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.archive-capture-date svg:last-child{width:14px;height:14px;color:#9b895f}
+.archive-capture-date:hover{background:#edf0e1}
+.nostalgia-video-card>.media-controls{order:3;padding:10px 16px 6px}
+.nostalgia-video-card>.media-people-tags{order:4;padding:0 16px}
+.nostalgia-video-card>.caption-editor{order:5;margin:8px 16px 14px;padding:0;border:0}
+.nostalgia-video-card>.caption-editor label{font-size:calc(15px * var(--a11y-text-scale,1));color:#68734f}
+.nostalgia-video-card>.caption-editor textarea{min-height:78px;background:#fbfaf3}
+.nostalgia-video-card>.video-file-info{order:6;justify-content:flex-end;margin:0;padding:8px 16px;border-top:1px solid #e8e0cd;background:#f8f4e9;font-size:calc(12px * var(--a11y-text-scale,1))}
+.nostalgia-video-card>.video-codec-note{order:7}
+@media(max-width:700px){#nostalgiaGrid{grid-template-columns:minmax(0,1fr);gap:16px}#nostalgiaView .nostalgia-intro{padding:18px 15px;gap:14px}#nostalgiaView .nostalgia-intro h3{font-size:calc(25px * var(--a11y-text-scale,1))}#nostalgiaView .nostalgia-intro .archive-emblem{width:38px;font-size:35px}.nostalgia-video-heading h4{font-size:calc(21px * var(--a11y-text-scale,1))}.nostalgia-video-card>.media-controls{gap:7px}.nostalgia-video-card>.media-controls button{font-size:calc(13px * var(--a11y-text-scale,1))}}
 @media(max-width:700px){
   body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-header{padding:12px 14px;gap:10px}
   body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-title h2{font-size:calc(20px * var(--a11y-text-scale,1));line-height:1.35}

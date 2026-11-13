@@ -9,6 +9,7 @@ class NodeStub extends EventTarget{
  querySelector(selector){if(!this.children.has(selector))this.children.set(selector,new NodeStub());return this.children.get(selector);}
  querySelectorAll(){return [];}
  replaceChildren(){}
+ insertAdjacentHTML(position,html){this.adjacentHTML=(this.adjacentHTML||'')+html;}
  focus(){}
 }
 function fixture(respond){
@@ -20,6 +21,16 @@ function fixture(respond){
  init();return {tags:window.FamilyTags,requests,events,emit:detail=>window.dispatchEvent(new CustomEvent('family-media-changed',{detail}))};
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});
+
+test('video tagging separates family, extended family and friends while retaining saved selections',async()=>{
+ const extended=Object.values(family.people).find(person=>person.extended),friend={id:'qa-friend',name:'Archive Guest',extra:true};assert.ok(extended);
+ const f=fixture(()=>Response.json({people:[family.people.yona,extended,friend]}));await f.tags.findPeople('');
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('archive-film'),kind:'video'});const widget=host._tagWidget;
+ widget.group='family';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="yona"/);assert.doesNotMatch(widget.results.innerHTML,/qa-friend/);
+ widget.group='extended';widget.renderResults(true);assert.ok(widget.results.innerHTML.includes('data-tag-person="'+extended.id+'"'));assert.doesNotMatch(widget.results.innerHTML,/data-tag-person="yona"/);
+ widget.group='friends';widget.renderResults(true);assert.match(widget.results.innerHTML,/qa-friend/);assert.match(widget.results.innerHTML,/חברים ומכרים/);assert.equal(widget.results.hidden,false);
+ f.tags.clearInline(host);
+});
 
 test('Hebrew tagging recognizes English keyboard keys, punctuation letters, capitals and mixed Hebrew input',async()=>{
  const asaf={id:'qa-asaf',name:'אסף כץ',nameEn:'Asaf Katz',extra:true},f=fixture(()=>Response.json({people:[...Object.values(family.people),asaf]}));

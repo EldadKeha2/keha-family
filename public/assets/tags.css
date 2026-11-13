@@ -14,6 +14,10 @@
 .tag-selection-empty{font-size:calc(15px * var(--a11y-text-scale,1));color:#9b8d72;padding:7px 0}
 .tag-search-label{display:flex;flex-direction:column;gap:7px;font-size:calc(16px * var(--a11y-text-scale,1));color:#786a4d}
 .tag-people-results{max-height:270px;overflow:auto;border:1px solid #e3d9c4;border-radius:7px;background:#fffefa;overscroll-behavior:contain}
+.tag-group-filters{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+.tag-group-filters button{min-height:34px;padding:5px 9px;border:1px solid #dbd2bc;border-radius:18px;background:#fbf8ef;color:#7b7058;font:calc(13px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+.tag-group-filters button[aria-pressed=true]{background:#63774e;border-color:#63774e;color:#fffdf5}
+.tag-group-heading{position:sticky;top:0;z-index:1;margin:0;padding:9px 13px;background:#eee9d9;color:#716b4e;border-bottom:1px solid #ddd4bb;font:600 calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans)}
 .tag-person-option{display:flex;gap:12px;align-items:center;padding:10px 13px;border-bottom:1px solid #eee8d9;cursor:pointer;min-height:62px}
 .tag-person-option:last-child{border-bottom:0}.tag-person-option:hover{background:#f4f2e8}
 .tag-person-option:has(input:checked){background:#f0f4e9}

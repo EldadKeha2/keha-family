@@ -29,6 +29,14 @@ function fixture(english=false){
  const click=id=>{const event=new Event('click');Object.defineProperty(event,'target',{value:node(id)});node('photoMomentTools').dispatchEvent(event);};
  return {window,document,node,changes,requests,messages,click,api:window.FamilyPhotoDate,mount:photo=>window.FamilyPhotoDate.mount({kind:'photo',tags:[],...photo}),flush:()=>new Promise(resolve=>setImmediate(resolve)),enter(field,value){const input=node('photoInlineDate'+field);input.value=value;const event=new Event('input');Object.defineProperty(event,'target',{value:input});input.dispatchEvent(event);},submit(){const event=new Event('submit',{cancelable:true});node('photoInlineDateForm').dispatchEvent(event);return event;},resize(height,top=0){Object.assign(window.visualViewport,{height,offsetTop:top});window.visualViewport.dispatchEvent(new Event('resize'));}};
 }
+test('a video recording date can be edited directly from an archive card without opening the video viewer',async()=>{
+ for(const english of [false,true]){
+  const f=fixture(english);f.api.open({id:'film',kind:'video',takenDate:{year:1994},takenDateRevision:'before'});
+  assert.equal(f.node('photoDateDialog').open,true);assert.equal(f.node('photoDateyear').value,1994);assert.match(f.node('photoDateTitle').textContent,english?/video recorded/:/הסרטון צולם/);
+  f.node('photoDateyear').value='1995';f.node('photoDateForm').dispatchEvent(new Event('submit',{cancelable:true}));await f.flush();
+  assert.equal(f.requests[0].path,'api/media/film/photo-date');assert.deepEqual(JSON.parse(f.requests[0].options.body),{date:{day:null,month:null,year:1995},expectedRevision:'before'});assert.equal(f.node('photoDateDialog').open,false);
+ }
+});
 test('name and age toggles are independent, retain state on metadata changes, and reset for a new photo',()=>{
  for(const english of [false,true]){
   const f=fixture(english);f.mount({id:'a',takenDate:{year:1980}});assert.match(f.node('photoMomentTools').innerHTML,/id="togglePhotoNames"/);

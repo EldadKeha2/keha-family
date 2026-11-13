@@ -352,7 +352,8 @@ export class FamilyState {
     ...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision,thumbnailSize:item.thumbnail.size}:{}),
     ...(item.preview?.revision===(item.photoRevision||'original')?{previewSrc:'/media/'+item.id+'?preview=1&v='+item.preview.revision,previewSize:item.preview.size}:{}),
     collections:this.mediaCollections(item),modifiedAt:item.modifiedAt||item.updatedAt||item.photoEditedAt||item.createdAt,
-    ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
+    ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels)}:{}),
+    ...(['photo','video'].includes(mediaKind(item))?{takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
   mediaChanged(item,operation,ids=this.relatedPeople(item)){
@@ -767,7 +768,7 @@ export class FamilyState {
         return {item:this.mediaPublic(item)};
       }
       case 'media.photo-date':{
-        const item=this.photo(p.id);
+        const item=this.media(p.id);if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'אפשר להזין תאריך צילום לתמונות ולסרטונים.');
         if(p.expectedRevision!==(item.takenDateRevision||'empty'))throw new HttpError(409,'תאריך הצילום עודכן בינתיים. סגרו ופתחו את העריכה מחדש.');
         let date;try{if(!p.date)throw Error();date=photoDate(p.date);}catch{throw new HttpError(400,'תאריך הצילום אינו תקין. אפשר להשאיר שדות לא ידועים ריקים.');}
         if(JSON.stringify(date)!==JSON.stringify(photoDate(item.takenDate))){

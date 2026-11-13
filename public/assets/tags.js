@@ -87,6 +87,8 @@
     if(p?.siblings?.length)return (I18n.isEnglish?'Sibling of ':'אח/אחות של ')+p.siblings.map(name).join(' / ');
     return person.extra?I18n.t('שם נוסף באלבומים'):branch||I18n.t('השורשים של כולנו');
   }
+  const tagGroup=person=>person.isNew?'friends':personPriority(person)<=5?'family':personPriority(person)===6?'extended':'friends';
+  const tagGroupLabel=group=>({all:I18n.isEnglish?'All':'הכול',family:I18n.isEnglish?'Family members':'בני משפחה',extended:I18n.isEnglish?'Extended family':'בני משפחה נוספים',friends:I18n.isEnglish?'Friends and acquaintances':'חברים ומכרים'})[group];
   const stores=new Map(),roster=new Map();let rosterPromise=null,rosterTime=0,rosterFetched=false,rosterVersion=0,modalWidget=null,modalStore=null,closeRequested=false,newCounter=0;
   async function request(path,options={}){
     const response=await I18n.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
@@ -147,11 +149,12 @@
   function storeFor(id,item){if(!stores.has(id))stores.set(id,new TagStore(id,item));return stores.get(id);}
   class TagWidget {
     constructor(host,store,inline=false){
-      this.host=host;this.store=store;this.inline=inline;this.photoOnly=inline&&store.item.kind==='photo';this.query='';this.version=-1;this.lastSelection='';
+      this.host=host;this.store=store;this.inline=inline;this.photoOnly=inline&&store.item.kind==='photo';this.query='';this.group='all';this.version=-1;this.lastSelection='';
       this.events=new AbortController();const on=(element,type,handler)=>element.addEventListener(type,handler,{signal:this.events.signal});
       const prefix=inline?'inline':'modal';
       host.innerHTML=I18n.html`<div class="tag-widget${inline?' inline-tag-widget':''}"><div class="tag-widget-heading"><h3><svg class="tag-heading-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13l-7 7a2 2 0 0 1-3 0l-7-7V4h9l8 6a2 2 0 0 1 0 3Z"/><circle cx="7.5" cy="8" r="1"/></svg><span>${I18n.t(this.photoOnly?'המתויגים בתמונה':'תייגו מי מופיע כאן')}</span></h3><span data-tag-count></span></div>${this.photoOnly?'':I18n.html`<div class="tag-search-area" data-tag-search-area><label class="tag-search-label" for="${prefix}TagPersonSearch"><span class="visually-hidden">חיפוש או הוספת שם</span><input type="search" id="${prefix}TagPersonSearch" data-tag-search maxlength="120" placeholder="הקלידו שם פרטי או שם משפחה…" autocomplete="off"></label><p class="tag-search-count" data-tag-search-count></p><div class="tag-people-results" data-tag-results></div><button type="button" class="tag-add-name" data-tag-add hidden></button></div>`}<p class="tag-autosave-status" data-tag-save-status role="status" aria-live="polite"></p><div class="tag-error-actions" data-tag-error-actions hidden><button type="button" class="secondary-button" data-tag-retry>ניסיון נוסף</button><button type="button" data-tag-discard>ביטול השינוי שלא נשמר</button></div><div class="selected-people" data-selected-people></div></div>`;
       this.input=this.photoOnly?null:host.querySelector('[data-tag-search]');this.results=this.photoOnly?null:host.querySelector('[data-tag-results]');this.selectedHost=host.querySelector('[data-selected-people]');this.status=host.querySelector('[data-tag-save-status]');
+      if(!this.photoOnly)this.results.insertAdjacentHTML('beforebegin',`<div class="tag-group-filters" role="group" aria-label="${I18n.isEnglish?'Tagging groups':'קבוצות תיוג'}">${['all','family','extended','friends'].map(group=>`<button type="button" data-tag-group="${group}" aria-pressed="${group==='all'}">${tagGroupLabel(group)}</button>`).join('')}</div>`);
       this.widget=host.querySelector('.tag-widget');this.searchArea=this.photoOnly?null:host.querySelector('[data-tag-search-area]');this.dialog=host.closest?.('dialog')||null;this.searchActive=false;this.searchFrame=null;
       this.listener=()=>this.render();store.listeners.add(this.listener);
       if(!this.photoOnly){
@@ -165,6 +168,7 @@
       }
       on(host,'change',event=>{if(!this.photoOnly&&event.target.matches('[data-tag-person]'))this.choose(roster.get(event.target.dataset.tagPerson),event.target.checked);});
       on(host,'click',event=>{
+        const group=event.target.closest('[data-tag-group]');if(group){this.group=group.dataset.tagGroup;this.renderResults(true);return;}
         const option=event.target.closest('.tag-person-option');
         if(option){
           const checkbox=option.querySelector('[data-tag-person]');
@@ -208,10 +212,11 @@
     }
     renderResults(resetScroll=false){
       if(this.photoOnly)return;
-      const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>Number.isFinite(matchRank(person,query))).sort((a,b)=>comparePeople(a,b,query));
-      this.results.hidden=this.inline&&!query;
+      const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>(this.group==='all'||tagGroup(person)===this.group)&&Number.isFinite(matchRank(person,query))).sort((a,b)=>comparePeople(a,b,query));
+      this.results.hidden=this.inline&&!query&&this.group==='all';
       const position=resetScroll?0:this.results.scrollTop;
-      this.results.innerHTML=names.slice(0,150).map(person=>`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}><span><strong>${safe(I18n.personName(person))}</strong><small>${safe(personContext(person))}</small></span></label>`).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
+      let previousGroup=null;this.results.innerHTML=names.slice(0,150).map(person=>{const group=tagGroup(person),heading=group!==previousGroup?`<h4 class="tag-group-heading">${tagGroupLabel(group)}</h4>`:'';previousGroup=group;return heading+`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}><span><strong>${safe(I18n.personName(person))}</strong><small>${safe(personContext(person))}</small></span></label>`;}).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
+      for(const button of this.host.querySelectorAll('[data-tag-group]'))button.setAttribute('aria-pressed',String(button.dataset.tagGroup===this.group));
       this.results.scrollTop=position;
       this.host.querySelector('[data-tag-search-count]').textContent=this.inline&&!query?'':I18n.html`${names.length} ${I18n.isEnglish?I18n.word(names.length,'name in the list','names in the list'):I18n.t('שמות ברשימה')}`;
       const add=this.host.querySelector('[data-tag-add]');add.hidden=!this.store.ready||!query||names.some(person=>matchRank(person,query)<=4)||[...selected.values()].some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalize(alias)===query));add.textContent=I18n.t('＋ הוספת השם ״')+this.query.trim()+'״';this.version=rosterVersion;
