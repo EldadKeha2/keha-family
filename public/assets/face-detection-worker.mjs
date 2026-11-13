@@ -1,8 +1,8 @@
 import {FaceDetector} from './vendor/mediapipe/vision_bundle.mjs';
 import {clampRect,sameRegion,unrotateRect,separateFaces} from './face-geometry.mjs?v=6';
 import {detectionRegions} from './face-scan.mjs?v=2';
-import {createYuNet,projectYuNet,confirmYuNet,sameDetection,unrotateYuNet} from './face-yunet.mjs?v=5';
-import {STRONG_FACE_SCORE,proposalMatches,verifiedEvidence} from './face-verification.mjs?v=2';
+import {createYuNet,projectYuNet,confirmYuNet,sameDetection,unrotateYuNet,separateYuNetRegions} from './face-yunet.mjs?v=6';
+import {STRONG_FACE_SCORE,proposalMatches,verifiedEvidence} from './face-verification.mjs?v=3';
 import pico from './vendor/pico/pico.mjs';
 
 // Model files are hosted with the site. Detection must not send photos or metrics elsewhere.
@@ -49,16 +49,20 @@ async function detailedFaces(bitmap,onProgress){
   try{
     for(const region of regions){
       const scale=640/Math.max(region.width,region.height),drawn={width:Math.round(region.width*scale),height:Math.round(region.height*scale)};
-      const scan=async flipped=>{
+      const scan=async (flipped,angle=0)=>{
         const ctx=tile.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,640,640);ctx.save();
+        if(angle){ctx.translate(drawn.width/2,drawn.height/2);ctx.rotate(angle);ctx.translate(-drawn.width/2,-drawn.height/2);}
         if(flipped){ctx.translate(drawn.width,0);ctx.scale(-1,1);}
         ctx.drawImage(bitmap,region.x,region.y,region.width,region.height,0,0,drawn.width,drawn.height);ctx.restore();
-        const faces=(await engine.detect(tile)).map(face=>projectYuNet(face,region,size,drawn,flipped)).filter(Boolean);
+        const faces=(await engine.detect(tile)).map(face=>projectYuNet(unrotateYuNet(face,angle,drawn),region,size,drawn,flipped)).filter(Boolean);
         const accepted=confirmYuNet(candidates,faces,++pass);onProgress(accepted.filter(face=>face.score>=STRONG_FACE_SCORE));return faces;
       };
       const faces=await scan(false);
       // A second viewpoint helps asymmetric occlusion and verifies weak faces.
       if(faces.length||pass===1)await scan(true);
+      // Coarse rotated views discover tilted infants and occluded pairs before
+      // local verification. Fine upright tiles keep the usual fast detail pass.
+      if(Math.max(region.width,region.height)>=Math.min(1024,Math.max(size.width,size.height)))for(const angle of [-Math.PI/3,Math.PI/3,-Math.PI/6,Math.PI/6])await scan(false,angle);
     }
     return candidates;
   }finally{tile.width=tile.height=1;}
@@ -109,7 +113,7 @@ async function verifiedFaces(bitmap,proposals,known,add){
 self.onmessage=async event=>{
   const {id,bitmap}=event.data;
   let galleryFaces=null;
-  const found=[],snapshotFaces=()=>separateFaces(found).toSorted((a,b)=>b.score-a.score).slice(0,150).map(({rect,score})=>({rect,score}));
+  const found=[],snapshotFaces=()=>separateFaces(separateYuNetRegions(found)).toSorted((a,b)=>b.score-a.score).slice(0,150).map(({rect,score})=>({rect,score}));
   const publish=(engine,partial=true)=>self.postMessage({id,faces:snapshotFaces(),galleryFaces,engine,partial});
   const add=faces=>{for(const face of faces){const previous=found.findIndex(other=>sameDetection(other,face));if(previous<0)found.push(face);else if(found[previous].score<face.score)found[previous]=face;}};
   let detailed=false;const proposals=[];

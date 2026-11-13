@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {decodeYuNet,projectYuNet,sameDetection,suppressDetections,confirmYuNet,plausibleFaceLandmarks,unrotateYuNet} from '../public/assets/face-yunet.mjs';
+import {decodeYuNet,projectYuNet,sameDetection,suppressDetections,confirmYuNet,plausibleFaceLandmarks,unrotateYuNet,separateYuNetRegions} from '../public/assets/face-yunet.mjs';
 import {sameRegion,mergeFaces} from '../public/assets/face-geometry.mjs';
 import {faceRect} from '../src/faces.mjs';
 import {detectionRegions} from '../public/assets/face-scan.mjs';
@@ -59,4 +59,10 @@ test('anatomical validation rejects collapsed or collinear hand and fabric propo
   const falsePositive={...real,landmarks};assert.equal(plausibleFaceLandmarks(falsePositive),false);const candidates=[];confirmYuNet(candidates,[falsePositive],1);assert.deepEqual(confirmYuNet(candidates,[falsePositive],2),[]);
  }
  const tiny={rect:{x:.4,y:.3,width:.002,height:.003},score:.8};tiny.landmarks=[[.34,.33],[.42,.34],[.55,.53],[.38,.75],[.55,.74]].map(([x,y])=>({x:tiny.rect.x+x*tiny.rect.width,y:tiny.rect.y+y*tiny.rect.height}));assert.equal(plausibleFaceLandmarks(tiny),true);
+});
+
+test('close profile faces with touching noses retain separate feature regions through rectangle-only storage',()=>{
+ const a=face(),b={...structuredClone(a),landmarks:a.landmarks.map((p,i)=>({...p,x:p.x+(i<2?.035:i>=3?.025:0)}))};
+ assert.equal(sameDetection(a,b),false);const separated=separateYuNetRegions([a,b]);assert.equal(sameRegion(separated[0].rect,separated[1].rect),false);assert.equal(mergeFaces([],separated).length,2);
+ assert.deepEqual(separateYuNetRegions([a,{...a,score:.7}]).map(f=>f.rect),[a.rect,a.rect],'Repeated views of one head do not shrink its box');
 });

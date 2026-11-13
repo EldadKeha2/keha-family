@@ -9,7 +9,19 @@ export function sameDetection(a,b){
   const w=Math.min(a.rect.width,b.rect.width),h=Math.min(a.rect.height,b.rect.height);
   const distance=a.landmarks.reduce((sum,p,i)=>sum+Math.hypot((p.x-b.landmarks[i].x)/w,(p.y-b.landmarks[i].y)/h),0)/5;
   const nose=Math.hypot((a.landmarks[2].x-b.landmarks[2].x)/w,(a.landmarks[2].y-b.landmarks[2].y)/h);
-  return distance<.26&&nose<.32;
+  const midpointDistance=indices=>{const x=indices.reduce((n,i)=>n+a.landmarks[i].x-b.landmarks[i].x,0)/indices.length/w,y=indices.reduce((n,i)=>n+a.landmarks[i].y-b.landmarks[i].y,0)/indices.length/h;return Math.hypot(x,y);};
+  return distance<.26&&nose<.32&&midpointDistance([0,1])<.24&&midpointDistance([3,4])<.24;
+}
+// Keep two landmark-supported heads separate even when their coarse model
+// boxes coincide. The padded feature bounds remain inside the original box.
+export function separateYuNetRegions(faces){
+  return faces.map(face=>{
+    if(!face.landmarks||!faces.some(other=>other!==face&&other.landmarks&&sameRegion(face.rect,other.rect)&&!sameDetection(face,other)))return face;
+    const r=face.rect,xs=face.landmarks.map(p=>p.x),ys=face.landmarks.map(p=>p.y),w=Math.max(...xs)-Math.min(...xs),h=Math.max(...ys)-Math.min(...ys);
+    if(w<=0||h<=0)return face;
+    const x=Math.max(r.x,Math.min(...xs)-w*.3),y=Math.max(r.y,Math.min(...ys)-h*.55),right=Math.min(r.x+r.width,Math.max(...xs)+w*.3),bottom=Math.min(r.y+r.height,Math.max(...ys)+h*.3);
+    return right>x&&bottom>y?{...face,rect:{x,y,width:right-x,height:bottom-y}}:face;
+  });
 }
 export function suppressDetections(faces){
   const kept=[];

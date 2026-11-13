@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {detectionSize} from '../public/assets/face-scan.mjs';
 import {detectionRegions} from '../public/assets/face-scan.mjs';
 import {clampRect,sameRegion,unrotateRect,separateFaces} from '../public/assets/face-geometry.mjs';
-import {sameDetection,projectYuNet,confirmYuNet,unrotateYuNet} from '../public/assets/face-yunet.mjs';
+import {sameDetection,projectYuNet,confirmYuNet,unrotateYuNet,separateYuNetRegions} from '../public/assets/face-yunet.mjs';
 import {STRONG_FACE_SCORE,proposalMatches,verifiedEvidence} from '../public/assets/face-verification.mjs';
 
 const source=(await readFile(new URL('../public/assets/face-detector.mjs',import.meta.url),'utf8'))
@@ -61,16 +61,16 @@ test('the worker finds close small faces through fine crops, projects coordinate
  let calls=0,picoCalls=0,closed=false;
  class Canvas{
   constructor(w,h){this.width=w;this.height=h;}
-  getContext(type){if(type==='webgl2')return {getExtension:()=>null};return {drawImage:(bitmap,...args)=>{this.crop=args.length===8?args:[0,0,width,height,0,0,this.width,this.height];this.drawFlip=this.flip;},save:()=>{this.savedFlip=this.flip;},restore:()=>{this.flip=this.savedFlip;},scale:x=>{this.flip=x;},clearRect(){},translate(){},rotate(){},getImageData:()=>({data:new Uint8Array(this.width*this.height*4)})};}
+  getContext(type){if(type==='webgl2')return {getExtension:()=>null};return {drawImage:(bitmap,...args)=>{this.crop=args.length===8?args:[0,0,width,height,0,0,this.width,this.height];this.drawFlip=this.flip;this.drawAngle=this.angle||0;},save:()=>{this.savedFlip=this.flip;this.savedAngle=this.angle||0;},restore:()=>{this.flip=this.savedFlip;this.angle=this.savedAngle;},scale:x=>{this.flip=x;},clearRect(){},translate(){},rotate:a=>{this.angle=(this.angle||0)+a;},getImageData:()=>({data:new Uint8Array(this.width*this.height*4)})};}
  }
  const FaceDetector={createFromOptions:async()=>({detect:tile=>{calls++;const [x,y,w,h]=tile.crop;return {detections:targets.filter(face=>face.x>=x&&face.y>=y&&face.x+face.width<=x+w&&face.y+face.height<=y+h&&face.width/w*128>=8).map(face=>({boundingBox:{originX:(face.x-x)*tile.width/w,originY:(face.y-y)*tile.height/h,width:face.width*tile.width/w,height:face.height*tile.height/h},categories:[{score:.9}]}))};}})};
  const pico={unpack_cascade:()=>{},run_cascade:image=>++picoCalls===1?[[height*.7,width*.8,24,12]]:[],cluster_detections:d=>d};
  const self={location:{href:'https://family.example/assets/face-detection-worker.mjs',origin:'https://family.example'},fetch:async()=>new Response(new ArrayBuffer(1)),postMessage:message=>messages.push(message)};
- const createYuNet=async()=>({detect:async tile=>{const[x,y,w,h,,,dw,dh]=tile.crop;return targets.filter(face=>face.x>=x&&face.y>=y&&face.x+face.width<=x+w&&face.y+face.height<=y+h&&face.width/w*640>=8).map(face=>{
+ const createYuNet=async()=>({detect:async tile=>{if(tile.drawAngle)return [];const[x,y,w,h,,,dw,dh]=tile.crop;return targets.filter(face=>face.x>=x&&face.y>=y&&face.x+face.width<=x+w&&face.y+face.height<=y+h&&face.width/w*640>=8).map(face=>{
   const rect={x:(face.x-x)*dw/w,y:(face.y-y)*dh/h,width:face.width*dw/w,height:face.height*dh/h};let landmarks=[[.25,.3],[.7,.3],[.48,.53],[.32,.75],[.65,.75]].map(([dx,dy])=>({x:rect.x+dx*rect.width,y:rect.y+dy*rect.height}));
   if(tile.drawFlip===-1){rect.x=dw-rect.x-rect.width;landmarks=[1,0,2,4,3].map(i=>({x:dw-landmarks[i].x,y:landmarks[i].y}));}return{rect,landmarks,score:.9};
  });}});
- vm.runInNewContext(workerSource,{FaceDetector,pico,clampRect,sameRegion,separateFaces,sameDetection,createYuNet,projectYuNet,confirmYuNet,unrotateYuNet,STRONG_FACE_SCORE,proposalMatches,verifiedEvidence,unrotateRect,detectionRegions,self,fetch:(...args)=>self.fetch(...args),OffscreenCanvas:Canvas,URL,Response});
+ vm.runInNewContext(workerSource,{FaceDetector,pico,clampRect,sameRegion,separateFaces,sameDetection,createYuNet,projectYuNet,confirmYuNet,unrotateYuNet,separateYuNetRegions,STRONG_FACE_SCORE,proposalMatches,verifiedEvidence,unrotateRect,detectionRegions,self,fetch:(...args)=>self.fetch(...args),OffscreenCanvas:Canvas,URL,Response});
  await self.onmessage({data:{id:7,bitmap:{width,height,close(){closed=true;}}}});
  const final=messages.at(-1);assert.equal(final.partial,false);assert.equal(final.engine,'yunet+mediapipe+verified-pico');assert.equal(closed,true);assert.equal(picoCalls,4);assert.ok(calls>5);
  for(const target of targets)assert.ok(final.faces.some(face=>Math.abs(face.rect.x-target.x/width)<1e-9&&Math.abs(face.rect.width-target.width/width)<1e-9),'Every face keeps its original normalized coordinates');

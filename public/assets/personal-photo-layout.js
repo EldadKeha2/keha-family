@@ -27,13 +27,14 @@
     const albumCount=[...albums.querySelectorAll('[data-photo-album-kind]')].filter(button=>!button.hidden).length;
     const leftHeight=rail*4+gap*3,zoomHeight=rail*3+gap*2;
     const controlsTop=Math.max(0,(height-leftHeight)/2);
-    const zoomTop=Math.max(54+gap,controlsTop);
+    const zoomTop=Math.max(rail+gap,controlsTop);
     const trashTop=Math.max(height-rail,zoomTop+zoomHeight+gap+rail+gap),editTop=trashTop-gap-rail;
     frame.style.setProperty('--personal-review-top',controlsTop+'px');
     frame.style.setProperty('--personal-albums-top',(controlsTop+rail+gap)+'px');
     frame.style.setProperty('--personal-albums-height',Math.max(0,albumCount*rail+gap*(albumCount-1))+'px');
     frame.style.setProperty('--personal-edit-top',Math.max(0,editTop)+'px');frame.style.setProperty('--personal-trash-top',Math.max(0,trashTop)+'px');
     frame.style.setProperty('--personal-zoom-top',zoomTop+'px');
+    const caption=$('mediaHeaderCaption');if(caption){caption.classList.remove('caption-multiline');const line=parseFloat(getComputedStyle(caption).lineHeight)||24;caption.classList[caption.textContent.includes('\n')||caption.scrollHeight>line*1.55?'add':'remove']('caption-multiline');}
   }
   function restore(){
     if(!active)return;

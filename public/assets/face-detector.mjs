@@ -10,7 +10,7 @@ async function run(){
   if(job.signal?.aborted){job.reject(new DOMException('Cancelled','AbortError'));return run();}
   active=job;
   try{
-    if(!worker){worker=new Worker(new URL('./face-detection-worker.mjs?v=10',import.meta.url),{type:'module'});worker.onmessage=event=>{if(event.data.id!==active?.id)return;const {faces,engine,partial,galleryFaces}=event.data;if(faces){faces.engine=engine||'mediapipe';faces.complete=!partial;faces.galleryFaces=galleryFaces;if(partial){active.partial=faces;active.onProgress?.(faces);return;}}finish(event.data.error?Error(event.data.error):null,faces);};worker.onerror=()=>{worker?.terminate();worker=null;finish(active?.partial?.length?null:Error('Face detection is unavailable'),active?.partial);};}
+    if(!worker){worker=new Worker(new URL('./face-detection-worker.mjs?v=11',import.meta.url),{type:'module'});worker.onmessage=event=>{if(event.data.id!==active?.id)return;const {faces,engine,partial,galleryFaces}=event.data;if(faces){faces.engine=engine||'mediapipe';faces.complete=!partial;faces.galleryFaces=galleryFaces;if(partial){active.partial=faces;active.onProgress?.(faces);return;}}finish(event.data.error?Error(event.data.error):null,faces);};worker.onerror=()=>{worker?.terminate();worker=null;finish(active?.partial?.length?null:Error('Face detection is unavailable'),active?.partial);};}
     const size=detectionSize(job.image.naturalWidth||job.image.width,job.image.naturalHeight||job.image.height),bitmap=await createImageBitmap(job.image,{resizeWidth:size.width,resizeHeight:size.height,resizeQuality:'high'});
     if(active!==job){bitmap.close();return;}
     if(job.signal?.aborted){bitmap.close();return finish(new DOMException('Cancelled','AbortError'));}

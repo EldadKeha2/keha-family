@@ -141,3 +141,18 @@ html[dir=ltr] #mediaViewer.media-caption-inline #openedCaptionForm{direction:ltr
  #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-button,.face-regions-toggle){min-height:32px;padding:3px 6px;font-size:calc(12px * var(--a11y-text-scale,1))}
  #mediaViewer.personal-photo-desktop #mediaShareActions{padding-block:4px}
 }
+
+@media(min-width:701px){
+ #mediaViewer.personal-photo-desktop #mediaHeaderCaption{color:#3c472f}
+ #mediaViewer.personal-photo-desktop #mediaHeaderCaption.caption-multiline{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.3;max-height:37px}
+ #mediaViewer.personal-photo-desktop #personalPhotoRight>button.photo-fullscreen-viewer{left:0;box-sizing:border-box;width:var(--personal-rail);min-width:var(--personal-rail);height:var(--personal-rail);min-height:var(--personal-rail);padding:6px;border-radius:9px}
+ #mediaViewer.personal-photo-desktop #personalPhotoRight>button.photo-fullscreen-viewer svg{width:28px;height:28px}
+ #mediaViewer.personal-photo-desktop #personalPhotoRight>button.photo-fullscreen-viewer .photo-fullscreen-label{font-size:calc(10px * var(--a11y-text-scale,1))}
+}
+.phone-swipe-hint{position:absolute;right:12px;top:50%;width:65px;height:90px;transform:translateY(-50%);pointer-events:none;z-index:25;filter:drop-shadow(0 2px 5px #14241988)}
+.phone-swipe-hint svg{display:block;width:100%;height:100%;stroke:#fff7df;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.phone-swipe-hint .swipe-hint-hand{fill:#76865de6;animation:phone-swipe-finger 1.7s ease-in-out infinite}
+.phone-swipe-hint .swipe-hint-arrow{stroke:#fff7df;stroke-width:3;opacity:.9}
+@keyframes phone-swipe-finger{0%,15%{transform:translateX(-7px);opacity:.65}65%,85%{transform:translateX(7px);opacity:1}100%{transform:translateX(-7px);opacity:.65}}
+@media(min-width:701px){.phone-swipe-hint{display:none}}
+@media(prefers-reduced-motion:reduce){.phone-swipe-hint .swipe-hint-hand{animation:none}}

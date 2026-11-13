@@ -1,5 +1,5 @@
 import {intersection} from './face-geometry.mjs?v=6';
-import {sameDetection,plausibleFaceLandmarks} from './face-yunet.mjs?v=5';
+import {sameDetection,plausibleFaceLandmarks} from './face-yunet.mjs?v=6';
 
 export const STRONG_FACE_SCORE=.88;
 export function profileFace(face){

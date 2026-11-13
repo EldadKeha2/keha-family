@@ -359,32 +359,15 @@ test('face names open real profiles on desktop and touch; free names and unknown
  }
 });
 
-test('saved face bubbles always remove the selected tag directly, including from that person’s profile gallery',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- for(const desktop of [false,true])for(const duplicate of [false,true])for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
-  const f=fixture([],{desktop}),person={id:'yona',name:'יונה'},otherPerson=duplicate?person:{id:'shlomo',name:'שלמה'},selected={id:'selected',revision:'face-1',rect:{x:.1,y:.2,width:.1,height:.1},personId:person.id,person},other={id:'other',revision:'other-1',rect:{x:.7,y:.2,width:.1,height:.1},personId:otherPerson.id,person:otherPerson},requests=[],opened=[];let saved=[selected,other];
-  f.window.FamilyApp.getPerson=()=>person;f.window.FamilyApp.openPerson=id=>opened.push(id);
-  f.window.FamilyI18n.fetch=async(path,options)=>{
-   if(path.endsWith('/save')){requests.push(JSON.parse(options.body));saved=[other];return Response.json({operation:'faces',scope,item:{id:'direct-remove',kind:'photo',scope,tags:[otherPerson],tagsRevision:'t2'},faces:saved,unassignedFaces:[{rect:selected.rect}],ignoredFaces:[]});}
-   return Response.json({faces:saved});
-  };
-  await f.mount('direct-remove',{}, {scope,tags:[person,otherPerson],tagsRevision:'t1'});const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===selected.id);
-  if(desktop)f.emit(hit,'focus');else f.emit(f.stage,'click',{detail:1,target:hit});
-  const bubble=f.find('face-popover face-name');assert.match(bubble.innerHTML,/data-face-remove[^>]*>הסרת התיוג<\/button>/);const remove=bubble.querySelector('[data-face-remove]'),query=bubble.querySelector.bind(bubble);bubble.querySelector=selector=>selector==='[data-face-status]'?null:query(selector);
-  f.emit(remove,'pointerdown',{pointerType:desktop?'mouse':'touch'});t.mock.timers.tick(2300);assert.equal(f.find('face-popover face-name'),bubble,'The action must survive its press through the click');f.emit(remove,'click');await f.faces.flush();
-  assert.equal(requests.length,1,scope);assert.equal(requests[0].personId,null);assert.equal(requests[0].faceId,selected.id);assert.equal(requests[0].expectedRevision,'face-1');assert.deepEqual(opened,[]);
-  const remaining=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===other.id);assert.ok(remaining);assert.match(remaining['aria-label'],new RegExp(otherPerson.name),'Another occurrence of the same person retains its tag');assert.equal(f.find('face-popover face-name'),undefined);f.emit(remove,'click');await f.faces.flush();assert.equal(requests.length,1,'A detached old button cannot remove another face');f.faces.clear();
+test('face information bubbles never expose removal; the editor retains the guarded removal action in every album',async()=>{
+ for(const desktop of [false,true])for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
+  const f=fixture([],{desktop}),person={id:'yona',name:'יונה'},face={...first,id:'named',revision:'current',personId:'yona',person};let writes=0;
+  f.window.FamilyI18n.fetch=async(path,options)=>{if(path.endsWith('/save')){writes++;return Response.json({operation:'faces',item:{id:'info-only',kind:'photo',scope},faces:[],unassignedFaces:[{rect:face.rect}],ignoredFaces:[]});}return Response.json({faces:[face]});};
+  await f.mount('info-only',{}, {scope});const hit=f.find('face-hit-buttons').children[0];f.emit(hit,'focus');const bubble=f.find('face-popover face-name');assert.ok(bubble);assert.doesNotMatch(bubble.innerHTML,/data-face-remove|הסרת התיוג/);assert.equal(writes,0);
+  if(desktop)f.emit(f.stage,'click',{target:hit,detail:0});else f.emit(bubble.querySelector('[data-face-edit]'),'click');
+  const picker=f.find('face-popover face-picker');assert.ok(picker);assert.match(picker.innerHTML,/data-face-remove/);f.emit(picker.querySelector('[data-face-remove]'),'click');await f.faces.flush();assert.equal(writes,1);f.faces.clear();
  }
 });
-test('a failed direct removal in a profile gallery restores the saved face and reports the failure',async()=>{
- for(const desktop of [false,true]){
-  const f=fixture([],{desktop}),person={id:'yona',name:'יונה'},face={...first,id:'named',revision:'current',personId:person.id,person},errors=[];let requests=0;
-  f.window.FamilyApp.toast=message=>errors.push(message);f.window.FamilyI18n.fetch=async path=>{if(path.endsWith('/save')){requests++;return Response.json({error:'Connection lost'},{status:503});}return Response.json({faces:[face]});};
-  await f.mount('failed-direct',{}, {scope:'personal:yona',tags:[person]});f.emit(f.find('face-hit-buttons').children[0],'focus');const bubble=f.find('face-popover face-name');f.emit(bubble.querySelector('[data-face-remove]'),'click');await f.faces.flush();
-  assert.equal(requests,1);assert.equal(errors.length,1);assert.match(errors[0],/Connection lost/);assert.match(f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===face.id)['aria-label'],/יונה/);f.faces.clear();
- }
-});
-
 test('editing an existing face survives focus leaving its former name bubble on desktop and touch',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const desktop of [false,true]){
@@ -505,12 +488,12 @@ test('upload preview resizing while face controls are still mounting waits for i
  const pending=f.mount('early-resize',{adapter,zoom:false});assert.doesNotThrow(()=>f.faces.fit());await pending;
  assert.ok(f.find('face-hit-buttons'));assert.doesNotThrow(()=>f.faces.fit());f.faces.clear();
 });
-test('a phone tap on an already tagged upload face opens the existing people picker immediately',async()=>{
+test('a phone tap on a tagged upload face shows information before opening its editor',async()=>{
  const person={id:'yona',name:'יונה'},named={...first,id:'draft-face',personId:person.id,person},f=fixture();
  const adapter={load:async()=>({faces:[named]}),mapDetections:faces=>faces,findPeople:async()=>[person],enabled:()=>true};
  await f.mount('draft-tap',{adapter,zoom:false});const hit=f.find('face-hit-buttons').children[0];
  f.emit(f.stage,'click',{detail:1,pointerType:'touch',target:hit});await new Promise(resolve=>setImmediate(resolve));
- const picker=f.find('face-popover face-picker');assert.ok(picker);assert.match(picker.querySelector('[data-face-results]').innerHTML,/יונה/);assert.equal(f.find('face-popover face-name'),undefined);f.faces.clear();
+ const info=f.find('face-popover face-name');assert.ok(info);assert.equal(f.find('face-popover face-picker'),undefined);f.emit(info.querySelector('[data-face-edit]'),'click');await new Promise(resolve=>setImmediate(resolve));const picker=f.find('face-popover face-picker');assert.ok(picker);assert.match(picker.querySelector('[data-face-results]').innerHTML,/יונה/);f.faces.clear();
 });
 test('drag scrolling does not create a face, and viewport resizing preserves normalized positions',async()=>{
  const f=fixture([first,second]);await f.mount();const toolbar=f.find('face-zoom-toolbar'),scroll=f.find('face-photo-scroll'),selection=f.find('face-selection');
@@ -808,7 +791,7 @@ test('tagged-area controls cover every shared album, preserve their state throug
   const f=fixture([second],{desktop:true}),face={...first,id:'saved',personId:'yona',person:{id:'yona',name:'יונה'}};f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});
   await f.mount('regions',{}, {scope});const toggle=f.find('face-regions-toggle'),note=f.find('face-regions-note'),hits=()=>f.find('face-hit-buttons').children,tagged=()=>hits().filter(node=>node.classList.contains('face-tagged-region'));
   assert.equal(toggle['aria-pressed'],'false');assert.equal(note.hidden,true);assert.equal(tagged().length,0);assert.equal(f.find('face-regions-text').textContent,'הצג אזורים מתויגים');
-  f.emit(toggle,'click');assert.equal(toggle['aria-pressed'],'true');assert.equal(tagged().length,1);assert.equal(hits().length,2);assert.match(note.textContent,/לחצו על מסגרת להסרת התיוג/);
+  f.emit(toggle,'click');assert.equal(toggle['aria-pressed'],'true');assert.equal(tagged().length,1);assert.equal(hits().length,2);assert.match(note.textContent,/לחצו על מסגרת לעריכת התיוג/);
   f.emit(tagged()[0],'focus');f.emit(tagged()[0],'pointerenter',{pointerType:'mouse'});assert.equal(f.find('face-popover face-name'),undefined);
   f.faces.update({id:'regions',kind:'photo',scope,takenDate:{year:1986}});await f.mount('regions',{}, {scope,takenDate:{year:1986}});f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');
   assert.equal(f.find('face-regions-toggle'),toggle);assert.equal(tagged().length,1);assert.equal(tagged()[0].style.left,first.rect.x*100+'%');assert.equal(toggle['aria-pressed'],'true');assert.equal(f.dialog.querySelectorAll('.face-regions-toggle').length,1);
@@ -828,7 +811,7 @@ test('clicking a dashed region removes its exact duplicate tag, renumbers immedi
    const removed=saved.find(face=>face.id===payload.faceId);saved=saved.filter(face=>face.id!==payload.faceId);unassigned=[...unassigned,{rect:removed.rect}];return Response.json({operation:'faces',item:{id:'regions-remove',kind:'photo',tags:[person,original[2].person]},faces:saved,unassignedFaces:unassigned,ignoredFaces:[]});
   };
   await f.mount('regions-remove');f.emit(f.find('face-regions-toggle'),'click');
-  const click=id=>{const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===id);f.emit(f.stage,'click',{target:hit,detail:desktop?0:1,pointerType:desktop?'mouse':'touch'});};
+  const click=id=>{const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId===id);f.emit(f.stage,'click',{target:hit,detail:desktop?0:1,pointerType:desktop?'mouse':'touch'});if(!desktop)f.emit(f.find('face-popover face-name').querySelector('[data-face-edit]'),'click');assert.ok(f.find('face-popover face-picker'));f.emit(f.find('face-popover face-picker').querySelector('[data-face-remove]'),'click');};
   const check=count=>{const host=f.find('face-visible-labels'),numbers=host.children.filter(node=>node.classList.contains('face-visible-label')).map(node=>Number(/face-label-number[^>]*>(\d+)/.exec(node.innerHTML)[1]));assert.deepEqual(numbers,Array.from({length:count},(_,i)=>i+1));assert.equal(f.find('face-hit-buttons').children.filter(node=>node.classList.contains('face-tagged-region')).length,count);};
   click('duplicate-b');check(2);assert.equal(f.find('face-popover face-picker'),undefined);assert.equal(f.find('face-popover face-name'),undefined);await new Promise(resolve=>setImmediate(resolve));assert.equal(requests[0].faceId,'duplicate-b');assert.equal(requests[0].expectedRevision,'b1');
   f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',item:{id:'regions-remove',kind:'photo'},faces:original}}));check(2);finish();await f.faces.flush();check(2);assert.equal(saved.filter(face=>face.personId===person.id).length,1);
@@ -841,5 +824,5 @@ test('the upload wizard removes dashed tags from the rotated draft without makin
  const adapter=createUploadFaceAdapter(d,{findPeople:async()=>[person],getPerson:()=>person,onChange:()=>changed++});adapter.enabled=()=>enabled;
  f.window.FamilyI18n.fetch=async()=>{throw Error('A draft must not use the media API');};await f.mount(d.key,{adapter,reviewHost:f.title,reviewLabel:true,zoom:false});const toggle=f.find('face-regions-toggle');assert.equal(toggle.parent,f.title);assert.equal(f.find('face-regions-text').textContent,'הצג אזורים מתויגים');f.emit(toggle,'click');
  const hit=f.find('face-hit-buttons').children.find(node=>node.dataset.faceId==='two');assert.notEqual(hit.style.left,second.rect.x*100+'%');enabled=false;f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(d.faceTags.length,2);
- enabled=true;f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(f.find('face-hit-buttons').children.length,2);await f.faces.flush();assert.equal(changed,1);assert.equal(d.faceTags.length,1);assert.equal(d.faceTags[0].id,'one');assert.deepEqual(d.ignoredFaces,[]);assert.deepEqual(d.unassignedFaces,[second.rect]);assert.equal(faceDraftPeople(d).length,1);assert.equal(d.facesComplete,false);assert.equal(toggle['aria-pressed'],'true');f.faces.clear();
+ enabled=true;f.emit(f.stage,'click',{target:hit,detail:0});assert.equal(d.faceTags.length,2);f.emit(f.find('face-popover face-picker').querySelector('[data-face-remove]'),'click');assert.equal(f.find('face-hit-buttons').children.length,2);await f.faces.flush();assert.equal(changed,1);assert.equal(d.faceTags.length,1);assert.equal(d.faceTags[0].id,'one');assert.deepEqual(d.ignoredFaces,[]);assert.deepEqual(d.unassignedFaces,[second.rect]);assert.equal(faceDraftPeople(d).length,1);assert.equal(d.facesComplete,false);assert.equal(toggle['aria-pressed'],'true');f.faces.clear();
 });

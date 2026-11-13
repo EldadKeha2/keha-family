@@ -818,3 +818,17 @@ test('gallery shortcuts preserve copy/paste and stay inactive behind upload/date
  f.document.querySelector=()=>({open:true});await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');
  f.document.querySelector=()=>null;f.navigator.userAgent='Android Mobile';await modifier(f,'Control',{ctrlKey:true});await modifier(f,'Control',{},'keyup');assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
 });
+
+test('phones show a right-hand swipe hint only on the first opened photo per album and dismiss it on navigation',async()=>{
+ const f=fixture();f.navigator.userAgent='Android Mobile';const items=[f.photo('hint-a'),f.photo('hint-b')],hint=()=>f.get('mediaStage').content.find(node=>node.className==='phone-swipe-hint');
+ f.window.FamilyMedia.open(items,1,'photos');assert.ok(hint());f.window.FamilyMedia.setFullscreen(true);assert.ok(hint(),'The same first-photo hint survives entering fullscreen');await f.window.FamilyMedia.step(1);assert.equal(hint(),undefined);f.close();f.window.FamilyMedia.open(items,0,'photos');assert.equal(hint(),undefined);f.close();
+ f.window.FamilyMedia.open(items,0,'personal:yona');assert.ok(hint());f.close();f.window.FamilyMedia.open([items[0]],0,'wedding:one');assert.equal(hint(),undefined);f.close();
+ const desktop=fixture();desktop.navigator.userAgent='Windows NT 10.0';desktop.window.FamilyMedia.open(items,0,'photos');assert.equal(desktop.get('mediaStage').content.some(node=>node.className==='phone-swipe-hint'),false);desktop.close();
+});
+test('closing a paginated viewer restores the grid page where that viewer was opened',async()=>{
+ const f=fixture(),pages=[[f.photo('return-a')],[f.photo('return-b')],[f.photo('return-c')]],visits=[];let page=2;
+ const register=n=>f.window.FamilyMedia.register('gallery',pages[n-1],{pagination:{page:n,pages:3,size:1,total:3}});register(page);
+ f.window.FamilyPortal={galleryQuery:()=>({page}),pageGallery:async n=>{page=n;visits.push(n);register(n);}};
+ f.window.FamilyMedia.openFrom('gallery','return-b');await f.window.FamilyMedia.step(-1);await f.window.FamilyMedia.step(-1);assert.equal(page,3);f.close();assert.equal(page,2);assert.deepEqual(visits,[1,3,2]);
+ f.window.FamilyMedia.openFrom('gallery','return-b');f.close();assert.deepEqual(visits,[1,3,2],'Closing without crossing a page does not reload the grid');
+});
