@@ -50,7 +50,7 @@
     speedControl.setAttribute('aria-label',tr('מהירות המצגת','Slideshow speed'));speedControl.title=tr('מהירות המצגת · שניות לתמונה: ','Slideshow speed · seconds per photo: ')+Number((4/speed).toFixed(1));
     effectsControl.setAttribute('aria-pressed',String(effects));effectsControl.setAttribute('aria-label',tr('מעברים אקראיים','Random transitions'));effectsControl.title=tr('מעברים אקראיים במצגת','Random slideshow transitions');
     namesControl.setAttribute('aria-pressed',String(showNames));agesControl.setAttribute('aria-pressed',String(showAges));
-    agesControl.disabled=!state.item.takenDate?.year;agesControl.title=agesControl.disabled?tr('יש להזין שנת צילום כדי להציג גילים','Add the year the photo was taken to show ages'):tr('הצגת גילים בזמן הצילום','Show ages at the time of the photo');
+    agesControl.title=tr('הצגת גילים בזמן הצילום, כשיש נתונים מתאימים','Show ages at the time of the photo, where dates are known');
     const playLabel=playing?tr('השהיית המצגת','Pause slideshow'):tr('הפעלת מצגת בלולאה','Play looping slideshow');
     if(play.getAttribute('aria-label')!==playLabel){play.setAttribute('aria-label',playLabel);play.title=playLabel;play.innerHTML=playing?pauseIcon:playIcon;}play.setAttribute('aria-pressed',String(playing));
     if(resumed&&ready)schedule();
