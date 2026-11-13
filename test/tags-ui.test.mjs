@@ -170,3 +170,22 @@ test('both Hebrew nicknames lead directly to Tidhar Fish in face and ordinary ta
   assert.match(widget.results.innerHTML,/tidhar/);f.tags.clearInline(host);
  }
 });
+
+test('Madi Fish comes first only for her exact full Hebrew name in both tagging pickers',async()=>{
+ const madi={id:'qa-madi',name:'מדי פיש',nameEn:'Madi Fish',extra:true};
+ const lookalike={id:'qa-main-madi',name:'עדי פיש',nameEn:'Adi Fish',generation:2};
+ const f=fixture(()=>Response.json({people:[...Object.values(family.people),madi,lookalike]}));
+ for(const query of ['מדי פיש','  מדי   פיש  ','מדי','מדי פי','מדי פיס','פיש מדי','Madi Fish']){
+  const exact=query.trim().replace(/\s+/g,' ')==='מדי פיש';
+  const found=await f.tags.findPeople(query,['qa-main-madi']);
+  const index=id=>found.findIndex(person=>person.id===id);
+  assert.ok(index(madi.id)>=0,query);assert.ok(index(lookalike.id)>=0,query);
+  if(exact)assert.equal(found[0].id,madi.id,query);
+  else assert.ok(index(lookalike.id)<index(madi.id),query);
+  const host=new NodeStub();f.tags.mountInline(host,{...photo('madi-'+query),kind:'video'});const widget=host._tagWidget;widget.query=query;widget.renderResults(true);
+  const html=widget.results.innerHTML;
+  if(exact)assert.equal(html.match(/data-tag-person="([^"]+)"/)?.[1],madi.id,query);
+  else assert.ok(html.indexOf('data-tag-person="'+lookalike.id+'"')<html.indexOf('data-tag-person="'+madi.id+'"'),query);
+  f.tags.clearInline(host);
+ }
+});

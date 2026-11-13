@@ -62,11 +62,13 @@
     return generation>=1&&generation<=5?generation:6;
   }
   function comparePeople(a,b,query,preferred=new Set()){
+    // Only Madi's correctly entered full Hebrew name bypasses family groups.
+    const exactMadi=p=>query==='מדי פיש'&&[p.name,window.FAMILY_DATA.people[p.id]?.name].some(name=>name&&normalize(name)===query)?0:1;
     // The six main branches stay ahead of similar extended-family and friend
     // names. Within each group, spelling wins before generation breaks ties.
     const group=p=>Math.max(0,personPriority(p)-5);
     const nickname=p=>tagAliases[p.id]?.includes(query)?0:1;
-    return group(a)-group(b)||nickname(a)-nickname(b)||matchRank(a,query)-matchRank(b,query)||personPriority(a)-personPriority(b)||(preferred.has(b.id)-preferred.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale);
+    return exactMadi(a)-exactMadi(b)||group(a)-group(b)||nickname(a)-nickname(b)||matchRank(a,query)-matchRank(b,query)||personPriority(a)-personPriority(b)||(preferred.has(b.id)-preferred.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale);
   }
   function matchRank(person,query){
     if(!query)return 5;
