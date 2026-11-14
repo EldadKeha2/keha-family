@@ -69,4 +69,4 @@ function controls(item,scope){
 }
 document.addEventListener('click',event=>{const add=event.target.closest?.('[data-video-new-category]');if(add){openCreate();return;}const assign=event.target.closest?.('[data-video-assign-category]');if(assign)openAssign(assign.dataset.videoAssignCategory);});
 document.addEventListener('change',event=>{const select=event.target;if(select.id==='videoUploadCategory'&&!createFromSelect(select))select.dataset.category=select.value;});
-window.FamilyVideoCategories={render,options,controls,createFromSelect};
+window.FamilyVideoCategories={render,options,controls,createFromSelect,openAssign};

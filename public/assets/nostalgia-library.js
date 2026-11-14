@@ -211,6 +211,6 @@
     $('nostalgiaAssignForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type=submit]');button.disabled=true;try{const current=allItems().find(item=>item.id===state.assignId)?.nostalgiaEventIds||[],wanted=selectedAssignments(current,[...$('nostalgiaAssignChoices').querySelectorAll('input:checked')].map(input=>input.value));await action('assign',{id:state.assignId,add:wanted.filter(id=>!current.includes(id)),remove:current.filter(id=>!wanted.includes(id))});$('nostalgiaAssignDialog').close();}catch(error){$('nostalgiaAssignError').textContent=I.error(error.message);}finally{button.disabled=false;}});
     for(const event of ['hashchange','popstate'])window.addEventListener(event,()=>{if(/^#nostalgia(?:\/|$)/.test(location.hash))window.FamilyArchive?.renderNostalgia?.();else{state.homeActive=false;closeCategory(true);}});
   }
-  window.FamilyNostalgia={select,decorateCard,viewItems,viewCategoryItems,selectedAssignments,stackPose,acceptDrop,isEvent:()=>{const event=getEvent(routeEvent());return Boolean(event&&event.categoryId!==DIRECT_CATEGORY);},uploadEvents,uploadEventId:()=>$('nostalgiaUploadEvent')?.value||null};
+  window.FamilyNostalgia={select,decorateCard,viewItems,viewCategoryItems,selectedAssignments,stackPose,acceptDrop,openAssign,isEvent:()=>{const event=getEvent(routeEvent());return Boolean(event&&event.categoryId!==DIRECT_CATEGORY);},uploadEvents,uploadEventId:()=>$('nostalgiaUploadEvent')?.value||null};
   document.addEventListener('DOMContentLoaded',init);
 })();
