@@ -41,7 +41,7 @@ function galleryModel(source,run){
   const collection={items:[],library:{categories:[{id:'military',name:'מסיבות גיוס ושחרור',icon:'olive',color:'olive'},{id:'holidays',name:'חגים ומועדים',icon:'lantern',color:'honey'}],events:[{id:'ora',categoryId:'military',name:'מסיבת השחרור של אורה',count:19,videoCount:19,revision:'1'},{id:'independence',categoryId:'holidays',name:'יום העצמאות 1996',count:1,videoCount:1,revision:'1'}]}};
   const render=()=>window.FamilyNostalgia.select(collection);render();
   const button=data=>({dataset:data,hasAttribute:name=>Object.hasOwn(data,name.replace(/^data-/,'').replace(/-([a-z])/g,(_,c)=>c.toUpperCase())),closest(selector){return selector==='button'||selector==='[data-nostalgia-category]'&&Object.hasOwn(data,'nostalgiaCategory')?this:null;}});
-  return {node:id=>nodes.get(id),collection,render,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>emit(documentListeners,'click',{target:button(data)}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
+  return {api:window.FamilyNostalgia,node:id=>nodes.get(id),collection,render,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>emit(documentListeners,'click',{target:button(data)}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
 }
 
 test('event folders use the browsing grid without upload actions, and returning home restores uploads',()=>{
@@ -51,9 +51,25 @@ test('event folders use the browsing grid without upload actions, and returning 
  assert.equal(gallery.node('nostalgiaDropzone').hidden,true);
  assert.doesNotMatch(gallery.node('nostalgiaEventHeader').innerHTML,/data-archive-upload/);
  assert.match(gallery.node('nostalgiaEventHeader').innerHTML,/מסיבת השחרור של אורה/);
+ assert.doesNotMatch(gallery.node('nostalgiaEventHeader').innerHTML,/nostalgia-event-title|nostalgia-event-seal|19|אירוע אחד, כל הרגעים/);
+ assert.equal(gallery.node('nostalgiaFeedIntro').hidden,true);
  gallery.goEvent(null);
  assert.equal(gallery.node('nostalgiaView').classList.contains('nostalgia-event-grid'),false);
  assert.equal(gallery.node('nostalgiaDropzone').hidden,false);
+ assert.equal(gallery.node('nostalgiaFeedIntro').hidden,false);
+});
+
+test('opening a folder ignores the search and media filter retained from the library home',()=>{
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
+ gallery.collection.items=[{id:'ora-video',kind:'video',name:'קטע ראשון',nostalgiaEventIds:['ora']},{id:'other-video',kind:'video',name:'קטע אחר',nostalgiaEventIds:['independence']},{id:'loose',kind:'photo',name:'Unassigned'}];
+ gallery.goEvent('ora');
+ const items=gallery.node('nostalgiaView');
+ assert.equal(items.classList.contains('nostalgia-event-grid'),true);
+ // The hidden home controls must not make a populated folder look empty.
+ const api=gallery.api;
+ assert.deepEqual(Array.from(api.select(gallery.collection,{query:'unrelated search',filter:'photo'}),item=>item.id),['ora-video']);
+ gallery.goEvent(null);
+ assert.deepEqual(Array.from(api.select(gallery.collection,{query:'Unassigned',filter:'photo'}),item=>item.id),['loose']);
 });
 
 test("Switching categories starts with the first event",()=>{

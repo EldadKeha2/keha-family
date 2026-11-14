@@ -48,7 +48,7 @@ test('event folders render compact video tiles without upload headings and refre
  f.window.FamilyVideoPresentation={tile:(item,scope)=>`<button data-media-scope="${scope}">${item.caption||'Add description'}</button>`};
  f.filter('all');const card=f.grid.children.find(node=>node.dataset.mediaFile===film.file);
  assert.match(card.className,/video-tile/);assert.equal(f.grid.dataset.layout,'event');
- assert.doesNotMatch(f.grid.children.find(node=>node.dataset.nostalgiaKind==='video').innerHTML,/data-archive-upload/);
+ assert.equal(f.grid.children.some(node=>node.dataset.nostalgiaKind),false,'folder contents start immediately without headings or counts');
  f.change({operation:'caption',item:{...film,caption:'A family dance'}});
  assert.match(f.grid.children.find(node=>node.dataset.mediaFile===film.file).innerHTML,/A family dance/);
 });

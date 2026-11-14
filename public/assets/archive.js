@@ -151,7 +151,7 @@
       const dateLabel=card.querySelector('[data-archive-date-label]');if(dateLabel)dateLabel.textContent=captureLabel(item);
       card.dataset.mediaKind=item.kind;if(key==='nostalgia')window.FamilyNostalgia?.decorateCard?.(card,item);cards.push(card);
     }
-    if(key==='nostalgia'){
+    if(key==='nostalgia'&&!eventGrid){
       const groups=[],kinds=filter==='all'?['video','photo','document']:[filter];
       const labels={photo:I18n.t('תמונות נוסטלגיות'),video:I18n.t('סרטוני נוסטלגיה'),document:I18n.t('מסמכים מהעבר')};
       const actions={photo:I18n.t('＋ העלאת תמונות'),video:I18n.t('＋ העלאת סרטונים'),document:I18n.t('＋ העלאת מסמכים')};
@@ -165,7 +165,7 @@
         if(!kindCards.length){const empty=grid.querySelector('[data-nostalgia-empty="'+kind+'"]')||document.createElement('p');empty.className='nostalgia-kind-empty';empty.dataset.nostalgiaEmpty=kind;empty.textContent=I18n.t(query?'לא נמצאו זיכרונות מהסוג הזה בחיפוש.':'כאן יש מקום לזיכרונות שלכם. הוסיפו את הראשון!');groups.push(empty);}
       }
       cards.splice(0,cards.length,...groups);
-    }else if(!items.length&&collection.items.length){const previous=grid.querySelector('.no-content-match');cards.push(previous||Object.assign(document.createElement('p'),{className:'no-content-match',textContent:I18n.t('לא נמצאו זיכרונות בבחירה הזו. נסו לשנות את הסינון או את החיפוש.')}));}
+    }else if(!items.length&&(eventGrid||collection.items.length)){const previous=grid.querySelector('.no-content-match');cards.push(previous||Object.assign(document.createElement('p'),{className:'no-content-match',textContent:eventGrid?(I18n.isEnglish?'No memories have been assigned to this folder yet.':'עדיין אין פריטים משויכים לתיקייה הזו.'):I18n.t('לא נמצאו זיכרונות בבחירה הזו. נסו לשנות את הסינון או את החיפוש.')}));}
     // Insert only new cards; do not detach playing videos during a background refresh.
     const active=document.activeElement,selection=active?.dataset?.archiveCaption?[active.selectionStart,active.selectionEnd]:null;
     const wanted=new Set(cards);for(const child of [...grid.children])if(!wanted.has(child))child.remove();

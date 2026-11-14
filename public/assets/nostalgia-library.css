@@ -1,4 +1,15 @@
 /* Warm paper, copper jewellery and the diamond stitches of family embroidery. */
+body[data-active-view=nostalgia]:has(#nostalgiaView.nostalgia-event-grid) .workspace-header{display:none!important}
+#nostalgiaView.nostalgia-event-grid>.archive-toolbar,#nostalgiaView.nostalgia-event-grid>#nostalgiaFeedIntro{display:none!important}
+#nostalgiaView.nostalgia-event-grid #nostalgiaEventHeader{padding:0;margin:0 0 16px}
+#nostalgiaView.nostalgia-event-grid .nostalgia-event-backbar{margin:0 0 8px;flex-wrap:nowrap}
+#nostalgiaView.nostalgia-event-grid .nostalgia-event-backbar button{min-height:32px;padding:4px 8px!important;font-size:12px!important}
+#nostalgiaView.nostalgia-event-grid .nostalgia-event-edit{font-size:20px!important;flex:none}
+.nostalgia-event-name{margin:0 0 6px;font:500 calc(31px * var(--a11y-text-scale,1))/1.3 var(--serif);color:#626f4d;text-align:start;overflow-wrap:anywhere}
+.nostalgia-event-details{display:flex;flex-wrap:wrap;gap:4px 18px;color:#93856c;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.nostalgia-event-details:empty{display:none}
+#nostalgiaView.nostalgia-event-grid .no-content-match{grid-column:1/-1}
+@media(max-width:700px){#nostalgiaView.nostalgia-event-grid{padding:12px 12px 20px}.nostalgia-event-name{font-size:calc(25px * var(--a11y-text-scale,1))}.nostalgia-event-details{font-size:calc(12px * var(--a11y-text-scale,1));gap:4px 12px}}
 .nostalgia-event-grid>.nostalgia-upload-actions,.nostalgia-event-grid>#nostalgiaDropzone{display:none!important}
 #nostalgiaView.nostalgia-event-grid #nostalgiaGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px;align-items:start}
 #nostalgiaView.nostalgia-event-grid .nostalgia-media-heading{grid-column:1/-1}

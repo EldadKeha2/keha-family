@@ -69,14 +69,16 @@
     $('nostalgiaLibraryHome').hidden=Boolean(event);$('nostalgiaView').classList.toggle('nostalgia-unclassified',!event);$('nostalgiaView').classList.toggle('nostalgia-event-grid',Boolean(event));$('nostalgiaEventHeader').hidden=!event;
     $('nostalgiaDropzone').hidden=Boolean(event);
     if(event){
-      const category=state.library.categories.find(c=>c.id===event.categoryId),header=$('nostalgiaEventHeader'),signature=JSON.stringify([event,category]);
-      if(header.dataset.signature!==signature){header.dataset.signature=signature;header.innerHTML=`<div class="nostalgia-event-backbar"><button type="button" class="secondary-button" data-nostalgia-home>← ${tr('לספריית הזיכרונות','Memory library')}</button><button type="button" class="quiet-button" data-nostalgia-category="${safe(category.id)}">${safe(categoryName(category))}</button><button type="button" class="quiet-button" data-nostalgia-edit-event="${safe(event.id)}">✎ ${tr('עריכת פרטי האירוע','Edit event details')}</button></div><div class="nostalgia-event-title theme-${safe(category.color)}"><span class="nostalgia-event-seal">${icon(category.icon)}</span><span class="small-eyebrow">${tr('אירוע אחד, כל הרגעים','One occasion, all its moments')}</span><h3>${safe(eventName(event))}</h3><div class="nostalgia-event-meta">${dateText(event.date)?`<span>◷ <bdi>${safe(dateText(event.date))}</bdi></span>`:''}${event.location?`<span>⌖ ${safe(event.location)}</span>`:''}<span>▻ ${videosText(event.videoCount)}</span></div>${sparkle}</div>`;}
+      const header=$('nostalgiaEventHeader'),signature=JSON.stringify(event),editLabel=tr('עריכת פרטי האירוע','Edit event details');
+      if(header.dataset.signature!==signature){header.dataset.signature=signature;header.innerHTML=`<div class="nostalgia-event-backbar"><button type="button" class="quiet-button" data-nostalgia-home>← ${tr('לספריית הזיכרונות','Memory library')}</button><button type="button" class="quiet-button nostalgia-event-edit" data-nostalgia-edit-event="${safe(event.id)}" aria-label="${editLabel}" title="${editLabel}">✎</button></div><h2 class="nostalgia-event-name">${safe(eventName(event))}</h2><div class="nostalgia-event-details">${dateText(event.date)?`<span><bdi>${safe(dateText(event.date))}</bdi></span>`:''}${event.location?`<span>${safe(event.location)}</span>`:''}</div>`;}
     }else categoryCards();
     const feed=$('nostalgiaFeedIntro'),signature=eventId||'unassigned';
-    if(feed.dataset.signature!==signature){feed.dataset.signature=signature;feed.innerHTML=event?`<div><span class="small-eyebrow">${tr('לוחצים על רגע ונכנסים שוב לסיפור','Choose a moment and step back into the story')}</span><h4>${tr('הסרטונים והזיכרונות מהאירוע','Videos and memories from this event')}</h4></div>`:`<div><h4>${tr('אירועים לא מתויגים','Unclassified memories')}</h4><p>${tr('בחרו שיוך לאירוע או גררו סרטון לתיקייה שלמעלה.','Upload videos here, then assign them to an event. You can also drag their event label onto a folder.')}</p></div>`;}
+    feed.hidden=Boolean(event);
+    if(feed.dataset.signature!==signature){feed.dataset.signature=signature;feed.innerHTML=event?'':`<div><h4>${tr('אירועים לא מתויגים','Unclassified memories')}</h4><p>${tr('בחרו שיוך לאירוע או גררו סרטון לתיקייה שלמעלה.','Upload videos here, then assign them to an event. You can also drag their event label onto a folder.')}</p></div>`;}
     uploadSelector();if($('nostalgiaCategoryDialog')?.open)renderCategory();
-    let items=viewItems(collection,eventId);if(filter!=='all')items=items.filter(item=>item.kind===filter);
-    if(state.query)items=items.filter(item=>mediaSearch(item).includes(state.query)||event&&normalize(eventName(event)).includes(state.query));
+    // Folder pages have no search or kind controls. Home filters must not hide their contents.
+    let items=viewItems(collection,eventId);if(!event&&filter!=='all')items=items.filter(item=>item.kind===filter);
+    if(!event&&state.query)items=items.filter(item=>mediaSearch(item).includes(state.query));
     return items;
   }
   function decorateCard(card,item){
