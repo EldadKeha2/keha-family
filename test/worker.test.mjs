@@ -60,6 +60,23 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('Life itself supports one direct video destination, preserves older assignments on migration, and has no new event folders',async()=>{
+ const f=fixture();try{
+  await f.connect();
+  const legacy=await(await f.call('/api/nostalgia/upload?filename=old.mp4&event=amir-tomer-gulf-war',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json(),old=legacy.collection.items[0];
+  const row=f.database.prepare('SELECT value FROM meta WHERE id=?').get('nostalgia-library-v1'),library=JSON.parse(row.value);
+  library.events=library.events.filter(event=>event.id!=='everyday-life-clips');f.database.prepare('UPDATE meta SET value=? WHERE id=?').run(JSON.stringify(library),'nostalgia-library-v1');f.restart();
+  let catalog=await(await f.call('/api/nostalgia')).json();assert.equal(catalog.library.events.filter(event=>event.id==='everyday-life-clips').length,1);
+  assert.deepEqual(catalog.items.find(item=>item.id===old.id).nostalgiaEventIds,['amir-tomer-gulf-war']);
+  const uploaded=await(await f.call('/api/nostalgia/upload?filename=new.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json(),film=uploaded.collection.items[0];
+  const response=await f.call('/api/nostalgia/assign',{method:'POST',body:{id:film.id,add:['everyday-life-clips']}});assert.equal(response.status,200);
+  assert.deepEqual((await response.json()).item.nostalgiaEventIds,['everyday-life-clips']);assert.equal(f.objects.size,2);
+  assert.equal((await f.call('/api/nostalgia/event',{method:'POST',body:{categoryId:'everyday-life',name:'An unwanted folder'}})).status,400);
+  const photoUpload=await(await f.call('/api/nostalgia/upload?filename=photo.jpg',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}})).json(),picture=photoUpload.collection.items[0];
+  assert.equal((await f.call('/api/nostalgia/assign',{method:'POST',body:{id:picture.id,add:['everyday-life-clips']}})).status,400);
+  f.restart();catalog=await(await f.call('/api/nostalgia')).json();assert.equal(catalog.library.events.filter(event=>event.id==='everyday-life-clips').length,1);assert.deepEqual(catalog.items.find(item=>item.id===film.id).nostalgiaEventIds,['everyday-life-clips']);
+ }finally{await f.close();}
+});
 test('nostalgia event folders keep explicit uploads, partial dates, multiple event tags and unclassified uploads durable without duplicating bytes',async()=>{
  const f=fixture();try{
   await f.connect();let catalog=await(await f.call('/api/nostalgia')).json();assert.equal(catalog.library.categories.length,6);

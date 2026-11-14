@@ -2,6 +2,9 @@ import {HttpError,text,uid} from './http.mjs';
 import {photoDate} from '../public/assets/photo-date.mjs';
 
 export const NOSTALGIA_LIBRARY_KEY='nostalgia-library-v1';
+export const EVERYDAY_LIFE_DESTINATION='everyday-life-clips';
+const everydayLifeDestination=()=>({id:EVERYDAY_LIFE_DESTINATION,categoryId:'everyday-life',name:'החיים עצמם',nameEn:'Life itself',date:null,location:'',directCategory:true,revision:uid(),createdAt:new Date().toISOString()});
+const isVideo=item=>item.kind==='video'||/^video\//i.test(item.mime||'');
 export const nostalgiaCategories=[
   {id:'birthdays',name:'ימי הולדת',nameEn:'Birthdays',icon:'cake',color:'rose'},
   {id:'holidays',name:'חגים ומועדים',nameEn:'Holidays and celebrations',icon:'lantern',color:'honey'},
@@ -30,8 +33,14 @@ export class NostalgiaLibrary{
   read(){const row=this.state.rows('SELECT value FROM meta WHERE id=?',NOSTALGIA_LIBRARY_KEY)[0];if(!row)throw new HttpError(503,'ספריית האירועים עדיין אינה זמינה. נסו לרענן.');return JSON.parse(row.value);}
   write(library){library.revision=uid();this.state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value',NOSTALGIA_LIBRARY_KEY,JSON.stringify(library));this.state.touch('nostalgia');}
   initialize(){
-    if(this.state.rows('SELECT value FROM meta WHERE id=?',NOSTALGIA_LIBRARY_KEY).length)return;
-    const library={categories:nostalgiaCategories.map(c=>({...c,revision:uid()})),events:nostalgiaEvents.map(e=>({...e,revision:uid(),createdAt:new Date().toISOString()}))};
+    const stored=this.state.rows('SELECT value FROM meta WHERE id=?',NOSTALGIA_LIBRARY_KEY);
+    if(stored.length){
+      const library=JSON.parse(stored[0].value);
+      // Keep all historical assignments, while providing one direct category destination.
+      if(!library.events.some(e=>e.id===EVERYDAY_LIFE_DESTINATION)){library.events.push(everydayLifeDestination());this.write(library);}
+      return;
+    }
+    const library={categories:nostalgiaCategories.map(c=>({...c,revision:uid()})),events:[...nostalgiaEvents.map(e=>({...e,revision:uid(),createdAt:new Date().toISOString()})),everydayLifeDestination()]};
     this.write(library);
     // One migration for the explicitly identified historical events. Later,
     // unclassified uploads stay unclassified until someone selects an event.
@@ -46,6 +55,7 @@ export class NostalgiaLibrary{
     const ids=eventId?[eventId]:item.nostalgiaEventIds||[];
     if(!Array.isArray(ids)||ids.length>30)throw new HttpError(400,'בחרו עד 30 אירועים לפריט.');
     const events=ids.map(id=>this.event(id));item.nostalgiaEventIds=[...new Set(ids)];
+    if(events.some(event=>event.id===EVERYDAY_LIFE_DESTINATION)&&!isVideo(item))throw new HttpError(400,'החיים עצמם מיועדת לסרטונים.');
     if(!item.takenDate&&events[0]?.date){item.takenDate=photoDate(events[0].date);item.takenDateRevision=uid();}
   }
   snapshot(items){
@@ -65,6 +75,7 @@ export class NostalgiaLibrary{
     if(p.id&&!old)throw new HttpError(404,'האירוע לא נמצא.');
     if(old&&p.expectedRevision!==old.revision)throw new HttpError(409,'פרטי האירוע עודכנו בינתיים. פתחו את העריכה מחדש.');
     if(!library.categories.some(c=>c.id===p.categoryId))throw new HttpError(400,'בחרו קטגוריה לאירוע.');
+    if(p.id===EVERYDAY_LIFE_DESTINATION||!old&&p.categoryId==='everyday-life')throw new HttpError(400,'החיים עצמם מציגה סרטונים ישירות, ללא תיקיות אירועים.');
     const name=text(p.name,'שם האירוע',140,true),location=text(p.location||'','מיקום',240);let date;
     try{date=photoDate(p.date);}catch{throw new HttpError(400,'תאריך האירוע אינו תקין.');}
     if(library.events.some(e=>e.id!==p.id&&e.categoryId===p.categoryId&&normalized(e.name)===normalized(name)))throw new HttpError(409,'כבר קיים אירוע בשם הזה בקטגוריה.');
@@ -76,7 +87,7 @@ export class NostalgiaLibrary{
   assign(p){
     const item=this.state.media(p.id);if(item.category!=='nostalgia')throw new HttpError(400,'אפשר לשייך כאן פריטים מפינת הנוסטלגיה בלבד.');
     for(const values of [p.add||[],p.remove||[]])if(!Array.isArray(values)||values.length>30||values.some(id=>typeof id!=='string'))throw new HttpError(400,'בחרו אירועים תקינים.');
-    for(const id of p.add||[])this.event(id);
+    for(const id of p.add||[]){this.event(id);if(id===EVERYDAY_LIFE_DESTINATION&&!isVideo(item))throw new HttpError(400,'החיים עצמם מיועדת לסרטונים.');}
     const ids=new Set(item.nostalgiaEventIds||[]);for(const id of p.remove||[])ids.delete(id);for(const id of p.add||[])ids.add(id);
     if(ids.size>30)throw new HttpError(400,'בחרו עד 30 אירועים לפריט.');
     item.nostalgiaEventIds=[...ids];this.state.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.state.touch('nostalgia');
