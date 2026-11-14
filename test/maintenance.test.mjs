@@ -54,7 +54,7 @@ function browserFixture({available=true,session=new Map(),images=[],fetch:fetche
   const window=new EventTarget();window.FAMILY_DATA=initialData;window.FAMILY_DATA_AVAILABLE=available;window.XMLHttpRequest=XHR;window.fetch=async(...args)=>{calls.push(args);return fetcher(...args);};
   const location={href:'https://family.example/?lang=he',origin:'https://family.example',reload(){reloads++;}};
   const storage={getItem(k){if(!storageWorks)throw Error('Storage blocked');return session.get(k)||null;},setItem(k,v){if(!storageWorks)throw Error('Storage blocked');session.set(k,v);},removeItem(k){session.delete(k);}};
-  vm.runInContext(read('../public/assets/maintenance.js'),vm.createContext({window,document,location,sessionStorage:storage,URL,WeakMap,setInterval(fn,ms){const id=nextTimer++;intervals.set(id,{fn,ms});return id;},clearInterval(id){intervals.delete(id);}}));
+  vm.runInContext(read('../public/assets/maintenance.js'),vm.createContext({window,document,location,sessionStorage:storage,URL,WeakMap,Event,setInterval(fn,ms){const id=nextTimer++;intervals.set(id,{fn,ms});return id;},clearInterval(id){intervals.delete(id);}}));
   return {window,document,root,calls,session,intervals,get reloads(){return reloads;},startup(){document.dispatchEvent(new Event('DOMContentLoaded'));},screen:()=>document.getElementById('familyMaintenanceScreen'),continue(){document.getElementById('familyMaintenanceScreen').querySelector('.family-maintenance-enter').dispatchEvent(new Event('click'));},emit(name,properties){const event=new Event(name);for(const [k,v]of Object.entries(properties))Object.defineProperty(event,k,{value:v});window.dispatchEvent(event);},async recovery(){for(const timer of intervals.values())await timer.fn();}};
 }
 test('failed or partial bootstrap raises the bilingual screen and continuation restores navigation once per tab',async()=>{
@@ -106,4 +106,13 @@ test('acknowledgement works when browser storage is blocked, and recovery requir
   const f=browserFixture({available:false,storageWorks:false});f.startup();f.continue();f.emit('error',{target:{tagName:'IMG',src:'https://family.example/media/123'}});assert.equal(f.window.FamilyMaintenance.isActive(),false);
   const configOnly=browserFixture({available:false,fetch:async()=>Response.json({database:true})});configOnly.startup();await configOnly.recovery();assert.equal(configOnly.reloads,0);
   const recovered=browserFixture({available:false,fetch:async()=>Response.json({available:true})});recovered.startup();await recovered.recovery();assert.equal(recovered.reloads,1);assert.equal(recovered.calls[0][0],'/api/health');
+});
+
+test('automatic service recovery preserves active upload queues and unsaved editors until their unload guard clears',async()=>{
+ const f=browserFixture({available:false,fetch:async()=>Response.json({available:true})});let pending=true;
+ f.window.addEventListener('beforeunload',event=>{if(pending)event.preventDefault();});
+ f.startup();await f.recovery();assert.equal(f.reloads,0);
+ f.continue();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.reloads,0);
+ await f.recovery();assert.equal(f.reloads,0,'a background upload remains protected after continuing past maintenance');
+ pending=false;await f.recovery();assert.equal(f.reloads,1,'recovery resumes once the pending work has finished');
 });

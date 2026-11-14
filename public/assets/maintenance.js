@@ -66,7 +66,12 @@
     if((!active&&!bypassed)||document.visibilityState==='hidden')return;
     try{
       const response=await nativeFetch('/api/health',{cache:'no-store'});
-      if(response.ok&&(await response.json()).available===true){try{sessionStorage.removeItem(bypassKey);}catch{}location.reload();}
+      if(response.ok&&(await response.json()).available===true){
+        // Upload queues and unsaved editors already register beforeunload guards.
+        // Honor them before an automatic refresh, without prompting or losing the queue.
+        if(!window.dispatchEvent(new Event('beforeunload',{cancelable:true})))return;
+        try{sessionStorage.removeItem(bypassKey);}catch{}location.reload();
+      }
     }catch{}
   }
   function observeResponse(input,response){
