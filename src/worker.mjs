@@ -115,7 +115,7 @@ async function streamUpload(request,maximum,withPhotoMetadata=false){
 }
 async function upload(request,env,db,ctx,{category,personId=null,mixed=false,mediaType='photo'}){
   const videoCategory=new URL(request.url).searchParams.get('group')||'family';
-  if(category==='videos'&&!['family','special-birthdays'].includes(videoCategory))throw new HttpError(400,'קטגוריית הסרטון אינה מוכרת.');
+  if(category==='videos')await db('video.category',{id:videoCategory});
   if(!configured(env))throw new HttpError(503,'יש להשלים את חיבור האחסון לפני העלאת קבצים.');
   if(personId)await db('person',{id:personId});
   const eventId=category==='nostalgia'?new URL(request.url).searchParams.get('event'):null;
@@ -337,6 +337,8 @@ export default {
         return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
+        if(path==='/api/collections/videos/categories'){const body=await readJSON(request,2000);return json(await db('video.category.create',{name:body.name,nameEn:body.nameEn}),201);}
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/video-category$/.exec(path))){const body=await readJSON(request,2000);return json(await db('video.category.assign',{id:match[1],group:body.group,expectedGroup:body.expectedGroup}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-upload$/.exec(path)))return await videoUploadFinalize(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/clip$/.exec(path)))return await videoClipRoute(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(thumbnail|preview)$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1],match[2]);

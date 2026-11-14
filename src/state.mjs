@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {NostalgiaLibrary} from './nostalgia-library.mjs';
+import {VideoCategories} from './video-categories.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection,weddingDate} from './weddings.mjs';
@@ -32,6 +33,7 @@ export class FamilyState {
   constructor(ctx,env){
     this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;this.peopleRevision=uid();this.peopleCache=null;
     this.nostalgiaLibrary=new NostalgiaLibrary(this);
+    this.videoCategories=new VideoCategories(this);
     this.initializationError=null;this.nextInitializationAttempt=0;this.initializeState();
   }
   initializeState(){
@@ -446,7 +448,7 @@ export class FamilyState {
     }
     if(kind!=='gallery'){
       const items=this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?) ORDER BY m.rowid DESC',kind,kind).map(row=>this.mediaPublic(JSON.parse(row.data)));
-      return {kind,items,count:items.length,revision,...(kind==='nostalgia'?{library:this.nostalgiaLibrary.snapshot(items)}:{}),...(kind.startsWith('wedding:')?{cover:this.albumCover(kind,items.find(item=>item.kind==='photo')?.src||null)}:{})};
+      return {kind,items,count:items.length,revision,...(kind==='videos'?{categories:this.videoCategories.snapshot()}:{}),...(kind==='nostalgia'?{library:this.nostalgiaLibrary.snapshot(items)}:{}),...(kind.startsWith('wedding:')?{cover:this.albumCover(kind,items.find(item=>item.kind==='photo')?.src||null)}:{})};
     }
     const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120),filter=options.filter||'all',order=galleryOrdering(options);
     if(!['all','untagged','partial','complete'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
@@ -755,6 +757,7 @@ export class FamilyState {
         if(!/^[a-f0-9]{32}$/.test(p.operationId||''))throw new HttpError(400,'אישור השמירה אינו תקין. פתחו את האשף מחדש.');
         let metadata;try{metadata=videoUploadMetadata(p.metadata);}catch{throw new HttpError(400,'בדקו את התאריך, התיאור או הקטע המסומן בסרטון.');}
         if(metadata.eventId&&source.category==='nostalgia')this.nostalgiaLibrary.event(metadata.eventId);
+        if(metadata.group&&source.category==='videos')this.videoCategories.category(metadata.group);
         if(source.videoUploadEdit?.operationId===p.operationId){if(source.videoUploadEdit.fingerprint!==JSON.stringify(metadata))throw new HttpError(409,'פרטי הסרטון השתנו. פתחו את האשף מחדש.');return {existing:{...this.mediaChanged(source,'video-upload'),file:source.file,alreadySaved:true}};}
         return {source,operationId:p.operationId,metadata};
       }
@@ -948,6 +951,9 @@ export class FamilyState {
         return {items:ids.map(id=>found.get(id))};
       }
       case 'collection':return this.collection(p.kind,p);
+      case 'video.category':return this.videoCategories.category(p.id);
+      case 'video.category.create':return this.videoCategories.create(p);
+      case 'video.category.assign':return this.videoCategories.assign(p);
       case 'nostalgia.event':return this.nostalgiaLibrary.event(p.id);
       case 'nostalgia.category.save':return this.nostalgiaLibrary.categorySave(p);
       case 'nostalgia.event.save':return this.nostalgiaLibrary.eventSave(p);
@@ -997,7 +1003,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:3,nostalgiaLibrary:this.nostalgiaLibrary.read(),faceIgnores:this.rows('SELECT f.media_id AS mediaId,f.photo_revision AS photoRevision,f.data FROM media_face_ignores f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,rects:JSON.parse(row.data)})),albumCovers:this.rows('SELECT c.collection,c.media_id AS mediaId FROM album_covers c JOIN media m ON m.id=c.media_id'),faceReviews:this.rows('SELECT r.media_id AS mediaId,r.photo_revision AS photoRevision,r.tags_revision AS tagsRevision,r.completed_at AS completedAt FROM media_face_reviews r JOIN media m ON m.id=r.media_id'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT f.media_id AS mediaId,f.data FROM media_faces f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
+      case 'export':return {schemaVersion:3,videoCategories:this.videoCategories.snapshot(),nostalgiaLibrary:this.nostalgiaLibrary.read(),faceIgnores:this.rows('SELECT f.media_id AS mediaId,f.photo_revision AS photoRevision,f.data FROM media_face_ignores f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,rects:JSON.parse(row.data)})),albumCovers:this.rows('SELECT c.collection,c.media_id AS mediaId FROM album_covers c JOIN media m ON m.id=c.media_id'),faceReviews:this.rows('SELECT r.media_id AS mediaId,r.photo_revision AS photoRevision,r.tags_revision AS tagsRevision,r.completed_at AS completedAt FROM media_face_reviews r JOIN media m ON m.id=r.media_id'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT f.media_id AS mediaId,f.data FROM media_faces f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

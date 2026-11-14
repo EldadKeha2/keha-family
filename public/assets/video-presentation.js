@@ -7,7 +7,7 @@
  let root,anchor,active=false,hadNative=false;
  function controls(item,scope,{viewer=false}={}){
   const id=safe(item.id||item.file),context=safe(scope||item.scope||'videos'),galleryLabel=tr('פתיחה בגלריית הסרטונים','Open video gallery'),fullscreenLabel=tr('מסך מלא','Full screen');
-  return `<div class="video-overlay-tools"><div class="video-overlay-editing">${window.FamilyVideoEditor?.controls(item,scope)||''}<button type="button" class="video-gallery-launch" ${viewer?'data-video-gallery-viewer':`data-media-open="${id}" data-media-scope="${context}"`} aria-label="${galleryLabel}" title="${galleryLabel}">${galleryIcon}</button></div><button type="button" class="video-fullscreen-launch" data-video-fullscreen="${id}" data-video-scope="${context}" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">${fullscreenIcon}</button></div>`;
+  return `<div class="video-overlay-tools"><div class="video-overlay-editing">${window.FamilyVideoEditor?.controls(item,scope)||''}${window.FamilyVideoCategories?.controls(item,scope)||''}<button type="button" class="video-gallery-launch" ${viewer?'data-video-gallery-viewer':`data-media-open="${id}" data-media-scope="${context}"`} aria-label="${galleryLabel}" title="${galleryLabel}">${galleryIcon}</button></div><button type="button" class="video-fullscreen-launch" data-video-fullscreen="${id}" data-video-scope="${context}" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">${fullscreenIcon}</button></div>`;
  }
  function tile(item,scope){
   const id=safe(item.id||item.file),context=safe(scope),title=item.caption||tr('ניגון הסרטון','Play video'),caption=item.caption||tr('הוספת תיאור','Add a description');

@@ -60,6 +60,42 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('custom video categories are shared, unique and durable without changing existing groups or nostalgia',async()=>{
+ const f=fixture();try{
+  await f.connect();const initial=await(await f.call('/api/collections/videos')).json(),nostalgia=await(await f.call('/api/nostalgia')).json();
+  assert.deepEqual(initial.categories.map(category=>category.id),['special-birthdays','family']);
+  const response=await f.call('/api/collections/videos/categories',{method:'POST',body:{name:'  טיולים משפחתיים  ',nameEn:'Family trips'}});assert.equal(response.status,201);
+  const created=await response.json(),category=created.category;assert.match(category.id,/^[a-f0-9]{32}$/);assert.equal(category.name,'טיולים משפחתיים');assert.notEqual(created.collection.revision,initial.revision);
+  assert.deepEqual(created.collection.items,initial.items);assert.equal(created.collection.categories.length,3);
+  for(const name of ['טיולים   משפחתיים',' FAMILY TRIPS ','סרטונים משפחתיים'])assert.equal((await f.call('/api/collections/videos/categories',{method:'POST',body:{name}})).status,409);
+  for(const name of ['',7,'x'.repeat(81)])assert.equal((await f.call('/api/collections/videos/categories',{method:'POST',body:{name}})).status,400);
+  f.restart();const current=await(await f.call('/api/collections/videos')).json();assert.equal(current.categories.find(c=>c.id===category.id).nameEn,'Family trips');assert.equal(current.categories.length,3);assert.deepEqual((await(await f.call('/api/export')).json()).videoCategories,current.categories);
+  const currentNostalgia=await(await f.call('/api/nostalgia')).json();assert.deepEqual(currentNostalgia.library,nostalgia.library);assert.equal(f.objects.size,0);
+ }finally{await f.close();}
+});
+test('videos can be uploaded and finalized into custom categories, while unknown categories cannot store bytes',async()=>{
+ const f=fixture();try{
+  await f.connect();const category=(await(await f.call('/api/collections/videos/categories',{method:'POST',body:{name:'טיולים'}})).json()).category;
+  const before=f.objects.size;
+  assert.equal((await f.call('/api/collections/videos/upload?filename=unknown.mp4&group='+uid(),{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).status,400);assert.equal(f.objects.size,before);
+  const uploaded=await f.call('/api/collections/videos/upload?filename=trip.mp4&group='+category.id,{method:'POST',body:video,headers:{'Content-Length':String(video.length)}});assert.equal(uploaded.status,201);const item=(await uploaded.json()).collection.items[0];assert.equal(item.videoCategory,category.id);
+  const saved=await f.call('/api/media/'+item.id+'/video-upload',{method:'POST',body:{operationId:uid(),metadata:{name:'הטיול שלנו',caption:'זיכרון מהטיול',date:{year:2000},group:category.id}}});assert.equal(saved.status,200);const final=await saved.json();assert.equal(final.item.id,item.id);assert.equal(final.item.videoCategory,category.id);assert.equal(final.item.caption,'זיכרון מהטיול');assert.equal(f.objects.size,before+1);
+  assert.equal((await f.call('/api/media/'+item.id+'/video-upload',{method:'POST',body:{operationId:uid(),metadata:{name:'Unknown',group:uid()}}})).status,400);
+  f.restart();assert.equal((await(await f.call('/api/collections/videos')).json()).items.find(film=>film.id===item.id).videoCategory,category.id);
+ }finally{await f.close();}
+});
+test('moving existing videos uses category conflict checks and preserves bytes, descriptions and separate nostalgia videos',async()=>{
+ const f=fixture();try{
+  await f.connect();const category=(await(await f.call('/api/collections/videos/categories',{method:'POST',body:{name:'הופעות'}})).json()).category;
+  const uploaded=await(await f.call('/api/collections/videos/upload?filename=show.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json(),item=uploaded.collection.items[0],objects=f.objects.size;
+  const moved=await f.call('/api/media/'+item.id+'/video-category',{method:'POST',body:{group:category.id,expectedGroup:'family'}});assert.equal(moved.status,200);const result=await moved.json();assert.equal(result.item.videoCategory,category.id);assert.equal(result.item.src,item.src);assert.equal(result.item.filename,item.filename);assert.equal(result.collection.count,uploaded.collection.count);assert.equal(f.objects.size,objects);
+  assert.equal((await f.call('/api/media/'+item.id+'/video-category',{method:'POST',body:{group:'special-birthdays',expectedGroup:'family'}})).status,409);
+  assert.equal((await f.call('/api/media/'+item.id+'/video-category',{method:'POST',body:{group:uid(),expectedGroup:category.id}})).status,400);
+  const youtube=featuredVideos[0];assert.equal((await f.call('/api/media/'+youtube.id+'/video-category',{method:'POST',body:{group:category.id,expectedGroup:'special-birthdays'}})).status,200);
+  const other=await(await f.call('/api/nostalgia/upload?filename=old.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json();assert.equal((await f.call('/api/media/'+other.collection.items[0].id+'/video-category',{method:'POST',body:{group:category.id,expectedGroup:'family'}})).status,400);
+  f.restart();const collection=await(await f.call('/api/collections/videos')).json();assert.equal(collection.items.find(film=>film.id===item.id).videoCategory,category.id);assert.equal(collection.items.find(film=>film.id===youtube.id).videoCategory,category.id);
+ }finally{await f.close();}
+});
 test('Life itself supports one direct video destination, preserves older assignments on migration, and has no new event folders',async()=>{
  const f=fixture();try{
   await f.connect();

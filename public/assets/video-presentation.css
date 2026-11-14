@@ -16,6 +16,12 @@ body[data-active-view=videos] #mainNav .nav-link{font-size:calc(15px * var(--a11
 .video-categories{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 12px;padding:3px 0;overflow:visible}
 .video-categories button{flex:0 1 auto;min-width:0;min-height:29px;padding:4px 10px;border:1px solid #d9cdb3;border-radius:16px;background:#fffcf5;color:#776b52;font:calc(12px * var(--a11y-text-scale,1))/1.35 var(--sans);white-space:nowrap}
 .video-categories button[aria-pressed=true]{background:#5d6c4d;border-color:#5d6c4d;color:#fffdf6}
+.video-categories .video-category-add{border-style:dashed;color:#61774c}
+.video-category-dialog{width:420px;max-width:calc(100vw - 28px);box-sizing:border-box}
+.video-category-dialog label{display:grid;gap:7px;margin:14px 0;font-size:14px;color:#685d49}
+.video-category-dialog input,.video-category-dialog select{box-sizing:border-box;width:100%;min-height:42px;padding:9px;border:1px solid #cfc2a6;border-radius:6px;background:#fffef8;color:#514936;font:inherit}
+.video-category-dialog h2{padding-inline-end:22px;font-size:26px}
+#videoCategoryFilm{overflow-wrap:anywhere;color:#807357}
 #videosView #videosGrid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px;align-items:start}
 #videosGrid .video-tile{display:flex;flex-direction:column;border-radius:6px;background:#fffdf7;transition:border-color .15s,box-shadow .15s}
 #videosGrid .video-tile:hover{border-color:#a7b293;box-shadow:0 4px 15px #48583d18}

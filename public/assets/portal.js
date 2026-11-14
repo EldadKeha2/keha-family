@@ -89,7 +89,7 @@
     const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:galleryPage.filter==='complete'?item.faceSummary?.reviewed:true):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
     const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged',partial=compact&&galleryPage.filter==='partial',complete=compact&&galleryPage.filter==='complete';
     window.FamilyMedia.register(kind,filtered,{retainCurrent:compact&&!reviewNavigation,advanceRemoved:compact&&reviewNavigation&&(untagged||partial),pagination:compact?collection.pagination:undefined});
-    if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>{const category=button.dataset.videoCategory;button.setAttribute('aria-pressed',String(category===state.videoCategory));button.textContent=I18n.t(category==='all'?'כל הסרטונים':category==='special-birthdays'?'ימי הולדת מיוחדים':'סרטונים משפחתיים');});
+    if(isVideo)window.FamilyVideoCategories?.render(collection.categories,state.videoCategory);
     $(collectionId(kind,'Count')).textContent = collection.items.length ? I18n.html`${filtered.length}${filtered.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?(isVideo?I18n.word(filtered.length,'video','videos'):I18n.word(filtered.length,'photo','photos')):(isVideo?I18n.t('סרטונים'):I18n.t('תמונות'))} באלבום המשותף` : isVideo?I18n.t('רגעים ששווה לראות שוב'):I18n.t('אלבום משותף לכל המשפחה');
     $(collectionId(kind,'Empty')).hidden = (compact?filtered:collection.items).length > 0;
     if(compact){const p=collection.pagination||{page:1,size:galleryPage.size,total:collection.count||0,pages:1};
@@ -419,6 +419,7 @@
         const page=state.collections.gallery.pagination||galleryPage;
         if(page.page!==1||page.size!==100||page.query||galleryPage.filter!=='all'||galleryPage.person||galleryPage.unit||galleryPage.labels||galleryPage.sort!==(result.collection.pagination?.sort||'uploaded-desc')){revisions.gallery=null;refreshCollection('gallery',true);return;}
       }
+      if(kind==='videos'&&result.operation==='video-category-create')state.videoCategory=result.category.id;
       state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
       if(state.view===kind)renderCollection(kind);else window.FamilyMedia.register(kind,result.collection.items);
     });
