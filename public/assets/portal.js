@@ -76,13 +76,19 @@
     const key=captionKey('photos',button.dataset.cancelSharedCaption),draft=drafts.get(key);if(draft?.saving)return;
     clearTimeout(draft?.timer);drafts.delete(key);refreshPhotoCaptions();button.closest('.family-photo-caption').querySelector('[data-edit-shared-caption]').focus();
   }
+  function videoTile(item){
+    const title=I18n.mediaName(item),category=I18n.t((item.videoCategory||'family')==='special-birthdays'?'ימי הולדת מיוחדים':'סרטונים משפחתיים');
+    const duration=Number(item.duration),time=Number.isFinite(duration)&&duration>0?Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0'):'';
+    const preview=item.provider==='youtube'?`<img src="${safe(item.poster)}" alt="" loading="lazy" decoding="async">`:`<video muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"><source src="${safe(item.src.split('#')[0]+'#t=0.1')}" type="${safe(item.mime)}"></video>`;
+    return `<button type="button" class="video-tile-open" data-media-open="${safe(item.id||item.file)}" data-media-scope="videos" aria-label="${safe(I18n.isEnglish?'Play '+title:'ניגון '+title+' בגלריה')}"><span class="video-tile-cover"><span class="video-tile-placeholder" aria-hidden="true">▤</span>${preview}<span class="video-tile-play" aria-hidden="true">▶</span>${time?`<span class="video-tile-duration" aria-hidden="true">${time}</span>`:''}</span><span class="video-tile-info"><strong dir="auto">${safe(title)}</strong><span class="video-tile-category">${safe(category)}</span>${item.caption?`<span class="video-tile-caption" dir="auto">${safe(item.caption)}</span>`:''}</span></button><div class="video-tile-actions">${window.FamilyVideoEditor?.controls(item,'videos')||''}</div>`;
+  }
   function renderCollection(kind,{reviewNavigation=false}={}) {
     if(kind==='gallery'&&holdGallery()&&!reviewNavigation){galleryDeferred=true;return;}
     const collection = state.collections[kind], query = normalize(state.query);
     const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:galleryPage.filter==='complete'?item.faceSummary?.reviewed:true):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
     const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged',partial=compact&&galleryPage.filter==='partial',complete=compact&&galleryPage.filter==='complete';
     window.FamilyMedia.register(kind,filtered,{retainCurrent:compact&&!reviewNavigation,advanceRemoved:compact&&reviewNavigation&&(untagged||partial),pagination:compact?collection.pagination:undefined});
-    if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.videoCategory===state.videoCategory)));
+    if(isVideo)$('videoCategories').querySelectorAll('button').forEach(button=>{const category=button.dataset.videoCategory,count=collection.items.filter(item=>category==='all'||(item.videoCategory||'family')===category).length;button.setAttribute('aria-pressed',String(category===state.videoCategory));button.textContent=I18n.t(category==='all'?'כל הסרטונים':category==='special-birthdays'?'ימי הולדת מיוחדים':'סרטונים משפחתיים')+' ('+count+')';});
     $(collectionId(kind,'Count')).textContent = collection.items.length ? I18n.html`${filtered.length}${filtered.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?(isVideo?I18n.word(filtered.length,'video','videos'):I18n.word(filtered.length,'photo','photos')):(isVideo?I18n.t('סרטונים'):I18n.t('תמונות'))} באלבום המשותף` : isVideo?I18n.t('רגעים ששווה לראות שוב'):I18n.t('אלבום משותף לכל המשפחה');
     $(collectionId(kind,'Empty')).hidden = (compact?filtered:collection.items).length > 0;
     if(compact){const p=collection.pagination||{page:1,size:galleryPage.size,total:collection.count||0,pages:1};
@@ -97,7 +103,8 @@
       empty.querySelector('p').textContent=I18n.t(complete?'תמונות שאישרתם בהן ״כל הפרצופים תויגו״ יופיעו כאן.':partial?'פתחו תמונה והוסיפו את השמות החסרים בלחיצה על הפנים. בסיום לחצו על ״כל הפרצופים תויגו״.':galleryPage.person||galleryPage.unit||galleryPage.labels?'אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':untagged||galleryPage.query?'אפשר להציג את כל התמונות או לשנות את החיפוש.':'אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.');
       for(const control of document.querySelectorAll('[data-gallery-pager]')){control.hidden=!p.total;control.querySelector('[data-gallery-page-label]').textContent=I18n.isEnglish?`Page ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} of ${p.total}`:`עמוד ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} מתוך ${p.total}`;control.querySelector('[data-gallery-prev]').disabled=control.querySelector('[data-gallery-next]').disabled=p.pages<2;control.querySelector('[data-gallery-size]').value=String(p.size);control.querySelector('[data-gallery-sort]').value=galleryPage.sort;}
     }
-    const signature = filtered.map(item=>item.file+'|'+item.src).join('\u0000');
+    const tileVersion=item=>isVideo?JSON.stringify([I18n.mediaName(item),item.caption,item.videoCategory,item.duration]):'';
+    const signature = filtered.map(item=>item.file+'|'+item.src+'|'+tileVersion(item)).join('\u0000');
     if (signatures[kind] !== signature) {
       const active = document.activeElement, focusedFile = active?.dataset?.sharedFile;
       const selection = focusedFile ? [active.selectionStart,active.selectionEnd] : null;
@@ -107,22 +114,17 @@
       const cards = [];
       for (const [index,item] of filtered.entries()) {
         let card = previous.get(item.file);
-        if (card && card.dataset.mediaSrc !== item.src) card = null;
+        if (card && (card.dataset.mediaSrc !== item.src||isVideo&&card.dataset.videoTileVersion!==tileVersion(item))) card = null;
         if (!card) {
-          card = document.createElement('article');card.className='shared-media-card'+(compact?' compact-gallery-card':'');card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;
+          card = document.createElement('article');card.className='shared-media-card'+(compact?' compact-gallery-card':'')+(isVideo?' video-tile':'');card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;if(isVideo)card.dataset.videoTileVersion=tileVersion(item);
           const draft = drafts.get(captionKey(kind,item.file));
           const caption = draft?.dirty ? draft.value : item.caption;
-          const viewer = item.provider==='youtube'
-            ? I18n.html`<button class="youtube-poster" data-media-open="${safe(item.id)}" data-media-scope="videos" aria-label="ניגון ${safe(I18n.mediaName(item))} בגלריה"><img src="${safe(item.poster)}" alt="${safe(I18n.mediaName(item))}" loading="lazy"><span class="youtube-play" aria-hidden="true"><span>▶</span></span><span class="youtube-poster-title" aria-hidden="true" hidden>${safe(I18n.mediaName(item))}</span></button><div class="youtube-card-heading"><h3>${safe(I18n.mediaName(item))}</h3><a href="${safe(item.watchUrl)}" target="_blank" rel="noopener">YouTube ↗</a></div><p class="video-category-label">ימי הולדת מיוחדים</p>`
-            : isVideo
-              ? I18n.html`<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||I18n.mediaName(item))}"><source src="${safe(item.src)}" type="${safe(item.mime)}">הדפדפן אינו תומך בניגון הסרטון.</video></div><div class="video-file-info"><span>${safe(I18n.mediaName(item))}</span><a href="${safe(item.src)}" download>הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הפורמט הזה לא מתנגן בדפדפן הנוכחי. אפשר להוריד את המקור או להעלות גרסת MP4 בתקן H.264.</p>`
-              : I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${kind}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.thumbnailSrc||item.src)}" ${window.FamilyPhotoThumbnails?.attributes(item)||''} alt="${safe(caption||item.name)}" loading="lazy" decoding="async"></button>`;
-          const id = `shared-caption-${kind}-${encodeURIComponent(item.file)}`;
-          card.innerHTML = !isVideo?viewer+photoFooter(item,kind):compact?viewer+I18n.html`<div class="compact-photo-info"><span data-compact-tag-count="${safe(item.id)}">${item.tags?.length?'♧ '+item.tags.length+I18n.t(' מתויגים'):I18n.t('לתצוגה ותיוג')}</span><button class="compact-photo-delete" data-media-delete="${safe(item.id)}" data-media-scope="gallery" aria-label="מחיקת ${safe(I18n.mediaName(item))}">×</button></div>`:viewer + window.FamilyMedia.controls(item,kind) + I18n.html`<div class="caption-editor"><label for="${safe(id)}">${isVideo?I18n.t('מה רואים בסרטון?'):I18n.t('מי בתמונה? איפה ומתי?')}</label><textarea dir="auto" id="${safe(id)}" data-shared-kind="${kind}" data-shared-file="${safe(item.file)}" rows="2" maxlength="5000" placeholder="כתבו כאן את הסיפור של הרגע הזה…" ${app()?.apiEnabled?'':'disabled'}>${safe(caption)}</textarea><div class="caption-toolbar"><span data-shared-status role="status">${draft?.dirty?I18n.t('ממתין לשמירה…'):''}</span><button data-save-shared="${safe(item.file)}" data-shared-kind="${kind}">שמירה</button></div></div>`;
-          card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;},true);
+          const viewer = isVideo?'':I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${kind}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.thumbnailSrc||item.src)}" ${window.FamilyPhotoThumbnails?.attributes(item)||''} alt="${safe(caption||item.name)}" loading="lazy" decoding="async"></button>`;
+          card.innerHTML = isVideo?videoTile(item):viewer+photoFooter(item,kind);
+          card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('video').hidden=true;},true);
           if(item.provider==='youtube'){
-            const img=card.querySelector('.youtube-poster img');
-            const fallback=()=>{img.hidden=true;card.querySelector('.youtube-poster').classList.add('is-fallback');card.querySelector('.youtube-poster-title').hidden=false;};
+            const img=card.querySelector('.video-tile-cover img');
+            const fallback=()=>{img.hidden=true;};
             img.addEventListener('error',fallback,{once:true});if(img.complete&&!img.naturalWidth)fallback();
           }
         }
