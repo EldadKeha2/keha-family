@@ -3,11 +3,10 @@
  const $=id=>document.getElementById(id),tr=(he,en)=>window.FamilyI18n.isEnglish?en:he;
  const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fullscreenIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M3 3l7 7M15 3h6v6M21 3l-7 7M3 15v6h6M3 21l7-7M15 21h6v-6M21 21l-7-7"/></svg>';
- const galleryIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
  let root,anchor,active=false,hadNative=false;
- function controls(item,scope,{viewer=false}={}){
-  const id=safe(item.id||item.file),context=safe(scope||item.scope||'videos'),galleryLabel=tr('פתיחה בגלריית הסרטונים','Open video gallery'),fullscreenLabel=tr('מסך מלא','Full screen');
-  return `<div class="video-overlay-tools"><div class="video-overlay-editing">${window.FamilyVideoEditor?.controls(item,scope)||''}${window.FamilyVideoCategories?.controls(item,scope)||''}<button type="button" class="video-gallery-launch" ${viewer?'data-video-gallery-viewer':`data-media-open="${id}" data-media-scope="${context}"`} aria-label="${galleryLabel}" title="${galleryLabel}">${galleryIcon}</button></div><button type="button" class="video-fullscreen-launch" data-video-fullscreen="${id}" data-video-scope="${context}" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">${fullscreenIcon}</button></div>`;
+ function controls(item,scope){
+  const id=safe(item.id||item.file),context=safe(scope||item.scope||'videos'),fullscreenLabel=tr('מסך מלא','Full screen');
+  return `<div class="video-overlay-tools"><div class="video-overlay-editing">${window.FamilyVideoEditor?.controls(item,scope)||''}</div><button type="button" class="video-fullscreen-launch" data-video-fullscreen="${id}" data-video-scope="${context}" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">${fullscreenIcon}</button></div>`;
  }
  function tile(item,scope){
   const id=safe(item.id||item.file),context=safe(scope),title=item.caption||tr('ניגון הסרטון','Play video'),caption=item.caption||tr('הוספת תיאור','Add a description');
@@ -44,7 +43,7 @@
  function present(item,scope){
   mount();const video=item?.kind==='video';$('mediaViewer')?.classList.toggle('video-gallery-viewer',video);
   if(!video){exit({focus:false});return;}
-  const stage=$('mediaStage');stage.querySelector('.video-overlay-tools')?.remove();stage.insertAdjacentHTML('beforeend',controls(item,scope,{viewer:true}));
+  const stage=$('mediaStage');stage.querySelector('.video-overlay-tools')?.remove();stage.insertAdjacentHTML('beforeend',controls(item,scope));
   if(root)for(const selector of ['.video-fullscreen-previous','.video-fullscreen-next'])root.querySelector(selector).hidden=$('mediaNext').hidden;
  }
  document.addEventListener('click',event=>{
@@ -53,7 +52,6 @@
  },true);
  document.addEventListener('click',event=>{
   const fullscreen=event.target.closest('[data-video-fullscreen]');if(fullscreen){event.preventDefault();if(active){exit();return;}const media=window.FamilyMedia;if(!media.isOpen(fullscreen.dataset.videoScope)||media.current()?.id!==fullscreen.dataset.videoFullscreen)media.openFrom(fullscreen.dataset.videoScope,fullscreen.dataset.videoFullscreen);enter();return;}
-  const gallery=event.target.closest('[data-video-gallery-viewer]');if(gallery){event.preventDefault();exit();$('mediaNext').focus({preventScroll:true});return;}
   const caption=event.target.closest('[data-video-caption]');if(caption){event.preventDefault();if(window.FamilyMedia.openFrom(caption.dataset.videoScope,caption.dataset.videoCaption))$('editOpenedCaption').click();}
  });
  document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement===root)hadNative=true;else if(active&&hadNative)exit();});

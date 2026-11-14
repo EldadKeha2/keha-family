@@ -4,17 +4,20 @@ const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEngl
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const categoryIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h7l2 2h9v13H3Z"/><path d="M8 13h8m-4-4v8"/></svg>';
 let catalog=DEFAULT_VIDEO_CATEGORIES,createDialog,assignDialog,assignment,afterCreate;
+const CREATE_CATEGORY='__create_category__';
 const name=category=>I.isEnglish?category.nameEn||category.name:category.name;
-function options(){return catalog.map(category=>`<option value="${safe(category.id)}">${safe(name(category))}</option>`).join('');}
+function options({allowCreate=false}={}){return catalog.map(category=>`<option value="${safe(category.id)}">${safe(name(category))}</option>`).join('')+(allowCreate?`<option value="${CREATE_CATEGORY}">＋ ${tr('הוסף קטגוריה','Add category')}</option>`:'');}
 function render(categories,selected='all'){
  if(Array.isArray(categories))catalog=categories;
  const tabs=$('videoCategories'),upload=$('videoUploadCategory');if(!tabs||!upload)return;
  const signature=JSON.stringify([I.isEnglish,catalog]);
  if(tabs.dataset.signature!==signature){
-  tabs.innerHTML=`<button type="button" data-video-category="all">${tr('כל הסרטונים','All videos')}</button>`+catalog.map(category=>`<button type="button" data-video-category="${safe(category.id)}">${safe(name(category))}</button>`).join('')+`<button type="button" class="video-category-add" data-video-new-category>＋ ${tr('הוספת קטגוריה','Add category')}</button>`;
-  const previous=upload.value;upload.innerHTML=options();upload.value=catalog.some(category=>category.id===previous)?previous:'family';tabs.dataset.signature=signature;
+  tabs.innerHTML=`<button type="button" data-video-category="all">${tr('כל הסרטונים','All videos')}</button>`+catalog.map(category=>`<button type="button" data-video-category="${safe(category.id)}">${safe(name(category))}</button>`).join('');
+  const previous=upload.value;upload.innerHTML=options({allowCreate:true});upload.value=catalog.some(category=>category.id===previous)?previous:'family';tabs.dataset.signature=signature;
  }
  if(selected!=='all'&&catalog.some(category=>category.id===selected))upload.value=selected;
+ upload.dataset.category=upload.value;
+ if($('videoCategoryAdd'))$('videoCategoryAdd').textContent='＋ '+tr('הוסף קטגוריה','Add category');
  for(const button of tabs.querySelectorAll('[data-video-category]'))button.setAttribute('aria-pressed',String(button.dataset.videoCategory===selected));
  if(assignDialog?.open){const value=$('videoCategoryChoice').value;$('videoCategoryChoice').innerHTML=options();$('videoCategoryChoice').value=value;}
 }
@@ -38,6 +41,12 @@ function mountCreate(){
 function openCreate(callback=null){
  mountCreate();if(createDialog.open)return;afterCreate=callback;createDialog.dir=I.isEnglish?'ltr':'rtl';$('videoCategoryName').value=$('videoCategoryNameEn').value=$('videoCategoryCreateError').textContent='';createDialog.showModal();$('videoCategoryName').focus();
 }
+function createFromSelect(select,{previous=select.dataset.category||'family',onSelect}={}){
+ if(select.value!==CREATE_CATEGORY)return false;
+ select.value=previous;
+ openCreate(category=>{select.innerHTML=options({allowCreate:true});select.value=select.dataset.category=category.id;onSelect?.(category.id);});
+ return true;
+}
 function mountAssign(){
  if(assignDialog)return;
  assignDialog=document.createElement('dialog');assignDialog.id='videoCategoryAssignment';assignDialog.className='portal-dialog video-category-dialog';assignDialog.dataset.i18nSkip='';assignDialog.setAttribute('aria-labelledby','videoCategoryAssignmentTitle');
@@ -59,4 +68,5 @@ function controls(item,scope){
  const label=tr('שיוך הסרטון לקטגוריה','Choose a video category');return `<button type="button" class="video-category-launch" data-video-assign-category="${safe(item.id)}" aria-label="${label}" title="${label}">${categoryIcon}</button>`;
 }
 document.addEventListener('click',event=>{const add=event.target.closest?.('[data-video-new-category]');if(add){openCreate();return;}const assign=event.target.closest?.('[data-video-assign-category]');if(assign)openAssign(assign.dataset.videoAssignCategory);});
-window.FamilyVideoCategories={render,options,controls};
+document.addEventListener('change',event=>{const select=event.target;if(select.id==='videoUploadCategory'&&!createFromSelect(select))select.dataset.category=select.value;});
+window.FamilyVideoCategories={render,options,controls,createFromSelect};

@@ -9,7 +9,7 @@ import {filenamePhotoDate} from '../public/assets/photo-upload-metadata.mjs';
 const source=(await readFile(new URL('../public/assets/video-upload-wizard.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function deferred(){let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};}
-function fixture({finalize}={}){
+function fixture({finalize,categories}={}){
  const nodes=new Map(),listeners=new Map(),uploads=[],saves=[],changed=[],toasts=[];
  class Element{
   constructor(tag='div'){this.tag=tag;this.dataset={};this.value='';this.validity={};this.disabled=false;this.hidden=false;this.open=false;this.listeners=new Map();this.attributes=new Map();this.classes=new Set();this.classList={toggle:(name,on)=>on?this.classes.add(name):this.classes.delete(name)};}
@@ -25,10 +25,10 @@ function fixture({finalize}={}){
   click(){assert.equal(this.disabled,false,'clicked control is enabled');return this.listeners.get('click')?.();}
  }
  const document={getElementById:id=>nodes.get(id),createElement:tag=>new Element(tag),body:{append(node){nodes.set(node.id,node);}}};
- const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoEditor:{icon:'',clock:String},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
+ const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
  vm.runInNewContext(source,{window,document,videoUploadMetadata,filenamePhotoDate,crypto:{randomUUID},URL:{createObjectURL:()=>'/local-preview',revokeObjectURL(){}},CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
  const upload=(file,progress,target)=>{const pending=deferred();uploads.push({file,progress,target,...pending});return pending.promise;};
- const prepare=(names=['first.mp4','second.mp4'])=>window.FamilyVideoUpload.prepare(names.map(name=>({name,type:'video/mp4',size:500})),{scope:'nostalgia',eventId:'original-event',upload});
+ const prepare=(names=['first.mp4','second.mp4'],options={})=>window.FamilyVideoUpload.prepare(names.map(name=>({name,type:'video/mp4',size:500})),{scope:'nostalgia',eventId:'original-event',upload,...options});
  const result=index=>({file:'file-'+index+'.mp4',collection:{items:[{id:'item-'+index,file:'file-'+index+'.mp4'}]}});
  return {get:id=>nodes.get('videoUpload'+id),prepare,uploads,saves,changed,toasts,listeners,result};
 }
@@ -59,4 +59,13 @@ test('a failed metadata save remains visible after minimizing and retrying reuse
  await f.get('SaveAll').click();await prepared;
  assert.equal(f.uploads.length,1,'metadata retry does not reupload the video');assert.equal(f.saves.length,2);
  assert.deepEqual(f.saves[0].data,f.saves[1].data,'the retry uses the same finalization operation');assert.equal(f.get('Background').hidden,true);
+});
+
+test('a category created during video upload becomes the saved destination without losing the draft description',async()=>{
+ let created;
+ const category='b'.repeat(32),categories={options:({allowCreate})=>{assert.equal(allowCreate,true);return '<option value="family">Family</option><option value="'+category+'">Trips</option><option value="__create_category__">Add category</option>';},createFromSelect:(select,{previous,onSelect})=>{if(select.value!=='__create_category__')return false;select.value=previous;created=()=>{select.value=category;onSelect(category);};return true;}};
+ const f=fixture({categories}),prepared=f.prepare(['trip.mp4'],{scope:'videos',group:'family'});
+ f.get('Caption').value='Our trip';f.get('Target').value='__create_category__';f.get('Target').listeners.get('change')();assert.equal(f.get('Target').value,'family');
+ created();const saving=f.get('SaveAll').click();assert.equal(f.uploads[0].target.group,category);f.uploads[0].resolve(f.result(0));await saving;await prepared;
+ assert.equal(f.saves[0].data.metadata.group,category);assert.equal(f.saves[0].data.metadata.caption,'Our trip');
 });
