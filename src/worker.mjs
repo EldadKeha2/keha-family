@@ -2,7 +2,7 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {multipartVideo} from './video-multipart.mjs';
-import {videoClipRoute} from './video-clip-route.mjs';
+import {videoClipRoute,videoUploadFinalize} from './video-clip-route.mjs';
 import {recycleRoute} from './recycle-route.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
@@ -120,8 +120,19 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
   if(personId)await db('person',{id:personId});
   const eventId=category==='nostalgia'?new URL(request.url).searchParams.get('event'):null;
   if(eventId)await db('nostalgia.event',{id:eventId});
+  const uploadId=new URL(request.url).searchParams.get('uploadId');
+  if(uploadId){
+    if(!/^[a-f0-9]{32}$/.test(uploadId))throw new HttpError(400,'אישור ההעלאה אינו תקין.');
+    let existing;try{existing=await db('media.get',{id:uploadId});}catch(error){if(error.status!==404)throw error;}
+    if(existing){
+      await request.body?.cancel();
+      if(existing.category!==category||existing.personId!==(personId||null)||existing.filename!==filename(new URL(request.url).searchParams.get('filename'))||existing.size!==Number(request.headers.get('Content-Length')))throw new HttpError(409,'הסרטון השתנה. בחרו אותו מחדש.');
+      if(personId)return json({saved:true,file:existing.file,person:await db('person',{id:personId})});
+      return json({saved:true,file:existing.file,collection:await db('collection',{kind:category})});
+    }
+  }
   const media=await streamUpload(request,mediaType==='document'?LIMITS.attachment:mixed||category==='videos'||mediaType==='video'?LIMITS.video:LIMITS.photo,true);
-  const id=uid(),original=filename(new URL(request.url).searchParams.get('filename'));
+  const id=uploadId||uid(),original=filename(new URL(request.url).searchParams.get('filename'));
   let format,metadata=null;
   try{
     format=mixed||mediaType==='document'?archiveFormat(media.head,original):sniff(media.head,category==='videos'||mediaType==='video');
@@ -133,7 +144,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
     }
   }catch(error){await media.body.cancel();throw error;}
   const prefix=category.startsWith('wedding:')?['weddings',category.slice(8)]:category.startsWith('nursery:')?['nursery',category.slice(8)]:[category,personId||'shared'];
-  const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,id+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
+  const item={id,category,personId,filename:original,name:original.replace(/\.[^.]*$/,'').replaceAll('_',' '),file:(personId?'gallery/':'')+id+format.ext,key:[...prefix,(uploadId?uid():id)+format.ext].join('/'),mime:format.mime,kind:format.kind||(format.mime.startsWith('image/')?'photo':'video'),size:media.size,caption:'',createdAt:new Date().toISOString()};
   if(category==='videos')item.videoCategory=videoCategory;
   if(eventId)item.nostalgiaEventIds=[eventId];
   if(metadata){item.caption=metadata.caption;item.takenDate=metadata.date;item.takenDateRevision=uid();if(metadata.labels)item.labels=metadata.labels;}
@@ -144,7 +155,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
     transfer.catch(()=>{});
   }
   await Promise.all([putObject(env,item.key,body,item.size,item.mime),transfer]);
-  try{await db('media.add',{item,familyPhoto:metadata?.familyPhoto===true,faces:metadata?.faces,complete:metadata?.complete===true});}
+  try{const registered=await db('media.add',{item,idempotentUpload:Boolean(uploadId),familyPhoto:metadata?.familyPhoto===true,faces:metadata?.faces,complete:metadata?.complete===true});if(registered.existingKey&&registered.existingKey!==item.key)ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));}
   catch(error){ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));throw error;}
   if(personId){const url=new URL(request.url);if(url.searchParams.get('layout')==='page')return json({saved:true,file:item.file,...await db('person.page',{id:personId,photos:url.searchParams.get('photos'),videos:url.searchParams.get('videos'),documents:url.searchParams.get('documents')})},201);return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);}
   return json({saved:true,file:item.file,collection:await db('collection',{kind:category})},201);
@@ -326,6 +337,7 @@ export default {
         return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/video-upload$/.exec(path)))return await videoUploadFinalize(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/clip$/.exec(path)))return await videoClipRoute(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(thumbnail|preview)$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1],match[2]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/ignore$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.ignore',{id:match[1],photoRevision:body.photoRevision,rect:body.rect,ignored:body.ignored,faceId:body.faceId,expectedRevision:body.expectedRevision}));}

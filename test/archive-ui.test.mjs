@@ -153,3 +153,10 @@ test('a wedding year displays as a year and the editor leaves unknown day and mo
   assert.match(f.nodes.get('weddingDatePreview').textContent,/לא תישלח תזכורת/);
 });
 
+
+test('dropping a video opens the shared video wizard and cancelling leaves the upload queue and gallery untouched',async()=>{
+ const f=fixture();await f.flush();const calls=[];f.window.FamilyVideoUpload={prepare:async(files,options)=>{calls.push({files,options});return [];}};
+ const file={name:'New family film.mp4',type:'video/mp4',size:128};
+ assert.equal(f.window.FamilyArchive.acceptDrop({dataTransfer:{files:[file]}}),true);await f.flush();
+ assert.equal(calls.length,1);assert.equal(calls[0].options.scope,'nostalgia');assert.equal(calls[0].files[0],file);assert.equal(typeof calls[0].options.upload,'function');assert.equal(typeof calls[0].options.onSaved,'function');assert.equal(f.grid.children.filter(n=>n.dataset.mediaKind==='video').length,0);
+});

@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {NostalgiaLibrary} from './nostalgia-library.mjs';
+import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection,weddingDate} from './weddings.mjs';
 import {featuredVideos,weddingVideos} from './featured-videos.mjs';
@@ -358,7 +359,7 @@ export class FamilyState {
     ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels)}:{}),
     ...(['photo','video'].includes(mediaKind(item))?{takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
-    ...(item.videoClip?{videoClip:item.videoClip,duration:item.duration}:{}),
+    ...(item.videoClip?{videoClip:item.videoClip}:{}),...(item.duration?{duration:item.duration}:{}),
     ...(item.youtubeStart!==undefined?{youtubeStart:item.youtubeStart,youtubeEnd:item.youtubeEnd}:{}),
     ...(item.category==='nostalgia'?{nostalgiaEventIds:item.nostalgiaEventIds||[]}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
@@ -749,6 +750,29 @@ export class FamilyState {
         if(date&&person.birthday!=='1.1.1111'&&time(date)<time(person.birthday))throw new HttpError(400,'תאריך הפטירה צריך להיות אחרי תאריך הלידה.');
         person.deathDate=date;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
       }
+      case 'video.upload.prepare':{
+        const source=this.media(p.id);if(mediaKind(source)!=='video'||source.provider)throw new HttpError(400,'בחרו סרטון שהועלה לאתר.');
+        if(!/^[a-f0-9]{32}$/.test(p.operationId||''))throw new HttpError(400,'אישור השמירה אינו תקין. פתחו את האשף מחדש.');
+        let metadata;try{metadata=videoUploadMetadata(p.metadata);}catch{throw new HttpError(400,'בדקו את התאריך, התיאור או הקטע המסומן בסרטון.');}
+        if(metadata.eventId&&source.category==='nostalgia')this.nostalgiaLibrary.event(metadata.eventId);
+        if(source.videoUploadEdit?.operationId===p.operationId){if(source.videoUploadEdit.fingerprint!==JSON.stringify(metadata))throw new HttpError(409,'פרטי הסרטון השתנו. פתחו את האשף מחדש.');return {existing:{...this.mediaChanged(source,'video-upload'),file:source.file,alreadySaved:true}};}
+        return {source,operationId:p.operationId,metadata};
+      }
+      case 'video.upload.save':{
+        const prepared=this.run('video.upload.prepare',p),item=prepared.source;
+        if(prepared.existing)return {...prepared.existing,storedKey:this.media(p.id).key};
+        if(item.key!==p.sourceKey||item.size!==p.sourceSize)throw new HttpError(409,'הסרטון השתנה. פתחו את האשף מחדש.');
+        const data=prepared.metadata;let obsoleteKey=null;
+        if(data.range){if(!p.rendered?.key?.startsWith('video-clips/'+item.id+'/')||!Number.isSafeInteger(p.rendered.size)||p.rendered.size<1)throw new HttpError(400,'הקטע המסומן לא נשמר.');obsoleteKey=item.key;Object.assign(item,{key:p.rendered.key,mime:'video/mp4',size:p.rendered.size,duration:p.rendered.duration,videoRevision:uid()});item.file=(item.category==='personal'?'gallery/':'')+item.id+'.mp4';}
+        Object.assign(item,{name:data.name,nameEn:null,caption:data.caption,takenDate:data.date,takenDateRevision:uid(),videoUploadEdit:{operationId:p.operationId,fingerprint:JSON.stringify(data)}});
+        if(data.range)item.filename=data.name.replace(/[\/\\<>:"|?*\x00-\x1f]/g,'_')+'.mp4';
+        if(item.category==='nostalgia'&&data.eventId!==undefined)item.nostalgiaEventIds=data.eventId?[data.eventId]:[];
+        if(item.category==='videos'&&data.group)item.videoCategory=data.group;
+        this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);
+        if(data.people.length)this.patchTags(item.id,data.people.map(person=>({...person,tagged:true})));
+        this.touchMedia(item);
+        return {...this.mediaChanged(item,'video-upload'),file:item.file,storedKey:item.key,obsoleteKey};
+      }
       case 'video.clip.prepare':{
         const source=this.media(p.id);
         if(mediaKind(source)!=='video'||source.category==='attachment')throw new HttpError(400,'בחרו סרטון לעריכת קטע.');
@@ -779,6 +803,8 @@ export class FamilyState {
       }
       case 'media.add':{
         const item=p.item;
+        if(p.idempotentUpload){const row=this.rows('SELECT data FROM media WHERE id=?',item.id)[0];if(row){const old=JSON.parse(row.data);if(old.category!==item.category||old.personId!==item.personId||old.filename!==item.filename||old.size!==item.size)throw new HttpError(409,'הסרטון השתנה. בחרו אותו מחדש.');return {saved:true,existingKey:old.key};}}
+
         if(item.category==='nostalgia')this.nostalgiaLibrary.attach(item,p.nostalgiaEventId);
         if(item.category==='personal')this.person(item.personId);
         else validCollection(item.category);

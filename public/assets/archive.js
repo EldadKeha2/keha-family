@@ -196,10 +196,10 @@
     $(id+'UploadState').textContent=item?.message||'';$(id+'Progress').hidden=!item?.active;$(id+'Progress').value=item?.percent||0;
     $(id+'Dropzone').classList.toggle('uploading',Boolean(item?.active));
   }
-  function sendFile(key,file,onProgress,eventId=null){
-    if(key==='nostalgia'&&file.size>90*1024*1024&&(/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name)))return sendLargeVideo(file,onProgress,eventId);
+  function sendFile(key,file,onProgress,eventId=null,uploadId=null){
+    if(key==='nostalgia'&&file.size>90*1024*1024&&(/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name)))return sendLargeVideo(file,onProgress,eventId,uploadId);
     return new Promise((resolve,reject)=>{
-      const xhr=new XMLHttpRequest();xhr.open('POST',base(key)+'/upload?filename='+encodeURIComponent(file.name)+(eventId?'&event='+encodeURIComponent(eventId):''));
+      const xhr=new XMLHttpRequest();xhr.open('POST',base(key)+'/upload?filename='+encodeURIComponent(file.name)+(eventId?'&event='+encodeURIComponent(eventId):'')+(uploadId?'&uploadId='+encodeURIComponent(uploadId):''));
       xhr.setRequestHeader('X-Family-Token',window.FAMILY_API_TOKEN);xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
       xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded/event.total*100));};
       xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(I18n.t('לא התקבל אישור שמירה. נסו לרענן.')));return;}if(xhr.status>=200&&xhr.status<300)Promise.resolve(window.FamilyPhotoThumbnails?.fromUpload?.(result,file)).then(()=>resolve(result),()=>resolve(result));else reject(Error(I18n.error(result.error)||I18n.t('הקובץ לא נשמר.')));};
@@ -222,9 +222,10 @@
       xhr.onerror=interrupted;xhr.ontimeout=interrupted;xhr.onabort=()=>reject(Error(I18n.t('ההעלאה בוטלה.')));xhr.send(blob);
     });
   }
-  async function sendLargeVideo(file,onProgress,eventId=null){
+  async function sendLargeVideo(file,onProgress,eventId=null,uploadId=null){
     const head=new Uint8Array(await file.slice(0,128).arrayBuffer());
-    const upload=await post('api/nostalgia/multipart/start',{filename:file.name,size:file.size,head:btoa(String.fromCharCode(...head)),...(eventId?{eventId}:{})});
+    const upload=await post('api/nostalgia/multipart/start',{filename:file.name,size:file.size,head:btoa(String.fromCharCode(...head)),...(eventId?{eventId}:{}),...(uploadId?{uploadId}:{})});
+    if(upload.saved)return upload;
     try{
       for(let offset=0,number=1;offset<file.size;offset+=upload.partSize,number++){
         const part=file.slice(offset,Math.min(file.size,offset+upload.partSize));
@@ -243,6 +244,10 @@
     let files=[...input];if(!files.length)return;
     if(files.some(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name))){
       try{files=await window.FamilyPhotoEditor.prepare(files,{scope:key,onUpload:async(file,progress)=>{const result=await sendFile(key,file,progress,eventId);applyUploaded(key,result);}});}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
+      if(!files?.length)return;
+    }
+    if(files.some(file=>/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name))&&window.FamilyVideoUpload){
+      try{files=await window.FamilyVideoUpload.prepare(files,{scope:key,eventId,upload:(file,progress,target)=>sendFile(key,file,progress,target.eventId,target.uploadId),onSaved:result=>applyUploaded(key,result)});}catch(error){toast(error.message||I18n.t('אשף העלאת הסרטונים לא נטען.'));return;}
       if(!files?.length)return;
     }
     const item=uploadStates.get(key);

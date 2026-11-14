@@ -89,3 +89,16 @@ test('segment filenames are sorted naturally within the event',()=>{
  const api=model(),items=[4,2,1,3].map(n=>({id:String(n),name:'Bloom-seg'+n,nostalgiaEventIds:['bloom']}));
  assert.deepEqual(Array.from(api.viewItems({items},'bloom'),i=>i.id),['1','2','3','4']);
 });
+
+test('folder stacks keep exactly one front cover, fan neighbours behind it, and hide distant covers',()=>{
+ const api=model(),front=api.stackPose(3,3,9),next=api.stackPose(4,3,9),previous=api.stackPose(2,3,9),far=api.stackPose(7,3,9);
+ assert.equal(front.distance,0);assert.ok(front.z>next.z);assert.equal(next.x,-previous.x);assert.ok(next.scale<front.scale);assert.equal(far.visible,false);
+});
+test('returning to the home starts from a random real event rather than the add-folder card and background updates preserve that choice',()=>{
+ const math=Object.create(Math);math.random=()=>.9;
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,{...context,Math:math}));
+ gallery.collection.library.events.push({id:'event-b',categoryId:'military',name:'B',videoCount:1},{id:'event-c',categoryId:'military',name:'C',videoCount:1});
+ gallery.leave();gallery.node('nostalgiaView').hidden=false;gallery.render();
+ assert.match(gallery.node('nostalgiaCategories').innerHTML,/nostalgia-folder is-active[^>]*data-nostalgia-event="event-c"/);
+ gallery.collection.library.events[2].videoCount=4;gallery.render();assert.match(gallery.node('nostalgiaCategories').innerHTML,/nostalgia-folder is-active[^>]*data-nostalgia-event="event-c"/);
+});

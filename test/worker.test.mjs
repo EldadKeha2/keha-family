@@ -1982,3 +1982,30 @@ test('clips keep unclassified videos unclassified and support personal and weddi
   }
  }finally{await f.close();}
 });
+
+test('the video upload wizard saves one trimmed video with recording details and the chosen event, and repeated saves never trim twice',async()=>{
+ const f=fixture();try{
+  await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url)),uploadId=uid();
+  const url='/api/nostalgia/upload?filename=wizard-film.mp4&uploadId='+uploadId,upload={method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}};
+  const first=await(await f.call(url,upload)).json(),original=first.collection.items.find(i=>i.id===uploadId);assert.ok(original);
+  const repeated=await(await f.call(url,upload)).json();assert.equal(repeated.collection.items.filter(i=>i.id===uploadId).length,1);assert.equal(f.objects.size,1);
+  const operation={operationId:uid(),metadata:{name:'הקטע שבחרנו',caption:'זיכרון משפחתי',date:{month:12,year:1990},eventId:'ora-release-1988',range:{start:1.5,end:4.5},people:[{personId:'yona'},{name:'אורחת בסרטון'}]}};
+  assert.equal((await f.call('/api/media/'+uploadId+'/video-upload',{method:'POST',body:operation,clientHeaders:false})).status,403);
+  let response=await f.call('/api/media/'+uploadId+'/video-upload',{method:'POST',body:operation});assert.equal(response.status,200,await response.clone().text());
+  const result=await response.json();assert.equal(result.item.id,uploadId);assert.equal(result.item.duration,3);assert.equal(result.item.caption,'זיכרון משפחתי');assert.deepEqual(result.item.takenDate,{day:null,month:12,year:1990});assert.deepEqual(result.item.nostalgiaEventIds,['ora-release-1988']);assert.ok(result.item.tags.some(p=>p.id==='yona'));assert.ok(result.item.tags.some(p=>p.name==='אורחת בסרטון'));assert.notEqual(result.item.src,original.src);
+  assert.equal(result.collection.items.filter(i=>i.id===uploadId).length,1);await f.flush();assert.equal(f.objects.size,1,'Only the chosen clip is retained');
+  const stored=await(await f.call(result.item.src)).arrayBuffer();assert.equal(stored.byteLength,result.item.size);
+  response=await f.call('/api/media/'+uploadId+'/video-upload',{method:'POST',body:operation});assert.equal(response.status,200);assert.equal((await response.json()).item.src,result.item.src);assert.equal(f.objects.size,1);
+  f.restart();const saved=(await(await f.call('/api/nostalgia')).json()).items.find(i=>i.id===uploadId);assert.equal(saved.name,'הקטע שבחרנו');assert.equal(saved.duration,3);
+ }finally{await f.close();}
+});
+test('video wizard metadata keeps unassigned uploads unassigned, changes the ordinary video folder, and rejects bad dates before replacing any bytes',async()=>{
+ const f=fixture();try{
+  await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url));
+  for(const [route,metadata]of [['/api/nostalgia/upload',{eventId:''}],['/api/collections/videos/upload?group=family',{group:'special-birthdays'}]]){
+   const posted=await(await f.call(route,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}})).json(),item=posted.collection.items.find(i=>i.file===posted.file),before=f.objects.size;
+   assert.equal((await f.call('/api/media/'+item.id+'/video-upload',{method:'POST',body:{operationId:uid(),metadata:{name:'Film',date:{day:31,month:2,year:1990},range:{start:0,end:1}}}})).status,400);assert.equal(f.objects.size,before);
+   const saved=await(await f.call('/api/media/'+item.id+'/video-upload',{method:'POST',body:{operationId:uid(),metadata:{name:'Film',...metadata}}})).json();assert.equal(saved.item.id,item.id);assert.equal(f.objects.size,before);if(metadata.eventId==='')assert.deepEqual(saved.item.nostalgiaEventIds,[]);else assert.equal(saved.item.videoCategory,'special-birthdays');
+  }
+ }finally{await f.close();}
+});

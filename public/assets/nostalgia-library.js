@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id),I=window.FamilyI18n,english=I.isEnglish;
   const tr=(he,en)=>english?en:he,safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
-  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',uploadChoice:'',assignId:null,newEventAssignId:null,hoverTimer:null,closeTimer:null,closing:false,activeFolders:{}};
+  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',uploadChoice:'',assignId:null,newEventAssignId:null,hoverTimer:null,closeTimer:null,closing:false,activeFolders:{},homeActive:false,stackSuppressUntil:0};
   const eventName=event=>english?(event.nameEn||event.name):event.name;
   const categoryName=category=>english?(category.nameEn||category.name):category.name;
   const eventsText=n=>english?`${n} ${n===1?'event':'events'}`:n===1?'אירוע אחד':`${n} אירועים`;
@@ -37,18 +37,23 @@
     const signature=JSON.stringify([state.query,categories,state.library.events]);if(grid.dataset.signature===signature)return;grid.dataset.signature=signature;
     grid.innerHTML=categories.map((category,index)=>{
       const events=matchingEvents(category.id),count=events.reduce((n,e)=>n+(e.videoCount||0),0),active=state.activeFolders[category.id];
-      if(!events.some(e=>e.id===active)&&active!=='+')state.activeFolders[category.id]=events[0]?.id||'+';
+      if(!events.some(e=>e.id===active)&&active!=='+')state.activeFolders[category.id]=events.length?events[Math.floor(Math.random()*events.length)].id:'+';
       const frame=['arabesque','mosaic','yemeni','manuscript'][index%4];
       return `<section class="nostalgia-shelf theme-${safe(category.color)} ornament-${frame}" data-nostalgia-shelf="${safe(category.id)}" aria-label="${safe(categoryName(category))}">${frameArt(frame)}<header class="nostalgia-shelf-heading"><span class="nostalgia-shelf-icon">${icon(category.icon)}</span><h4>${safe(categoryName(category))}</h4><span>${eventsText(events.length)} · ${videosText(count)}</span></header><div class="nostalgia-folder-stage"><button type="button" class="nostalgia-shelf-arrow shelf-right" data-nostalgia-shelf-step="1" data-shelf="${safe(category.id)}" aria-label="${tr('התיקייה הבאה ב','Next folder in ')}${safe(categoryName(category))}">›</button><div class="nostalgia-folder-deck" role="group" aria-label="${tr('התיקיות ב','Folders in ')}${safe(categoryName(category))}">${events.map(event=>`<button type="button" class="nostalgia-folder${state.activeFolders[category.id]===event.id?' is-active':''}" data-nostalgia-event="${safe(event.id)}" data-nostalgia-folder="${safe(event.id)}" data-shelf="${safe(category.id)}" aria-label="${safe(eventName(event))} · ${videosText(event.videoCount)}"><span class="nostalgia-folder-tab" aria-hidden="true"></span><span class="nostalgia-folder-cover">${eventCover(event,category)}</span><span class="nostalgia-folder-copy"><strong>${safe(eventName(event))}</strong><small>${dateText(event.date)?safe(dateText(event.date))+' · ':''}${videosText(event.videoCount)}</small></span></button>`).join('')}<button type="button" class="nostalgia-folder nostalgia-folder-add${state.activeFolders[category.id]==='+'?' is-active':''}" data-nostalgia-new-event="${safe(category.id)}" data-nostalgia-folder="+" data-shelf="${safe(category.id)}" aria-label="${tr('הוספת תיקייה ל','Add a folder to ')}${safe(categoryName(category))}"><span class="nostalgia-folder-tab" aria-hidden="true"></span><span class="nostalgia-folder-add-icon" aria-hidden="true">＋</span><strong>${tr('תיקייה חדשה','New folder')}</strong></button></div><button type="button" class="nostalgia-shelf-arrow shelf-left" data-nostalgia-shelf-step="-1" data-shelf="${safe(category.id)}" aria-label="${tr('התיקייה הקודמת ב','Previous folder in ')}${safe(categoryName(category))}">‹</button></div></section>`;
     }).join('');
+    for(const category of categories)focusFolder(category.id,state.activeFolders[category.id]);
   }
+  function stackPose(index,active,count){let distance=(index-active+count)%count;if(distance>count/2)distance-=count;return {distance,x:Math.sign(distance)*Math.min(Math.abs(distance),3)*19,y:Math.min(Math.abs(distance),3)*5,angle:Math.sign(distance)*Math.min(Math.abs(distance),3)*3,scale:Math.max(.85,1-Math.abs(distance)*.045),z:100-Math.abs(distance),visible:Math.abs(distance)<=2};}
   function focusFolder(categoryId,folderId){
     state.activeFolders[categoryId]=folderId;
-    document.querySelectorAll('[data-nostalgia-folder]').forEach(button=>{if(button.dataset.shelf===categoryId){const active=button.dataset.nostalgiaFolder===folderId;button.classList.toggle('is-active',active);button.setAttribute('aria-current',active?'true':'false');}});
+    const buttons=[...document.querySelectorAll('[data-nostalgia-folder]')].filter(button=>button.dataset.shelf===categoryId),selected=buttons.findIndex(button=>button.dataset.nostalgiaFolder===folderId);
+    buttons.forEach((button,index)=>{const active=index===selected,pose=stackPose(index,selected,buttons.length);button.classList.toggle('is-active',active);button.setAttribute('aria-current',active?'true':'false');button.setAttribute('aria-hidden',active?'false':'true');button.tabIndex=active?0:-1;
+      for(const [key,value]of Object.entries({'--stack-x':pose.x+'px','--stack-y':pose.y+'px','--stack-angle':pose.angle+'deg','--stack-scale':pose.scale,'--stack-index':pose.z,'--stack-opacity':pose.visible?1:0}))button.style.setProperty(key,String(value));
+    });
   }
   function moveShelf(categoryId,direction){
     const ids=[...matchingEvents(categoryId).map(e=>e.id),'+'],index=ids.indexOf(state.activeFolders[categoryId]);
-    focusFolder(categoryId,ids[(Math.max(0,index)+direction+ids.length)%ids.length]);
+    const next=ids[(Math.max(0,index)+direction+ids.length)%ids.length];focusFolder(categoryId,next);return next;
   }
   function uploadSelector(){
     let host=$('nostalgiaUploadTarget');if(!host){host=document.createElement('div');host.id='nostalgiaUploadTarget';host.className='nostalgia-upload-target';host.setAttribute('data-i18n-skip','');$('nostalgiaDropzone').insertBefore(host,$('nostalgiaUploadState'));}
@@ -60,6 +65,7 @@
     state.collection=collection;state.library=collection.library;state.query=normalize(query);
     const requested=routeEvent(),event=getEvent(requested),eventId=event?.id||null;
     if(state.eventId!==eventId){state.eventId=eventId;state.uploadChoice=eventId||'';}
+    if(event)state.homeActive=false;else if(!state.homeActive){state.homeActive=true;state.activeFolders={};$('nostalgiaCategories').dataset.signature='';}
     $('nostalgiaLibraryHome').hidden=Boolean(event);$('nostalgiaView').classList.toggle('nostalgia-unclassified',!event);$('nostalgiaEventHeader').hidden=!event;
     if(event){
       const category=state.library.categories.find(c=>c.id===event.categoryId),header=$('nostalgiaEventHeader'),signature=JSON.stringify([event,category]);
@@ -143,6 +149,8 @@
     $('nostalgiaCategoryDialog').addEventListener('click',event=>{if(event.target===$('nostalgiaCategoryDialog'))closeCategory();});
     document.addEventListener('click',event=>{
       const target=event.target.closest?.('button');if(!target)return;
+      if(target.closest?.('[data-nostalgia-shelf]')&&Date.now()<state.stackSuppressUntil){event.preventDefault();return;}
+      if(target.dataset.nostalgiaFolder&&!target.classList.contains('is-active'))return focusFolder(target.dataset.shelf,target.dataset.nostalgiaFolder);
       if(target.hasAttribute('data-nostalgia-close-category'))return closeCategory();
       if(target.dataset.nostalgiaClose)return $(target.dataset.nostalgiaClose).close();
       if(target.dataset.nostalgiaShelfStep)return moveShelf(target.dataset.shelf,Number(target.dataset.nostalgiaShelfStep));
@@ -158,6 +166,10 @@
     });
     const highlight=event=>{const folder=event.target.closest?.('[data-nostalgia-folder]');if(folder)focusFolder(folder.dataset.shelf,folder.dataset.nostalgiaFolder);};
     document.addEventListener('focusin',event=>{if(event.target.matches?.(':focus-visible'))highlight(event);});
+    let stackDrag=null;
+    document.addEventListener('pointerdown',event=>{const shelf=event.target.closest?.('[data-nostalgia-shelf]');if(shelf&&event.pointerType!=='mouse')stackDrag={id:event.pointerId,category:shelf.dataset.nostalgiaShelf,x:event.clientX,y:event.clientY};});
+    document.addEventListener('pointerup',event=>{const start=stackDrag;stackDrag=null;if(!start||start.id!==event.pointerId)return;const dx=event.clientX-start.x,dy=event.clientY-start.y;if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.25){state.stackSuppressUntil=Date.now()+450;moveShelf(start.category,dx>0?-1:1);}});
+    document.addEventListener('pointercancel',()=>{stackDrag=null;});
     document.addEventListener('keydown',event=>{const folder=event.target.closest?.('[data-nostalgia-folder]');if(folder&&['ArrowRight','ArrowLeft'].includes(event.key)){event.preventDefault();moveShelf(folder.dataset.shelf,event.key==='ArrowRight'?1:-1);}});
     document.addEventListener('change',event=>{if(event.target.id==='nostalgiaUploadEvent')state.uploadChoice=event.target.value;});
     document.addEventListener('dragstart',event=>{const handle=event.target.closest?.('[data-nostalgia-drag]');if(handle){event.dataTransfer.setData('application/x-keha-memory',handle.dataset.nostalgiaDrag);event.dataTransfer.effectAllowed='copy';}});
@@ -174,8 +186,8 @@
     $('nostalgiaEventForm').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{const date=Object.fromEntries(['day','month','year'].map(part=>[part,$('nostalgiaEvent'+part).value?Number($('nostalgiaEvent'+part).value):null]));const result=await action('event',{id:form.dataset.eventId||undefined,expectedRevision:form.dataset.revision||undefined,categoryId:$('nostalgiaEventCategory').value,name:$('nostalgiaEventName').value,location:$('nostalgiaEventLocation').value,date});$('nostalgiaEventDialog').close();if(state.newEventAssignId){await action('assign',{id:state.newEventAssignId,add:[result.event.id]});$('nostalgiaAssignDialog').close();state.newEventAssignId=null;}navigate(result.event.id);}catch(error){$('nostalgiaEventError').textContent=I.error(error.message);}finally{button.disabled=false;}});
     $('nostalgiaNewCategoryForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type=submit]');button.disabled=true;try{const result=await action('category',{name:$('nostalgiaNewCategoryName').value});$('nostalgiaNewCategoryDialog').close();openCategory(result.category.id);}catch(error){$('nostalgiaNewCategoryError').textContent=I.error(error.message);}finally{button.disabled=false;}});
     $('nostalgiaAssignForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type=submit]');button.disabled=true;try{const current=allItems().find(item=>item.id===state.assignId)?.nostalgiaEventIds||[],wanted=[...$('nostalgiaAssignChoices').querySelectorAll('input:checked')].map(input=>input.value);await action('assign',{id:state.assignId,add:wanted.filter(id=>!current.includes(id)),remove:current.filter(id=>!wanted.includes(id))});$('nostalgiaAssignDialog').close();}catch(error){$('nostalgiaAssignError').textContent=I.error(error.message);}finally{button.disabled=false;}});
-    for(const event of ['hashchange','popstate'])window.addEventListener(event,()=>{if(/^#nostalgia(?:\/|$)/.test(location.hash))window.FamilyArchive?.renderNostalgia?.();else closeCategory(true);});
+    for(const event of ['hashchange','popstate'])window.addEventListener(event,()=>{if(/^#nostalgia(?:\/|$)/.test(location.hash))window.FamilyArchive?.renderNostalgia?.();else{state.homeActive=false;closeCategory(true);}});
   }
-  window.FamilyNostalgia={select,decorateCard,viewItems,acceptDrop,uploadEventId:()=>$('nostalgiaUploadEvent')?.value||null};
+  window.FamilyNostalgia={select,decorateCard,viewItems,stackPose,acceptDrop,uploadEvents:()=>state.library?.events||[],uploadEventId:()=>$('nostalgiaUploadEvent')?.value||null};
   document.addEventListener('DOMContentLoaded',init);
 })();

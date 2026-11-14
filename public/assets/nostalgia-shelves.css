@@ -34,3 +34,22 @@
 @media(max-width:760px){#nostalgiaView.nostalgia-unclassified>.nostalgia-upload-actions{float:none!important;margin:0 0 10px}.nostalgia-shelf-arrow{opacity:1}#nostalgiaView.nostalgia-unclassified #nostalgiaGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.nostalgia-shelf{padding:25px 23px 21px}.nostalgia-shelf-heading h4{font-size:19px}.nostalgia-shelves-tools{font-size:12px}.nostalgia-shelf-heading{margin-bottom:9px}#nostalgiaCategories.nostalgia-shelves{gap:12px}}
 @media(max-width:540px){#nostalgiaCategories.nostalgia-shelves{grid-template-columns:1fr}.nostalgia-shelf{padding:25px 28px 21px}.nostalgia-folder{min-height:96px}.nostalgia-folder-stage,.nostalgia-folder-deck{min-height:104px}.nostalgia-folder-deck{flex-wrap:wrap}.nostalgia-folder-copy strong{font-size:11px}.nostalgia-shelf-heading{min-height:40px}#nostalgiaView.nostalgia-unclassified .media-controls button{font-size:10px;padding-inline:5px}#nostalgiaView.nostalgia-unclassified .nostalgia-video-heading h4{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.nostalgia-folder,.nostalgia-shelf-arrow{transition:none!important}.nostalgia-folder.is-active{transform:none}}
+/* One readable folder in front, with the other folder covers fanned behind. */
+#nostalgiaCategories .nostalgia-folder-stage{min-height:166px;margin-top:3px}
+#nostalgiaCategories .nostalgia-folder-deck{position:relative;display:block;min-height:166px;padding:0;perspective:700px;touch-action:pan-y}
+#nostalgiaCategories .nostalgia-folder{position:absolute;top:7px;left:50%;width:calc(100% - 53px);max-width:250px;height:145px;min-height:0;min-width:0;display:flex;flex-direction:column;gap:5px;padding:10px 12px 8px;z-index:var(--stack-index,1);opacity:var(--stack-opacity,0);transform:translate(calc(-50% + var(--stack-x,0px)),var(--stack-y,0px)) rotate(var(--stack-angle,0deg)) scale(var(--stack-scale,.9));transform-origin:center bottom;transition:transform .3s ease,opacity .2s ease,box-shadow .25s;box-shadow:0 3px 8px #58412a26;background:linear-gradient(145deg,#f6e8c9,#ddc79b);overflow:visible}
+#nostalgiaCategories .nostalgia-folder.is-active{opacity:1;min-width:0;background:linear-gradient(140deg,#fffaf0,var(--shelf-wash));box-shadow:0 7px 16px #5d472930}
+#nostalgiaCategories .nostalgia-folder:not(.is-active)>.nostalgia-folder-copy,#nostalgiaCategories .nostalgia-folder:not(.is-active)>strong,#nostalgiaCategories .nostalgia-folder:not(.is-active)>.nostalgia-folder-add-icon{visibility:hidden}
+#nostalgiaCategories .nostalgia-folder:not(.is-active) .nostalgia-folder-cover{opacity:.1}
+#nostalgiaCategories .nostalgia-folder[style*="--stack-opacity: 0"]{pointer-events:none}
+#nostalgiaCategories .nostalgia-folder-cover,#nostalgiaCategories .nostalgia-folder.is-active .nostalgia-folder-cover{height:71px;flex:none;width:100%;border-radius:3px;background:#ddd0b2}
+#nostalgiaCategories .nostalgia-folder-copy{min-height:44px;gap:3px}
+#nostalgiaCategories .nostalgia-folder.is-active .nostalgia-folder-copy strong{font:500 calc(16px * var(--a11y-text-scale,1))/1.2 var(--serif);-webkit-line-clamp:2}
+#nostalgiaCategories .nostalgia-folder.is-active .nostalgia-folder-copy small{font-size:10px;display:block}
+#nostalgiaCategories .nostalgia-folder-add{justify-content:center;background:linear-gradient(140deg,#fff8e9,#efe0c0)}
+#nostalgiaCategories .nostalgia-folder-add.is-active strong{font-size:15px}
+#nostalgiaCategories .nostalgia-folder-add-icon{font-size:37px}
+#nostalgiaCategories .nostalgia-shelf-arrow{top:58px;width:30px;height:36px;opacity:1;background:#fffaf0f5;z-index:110}
+#nostalgiaCategories .nostalgia-shelf-arrow.shelf-right{right:-15px}#nostalgiaCategories .nostalgia-shelf-arrow.shelf-left{left:-15px}
+@media(max-width:540px){#nostalgiaCategories .nostalgia-folder{max-width:265px;height:151px}#nostalgiaCategories .nostalgia-folder-stage,#nostalgiaCategories .nostalgia-folder-deck{min-height:171px}#nostalgiaCategories .nostalgia-folder.is-active .nostalgia-folder-copy strong{font-size:17px}#nostalgiaCategories .nostalgia-folder.is-active .nostalgia-folder-copy small{font-size:11px}}
+@media(prefers-reduced-motion:reduce){#nostalgiaCategories .nostalgia-folder{transition:none!important}}

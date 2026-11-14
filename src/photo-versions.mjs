@@ -2,7 +2,7 @@ import {HttpError} from './http.mjs';
 import {rotateCrop} from '../public/assets/photo-edit-core.mjs';
 
 export const photoVersionId=value=>value==='original'||typeof value==='string'&&/^[a-f0-9]{32}$/.test(value);
-export const photoSource=item=>'/media/'+item.id+(item.photoRevision?'?v='+item.photoRevision:'');
+export const photoSource=item=>'/media/'+item.id+(item.photoRevision||item.videoRevision?'?v='+(item.photoRevision||item.videoRevision):'');
 export function photoTransform(rotation,crop){
   if(!Number.isInteger(rotation)||rotation<0||rotation>3||!crop||['x','y','width','height'].some(key=>!Number.isFinite(crop[key]))||crop.x<0||crop.y<0||crop.width<=0||crop.height<=0||crop.x+crop.width>1.000001||crop.y+crop.height>1.000001)throw new HttpError(400,'פרטי הסיבוב או החיתוך אינם תקינים.');
   return {rotation,crop:{x:crop.x,y:crop.y,width:crop.width,height:crop.height}};

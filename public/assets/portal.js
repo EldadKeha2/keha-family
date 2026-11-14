@@ -206,12 +206,16 @@
       try{approved=await window.FamilyPhotoEditor.prepare(approved,{scope:kind,onUpload:async(file,progress)=>{const result=await uploadFile(kind,file,file.name,progress,group);applyUploaded(kind,result);}});}catch{notify(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
       if(!approved?.length)return;
     }
+    if(kind==='videos'&&window.FamilyVideoUpload){
+      try{approved=await window.FamilyVideoUpload.prepare(approved,{scope:kind,group,upload:(file,progress,target)=>uploadFile(kind,file,file.name,progress,target.group,target.uploadId),onSaved:result=>applyUploaded(kind,result)});}catch(error){notify(error.message||I18n.t('אשף העלאת הסרטונים לא נטען.'));return;}
+      if(!approved?.length)return;
+    }
     // Only approved files enter the upload queue; saved media has no edit action.
     queues[kind].push(...approved.map(file=>({file,clipboard,group})));runUploads(kind);
   }
-  function uploadFile(kind,file,name,onProgress,group) {
+  function uploadFile(kind,file,name,onProgress,group,uploadId=null) {
     return new Promise((resolve,reject)=>{
-      const xhr=new XMLHttpRequest();xhr.open('POST','api/collections/'+kind+'/upload?filename='+encodeURIComponent(name)+(kind==='videos'?'&group='+encodeURIComponent(group):''));
+      const xhr=new XMLHttpRequest();xhr.open('POST','api/collections/'+kind+'/upload?filename='+encodeURIComponent(name)+(kind==='videos'?'&group='+encodeURIComponent(group):'')+(uploadId?'&uploadId='+encodeURIComponent(uploadId):''));
       xhr.setRequestHeader('X-Family-Token',window.FAMILY_API_TOKEN);xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
       xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded/event.total*100));};
       xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(I18n.t('החיבור הסתיים בלי אישור שמירה. נסו לרענן.')));return;}if(xhr.status>=200&&xhr.status<300)Promise.resolve(window.FamilyPhotoThumbnails?.fromUpload?.(result,file)).then(()=>resolve(result),()=>resolve(result));else reject(Error(I18n.error(result.error)||I18n.t('הקובץ לא נשמר.')));};

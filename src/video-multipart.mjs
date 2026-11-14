@@ -42,7 +42,10 @@ export async function multipartVideo(request,env,db,ctx,{action,sniff,limit}){
     if(!Number.isSafeInteger(size)||size<1||size>limit)throw new HttpError(413,'אפשר להעלות סרטון נוסטלגיה עד 500MB.');
     let head;try{if(typeof body.head!=='string'||body.head.length>172)throw Error();head=Uint8Array.from(atob(body.head),c=>c.charCodeAt(0));}catch{throw new HttpError(400,'לא התקבלה תחילת הסרטון. בחרו אותו מחדש.');}
     const event=body.eventId?await db('nostalgia.event',{id:body.eventId}):null;
-    const format=sniff(head,true),id=uid(),filename=nameOf(body.filename),key='nostalgia/shared/'+id+format.ext;
+    const format=sniff(head,true),id=body.uploadId||uid(),filename=nameOf(body.filename),key='nostalgia/shared/'+id+format.ext;
+    if(!/^[a-f0-9]{32}$/.test(id))throw new HttpError(400,'אישור ההעלאה אינו תקין.');
+    if(body.uploadId){let existing;try{existing=await db('media.get',{id});}catch(error){if(error.status!==404)throw error;}if(existing){if(existing.category!=='nostalgia'||existing.size!==size||existing.filename!==filename)throw new HttpError(409,'הסרטון השתנה. בחרו אותו מחדש.');return json({saved:true,file:existing.file,collection:await db('collection',{kind:'nostalgia'})});}}
+
     const uploadId=await createMultipartUpload(env,key,format.mime);
     const session={version:1,id,key,filename,size,mime:format.mime,ext:format.ext,uploadId,partSize:VIDEO_PART_SIZE,createdAt:new Date().toISOString(),expires:Date.now()+SESSION_LIFETIME,eventId:event?.id||null,eventDate:event?.date||null};
     return json({session:await signSession(env,session),partSize:VIDEO_PART_SIZE,parts:Math.ceil(size/VIDEO_PART_SIZE)},201);
