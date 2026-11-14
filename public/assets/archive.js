@@ -114,13 +114,20 @@
     const collection=collections.get(key)||{items:[]},filter=filters.get(key)||'all',query=normalize(state.query);
     let items=collection.items.filter(item=>(filter==='all'||item.kind===filter)&&(!query||normalize(item.name+' '+item.caption+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
     if(key==='nostalgia'&&window.FamilyNostalgia&&collection.library)items=window.FamilyNostalgia.select(collection,{query,filter});
+    const eventGrid=key==='nostalgia'&&window.FamilyNostalgia?.isEvent?.();
     window.FamilyMedia.register(key,items,{cover:collection.cover});
-    const grid=$(gridId(key)),sameScope=grid.dataset.scope===key;
+    const grid=$(gridId(key)),layout=eventGrid?'event':'collection',sameScope=grid.dataset.scope===key&&grid.dataset.layout===layout;
     const oldCards=new Map((sameScope?[...grid.children]:[]).filter(card=>card.dataset.mediaFile).map(card=>[card.dataset.mediaFile,card]));
     const cards=[];
     for(const item of items){
       let card=oldCards.get(item.file);
       if(card&&card.dataset.mediaSrc!==item.src)card=null;
+      if(eventGrid&&item.kind==='video'&&window.FamilyVideoPresentation?.tile){
+        const version=JSON.stringify([item.caption,item.duration,item.poster,item.name]);
+        if(card&&card.dataset.videoTileVersion!==version)card=null;
+        if(!card){card=document.createElement('article');card.className='shared-media-card video-tile nostalgia-event-video';card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;card.dataset.videoTileVersion=version;card.innerHTML=window.FamilyVideoPresentation.tile(item,key);card.querySelector('video')?.addEventListener('error',event=>{event.currentTarget.hidden=true;},true);card.querySelector('img')?.addEventListener('error',event=>{event.currentTarget.hidden=true;});}
+        card.dataset.mediaKind=item.kind;cards.push(card);continue;
+      }
       if(!card){
         card=document.createElement('article');card.className='shared-media-card'+(key==='nostalgia'&&item.kind==='video'?' nostalgia-video-card':'');card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;
         let viewer;
@@ -153,7 +160,7 @@
         if(key==='nostalgia'&&!kindCards.length&&filter==='all')continue;
         const heading=grid.querySelector('[data-nostalgia-kind="'+kind+'"]')||document.createElement('header');
         heading.className='nostalgia-media-heading';heading.dataset.nostalgiaKind=kind;
-        heading.innerHTML=`<h4>${labels[kind]} <span>(${kindCards.length})</span></h4><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="${kind}">${actions[kind]}</button>`;
+        heading.innerHTML=`<h4>${labels[kind]} <span>(${kindCards.length})</span></h4>`+(eventGrid?'':`<button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="${kind}">${actions[kind]}</button>`);
         groups.push(heading,...kindCards);
         if(!kindCards.length){const empty=grid.querySelector('[data-nostalgia-empty="'+kind+'"]')||document.createElement('p');empty.className='nostalgia-kind-empty';empty.dataset.nostalgiaEmpty=kind;empty.textContent=I18n.t(query?'לא נמצאו זיכרונות מהסוג הזה בחיפוש.':'כאן יש מקום לזיכרונות שלכם. הוסיפו את הראשון!');groups.push(empty);}
       }
@@ -163,7 +170,7 @@
     const active=document.activeElement,selection=active?.dataset?.archiveCaption?[active.selectionStart,active.selectionEnd]:null;
     const wanted=new Set(cards);for(const child of [...grid.children])if(!wanted.has(child))child.remove();
     let anchor=grid.firstElementChild;for(const card of cards){if(card===anchor)anchor=anchor.nextElementSibling;else grid.insertBefore(card,anchor);}
-    grid.dataset.scope=key;
+    grid.dataset.scope=key;grid.dataset.layout=layout;
     window.FamilyTags.refresh(grid,items);
     if(selection&&grid.contains(active)){active.focus({preventScroll:true});active.setSelectionRange(...selection);}
     const nostalgia=key==='nostalgia',empty=$(nostalgia?'nostalgiaEmpty':'weddingMediaEmpty');empty.hidden=nostalgia||collection.items.length>0;
@@ -241,6 +248,7 @@
         if(scope()===key)renderCollection(key);}
   async function addFiles(key,input,{eventId=key==='nostalgia'?window.FamilyNostalgia?.uploadEventId?.():null}={}){
     if(!key||!canSave())return;
+    if(key==='nostalgia'&&window.FamilyNostalgia?.isEvent?.())return;
     let files=[...input];if(!files.length)return;
     if(files.some(file=>/^image\//i.test(file.type)||/\.(jpe?g|png|webp|gif|avif)$/i.test(file.name))){
       try{files=await window.FamilyPhotoEditor.prepare(files,{scope:key,onUpload:async(file,progress)=>{const result=await sendFile(key,file,progress,eventId);applyUploaded(key,result);}});}catch{toast(I18n.isEnglish?'The photo editor could not open. Refresh the page and try again.':'מסך עריכת התמונות לא נטען. רעננו את הדף ונסו שוב.');return;}
@@ -311,10 +319,10 @@
     for(const [key,draft]of drafts)if(draft.dirty)saveCaption(key);
   }
   function search(query){state.query=query;if(state.view==='weddings'&&!state.weddingId)renderWeddings();else if(scope())renderCollection(scope());}
-  function acceptDrop(event){const key=scope();if(key==='nostalgia'&&window.FamilyNostalgia?.acceptDrop?.(event))return true;if(!key||document.querySelector('dialog[open]'))return false;$(prefix(key)+'Dropzone').classList.remove('drag-over');addFiles(key,event.dataTransfer.files);return true;}
-  function dragOver(){const key=scope();if(key&&!document.querySelector('dialog[open]'))$(prefix(key)+'Dropzone').classList.add('drag-over');}
+  function acceptDrop(event){const key=scope();if(key==='nostalgia'&&window.FamilyNostalgia?.acceptDrop?.(event))return true;if(!key||document.querySelector('dialog[open]'))return false;if(key==='nostalgia'&&window.FamilyNostalgia?.isEvent?.())return true;$(prefix(key)+'Dropzone').classList.remove('drag-over');addFiles(key,event.dataTransfer.files);return true;}
+  function dragOver(){const key=scope();if(key&&!(key==='nostalgia'&&window.FamilyNostalgia?.isEvent?.())&&!document.querySelector('dialog[open]'))$(prefix(key)+'Dropzone').classList.add('drag-over');}
   function acceptPaste(event){
-    const key=scope();if(!key||document.querySelector('dialog[open]')||event.target.closest('textarea,input'))return false;
+    const key=scope();if(!key||key==='nostalgia'&&window.FamilyNostalgia?.isEvent?.()||document.querySelector('dialog[open]')||event.target.closest('textarea,input'))return false;
     const files=[...(event.clipboardData?.items||[])].filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);
     if(!files.length)return false;event.preventDefault();addFiles(key,files);return true;
   }

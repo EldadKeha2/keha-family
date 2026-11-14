@@ -1,4 +1,12 @@
 /* Warm paper, copper jewellery and the diamond stitches of family embroidery. */
+.nostalgia-event-grid>.nostalgia-upload-actions,.nostalgia-event-grid>#nostalgiaDropzone{display:none!important}
+#nostalgiaView.nostalgia-event-grid #nostalgiaGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px;align-items:start}
+#nostalgiaView.nostalgia-event-grid .nostalgia-media-heading{grid-column:1/-1}
+#nostalgiaGrid .nostalgia-event-video{display:flex;flex-direction:column;min-width:0;border-radius:6px;background:#fffdf7;overflow:hidden}
+#nostalgiaGrid .nostalgia-event-video .video-tile-open{border:0;background:none;color:inherit}
+#nostalgiaGrid .nostalgia-event-video .video-tile-caption{border:0;background:none}
+#nostalgiaGrid .nostalgia-event-video .video-tile-cover{aspect-ratio:16/10}
+@media(max-width:700px){#nostalgiaView.nostalgia-event-grid #nostalgiaGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}}
 #nostalgiaView,.nostalgia-category-dialog,.nostalgia-form-dialog{--nostalgia-ink:#4e4a37;--nostalgia-copper:#9a6543;--nostalgia-gold:#c6a264;--nostalgia-paper:#fcf7e9;--nostalgia-ease:cubic-bezier(.2,.78,.23,1)}
 .nostalgia-library-intro{position:relative;isolation:isolate;overflow:hidden;text-align:center;padding:42px 26px 30px;margin:0 0 30px;border:1px solid #daccac;border-radius:20px;background:radial-gradient(ellipse at 22% 10%,#dfc89c30,transparent 45%),radial-gradient(ellipse at 84% 95%,#a5af8b24,transparent 42%),linear-gradient(135deg,#fcf8ee,#f1e8d5);box-shadow:inset 0 0 0 5px #fff9,0 10px 28px #6b543509}
 .nostalgia-library-intro::before,.nostalgia-library-intro::after{content:"";position:absolute;pointer-events:none;inset:11px;border:1px solid #b9a37555;border-radius:12px;z-index:-1}.nostalgia-library-intro::after{inset:17px;border-style:dotted;border-color:#b9a37535}

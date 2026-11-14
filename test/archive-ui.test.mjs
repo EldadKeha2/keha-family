@@ -42,6 +42,17 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
 }
 const item=(kind,n)=>({id:String(n),file:n+'.'+({photo:'jpg',video:'mp4',document:'pdf'}[kind]),filename:'Memory '+n,name:'Memory '+n,kind,src:'/media/'+n,mime:{photo:'image/jpeg',video:'video/mp4',document:'application/pdf'}[kind],size:100});
 
+test('event folders render compact video tiles without upload headings and refresh descriptions after edits',async()=>{
+ const film=item('video',1),f=fixture([film]);await f.flush();
+ f.window.FamilyNostalgia={isEvent:()=>true};
+ f.window.FamilyVideoPresentation={tile:(item,scope)=>`<button data-media-scope="${scope}">${item.caption||'Add description'}</button>`};
+ f.filter('all');const card=f.grid.children.find(node=>node.dataset.mediaFile===film.file);
+ assert.match(card.className,/video-tile/);assert.equal(f.grid.dataset.layout,'event');
+ assert.doesNotMatch(f.grid.children.find(node=>node.dataset.nostalgiaKind==='video').innerHTML,/data-archive-upload/);
+ f.change({operation:'caption',item:{...film,caption:'A family dance'}});
+ assert.match(f.grid.children.find(node=>node.dataset.mediaFile===film.file).innerHTML,/A family dance/);
+});
+
 test('a nostalgia video over 90MB uses bounded parts, retries a transient failed part, and publishes only after completion',async()=>{
  const size=90*1024*1024+12345,partSize=8*1024*1024,requests=[],parts=[],attempts=new Map(),film={...item('video',99),size};
  class XHR{

@@ -35,3 +35,9 @@ test('fullscreen navigation changes the video in the current gallery and Escape 
 test('editing from native fullscreen exits it before opening the same video editor',async()=>{
  const f=fixture({native:true});f.api.enter();await f.flush();const button={dataset:{videoScope:'videos'},closest:selector=>selector==='[data-video-edit]'?button:null};f.emit(button,'click');assert.deepEqual(f.edits,[['a','videos']]);assert.equal(f.api.isActive(),false);assert.equal(f.stage.parentNode,f.viewer);
 });
+test('event video tiles open their own gallery and fullscreen, show descriptions, and omit filenames',()=>{
+ const f=fixture(),markup=f.api.tile({id:'event-film',file:'event-film.mp4',filename:'camera-original.mp4',src:'/media/event-film',mime:'video/mp4',caption:'Dancing together',duration:288},'nostalgia');
+ assert.match(markup,/data-media-scope="nostalgia"/);assert.match(markup,/data-video-scope="nostalgia"/);
+ assert.match(markup,/data-video-fullscreen="event-film"/);assert.match(markup,/data-video-edit="event-film"/);
+ assert.match(markup,/Dancing together/);assert.match(markup,/4:48/);assert.doesNotMatch(markup,/camera-original|data-archive-upload/);
+});

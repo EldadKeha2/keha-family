@@ -41,8 +41,20 @@ function galleryModel(source,run){
   const collection={items:[],library:{categories:[{id:'military',name:'מסיבות גיוס ושחרור',icon:'olive',color:'olive'},{id:'holidays',name:'חגים ומועדים',icon:'lantern',color:'honey'}],events:[{id:'ora',categoryId:'military',name:'מסיבת השחרור של אורה',count:19,videoCount:19,revision:'1'},{id:'independence',categoryId:'holidays',name:'יום העצמאות 1996',count:1,videoCount:1,revision:'1'}]}};
   const render=()=>window.FamilyNostalgia.select(collection);render();
   const button=data=>({dataset:data,hasAttribute:name=>Object.hasOwn(data,name.replace(/^data-/,'').replace(/-([a-z])/g,(_,c)=>c.toUpperCase())),closest(selector){return selector==='button'||selector==='[data-nostalgia-category]'&&Object.hasOwn(data,'nostalgiaCategory')?this:null;}});
-  return {node:id=>nodes.get(id),collection,render,click:data=>emit(documentListeners,'click',{target:button(data)}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
+  return {node:id=>nodes.get(id),collection,render,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>emit(documentListeners,'click',{target:button(data)}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
 }
+
+test('event folders use the browsing grid without upload actions, and returning home restores uploads',()=>{
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
+ gallery.goEvent('ora');
+ assert.equal(gallery.node('nostalgiaView').classList.contains('nostalgia-event-grid'),true);
+ assert.equal(gallery.node('nostalgiaDropzone').hidden,true);
+ assert.doesNotMatch(gallery.node('nostalgiaEventHeader').innerHTML,/data-archive-upload/);
+ assert.match(gallery.node('nostalgiaEventHeader').innerHTML,/מסיבת השחרור של אורה/);
+ gallery.goEvent(null);
+ assert.equal(gallery.node('nostalgiaView').classList.contains('nostalgia-event-grid'),false);
+ assert.equal(gallery.node('nostalgiaDropzone').hidden,false);
+});
 
 test("Switching categories starts with the first event",()=>{
  const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
