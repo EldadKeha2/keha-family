@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="assets/nostalgia-shelves.css?v=folder-stack-v4">
   <link rel="stylesheet" href="assets/video-editor.css?v=upload-wizard-v3">
   <link rel="stylesheet" href="assets/wedding-garden.css?v=2">
-  <link rel="stylesheet" href="assets/media.css?v=video-grid-v1">
+  <link rel="stylesheet" href="assets/media.css?v=compact-video-v2">
   <link rel="stylesheet" href="assets/photo-editor.css?v=editor-footer-rows-v17">
   <link rel="stylesheet" href="assets/photo-drop.css?v=1">
   <link rel="stylesheet" href="assets/tags.css?v=tag-groups-v2">
@@ -62,6 +62,7 @@
   <link rel="stylesheet" href="assets/personal-photo-layout.css?v=inline-overlay-pencil-v19">
   <link rel="stylesheet" href="assets/recycle-bin.css?v=private-bin-v1">
 <link rel="stylesheet" href="assets/photo-fullscreen.css?v=screensaver-labels-v9">
+<link rel="stylesheet" href="assets/video-presentation.css?v=compact-video-v1">
   <link rel="stylesheet" href="assets/screensaver.css?v=family-screensaver-v1">
   <script src="assets/maintenance.js" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
@@ -85,15 +86,16 @@
   <script src="assets/photo-thumbnails.js?v=nonblocking-uploads-v3" defer></script>
   <script src="assets/photo-presentation.js?v=continuous-swipe-v4" defer></script>
   <script src="assets/photo-swipe.js?v=phone-single-touch-v11" defer></script>
-  <script src="assets/media.js?v=video-clips-v24" defer></script>
+  <script src="assets/media.js?v=compact-video-v25" defer></script>
   <script src="assets/video-editor.js?v=upload-wizard-v2" defer></script>
+  <script src="assets/video-presentation.js?v=compact-video-v1" defer></script>
   <script src="assets/video-upload-wizard.js?v=upload-wizard-v1" type="module"></script>
   <script src="assets/photo-viewer-layout.js?v=fullscreen-layout-v9" defer></script>
   <script src="assets/personal-photo-layout.js?v=inline-overlay-row-v16" defer></script>
   <script src="assets/photo-fullscreen-faces.js?v=screensaver-labels-v2" defer></script>
   <script src="assets/photo-fullscreen.js?v=always-available-ages-v9" defer></script>
   <script src="assets/screensaver.js?v=family-screensaver-v1" defer></script>
-  <script src="assets/portal.js?v=video-grid-v1" defer></script>
+  <script src="assets/portal.js?v=compact-video-v2" defer></script>
   <script src="assets/gallery-filter.js?v=custom-tags-v2" type="module"></script>
   <script src="assets/updates.js" defer></script>
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
@@ -109,7 +111,7 @@
   <script src="assets/nursery.js?v=circular-photo-pages-v4" defer></script>
   <script src="assets/tree-guide.js" defer></script>
   <script src="assets/games.js?v=quiz-speed-v1" type="module"></script>
-  <script src="assets/app.js?v=family-screensaver-route-v3" defer></script>
+  <script src="assets/app.js?v=compact-video-search-v1" defer></script>
   <script src="assets/cloud.js" defer></script>
   <script src="assets/recycle-bin.js?v=private-bin-v1" defer></script>
 </head>
@@ -133,6 +135,7 @@
         <div class="workspace-header">
           <div class="workspace-title"><span class="section-diamond" aria-hidden="true">◇</span><div><h2 id="workspaceTitle">האילן המשפחתי</h2><p id="workspaceSubtitle">משורש משותף, שישה ענפים של אהבה</p><p id="workspaceDetail" class="workspace-detail" hidden></p></div></div>
           <button type="button" id="galleryHeaderUpload" class="primary-button gallery-header-upload" data-upload-collection="gallery" aria-label="הוספת תמונות לגלריה"><span>+ הוספת</span><span>תמונות</span></button>
+          <button type="button" id="videoHeaderUpload" class="primary-button video-header-upload" data-upload-collection="videos" aria-label="העלאת סרטונים"><span>+ העלאת</span><span>סרטונים</span></button>
           <div class="workspace-actions">
             <div class="search-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg><input id="searchInput" type="search" placeholder="חיפוש בן או בת משפחה" aria-label="חיפוש בני משפחה" autocomplete="off"><div class="search-results" id="searchResults" hidden></div></div>
           </div>

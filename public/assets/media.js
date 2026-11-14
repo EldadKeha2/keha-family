@@ -256,6 +256,7 @@
     }else{
       const note=document.createElement('p');note.className='media-document-preview';note.textContent='▤ '+item.filename+I18n.t(' · לפתיחת המסמך בחרו ״הורדת המקור״.');stage.append(note);$('mediaPlaybackNote').hidden=true;
     }
+    window.FamilyVideoPresentation?.present(item,state.scope);
     renderSwipeHint();
   }
   function open(items,index=0,scope){
