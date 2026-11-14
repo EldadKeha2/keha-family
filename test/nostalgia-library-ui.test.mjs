@@ -35,6 +35,7 @@ function galleryModel(source,run){
     close(){this.open=false;}
     scrollBy({left}){this.scrollLeft+=left;}
     scrollIntoView(){}
+    focus(){this.focused=true;}
     reset(){}
   }
   for(const id of ['nostalgiaView','nostalgiaLibraryHome','nostalgiaEventHeader','nostalgiaFeedIntro','nostalgiaDropzone','nostalgiaUploadState']){const node=new Element();node.id=id;nodes.set(id,node);}
@@ -48,33 +49,46 @@ function galleryModel(source,run){
   const collection={items:[],library:{categories:[{id:'military',name:'מסיבות גיוס ושחרור',icon:'olive',color:'olive'},{id:'holidays',name:'חגים ומועדים',icon:'lantern',color:'honey'}],events:[{id:'ora',categoryId:'military',name:'מסיבת השחרור של אורה',count:19,videoCount:19,revision:'1'},{id:'independence',categoryId:'holidays',name:'יום העצמאות 1996',count:1,videoCount:1,revision:'1'}]}};
   const render=()=>window.FamilyNostalgia.select(collection);render();
   const button=data=>({dataset:data,hasAttribute:name=>Object.hasOwn(data,name.replace(/^data-/,'').replace(/-([a-z])/g,(_,c)=>c.toUpperCase())),closest(selector){return selector==='button'||selector==='[data-nostalgia-category]'&&Object.hasOwn(data,'nostalgiaCategory')?this:null;}});
-  return {api:window.FamilyNostalgia,window,location,openedVideos,node:id=>nodes.get(id),collection,render,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>{const target=button(data);emit(documentListeners,'click',{target});return target;},hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
+  return {api:window.FamilyNostalgia,window,location,openedVideos,node:id=>nodes.get(id),collection,render,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>{const target=button(data);emit(documentListeners,'click',{target});return target;},activate:(id,type='click',event={})=>emit(nodes.get(id).listeners,type,{preventDefault(){},stopPropagation(){},...event}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
 }
 
-test('folder deletion requires confirmation and keeps the folder and contents unchanged when cancelled',()=>{
- const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));gallery.goEvent('ora');let confirmation;
- gallery.window.confirm=message=>{confirmation=message;return false;};gallery.window.FamilyArchive.nostalgiaAction=()=>assert.fail('Cancellation must not send a deletion');
+test('folder deletion uses its own confirmation with the folder name and sends no deletion when cancelled',async()=>{
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));gallery.goEvent('ora');
+ gallery.window.confirm=()=>assert.fail('Use the site confirmation instead of the browser prompt');gallery.window.FamilyArchive.nostalgiaAction=()=>assert.fail('Cancellation must not send a deletion');
  assert.match(gallery.node('nostalgiaEventHeader').innerHTML,/data-nostalgia-delete-event="ora"/);
  gallery.click({nostalgiaDeleteEvent:'ora',nostalgiaEventRevision:'1'});
- assert.match(confirmation,/מסיבת השחרור של אורה/);assert.match(confirmation,/הקבצים יישמרו/);assert.equal(gallery.collection.library.events.length,2);assert.equal(gallery.location.hash,'#nostalgia/event/ora');
+ assert.equal(gallery.node('nostalgiaDeleteDialog').open,true);assert.equal(gallery.node('nostalgiaDeleteFolderName').textContent,'מסיבת השחרור של אורה');assert.equal(gallery.node('nostalgiaDeleteCancel').focused,true);
+ gallery.activate('nostalgiaDeleteCancel');await new Promise(resolve=>setImmediate(resolve));assert.equal(gallery.node('nostalgiaDeleteDialog').open,false);assert.equal(gallery.collection.library.events.length,2);assert.equal(gallery.location.hash,'#nostalgia/event/ora');
  gallery.click({nostalgiaEditEvent:'ora'});assert.equal(gallery.node('nostalgiaDeleteEvent').hidden,false);assert.equal(gallery.node('nostalgiaDeleteEvent').dataset.nostalgiaEventRevision,'1');
  gallery.click({nostalgiaNewEvent:'military'});assert.equal(gallery.node('nostalgiaDeleteEvent').hidden,true);
 });
 
 test('successful folder deletion waits for the server and returns to the unclassified list',async()=>{
  const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context)),requests=[];let complete;
- gallery.collection.items=[{id:'film',kind:'video',nostalgiaEventIds:['ora']}];gallery.goEvent('ora');gallery.window.confirm=()=>true;
+ gallery.collection.items=[{id:'film',kind:'video',nostalgiaEventIds:['ora']}];gallery.goEvent('ora');
  gallery.window.FamilyArchive.nostalgiaAction=(action,body)=>{requests.push({action,body});return new Promise(resolve=>complete=resolve);};gallery.window.FamilyArchive.renderNostalgia=gallery.render;
- const button=gallery.click({nostalgiaDeleteEvent:'ora',nostalgiaEventRevision:'1'});assert.equal(button.disabled,true);assert.equal(gallery.collection.library.events.length,2);
+ const button=gallery.click({nostalgiaDeleteEvent:'ora',nostalgiaEventRevision:'1'});assert.equal(requests.length,0);assert.equal(gallery.node('nostalgiaDeleteDialog').open,true);gallery.activate('nostalgiaDeleteConfirm');await new Promise(resolve=>setImmediate(resolve));assert.equal(button.disabled,true);assert.equal(gallery.node('nostalgiaDeleteDialog').open,false);assert.equal(gallery.collection.library.events.length,2);
  assert.equal(requests[0].action,'event-delete');assert.equal(requests[0].body.id,'ora');assert.equal(requests[0].body.expectedRevision,'1');
  gallery.collection.library.events=gallery.collection.library.events.filter(event=>event.id!=='ora');gallery.collection.items[0].nostalgiaEventIds=[];gallery.render();complete({saved:true,collection:gallery.collection});await new Promise(resolve=>setImmediate(resolve));
  assert.equal(button.disabled,false);assert.equal(gallery.location.hash,'#nostalgia');assert.equal(gallery.node('nostalgiaEventHeader').hidden,true);assert.deepEqual(Array.from(gallery.render(),item=>item.id),['film']);
 });
 
 test('failed folder deletion keeps the folder editable and displays the error for retry',async()=>{
- const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));gallery.goEvent('ora');gallery.click({nostalgiaEditEvent:'ora'});gallery.window.confirm=()=>true;
- gallery.window.FamilyArchive.nostalgiaAction=async()=>{throw Error('Please retry');};const button=gallery.click({nostalgiaDeleteEvent:'ora',nostalgiaEventRevision:'1'});await new Promise(resolve=>setImmediate(resolve));
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));gallery.goEvent('ora');gallery.click({nostalgiaEditEvent:'ora'});
+ gallery.window.FamilyArchive.nostalgiaAction=async()=>{throw Error('Please retry');};const button=gallery.click({nostalgiaDeleteEvent:'ora',nostalgiaEventRevision:'1'});gallery.activate('nostalgiaDeleteConfirm');await new Promise(resolve=>setImmediate(resolve));
  assert.equal(gallery.node('nostalgiaEventDialog').open,true);assert.equal(gallery.node('nostalgiaEventError').textContent,'Please retry');assert.equal(gallery.collection.library.events.length,2);assert.equal(button.disabled,false);assert.equal(gallery.location.hash,'#nostalgia/event/ora');
+});
+
+test('Escape, closing and clicking the backdrop dismiss the folder confirmation without deleting anything',async()=>{
+ for(const dismissal of ['escape','close','backdrop']){
+  const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));gallery.goEvent('ora');gallery.window.FamilyArchive.nostalgiaAction=()=>assert.fail('Dismissing must not delete');
+  gallery.click({nostalgiaDeleteEvent:'ora',nostalgiaEventRevision:'1'});
+  if(dismissal==='escape')gallery.activate('nostalgiaDeleteDialog','cancel');
+  else if(dismissal==='close')gallery.activate('nostalgiaDeleteClose');
+  else gallery.activate('nostalgiaDeleteDialog','click',{target:gallery.node('nostalgiaDeleteDialog')});
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(gallery.node('nostalgiaDeleteDialog').open,false);assert.equal(gallery.collection.library.events.length,2);
+  gallery.click({nostalgiaDeleteEvent:'ora',nostalgiaEventRevision:'1'});assert.equal(gallery.node('nostalgiaDeleteDialog').open,true);gallery.activate('nostalgiaDeleteCancel');await new Promise(resolve=>setImmediate(resolve));
+ }
 });
 
 test('event folders use the browsing grid without upload actions, and returning home restores uploads',()=>{

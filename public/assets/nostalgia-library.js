@@ -129,10 +129,19 @@
     if(state.closing)return;state.closing=true;dialog.classList.add('is-closing');state.closeTimer=setTimeout(()=>{state.closeTimer=null;if(dialog.open)dialog.close();state.closing=false;},170);
   }
   async function action(name,body){return window.FamilyArchive.nostalgiaAction(name,body);}
+  let deleteConfirmation=null;
+  function finishDeleteConfirmation(confirmed=false){
+    const pending=deleteConfirmation;if(!pending)return;deleteConfirmation=null;
+    const dialog=$('nostalgiaDeleteDialog');if(dialog.open)dialog.close();
+    pending.opener?.focus?.({preventScroll:true});pending.resolve(confirmed);
+  }
+  function confirmDelete(event,opener){
+    const dialog=$('nostalgiaDeleteDialog');$('nostalgiaDeleteFolderName').textContent=eventName(event);
+    return new Promise(resolve=>{deleteConfirmation={resolve,opener};dialog.showModal();$('nostalgiaDeleteCancel').focus();});
+  }
   async function deleteEvent(id,expectedRevision,button){
-    const event=getEvent(id);if(!event||event.id===DIRECT_DESTINATION||event.directCategory||state.deletingEvent)return;
-    const message=tr('למחוק את התיקייה „'+eventName(event)+'”? התוכן שבתוכה יעבור לרשימת הפריטים הלא משויכים והקבצים יישמרו.','Delete the folder “'+eventName(event)+'”? Its contents will move to the unclassified list and the files will be kept.');
-    if(!window.confirm(message))return;
+    const event=getEvent(id);if(!event||event.id===DIRECT_DESTINATION||event.directCategory||state.deletingEvent||deleteConfirmation)return;
+    if(!await confirmDelete(event,button))return;
     state.deletingEvent=id;button.disabled=true;$('nostalgiaEventError').textContent='';
     try{
       await action('event-delete',{id,expectedRevision});
@@ -184,6 +193,14 @@
     createDialog('nostalgiaEventDialog',`<form id="nostalgiaEventForm"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close="nostalgiaEventDialog" aria-label="${tr('סגירה','Close')}">×</button><span class="small-eyebrow">${tr('עוד סיפור לאלבום שלנו','Another story for our album')}</span><h3 id="nostalgiaEventFormTitle"></h3><label>${tr('שם האירוע','Event name')}<input id="nostalgiaEventName" maxlength="140" required></label><label>${tr('באיזה מדף?','Which shelf?')}<select id="nostalgiaEventCategory" required></select></label><fieldset class="nostalgia-date-inputs"><legend>${tr('תאריך האירוע — אם ידוע','Event date — if known')}</legend><label>${tr('יום','Day')}<input id="nostalgiaEventday" inputmode="numeric" type="number" min="1" max="31"></label><label>${tr('חודש','Month')}<input id="nostalgiaEventmonth" inputmode="numeric" type="number" min="1" max="12"></label><label>${tr('שנה','Year')}<input id="nostalgiaEventyear" inputmode="numeric" type="number" min="1000" max="9999"></label></fieldset><label>${tr('איפה זה היה?','Where was it?')}<input id="nostalgiaEventLocation" maxlength="240"></label><p class="form-error" id="nostalgiaEventError" role="alert"></p><div class="nostalgia-event-form-actions"><button type="submit" class="primary-button">${tr('שמירת האירוע','Save event')}</button><button type="button" id="nostalgiaDeleteEvent" class="nostalgia-event-delete" data-nostalgia-delete-event hidden>${trashIcon}<span>${tr('מחיקת תיקייה','Delete folder')}</span></button></div></form>`);
     createDialog('nostalgiaNewCategoryDialog',`<form id="nostalgiaNewCategoryForm"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close="nostalgiaNewCategoryDialog" aria-label="${tr('סגירה','Close')}">×</button><span class="small-eyebrow">${tr('עוד מקום לזיכרונות','More room for memories')}</span><h3>${tr('מוסיפים מדף חדש','Add another shelf')}</h3><label>${tr('שם הקטגוריה','Category name')}<input id="nostalgiaNewCategoryName" maxlength="80" required></label><p class="form-error" id="nostalgiaNewCategoryError" role="alert"></p><button type="submit" class="primary-button">${tr('יצירת קטגוריה','Create category')}</button></form>`);
     createDialog('nostalgiaAssignDialog',`<form id="nostalgiaAssignForm"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close="nostalgiaAssignDialog" aria-label="${tr('סגירה','Close')}">×</button><h3 id="nostalgiaAssignTitle"></h3><p>${tr('אפשר לבחור יותר מאירוע אחד. בלי סימון, הפריט יופיע באזור הלא מתויג.','Choose more than one event if needed. With none selected, the file stays unclassified.')}</p><div id="nostalgiaAssignChoices" class="nostalgia-assign-choices"></div><button type="button" class="quiet-button" data-nostalgia-new-event-for-item>${tr('＋ יצירת אירוע חדש','＋ Create a new event')}</button><p id="nostalgiaAssignError" class="form-error" role="alert"></p><button type="submit" class="primary-button">${tr('שמירת השיוך','Save selection')}</button></form>`);
+    const deletion=createDialog('nostalgiaDeleteDialog',`<button type="button" id="nostalgiaDeleteClose" class="nostalgia-dialog-close" aria-label="${tr('סגירה','Close')}">×</button><div class="nostalgia-delete-ornament" aria-hidden="true"><span>◇</span><span>◆</span><span>◇</span></div><div class="nostalgia-delete-emblem" aria-hidden="true">${trashIcon}</div><h3 id="nostalgiaDeleteTitle">${tr('מחיקת תיקייה','Delete folder')}</h3><strong id="nostalgiaDeleteFolderName" dir="auto"></strong><p id="nostalgiaDeleteDescription">${tr('התוכן שבתיקייה יעבור לאזור הלא משויך.','This folder’s contents will move to the unclassified area.')}</p><p class="nostalgia-delete-reassurance">${tr('כל הקבצים יישמרו, ותוכלו לשייך אותם מחדש בכל עת.','All files will be kept, ready to assign again at any time.')}</p><div class="nostalgia-delete-actions"><button type="button" id="nostalgiaDeleteCancel">${tr('ביטול','Cancel')}</button><button type="button" id="nostalgiaDeleteConfirm">${tr('מחיקת התיקייה','Delete folder')}</button></div>`,'nostalgia-form-dialog nostalgia-delete-dialog');
+    deletion.setAttribute('role','alertdialog');deletion.setAttribute('aria-labelledby','nostalgiaDeleteTitle');deletion.setAttribute('aria-describedby','nostalgiaDeleteFolderName nostalgiaDeleteDescription');deletion.dir=english?'ltr':'rtl';
+    $('nostalgiaDeleteConfirm').addEventListener('click',()=>finishDeleteConfirmation(true));
+    for(const id of ['nostalgiaDeleteCancel','nostalgiaDeleteClose'])$(id).addEventListener('click',()=>finishDeleteConfirmation(false));
+    deletion.addEventListener('cancel',event=>{event.preventDefault();finishDeleteConfirmation(false);});
+    deletion.addEventListener('close',()=>{if(!deletion.open)finishDeleteConfirmation(false);});
+    deletion.addEventListener('click',event=>{if(event.target===deletion)finishDeleteConfirmation(false);});
+    deletion.addEventListener('keydown',event=>event.stopPropagation());
     $('nostalgiaCategoryDialog').addEventListener('cancel',event=>{event.preventDefault();closeCategory();});
     $('nostalgiaCategoryDialog').addEventListener('click',event=>{if(event.target===$('nostalgiaCategoryDialog'))closeCategory();});
     document.addEventListener('click',event=>{

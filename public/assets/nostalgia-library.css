@@ -49,3 +49,22 @@ dialog.nostalgia-form-dialog{width:min(500px,calc(100vw - 32px));max-width:none;
 @media(max-width:700px){#nostalgiaView.nostalgia-event-grid{padding:12px 12px 20px}#nostalgiaView.nostalgia-event-grid #nostalgiaGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.nostalgia-event-name{font-size:calc(25px * var(--a11y-text-scale,1))}.nostalgia-event-details{font-size:calc(12px * var(--a11y-text-scale,1));gap:4px 12px}}
 
 .nostalgia-event-actions{display:flex;align-items:center;gap:6px;flex:none}.nostalgia-event-delete{display:inline-flex;align-items:center;justify-content:center;gap:5px;color:#995247}.nostalgia-event-delete svg{width:16px;height:16px;flex:none}.nostalgia-event-form-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.nostalgia-event-form-actions>.nostalgia-event-delete{padding:8px 12px;min-height:36px;border:1px solid #d9b8ab;border-radius:6px;background:#fff4ef}.nostalgia-event-delete:disabled{opacity:.5;cursor:wait}@media(max-width:600px){.nostalgia-event-actions .nostalgia-event-delete span{display:none}}
+
+dialog.nostalgia-delete-dialog{box-sizing:border-box;width:min(440px,calc(100vw - 32px));max-width:none;max-height:calc(100dvh - 32px);padding:26px 28px 25px;border:1px solid #bba476;border-radius:16px;background:radial-gradient(ellipse at 50% 0,#ecddbd55,transparent 65%),#fffaf0;color:#63563f;text-align:center;box-shadow:inset 0 0 0 5px #fffdf7,inset 0 0 0 6px #d9c6a580,0 22px 75px #34281745;overflow:auto}
+dialog.nostalgia-delete-dialog::backdrop{background:#30291f94;backdrop-filter:blur(3px)}
+.nostalgia-delete-dialog .nostalgia-dialog-close{top:13px;inset-inline-end:13px;width:30px;height:30px;font-size:23px}
+.nostalgia-delete-ornament{display:flex;align-items:center;justify-content:center;gap:9px;color:#b39862;font-size:11px;line-height:1;margin:0 35px 17px}
+.nostalgia-delete-ornament::before,.nostalgia-delete-ornament::after{content:'';height:1px;flex:1;max-width:60px;background:linear-gradient(90deg,transparent,#bea579,transparent)}
+.nostalgia-delete-emblem{display:grid;place-items:center;width:48px;height:48px;margin:0 auto 12px;border:1px solid #d7c2a3;border-radius:50%;background:#f5e8d9;color:#9a6752}
+.nostalgia-delete-emblem svg{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.nostalgia-delete-dialog h3{font:500 calc(29px * var(--a11y-text-scale,1))/1.3 var(--serif);margin:0 0 9px;color:#6b5940}
+#nostalgiaDeleteFolderName{display:block;font:600 calc(17px * var(--a11y-text-scale,1))/1.5 var(--sans);color:#6b7653;overflow-wrap:anywhere}
+.nostalgia-delete-dialog p{font:calc(14px * var(--a11y-text-scale,1))/1.7 var(--sans);margin:13px 0 0;color:#75674f}
+.nostalgia-delete-dialog .nostalgia-delete-reassurance{font-size:calc(12px * var(--a11y-text-scale,1));color:#928264;margin-top:5px}
+.nostalgia-delete-actions{display:flex;align-items:stretch;justify-content:center;gap:10px;margin-top:23px}
+.nostalgia-delete-actions button{flex:1;min-width:0;min-height:43px;padding:9px 11px;border:1px solid;border-radius:7px;font:500 calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);cursor:pointer;transition:background .15s,border-color .15s}
+#nostalgiaDeleteCancel{color:#64734d;border-color:#c6cbb7;background:#f5f5ea}#nostalgiaDeleteCancel:hover{border-color:#a6b292;background:#eaf0de}
+#nostalgiaDeleteConfirm{color:#fffaf1;border-color:#985d47;background:#9e664d}#nostalgiaDeleteConfirm:hover{border-color:#85513e;background:#8a573f}
+.nostalgia-delete-actions button:focus-visible{outline:2px solid #8e9d70;outline-offset:3px}
+@media(max-width:480px){dialog.nostalgia-delete-dialog{padding:25px 21px 22px}.nostalgia-delete-dialog h3{font-size:calc(26px * var(--a11y-text-scale,1))}.nostalgia-delete-actions{gap:8px}.nostalgia-delete-actions button{font-size:calc(13px * var(--a11y-text-scale,1))}}
+@media(prefers-reduced-motion:reduce){.nostalgia-delete-actions button{transition:none}}
