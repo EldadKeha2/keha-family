@@ -134,8 +134,8 @@ test('the wedding return button and revisiting the weddings tab do not reopen a 
   f.window.FamilyApp.setView('gallery');f.window.FamilyApp.setView('weddings');await f.flush();
   assert.equal(f.browser.location.hash,'#weddings');assert.equal(f.nodes.get('weddingsOverview').hidden,false);
 });
-test('empty nostalgia categories expose upload controls and each picker accepts the selected type',async()=>{
-  const f=fixture();await f.flush();assert.equal(f.grid.children.filter(n=>n.dataset.nostalgiaKind).length,3);
+test('empty nostalgia grids stay compact and each upload picker accepts the selected type',async()=>{
+  const f=fixture();await f.flush();assert.equal(f.grid.children.filter(n=>n.dataset.nostalgiaKind).length,0);
   for(const [kind,accept]of [['photo','image/jpeg'],['video','video/mp4'],['document','.pdf']]){
     f.upload(kind);const input=f.nodes.get('nostalgiaUploadInput');assert.equal(input.dataset.scope,'nostalgia');assert.ok(input.accept.includes(accept));
     if(kind==='video')assert.ok(!input.accept.includes('image/'));if(kind==='photo')assert.ok(!input.accept.includes('video/'));

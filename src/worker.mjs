@@ -2,6 +2,7 @@ import family from './family.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {multipartVideo} from './video-multipart.mjs';
+import {videoClipRoute} from './video-clip-route.mjs';
 import {recycleRoute} from './recycle-route.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
@@ -321,10 +322,11 @@ export default {
         let item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]}),derived=false;
         const variant=url.searchParams.get('thumbnail')==='1'?'thumbnail':url.searchParams.get('preview')==='1'?'preview':null;
         if(variant&&!url.searchParams.has('version')&&item[variant]?.revision===(item.photoRevision||'original')){item={...item,...item[variant]};derived=true;}
-        if(item.provider==='youtube')return new Response(null,{status:302,headers:{Location:'https://www.youtube.com/watch?v='+item.youtubeId,'Cache-Control':'no-store'}});
+        if(item.provider==='youtube')return new Response(null,{status:302,headers:{Location:'https://www.youtube.com/watch?v='+item.youtubeId+(item.youtubeStart?'&t='+Math.floor(item.youtubeStart)+'s':''),'Cache-Control':'no-store'}});
         return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/clip$/.exec(path)))return await videoClipRoute(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(thumbnail|preview)$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1],match[2]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/ignore$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.ignore',{id:match[1],photoRevision:body.photoRevision,rect:body.rect,ignored:body.ignored,faceId:body.faceId,expectedRevision:body.expectedRevision}));}
         if(path==='/api/collections/cover'){const body=await readJSON(request,2000);return json(await db('collection.cover',{kind:body.collection,mediaId:body.mediaId}));}

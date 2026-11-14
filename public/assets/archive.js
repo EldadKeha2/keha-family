@@ -150,6 +150,7 @@
       const actions={photo:I18n.t('＋ העלאת תמונות'),video:I18n.t('＋ העלאת סרטונים'),document:I18n.t('＋ העלאת מסמכים')};
       for(const kind of kinds){
         const kindCards=cards.filter(card=>card.dataset.mediaKind===kind);
+        if(key==='nostalgia'&&!kindCards.length&&filter==='all')continue;
         const heading=grid.querySelector('[data-nostalgia-kind="'+kind+'"]')||document.createElement('header');
         heading.className='nostalgia-media-heading';heading.dataset.nostalgiaKind=kind;
         heading.innerHTML=`<h4>${labels[kind]} <span>(${kindCards.length})</span></h4><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="${kind}">${actions[kind]}</button>`;

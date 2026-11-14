@@ -62,7 +62,7 @@
   function shareURL(item){const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);url.hash='gallery';return url.href;}
 
   function controls(item,scope){
-    return I18n.html`<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?I18n.t('הסרת'):I18n.t('מחיקת')} ${safe(I18n.mediaName(item))}${linked(item,scope)?I18n.t(' מהאלבום'):''}">${I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט')}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
+    return I18n.html`<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyVideoEditor?.controls(item,scope)||''}${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?I18n.t('הסרת'):I18n.t('מחיקת')} ${safe(I18n.mediaName(item))}${linked(item,scope)?I18n.t(' מהאלבום'):''}">${I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט')}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
   }
   function routeAlbum(){
     const [view,raw]=new URL(location.href).hash.slice(1).split('/');let id;
@@ -156,6 +156,7 @@
     profileButton.querySelector('span').textContent=profileLabel;profileButton.setAttribute('aria-label',profileLabel);profileButton.title=profileLabel;
     if(selected&&!albumCover){const undoLabel=tr('זו תמונת הפרופיל. לחצו לביטול הבחירה ולחזרה לתמונה הקודמת','Current profile picture. Click to undo this selection and restore the previous photo');profileButton.title=undoLabel;profileButton.setAttribute('aria-label',undoLabel);}
     const profileHair=profileButton.querySelector('[data-profile-hair]');if(gender==='f')profileHair.removeAttribute('hidden');else profileHair.setAttribute('hidden','');
+    window.FamilyVideoEditor?.viewer(item,state.scope);
     captionControls();
     const page=albumPages.get(state.scope),total=page?.total??state.items.length,offset=page?(page.page-1)*page.size:0;
     $('mediaStage').classList.toggle('photo-swipe-enabled',item.kind==='photo'&&total>1&&!state.paging);
@@ -227,7 +228,7 @@
     const stage=$('mediaStage');stage.classList.toggle('is-video',item.kind==='video');stage.classList.toggle('is-document',item.kind==='document');
     if(item.provider==='youtube'&&/^[\w-]{11}$/.test(item.youtubeId)){
       const frame=document.createElement('iframe');
-      frame.src='https://www.youtube-nocookie.com/embed/'+item.youtubeId+'?rel=0';
+      frame.src='https://www.youtube-nocookie.com/embed/'+item.youtubeId+'?rel=0'+(item.youtubeStart!==undefined?'&start='+Math.floor(item.youtubeStart)+'&end='+Math.ceil(item.youtubeEnd):'');
       frame.title=I18n.mediaName(item);frame.allow='autoplay; encrypted-media; picture-in-picture; fullscreen';
       frame.allowFullscreen=true;frame.referrerPolicy='strict-origin-when-cross-origin';
       stage.append(frame);

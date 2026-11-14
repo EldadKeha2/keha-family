@@ -1946,3 +1946,39 @@ test('ZIP downloads stream exactly the selected gallery photos, deduplicate name
 });
 
 
+
+test('video editing saves a real separate clip in all the original folders, with tags, dates and retry protection',async()=>{
+ const f=fixture();try{
+  await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url));
+  let response=await f.call('/api/nostalgia/upload?filename=family-film.mp4&event=ora-release-1988',{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}});
+  const original=(await response.json()).collection.items[0];
+  await f.call('/api/nostalgia/assign',{method:'POST',body:{id:original.id,add:['independence-1996']}});
+  await f.call('/api/media/'+original.id+'/tag',{method:'POST',body:{personId:'tomer',tagged:true}});
+  const clipId=uid(),body={clipId,name:'הרגע שבחרנו',start:2.125,end:5.875},before=f.objects.size;
+  assert.equal((await f.call('/api/media/'+original.id+'/clip',{method:'POST',body,clientHeaders:false})).status,403);
+  response=await f.call('/api/media/'+original.id+'/clip',{method:'POST',body});assert.equal(response.status,201,await response.clone().text());
+  const result=await response.json();assert.equal(result.operation,'video-clip');assert.equal(result.item.id,clipId);assert.equal(result.item.duration,3.75);assert.equal(result.item.name,'הרגע שבחרנו');
+  assert.deepEqual(result.item.nostalgiaEventIds,['ora-release-1988','independence-1996']);assert.deepEqual(result.item.takenDate,original.takenDate);assert.ok(result.item.tags.some(p=>p.id==='tomer'));
+  assert.equal(f.objects.size,before+1);const originalFile=await f.call(original.src);assert.deepEqual(new Uint8Array(await originalFile.arrayBuffer()),new Uint8Array(bytes));
+  const clipFile=await f.call(result.item.src);assert.equal(clipFile.status,200);assert.equal(clipFile.headers.get('Content-Type'),'video/mp4');assert.equal(Number(clipFile.headers.get('Content-Length')),result.item.size);
+  const retry=await f.call('/api/media/'+original.id+'/clip',{method:'POST',body});assert.equal(retry.status,200);assert.equal((await retry.json()).item.id,clipId);assert.equal(f.objects.size,before+1);
+  assert.equal((await f.call('/api/media/'+original.id+'/clip',{method:'POST',body:{...body,name:'שינוי באותה בקשה'}})).status,409);
+  f.restart();const collection=await(await f.call('/api/nostalgia')).json();assert.ok(collection.items.some(i=>i.id===clipId&&i.videoClip.sourceId===original.id));
+  await f.call('/api/media/'+original.id+'/delete',{method:'POST',body:{scope:'nostalgia'}});assert.equal((await f.call(result.item.src)).status,200,'The clip remains independently accessible after the original is removed');
+ }finally{await f.close();}
+});
+
+test('clips keep unclassified videos unclassified and support personal and wedding albums without changing the source',async()=>{
+ const f=fixture();try{
+  await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url));
+  for(const route of ['/api/nostalgia/upload','/api/people/tomer/videos','/api/weddings/'+family.root+'/upload']){
+   const uploaded=await(await f.call(route+'?filename=source.mp4',{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}})).json();
+   const scope=route.includes('/people/')?'personal:tomer':route.includes('/weddings/')?'wedding:'+family.root:'nostalgia';
+   const source=scope.startsWith('personal:')?uploaded.person.gallery.find(i=>i.file===uploaded.file):uploaded.collection.items.find(i=>i.file===uploaded.file);
+   assert.ok(source,'Uploaded source belongs to its album');
+   const result=await(await f.call('/api/media/'+source.id+'/clip',{method:'POST',body:{clipId:uid(),name:'clip',start:1,end:2}})).json();
+   assert.equal(result.scope,scope);assert.equal(result.item.duration,1);if(scope==='nostalgia')assert.deepEqual(result.item.nostalgiaEventIds,[]);
+   assert.equal((await f.call(source.src)).status,200);
+  }
+ }finally{await f.close();}
+});

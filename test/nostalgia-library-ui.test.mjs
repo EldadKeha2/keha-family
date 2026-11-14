@@ -18,7 +18,7 @@ test('numbered event clips stay in their original sequence even when uploaded ou
 function galleryModel(source,run){
   const nodes=new Map(),documentListeners=new Map(),windowListeners=new Map(),timers=new Map();let timerId=0;
   class Element{
-    constructor(tag='div'){this.tagName=tag.toUpperCase();this.dataset={};this.style={scrollBehavior:''};this.hidden=false;this.open=false;this.scrollLeft=0;this.clientWidth=800;this.value='';this.listeners=new Map();this._html='';const classes=new Set();this.classList={add:(...values)=>values.forEach(v=>classes.add(v)),remove:(...values)=>values.forEach(v=>classes.delete(v)),contains:v=>classes.has(v)};}
+    constructor(tag='div'){this.tagName=tag.toUpperCase();this.dataset={};this.style={scrollBehavior:''};this.hidden=false;this.open=false;this.scrollLeft=0;this.clientWidth=800;this.value='';this.listeners=new Map();this._html='';const classes=new Set();this.classList={add:(...values)=>values.forEach(v=>classes.add(v)),remove:(...values)=>values.forEach(v=>classes.delete(v)),contains:v=>classes.has(v),toggle:(v,on)=>{if(on??!classes.has(v))classes.add(v);else classes.delete(v)}};}
     set innerHTML(value){this._html=value;for(const match of value.matchAll(/\bid="([^"]+)"/g))if(!nodes.has(match[1])){const child=new Element();child.id=match[1];nodes.set(child.id,child);}}
     get innerHTML(){return this._html;}
     setAttribute(){}
@@ -72,4 +72,20 @@ test("A delayed hover cannot open a category on a hidden page",()=>{
 test("Reopening a closing category cancels the earlier close timer",()=>{
  const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
  (function(m,assert){m.click({nostalgiaCategory:'military'});m.click({nostalgiaCloseCategory:''});m.click({nostalgiaCategory:'military'});m.flush();assert.equal(m.node('nostalgiaCategoryDialog').open,true);assert.equal(m.node('nostalgiaCategoryDialog').classList.contains('is-closing'),false);})(gallery,assert);
+});
+
+test('the home shows every folder inside compact shelves, with one highlighted folder per category and no opening banner',()=>{
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
+ const markup=gallery.node('nostalgiaCategories').innerHTML;
+ assert.match(markup,/data-nostalgia-shelf="military"/);
+ assert.match(markup,/data-nostalgia-event="ora"/);
+ assert.match(markup,/data-nostalgia-event="independence"/);
+ assert.equal((markup.match(/class="nostalgia-folder is-active"/g)||[]).length,2);
+ assert.equal((markup.match(/data-nostalgia-new-event=/g)||[]).length,2);
+ assert.match(markup,/nostalgia-shelf-frame/);
+ assert.doesNotMatch(gallery.node('nostalgiaLibraryHome').innerHTML,/nostalgia-library-intro|פותחים מגירה של זיכרונות/);
+});
+test('segment filenames are sorted naturally within the event',()=>{
+ const api=model(),items=[4,2,1,3].map(n=>({id:String(n),name:'Bloom-seg'+n,nostalgiaEventIds:['bloom']}));
+ assert.deepEqual(Array.from(api.viewItems({items},'bloom'),i=>i.id),['1','2','3','4']);
 });

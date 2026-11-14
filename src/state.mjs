@@ -358,6 +358,8 @@ export class FamilyState {
     ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item),labels:photoLabels(item.labels)}:{}),
     ...(['photo','video'].includes(mediaKind(item))?{takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
+    ...(item.videoClip?{videoClip:item.videoClip,duration:item.duration}:{}),
+    ...(item.youtubeStart!==undefined?{youtubeStart:item.youtubeStart,youtubeEnd:item.youtubeEnd}:{}),
     ...(item.category==='nostalgia'?{nostalgiaEventIds:item.nostalgiaEventIds||[]}:{}),
     ...(item.provider==='youtube'?{provider:'youtube',youtubeId:item.youtubeId,watchUrl:'https://www.youtube.com/watch?v='+item.youtubeId,poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};}
   mediaChanged(item,operation,ids=this.relatedPeople(item)){
@@ -746,6 +748,34 @@ export class FamilyState {
         const time=value=>{const [d,m,y]=value.split('.').map(Number);return Date.UTC(y,m-1,d);};
         if(date&&person.birthday!=='1.1.1111'&&time(date)<time(person.birthday))throw new HttpError(400,'תאריך הפטירה צריך להיות אחרי תאריך הלידה.');
         person.deathDate=date;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
+      }
+      case 'video.clip.prepare':{
+        const source=this.media(p.id);
+        if(mediaKind(source)!=='video'||source.category==='attachment')throw new HttpError(400,'בחרו סרטון לעריכת קטע.');
+        if(!/^[a-f0-9]{32}$/.test(p.clipId||''))throw new HttpError(400,'אישור השמירה אינו תקין. פתחו את העורך מחדש.');
+        const name=text(p.name,'שם הקטע',140,true),start=p.start,end=p.end;
+        if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end-start<.1||end>86400||source.duration&&end>source.duration+.05)throw new HttpError(400,'סמנו התחלה וסיום תקינים לקטע.');
+        const row=this.rows('SELECT data FROM media WHERE id=?',p.clipId)[0];
+        if(row){const item=JSON.parse(row.data);if(item.videoClip?.sourceId!==source.id||item.videoClip.start!==start||item.videoClip.end!==end||item.name!==name)throw new HttpError(409,'הקטע השתנה. פתחו את העורך מחדש.');return {existing:{...this.mediaChanged(item,'video-clip'),alreadySaved:true}};}
+        if(this.rows('SELECT id FROM media_trash WHERE id=?',p.clipId).length)throw new HttpError(409,'הקטע הועבר לסל המחזור. פתחו את העורך מחדש.');
+        return {source,clipId:p.clipId,name,start,end};
+      }
+      case 'video.clip.save':{
+        const prepared=this.run('video.clip.prepare',p);
+        if(prepared.existing){const item=this.media(p.clipId);return {...prepared.existing,storedKey:item.key||null};}
+        const source=prepared.source;
+        if((source.key||null)!==p.sourceKey)throw new HttpError(409,'הסרטון השתנה. פתחו את העורך מחדש.');
+        const youtube=source.provider==='youtube',data=p.item;
+        if(!youtube&&(!data?.key?.startsWith('video-clips/'+p.clipId+'/')||!Number.isSafeInteger(data.size)||data.size<=0||data.mime!=='video/mp4'))throw new HttpError(400,'הקטע החדש לא התקבל.');
+        const now=new Date().toISOString(),filename=p.name.replace(/[\/\\<>:"|?*\x00-\x1f]/g,'_')+'.mp4';
+        const copy={id:p.clipId,category:source.category,personId:source.personId||null,name:p.name,filename,file:(source.category==='personal'?'gallery/':'')+p.clipId+'.mp4',kind:'video',mime:youtube?source.mime:'video/mp4',size:youtube?0:data.size,...(!youtube?{key:data.key}:{provider:'youtube',youtubeId:source.youtubeId,youtubeStart:(source.youtubeStart||0)+p.start,youtubeEnd:(source.youtubeStart||0)+p.end}),caption:source.caption||'',createdAt:now,takenDate:photoDate(source.takenDate),takenDateRevision:uid(),duration:p.end-p.start,videoClip:{sourceId:source.id,start:p.start,end:p.end,duration:p.end-p.start}};
+        if(source.videoCategory)copy.videoCategory=source.videoCategory;
+        if(source.category==='nostalgia'){copy.nostalgiaEventIds=[...(source.nostalgiaEventIds||[])];this.nostalgiaLibrary.attach(copy);}
+        this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',copy.id,copy.category,copy.personId,JSON.stringify(copy));
+        this.sql.exec('INSERT INTO media_tags(media_id,person_id) SELECT ?,person_id FROM media_tags WHERE media_id=? ORDER BY rowid',copy.id,source.id);
+        this.sql.exec('INSERT INTO media_collections(media_id,collection,added_at) SELECT ?,collection,? FROM media_collections WHERE media_id=?',copy.id,now,source.id);
+        this.touchTags(copy.id);this.touchMedia(copy);
+        return {...this.mediaChanged(copy,'video-clip'),storedKey:copy.key||null};
       }
       case 'media.add':{
         const item=p.item;

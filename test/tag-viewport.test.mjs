@@ -14,6 +14,7 @@ function fixture({mobile=true}={}){
     closest(selector){return selector==='dialog'?this.dialog:selector==='label'?this.label:null;}
     contains(node){return node===this||[...this.children.values()].some(child=>child.contains(node));}
     getBoundingClientRect(){return {...this.bounds,bottom:this.bounds.top+this.bounds.height};}
+    insertAdjacentHTML(position,html){this.adjacentHTML={position,html};}
     replaceChildren(){}
     focus(){}
   }
