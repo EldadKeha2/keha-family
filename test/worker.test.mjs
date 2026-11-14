@@ -130,7 +130,7 @@ test('nostalgia event folders keep explicit uploads, partial dates, multiple eve
 });
 test('nostalgia categories and event metadata are editable, backed up, protected against stale changes and validated before binary uploads',async()=>{
  const f=fixture();try{
-  await f.connect();for(const action of ['category','event','assign'])assert.equal((await f.call('/api/nostalgia/'+action,{method:'POST',body:{},clientHeaders:false})).status,403);
+  await f.connect();for(const action of ['category','event','event-delete','assign'])assert.equal((await f.call('/api/nostalgia/'+action,{method:'POST',body:{},clientHeaders:false})).status,403);
   let response=await f.call('/api/nostalgia/category',{method:'POST',body:{name:'טיולים משפחתיים'}});assert.equal(response.status,200);const category=(await response.json()).category;
   assert.equal((await f.call('/api/nostalgia/category',{method:'POST',body:{name:'טיולים משפחתיים'}})).status,409);
   response=await f.call('/api/nostalgia/event',{method:'POST',body:{categoryId:category.id,name:'טיול לצפון',date:{year:1992},location:'הגליל'}});assert.equal(response.status,200);const event=(await response.json()).event;
@@ -141,6 +141,52 @@ test('nostalgia categories and event metadata are editable, backed up, protected
   assert.equal((await f.call('/api/nostalgia/multipart/start',{method:'POST',body:{filename:'a.mp4',size:video.length,head:video.subarray(0,128).toString('base64'),eventId:'not-an-event'}})).status,404);assert.equal(f.network.length,before);
   f.restart();const library=(await(await f.call('/api/nostalgia')).json()).library;assert.equal(library.categories.find(c=>c.id===category.id).name,'טיולים משפחתיים');assert.equal(library.events.find(e=>e.id===event.id).name,'טיול משפחתי לצפון');
   const backup=await(await f.call('/api/export')).json();assert.equal(backup.nostalgiaLibrary.events.find(e=>e.id===event.id).date.year,1992);
+ }finally{await f.close();}
+});
+test('deleting a populated nostalgia folder moves its content to unclassified while preserving files, tags, dates and unrelated folders',async()=>{
+ const f=fixture();try{
+  await f.connect();const initial=await(await f.call('/api/nostalgia')).json(),folder=initial.library.events.find(event=>event.id==='ora-release-1988');
+  const upload=async(filename,bytes,event=folder.id)=>(await(await f.call('/api/nostalgia/upload?filename='+filename+'&event='+event,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}})).json()).collection.items.find(item=>item.filename===filename);
+  const film=await upload('folder-film.mp4',video),picture=await upload('folder-picture.jpg',photo),trashed=await upload('folder-trashed.mp4',video),other=await upload('other-folder.mp4',video,'independence-1996');
+  await f.call('/api/nostalgia/assign',{method:'POST',body:{id:film.id,add:['independence-1996']}});
+  await f.call('/api/media/'+film.id+'/tag',{method:'POST',body:{personId:'tomer',tagged:true}});
+  assert.equal((await f.call('/api/media/'+trashed.id+'/delete',{method:'POST',body:{scope:'nostalgia'}})).status,200);
+  const before=await(await f.call('/api/nostalgia')).json(),bytesBefore=[...f.objects],networkBefore=f.network.length;
+  const response=await f.call('/api/nostalgia/event-delete',{method:'POST',body:{id:folder.id,expectedRevision:folder.revision}});assert.equal(response.status,200);const deleted=await response.json();
+  assert.equal(deleted.operation,'nostalgia-event-delete');assert.equal(deleted.moved,2);assert.equal(deleted.collection.items.length,before.items.length);
+  assert.equal(deleted.collection.library.events.some(event=>event.id===folder.id),false);assert.deepEqual(deleted.collection.library.categories,before.library.categories);
+  for(const id of [film.id,picture.id]){const item=deleted.collection.items.find(item=>item.id===id),previous=before.items.find(item=>item.id===id);assert.deepEqual(item.nostalgiaEventIds,[]);assert.deepEqual({...item,nostalgiaEventIds:previous.nostalgiaEventIds},previous);}
+  assert.deepEqual(deleted.collection.items.find(item=>item.id===other.id),before.items.find(item=>item.id===other.id));assert.equal(f.network.length,networkBefore);assert.deepEqual([...f.objects],bytesBefore);
+  assert.equal((await f.call('/api/media/'+trashed.id+'/restore',{method:'POST',body:{scope:'nostalgia'}})).status,200);
+  f.restart();const current=await(await f.call('/api/nostalgia')).json();assert.equal(current.library.events.some(event=>event.id===folder.id),false);assert.equal(current.items.length,4);assert.deepEqual(current.items.find(item=>item.id===trashed.id).nostalgiaEventIds,[]);
+  assert.equal((await f.call('/api/nostalgia/upload?filename=gone.mp4&event='+folder.id,{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).status,404);assert.deepEqual([...f.objects],bytesBefore);
+  const backup=await(await f.call('/api/export')).json();assert.equal(backup.nostalgiaLibrary.events.some(event=>event.id===folder.id),false);assert.deepEqual(backup.media.find(item=>item.id===film.id).nostalgiaEventIds,[]);
+ }finally{await f.close();}
+});
+test('folder deletion rejects stale changes and the direct Life itself category, and removes empty folders in every folder category',async()=>{
+ const f=fixture();try{
+  await f.connect();const initial=await(await f.call('/api/nostalgia')).json(),direct=initial.library.events.find(event=>event.id==='everyday-life-clips');
+  assert.equal((await f.call('/api/nostalgia/event-delete',{method:'POST',body:{id:direct.id,expectedRevision:direct.revision}})).status,400);
+  assert.equal((await f.call('/api/nostalgia/event-delete',{method:'POST',body:{id:'unknown',expectedRevision:'unknown'}})).status,404);
+  for(const categoryId of ['birthdays','holidays','other-events','military','bar-bat-mitzvah']){
+   const created=await(await f.call('/api/nostalgia/event',{method:'POST',body:{categoryId,name:'Empty folder'}})).json(),event=created.event;
+   const updated=await(await f.call('/api/nostalgia/event',{method:'POST',body:{id:event.id,expectedRevision:event.revision,categoryId,name:'Renamed folder'}})).json();
+   assert.equal((await f.call('/api/nostalgia/event-delete',{method:'POST',body:{id:event.id,expectedRevision:event.revision}})).status,409);
+   assert.equal((await f.call('/api/nostalgia/event-delete',{method:'POST',body:{id:event.id}})).status,409);
+   const response=await f.call('/api/nostalgia/event-delete',{method:'POST',body:{id:event.id,expectedRevision:updated.event.revision}});assert.equal(response.status,200);const result=await response.json();assert.equal(result.moved,0);assert.equal(result.collection.library.events.some(candidate=>candidate.id===event.id),false);
+  }
+  f.restart();const current=await(await f.call('/api/nostalgia')).json();assert.deepEqual(current.library.events,initial.library.events);assert.deepEqual(current.library.categories,initial.library.categories);assert.equal(f.objects.size,0);
+ }finally{await f.close();}
+});
+test('folder deletion rolls back all moves when a metadata write fails',async()=>{
+ const f=fixture();try{
+  await f.connect();const folder=(await(await f.call('/api/nostalgia')).json()).library.events.find(event=>event.id==='ora-release-1988');
+  const film=(await(await f.call('/api/nostalgia/upload?filename=kept.mp4&event='+folder.id,{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json()).collection.items[0];
+  const trashed=(await(await f.call('/api/nostalgia/upload?filename=trashed.mp4&event='+folder.id,{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json()).collection.items.find(item=>item.filename==='trashed.mp4');
+  await f.call('/api/media/'+trashed.id+'/delete',{method:'POST',body:{scope:'nostalgia'}});
+  f.database.exec("CREATE TRIGGER fail_folder_delete BEFORE UPDATE ON media_trash BEGIN SELECT RAISE(ABORT,'test write failure'); END");
+  assert.equal((await f.call('/api/nostalgia/event-delete',{method:'POST',body:{id:folder.id,expectedRevision:folder.revision}})).status,500);
+  const current=await(await f.call('/api/nostalgia')).json();assert.deepEqual(current.library.events.find(event=>event.id===folder.id).revision,folder.revision);assert.deepEqual(current.items.find(item=>item.id===film.id).nostalgiaEventIds,[folder.id]);assert.equal(f.objects.size,2);
  }finally{await f.close();}
 });
 test('historical nostalgia grouping runs once and never restores an event tag that a visitor removed',async()=>{

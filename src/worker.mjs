@@ -371,7 +371,7 @@ export default {
           return json(await db('media.caption',{kind,file:body.file,caption:body.caption}));
         }
         if((match=/^\/api\/nostalgia\/multipart\/(start|part|complete|abort)$/.exec(path)))return await multipartVideo(request,env,db,ctx,{action:match[1],sniff,limit:LIMITS.nostalgiaVideo});
-        if((match=/^\/api\/nostalgia\/(category|event|assign)$/.exec(path))){const body=await readJSON(request,16000);return json(await db({'category':'nostalgia.category.save',event:'nostalgia.event.save',assign:'nostalgia.assign'}[match[1]],body));}
+        if((match=/^\/api\/nostalgia\/(category|event|event-delete|assign)$/.exec(path))){const body=await readJSON(request,16000);return json(await db({'category':'nostalgia.category.save',event:'nostalgia.event.save','event-delete':'nostalgia.event.delete',assign:'nostalgia.assign'}[match[1]],body));}
         if((match=/^\/api\/nostalgia\/(upload|caption)$/.exec(path))){
           if(match[1]==='upload')return await upload(request,env,db,ctx,{category:'nostalgia',mixed:true});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:'nostalgia',file:body.file,caption:body.caption}));

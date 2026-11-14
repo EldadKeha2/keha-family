@@ -84,6 +84,23 @@ export class NostalgiaLibrary{
     if(old)library.events[library.events.indexOf(old)]=event;else library.events.push(event);this.write(library);
     return {saved:true,event,collection:this.state.collection('nostalgia')};
   }
+  eventDelete(p){
+    const library=this.read(),event=library.events.find(event=>event.id===p.id);
+    if(!event)throw new HttpError(404,'התיקייה לא נמצאה.');
+    if(event.id===EVERYDAY_LIFE_DESTINATION||event.directCategory)throw new HttpError(400,'אפשר למחוק תיקיות אירועים בלבד.');
+    if(p.expectedRevision!==event.revision)throw new HttpError(409,'פרטי התיקייה עודכנו בינתיים. פתחו אותה מחדש לפני המחיקה.');
+    let moved=0;
+    for(const row of this.state.rows("SELECT id,data FROM media WHERE category='nostalgia'")){
+      const item=JSON.parse(row.data);if(!item.nostalgiaEventIds?.includes(event.id))continue;
+      item.nostalgiaEventIds=[];this.state.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),row.id);moved++;
+    }
+    for(const row of this.state.rows('SELECT id,data FROM media_trash')){
+      const item=JSON.parse(row.data);if(item.category!=='nostalgia'||!item.nostalgiaEventIds?.includes(event.id))continue;
+      item.nostalgiaEventIds=[];this.state.sql.exec('UPDATE media_trash SET data=? WHERE id=?',JSON.stringify(item),row.id);
+    }
+    library.events=library.events.filter(candidate=>candidate.id!==event.id);this.write(library);
+    return {saved:true,operation:'nostalgia-event-delete',scope:'nostalgia',event,moved,collection:this.state.collection('nostalgia')};
+  }
   assign(p){
     const item=this.state.media(p.id);if(item.category!=='nostalgia')throw new HttpError(400,'אפשר לשייך כאן פריטים מפינת הנוסטלגיה בלבד.');
     for(const values of [p.add||[],p.remove||[]])if(!Array.isArray(values)||values.length>30||values.some(id=>typeof id!=='string'))throw new HttpError(400,'בחרו אירועים תקינים.');

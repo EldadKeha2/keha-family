@@ -957,6 +957,7 @@ export class FamilyState {
       case 'nostalgia.event':return this.nostalgiaLibrary.event(p.id);
       case 'nostalgia.category.save':return this.nostalgiaLibrary.categorySave(p);
       case 'nostalgia.event.save':return this.nostalgiaLibrary.eventSave(p);
+      case 'nostalgia.event.delete':return this.nostalgiaLibrary.eventDelete(p);
       case 'nostalgia.assign':return this.nostalgiaLibrary.assign(p);
       case 'collection.cover':{
         const kind=validCollection(p.kind);
