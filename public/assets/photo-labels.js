@@ -23,6 +23,20 @@ function fit(){
   viewer.style.setProperty('--photo-fit-height',value);window.FamilyFaces?.fit?.();
 }
 function scheduleFit(){if(!fitFrame)fitFrame=requestAnimationFrame(fit);}
+function revealChoices(){
+  const id=item?.id;
+  requestAnimationFrame(()=>{
+    const viewer=$('mediaViewer'),host=$('mediaPhotoLabels');
+    if(!open||item?.id!==id||!viewer?.open||host?.hidden)return;
+    const scroller=viewer.classList.contains('personal-photo-desktop')?viewer.querySelector('.media-viewer-footer'):viewer;
+    if(!scroller?.scrollTo)return;
+    const viewport=scroller.getBoundingClientRect(),panel=host.getBoundingClientRect(),header=viewer.querySelector('.media-viewer-header').getBoundingClientRect();
+    const top=Math.max(viewport.top,header.bottom)+8,bottom=viewport.bottom-8,available=bottom-top;
+    // Reveal the full panel when it fits; start at its heading for longer catalogs.
+    const delta=panel.height>available?panel.top-top:panel.bottom>bottom?panel.bottom-bottom:panel.top<top?panel.top-top:0;
+    if(delta)scroller.scrollTo({top:scroller.scrollTop+delta,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});
+  });
+}
 function render(){
   const host=$('mediaPhotoLabels');if(!host)return;
   host.hidden=!item||item.kind!=='photo';$('mediaViewer')?.classList.toggle('has-photo-labels',!host.hidden);$('mediaViewer')?.classList.toggle('mobile-photo-frame',!host.hidden&&mobileFrame());if(host.hidden){host.replaceChildren();return;}
@@ -51,7 +65,7 @@ function mount(photo){
 function init(){
   const host=$('mediaPhotoLabels');if(!host)return;
   host.addEventListener('click',event=>{
-    if(event.target.closest('[data-photo-label-toggle]')){open=!open;render();if(open){const id=item?.id;loadPhotoLabelCatalog().then(()=>{if(item?.id===id&&open)render();});}}
+    if(event.target.closest('[data-photo-label-toggle]')){open=!open;render();if(open){revealChoices();const id=item?.id;loadPhotoLabelCatalog().then(()=>{if(item?.id===id&&open){render();revealChoices();}});}}
     if(event.target.closest('[data-photo-label-add]')&&window.FamilyApp?.apiEnabled){const entry=store(item);entry.customOpen=true;entry.error='';render();$('photoCustomLabelName')?.focus();}
     if(event.target.closest('[data-photo-label-cancel]')){const entry=store(item);entry.customOpen=false;entry.customName='';entry.error='';render();}
   });

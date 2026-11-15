@@ -18,7 +18,7 @@
 .media-controls .media-delete:hover{background:#f9eee6}
 .media-viewer{width:min(1120px,calc(100vw - 28px));max-width:none;max-height:94vh;max-height:94dvh;padding:0;border:1px solid #a69c7a;border-radius:12px;background:#fbf7ed;color:#554c39;overflow:auto;box-shadow:0 20px 100px #0005;overscroll-behavior:contain}
 .media-viewer::backdrop{background:#66573e99;backdrop-filter:blur(4px)}
-.media-viewer-header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:15px 20px}
+.media-viewer-header{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:15px 20px;background:#fbf7ed;isolation:isolate}
 .media-viewer-header h2{font:calc(27px * var(--a11y-text-scale,1))/1.4 var(--serif);margin:0;overflow-wrap:anywhere}
 .media-viewer-header button{flex-shrink:0;width:44px;font-size:calc(29px * var(--a11y-text-scale,1));line-height:1}
 .media-stage{display:flex;justify-content:center;align-items:center;min-height:200px;background:#ede5d4}
