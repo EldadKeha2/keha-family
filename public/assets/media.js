@@ -223,6 +223,7 @@
     const handoff=native?window.FamilyPhotoPresentation?.holdNative?.($('mediaStage'),image):null;
     const ghost=!instant&&!native&&direction&&current()?.kind==='photo'?window.FamilyPhotoPresentation?.snapshot($('mediaStage')):null;
     state.index=(index+state.items.length)%state.items.length;
+    $('openedCaptionForm').classList.remove('caption-expanded');$('openedCaptionText').style.height='';
     const item=current();if(direction||state.swipeHintId&&state.swipeHintId!==identity(item))hideSwipeHint();state.activeId=identity(item);captionEditing=false;captionLocked=false;captionEditor++;captionSave=null;clearStage({preserveHandoff:Boolean(handoff),nextItem:item});renderedVersion=versionKey(item);metadata();
     if($('mediaViewer').open)syncMediaRoute(item,true);
     const stage=$('mediaStage');stage.classList.toggle('is-video',item.kind==='video');stage.classList.toggle('is-document',item.kind==='document');
@@ -381,16 +382,24 @@
     try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));const loaded=registeredLink(id);if(loaded)open(loaded.items,loaded.index,loaded.scope);else open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
   function captionControls(){
-    const inline=inlineCaption(),input=$('openedCaptionText'),form=$('openedCaptionForm');
+    const inline=inlineCaption(),video=current()?.kind==='video',input=$('openedCaptionText'),form=$('openedCaptionForm');
     $('mediaViewer').classList.toggle('media-caption-inline',inline);$('editOpenedCaption').hidden=inline;
     form.hidden=!(inline||captionEditing);
     form.classList.toggle('caption-editing',captionEditing);
     input.readOnly=inline&&captionLocked;form.classList.toggle('caption-saved',input.readOnly);
-    const editSaved=$('editSavedCaption');if(editSaved){editSaved.hidden=!input.readOnly;editSaved.title=tr('עריכת התיאור','Edit description');editSaved.setAttribute('aria-label',editSaved.title);}
+    const editSaved=$('editSavedCaption');if(editSaved){editSaved.hidden=!video&&!input.readOnly;editSaved.title=video&&!form.classList.contains('caption-expanded')?tr('הרחבה ועריכה של התיאור','Expand and edit description'):tr('עריכת התיאור','Edit description');editSaved.setAttribute('aria-label',editSaved.title);editSaved.setAttribute('aria-controls','openedCaptionText');if(video)editSaved.setAttribute('aria-expanded',String(form.classList.contains('caption-expanded')));else editSaved.removeAttribute('aria-expanded');}
     if(!captionEditing){expectedCaption=current()?.caption||'';input.value=expectedCaption;$('openedCaptionError').textContent='';}
     form.querySelector('label').textContent=current()?.kind==='video'?tr('תיאור הסרטון','Video description'):inline?tr('תיאור התמונה','Photo description'):tr('כיתוב לתמונה או לקובץ','Photo or file description');
     input.setAttribute('dir',I18n.isEnglish?'ltr':'rtl');
     input.placeholder=tr('הקלידו כאן תיאור...','Type a description here...');input.rows=current()?.kind==='video'?1:inline?2:3;
+  }
+  function expandVideoCaption(){
+    if(current()?.kind!=='video')return;
+    const form=$('openedCaptionForm'),input=$('openedCaptionText');
+    if(!form.classList.contains('caption-expanded')){
+      form.classList.add('caption-expanded');input.style.height=Math.min(240,Math.max(100,(input.scrollHeight||0)+2))+'px';
+    }
+    captionLocked=false;captionControls();
   }
   function beginCaptionEdit(preserveValue=false){
     const item=current();if(!item||captionEditing)return;
@@ -468,11 +477,16 @@
       }
       catch(error){notify(error.message);}
     });
-    $('editOpenedCaption').addEventListener('click',()=>{beginCaptionEdit();$('openedCaptionText').focus();});
-    $('editSavedCaption')?.addEventListener('click',()=>{beginCaptionEdit(true);$('openedCaptionText').focus();});
+    $('editOpenedCaption').addEventListener('click',()=>{beginCaptionEdit();expandVideoCaption();$('openedCaptionText').focus();});
+    $('editSavedCaption')?.addEventListener('click',()=>{if(current()?.kind==='video')expandVideoCaption();else beginCaptionEdit(true);$('openedCaptionText').focus();});
     $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionLocked=false;captionEditor++;captionSave=null;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;captionControls();});
-    $('openedCaptionText').addEventListener('click',()=>{if(inlineCaption()&&captionLocked){beginCaptionEdit(true);$('openedCaptionText').focus();}});
-    $('openedCaptionText').addEventListener('input',()=>{if(inlineCaption())beginCaptionEdit(true);});
+    $('openedCaptionText').addEventListener('click',()=>{if(current()?.kind==='video'){expandVideoCaption();return;}if(inlineCaption()&&captionLocked){beginCaptionEdit(true);$('openedCaptionText').focus();}});
+    $('openedCaptionText').addEventListener('input',()=>{if(inlineCaption())beginCaptionEdit(true);expandVideoCaption();});
+    if(typeof ResizeObserver==='function')new ResizeObserver(()=>{
+      if(current()?.kind!=='video')return;
+      const input=$('openedCaptionText'),expanded=input.getBoundingClientRect().height>(parseFloat(getComputedStyle(input).minHeight)||40)+1;
+      $('openedCaptionForm').classList.toggle('caption-expanded',expanded);$('editSavedCaption')?.setAttribute('aria-expanded',String(expanded));
+    }).observe($('openedCaptionText'));
     $('openedCaptionForm').addEventListener('submit',saveOpenedCaption);
     $('openedCaptionText').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,saveOpenedCaption));
     window.FamilyPhotoKeyboard?.bindNavigation({available:canControlNavigate,capture:()=>({session:state.session,navigation:state.navigation,id:identity(current())}),navigate:controlNavigate});

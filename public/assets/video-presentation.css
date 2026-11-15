@@ -114,14 +114,16 @@ html[dir=ltr] #mediaViewer.video-gallery-viewer .media-viewer-footer{direction:l
 #mediaViewer.video-gallery-viewer #mediaViewerDelete svg{width:20px;height:20px;flex-basis:20px}
 #mediaViewer.video-gallery-viewer #openedCaptionForm{position:relative;grid-area:1/1;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:5px;min-width:0;margin:0;padding:0;border:0;background:transparent}
 #mediaViewer.video-gallery-viewer #openedCaptionForm>label{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-#mediaViewer.video-gallery-viewer #openedCaptionText{grid-column:1/-1;box-sizing:border-box;width:100%;min-width:0;height:40px;min-height:40px;max-height:140px;margin:0;padding:9px 8px;border:1px solid #cfc5aa;border-radius:7px;background:#fffdf6;color:#303a29;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans);text-align:start;resize:vertical;overflow:auto}
+#mediaViewer.video-gallery-viewer #openedCaptionText{grid-column:1/-1;box-sizing:border-box;width:100%;min-width:0;height:40px;min-height:40px;max-height:280px;margin:0;padding:0 8px;padding-inline-end:38px;border:1px solid #cfc5aa;border-radius:7px;background:#fffdf6;color:#303a29;font:calc(13px * var(--a11y-text-scale,1))/38px var(--sans);text-align:start;white-space:pre;overflow-wrap:normal;text-overflow:ellipsis;resize:vertical;overflow:hidden}
+#mediaViewer.video-gallery-viewer #openedCaptionForm.caption-expanded #openedCaptionText{padding-block:8px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto}
 #mediaViewer.video-gallery-viewer #openedCaptionText[dir=rtl]{text-align:right;direction:rtl}
 #mediaViewer.video-gallery-viewer #openedCaptionText[dir=ltr]{text-align:left;direction:ltr}
 #mediaViewer.video-gallery-viewer #openedCaptionForm:not(.caption-editing)>:is([type=submit],#cancelOpenedCaption){display:none}
 #mediaViewer.video-gallery-viewer #openedCaptionForm>[type=submit]{grid-column:1;min-width:0;padding-inline:6px}
 #mediaViewer.video-gallery-viewer #cancelOpenedCaption{grid-column:2;min-width:0;padding-inline:6px}
-#mediaViewer.video-gallery-viewer #openedCaptionForm.caption-saved #openedCaptionText{padding-inline-end:36px}
-#mediaViewer.video-gallery-viewer #openedCaptionForm.caption-saved>#editSavedCaption{position:absolute;inset-block-start:5px;inset-inline-end:4px;grid-area:auto;width:28px;height:30px;min-height:30px}
+#mediaViewer.video-gallery-viewer #openedCaptionForm.caption-saved #openedCaptionText{padding-inline-end:38px}
+#mediaViewer.video-gallery-viewer #openedCaptionForm>#editSavedCaption,#mediaViewer.video-gallery-viewer #openedCaptionForm.caption-saved>#editSavedCaption{position:absolute;inset-block-start:3px;inset-inline-end:5px;grid-area:auto;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:26px;height:26px;min-height:26px;margin:0;padding:4px;border:1px solid #c4c9af;border-radius:5px;background:#faf8ef;color:#52643e}
+#mediaViewer.video-gallery-viewer #editSavedCaption svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 #mediaViewer.video-gallery-viewer #openedCaptionError{grid-column:1/-1}
 
 /* The share label and all six smaller icons occupy one line. */
@@ -139,8 +141,7 @@ html[dir=ltr] #mediaViewer.video-gallery-viewer #mediaShareActions{direction:ltr
 html[dir=ltr] #mediaViewer.video-gallery-viewer .tag-search-label input{direction:ltr;text-align:left}
 @media(max-width:380px){
  #mediaViewer.video-gallery-viewer .media-viewer-header{padding-inline:8px;gap:4px}
- #mediaViewer.video-gallery-viewer #mediaOriginal span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%)}
- #mediaViewer.video-gallery-viewer #mediaOriginal:has(svg[hidden])::before{content:'↗';font:20px/1 Arial,sans-serif}
+ #mediaViewer.video-gallery-viewer #mediaOriginal{gap:4px;padding-inline:6px;font-size:calc(12px * var(--a11y-text-scale,1))}
  #mediaViewer.video-gallery-viewer #mediaShareActions{gap:2px}
  #mediaViewer.video-gallery-viewer #mediaShareActions .media-share-heading{gap:3px;font-size:calc(11px * var(--a11y-text-scale,1))}
  #mediaViewer.video-gallery-viewer #mediaShareActions .share-icon{width:26px;height:26px;flex-basis:26px}
