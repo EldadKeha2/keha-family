@@ -29,7 +29,7 @@ function fixture(){
 }
 test('shared custom video categories appear in filters and upload choices with escaped names and leave nostalgia controls alone',()=>{
  const f=fixture(),custom={id:'a'.repeat(32),name:'טיולים <ים>',nameEn:'Trips'};f.api.render([...DEFAULT_VIDEO_CATEGORIES,custom],custom.id);
- assert.match(f.nodes.get('videoCategories').innerHTML,/טיולים &lt;ים&gt;/);assert.match(f.api.options(),new RegExp(custom.id));assert.equal(f.nodes.get('videoUploadCategory').value,custom.id);
+ assert.doesNotMatch(f.nodes.get('videoCategories').innerHTML,/טיולים|data-video-category="family"|data-video-category="all"/);assert.match(f.nodes.get('videoCategories').innerHTML,/ימי הולדת עגולים/);assert.match(f.nodes.get('videoUploadCategory').innerHTML,/טיולים &lt;ים&gt;/);assert.match(f.api.options(),new RegExp(custom.id));assert.equal(f.nodes.get('videoUploadCategory').value,custom.id);
  assert.match(f.api.controls({id:'video-a',kind:'video'},'videos'),/data-video-assign-category="video-a"/);assert.equal(f.api.controls({id:'video-a',kind:'video'},'nostalgia'),'');
  f.window.FamilyI18n.isEnglish=true;f.api.render([...DEFAULT_VIDEO_CATEGORIES,custom],custom.id);assert.match(f.api.options(),/>Trips</);
 });

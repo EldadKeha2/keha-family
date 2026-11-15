@@ -12,7 +12,7 @@ function render(categories,selected='all'){
  const tabs=$('videoCategories'),upload=$('videoUploadCategory');if(!tabs||!upload)return;
  const signature=JSON.stringify([I.isEnglish,catalog]);
  if(tabs.dataset.signature!==signature){
-  tabs.innerHTML=`<button type="button" data-video-category="all">${tr('כל הסרטונים','All videos')}</button>`+catalog.map(category=>`<button type="button" data-video-category="${safe(category.id)}">${safe(name(category))}</button>`).join('');
+  tabs.innerHTML=catalog.filter(category=>category.id==='special-birthdays').map(category=>`<button type="button" data-video-category="${safe(category.id)}">${safe(name(category))}</button>`).join('');
   const previous=upload.value;upload.innerHTML=options({allowCreate:true});upload.value=catalog.some(category=>category.id===previous)?previous:'family';tabs.dataset.signature=signature;
  }
  if(selected!=='all'&&catalog.some(category=>category.id===selected))upload.value=selected;
@@ -20,6 +20,7 @@ function render(categories,selected='all'){
  if($('videoCategoryAdd'))$('videoCategoryAdd').textContent='＋ '+tr('הוסף קטגוריה','Add category');
  for(const button of tabs.querySelectorAll('[data-video-category]'))button.setAttribute('aria-pressed',String(button.dataset.videoCategory===selected));
  if(assignDialog?.open){const value=$('videoCategoryChoice').value;$('videoCategoryChoice').innerHTML=options();$('videoCategoryChoice').value=value;}
+ window.FamilyVideoFilter?.render(catalog);
 }
 async function post(path,body){
  const response=await I.fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify(body)});

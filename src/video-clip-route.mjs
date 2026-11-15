@@ -20,7 +20,7 @@ export async function renderVideoRange(request,env,ctx,source,range,ownerId){
  return {key,size:plan.size,mime:'video/mp4',duration:plan.duration};
 }
 export async function videoClipRoute(request,env,db,ctx,id){
- const body=await readJSON(request,4096),prepared=await db('video.clip.prepare',{...body,id});
+ const body=await readJSON(request,100000),prepared=await db('video.clip.prepare',{...body,id});
  if(prepared.existing)return json(prepared.existing,200);
  const source=prepared.source;let plan=null,key=null;
  if(source.provider!=='youtube'){
@@ -31,6 +31,18 @@ export async function videoClipRoute(request,env,db,ctx,id){
   if(key&&result.item?.id===prepared.clipId&&result.storedKey!==key)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));
   const {storedKey,...publicResult}=result;return json(publicResult,result.alreadySaved?200:201);
  }catch(error){if(key&&error.status>=400&&error.status<500)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));throw error;}
+}
+
+export async function videoEditRoute(request,env,db,ctx,id){
+ const body=await readJSON(request,100000),prepared=await db('video.edit.prepare',{...body,id});
+ if(prepared.existing)return json(prepared.existing);
+ const source=prepared.source;let rendered=null;
+ if(prepared.range&&source.provider!=='youtube')rendered=await renderVideoRange(request,env,ctx,source,prepared.range,id);
+ try{
+  const result=await db('video.edit.save',{id,...prepared,sourceKey:source.key||null,rendered});
+  if(rendered&&result.storedKey!==rendered.key)ctx.waitUntil(deleteObject(env,rendered.key).catch(()=>{}));
+  const {storedKey,...publicResult}=result;return json(publicResult);
+ }catch(error){if(rendered&&error.status>=400&&error.status<500)ctx.waitUntil(deleteObject(env,rendered.key).catch(()=>{}));throw error;}
 }
 
 export async function videoUploadFinalize(request,env,db,ctx,id){

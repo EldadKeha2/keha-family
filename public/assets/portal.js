@@ -6,7 +6,7 @@
   const app = () => window.FamilyApp;
   const notify = message => app()?.toast(message);
   const normalize = value => String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g, '').toLowerCase().trim();
-  const state = {view:'tree', query:'', videoCategory:'all', collections:{photos:{items:[]},videos:{items:[]},gallery:{items:[]}}, stories:[], storyRevision:null, editingStory:null, birthdayId:null};
+  const state = {view:'tree', query:'', collections:{photos:{items:[]},videos:{items:[]},gallery:{items:[]}}, stories:[], storyRevision:null, editingStory:null, birthdayId:null};
   const collectionId=(kind,suffix)=>kind==='gallery'&&['Grid','Count','Empty'].includes(suffix)?'sharedGallery'+suffix:kind+suffix;
   const gallerySeed=()=>Math.floor(Math.random()*0x100000000);
   const galleryPage={page:1,size:100,query:'',filter:'all',person:'',unit:'',labels:'',sort:'random',seed:gallerySeed()};let gallerySearchTimer,galleryDeferred=false;
@@ -80,16 +80,16 @@
     const title=item.caption||(I18n.isEnglish?'Play video':'ניגון הסרטון');
     const duration=Number(item.duration),time=Number.isFinite(duration)&&duration>0?Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0'):'';
     const preview=item.provider==='youtube'?`<img src="${safe(item.poster)}" alt="" loading="lazy" decoding="async">`:`<video muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"><source src="${safe(item.src.split('#')[0]+'#t=0.1')}" type="${safe(item.mime)}"></video>`;
-    const caption=item.caption||(I18n.isEnglish?'Add a description':'הוספת תיאור');
-    return `<div class="video-tile-preview"><button type="button" class="video-tile-open" data-media-open="${safe(item.id||item.file)}" data-media-scope="videos" aria-label="${safe(title)}"><span class="video-tile-cover"><span class="video-tile-placeholder" aria-hidden="true">▤</span>${preview}<span class="video-tile-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 10 7-10 7Z"/></svg></span>${time?`<span class="video-tile-duration" aria-hidden="true">${time}</span>`:''}</span></button>${window.FamilyVideoPresentation?.controls(item,'videos')||''}</div><button type="button" class="video-tile-caption ${item.caption?'':'is-empty'}" data-video-caption="${safe(item.id||item.file)}" data-video-scope="videos" dir="auto" title="${safe(caption)}">${safe(caption)}</button>`;
+    const caption=item.caption||(I18n.isEnglish?'View and add details':'הצגה והוספת פרטים'),galleryIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="14" height="14" rx="2"/><path d="M17 21H5a2 2 0 0 1-2-2V7m4 6 4-4 4 4 2-2 4 4"/><circle cx="16.5" cy="7.5" r="1"/></svg>',trashIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/></svg>';
+    return `<div class="video-tile-preview"><button type="button" class="video-tile-open" data-media-open="${safe(item.id||item.file)}" data-media-scope="videos" aria-label="${safe(title)}"><span class="video-tile-cover"><span class="video-tile-placeholder" aria-hidden="true">▤</span>${preview}<span class="video-tile-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 10 7-10 7Z"/></svg></span>${time?`<span class="video-tile-duration" aria-hidden="true">${time}</span>`:''}</span></button>${window.FamilyVideoPresentation?.controls(item,'videos')||''}</div><div class="video-tile-footer"><button type="button" class="video-tile-caption ${item.caption?'':'is-empty'}" data-media-open="${safe(item.id||item.file)}" data-media-scope="videos" title="${safe(caption)}">${galleryIcon}<span dir="auto">${safe(caption)}</span></button><button type="button" class="video-tile-delete" data-media-delete="${safe(item.id)}" data-media-scope="videos" aria-label="${I18n.isEnglish?'Delete video':'מחיקת הסרטון'}: ${safe(item.caption||I18n.mediaName(item))}">${trashIcon}</button></div>`;
   }
   function renderCollection(kind,{reviewNavigation=false}={}) {
     if(kind==='gallery'&&holdGallery()&&!reviewNavigation){galleryDeferred=true;return;}
-    const collection = state.collections[kind], query = normalize(state.query);
-    const filtered = kind==='gallery'?collection.items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:galleryPage.filter==='complete'?item.faceSummary?.reviewed:true):collection.items.filter(item => (kind!=='videos'||state.videoCategory==='all'||(item.videoCategory||'family')===state.videoCategory)&&(!query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query)));
+    const collection = state.collections[kind], query = normalize(state.query),items=kind==='videos'?(window.FamilyVideoFilter?.filter(collection.items)||collection.items):collection.items;
+    const filtered = kind==='gallery'?items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:galleryPage.filter==='complete'?item.faceSummary?.reviewed:true):items.filter(item => !query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query));
     const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged',partial=compact&&galleryPage.filter==='partial',complete=compact&&galleryPage.filter==='complete';
     window.FamilyMedia.register(kind,filtered,{retainCurrent:compact&&!reviewNavigation,advanceRemoved:compact&&reviewNavigation&&(untagged||partial),pagination:compact?collection.pagination:undefined});
-    if(isVideo)window.FamilyVideoCategories?.render(collection.categories,state.videoCategory);
+    if(isVideo)window.FamilyVideoCategories?.render(collection.categories);
     $(collectionId(kind,'Count')).textContent = collection.items.length ? I18n.html`${filtered.length}${filtered.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?(isVideo?I18n.word(filtered.length,'video','videos'):I18n.word(filtered.length,'photo','photos')):(isVideo?I18n.t('סרטונים'):I18n.t('תמונות'))} באלבום המשותף` : isVideo?I18n.t('רגעים ששווה לראות שוב'):I18n.t('אלבום משותף לכל המשפחה');
     $(collectionId(kind,'Empty')).hidden = (compact?filtered:collection.items).length > 0;
     if(compact){const p=collection.pagination||{page:1,size:galleryPage.size,total:collection.count||0,pages:1};
@@ -359,7 +359,7 @@
       const save=event.target.closest('[data-save-shared]');if(save){saveCaption(captionKey(save.dataset.sharedKind,save.dataset.saveShared));return;}
       const editCaption=event.target.closest('[data-edit-shared-caption]');if(editCaption){openPhotoCaption(editCaption);return;}
       const cancelCaption=event.target.closest('[data-cancel-shared-caption]');if(cancelCaption){cancelPhotoCaption(cancelCaption);return;}
-      const category=event.target.closest('[data-video-category]');if(category){state.videoCategory=category.dataset.videoCategory;if(state.videoCategory!=='all')$('videoUploadCategory').value=state.videoCategory;renderCollection('videos');return;}
+      const category=event.target.closest('[data-video-category]');if(category){window.FamilyVideoFilter?.toggleCategory(category.dataset.videoCategory);return;}
       const photo=event.target.closest('[data-shared-open]');if(photo){const items=state.collections.photos.items;app().openSharedGallery(items,items.findIndex(item=>item.file===photo.dataset.sharedOpen));return;}
       const read=event.target.closest('[data-open-story]');if(read){openStory(read.dataset.openStory);return;}
       const edit=event.target.closest('[data-edit-story]');if(edit){editStory(edit.dataset.editStory);return;}
@@ -419,7 +419,7 @@
         const page=state.collections.gallery.pagination||galleryPage;
         if(page.page!==1||page.size!==100||page.query||galleryPage.filter!=='all'||galleryPage.person||galleryPage.unit||galleryPage.labels||galleryPage.sort!==(result.collection.pagination?.sort||'uploaded-desc')){revisions.gallery=null;refreshCollection('gallery',true);return;}
       }
-      if(kind==='videos'&&result.operation==='video-category-create')state.videoCategory=result.category.id;
+      if(kind==='videos'&&result.operation==='video-category-create')window.FamilyVideoFilter?.setCategories([result.category.id],{refresh:false});
       state.collections[kind]=result.collection;revisions[kind]=result.collection.revision;
       if(state.view===kind)renderCollection(kind);else window.FamilyMedia.register(kind,result.collection.items);
     });
@@ -441,7 +441,7 @@
     return refreshCollection('gallery',true);
   }
   function pageGallery(page){galleryPage.page=page;revisions.gallery=null;return refreshCollection('gallery',true,{reviewNavigation:true});}
-  window.FamilyPortal={getCollection:kind=>state.collections[kind],galleryQuery:()=>({...galleryPage}),refineGallery,sortGallery,pageGallery,isPartialGallery:()=>state.view==='gallery'&&galleryPage.filter==='partial',activate,search,acceptDrop,acceptPaste,dragOver};
+  window.FamilyPortal={getCollection:kind=>state.collections[kind],refreshVideos:()=>renderCollection('videos'),galleryQuery:()=>({...galleryPage}),refineGallery,sortGallery,pageGallery,isPartialGallery:()=>state.view==='gallery'&&galleryPage.filter==='partial',activate,search,acceptDrop,acceptPaste,dragOver};
   document.addEventListener('DOMContentLoaded',init);
 })();
 

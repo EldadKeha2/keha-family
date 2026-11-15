@@ -21,6 +21,12 @@ function fixture(respond){
  init();return {tags:window.FamilyTags,requests,events,emit:detail=>window.dispatchEvent(new CustomEvent('family-media-changed',{detail}))};
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});
+test('video editor tags stay in a draft until Save and closing the editor never sends tag mutations',async()=>{
+ const item={...photo('draft-film'),kind:'video',tags:[family.people.shlomo]},f=fixture(()=>Response.json({item,people:Object.values(family.people)})),host=new NodeStub();
+ f.tags.mountDraft(host,item);await host._tagWidget.store.load();host._tagWidget.store.enqueue(family.people.yona,true);host._tagWidget.store.enqueue(family.people.shlomo,false);host._tagWidget.store.enqueue({id:'new:guest',name:'A guest'},true);
+ const selection=await f.tags.draftSelection(host);assert.deepEqual(Array.from(selection.people,person=>person.personId||person.name),['A guest','yona']);assert.equal(selection.expectedTagsRevision,'empty');assert.equal(f.requests.some(request=>request.body),false);assert.doesNotMatch(host._tagWidget.selectedHost.innerHTML,/שומר/);
+ f.tags.clearInline(host);assert.equal(f.requests.some(request=>request.body),false);
+});
 
 test('video tagging searches all people without category controls or headings',async()=>{
  const extended=Object.values(family.people).find(person=>person.extended),friend={id:'qa-friend',name:'Archive Guest',extra:true};assert.ok(extended);

@@ -31,8 +31,13 @@ function editorFixture(){
  vm.runInNewContext(source,{window,document,URL,Response,CustomEvent,crypto:{randomUUID:()=>String(++sequence).padStart(32,'0')}});listeners.get('DOMContentLoaded')();
  const api=window.FamilyVideoEditor,get=id=>nodes.get(id);
  const open=async(id='film')=>{api.open({id,kind:'video',name:'Family movie',src:'/media/'+id,duration:120},'nostalgia');const media=videos.at(-1);await media.emit('loadedmetadata');await media.finishSeek();media.seeks=[];return media;};
- return {api,document,get,requests,open,input(id,value){get(id).value=String(value);return get(id).emit('input');}};
+ return {api,window,document,get,requests,open,input(id,value){get(id).value=String(value);return get(id).emit('input');}};
 }
+test('Save submits the caption and staged tags together without a clip range when only details changed',async()=>{
+ const f=editorFixture();f.window.FamilyTags={mountDraft(){},clearInline(){},draftSelection:async()=>({people:[{personId:'yona'},{name:'New guest'}],expectedTagsRevision:'tags-before'})};
+ await f.open();await f.input('videoClipName','Our updated family memory');await f.get('videoClipForm').emit('submit',{submitter:f.get('videoClipSave')});
+ assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/film/video-edit');assert.equal(f.requests[0].body.range,null);assert.equal(f.requests[0].body.caption,'Our updated family memory');assert.equal(f.requests[0].body.people.length,2);assert.equal(f.requests[0].body.expectedTagsRevision,'tags-before');
+});
 test('touch scrubbing previews the boundary that moved even when focus stays on the other slider',async()=>{
  const f=editorFixture(),video=await f.open();f.document.activeElement=f.get('videoClipStartRange');
  await f.input('videoClipEndRange',87.25);assert.equal(video.currentTime,87.25);assert.equal(f.get('videoClipEnd').value,'01:27.25');await video.finishSeek();
@@ -42,7 +47,7 @@ test('rapid scrubbing displays the latest requested frame and saves those exact 
  const f=editorFixture(),video=await f.open();await f.input('videoClipStartRange',10);await f.input('videoClipStartRange',20);await f.input('videoClipStartRange',30);
  assert.deepEqual(video.seeks,[10]);await video.finishSeek();assert.deepEqual(video.seeks,[10,30]);await video.finishSeek();
  await f.input('videoClipEnd','01:30.25');assert.equal(video.currentTime,90.25);await video.finishSeek();
- await f.get('videoClipForm').emit('submit');assert.equal(f.requests.length,1);assert.equal(f.requests[0].body.start,30);assert.equal(f.requests[0].body.end,90.25);
+ await f.get('videoClipForm').emit('submit',{submitter:f.get('videoClipSaveNew')});assert.equal(f.requests.length,1);assert.equal(f.requests[0].body.start,30);assert.equal(f.requests[0].body.end,90.25);
 });
 test('late seek and metadata events from a closed video cannot change the next editor',async()=>{
  const f=editorFixture(),old=await f.open('old');await f.input('videoClipStartRange',10);await f.input('videoClipStartRange',50);await f.get('videoClipClose').emit('click');

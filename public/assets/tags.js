@@ -154,11 +154,35 @@
     discard(){if(this.active.length)return;clearTimeout(this.timer);this.queue=[];this.error='';this.status='';this.emit();}
   }
   function storeFor(id,item){if(!stores.has(id))stores.set(id,new TagStore(id,item));return stores.get(id);}
+  class DraftTagStore extends TagStore {
+    constructor(item){super(item.id,item);this.draft=true;this.ready=false;}
+    get busy(){return false;}
+    async load(){
+      if(this.loading)return this.loading;
+      this.loading=(async()=>{
+        this.status='loading';this.emit();
+        try{
+          await flush(this.id);await loadRoster();
+          const live=stores.get(this.id),latest=live?.ready?live.item:(await request('api/media/'+this.id+'/tags')).item;
+          this.item={...this.item,...latest};this.saved=new Map((latest.tags||[]).map(person=>[person.id,person]));this.ready=true;this.status='';this.error='';
+        }catch(error){this.error=error.message;this.status='error';}
+        this.emit();
+      })();return this.loading;
+    }
+    enqueue(person,tagged){
+      if(tagged&&!this.selected().has(person.id)&&this.selected().size>=150){this.error=I18n.t('אפשר לתייג עד 150 אנשים בפריט.');this.emit();return;}
+      this.queue=this.queue.filter(op=>op.key!==person.id);this.queue.push({key:person.id,name:person.name,tagged});this.status='';this.error='';this.emit();
+    }
+    run(){}
+    retry(){this.loading=null;this.load();}
+  }
+  const videoAge=(person,item)=>item.kind==='video'?window.FamilyPhotoDate?.videoTagAge?.(person,item)||'':'';
+  const tagName=(person,item)=>safe(I18n.personName(person))+(videoAge(person,item)?` <small class="video-person-age">${safe(videoAge(person,item))}</small>`:'');
   class TagWidget {
     constructor(host,store,inline=false){
       this.host=host;this.store=store;this.inline=inline;this.photoOnly=inline&&store.item.kind==='photo';this.query='';this.group='all';this.version=-1;this.lastSelection='';
       this.events=new AbortController();const on=(element,type,handler)=>element.addEventListener(type,handler,{signal:this.events.signal});
-      const prefix=inline?'inline':'modal';
+      const prefix=store.draft?'videoEditor':inline?'inline':'modal';
       host.innerHTML=I18n.html`<div class="tag-widget${inline?' inline-tag-widget':''}"><div class="tag-widget-heading"><h3><svg class="tag-heading-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13l-7 7a2 2 0 0 1-3 0l-7-7V4h9l8 6a2 2 0 0 1 0 3Z"/><circle cx="7.5" cy="8" r="1"/></svg><span>${this.photoOnly?I18n.t('המתויגים בתמונה'):inline?(I18n.isEnglish?'Tag people':'תיוג אנשים'):I18n.t('תייגו מי מופיע כאן')}</span></h3><span data-tag-count></span></div>${this.photoOnly?'':I18n.html`<div class="tag-search-area" data-tag-search-area><label class="tag-search-label" for="${prefix}TagPersonSearch"><span class="visually-hidden">חיפוש או הוספת שם</span><input type="search" id="${prefix}TagPersonSearch" data-tag-search maxlength="120" placeholder="הקלידו שם פרטי או שם משפחה…" autocomplete="off"></label><p class="tag-search-count" data-tag-search-count></p><div class="tag-people-results" data-tag-results></div><button type="button" class="tag-add-name" data-tag-add hidden></button></div>`}<p class="tag-autosave-status" data-tag-save-status role="status" aria-live="polite"></p><div class="tag-error-actions" data-tag-error-actions hidden><button type="button" class="secondary-button" data-tag-retry>ניסיון נוסף</button><button type="button" data-tag-discard>ביטול השינוי שלא נשמר</button></div><div class="selected-people" data-selected-people></div></div>`;
       this.input=this.photoOnly?null:host.querySelector('[data-tag-search]');this.results=this.photoOnly?null:host.querySelector('[data-tag-results]');this.selectedHost=host.querySelector('[data-selected-people]');this.status=host.querySelector('[data-tag-save-status]');
       if(!this.photoOnly&&!inline)this.results.insertAdjacentHTML('beforebegin',`<div class="tag-group-filters" role="group" aria-label="${I18n.isEnglish?'Tagging groups':'קבוצות תיוג'}">${['all','family','extended','friends'].map(group=>`<button type="button" data-tag-group="${group}" aria-pressed="${group==='all'}">${tagGroupLabel(group)}</button>`).join('')}</div>`);
@@ -222,7 +246,7 @@
       const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>(this.group==='all'||tagGroup(person)===this.group)&&Number.isFinite(matchRank(person,query))).sort((a,b)=>comparePeople(a,b,query));
       this.results.hidden=this.inline&&!query&&this.group==='all';
       const position=resetScroll?0:this.results.scrollTop;
-      let previousGroup=null;this.results.innerHTML=names.slice(0,150).map(person=>{const group=tagGroup(person),heading=!this.inline&&group!==previousGroup?`<h4 class="tag-group-heading">${tagGroupLabel(group)}</h4>`:'';previousGroup=group;return heading+`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}>${personAvatar(person)}<span class="tag-person-name"><strong dir="auto">${safe(I18n.personName(person))}</strong></span></label>`;}).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
+      let previousGroup=null;this.results.innerHTML=names.slice(0,150).map(person=>{const group=tagGroup(person),heading=!this.inline&&group!==previousGroup?`<h4 class="tag-group-heading">${tagGroupLabel(group)}</h4>`:'';previousGroup=group;return heading+`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}>${personAvatar(person)}<span class="tag-person-name"><strong dir="auto">${tagName(person,this.store.item)}</strong></span></label>`;}).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
       for(const button of this.host.querySelectorAll('[data-tag-group]'))button.setAttribute('aria-pressed',String(button.dataset.tagGroup===this.group));
       this.results.scrollTop=position;
       this.host.querySelector('[data-tag-search-count]').textContent=this.inline&&!query?'':I18n.html`${names.length} ${I18n.isEnglish?I18n.word(names.length,'name in the list','names in the list'):I18n.t('שמות ברשימה')}`;
@@ -230,8 +254,8 @@
     }
     render(){
       if(!this.host.isConnected)return;
-      const selected=this.store.selected(),signature=JSON.stringify([...selected].map(([key,person])=>[key,person.name]));
-      if(this.lastSelection!==signature){this.selectedHost.innerHTML=[...selected].map(([key,person])=>I18n.html`<button type="button" class="selected-person-tag" data-remove-person-tag="${safe(key)}" aria-label="הסרת התיוג של ${safe(I18n.personName(person))}">${safe(I18n.personName(person))}${person.isNew?I18n.t('<small>שומר…</small>'):''}<span aria-hidden="true">×</span></button>`).join('')||'';this.lastSelection=signature;}
+      const selected=this.store.selected(),signature=JSON.stringify([...selected].map(([key,person])=>[key,person.name,videoAge(person,this.store.item)]));
+      if(this.lastSelection!==signature){this.selectedHost.innerHTML=[...selected].map(([key,person])=>I18n.html`<button type="button" class="selected-person-tag" data-remove-person-tag="${safe(key)}" aria-label="הסרת התיוג של ${safe(I18n.personName(person))}">${tagName(person,this.store.item)}${person.isNew&&!this.store.draft?I18n.t('<small>שומר…</small>'):''}<span aria-hidden="true">×</span></button>`).join('')||'';this.lastSelection=signature;}
       if(this.photoOnly)window.FamilyPhotoDate?.decorate(this.selectedHost,this.store.item,[...selected.values()]);
       this.host.querySelector('[data-tag-count]').textContent=selected.size===0?'':selected.size===1?I18n.t('אדם אחד תויג'):selected.size+I18n.t(' מתויגים');
       const state=this.store;if(this.input)this.input.disabled=!state.ready;this.status.className='tag-autosave-status '+(state.error?'failed':state.status);
@@ -244,10 +268,10 @@
   }
   function taggable(item){return Boolean(item.id)&&['photo','video'].includes(item.kind);}
   function controls(item){return taggable(item)&&item.kind!=='photo'?`<button class="media-tag-button" data-edit-media-tags="${safe(item.id)}">${item.tags?.length?I18n.t('תיוג אנשים (')+item.tags.length+')':I18n.t('＋ תיוג אנשים')}</button>`:'';}
-  function labels(item){return `<div class="media-people-tags" data-media-tags-for="${safe(item.id)}">${(item.tags||[]).map(person=>I18n.html`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(I18n.personName(person))}">${safe(I18n.personName(person))}</button>`).join('')}</div>`;}
+  function labels(item){return `<div class="media-people-tags" data-media-tags-for="${safe(item.id)}">${(item.tags||[]).map(person=>I18n.html`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(I18n.personName(person))}">${tagName(person,item)}</button>`).join('')}</div>`;}
   function refresh(root,items){
     const byId=new Map(items.map(item=>[item.id,item]));
-    for(const row of root.querySelectorAll('[data-media-tags-for]')){const item=byId.get(row.dataset.mediaTagsFor);if(!item)continue;const signature=JSON.stringify(item.tags||[]);if(row.dataset.signature!==signature){row.innerHTML=(item.tags||[]).map(person=>I18n.html`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(I18n.personName(person))}">${safe(I18n.personName(person))}</button>`).join('');row.dataset.signature=signature;}}
+    for(const row of root.querySelectorAll('[data-media-tags-for]')){const item=byId.get(row.dataset.mediaTagsFor);if(!item)continue;const signature=JSON.stringify([item.tags||[],item.takenDate]);if(row.dataset.signature!==signature){row.innerHTML=(item.tags||[]).map(person=>I18n.html`<button data-open-tag-person="${safe(person.id)}" aria-label="פתיחת האלבום של ${safe(I18n.personName(person))}">${tagName(person,item)}</button>`).join('');row.dataset.signature=signature;}}
     for(const button of root.querySelectorAll('[data-edit-media-tags]')){const item=byId.get(button.dataset.editMediaTags);if(item)button.textContent=item.tags?.length?I18n.t('תיוג אנשים (')+item.tags.length+')':I18n.t('＋ תיוג אנשים');}
     for(const label of root.querySelectorAll('[data-compact-tag-count]')){const item=byId.get(label.dataset.compactTagCount);if(item)label.textContent=item.tags?.length?'♧ '+item.tags.length+I18n.t(' מתויגים'):I18n.t('לתצוגה ותיוג');}
   }
@@ -265,10 +289,20 @@
     clearInline(host);host.dataset.media=item.id;host._tagWidget=new TagWidget(host,storeFor(item.id,item),true);
   }
   function clearInline(host){host._tagWidget?.destroy();delete host._tagWidget;delete host.dataset.media;host.replaceChildren();}
+  function mountDraft(host,item){clearInline(host);host.dataset.media=item.id;host._tagWidget=new TagWidget(host,new DraftTagStore(item),true);}
+  async function draftSelection(host){
+    const store=host?._tagWidget?.store;if(!store?.draft)return {};
+    await store.load();if(store.error)throw Error(store.error);
+    return {people:[...store.selected().values()].map(person=>person.id.startsWith('new:')?{name:person.name}:{personId:person.id}),expectedTagsRevision:store.item.tagsRevision||'empty'};
+  }
   function init(){
     window.addEventListener('family-media-changed',event=>{
-      const result=event.detail,item=result.item;if(result.operation!=='faces')return;
+      const result=event.detail,item=result.item;
       for(const person of result.taggedPeople||[])addPerson(person);
+      if(item?.kind==='video'){
+        const store=stores.get(item.id);if(store){store.item={...store.item,...item};if(!store.busy&&Array.isArray(item.tags))store.saved=new Map(item.tags.map(person=>[person.id,person]));store.emit();}
+      }
+      if(result.operation!=='faces')return;
       const store=item&&stores.get(item.id);if(!store)return;
       if(store.active.length)store.refreshPending=true;
       store.item=item;store.saved=new Map((item.tags||[]).map(person=>[person.id,person]));store.ready=true;store.emit();
@@ -293,5 +327,5 @@
     await store.load();if(store.error)throw Error(store.error);if(!store.busy)return;
     await new Promise((resolve,reject)=>{const check=()=>{if(store.error||!store.busy){store.listeners.delete(check);if(store.error)reject(Error(store.error));else resolve();}};store.listeners.add(check);store.run();check();});
   }
-  window.FamilyTags={controls,labels,refresh,open,taggable,mountInline,clearInline,findPeople,flush};document.addEventListener('DOMContentLoaded',init);
+  window.FamilyTags={controls,labels,refresh,open,taggable,mountInline,mountDraft,draftSelection,clearInline,findPeople,flush};document.addEventListener('DOMContentLoaded',init);
 })();

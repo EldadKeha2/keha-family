@@ -62,6 +62,12 @@ function ageFor(person,photo){
   const value=age.years===0?tr('פחות משנה','Under 1'):String(age.years);
   return {text:value,title:tr('גיל בזמן הצילום: ','Age in this photo: ')+value};
 }
+function videoTagAge(person,video){
+  const summary=window.FamilyApp?.getPersonSummary?.(person?.id),canonical=window.FAMILY_DATA?.people?.[person?.id],birthday=[person?.birthday,video.tags?.find(tag=>tag.id===person?.id)?.birthday,summary?.birthday,canonical?.birthday].find(value=>value&&!String(value).endsWith('1111'));
+  const age=ageFor({...person,birthday},video);if(!age)return '';
+  const gender=person?.gender||summary?.gender||canonical?.gender;
+  return '('+(I.isEnglish?'age ':gender==='f'?'בת ':gender==='m'?'בן ':'גיל ')+age.text+')';
+}
 const overlays=id=>item?.id===id?{showNames,showAges:showAges&&Boolean(item.takenDate?.year)}:{showNames:false,showAges:false};
 
 function decorate(host,photo,people){
@@ -163,5 +169,5 @@ function init(){
   window.addEventListener('family-media-changed',event=>{const photo=event.detail.item;if(photo?.id===item?.id){item={...item,...photo};if(!item.takenDate?.year)showAges=false;render();}});
   if(viewer.open&&window.FamilyMedia?.current?.())mount(window.FamilyMedia.current());
 }
-window.FamilyPhotoDate={mount,decorate,ageFor,overlays,setDesktopInline,open:openDate,text:date=>photoDateText(date,I.locale)};
+window.FamilyPhotoDate={mount,decorate,ageFor,videoTagAge,overlays,setDesktopInline,open:openDate,text:date=>photoDateText(date,I.locale)};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

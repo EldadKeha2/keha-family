@@ -1,5 +1,5 @@
 export const DEFAULT_VIDEO_CATEGORIES=[
- {id:'special-birthdays',name:'ימי הולדת מיוחדים',nameEn:'Special birthdays'},
+ {id:'special-birthdays',name:'ימי הולדת עגולים',nameEn:'Milestone birthdays'},
  {id:'family',name:'סרטונים משפחתיים',nameEn:'Family videos'}
 ];
 export function videoCategoryId(value){

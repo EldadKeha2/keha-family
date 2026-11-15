@@ -29,6 +29,11 @@ function fixture(english=false){
  const click=id=>{const event=new Event('click');Object.defineProperty(event,'target',{value:node(id)});node('photoMomentTools').dispatchEvent(event);};
  return {window,document,node,changes,requests,messages,click,api:window.FamilyPhotoDate,mount:photo=>window.FamilyPhotoDate.mount({kind:'photo',tags:[],...photo}),flush:()=>new Promise(resolve=>setImmediate(resolve)),enter(field,value){const input=node('photoInlineDate'+field);input.value=value;const event=new Event('input');Object.defineProperty(event,'target',{value:input});input.dispatchEvent(event);},submit(){const event=new Event('submit',{cancelable:true});node('photoInlineDateForm').dispatchEvent(event);return event;},resize(height,top=0){Object.assign(window.visualViewport,{height,offsetTop:top});window.visualViewport.dispatchEvent(new Event('resize'));}};
 }
+test('video tag ages use the recording date and gender and omit people with no known birthday',()=>{
+ const f=fixture(),video={takenDate:{day:15,month:6,year:2020},tags:[]};
+ assert.equal(f.api.videoTagAge({id:'male',gender:'m',birthday:'14.6.2000'},video),'(בן 20)');assert.equal(f.api.videoTagAge({id:'female',gender:'f',birthday:'16.6.2000'},video),'(בת 19)');assert.equal(f.api.videoTagAge({birthday:'1.1.1111'},video),'');assert.equal(f.api.videoTagAge({birthday:'1.1.2000'},{tags:[]}),'');assert.equal(fixture(true).api.videoTagAge({birthday:'1.1.2000'},video),'(age 20)');
+ f.window.FamilyApp.getPersonSummary=()=>({birthday:'1.1.2000',gender:'f'});assert.equal(f.api.videoTagAge({id:'known',birthday:'1.1.1111'},video),'(בת 20)');
+});
 test('a video recording date can be edited directly from an archive card without opening the video viewer',async()=>{
  for(const english of [false,true]){
   const f=fixture(english);f.api.open({id:'film',kind:'video',takenDate:{year:1994},takenDateRevision:'before'});

@@ -60,6 +60,44 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('saving video details atomically updates the same film and its tags without reading or duplicating its bytes',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/nostalgia',video,'film.mp4');await setTags(f,item,['tomer']);
+  const source=(await(await f.call('/api/media/'+item.id+'/view')).json()).item,objects=f.objects.size,network=f.network.length;
+  const body={operationId:uid(),name:'Updated family film',caption:'A new family description',people:[{personId:'yona'},{name:'A new film guest'}],expectedName:source.name,expectedCaption:source.caption,expectedVideoRevision:source.videoRevision,expectedTagsRevision:source.tagsRevision};
+  let response=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(response.status,200,await response.clone().text());const result=await response.json();
+  assert.equal(result.item.id,source.id);assert.equal(result.item.src,source.src);assert.equal(result.item.caption,body.caption);assert.equal(result.item.name,body.name);assert.equal(result.collection.items.filter(film=>film.id===source.id).length,1);assert.deepEqual(result.item.tags.map(person=>person.name).sort(),['A new film guest',family.people.yona.name].sort());assert.ok(result.people.tomer);assert.equal(f.objects.size,objects);assert.equal(f.network.length,network);
+  response=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(response.status,200);assert.equal((await response.json()).alreadySaved,true);assert.equal(f.objects.size,objects);
+  const latest=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;
+  const invalid={...body,operationId:uid(),name:'Must roll back',caption:'Must roll back',expectedName:latest.name,expectedCaption:latest.caption,expectedTagsRevision:latest.tagsRevision,people:[{name:'Orphan name must roll back'},{personId:'missing-person'}]};
+  assert.equal((await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body:invalid})).status,404);
+  const unchanged=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;assert.equal(unchanged.caption,latest.caption);assert.deepEqual(unchanged.tags,latest.tags);assert.equal(f.database.prepare("SELECT count(*) AS n FROM people WHERE json_extract(data,'$.name')=?").get('Orphan name must roll back').n,0);
+  await f.call('/api/media/'+item.id+'/caption',{method:'POST',body:{caption:'Another editor updated this',expectedCaption:latest.caption}});
+  assert.equal((await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body:{...invalid,people:[]}})).status,409);
+ }finally{await f.close();}
+});
+test('Save trims an existing video in place, preserves its original and metadata, and does not repeat a successful trim',async()=>{
+ const f=fixture();try{
+  await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url)),item=await taggedUpload(f,'/api/collections/videos',bytes,'film.mp4');await setTags(f,item,['yona']);
+  const source=(await(await f.call('/api/media/'+item.id+'/view')).json()).item,objects=f.objects.size;
+  const body={operationId:uid(),name:'Shortened film',caption:'The chosen moment',range:{start:1.25,end:3.5},expectedName:source.name,expectedCaption:source.caption,expectedVideoRevision:source.videoRevision};
+  let response=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(response.status,200,await response.clone().text());const saved=await response.json();
+  assert.equal(saved.item.id,item.id);assert.equal(saved.item.duration,2.25);assert.notEqual(saved.item.src,item.src);assert.equal(saved.item.videoCategory,source.videoCategory);assert.deepEqual(saved.item.tags,source.tags);assert.equal(f.objects.size,objects+1);
+  const stored=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data);assert.ok(stored.videoOriginal.key);assert.notEqual(stored.videoOriginal.key,stored.key);assert.equal((await f.call(saved.item.src)).status,200);
+  response=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(response.status,200);assert.equal((await response.json()).alreadySaved,true);assert.equal(f.objects.size,objects+1);
+ }finally{await f.close();}
+});
+test('linked video edits retain their identity while Save as new clip uses the chosen caption and people independently',async()=>{
+ const f=fixture();try{
+  await f.connect();const original=(await(await f.call('/api/collections/videos')).json()).items.find(item=>item.provider==='youtube');
+  const body={operationId:uid(),name:'Edited linked film',caption:'Updated linked caption',range:{start:2,end:5},people:[{personId:'tomer'}],expectedName:original.name,expectedCaption:original.caption,expectedVideoRevision:original.videoRevision,expectedTagsRevision:original.tagsRevision};
+  let response=await f.call('/api/media/'+original.id+'/video-edit',{method:'POST',body});assert.equal(response.status,200,await response.clone().text());const edited=(await response.json()).item;
+  assert.equal(edited.id,original.id);assert.equal(edited.youtubeStart,(original.youtubeStart||0)+2);assert.equal(edited.youtubeEnd,(original.youtubeStart||0)+5);assert.equal(edited.tags[0].id,'tomer');assert.equal(f.objects.size,0);
+  const copyBody={clipId:uid(),name:'Separate clip',caption:'Separate description',start:0,end:1,people:[{personId:'yona'}]};
+  response=await f.call('/api/media/'+edited.id+'/clip',{method:'POST',body:copyBody});assert.equal(response.status,201,await response.clone().text());const copy=(await response.json()).item;assert.equal(copy.caption,copyBody.caption);assert.deepEqual(copy.tags.map(person=>person.id),['yona']);assert.notEqual(copy.id,edited.id);
+  const unchanged=(await(await f.call('/api/media/'+edited.id+'/view')).json()).item;assert.equal(unchanged.caption,edited.caption);assert.deepEqual(unchanged.tags.map(person=>person.id),['tomer']);assert.equal((await f.call('/api/media/'+edited.id+'/clip',{method:'POST',body:copyBody})).status,200);
+ }finally{await f.close();}
+});
 test('custom video categories are shared, unique and durable without changing existing groups or nostalgia',async()=>{
  const f=fixture();try{
   await f.connect();const initial=await(await f.call('/api/collections/videos')).json(),nostalgia=await(await f.call('/api/nostalgia')).json();
