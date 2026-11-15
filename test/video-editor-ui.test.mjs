@@ -23,6 +23,7 @@ function editorFixture(){
   emit(type,extra={}){return Promise.all((this.handlers.get(type)||[]).map(fn=>fn({target:this,currentTarget:this,preventDefault(){},stopPropagation(){},...extra})));}
   setAttribute(key,value){this[key]=value;}removeAttribute(key){delete this[key];}
   replaceChildren(...children){this.children=children;}appendChild(child){this.children.push(child);return child;}
+  focus(){if(!this.disabled)document.activeElement=this;}select(){this.selectionStart=0;this.selectionEnd=this.value.length;}
   pause(){this.paused=true;}load(){}showModal(){this.open=true;}close(){this.open=false;}
   async finishSeek(){this.seeking=false;await this.emit('seeked');}
  }
@@ -41,6 +42,43 @@ test('Save submits the caption and staged tags together without a clip range whe
 test('saving details retains a long description while keeping the video title within its name limit',async()=>{
  const f=editorFixture(),caption='A longer family memory. '.repeat(30);await f.open();await f.input('videoClipName',caption);await f.get('videoClipForm').emit('submit',{submitter:f.get('videoClipSave')});
  assert.equal(f.requests[0].body.caption,caption.trim());assert.equal(f.requests[0].body.name.length,140);assert.equal(f.requests[0].body.range,null);
+});
+test('the name pencil selects the entire caption and exposes its own save action',async()=>{
+ const f=editorFixture();await f.open();await f.get('videoClipEditName').emit('click');
+ const field=f.get('videoClipName');assert.equal(f.document.activeElement,field);assert.equal(field.selectionStart,0);assert.equal(field.selectionEnd,field.value.length);
+ assert.equal(field.hidden,false);assert.equal(f.get('videoClipSaveName').hidden,false);assert.equal(f.get('videoClipEditName').hidden,true);assert.equal(f.get('videoClipSubtitle').hidden,true);
+});
+test('saving a caption leaves trim and tag drafts open and refreshes the next save expectations',async()=>{
+ const f=editorFixture();let tagReads=0;
+ f.window.FamilyTags={mountDraft(){},clearInline(){},draftSelection:async()=>{tagReads++;return {people:[{personId:'yona'}],expectedTagsRevision:'tags-before'};}};
+ await f.open();await f.input('videoClipStart',10);await f.input('videoClipEnd',40);await f.get('videoClipEditName').emit('click');
+ await f.input('videoClipName','Updated caption');await f.get('videoClipSaveName').emit('click');
+ assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/film/video-edit');assert.equal(f.requests[0].body.caption,'Updated caption');assert.equal(f.requests[0].body.range,null);assert.equal('people' in f.requests[0].body,false);assert.equal(tagReads,0);
+ assert.equal(f.document.body.children[0].open,true);assert.equal(f.get('videoClipName').hidden,true);assert.equal(f.get('videoClipEditName').hidden,false);assert.equal(f.get('videoClipSaveName').hidden,true);
+ assert.equal(f.document.activeElement,f.get('videoClipEditName'));
+ assert.equal(f.get('videoClipSubtitle').textContent,'Updated caption');assert.equal(f.get('videoClipStart').value,'10');assert.equal(f.get('videoClipEnd').value,'40');
+ await f.get('videoClipForm').emit('submit',{submitter:f.get('videoClipSave')});
+ assert.equal(f.requests[1].body.expectedName,'Updated caption');assert.equal(f.requests[1].body.expectedCaption,'Updated caption');assert.deepEqual(f.requests[1].body.range,{start:10,end:40});assert.equal(f.requests[1].body.people.length,1);assert.equal(tagReads,1);
+});
+test('Enter saves the edited caption while Shift Enter, composition and held Enter keep typing safe',async()=>{
+ const f=editorFixture();await f.open();await f.get('videoClipEditName').emit('click');await f.input('videoClipName','A caption\nwith another line');
+ for(const extra of [{shiftKey:true},{isComposing:true},{keyCode:229},{ctrlKey:true},{repeat:true}])await f.get('videoClipName').emit('keydown',{key:'Enter',...extra});
+ assert.equal(f.requests.length,0);let prevented=false;
+ await f.get('videoClipName').emit('keydown',{key:'Enter',preventDefault(){prevented=true;}});
+ assert.equal(prevented,true);assert.equal(f.requests.length,1);assert.equal(f.requests[0].body.caption,'A caption\nwith another line');assert.equal(f.document.body.children[0].open,true);
+});
+test('a caption retry retains its operation id and text, and does not require a valid trim range',async()=>{
+ const f=editorFixture(),attempts=[];f.window.FamilyI18n.fetch=async(path,options)=>{const body=JSON.parse(options.body);attempts.push(body);if(attempts.length===1)throw Error('Connection interrupted');return Response.json({item:{id:'film',kind:'video',name:body.name,caption:body.caption}});};
+ await f.open();await f.input('videoClipEnd','invalid');await f.get('videoClipEditName').emit('click');await f.input('videoClipName','Try this caption');await f.get('videoClipSaveName').emit('click');
+ assert.equal(f.get('videoClipName').hidden,false);assert.equal(f.get('videoClipName').readOnly,false);assert.equal(f.get('videoClipName').value,'Try this caption');assert.equal(f.get('videoClipSaveName').disabled,false);assert.match(f.get('videoClipStatus').textContent,/Connection interrupted/);
+ await f.get('videoClipSaveName').emit('click');assert.equal(attempts.length,2);assert.equal(attempts[0].operationId,attempts[1].operationId);assert.equal(attempts[1].range,null);assert.equal(f.get('videoClipSave').disabled,true);assert.equal(f.get('videoClipName').hidden,true);
+});
+test('caption saving in the upload preview stays local until the selected clip is confirmed',async()=>{
+ const f=editorFixture();let selection;
+ f.api.open({id:'upload-preview',kind:'video',name:'Original upload',src:'blob:preview',duration:120},'upload',{selectionOnly:true,onConfirm:value=>{selection=value;}});
+ await f.get('videoClipEditName').emit('click');await f.input('videoClipName','Renamed upload');await f.get('videoClipSaveName').emit('click');
+ assert.equal(f.requests.length,0);assert.equal(f.document.body.children[0].open,true);assert.equal(f.get('videoClipSubtitle').textContent,'Renamed upload');
+ await f.get('videoClipForm').emit('submit',{submitter:f.get('videoClipSave')});assert.equal(selection.name,'Renamed upload');assert.equal(f.requests.length,0);
 });
 test('touch scrubbing previews the boundary that moved even when focus stays on the other slider',async()=>{
  const f=editorFixture(),video=await f.open();f.document.activeElement=f.get('videoClipStartRange');

@@ -19,10 +19,10 @@
   field.style.height='auto';field.style.height=Math.min(maximum,Math.max(minimum,Math.ceil((field.scrollHeight||0)+border)))+'px';
  }
  function editName(editing){
-  if(!active)return;
-  active.nameExpanded=editing;$('videoClipName').hidden=!editing;$('videoClipSubtitle').hidden=editing||!$('videoClipName').value.trim();
+  if(!active||saving)return;
+  active.nameExpanded=editing;$('videoClipName').hidden=!editing;$('videoClipSaveName').hidden=!editing;$('videoClipEditName').hidden=editing;$('videoClipSubtitle').hidden=editing||!$('videoClipName').value.trim();
   $('videoClipEditName').setAttribute('aria-expanded',String(editing));
-  if(editing){fitName();$('videoClipName').focus();}
+  if(editing){feedback();fitName();$('videoClipName').focus();$('videoClipName').select();}
  }
  function pausePlayer(){if(player?.tagName==='VIDEO')player.pause();}
  function flushSeek(){
@@ -41,6 +41,7 @@
   active.start=start;active.end=end;active.valid=valid;
   const name=$('videoClipName').value.trim();$('videoClipSubtitle').textContent=name;$('videoClipSubtitle').hidden=active.nameExpanded||!name;
   $('videoClipSave').disabled=saving||!valid||!name;$('videoClipSaveNew').disabled=saving||!valid||!name;
+  $('videoClipSaveName').disabled=saving||!name;$('videoClipEditName').disabled=saving;$('videoClipName').readOnly=saving;
   if(valid){$('videoClipStartRange').value=start;$('videoClipEndRange').value=end;}
   const max=Math.max(active.duration,end||0,1);$('videoClipSelection').style.left=(Math.max(0,start)/max*100)+'%';$('videoClipSelection').style.width=(Math.max(0,end-start)/max*100)+'%';
   $('videoClipLength').textContent=valid?clock(end-start):'—';
@@ -72,11 +73,28 @@
   for(const id of ['videoClipStartRange','videoClipEndRange'])$(id).max=active.duration;$('videoClipStartRange').value=active.start;$('videoClipEndRange').value=active.end;
   sync();dialog.showModal();fitName();
  }
+ async function saveName(){
+  if(!active||saving||!active.nameExpanded)return;
+  const editor=active,field=$('videoClipName'),caption=field.value.trim(),name=caption.slice(0,140);
+  if(!name){feedback(tr('הזינו כיתוב לסרטון.','Enter a video caption.'),true);field.focus();return;}
+  if(editor.selectionOnly){editName(false);sync();$('videoClipEditName').focus({preventScroll:true});return;}
+  const details={name,caption,range:null,expectedName:editor.item.name,expectedCaption:editor.item.caption||'',expectedVideoRevision:editor.item.videoRevision||'original'},signature=JSON.stringify(details);
+  if(editor.nameRequest?.signature!==signature)editor.nameRequest={signature,operationId:crypto.randomUUID().replaceAll('-','')};
+  saving=true;queuedSeek=null;pausePlayer();$('videoClipClose').disabled=true;dialog.setAttribute('aria-busy','true');feedback(tr('שומר את הכיתוב…','Saving caption…'));sync();
+  try{
+   const response=await I.fetch('api/media/'+encodeURIComponent(editor.item.id)+'/video-edit',{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify({...details,operationId:editor.nameRequest.operationId})});
+   let result;try{result=await response.json();}catch{throw Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Try again.'));}
+   if(!response.ok)throw Error(I.error(result.error)||tr('לא ניתן לשמור את הכיתוב.','The caption could not be saved.'));
+   editor.item={...editor.item,...(result.item?.id===editor.item.id?result.item:{}),name,caption};editor.nameRequest=null;
+   window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+   saving=false;editName(false);sync();feedback(tr('הכיתוב נשמר ✓','Caption saved ✓'));$('videoClipEditName').focus({preventScroll:true});
+  }catch(error){feedback(error.message,true);}finally{saving=false;$('videoClipClose').disabled=false;dialog.removeAttribute('aria-busy');if(active)sync();}
+ }
  async function save(event){
   event.preventDefault();sync();if(!active?.valid||saving)return;
   if(active.selectionOnly){const confirm=active.onConfirm,selection={start:active.start,end:active.end,duration:active.duration,name:$('videoClipName').value.trim()};active.onCancel=null;close();confirm?.(selection);return;}
   const saveAsNew=event.submitter?.id==='videoClipSaveNew';
-  saving=true;queuedSeek=null;pausePlayer();$('videoClipSave').disabled=$('videoClipSaveNew').disabled=$('videoClipClose').disabled=true;$('videoClipTags').inert=true;dialog.setAttribute('aria-busy','true');feedback(tr('שומר את השינויים…','Saving changes…'));
+  saving=true;queuedSeek=null;pausePlayer();$('videoClipSave').disabled=$('videoClipSaveNew').disabled=$('videoClipClose').disabled=true;$('videoClipTags').inert=true;dialog.setAttribute('aria-busy','true');feedback(tr('שומר את השינויים…','Saving changes…'));sync();
   try{
    const tags=await window.FamilyTags?.draftSelection($('videoClipTags'))||{},caption=$('videoClipName').value.trim(),name=caption.slice(0,140),changedRange=Math.abs(active.start-active.initialStart)>.0001||Math.abs(active.end-active.initialEnd)>.0001;
    const payload={name,caption,...tags,expectedName:active.item.name,expectedCaption:active.item.caption||'',expectedVideoRevision:active.item.videoRevision||'original',...(saveAsNew?{clipId:active.clipId,start:active.start,end:active.end}:{operationId:active.clipId,range:changedRange?{start:active.start,end:active.end}:null})};
@@ -94,7 +112,7 @@
   dialog.innerHTML=`<form id="videoClipForm">
    <header><div class="video-clip-heading">
     <div class="video-clip-title-row"><span class="section-diamond" aria-hidden="true">◇</span><h2 id="videoClipTitle">${tr('עריכת הסרטון','Edit video')}</h2></div>
-    <div class="video-clip-subtitle-row"><button type="button" id="videoClipEditName" aria-label="${tr('עריכת שם הסרטון','Edit video name')}" aria-controls="videoClipName" aria-expanded="false">${pencilIcon}</button><p id="videoClipSubtitle" dir="auto"></p><textarea id="videoClipName" rows="1" maxlength="5000" dir="auto" required hidden aria-label="${tr('שם הסרטון','Video name')}"></textarea></div>
+    <div class="video-clip-subtitle-row"><button type="button" id="videoClipEditName" aria-label="${tr('עריכת שם הסרטון','Edit video name')}" aria-controls="videoClipName" aria-expanded="false">${pencilIcon}</button><button type="button" id="videoClipSaveName" hidden>${tr('שמירת הכיתוב','Save caption')}</button><p id="videoClipSubtitle" dir="auto"></p><textarea id="videoClipName" rows="1" maxlength="5000" dir="auto" required hidden aria-label="${tr('שם הסרטון','Video name')}"></textarea></div>
    </div><button type="button" id="videoClipClose" aria-label="${tr('סגירת עורך הסרטונים','Close video editor')}">×</button></header>
    <div id="videoClipPlayer"></div>
    <div class="video-clip-timeline" id="videoClipTimeline"><div class="video-clip-track"><span id="videoClipSelection"></span></div><label>${tr('תחילת הקטע','Clip start')}<input type="range" min="0" max="60" step=".01" value="0" id="videoClipStartRange" aria-label="${tr('תחילת הקטע בציר הזמן','Clip start on timeline')}"></label><label>${tr('סיום הקטע','Clip end')}<input type="range" min="0" max="60" step=".01" value="60" id="videoClipEndRange" aria-label="${tr('סיום הקטע בציר הזמן','Clip end on timeline')}"></label></div>
@@ -110,7 +128,8 @@
   dialog.addEventListener('keydown',event=>event.stopPropagation());
   for(const [id,boundary]of [['videoClipStart','start'],['videoClipEnd','end']])$(id).addEventListener('input',()=>sync('fields',boundary));
   $('videoClipName').addEventListener('input',()=>{fitName();sync();});
-  $('videoClipName').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,()=>{if(!$('videoClipSave').disabled)$('videoClipForm').requestSubmit();}));
+  $('videoClipName').addEventListener('keydown',event=>{if(event.key!=='Enter'||event.shiftKey||event.ctrlKey||event.altKey||event.metaKey||event.isComposing||event.keyCode===229||event.defaultPrevented)return;event.preventDefault();event.stopPropagation();if(!event.repeat)return saveName();});
+  $('videoClipSaveName').addEventListener('click',saveName);
   $('videoClipEditName').addEventListener('click',()=>editName(!active?.nameExpanded));
   if(typeof ResizeObserver==='function'){let width=0;new ResizeObserver(entries=>{const next=entries[0]?.contentRect.width;if(next&&next!==width){width=next;fitName();}}).observe($('videoClipName'));}
   for(const [id,boundary]of [['videoClipStartRange','start'],['videoClipEndRange','end']])$(id).addEventListener('input',()=>sync('ranges',boundary));
