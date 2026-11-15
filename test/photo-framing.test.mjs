@@ -7,15 +7,15 @@ import {photoFrame,validatePhotoFrame} from '../src/photo-framing.mjs';
 const source=(await readFile(new URL('../public/assets/photo-framing.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
 const id='a'.repeat(32),flush=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(){
- const handlers=new Map(),events=new Map(),timers=new Map(),calls=[];let now=0,serial=0,toolbar;
+ const handlers=new Map(),events=new Map(),timers=new Map(),calls=[];let now=0,serial=0,toolbar,mutated;
  const image={tagName:'IMG',dataset:{photoFrame:id},style:{},naturalWidth:400,naturalHeight:1000,isConnected:true,attrs:{},classList:{values:new Set(),add(v){this.values.add(v);},remove(v){this.values.delete(v);}},getAttribute:key=>key==='src'?'/media/'+id:null,getBoundingClientRect:()=>({left:10,top:10,bottom:210,width:200,height:200}),setPointerCapture(){},releasePointerCapture(){},matches:()=>true,querySelectorAll:()=>[],setAttribute(key,value){this.attrs[key]=value;},closest(s){return s==='img[data-photo-frame]'?this:s==='dialog'||s==='[aria-hidden=true]'?null:s==='button,a'?owner:null;}};
  const owner={dataset:{},title:'Open photo',setAttribute(){},closest:()=>null,querySelector:()=>image};
  const button=()=>({textContent:'',setAttribute(){}}),buttons=new Map();
  const document={readyState:'complete',body:{append(node){toolbar=node;}},querySelectorAll:()=>[image],addEventListener:(type,fn)=>handlers.set(type,fn),createElement:()=>({style:{},offsetHeight:74,hidden:false,setAttribute(){},addEventListener(type,fn){this[type]=fn;},querySelector(selector){if(!buttons.has(selector))buttons.set(selector,button());return buttons.get(selector);}})};
  const window={FamilyI18n:{isEnglish:false,error:String,fetch:async(url,options)=>{const body=JSON.parse(options.body);calls.push({url,...body});return Response.json({item:{id,framing:body.framing}});}},FamilyApp:{toast(){}},addEventListener:(type,fn)=>events.set(type,fn),dispatchEvent(event){events.get(event.type)?.(event);},FAMILY_API_TOKEN:'test'};
- vm.runInNewContext(source,{window,document,HOLD_MS,normalizeFrame,dragFrame,innerWidth:400,innerHeight:700,CustomEvent,MutationObserver:class{observe(){}},Date:{now:()=>now},setTimeout:(fn,ms)=>{timers.set(++serial,{fn,at:now+ms});return serial;},clearTimeout:key=>timers.delete(key)});
+ vm.runInNewContext(source,{window,document,HOLD_MS,normalizeFrame,dragFrame,innerWidth:400,innerHeight:700,CustomEvent,MutationObserver:class{constructor(fn){mutated=fn;}observe(){}},Date:{now:()=>now},setTimeout:(fn,ms)=>{timers.set(++serial,{fn,at:now+ms});return serial;},clearTimeout:key=>timers.delete(key)});
  function event(type,extra={}){const e={target:image,button:0,isPrimary:true,pointerType:'mouse',pointerId:1,clientX:100,clientY:100,preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=true;},...extra};handlers.get(type)?.(e);return e;}
- return{image,calls,window,event,get toolbar(){return toolbar;},tick(ms){now+=ms;for(const [key,timer]of [...timers])if(timer.at<=now){timers.delete(key);timer.fn();}}};
+ return{image,owner,calls,window,event,rescan:()=>mutated([{addedNodes:[image]}]),get toolbar(){return toolbar;},tick(ms){now+=ms;for(const [key,timer]of [...timers])if(timer.at<=now){timers.delete(key);timer.fn();}}};
 }
 test('framing translates in the direction of a drag for tall and wide photos and stays within the frame',()=>{
  const box={width:200,height:200},center=normalizeFrame();
@@ -41,3 +41,5 @@ test('a phone enables positioning only after exactly 1500 ms and then saves the 
 test('an interrupted long press restores its previous position without saving',()=>{
  const f=fixture();f.event('pointerdown',{pointerType:'touch'});f.tick(1500);f.event('pointermove',{pointerType:'touch',clientY:160});f.event('pointercancel',{pointerType:'touch'});assert.equal(f.calls.length,0);assert.equal(f.image.style.objectPosition,'50% 50%');
 });
+
+test('framing instructions appear once when other gallery controls are added or the same image is observed again',()=>{const f=fixture();f.rescan();f.rescan();assert.equal(f.owner.title.split('למיקום התמונה:').length-1,1);});

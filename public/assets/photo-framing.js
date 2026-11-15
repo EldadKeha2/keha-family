@@ -22,7 +22,7 @@ function scan(root=document){
     image.dataset.photoFrame=id;image.draggable=false;paint(image,id);
     const owner=image.closest('button,a')||image;if(owner.closest('[aria-hidden=true]'))continue;
     owner.setAttribute('aria-keyshortcuts','Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight');
-    if(!owner.dataset.frameHint){owner.dataset.frameHint='';owner.title=(owner.title?owner.title+' · ':'')+tr('למיקום התמונה: גררו בעכבר. בטלפון החזיקו שנייה וחצי ואז גררו.','Position photo: drag with the mouse. On a phone, hold for 1.5 seconds, then drag.');}
+    if(owner.dataset.frameHint!=='true'){owner.dataset.frameHint='true';owner.title=(owner.title?owner.title+' · ':'')+tr('למיקום התמונה: גררו בעכבר. בטלפון החזיקו שנייה וחצי ואז גררו.','Position photo: drag with the mouse. On a phone, hold for 1.5 seconds, then drag.');}
   }
 }
 function rememberProfiles(){
