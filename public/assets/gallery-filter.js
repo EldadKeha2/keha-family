@@ -5,7 +5,7 @@ const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
 const state={open:false,people:new Set(),families:new Set(),labels:new Set(),selected:new Set(),version:0,busy:false,resultsReady:false};
 const downloadIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>';
-const previewIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const previewIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="14" height="14" rx="2"/><path d="M17 21H5a2 2 0 0 1-2-2V7m4 6 4-4 4 4 2-2 4 4"/><circle cx="16.5" cy="7.5" r="1"/></svg>';
 let roster=[],ready=false;
 function status(message='',error=false){const host=$('gallerySelectionStatus');if(!host)return;host.textContent=message;host.hidden=!message;host.classList.toggle('is-error',error);}
 function clearSelection(){state.selected.clear();state.version++;state.busy=false;status();render();}
@@ -58,8 +58,18 @@ function render(){
     else{button.removeAttribute('aria-pressed');button.removeAttribute('aria-disabled');button.setAttribute('aria-label',tr('פתיחת התמונה ','Open photo ')+(item.caption||item.name));}
     const card=button.closest('.compact-gallery-card');let preview=card.querySelector('[data-gallery-preview]');
     if(!open){preview?.remove();continue;}
-    if(!preview){preview=document.createElement('button');preview.type='button';preview.className='gallery-selection-preview';preview.dataset.galleryPreview=id;preview.innerHTML=previewIcon;preview.setAttribute('aria-label',tr('פתיחת התמונה ללא שינוי הבחירה','Open photo without changing selection'));card.append(preview);}
+    if(!preview){preview=document.createElement('button');preview.type='button';preview.className='gallery-selection-preview';preview.dataset.galleryPreview=id;preview.innerHTML=previewIcon;preview.setAttribute('aria-label',tr('פתיחת הגלריה המסוננת','Open filtered gallery'));preview.title=preview.getAttribute('aria-label');card.append(preview);}
+    preview.disabled=!state.resultsReady||state.busy;
   }
+}
+function previewFiltered(id){
+  if(!state.open||state.busy||!state.resultsReady)return;
+  const collection=window.FamilyPortal.getCollection('gallery');
+  if(!collection.items.some(item=>item.id===id))return;
+  // Register the matching page and its filter context before opening. Paging
+  // continues through the same server-side filters instead of a stale album.
+  window.FamilyMedia.register('gallery',collection.items,{pagination:collection.pagination});
+  window.FamilyMedia.openFrom('gallery',id);
 }
 async function selectAll(){
   if(state.busy)return;state.busy=true;const version=++state.version;status(tr('בוחרים את כל תוצאות הסינון…','Selecting all matching photos…'));render();
@@ -112,7 +122,7 @@ function init(){
     if(event.target.closest('[data-gallery-select-all]'))selectAll();
     else if(event.target.closest('[data-gallery-clear-selection]'))clearSelection();
     else if(event.target.closest('[data-gallery-download]'))download();
-    else{const preview=event.target.closest('[data-gallery-preview]');if(preview)window.FamilyMedia.openFrom('gallery',preview.dataset.galleryPreview);}
+    else{const preview=event.target.closest('[data-gallery-preview]');if(preview)previewFiltered(preview.dataset.galleryPreview);}
   });
   document.addEventListener('click',event=>{
     if(!state.open||window.FamilyPortal.galleryQuery().filter!=='all')return;

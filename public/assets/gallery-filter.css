@@ -39,10 +39,12 @@
 .compact-gallery-card:has(.gallery-selectable){position:relative}
 .gallery-selectable{position:relative}
 .gallery-selectable[aria-disabled=true]{opacity:.55;cursor:wait}
-.gallery-selectable::after{content:'';position:absolute;top:8px;inset-inline-end:8px;display:grid;place-items:center;width:24px;height:24px;border:2px solid #fffdf7;border-radius:6px;background:#fffdf7e8;color:#fff;box-shadow:0 1px 5px #27321c66;font:700 18px/1 Arial;pointer-events:none}
-.gallery-selectable[aria-pressed=true]::after{content:'✓';background:#54723b}
+#sharedGalleryGrid .gallery-selectable::after{content:'';position:absolute;right:6px;bottom:6px;top:auto;left:auto;z-index:2;display:grid;place-items:center;width:20px;height:20px;border:1px solid #fffdf7;border-radius:5px;background:#fffdf7e8;color:#fff;box-shadow:0 1px 5px #27321c66;font:700 16px/1 Arial;pointer-events:none}
+#sharedGalleryGrid .gallery-selectable[aria-pressed=true]::after{content:'✓';background:#54723b}
 .gallery-selectable[aria-pressed=true]{outline:3px solid #54723b;outline-offset:-3px}
-.gallery-selection-preview{position:absolute;bottom:42px;inset-inline-end:8px;z-index:1;display:grid;place-items:center;width:34px;height:34px;padding:5px;border:1px solid #d0c8af;border-radius:6px;background:#fffdf4f0;color:#566943;box-shadow:0 1px 4px #27321c33}
+#sharedGalleryGrid .compact-gallery-card .gallery-selection-preview{position:absolute;top:6px;left:6px;right:auto;bottom:auto;z-index:6;display:grid;place-items:center;box-sizing:border-box;width:26px;height:26px;min-width:26px;min-height:26px;margin:0;padding:4px;border:1px solid #d0c8af;border-radius:5px;background:#fffdf4f0;color:#566943;box-shadow:0 1px 4px #27321c33}
+#sharedGalleryGrid .gallery-selection-preview svg{width:16px;height:16px}
+#sharedGalleryGrid .gallery-selection-preview:disabled{opacity:.45;cursor:wait}
 .gallery-filter-panel[hidden],.gallery-selection-bar[hidden],.gallery-refine-toggle[hidden],.gallery-selection-status[hidden]{display:none}
 @media(max-width:1000px){.gallery-refine-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){body[data-active-view=gallery] .workspace-header .workspace-actions{display:none}.gallery-refine-fields{gap:10px}.gallery-filter-panel{padding:12px}.gallery-filter-field summary{min-height:60px}.gallery-selection-bar{gap:6px}.gallery-selection-bar button{font-size:calc(13px * var(--a11y-text-scale,1));padding:7px 9px}}

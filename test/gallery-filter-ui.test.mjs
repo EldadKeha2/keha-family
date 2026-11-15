@@ -9,7 +9,7 @@ import * as labelCatalog from '../public/assets/photo-labels-catalog.mjs';
 
 const source=(await readFile(new URL('../public/assets/gallery-filter.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 function fixture(english=false){
- const nodes=new Map(),handlers=new Map(),requests=[];let query={filter:'all',query:'',person:'',unit:''};
+ const nodes=new Map(),handlers=new Map(),requests=[],registered=[],opened=[];let query={filter:'all',query:'',person:'',unit:''};
  class Node{
   constructor(){this.innerHTML='';this.value='';this.dataset={};this.handlers=new Map();this.children=new Map();this.classList={toggle(){}};}
   addEventListener(name,callback){this.handlers.set(name,callback);}
@@ -20,10 +20,11 @@ function fixture(english=false){
  const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
  const collection={items:[],count:0,pagination:{person:'',unit:'',query:''}};
  const window={FAMILY_DATA:family,addEventListener(){},FamilyI18n:{isEnglish:english,locale:english?'en-US':'he',personName:p=>english?p.nameEn||p.name:p.name,fetch:async path=>{requests.push(path);return Response.json({people:Object.values(family.people).filter(p=>!p.placeholder)});}},FamilyPortal:{getCollection:()=>collection,galleryQuery:()=>({...query}),refineGallery:value=>{query={...query,...value};collection.pagination={...query};window.FamilyGalleryFilter.render();}}};
+ window.FamilyMedia={register:(scope,items,options)=>registered.push({scope,items,options}),openFrom:(scope,id)=>opened.push({scope,id})};
  const document={readyState:'complete',getElementById:get,addEventListener:(name,callback)=>{if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(callback);}};
  vm.runInNewContext(source,{...labelCatalog,window,document,familyOptions,familyLabel,URLSearchParams});
  const change=(kind,id,checked)=>get('galleryFilterPanel').handlers.get('change')({target:{dataset:{[{person:'galleryPerson',family:'galleryFamily',label:'galleryLabel'}[kind]]:id},checked}});
- return {window,get,change,requests,query:()=>query,async open(){await get('galleryFilterToggle').handlers.get('click')();},search(text){get('galleryPersonSearch').value=text;get('galleryPersonSearch').handlers.get('input')();},reset(){get('clearGalleryFilter').handlers.get('click')();}};
+ return {window,get,change,requests,registered,opened,collection,preview(id){for(const fn of handlers.get('click')||[])fn({target:{closest:selector=>selector==='[data-gallery-preview]'?{dataset:{galleryPreview:id}}:null}});},query:()=>query,async open(){await get('galleryFilterToggle').handlers.get('click')();},search(text){get('galleryPersonSearch').value=text;get('galleryPersonSearch').handlers.get('input')();},reset(){get('clearGalleryFilter').handlers.get('click')();}};
 }
 for(const english of [false,true])test('checkboxes keep independent people and family selections through search, removal and reset '+(english?'English':'Hebrew'),async()=>{
  const f=fixture(english);await f.open();
@@ -55,4 +56,15 @@ test('photo-label filters combine with people, keep their checked state and rese
  const f=fixture();await f.open();assert.match(f.get('galleryLabelFilter').innerHTML,/בר\/בת מצווה/);f.change('person','yona',true);f.change('label','holidays',true);f.change('label','birthdays',true);
  assert.equal(f.query().labels,'birthdays,holidays');assert.equal(f.query().person,'yona');assert.equal(f.get('galleryLabelChoiceCount').textContent,'(2)');
  f.change('label','birthdays',false);assert.equal(f.query().labels,'holidays');f.change('person','yona',false);assert.equal(f.get('clearGalleryFilter').hidden,false);f.reset();assert.equal(f.query().labels,'');assert.equal(f.get('galleryLabelChoiceCount').textContent,'');assert.doesNotMatch(f.get('galleryLabelFilter').innerHTML,/ checked/);
+});
+test('opening the filtered gallery replaces a stale album with matching photos and preserves filtered pagination',async()=>{
+ const f=fixture();await f.open();f.change('label','black-and-white',true);f.change('person','yona',true);
+ f.collection.items=[{id:'matching-a'},{id:'matching-b'}];f.collection.count=103;
+ f.collection.pagination={...f.query(),page:1,size:100,total:103,pages:2};f.window.FamilyGalleryFilter.render();
+ f.preview('matching-b');assert.equal(f.registered.length,1);assert.equal(f.registered[0].scope,'gallery');
+ assert.deepEqual(f.registered[0].items.map(item=>item.id),['matching-a','matching-b']);
+ assert.equal(f.registered[0].options.pagination.labels,'black-and-white');assert.equal(f.registered[0].options.pagination.person,'yona');assert.equal(f.registered[0].options.pagination.pages,2);
+ assert.deepEqual(f.opened,[{scope:'gallery',id:'matching-b'}]);
+ f.preview('outside-the-filter');assert.equal(f.opened.length,1);
+ f.collection.pagination.labels='holidays';f.window.FamilyGalleryFilter.render();f.preview('matching-a');assert.equal(f.opened.length,1,'A pending filter response cannot open the previous album');
 });
