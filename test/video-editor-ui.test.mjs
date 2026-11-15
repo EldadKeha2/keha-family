@@ -38,6 +38,10 @@ test('Save submits the caption and staged tags together without a clip range whe
  await f.open();await f.input('videoClipName','Our updated family memory');await f.get('videoClipForm').emit('submit',{submitter:f.get('videoClipSave')});
  assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/film/video-edit');assert.equal(f.requests[0].body.range,null);assert.equal(f.requests[0].body.caption,'Our updated family memory');assert.equal(f.requests[0].body.people.length,2);assert.equal(f.requests[0].body.expectedTagsRevision,'tags-before');
 });
+test('saving details retains a long description while keeping the video title within its name limit',async()=>{
+ const f=editorFixture(),caption='A longer family memory. '.repeat(30);await f.open();await f.input('videoClipName',caption);await f.get('videoClipForm').emit('submit',{submitter:f.get('videoClipSave')});
+ assert.equal(f.requests[0].body.caption,caption.trim());assert.equal(f.requests[0].body.name.length,140);assert.equal(f.requests[0].body.range,null);
+});
 test('touch scrubbing previews the boundary that moved even when focus stays on the other slider',async()=>{
  const f=editorFixture(),video=await f.open();f.document.activeElement=f.get('videoClipStartRange');
  await f.input('videoClipEndRange',87.25);assert.equal(video.currentTime,87.25);assert.equal(f.get('videoClipEnd').value,'01:27.25');await video.finishSeek();
