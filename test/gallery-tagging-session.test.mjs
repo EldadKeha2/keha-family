@@ -204,3 +204,15 @@ test('page navigation waits for an older response, wraps across the last page an
  await f.window.FamilyPortal.pageGallery(3);f.close();f.open('204');f.get('mediaNext').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/0');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 205');f.get('mediaPrevious').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/204');assert.equal(f.get('mediaViewerCounter').textContent,'205 / 205');
  f.defer();f.get('mediaNext').click();f.close();f.pending.shift()();await f.flush();assert.equal(f.get('mediaViewer').open,false);
 });
+
+test('Artificial Family reuses gallery paging, preserves its opening page and removes only from the AI section',async()=>{
+ const items=Array.from({length:3},(_,i)=>photo('ai-'+i)),f=fixture(items);await f.flush();let page=1,excluded=null;
+ const register=next=>{page=next;f.window.FamilyMedia.register('family-ai',next===1?items.slice(0,2):items.slice(2),{pagination:{page:next,size:2,pages:2,total:3}});};
+ f.window.FamilyAI={pageGallery:async next=>register(next),galleryQuery:()=>({page}),exclude:id=>{excluded=id;}};
+ register(1);f.window.FamilyMedia.open(items.slice(0,2),1,'family-ai');assert.equal(f.get('mediaViewerCounter').textContent,'2 / 3');
+ f.get('mediaNext').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/ai-2');assert.equal(f.get('mediaViewerCounter').textContent,'3 / 3');assert.equal(page,2);
+ f.get('mediaViewerDelete').click();assert.equal(excluded,'ai-2');assert.equal(f.get('deleteMediaDialog').open,false);assert.equal(f.server.length,3);
+ f.get('mediaNext').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/ai-0');assert.equal(page,1);
+ f.get('mediaPrevious').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/ai-2');assert.equal(page,2);
+ f.close();await f.flush();assert.equal(page,1);assert.equal(f.get('mediaViewer').open,false);
+});

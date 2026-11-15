@@ -82,3 +82,15 @@ test('native same-site portrait anchors preserve their actual source and repeate
   assert.equal(f.nav.go('#person/yona'),false);assert.equal(f.history.length,length+1);
   f.nav.back('#directory');await f.flush();assert.equal(f.location.hash,'#memorial');
 });
+
+
+test('direct Artificial Family links retain a home parent and selected language',async()=>{
+ for(const phone of [false,true]){
+  const f=fixture('https://family.test/?lang=en-GB#family-ai',{phone});
+  assert.equal(f.location.hash,'#family-ai');
+  f.nav.back();await f.flush();
+  assert.equal(f.location.hash,phone?'#home':'#tree');
+  f.history.forward();await f.flush();assert.equal(f.location.hash,'#family-ai');
+  assert.equal(f.location.search,'?lang=en-GB');
+ }
+});

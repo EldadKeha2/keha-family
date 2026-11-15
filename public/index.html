@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="assets/maintenance.css?v=a11y1">
   <link rel="stylesheet" href="assets/readable.css?v=search-portraits-v2">
   <link rel="stylesheet" href="assets/gallery.css?v=a11y1">
+  <link rel="stylesheet" href="assets/family-ai.css?v=family-ai-v1">
   <link rel="stylesheet" href="assets/portal.css?v=mobile-upload-source-v1">
   <link rel="stylesheet" href="assets/nostalgia-library.css?v=styled-delete-v5">
   <link rel="stylesheet" href="assets/archive.css?v=nostalgia-films-v6">
@@ -67,12 +68,12 @@
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
-  <script src="assets/translations.js?v=video-library-labels-v7" defer></script>
+  <script src="assets/translations.js?v=family-ai-v1-video-library-labels-v7" defer></script>
   <script src="assets/i18n.js?v=paging-labels-v1" defer></script>
   <script src="assets/photo-keyboard.js?v=desktop-captions-navigation-v1" defer></script>
   <script src="assets/photo-editor.js?v=upload-swipes-v21" type="module"></script>
   <script src="assets/photo-drop.js?v=1" type="module"></script>
-  <script src="assets/navigation.js?v=nostalgia-library-v4" defer></script>
+  <script src="assets/navigation.js?v=family-ai-v1-nostalgia-library-v4" defer></script>
   <script src="assets/desktop-app.js?v=fit-window-v1" defer></script>
   <script src="assets/home-install.js?v=ios-device-steps-v12" defer></script>
   <script src="assets/accessibility.js?v=1" defer></script>
@@ -86,7 +87,7 @@
   <script src="assets/photo-thumbnails.js?v=nonblocking-uploads-v3" defer></script>
   <script src="assets/photo-presentation.js?v=continuous-swipe-v4" defer></script>
   <script src="assets/photo-swipe.js?v=upload-video-swipes-v12" defer></script>
-  <script src="assets/media.js?v=collapsed-video-caption-v29" defer></script>
+  <script src="assets/media.js?v=family-ai-v1" defer></script>
   <script src="assets/video-editor.js?v=plain-time-labels-v14" defer></script>
   <script src="assets/video-presentation.js?v=compact-actions-v2" defer></script>
   <script src="assets/video-upload-wizard.js?v=finger-swipes-v3" type="module"></script>
@@ -95,6 +96,7 @@
   <script src="assets/photo-fullscreen-faces.js?v=screensaver-labels-v2" defer></script>
   <script src="assets/photo-fullscreen.js?v=always-available-ages-v9" defer></script>
   <script src="assets/screensaver.js?v=family-screensaver-v1" defer></script>
+  <script src="assets/family-ai.js?v=family-ai-v1" defer></script>
   <script src="assets/video-categories.js?v=milestone-category-v5" type="module"></script>
   <script src="assets/video-filter.js?v=video-library-filters-v2" type="module"></script>
   <script src="assets/portal.js?v=video-library-filters-v2" defer></script>
@@ -107,13 +109,13 @@
   <script src="assets/archive.js?v=compact-folder-v15" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/family-timeline.js?v=annual-portraits-v8" type="module"></script>
-  <script src="assets/home.js?v=family-screensaver-tile-v3" defer></script>
+  <script src="assets/home.js?v=family-ai-v1-family-screensaver-tile-v3" defer></script>
   <script src="assets/home-scroll.js?v=1" defer></script>
   <script src="assets/memorial.js?v=memorial-email-link-v2" defer></script>
   <script src="assets/nursery.js?v=circular-photo-pages-v4" defer></script>
   <script src="assets/tree-guide.js" defer></script>
   <script src="assets/games.js?v=quiz-speed-v1" type="module"></script>
-  <script src="assets/app.js?v=compact-video-search-v1" defer></script>
+  <script src="assets/app.js?v=family-ai-v1-compact-video-search-v1" defer></script>
   <script src="assets/cloud.js" defer></script>
   <script src="assets/recycle-bin.js?v=private-bin-v1" defer></script>
 </head>
@@ -129,7 +131,7 @@
       <div class="language-selector"><span class="language-switcher-label" data-i18n-skip dir="ltr"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg><bdi>Language/שפה</bdi></span><div class="language-switcher" role="group" aria-label="בחירת שפה" data-i18n-skip><button type="button" data-language="he" aria-label="עברית" title="עברית" aria-pressed="true"><img src="assets/flag-il.svg" alt="" width="28" height="20"><span class="visually-hidden">עברית</span></button><button type="button" data-language="en-US" aria-label="English (United States)" title="English (United States)" aria-pressed="false"><img src="assets/flag-us.svg" alt="" width="28" height="20"><span class="visually-hidden">English (US)</span></button><button type="button" data-language="en-GB" aria-label="English (United Kingdom)" title="English (United Kingdom)" aria-pressed="false"><img src="assets/flag-gb.svg" alt="" width="28" height="20"><span class="visually-hidden">English (UK)</span></button></div></div>
       <button type="button" class="a11y-trigger" id="accessibilityButton" aria-label="נגישות" aria-haspopup="dialog" aria-controls="accessibilityPanel" aria-expanded="false" data-i18n-skip>נגישות</button>
       </div>
-      <div class="phone-navigation"><button class="phone-home-button" data-view="home" aria-label="מסך הבית">⌂ הבית</button><button id="mobileMenuToggle" aria-haspopup="dialog" aria-label="פתיחת תפריט העמודים"><span id="mobileViewTitle">הבית שלנו</span><span aria-hidden="true">☰</span></button></div><nav class="main-nav" id="mainNav" aria-label="תצוגה"><button class="nav-link active" data-view="tree" aria-pressed="true">אילן היוחסין</button><button class="nav-link" data-view="timeline" aria-pressed="false">ציר זמן משפחתי</button><button class="nav-link" data-view="directory" aria-pressed="false">בני המשפחה</button><button class="nav-link" data-view="videos" aria-pressed="false">סרטונים</button><button class="nav-link" data-view="gallery" aria-pressed="false">הגלריה המשפחתית</button><button class="nav-link" data-view="screensaver" aria-pressed="false">שומר מסך משפחתי</button><button class="nav-link" data-view="calendar" aria-pressed="false">לוח שנה משפחתי</button><button class="nav-link" data-view="photos" aria-pressed="false">תמונות משפחתיות</button><button class="nav-link" data-view="stories" aria-pressed="false">הסיפורים שלנו</button><button class="nav-link" data-view="weddings" aria-pressed="false">חתונות</button><button class="nav-link" data-view="nostalgia" aria-pressed="false">פינת הנוסטלגיה</button><button class="nav-link" data-view="updates" aria-pressed="false">הרשמה לעדכונים</button><button class="nav-link" data-view="games" aria-pressed="false">משחקי משפחה</button><button class="nav-link" data-view="nursery" aria-pressed="false">התינוקייה</button><button class="nav-link" data-view="memorial" aria-pressed="false">לזכרם</button></nav>
+      <div class="phone-navigation"><button class="phone-home-button" data-view="home" aria-label="מסך הבית">⌂ הבית</button><button id="mobileMenuToggle" aria-haspopup="dialog" aria-label="פתיחת תפריט העמודים"><span id="mobileViewTitle">הבית שלנו</span><span aria-hidden="true">☰</span></button></div><nav class="main-nav" id="mainNav" aria-label="תצוגה"><button class="nav-link active" data-view="tree" aria-pressed="true">אילן היוחסין</button><button class="nav-link" data-view="timeline" aria-pressed="false">ציר זמן משפחתי</button><button class="nav-link" data-view="directory" aria-pressed="false">בני המשפחה</button><button class="nav-link" data-view="videos" aria-pressed="false">סרטונים</button><button class="nav-link" data-view="gallery" aria-pressed="false">הגלריה המשפחתית</button><button class="nav-link" data-view="screensaver" aria-pressed="false">שומר מסך משפחתי</button><button class="nav-link" data-view="calendar" aria-pressed="false">לוח שנה משפחתי</button><button class="nav-link" data-view="photos" aria-pressed="false">תמונות משפחתיות</button><button class="nav-link" data-view="stories" aria-pressed="false">הסיפורים שלנו</button><button class="nav-link" data-view="weddings" aria-pressed="false">חתונות</button><button class="nav-link" data-view="family-ai" aria-pressed="false">בינה משפחתית</button><button class="nav-link" data-view="nostalgia" aria-pressed="false">פינת הנוסטלגיה</button><button class="nav-link" data-view="updates" aria-pressed="false">הרשמה לעדכונים</button><button class="nav-link" data-view="games" aria-pressed="false">משחקי משפחה</button><button class="nav-link" data-view="nursery" aria-pressed="false">התינוקייה</button><button class="nav-link" data-view="memorial" aria-pressed="false">לזכרם</button></nav>
     </header>
 
     <main id="mainContent" tabindex="-1">
@@ -171,6 +173,7 @@
         <section id="nurseryView" class="portal-view nursery-view" aria-label="התינוקייה" hidden><div id="nurseryContent"></div></section>
         <section id="memorialView" class="portal-view remembrance-view" aria-label="לזכרם" hidden><div id="memorialContent"></div></section>
         <section id="updatesView" class="portal-view updates-view" aria-label="עדכונים" hidden><div id="updatesContent"></div></section>
+        <section id="familyAiView" class="portal-view" aria-label="בינה משפחתית" hidden></section>
         <section id="galleryView" class="portal-view compact-gallery-view" aria-label="הגלריה" hidden>
           <div class="collection-heading"><span class="collection-count" id="sharedGalleryCount"></span><button class="primary-button" data-upload-collection="gallery">＋ הוספת תמונות</button></div>
           <div class="gallery-category-row"><div class="archive-filters gallery-tag-filters" aria-label="סינון תמונות בגלריה"><button type="button" data-gallery-filter="all" aria-pressed="true">כל התמונות</button><button type="button" data-gallery-filter="untagged" aria-pressed="false">ללא תיוג</button><button type="button" data-gallery-filter="partial" aria-pressed="false">תיוג חלקי</button><button type="button" data-gallery-filter="complete" aria-pressed="false">תיוג מלא</button></div><button type="button" class="gallery-refine-toggle" id="galleryFilterToggle" aria-label="סינון ובחירת תמונות" aria-expanded="false" aria-controls="galleryFilterPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8Z"/></svg><span>סינון</span></button></div>

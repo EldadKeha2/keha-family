@@ -2,6 +2,7 @@ import family from './family.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {NostalgiaLibrary} from './nostalgia-library.mjs';
 import {VideoCategories} from './video-categories.mjs';
+import {FamilyAiState} from './family-ai-state.mjs';
 import {VideoEdits,videoEditorPeople} from './video-edits.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
@@ -35,6 +36,7 @@ export class FamilyState {
     this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;this.peopleRevision=uid();this.peopleCache=null;
     this.nostalgiaLibrary=new NostalgiaLibrary(this);
     this.videoCategories=new VideoCategories(this);
+    this.familyAi=new FamilyAiState(this);
     this.videoEdits=new VideoEdits(this);
     this.initializationError=null;this.nextInitializationAttempt=0;this.initializeState();
   }
@@ -85,6 +87,7 @@ export class FamilyState {
     this.sql.exec('CREATE INDEX IF NOT EXISTS trash_auth_expiry ON trash_auth(expires_at)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS meta(id TEXT PRIMARY KEY,value TEXT NOT NULL)');
+    this.familyAi.initialize();
     this.sql.exec('CREATE TABLE IF NOT EXISTS weddings(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS greetings(id TEXT PRIMARY KEY,wedding_id TEXT NOT NULL,data TEXT NOT NULL)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS greetings_wedding ON greetings(wedding_id)');
@@ -505,6 +508,13 @@ export class FamilyState {
   }
   run(action,p){
     switch(action){
+      case 'family-ai.list':return this.familyAi.list(p);
+      case 'family-ai.exclude':return this.familyAi.exclude(p);
+      case 'family-ai.job.get':this.photo(p.id);return {job:this.familyAi.job(p.id)};
+      case 'family-ai.job.claim':return this.familyAi.claim(p);
+      case 'family-ai.job.update':return this.familyAi.update(p);
+      case 'family-ai.job.poll':return this.familyAi.poll(p);
+      case 'family-ai.job.pending':return this.familyAi.pending();
       case 'nursery':{
         const albums={};
         // One bounded index query supplies covers and counts, without reading other galleries.
@@ -1011,7 +1021,7 @@ export class FamilyState {
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
         return {saved:true,story:item};
       }
-      case 'export':return {schemaVersion:3,videoCategories:this.videoCategories.snapshot(),nostalgiaLibrary:this.nostalgiaLibrary.read(),faceIgnores:this.rows('SELECT f.media_id AS mediaId,f.photo_revision AS photoRevision,f.data FROM media_face_ignores f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,rects:JSON.parse(row.data)})),albumCovers:this.rows('SELECT c.collection,c.media_id AS mediaId FROM album_covers c JOIN media m ON m.id=c.media_id'),faceReviews:this.rows('SELECT r.media_id AS mediaId,r.photo_revision AS photoRevision,r.tags_revision AS tagsRevision,r.completed_at AS completedAt FROM media_face_reviews r JOIN media m ON m.id=r.media_id'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT f.media_id AS mediaId,f.data FROM media_faces f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
+      case 'export':return {schemaVersion:3,familyAi:this.familyAi.snapshot(),videoCategories:this.videoCategories.snapshot(),nostalgiaLibrary:this.nostalgiaLibrary.read(),faceIgnores:this.rows('SELECT f.media_id AS mediaId,f.photo_revision AS photoRevision,f.data FROM media_face_ignores f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,rects:JSON.parse(row.data)})),albumCovers:this.rows('SELECT c.collection,c.media_id AS mediaId FROM album_covers c JOIN media m ON m.id=c.media_id'),faceReviews:this.rows('SELECT r.media_id AS mediaId,r.photo_revision AS photoRevision,r.tags_revision AS tagsRevision,r.completed_at AS completedAt FROM media_face_reviews r JOIN media m ON m.id=r.media_id'),faceScans:this.rows('SELECT s.media_id AS mediaId,s.photo_revision AS photoRevision,s.version,s.data FROM media_face_scans s JOIN media m ON m.id=s.media_id').map(row=>({mediaId:row.mediaId,photoRevision:row.photoRevision,version:row.version,...JSON.parse(row.data)})),photoVersions:this.rows('SELECT v.media_id AS mediaId,v.data FROM photo_versions v JOIN media m ON m.id=v.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)})),exportedAt:new Date().toISOString(),people:this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)),media:this.rows('SELECT data FROM media').map(row=>JSON.parse(row.data)),tags:this.rows('SELECT t.media_id AS mediaId,t.person_id AS personId FROM media_tags t JOIN media m ON m.id=t.media_id'),mediaCollections:this.rows('SELECT c.media_id AS mediaId,c.collection,c.added_at AS addedAt FROM media_collections c JOIN media m ON m.id=c.media_id'),stories:this.rows('SELECT data FROM stories').map(row=>JSON.parse(row.data)),weddings:this.rows('SELECT data FROM weddings').map(row=>JSON.parse(row.data)),greetings:this.rows('SELECT data FROM greetings').map(row=>JSON.parse(row.data)),triviaQuestions:this.rows('SELECT id,data,created_at FROM trivia_questions').map(row=>({id:row.id,...JSON.parse(row.data),createdAt:row.created_at})),faceTags:this.rows('SELECT f.media_id AS mediaId,f.data FROM media_faces f JOIN media m ON m.id=f.media_id').map(row=>({mediaId:row.mediaId,...JSON.parse(row.data)}))};
       default:throw new HttpError(404,'הפעולה אינה זמינה.');
     }
   }

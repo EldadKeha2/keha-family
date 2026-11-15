@@ -41,3 +41,5 @@
 #homeTiles .home-tile-memorial .home-tile-arrow,#mobileMenuTiles .home-tile-memorial .home-tile-arrow{display:none}
 @media(max-width:430px){#mobileMenuTiles .home-tile-memorial{min-height:81px}}
 @media(prefers-reduced-motion:reduce){.site-header .main-nav .nav-link,:is(#homeTiles,#mobileMenuTiles) .home-tile{transition:none}}
+
+#mainNav .nav-link[data-view="family-ai"],:is(#homeTiles,#mobileMenuTiles) .home-tile-family-ai{--tab-top:#f2edf8;--tab-mid:#d7cbe7;--tab-low:#baaccd;--tab-line:#b5a1cb;--tab-ink:#625373}

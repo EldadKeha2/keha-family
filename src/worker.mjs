@@ -9,6 +9,7 @@ import {calendarResponse} from './calendar.mjs';
 import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {galleryRevision} from './gallery.mjs';
+import {familyAiRoute,familyAiTick} from './family-ai-route.mjs';
 import {zipStream} from './zip.mjs';
 import {PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES,decodeUploadMetadata} from '../public/assets/photo-upload-metadata.mjs';
 export {FamilyState} from './state.mjs';
@@ -242,6 +243,9 @@ export default {
         checkOrigin(request);
         if(!equal(request.headers.get('X-Family-Token'),PUBLIC_WRITE_TOKEN))throw new HttpError(403,'יש לרענן את הדף לפני שמירת השינוי.');
       }
+      if(path==='/api/family-ai'&&request.method==='GET')return json(await db('family-ai.list',{page:url.searchParams.get('page'),size:url.searchParams.get('size'),filter:url.searchParams.get('filter')||'all',query:url.searchParams.get('q')||'',excluded:url.searchParams.get('excluded')==='1'}));
+      if(path==='/api/family-ai/exclude'&&request.method==='POST')return json(await db('family-ai.exclude',await readJSON(request,2000)));
+      if(path.startsWith('/api/family-ai/'))return await familyAiRoute(request,env,db,ctx);
       if(path==='/api/trash'||path.startsWith('/api/trash/'))return await recycleRoute(request,env,db);
       if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);
       if(path==='/api/games/jachnun/head-request')return await headRequestRoute(request,env);
@@ -409,6 +413,7 @@ export default {
   async scheduled(controller,env,ctx){
     const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
     ctx.waitUntil(dispatchUpdates(env,db,controller.scheduledTime||Date.now()));
+    ctx.waitUntil(familyAiTick(env,db,ctx));
   }
 };
 

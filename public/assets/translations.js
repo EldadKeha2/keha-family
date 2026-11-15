@@ -1,5 +1,7 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "בינה משפחתית":"Artificial Family",
+  "רגעים של פעם מתעוררים לחיים":"Memories of yesterday come to life",
   "ספריית האירועים עדיין אינה זמינה. נסו לרענן":"The event library is not available yet. Please refresh",
   "האירוע לא נמצא. בחרו אירוע מהרשימה":"Event not found. Choose an event from the list",
   "האירוע לא נמצא":"Event not found",
