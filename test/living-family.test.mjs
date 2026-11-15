@@ -54,6 +54,7 @@ test('each action imports independently, survives retries, and plays from durabl
     response=await f.call(path,{method:'POST'});assert.equal(response.status,200);assert.equal((await response.json()).alreadySaved,true);assert.equal(f.calls.filter(c=>c.method==='PUT').length,1);
     await f.call(f.path(id,'wave'),{method:'POST'});await f.call(f.path(id,'dance'),{method:'POST'});
     const album=f.run('family-ai.living.list');assert.equal(album.readyClips,3);assert.equal(album.items[0].animations.filter(a=>a.status==='ready').length,3);assert.equal(album.items[1].animations.filter(a=>a.status==='ready').length,0);
+    for(const action of album.items[0].animations){assert.ok(action.videoSrc.includes('/'+action.id+'?v='));response=await f.call(action.videoSrc);assert.equal(response.status,200);assert.equal((await response.arrayBuffer()).byteLength,video.byteLength);}
     response=await f.call(saved.clip.videoSrc,{headers:{Range:'bytes=0-9'}});assert.equal(response.status,206);assert.equal((await response.arrayBuffer()).byteLength,10);assert.match(response.headers.get('Content-Range'),/^bytes 0-9\//);
     response=await f.call(saved.clip.videoSrc+'&download=1');assert.match(response.headers.get('Content-Disposition'),/attachment;.*smile/);
     response=await f.call(saved.clip.videoSrc,{method:'HEAD'});assert.equal(response.status,200);assert.equal((await response.arrayBuffer()).byteLength,0);

@@ -17,7 +17,7 @@ export class LivingFamilyState {
   clip(id,action){this.action(action);const row=this.owner.rows('SELECT data FROM living_family_clips WHERE media_id=? AND action_id=?',id,action)[0];return row?JSON.parse(row.data):null;}
   publicClip(clip,item){
     if(!clip)return null;
-    return {status:'ready',version:clip.version,revision:clip.revision,duration:clip.video.duration,stale:clip.revision!==(item.photoRevision||'original'),videoSrc:'/api/family-ai/video/'+clip.id+'/'+clip.variant+'?v='+clip.version};
+    return {status:'ready',version:clip.version,revision:clip.revision,duration:clip.video.duration,stale:clip.revision!==(item.photoRevision||'original'),videoSrc:'/api/family-ai/video/'+clip.id+'/'+clip.action+'?v='+clip.version};
   }
   featured(){
     const items=[];
