@@ -105,5 +105,7 @@ export function renderEffects(canvas,source,input={},maxEdge=1400){
   const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw Error('Canvas unavailable');
   ctx.drawImage(source,0,0,canvas.width,canvas.height);
   const data=ctx.getImageData(0,0,canvas.width,canvas.height);data.data.set(effectPixels(data.data,canvas.width,canvas.height,s));ctx.putImageData(data,0,0);
-  lighting(ctx,canvas.width,canvas.height,s);frame(ctx,canvas.width,canvas.height,s.frame);return canvas;
+  lighting(ctx,canvas.width,canvas.height,s);
+  if(s.intensity>0){ctx.save();ctx.globalAlpha=s.intensity/100;frame(ctx,canvas.width,canvas.height,s.frame);ctx.restore();}
+  return canvas;
 }

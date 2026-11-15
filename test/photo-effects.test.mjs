@@ -36,6 +36,7 @@ test('preview and export share the renderer, constrain resolution and preserve i
     renderEffects(canvas,source,{[group]:id},120);assert.equal(canvas.width,120);assert.equal(canvas.height,80);
   }
   renderEffects(canvas,source,{frame:'ornament'},1200);assert.equal(canvas.width,600);assert.equal(canvas.height,400);assert.ok(calls.includes('frame')&&calls.includes('paint'));
+  calls.length=0;renderEffects(canvas,source,{frame:'ornament',light:'sun',intensity:0},120);assert.equal(calls.length,0,'Zero strength also removes light overlays and frames');
 });
 test('a phone-sized complex preview stays bounded in memory and completes',()=>{
   const w=480,h=320,buffer=new Uint8ClampedArray(w*h*4).fill(140),start=performance.now(),result=effectPixels(buffer,w,h,{look:'golden',art:'watercolor',sharpness:20});
