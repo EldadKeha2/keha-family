@@ -382,13 +382,13 @@
     restoringLink=href;
     try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));const loaded=registeredLink(id);if(loaded)open(loaded.items,loaded.index,loaded.scope);else open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
-  function fitVideoCaption(){
+  function fitVideoCaption(expand=false){
     if(current()?.kind!=='video')return;
     const input=$('openedCaptionText'),form=$('openedCaptionForm'),style=typeof getComputedStyle==='function'?getComputedStyle(input):null;
     const minimum=parseFloat(style?.minHeight)||40,maximum=parseFloat(style?.maxHeight)||280,border=(parseFloat(style?.borderTopWidth)||1)+(parseFloat(style?.borderBottomWidth)||1);
-    // Reset the old editor height before measuring, so shorter captions shrink too.
+    // Saved captions stay on one line; expanding measures the complete text.
     input.style.height='auto';
-    const height=Math.min(maximum,Math.max(minimum,Math.ceil((input.scrollHeight||0)+border)));
+    const height=expand?Math.min(maximum,Math.max(minimum,Math.ceil((input.scrollHeight||0)+border))):minimum;
     input.style.height=height+'px';input.scrollTop=0;
     form.classList.toggle('caption-expanded',height>minimum+1);
     $('editSavedCaption')?.setAttribute('aria-expanded',String(height>minimum+1));
@@ -408,10 +408,7 @@
   }
   function expandVideoCaption(){
     if(current()?.kind!=='video')return;
-    const form=$('openedCaptionForm'),input=$('openedCaptionText');
-    captionLocked=false;captionControls();
-    form.classList.add('caption-expanded');input.style.height=Math.min(280,Math.max(100,parseFloat(input.style.height)||0,(input.scrollHeight||0)+2))+'px';
-    $('editSavedCaption')?.setAttribute('aria-expanded','true');
+    beginCaptionEdit(true);fitVideoCaption(true);
   }
   function beginCaptionEdit(preserveValue=false){
     const item=current();if(!item||captionEditing)return;

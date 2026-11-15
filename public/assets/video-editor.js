@@ -15,7 +15,8 @@
   if(!active||!dialog?.open)return;
   const field=$('videoClipName'),style=typeof getComputedStyle==='function'?getComputedStyle(field):null;
   const minimum=parseFloat(style?.minHeight)||40,maximum=parseFloat(style?.maxHeight)||180,border=(parseFloat(style?.borderTopWidth)||0)+(parseFloat(style?.borderBottomWidth)||0);
-  field.style.height='auto';field.style.height=Math.min(maximum,Math.max(minimum,Math.ceil((field.scrollHeight||0)+border)))+'px';
+  field.style.height='auto';const height=active.nameExpanded?Math.min(maximum,Math.max(minimum,Math.ceil((field.scrollHeight||0)+border))):minimum;field.style.height=height+'px';
+  $('videoClipEditName').setAttribute('aria-expanded',String(height>minimum+1));
  }
  function pausePlayer(){if(player?.tagName==='VIDEO')player.pause();}
  function flushSeek(){
@@ -81,9 +82,9 @@
   document.body.appendChild(dialog);$('videoClipClose').addEventListener('click',close);$('videoClipCategory').addEventListener('click',editCategory);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});$('videoClipForm').addEventListener('submit',save);
   dialog.addEventListener('keydown',event=>event.stopPropagation());
   for(const [id,boundary]of [['videoClipStart','start'],['videoClipEnd','end']])$(id).addEventListener('input',()=>sync('fields',boundary));
-  $('videoClipName').addEventListener('input',()=>{fitName();sync();});
+  $('videoClipName').addEventListener('input',()=>{if(active)active.nameExpanded=true;fitName();sync();});
   $('videoClipName').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,()=>{if(!$('videoClipSave').disabled)$('videoClipForm').requestSubmit();}));
-  $('videoClipEditName').addEventListener('click',()=>{fitName();$('videoClipName').focus();});
+  $('videoClipEditName').addEventListener('click',()=>{if(active)active.nameExpanded=true;fitName();$('videoClipName').focus();});
   if(typeof ResizeObserver==='function'){let width=0;new ResizeObserver(entries=>{const next=entries[0]?.contentRect.width;if(next&&next!==width){width=next;fitName();}}).observe($('videoClipName'));}
   for(const [id,boundary]of [['videoClipStartRange','start'],['videoClipEndRange','end']])$(id).addEventListener('input',()=>sync('ranges',boundary));
   $('videoClipMarkStart').addEventListener('click',()=>{if(player?.tagName!=='VIDEO')return;$('videoClipStart').value=clock(player.currentTime);pausePlayer();sync();});
