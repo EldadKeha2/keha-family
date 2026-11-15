@@ -25,15 +25,16 @@ dialog.video-clip-editor{width:min(900px,calc(100vw - 24px));max-width:none;max-
 @media(max-width:700px){#videoUploadWizard[open]{width:calc(100vw - 14px);height:calc(100dvh - 14px);max-height:calc(100dvh - 14px);padding:13px 12px}#videoUploadWizard h2{font-size:20px}#videoUploadWizard .video-upload-metadata{grid-template-columns:1fr;gap:7px;padding:8px}#videoUploadWizard .photo-edit-date-label,#videoUploadWizard .photo-edit-caption-label{width:65px;max-width:65px;flex:none}#videoUploadWizard .photo-edit-date-fields{grid-template-columns:minmax(35px,.75fr) minmax(35px,.75fr) minmax(60px,1.1fr) 34px;flex:1}#videoUploadWizard .photo-edit-caption textarea{height:36px;resize:none}#videoUploadWizard .video-upload-viewport{flex-basis:170px;max-height:34dvh;min-height:120px}#videoUploadWizard .photo-edit-pager{margin:7px 0}#videoUploadWizard .video-upload-toolbar{gap:6px}#videoUploadRange{width:100%;margin:0;font-size:11px}.video-upload-details{gap:8px}#videoUploadWizard .photo-edit-footer button{font-size:12px;padding:7px 8px}#videoUploadSaveCurrent,#videoUploadSaveAll{flex:1}#videoUploadRemove{width:100%;min-height:26px!important;text-align:center}#videoUploadWizard .photo-edit-footer{position:sticky;bottom:-13px;background:#fffcf6;z-index:4;padding-bottom:8px}}
 
 /* Compact time controls with the selected duration beside both boundaries. */
-#videoClipEditor .video-clip-timing{display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,.32fr);gap:8px;direction:rtl}
+#videoClipEditor .video-clip-timing{display:grid;grid-template-columns:minmax(0,calc(240px * var(--a11y-text-scale,1))) minmax(calc(90px * var(--a11y-text-scale,1)),calc(112px * var(--a11y-text-scale,1)));justify-content:start;align-items:stretch;gap:8px;direction:rtl}
 html[dir=ltr] #videoClipEditor .video-clip-timing{direction:ltr}
-#videoClipEditor .video-clip-times{display:grid;grid-template-columns:minmax(0,1fr);gap:5px}
-#videoClipEditor .video-clip-duration{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;padding:5px 4px;box-sizing:border-box;border:1px solid #d0bfa0;border-radius:6px;background:#f5eddc;text-align:center}
-#videoClipEditor .video-clip-duration>span{font:calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans)}
-#videoClipEditor .video-clip-time-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:8px;direction:rtl}
+#videoClipEditor .video-clip-times{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:8px;min-width:0}
+#videoClipEditor .video-clip-duration{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:4px 3px;box-sizing:border-box;border:1px solid #d0bfa0;border-radius:6px;background:#f5eddc;text-align:center}
+#videoClipEditor .video-clip-duration>span{font:calc(12px * var(--a11y-text-scale,1))/1.2 var(--sans)}
+#videoClipEditor .video-clip-time-row{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;align-items:start;gap:2px;min-width:0;direction:rtl}
 html[dir=ltr] #videoClipEditor .video-clip-time-row{direction:ltr}
-#videoClipEditor .video-clip-time-row>:is(button,label){grid-column:1;grid-row:1;box-sizing:border-box;width:100%;min-width:0;min-height:40px;margin:0;font:calc(13px * var(--a11y-text-scale,1))/1.4 var(--sans)}
-#videoClipEditor .video-clip-time-row input{grid-column:2;grid-row:1;box-sizing:border-box;width:100%;min-width:0;min-height:40px;font:16px/1.4 var(--sans);text-align:center}
+#videoClipEditor .video-clip-time-row>label{display:block;grid-column:1;grid-row:1;box-sizing:border-box;width:100%;min-width:0;min-height:0;margin:0;padding:0;border:0;background:none;text-align:right;overflow-wrap:anywhere;font:calc(12px * var(--a11y-text-scale,1))/1.2 var(--sans)}
+html[dir=ltr] #videoClipEditor .video-clip-time-row>label{text-align:left}
+#videoClipEditor .video-clip-time-row input{grid-column:1;grid-row:2;box-sizing:border-box;width:100%;min-width:0;min-height:32px;margin:0;padding:4px 6px;font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans);font-variant-numeric:tabular-nums;text-align:right}
 #videoClipEditor footer{display:grid;grid-template-columns:minmax(0,.6fr) minmax(0,1fr) minmax(0,1.4fr);gap:7px;align-items:stretch;direction:rtl}
 #videoClipEditor:not(.is-selection) footer:has(#videoClipCategory[hidden]){grid-template-columns:repeat(2,minmax(0,1fr))}
 #videoClipEditor.is-selection footer{grid-template-columns:1fr}
@@ -74,9 +75,10 @@ html[dir=ltr] #videoClipEditor footer{direction:ltr}
 #videoClipEditor #videoClipTitle{margin:0;font-size:calc(24px * var(--a11y-text-scale,1));line-height:1.2}
 #videoClipEditor #videoClipSubtitle{min-width:0;max-width:none;margin:3px 0 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:#796b52;font:calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans);text-align:right;white-space:pre-wrap;overflow-wrap:anywhere}
 html[dir=ltr] #videoClipEditor .video-clip-heading,html[dir=ltr] #videoClipEditor #videoClipSubtitle{text-align:left}
-#videoClipEditor #videoClipLength{margin:0;color:#5c523f;font:calc(16px * var(--a11y-text-scale,1))/1.4 var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap}
+#videoClipEditor #videoClipLength{margin:0;color:#5c523f;font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap}
 #videoClipEditor footer #videoClipSaveNew{flex:1 1 auto;box-sizing:border-box;min-width:0;margin:0;padding:10px 12px;border:1px solid #b9c5a8;background:#f5f7ee;color:#536b3e;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 #videoClipEditor .video-clip-tags,#videoClipEditor .inline-tag-widget{flex-shrink:0;margin:0;padding:0;border:0}
+#videoClipEditor .video-clip-tags{padding-top:5px;border-top:1px solid #dfd5c2}
 #videoClipEditor .tag-widget-heading{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:0 0 3px}
 #videoClipEditor .tag-widget-heading h3{gap:5px;margin:0;font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans)}
 #videoClipEditor .tag-heading-icon{width:16px;height:16px;flex-basis:16px}
@@ -97,10 +99,9 @@ html[dir=ltr] #videoClipEditor .video-clip-heading,html[dir=ltr] #videoClipEdito
  #videoClipEditor #videoClipForm{gap:5px;max-height:calc(var(--tag-visible-height,100dvh) - 38px)}
  #videoClipEditor #videoClipTitle{font-size:calc(22px * var(--a11y-text-scale,1))}
  #videoClipEditor #videoClipSaveName{max-width:92px;padding-inline:7px;font-size:calc(11px * var(--a11y-text-scale,1))}
- #videoClipEditor .video-clip-timing{grid-template-columns:minmax(0,1fr) minmax(76px,.34fr);gap:6px}
- #videoClipEditor .video-clip-time-row{gap:5px}
- #videoClipEditor .video-clip-time-row>:is(button,label){padding:6px 4px;font-size:calc(11px * var(--a11y-text-scale,1))}
- #videoClipEditor .video-clip-time-row input{padding:6px 3px;font-size:14px}
+ #videoClipEditor .video-clip-timing{grid-template-columns:minmax(0,calc(232px * var(--a11y-text-scale,1))) calc(90px * var(--a11y-text-scale,1));gap:6px}
+ #videoClipEditor .video-clip-times{gap:6px}
+ #videoClipEditor .video-clip-time-row input{padding:4px 5px}
  #videoClipEditor .video-clip-duration>span{font-size:calc(11px * var(--a11y-text-scale,1))}
  #videoClipEditor #videoClipLength{font-size:calc(13px * var(--a11y-text-scale,1))}
  #videoClipEditor footer{gap:5px}
@@ -108,7 +109,7 @@ html[dir=ltr] #videoClipEditor .video-clip-heading,html[dir=ltr] #videoClipEdito
 }
 @media(pointer:coarse){
  #videoClipEditor :is(#videoClipSaveName,#videoClipSave,#videoClipSaveNew,#videoClipCategory){min-height:44px}
- #videoClipEditor .video-clip-time-row>:is(button,label,input){min-height:44px}
+ #videoClipEditor .video-clip-time-row input{min-height:44px}
  #videoClipEditor .video-clip-timeline input[type=range]{height:36px;min-height:36px}
  #videoClipEditor .tag-search-label input{min-height:40px}
 }
