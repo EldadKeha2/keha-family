@@ -119,6 +119,9 @@ function init(){
   });
   $('clearGalleryFilter').addEventListener('click',()=>{clearCriteria();apply();});
   document.addEventListener('click',event=>{
+    if(state.open&&!event.target.closest('#galleryFilterPanel .gallery-filter-field')){
+      for(const field of $('galleryFilterPanel').querySelectorAll('details[open]'))field.open=false;
+    }
     if(event.target.closest('[data-gallery-select-all]'))selectAll();
     else if(event.target.closest('[data-gallery-clear-selection]'))clearSelection();
     else if(event.target.closest('[data-gallery-download]'))download();
