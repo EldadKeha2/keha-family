@@ -5,7 +5,7 @@
 .photo-label-toggle svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 #mediaViewer .photo-label-toggle[aria-expanded=true]{background:#e8bcaa;border-color:#be8470;color:#743c30}
 .photo-label-chips{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
-.photo-label-chip{display:inline-block;border:1px solid #e2bbb0;border-radius:4px;background:#fbebe4;color:#9b5c4a;padding:3px 7px;font:calc(13px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+#mediaViewer .photo-label-chip{display:inline-block;min-height:0;max-width:100%;margin:0;cursor:pointer;border:1px solid #e2bbb0;border-radius:4px;background:#fbebe4;color:#9b5c4a;padding:3px 7px;font:calc(13px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 .photo-label-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:7px}
 .photo-label-choices label{display:flex;align-items:center;gap:7px;min-height:36px;padding:4px 7px;border:1px solid #ead2c7;border-radius:5px;background:#fff8f4;color:#8d5548;cursor:pointer;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 .photo-label-choices input{width:17px;height:17px;flex:none;margin:0;accent-color:#a8614d}
@@ -41,8 +41,12 @@ html[lang^=en] .photo-custom-label-form input{direction:ltr;text-align:left}
   .photo-labels{padding-top:6px;margin-top:6px}
   .photo-label-heading{gap:6px}
   #mediaViewer .photo-label-toggle{min-height:32px;font-size:calc(13px * var(--a11y-text-scale,1));padding:3px 6px}
-  .photo-label-chip{font-size:calc(12px * var(--a11y-text-scale,1));padding:2px 5px}
+  #mediaViewer .photo-label-chip{font-size:calc(12px * var(--a11y-text-scale,1));padding:2px 5px}
   .photo-label-choices{gap:4px;margin-top:5px}
   .photo-label-choices label{min-height:34px;padding:3px 5px;gap:4px;font-size:calc(12px * var(--a11y-text-scale,1))}
 }
 @media(max-width:700px) and (max-height:760px){#mediaViewer.has-photo-labels #mediaShareActions .media-share-heading{display:none}}
+
+
+#mediaViewer .photo-label-chip:hover{background:#f2d9cd;border-color:#ce9c86}
+#mediaViewer .photo-label-chip:focus-visible{outline:2px solid #a8614d;outline-offset:2px}

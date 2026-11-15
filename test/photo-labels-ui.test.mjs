@@ -13,8 +13,8 @@ function fixture(english=false,{navigator={userAgent:'Mozilla/5.0 (Linux; Androi
  window.navigator=navigator;Object.defineProperty(node('mediaStage'),'clientWidth',{get:()=>viewportWidth});
  const document={readyState:'complete',activeElement:null,getElementById:node};
  vm.runInNewContext(source,{...labelCatalog,window,document,Response,CustomEvent,matchMedia:()=>({matches:true}),requestAnimationFrame:fn=>{frames.push(fn);return frames.length;}});
- const click=selector=>handlers.get('mediaPhotoLabels:click')({target:{closest:value=>value===selector?{}:null}}),submit=()=>handlers.get('mediaPhotoLabels:submit')({preventDefault(){},target:{matches:selector=>selector==='[data-photo-label-form]'}});
- return{requests,pending,saved,window,submit,add(name){click('[data-photo-label-toggle]');click('[data-photo-label-add]');handlers.get('mediaPhotoLabels:input')({target:{matches:()=>true,value:name}});submit();},fit(footer=300,height=800,width=viewportWidth){footerHeight=footer;viewportHeight=height;viewportWidth=width;node('mediaViewer').open=true;for(const fn of listeners.get('resize')||[])fn();for(const fn of frames.splice(0))fn();return Number.parseFloat(styles.get('--photo-fit-height'));},mount(id,labels=[]){saved.set(id,labels);window.FamilyPhotoLabels.mount({id,kind:'photo',labels});},toggle(label,checked=true){handlers.get('mediaPhotoLabels:change')({target:{dataset:{photoLabelOption:label},checked}});},get fixedFrame(){return classes.has('mobile-photo-frame');},get html(){return node('mediaPhotoLabels').innerHTML;},async reply(ok=true){pending.shift()(ok);await new Promise(resolve=>setImmediate(resolve));}};
+ const click=(selector,dataset={})=>handlers.get('mediaPhotoLabels:click')({target:{closest:value=>value===selector?{dataset}:null}}),submit=()=>handlers.get('mediaPhotoLabels:submit')({preventDefault(){},target:{matches:selector=>selector==='[data-photo-label-form]'}});
+ return{requests,pending,saved,window,submit,remove(label){click('[data-photo-label-remove]',{photoLabelRemove:label});},add(name){click('[data-photo-label-toggle]');click('[data-photo-label-add]');handlers.get('mediaPhotoLabels:input')({target:{matches:()=>true,value:name}});submit();},fit(footer=300,height=800,width=viewportWidth){footerHeight=footer;viewportHeight=height;viewportWidth=width;node('mediaViewer').open=true;for(const fn of listeners.get('resize')||[])fn();for(const fn of frames.splice(0))fn();return Number.parseFloat(styles.get('--photo-fit-height'));},mount(id,labels=[]){saved.set(id,labels);window.FamilyPhotoLabels.mount({id,kind:'photo',labels});},toggle(label,checked=true){handlers.get('mediaPhotoLabels:change')({target:{dataset:{photoLabelOption:label},checked}});},get fixedFrame(){return classes.has('mobile-photo-frame');},get html(){return node('mediaPhotoLabels').innerHTML;},async reply(ok=true){pending.shift()(ok);await new Promise(resolve=>setImmediate(resolve));}};
 }
 test('custom labels save with escaped names, survive reopening and do not attach to the next photo',async()=>{
  const f=fixture(),name='טיולים, חוף <ים>',id=labelCatalog.photoLabelFromName(name);f.mount('custom-a');f.add(name);assert.equal(f.requests[0].body.label,id);assert.match(f.html,/טיולים, חוף &lt;ים&gt;/);f.mount('custom-b');await f.reply();assert.doesNotMatch(f.html,/photo-label-chip[^>]*>טיולים/);
@@ -39,6 +39,22 @@ test('a long list of people cannot shrink the mobile photo, and rotation still r
  const f=fixture();f.mount('group-photo');const withShortList=f.fit(80),withManyPeople=f.fit(1400),withLabelsExpanded=f.fit(1800);
  assert.ok(withShortList>400,'A portrait phone reserves a large photo area');assert.equal(withManyPeople,withShortList,'Dozens of names scroll below the image instead of reducing it');assert.equal(withLabelsExpanded,withShortList,'Expanding subject labels also leaves the photo size intact');
  const landscape=f.fit(1400,360);assert.ok(landscape>100&&landscape<=360-60-70,'The photo and its controls remain usable after rotation');assert.equal(f.fit(1400,800),withShortList,'Returning to portrait restores the large photo');
+});
+test('clicking an applied label removes only that label from its own photo and ignores repeat taps',async()=>{
+ const f=fixture(),vintage=labelCatalog.photoLabelFromName("וינטג'");f.mount('remove-a',['black-and-white',vintage]);
+ assert.match(f.html,/<button[^>]*data-photo-label-remove="black-and-white"[^>]*>שחור לבן<\/button>/);
+ f.remove(vintage);f.remove(vintage);assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/remove-a/labels');assert.equal(f.requests[0].body.label,vintage);assert.equal(f.requests[0].body.tagged,false);
+ assert.doesNotMatch(f.html,/photo-label-chip[^>]*>וינטג/);assert.match(f.html,/photo-label-chip[^>]*>שחור לבן/);
+ f.mount('remove-b',['purim']);await f.reply();assert.match(f.html,/photo-label-chip[^>]*>פורים/);assert.deepEqual(f.saved.get('remove-a'),['black-and-white']);assert.deepEqual(f.saved.get('remove-b'),['purim']);
+});
+test('a failed chip removal restores the label and can be retried',async()=>{
+ const f=fixture();f.mount('remove-retry',['birthdays','holidays']);f.remove('birthdays');assert.doesNotMatch(f.html,/photo-label-chip[^>]*>ימי הולדת/);await f.reply(false);
+ assert.match(f.html,/Save failed/);assert.match(f.html,/photo-label-chip[^>]*>ימי הולדת/);assert.deepEqual(f.saved.get('remove-retry'),['birthdays','holidays']);
+ f.remove('birthdays');await f.reply();assert.deepEqual(f.saved.get('remove-retry'),['holidays']);assert.doesNotMatch(f.html,/Save failed/);
+});
+test('removing a newly added chip while its save is pending preserves the final removal',async()=>{
+ const f=fixture();f.mount('remove-pending');f.toggle('birthdays');f.remove('birthdays');assert.equal(f.requests.length,1);assert.doesNotMatch(f.html,/photo-label-chip[^>]*>ימי הולדת/);
+ await f.reply();assert.equal(f.requests.length,2);assert.equal(f.requests[1].body.tagged,false);await f.reply();assert.deepEqual(f.saved.get('remove-pending'),[]);
 });
 test('phone frames stay the same across photos, respect narrow screens and do not apply to Windows touch computers',()=>{
  const phone=fixture(false,{width:360});phone.mount('wide-photo');assert.equal(phone.fixedFrame,true);assert.equal(phone.fit(),360);
