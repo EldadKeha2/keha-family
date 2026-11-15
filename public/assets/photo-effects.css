@@ -16,7 +16,8 @@ html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{
 #photoEffectsEditor button:focus-visible,#photoEffectsEditor input:focus-visible{outline:2px solid #9f783e;outline-offset:2px}
 #photoEffectsEditor svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .pe-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;direction:ltr}
-.pe-heading{display:flex;align-items:center;gap:10px;min-width:0}
+#photoEffectsEditor[dir=rtl] .pe-header{direction:rtl}
+.pe-heading{display:flex;align-items:center;gap:10px;min-width:0;direction:ltr}
 .pe-heading>div{direction:rtl}
 #photoEffectsEditor[dir=ltr] .pe-heading>div{direction:ltr}
 .pe-diamond{color:var(--pe-gold);font-size:40px;line-height:1;flex:none;text-shadow:0 2px 7px #ae8a4f20}
@@ -35,7 +36,7 @@ html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{
 #photoEffectsEditor .pe-compare{display:flex;align-items:center;gap:6px;border:1px solid #cfc3a6;border-radius:7px;background:#fffbf3;padding:6px 9px;font-size:12px;min-height:34px}
 #photoEffectsEditor .pe-compare[aria-pressed=true]{background:#e5eadb;border-color:#96a37e;color:#4e653b}
 .pe-controls{flex:none;display:flex;flex-direction:column;gap:9px;min-width:0;padding-top:1px}
-.pe-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:4px;border:1px solid #ddd1b7;border-radius:10px;background:#efe8d9}
+.pe-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;padding:4px;border:1px solid #ddd1b7;border-radius:10px;background:#efe8d9}
 #photoEffectsEditor .pe-tabs button{min-width:0;min-height:34px;padding:5px 3px;border:1px solid transparent;border-radius:6px;background:transparent;font-size:13px;white-space:nowrap}
 #photoEffectsEditor .pe-tabs [aria-selected=true]{background:#fffdf6;border-color:#d3c29e;color:#6f542f;box-shadow:0 2px 5px #65553b12}
 .pe-panel{position:relative;min-width:0;padding-inline:30px}
@@ -74,3 +75,45 @@ html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaNext{
   .pe-choices{grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}#photoEffectsEditor .pe-choices button{min-height:47px;padding:2px}#photoEffectsEditor .pe-choices canvas,.pe-tune-symbol{height:24px}#photoEffectsEditor .pe-choices button>span:last-child{font-size:9px}.pe-controls{gap:4px}.pe-tabs{padding:2px}#photoEffectsEditor .pe-tabs button{min-height:25px;font-size:11px}.pe-slider-row{min-height:25px;margin-top:3px}.pe-footer{padding-top:4px}#photoEffectsEditor #photoEffectsSave{min-height:32px;font-size:12px}.pe-stage{min-height:35px}
 }
 @media(prefers-reduced-motion:reduce){#mediaStage>.photo-magic-wand{transition:none}}
+.pe-fun{display:flex;flex-direction:column;gap:7px;min-width:0}
+.pe-fun-tabs{display:flex;align-items:center;justify-content:center;gap:6px}
+#photoEffectsEditor .pe-fun-tabs button{min-width:75px;min-height:29px;padding:4px 12px;border:1px solid #ddd0b6;border-radius:15px;background:#f4eddd;font-size:12px}
+#photoEffectsEditor .pe-fun-tabs button[aria-selected=true]{color:#fffdf4;background:#84714f;border-color:#84714f}
+.pe-fun-strip{display:flex;align-items:center;gap:5px;min-width:0;direction:ltr}
+.pe-fun-choices{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;flex:1;min-width:0;direction:rtl}
+#photoEffectsEditor[dir=ltr] .pe-fun-choices{direction:ltr}
+#photoEffectsEditor .pe-fun-choices button{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;min-width:0;min-height:73px;padding:4px 3px;border:1px solid #dcd0b9;border-radius:8px;background:#fffcf5;overflow:hidden}
+#photoEffectsEditor .pe-fun-choices button>span:last-child{font-size:11px;line-height:1.15;white-space:normal;min-height:14px;text-align:center}
+#photoEffectsEditor .pe-fun-choices button[aria-pressed=true]{border-color:#9d8050;background:#f1e4c8;box-shadow:inset 0 0 0 1px #b99a64}
+#photoEffectsEditor .pe-fun-choices canvas{display:block;width:100%;height:43px;object-fit:cover;border-radius:4px}
+.pe-fun-glyph{display:grid;align-items:center;justify-content:center;height:43px;font:32px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif}
+#photoEffectsEditor .pe-fun-page{min-width:22px;width:22px;height:36px;padding:0;border:1px solid #d4c5a6;border-radius:6px;background:#f5eedf;font-size:23px}
+.pe-fun-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:31px}
+.pe-fun-mask-tools,.pe-fun-sticker-tools{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+#photoEffectsEditor .pe-fun-tools button{min-height:29px;padding:4px 8px;border:1px solid #d6cab1;border-radius:6px;background:#faf5e9;font-size:11px;white-space:nowrap}
+#photoEffectsEditor .pe-fun-tools [aria-pressed=true]{background:#e4ebd9;border-color:#91a478;color:#48623a}
+.pe-fun-range{display:grid;grid-template-columns:auto minmax(55px,110px) 30px;align-items:center;gap:6px;min-width:0;font-size:11px;white-space:nowrap}
+.pe-fun-range input{width:100%;height:26px;min-width:0;accent-color:#657950;direction:ltr}
+.pe-fun-range output{font:11px Arial,sans-serif;direction:ltr;text-align:center}
+.pe-fun-editing canvas,.pe-sticker-selection{touch-action:none}
+.pe-fun-editing canvas{cursor:grab}.pe-brush-mode canvas{cursor:crosshair}
+.pe-sticker-selection{position:absolute;z-index:5;border:1px dashed #547947;box-shadow:0 0 0 1px #fffc;pointer-events:none;min-width:12px;min-height:12px;border-radius:6px}
+.pe-sticker-selection:focus-visible{outline:2px solid #e0bf72;outline-offset:5px}
+#photoEffectsEditor .pe-sticker-selection button{position:absolute;display:grid;place-items:center;pointer-events:auto;min-width:28px;min-height:28px;width:28px;height:28px;padding:0;border:1px solid #b7c3a6;border-radius:50%;background:#fffaf0;color:#4b613a;font:20px Arial,sans-serif;touch-action:none;box-shadow:0 1px 4px #30291530}
+.pe-sticker-selection [data-fun-delete]{right:-14px;top:-14px}
+.pe-sticker-selection [data-fun-resize]{right:-14px;bottom:-14px;cursor:nwse-resize}
+.pe-fun-tip{position:absolute;z-index:4;bottom:7px;left:8px;max-width:calc(100% - 115px);padding:4px 7px;border-radius:5px;background:#fffaf0e8;color:#786347;font-size:10px;line-height:1.35;pointer-events:none;direction:rtl}
+#photoEffectsEditor[dir=ltr] .pe-fun-tip{direction:ltr}
+#photoEffectsEditor .pe-fun-text{position:absolute;z-index:8;bottom:30px;left:50%;transform:translateX(-50%);width:min(330px,calc(100% - 30px));height:37px;padding:6px 10px;border:1px solid #b6a17b;border-radius:8px;background:#fffdf4f2;color:#564938;font:16px Arial,sans-serif;box-shadow:0 2px 10px #4b3b2320}
+@media(max-width:700px){
+  #photoEffectsEditor .pe-tabs button{font-size:11px;padding-inline:1px}
+  .pe-fun{gap:5px}.pe-fun-tabs{gap:4px}#photoEffectsEditor .pe-fun-tabs button{min-width:0;flex:1;min-height:26px;padding:4px 5px;font-size:11px}
+  .pe-fun-choices{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}#photoEffectsEditor .pe-fun-choices button{min-height:55px;padding:3px}#photoEffectsEditor .pe-fun-choices canvas,.pe-fun-glyph{height:32px}.pe-fun-glyph{font-size:27px}#photoEffectsEditor .pe-fun-choices button>span:last-child{font-size:10px;min-height:13px}
+  .pe-fun-tools{flex-wrap:wrap;gap:3px;justify-content:center}#photoEffectsEditor .pe-fun-tools button{min-height:25px;padding:3px 6px;font-size:10px}.pe-fun-range{width:100%;grid-template-columns:84px minmax(0,1fr) 30px;font-size:10px;gap:5px}.pe-fun-range input{height:24px}
+  .pe-fun-tip{font-size:9px;max-width:calc(100% - 90px)}
+}
+@media(max-height:530px){
+  .pe-fun{gap:3px}#photoEffectsEditor .pe-fun-tabs button{min-height:23px;padding:3px 7px;font-size:10px}.pe-fun-choices{grid-template-columns:repeat(8,minmax(0,1fr));gap:3px}#photoEffectsEditor .pe-fun-choices button{min-height:45px;padding:2px}#photoEffectsEditor .pe-fun-choices canvas,.pe-fun-glyph{height:24px}.pe-fun-glyph{font-size:23px}#photoEffectsEditor .pe-fun-choices button>span:last-child{font-size:9px;min-height:12px}
+  .pe-fun-tools{flex-wrap:nowrap;gap:5px}.pe-fun-range{width:auto;grid-template-columns:auto minmax(40px,90px) 27px}.pe-fun-range>span{display:none}#photoEffectsEditor .pe-fun-tools button{min-height:23px;padding:2px 5px;font-size:9px}.pe-fun-tip{display:none}
+}
+@media(max-height:420px){.pe-fun-range{display:none}.pe-header h2{font-size:16px}#photoEffectsEditor .pe-header .pe-icon{height:24px}.pe-header .pe-diamond{font-size:24px}}

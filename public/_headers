@@ -6,6 +6,10 @@
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net; object-src 'none'
   Referrer-Policy: no-referrer
 
+/assets/photo-fun-worker.mjs
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net; object-src 'none'
+  Referrer-Policy: no-referrer
+
 /
   Cache-Control: no-cache
 
