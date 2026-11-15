@@ -25,6 +25,25 @@ function fixture(provider='resend'){
 test('updates fail closed until sender setup and never pretend an email was sent',async()=>{
  const f=fixture();try{delete f.env.RESEND_API_KEY;assert.equal((await (await f.call('/api/updates/config')).json()).enabled,false);assert.equal((await f.call('/api/updates/register',{email:'a@example.com'})).status,503);assert.equal(f.messages.length,0);assert.equal(f.db.exec('SELECT count(*) AS n FROM subscribers').toArray()[0].n,0);const preview=await f.call('/api/updates/preview?type=memorials&lang=en-GB');assert.equal(preview.status,200);assert.match(await preview.text(),/In loving memory/);}finally{f.close();}
 });
+test('public count includes only confirmed active subscriptions and exposes no subscriber records',async()=>{
+ const f=fixture();try{
+  const count=async()=>{const r=await f.call('/api/updates/config');assert.equal(r.status,200);assert.equal(r.headers.get('Cache-Control'),'no-store');const body=await r.json();assert.deepEqual(Object.keys(body).sort(),['enabled','hour','sender','subscriberCount','timeZone']);return body.subscriberCount;};
+  assert.equal(await count(),0);
+  const raw=await f.register();assert.equal(await count(),0);
+  const active=await (await f.call('/api/updates/confirm',{token:raw})).json();assert.equal(active.subscriberCount,1);assert.equal(await count(),1);
+  await f.register('pending@example.net');assert.equal(await count(),1);
+  f.advance();assert.equal((await f.call('/api/updates/register',{email:'visitor@example.net',preferences:f.all(),language:'he',consent:true})).status,200);assert.equal(await count(),1);
+  const before=f.messages.length;delete f.env.RESEND_API_KEY;assert.equal(await count(),1);assert.equal(f.messages.length,before);
+  f.env.RESEND_API_KEY='test-only-no-real-network';
+  const removed=await (await f.call('/api/updates/unsubscribe',{token:active.token})).json();assert.equal(removed.subscriberCount,0);assert.equal(await count(),0);
+ }finally{f.close();}
+});
+test('an unavailable count never becomes a false zero or disables the registration configuration',async()=>{
+ const f=fixture();try{
+  f.env.FAMILY_UPDATES.get=()=>({fetch:async()=>{throw Error('temporarily unavailable');}});
+  const r=await f.call('/api/updates/config'),body=await r.json();assert.equal(r.status,200);assert.equal(body.enabled,true);assert.equal(body.subscriberCount,null);
+ }finally{f.close();}
+});
 test('double opt-in encrypts addresses, stores only hashed tokens, and excludes subscribers from public exports',async()=>{
  const f=fixture();try{
   const confirmation=await f.register(),pending=f.db.exec('SELECT * FROM subscribers').toArray()[0];assert.equal(pending.status,'pending');assert.ok(!JSON.stringify(pending).includes('visitor@example.net'));assert.ok(!JSON.stringify(pending).includes(confirmation));

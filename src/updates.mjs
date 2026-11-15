@@ -115,6 +115,7 @@ export class FamilyUpdates {
     this.sql.exec('CREATE TABLE IF NOT EXISTS deliveries(id TEXT NOT NULL,day TEXT NOT NULL,status TEXT NOT NULL,data TEXT,revision TEXT,PRIMARY KEY(id,day))');
   }
   rows(q,...args){return this.sql.exec(q,...args).toArray();}
+  stats(){return {subscriberCount:Number(this.rows("SELECT COUNT(*) AS n FROM subscribers WHERE status='active'")[0].n)};}
   tx(callback){return this.ctx.storage.transactionSync(callback);}
   async digest(value){return hex(await hmac(this.env.UPDATES_SECRET,value));}
   async key(){return crypto.subtle.importKey('raw',await crypto.subtle.digest('SHA-256',encoder.encode('keha-updates-aes-v1:'+this.env.UPDATES_SECRET)),'AES-GCM',false,['encrypt','decrypt']);}
@@ -274,10 +275,13 @@ export class FamilyUpdates {
   async fetch(request){
     try{
       const {action,...p}=await request.json();
+      if(action==='stats')return json(this.stats());
       if(!updatesConfigured(this.env))throw new HttpError(503,'שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.','UPDATES_NOT_CONFIGURED');
       const now=Date.now();this.sql.exec('DELETE FROM mail_requests WHERE started<?',now-7*86400000);this.sql.exec('DELETE FROM rate_limits WHERE expires<?',now);this.sql.exec("DELETE FROM subscribers WHERE status='pending' AND confirm_expires<?",now);this.sql.exec('DELETE FROM deliveries WHERE day<?',new Date(now-7*86400000).toISOString().slice(0,10));
       const methods={register:'register',confirm:'confirm','request-link':'requestLink',preferences:'getPreferences',save:'savePreferences',unsubscribe:'unsubscribe',dispatch:'dispatch','head-request':'headRequest'};
-      if(!methods[action])throw new HttpError(404,'הפעולה אינה זמינה.');return json(await this[methods[action]](p));
+      if(!methods[action])throw new HttpError(404,'הפעולה אינה זמינה.');
+      const result=await this[methods[action]](p);
+      return json(action==='confirm'||action==='unsubscribe'?{...result,...this.stats()}:result);
     }catch(error){return fail(error);}
   }
 }
@@ -293,7 +297,14 @@ export async function headRequestRoute(request,env){
 
 export async function updatesRoute(request,env,db){
   const url=new URL(request.url),path=url.pathname;
-  if(path==='/api/updates/config'&&request.method==='GET')return json({enabled:updatesConfigured(env),sender:'Keha Family',hour:9,timeZone:'Asia/Jerusalem'});
+  if(path==='/api/updates/config'&&request.method==='GET'){
+    let subscriberCount=null;
+    if(env.FAMILY_UPDATES)try{
+      const response=await env.FAMILY_UPDATES.get(env.FAMILY_UPDATES.idFromName('keha-updates')).fetch(new Request('https://updates.internal/',{method:'POST',body:JSON.stringify({action:'stats'})}));
+      if(response.ok){const stats=await response.json();if(Number.isSafeInteger(stats.subscriberCount)&&stats.subscriberCount>=0)subscriberCount=stats.subscriberCount;}
+    }catch{}
+    return json({enabled:updatesConfigured(env),subscriberCount,sender:'Keha Family',hour:9,timeZone:'Asia/Jerusalem'});
+  }
   if(path==='/api/updates/preview'&&request.method==='GET'){
     const type=['birthdays','anniversaries','memorials'].includes(url.searchParams.get('type'))?url.searchParams.get('type'):'birthdays',language=langs.has(url.searchParams.get('lang'))?url.searchParams.get('lang'):'he';
     let names=[{name:'בן משפחה',nameEn:'A family member'}];if(type==='anniversaries')names.push({name:'בת משפחה',nameEn:'A family member'});

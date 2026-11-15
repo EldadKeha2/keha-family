@@ -5,7 +5,7 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const excludedPeople=new Set(['adi']);
   const fresh=()=>Object.fromEntries(['birthdays','anniversaries','memorials'].map(key=>[key,{enabled:true,ids:null}]));
-  const state={view:'tree',ready:false,loaded:false,loading:false,loadId:0,enabled:false,prefs:fresh(),mode:'register',token:null,revision:null,email:'',formEmail:'',linkEmail:'',consent:false,verified:false,confirmRemoval:false,language:I.language,busy:false,feedbackForm:'updatesForm',message:'',error:'',catalog:{}};
+  const state={view:'tree',ready:false,loaded:false,loading:false,loadId:0,enabled:false,subscriberCount:null,prefs:fresh(),mode:'register',token:null,revision:null,email:'',formEmail:'',linkEmail:'',consent:false,verified:false,confirmRemoval:false,language:I.language,busy:false,feedbackForm:'updatesForm',message:'',error:'',catalog:{}};
   const kinds=[['birthdays','🎈','ימי הולדת','Birthdays'],['anniversaries','💐','ימי נישואים','Wedding anniversaries'],['memorials','🕯','ימי זיכרון','Memorial days']];
   async function api(action,body){
     const response=await I.fetch('api/updates/'+action,{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{},...(body?{body:JSON.stringify(body)}:{})});
@@ -48,7 +48,7 @@
   function render(){
     if(!state.ready)return;
     const manage=state.mode==='manage',confirm=state.mode==='confirm';
-    const heading=`<header class="updates-intro"><span class="updates-envelope" aria-hidden="true">✉</span><div><span class="small-eyebrow">${tr('לא מפספסים את הרגעים שלנו','Remembering our shared moments')}</span><h3>${tr('קרובים, גם דרך המייל','A little closer, by email')}</h3><p>${tr('שמחות קטנות, תאריכים חשובים וזיכרונות שנשארים איתנו.','Little celebrations, important dates and memories we carry with us.')}</p></div></header>`;
+    const heading=state.subscriberCount===null?'':`<p class="updates-success" role="status">${tr('נרשמו לעדכונים: ','Subscribed to updates: ')}<strong>${state.subscriberCount.toLocaleString(I.locale)}</strong></p>`;
     const notice=!state.enabled?`<p class="updates-setup-notice" role="status">${state.loading?tr('בודק את חיבור המייל…','Checking email delivery…'):tr('שליחת העדכונים עדיין בהגדרה. אפשר לעיין באפשרויות ובדוגמאות; ההרשמה תיפתח אחרי חיבור כתובת השולח.','Email delivery is being set up. Explore the options and previews; registration will open once the sender is connected.')}</p>`:'';
     const messages='<p class="form-error" id="updatesError" role="alert"></p><p class="updates-success" id="updatesMessage" role="status"></p>';
     if(state.mode==='unsubscribed'){
@@ -79,7 +79,7 @@
   }
   async function load(){
     const loadId=++state.loadId,mode=state.mode,raw=state.token;state.loading=true;render();
-    try{const config=await api('config');if(loadId!==state.loadId)return;state.enabled=config.enabled;state.loaded=true;
+    try{const config=await api('config');if(loadId!==state.loadId)return;state.enabled=config.enabled;state.subscriberCount=Number.isSafeInteger(config.subscriberCount)&&config.subscriberCount>=0?config.subscriberCount:null;state.loaded=true;
       if(mode==='manage'&&state.enabled){const result=await api('preferences',{token:raw});if(loadId!==state.loadId)return;state.prefs=result.preferences;state.revision=result.revision;state.language=result.language;state.email=result.email;state.verified=true;}
     }catch(error){if(loadId===state.loadId)state.error=error.message;}finally{if(loadId===state.loadId){state.loading=false;render();}}
   }
@@ -96,6 +96,7 @@
     try{
       const result=await api(name,{token:state.token});
       if(raw!==state.token)return;
+      if(Number.isSafeInteger(result.subscriberCount)&&result.subscriberCount>=0)state.subscriberCount=result.subscriberCount;
       if(name==='confirm'){
         state.mode='manage';state.token=result.token;state.prefs=result.preferences;state.revision=result.revision;state.language=result.language;state.email=result.email;state.verified=true;state.confirmRemoval=false;history.replaceState(null,'','#updates/manage/'+state.token);state.message=tr('✓ ההרשמה אושרה. התזכורות שלכם פעילות.','✓ Subscription confirmed. Your reminders are active.');
       }else{state.mode='unsubscribed';state.token=null;state.revision=null;state.email='';state.verified=false;state.confirmRemoval=false;state.prefs=fresh();history.replaceState(null,'','#updates');state.message=tr('✓ ההרשמה הוסרה. לא יישלחו עוד עדכונים.','✓ Unsubscribed. No more updates will be sent.');}

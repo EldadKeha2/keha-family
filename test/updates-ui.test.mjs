@@ -7,7 +7,7 @@ const source=await readFile(new URL('../public/assets/updates.js',import.meta.ur
 const all=()=>Object.fromEntries(['birthdays','anniversaries','memorials'].map(key=>[key,{enabled:true,ids:null}]));
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
-async function fixture({hash='#updates',english=false,respond=()=>({})}={}){
+async function fixture({hash='#updates',english=false,subscriberCount=0,respond=()=>({})}={}){
   const handlers=new Map(),windowHandlers=new Map(),nodes=new Map(),requests=[],location={hash};let html='';
   const makeNode=id=>({id,value:'',checked:false,disabled:false,textContent:'',hidden:false,querySelectorAll:()=>[],addEventListener:(type,handler)=>handlers.set(id+':'+type,handler)});
   for(const id of ['updatesView','updatesContent','emailPreviewFrame','emailPreviewDialog'])nodes.set(id,makeNode(id));
@@ -21,7 +21,7 @@ async function fixture({hash='#updates',english=false,respond=()=>({})}={}){
   const people=[{id:'a',name:'Alice',nameEn:'Alice'},{id:'b',name:'Bob',nameEn:'Bob'}];
   const window={FAMILY_API_TOKEN:'public-test-token',FAMILY_DATA:{units:{}},FamilyApp:{getPeople:()=>people,getPerson:id=>people.find(p=>p.id===id),nameOf:id=>people.find(p=>p.id===id).name,getView:()=>'updates'},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',locale:english?'en-US':'he-IL',searchNames:p=>p.name,error:v=>v,async fetch(url,options){
     const action=url.replace('api/updates/',''),body=options.body?JSON.parse(options.body):undefined;requests.push({action,body});
-    if(action==='config')return Response.json({enabled:true});
+    if(action==='config')return Response.json({enabled:true,subscriberCount});
     const value=await respond(action,body);return Response.json(value?.body??value,{status:value?.status??200,headers:value?.headers});
   }},addEventListener:(type,handler)=>windowHandlers.set(type,handler)};
   const document={getElementById:id=>nodes.get(id)||null,querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(type,handler)=>handlers.set('document:'+type,handler)};
@@ -40,6 +40,18 @@ test('registration explains existing-address management and offers a separate ma
     assert.equal(f.requests.at(-1).action,'register');assert.equal(f.requests.at(-1).body.email,'visitor@example.net');assert.equal(f.requests.at(-1).body.consent,true);
     assert.match(f.nodes.get('updatesMessage').textContent,english?/existing subscribers receive a link/:/לכתובת שכבר רשומה יישלח קישור/);
     f.input('updatesLinkEmail','visitor@example.net');await f.submit('updatesLinkForm');assert.equal(f.requests.at(-1).action,'request-link');assert.match(f.nodes.get('updatesLinkMessage').textContent,english?/update your preferences or unsubscribe/:/לעדכון ההעדפות או להסרה/);assert.equal(f.nodes.get('updatesMessage').textContent,'');
+  }
+});
+
+test('confirmed subscriber count is visible in both languages and follows confirmation and removal',async()=>{
+  for(const english of [false,true]){
+    const token='c'.repeat(64),f=await fixture({english,hash:'#updates/confirm/'+token,respond:action=>action==='confirm'?{token,email:'owner@example.net',preferences:all(),language:english?'en-US':'he',revision:'r',subscriberCount:1}:{saved:true,unsubscribed:true,subscriberCount:0}});
+    assert.match(f.html,english?/Subscribed to updates: <strong>0<\/strong>/:/נרשמו לעדכונים: <strong>0<\/strong>/);
+    assert.ok(!f.html.includes('updates-intro'));
+    await f.click('[data-updates-action]',{dataset:{updatesAction:'confirm'}});
+    assert.match(f.html,english?/Subscribed to updates: <strong>1<\/strong>/:/נרשמו לעדכונים: <strong>1<\/strong>/);
+    await f.click('[data-updates-unsubscribe]');await f.click('[data-updates-action]',{dataset:{updatesAction:'unsubscribe'}});
+    assert.match(f.html,english?/Subscribed to updates: <strong>0<\/strong>/:/נרשמו לעדכונים: <strong>0<\/strong>/);
   }
 });
 
