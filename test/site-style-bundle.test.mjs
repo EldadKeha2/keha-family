@@ -10,7 +10,7 @@ const root=new URL('../',import.meta.url);
 
 test('site bundle preserves every authored stylesheet byte and cascade position',async()=>{
   const sources=JSON.parse(await readFile(new URL('scripts/site-style-sources.json',root),'utf8'));
-  assert.equal(sources.length,52);
+  assert.equal(sources.length,53);
   assert.equal(new Set(sources).size,sources.length);
   assert.equal(sources[0],'home-install.css');
   assert.equal(sources.at(-2),'photo-effects.css');assert.equal(sources.at(-1),'photo-framing.css');

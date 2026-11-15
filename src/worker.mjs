@@ -13,6 +13,7 @@ import {collectionPageRevision} from './collection-pages.mjs';
 import {saveVideoAssetRoute,resolveVideoAsset} from './video-assets.mjs';
 import {multipartVideoAsset} from './video-assets-multipart.mjs';
 import {familyAiRoute,familyAiTick} from './family-ai-route.mjs';
+import {livingFamilyRoute} from './living-family-route.mjs';
 import {CUTOUT_MODEL_PATH,cutoutModelResponse} from './photo-cutout-model.mjs';
 import {zipStream} from './zip.mjs';
 import {PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES,decodeUploadMetadata} from '../public/assets/photo-upload-metadata.mjs';
@@ -250,7 +251,7 @@ export default {
       }
       if(path==='/api/family-ai'&&request.method==='GET')return json(await db('family-ai.list',{page:url.searchParams.get('page'),size:url.searchParams.get('size'),filter:url.searchParams.get('filter')||'all',query:url.searchParams.get('q')||'',excluded:url.searchParams.get('excluded')==='1'}));
       if(path==='/api/family-ai/exclude'&&request.method==='POST')return json(await db('family-ai.exclude',await readJSON(request,2000)));
-      if(path.startsWith('/api/family-ai/'))return await familyAiRoute(request,env,db,ctx);
+      if(path.startsWith('/api/family-ai/'))return await livingFamilyRoute(request,env,db,ctx)||await familyAiRoute(request,env,db,ctx);
       if(path==='/api/trash'||path.startsWith('/api/trash/'))return await recycleRoute(request,env,db);
       if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);
       if(path==='/api/games/jachnun/head-request')return await headRequestRoute(request,env);

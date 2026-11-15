@@ -1,6 +1,7 @@
 import {aliasPersonIds} from './gallery.mjs';
 import {HttpError,text,uid} from './http.mjs';
 import {photoLabelFromName} from '../public/assets/photo-labels-catalog.mjs';
+import {LivingFamilyState} from './living-family-state.mjs';
 
 const vintageNames=['vintage','וינטג','וינטג׳',"וינטג'",'וינטג’','וינטאג','וינטאג׳',"וינטאג'",'וינטאג’'];
 const vintageLabels=[...new Set(vintageNames.map(name=>photoLabelFromName(name).toLowerCase()))];
@@ -16,8 +17,9 @@ const args=()=>[JSON.stringify(vintageLabels)];
 // Kept separate from media metadata: removing a photograph here never removes
 // its pixels, tags, album membership, or original gallery entry.
 export class FamilyAiState {
-  constructor(owner){this.owner=owner;}
+  constructor(owner){this.owner=owner;this.living=new LivingFamilyState(owner);}
   initialize(){
+    this.living.initialize();
     this.owner.sql.exec('CREATE TABLE IF NOT EXISTS family_ai_exclusions(media_id TEXT PRIMARY KEY,created_at TEXT NOT NULL)');
     this.owner.sql.exec('CREATE TABLE IF NOT EXISTS family_ai_jobs(media_id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.owner.sql.exec('CREATE TABLE IF NOT EXISTS family_ai_claims(claim_id TEXT PRIMARY KEY,media_id TEXT NOT NULL,created_at TEXT NOT NULL)');
@@ -92,5 +94,5 @@ export class FamilyAiState {
     job.lastPollAt=now;job.pollToken=uid();job.pollLeaseUntil=now+120000;this.save(job);return {poll:true,job,pollToken:job.pollToken};
   }
   pending(){return {jobs:this.owner.rows("SELECT j.data FROM family_ai_jobs j JOIN media m ON m.id=j.media_id WHERE json_extract(j.data,'$.status') NOT IN ('SUCCEEDED','FAILED','CANCELLED') AND json_extract(j.data,'$.taskId') IS NOT NULL ORDER BY json_extract(j.data,'$.createdAt') LIMIT 20").map(row=>JSON.parse(row.data))};}
-  snapshot(){return {exclusions:this.owner.rows('SELECT media_id AS mediaId,created_at AS createdAt FROM family_ai_exclusions'),jobs:this.owner.rows('SELECT data FROM family_ai_jobs').map(row=>JSON.parse(row.data)),claims:this.owner.rows('SELECT claim_id AS claimId,media_id AS mediaId,created_at AS createdAt FROM family_ai_claims')};}
+  snapshot(){return {living:this.living.snapshot(),exclusions:this.owner.rows('SELECT media_id AS mediaId,created_at AS createdAt FROM family_ai_exclusions'),jobs:this.owner.rows('SELECT data FROM family_ai_jobs').map(row=>JSON.parse(row.data)),claims:this.owner.rows('SELECT claim_id AS claimId,media_id AS mediaId,created_at AS createdAt FROM family_ai_claims')};}
 }

@@ -538,6 +538,10 @@ export class FamilyState {
   run(action,p){
     switch(action){
       case 'family-ai.list':return this.familyAi.list(p);
+      case 'family-ai.living.list':return this.familyAi.living.featured();
+      case 'family-ai.living.get':return this.familyAi.living.get(p);
+      case 'family-ai.living.prepare':return this.familyAi.living.prepare(p);
+      case 'family-ai.living.save':return this.familyAi.living.save(p);
       case 'family-ai.exclude':return this.familyAi.exclude(p);
       case 'family-ai.job.get':this.photo(p.id);return {job:this.familyAi.job(p.id)};
       case 'family-ai.job.claim':return this.familyAi.claim(p);
