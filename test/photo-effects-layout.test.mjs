@@ -9,7 +9,7 @@ function fixture(){
  const frames=new Map(),events=new Map();let serial=0,notify,reads=0,writes=0;
  const style=()=>new Proxy({},{set(target,key,value){writes++;target[key]=value;return true;}});
  const node=()=>({dataset:{},style:style(),attrs:{},addEventListener(type,fn){events.set(type,fn);},getAttribute(key){return this.attrs[key];},setAttribute(key,value){this.attrs[key]=value;},remove(){stage.button=null;}});
- const image={rect:{left:20,top:30,width:200,height:120},getBoundingClientRect(){reads++;return this.rect;}};
+ const image={complete:true,naturalWidth:200,rect:{left:20,top:30,width:200,height:120},getBoundingClientRect(){reads++;return this.rect;}};
  const stage={button:null,querySelector(selector){return selector==='[data-photo-magic]'?this.button:image;},append(button){this.button=button;},getBoundingClientRect(){reads++;return {left:0,top:0,width:400,height:300};}};
  const viewer={open:true,addEventListener(type,fn){events.set(type,fn);}};
  let item={id:'a',kind:'photo'};

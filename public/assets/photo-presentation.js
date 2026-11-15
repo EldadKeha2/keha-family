@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const prepared=new Map(),originals=new Map();let motion=null,dragged=null,queuedDrag=null,serial=0,handoff=null,lastSlide=0;
-  const source=item=>item.previewSrc||item.src;
+  const source=item=>window.FamilyPhotoThumbnails?.source?.(item)||item.previewSrc||item.src;
   const mobile=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
   const desktop=()=>!mobile()&&!matchMedia('(max-width:700px)').matches;
   const copy=image=>image?.cloneNode?image.cloneNode(false):image;
@@ -14,14 +14,15 @@
   const photoImage=stage=>stage._familyFaceContext?.image||stage.querySelector('.face-photo-scroll img')||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
   function prepare(item,priority='high',original=false){
     if(item?.kind!=='photo'||typeof Image==='undefined')return null;
-    const src=original?item.src:source(item),cache=original&&src!==source(item)?originals:prepared;
+    let src=original?item.src:source(item);const cache=original&&src!==source(item)?originals:prepared;
     if(cache.has(src)){const entry=cache.get(src);cache.delete(src);cache.set(src,entry);if(priority==='high')entry.image.fetchPriority='high';return entry.promise;}
     const image=new Image(),entry={image,promise:null,ready:false,pixels:0};
     const promise=entry.promise=new Promise((resolve,reject)=>{
       image.decoding='async';image.fetchPriority=priority;
-      const timeout=setTimeout(()=>reject(Error('Photo preparation timed out')),original?30000:10000);
-      image.onload=async()=>{clearTimeout(timeout);try{await image.decode?.();}catch{}if(image.naturalWidth){entry.ready=true;entry.pixels=image.naturalWidth*(image.naturalHeight||1);trim(cache,src);resolve(image);}else reject(Error('Photo unavailable'));};
-      image.onerror=()=>{clearTimeout(timeout);reject(Error('Photo unavailable'));};image.src=src;
+      let timeout=setTimeout(()=>reject(Error('Photo preparation timed out')),original?30000:10000);
+      const fallback=()=>{if(src===item.src)return false;window.FamilyPhotoThumbnails?.rejectPreview?.(item);if(cache.get(src)===entry)cache.delete(src);src=item.src;cache.set(src,entry);clearTimeout(timeout);timeout=setTimeout(()=>reject(Error('Photo preparation timed out')),30000);image.src=src;return true;};
+      image.onload=async()=>{if(image.naturalWidth&&window.FamilyPhotoThumbnails?.visiblePixels?.(image)===false&&fallback())return;clearTimeout(timeout);try{await image.decode?.();}catch{}if(image.naturalWidth){entry.ready=true;entry.pixels=image.naturalWidth*(image.naturalHeight||1);trim(cache,src);resolve(image);}else reject(Error('Photo unavailable'));};
+      image.onerror=()=>{if(fallback())return;clearTimeout(timeout);reject(Error('Photo unavailable'));};image.src=src;
     });
     cache.set(src,entry);
     promise.catch(()=>{if(cache.get(src)===entry)cache.delete(src);});

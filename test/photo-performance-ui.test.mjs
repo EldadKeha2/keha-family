@@ -148,7 +148,7 @@ test('background copies wait for browsing to settle and retain the full original
  let browsing=true;window.FamilyMedia={isPhotoBrowsing:()=>browsing};vm.runInNewContext(thumbnails,{window,document,setTimeout,Blob,CustomEvent});const api=window.FamilyPhotoThumbnails;
  api.schedule(item,image);api.schedule(item,image);t.mock.timers.tick(1000);await new Promise(resolve=>setImmediate(resolve));
  assert.equal(requests.length,0);assert.equal(dimensions.length,0,'Canvas processing must not compete with photo browsing');browsing=false;t.mock.timers.tick(400);await new Promise(resolve=>setImmediate(resolve));
- assert.equal(requests.length,2);assert.deepEqual(Array.from(dimensions[0]),[0,0,640,403]);assert.equal(requests[0].options.body.type,'image/webp');assert.equal(image.src,'/media/a');assert.equal(item.src,'/media/a');assert.match(item.thumbnailSrc,/thumbnail=1/);assert.match(item.previewSrc,/preview=1/);
+ assert.equal(requests.length,2);assert.deepEqual(Array.from(dimensions[0]),[0,0,2048,1290]);assert.deepEqual(Array.from(dimensions[2]),[0,0,640,403]);assert.equal(requests[0].options.body.type,'image/webp');assert.equal(image.src,'/media/a');assert.equal(item.src,'/media/a');assert.match(item.thumbnailSrc,/thumbnail=1/);assert.match(item.previewSrc,/preview=1/);
  api.schedule({...item,thumbnailSrc:null},image);t.mock.timers.tick(2000);assert.equal(requests.length,2);
  assert.equal(api.attributes(item),'');assert.match(api.attributes({...item,thumbnailSrc:null}),/data-thumbnail-id="a"/);
 });

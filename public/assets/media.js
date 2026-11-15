@@ -243,14 +243,14 @@
       video.addEventListener('loadeddata',()=>{$('mediaPlaybackNote').hidden=true;});
       $('mediaPlaybackNote').hidden=true;
     }else if(item.kind==='photo'||item.mime?.startsWith('image/')){
-      const img=image||document.createElement('img');img.decoding='async';img.fetchPriority='high';img.draggable=false;if(!image)img.src=(item.kind==='photo'?item.previewSrc||item.src:item.src)+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;
+      const img=image||document.createElement('img');img.decoding='async';img.fetchPriority='high';img.draggable=false;window.FamilyPhotoThumbnails?.bind?.(item,img);if(!image)img.src=(item.kind==='photo'?(window.FamilyPhotoPresentation?.source?.(item)||item.src):item.src)+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;
       window.FamilyPhotoPresentation?.preload(state.items,state.index);
       if(!state.fullscreen){
         const mountFaces=()=>{faceTimer=null;if(current()&&identity(current())===identity(item)&&renderedVersion===versionKey(item))window.FamilyFaces?.mount(stage,img,current(),{highlightMissing:state.scope==='gallery'&&window.FamilyPortal?.isPartialGallery?.()===true});};
         if(direction&&!native&&!instant&&$('mediaViewer').classList.contains('personal-photo-desktop'))faceTimer=setTimeout(mountFaces,180);else mountFaces();
       }
-      const preload=()=>{if($('mediaViewer').open&&current()===item)window.FamilyPhotoThumbnails?.schedule(item,img);};
-      if(img.complete&&img.naturalWidth)preload();else img.addEventListener('load',preload,{once:true});
+      const preload=()=>{if(!img.complete||!img.naturalWidth||window.FamilyPhotoThumbnails?.visiblePixels?.(img)===false)return;if($('mediaViewer').open&&current()===item)window.FamilyPhotoThumbnails?.schedule(item,img);img.removeEventListener('load',preload);};
+      img.addEventListener('load',preload);if(img.complete&&img.naturalWidth)preload();
       if(item.kind==='photo'&&!instant){if(effect&&!native)window.FamilyPhotoPresentation?.transition(stage,ghost,effect);else window.FamilyPhotoPresentation?.slide(stage,ghost,-direction);}
       refreshPhotoPresentation();
       window.FamilyPhotoPresentation?.finishHandoff?.(handoff,img,window.FamilyFaces?.whenReady?.(stage,img));

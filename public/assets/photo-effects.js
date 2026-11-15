@@ -149,7 +149,8 @@ function sync(){
   if(!button){button=document.createElement('button');button.type='button';button.className='photo-magic-wand';button.dataset.photoMagic='';button.dataset.i18nSkip='';button.innerHTML=wand;button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();open(window.FamilyMedia.current());});stage.append(button);}
   const label=tr('אשף עיצוב תמונה · אפקטים ומסגרות','Photo design studio · effects and frames');if(button.title!==label)button.title=label;if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);const disabled=Boolean(window.FamilyMedia.photoState().busy);if(button.disabled!==disabled)button.disabled=disabled;
   const image=stage._familyFaceContext?.image||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
-  if(image){const bounds=stage.getBoundingClientRect(),photo=image.getBoundingClientRect();if(photo.width&&photo.height){const left=Math.min(Math.max(8,photo.left-bounds.left+8),Math.max(8,bounds.width-50))+'px',top=Math.min(Math.max(8,photo.top-bounds.top+8),Math.max(8,bounds.height-50))+'px';if(button.style.left!==left)button.style.left=left;if(button.style.top!==top)button.style.top=top;}}
+  button.hidden=!image?.complete||!image.naturalWidth||window.FamilyPhotoThumbnails?.visiblePixels?.(image)===false;
+  if(!button.hidden){const bounds=stage.getBoundingClientRect(),photo=image.getBoundingClientRect();if(photo.width&&photo.height){const left=Math.min(Math.max(8,photo.left-bounds.left+8),Math.max(8,bounds.width-50))+'px',top=Math.min(Math.max(8,photo.top-bounds.top+8),Math.max(8,bounds.height-50))+'px';if(button.style.left!==left)button.style.left=left;if(button.style.top!==top)button.style.top=top;}}
 }
 function queueSync(){
   if(syncFrame!==null)return;
@@ -159,5 +160,5 @@ function queueSync(){
   syncFrame=requestAnimationFrame(()=>{syncFrame=null;sync();});
 }
 window.FamilyPhotoEffects={open,sync,isOpen:()=>Boolean(session)};
-function init(){const viewer=document.getElementById('mediaViewer');if(!viewer)return;new MutationObserver(queueSync).observe(viewer,{childList:true,subtree:true,attributes:true,attributeFilter:['open']});viewer.addEventListener('load',queueSync,true);window.addEventListener('resize',queueSync);sync();}
+function init(){const viewer=document.getElementById('mediaViewer');if(!viewer)return;new MutationObserver(queueSync).observe(viewer,{childList:true,subtree:true,attributes:true,attributeFilter:['open']});viewer.addEventListener('load',queueSync,true);window.addEventListener('resize',queueSync);window.addEventListener('family-face-viewer',queueSync);if(typeof ResizeObserver!=='undefined')new ResizeObserver(queueSync).observe(document.getElementById('mediaStage'));sync();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

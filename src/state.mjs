@@ -1,3 +1,4 @@
+import {photoFrame,validatePhotoFrame} from './photo-framing.mjs';
 import family from './family.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {NostalgiaLibrary} from './nostalgia-library.mjs';
@@ -371,10 +372,10 @@ export class FamilyState {
     return output;
   }
   mediaPublic(item,cached=null){return {id:item.id,scope:this.mediaScope(item),file:item.file,filename:item.filename,name:item.name,nameEn:item.nameEn||null,caption:item.caption||'',size:item.size,mime:item.mime,kind:mediaKind(item),src:photoSource(item),...(item.photoRevision?{photoRevision:item.photoRevision}:{}),uploadedAt:item.createdAt,tags:cached?cached.tags:this.tags(item.id),tagsRevision:cached?cached.tagsRevision:this.tagsRevision(item.id),
-    ...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision,thumbnailSize:item.thumbnail.size}:{}),
-    ...(item.preview?.revision===(item.photoRevision||'original')?{previewSrc:'/media/'+item.id+'?preview=1&v='+item.preview.revision,previewSize:item.preview.size}:{}),
+    ...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision+(item.thumbnail.cacheRevision?'&copy='+item.thumbnail.cacheRevision:''),thumbnailSize:item.thumbnail.size}:{}),
+    ...(item.preview?.revision===(item.photoRevision||'original')?{previewSrc:'/media/'+item.id+'?preview=1&v='+item.preview.revision+(item.preview.cacheRevision?'&copy='+item.preview.cacheRevision:''),previewSize:item.preview.size}:{}),
     collections:cached?[...new Set([...(item.category==='personal'?[]:[item.category]),...cached.collections])]:this.mediaCollections(item),modifiedAt:item.modifiedAt||item.updatedAt||item.photoEditedAt||item.createdAt,
-    ...(mediaKind(item)==='photo'?{faceSummary:this.faceSummary(item,cached?.face),labels:photoLabels(item.labels)}:{}),
+    ...(mediaKind(item)==='photo'?{framing:photoFrame(item.framing),faceSummary:this.faceSummary(item,cached?.face),labels:photoLabels(item.labels)}:{}),
     ...(['photo','video'].includes(mediaKind(item))?{takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.videoClip?{videoClip:item.videoClip}:{}),...(item.duration?{duration:item.duration}:{}),...(mediaKind(item)==='video'?{videoRevision:item.videoRevision||'original'}:{}),
@@ -435,7 +436,7 @@ export class FamilyState {
   snapshot(person,items,includeGallery=true){
     const photos=items.filter(item=>mediaKind(item)==='photo'),videos=items.filter(item=>mediaKind(item)==='video');
     const selected=photos.find(photo=>photo.id===person.profileId),profile=this.profilePhoto(person,photos);
-    return {...person,invalidBirthday:false,profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileIsManual:Boolean(selected),photoCount:photos.length,videoCount:videos.length,documentCount:items.filter(item=>mediaKind(item)==='document').length,mediaCount:items.length,
+    return {...person,invalidBirthday:false,profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileFraming:profile?photoFrame(profile.framing):null,profileMediaId:profile?.id||null,profileIsManual:Boolean(selected),photoCount:photos.length,videoCount:videos.length,documentCount:items.filter(item=>mediaKind(item)==='document').length,mediaCount:items.length,
       ...(includeGallery?{gallery:this.mediaPublicMany(items).map(item=>({...item,linked:item.scope!=='personal:'+person.id}))}:{})};
   }
   personPage(id,options={}){
@@ -451,7 +452,7 @@ export class FamilyState {
     }
     const row=this.rows('SELECT m.data FROM media m WHERE '+owner+" AND "+kind+"='photo' ORDER BY CASE WHEN m.id=? THEN 0 WHEN m.category='personal' AND m.person_id=? THEN 1 ELSE 2 END,m.rowid LIMIT 1",id,id,person.profileId||'',id)[0];
     const candidate=row?JSON.parse(row.data):null,profile=person.profileCleared&&candidate?.id!==person.profileId?null:candidate;
-    return {person:{...person,about:person.about||'',profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileIsManual:Boolean(profile&&profile.id===person.profileId),photoCount:counts.photo||0,videoCount:counts.video||0,documentCount:counts.document||0,mediaCount:Object.values(counts).reduce((n,v)=>n+v,0)},albums};
+    return {person:{...person,about:person.about||'',profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileFraming:profile?photoFrame(profile.framing):null,profileMediaId:profile?.id||null,profileIsManual:Boolean(profile&&profile.id===person.profileId),photoCount:counts.photo||0,videoCount:counts.video||0,documentCount:counts.document||0,mediaCount:Object.values(counts).reduce((n,v)=>n+v,0)},albums};
   }
   collection(kind,options={}){
     validCollection(kind);
@@ -461,7 +462,7 @@ export class FamilyState {
       if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
       const total=this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?)',kind,kind)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
       const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?) ORDER BY m.rowid DESC LIMIT ? OFFSET ?',kind,kind,size,(page-1)*size).map(row=>JSON.parse(row.data)));
-      return {kind,items,count:total,cover:this.albumCover(kind),revision:revision+':'+page,pagination:{page,pages,size,total}};
+      const cover=this.albumCover(kind),coverMediaId=/\/media\/([a-f0-9]{32})/.exec(cover||'')?.[1],coverPhoto=coverMediaId?this.photo(coverMediaId):null;return {kind,items,count:total,cover,coverMediaId:coverPhoto?.id||null,coverFraming:coverPhoto?photoFrame(coverPhoto.framing):null,revision:revision+':'+page,pagination:{page,pages,size,total}};
     }
     if(kind!=='gallery'){
       const where='m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?)';
@@ -474,7 +475,7 @@ export class FamilyState {
         // A transport page still carries the full folder counts/covers. Its
         // library index only needs media cover fields, never tags or faces.
         const covers=pagination?this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC',kind,kind).map(row=>{
-          const item=JSON.parse(row.data);return {kind:mediaKind(item),src:photoSource(item),nostalgiaEventIds:item.nostalgiaEventIds||[],...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision}:{}),...videoAssetsPublic(item),...(item.provider==='youtube'?{poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};
+          const item=JSON.parse(row.data);return {kind:mediaKind(item),src:photoSource(item),nostalgiaEventIds:item.nostalgiaEventIds||[],...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision+(item.thumbnail.cacheRevision?'&copy='+item.thumbnail.cacheRevision:'')}:{}),...videoAssetsPublic(item),...(item.provider==='youtube'?{poster:'https://i.ytimg.com/vi/'+item.youtubeId+'/hqdefault.jpg'}:{})};
         }):items;
         library=this.nostalgiaLibrary.snapshot(covers);
       }
@@ -548,10 +549,10 @@ export class FamilyState {
         // One bounded index query supplies covers and counts, without reading other galleries.
         for(const row of this.rows("SELECT latest.category,latest.n,m.data FROM (SELECT category,count(*) AS n,max(media_row) AS newest FROM (SELECT category,rowid AS media_row,id FROM media WHERE category>='nursery:' AND category<'nursery;' UNION SELECT c.collection AS category,m.rowid AS media_row,m.id FROM media_collections c JOIN media m ON m.id=c.media_id WHERE c.collection>='nursery:' AND c.collection<'nursery;') GROUP BY category) latest JOIN media m ON m.rowid=latest.newest")){
           const id=row.category.slice(8);try{nurseryCollection(id);}catch{continue;}
-          const item=JSON.parse(row.data);albums[id]={count:row.n,cover:photoSource(item)};
+          const item=JSON.parse(row.data);albums[id]={count:row.n,cover:photoSource(item),coverMediaId:item.id,coverFraming:photoFrame(item.framing)};
         }
         for(const row of this.rows("SELECT c.collection,m.data FROM album_covers c JOIN media m ON m.id=c.media_id WHERE c.collection>='nursery:' AND c.collection<'nursery;' AND (m.category=c.collection OR EXISTS (SELECT 1 FROM media_collections x WHERE x.media_id=m.id AND x.collection=c.collection))")){
-          const id=row.collection.slice(8);if(albums[id])albums[id].cover=photoSource(JSON.parse(row.data));
+          const id=row.collection.slice(8);if(albums[id]){const item=JSON.parse(row.data);Object.assign(albums[id],{cover:photoSource(item),coverMediaId:item.id,coverFraming:photoFrame(item.framing)});}
         }
         return {albums};
       }
@@ -683,9 +684,9 @@ export class FamilyState {
       case 'photo.thumbnail':{
         const item=this.photo(p.id),variant=p.variant==='preview'?'preview':'thumbnail';
         if(p.revision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה בינתיים.');
-        if(item[variant]?.revision===p.revision)return {saved:false,item:this.mediaPublic(item)};
+        if(item[variant]?.revision===p.revision&&!p.replace)return {saved:false,item:this.mediaPublic(item)};
         if(!p.thumbnail?.key?.startsWith((variant==='preview'?'previews/':'thumbnails/')+item.id+'/'))throw new HttpError(400,'התצוגה המקדימה אינה תקינה.');
-        const obsoleteKey=item[variant]?.key;item[variant]=p.thumbnail;
+        const obsoleteKey=item[variant]?.key;item[variant]={...p.thumbnail,cacheRevision:uid()};
         // Invalidate album snapshots without treating a derived thumbnail as a
         // photo edit or changing the "last modified" photo ordering.
         this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchPeople(this.relatedPeople(item));for(const kind of this.mediaCollections(item))this.touch(kind);
@@ -970,6 +971,10 @@ export class FamilyState {
         const item=candidates.find(item=>item.file===p.file);if(!item)throw new HttpError(404,'הקובץ לא נמצא באלבום הזה.');
         item.caption=caption;item.updatedAt=new Date().toISOString();this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);
         this.touchMedia(item);return this.mediaChanged(item,'caption');
+      }
+      case 'media.photo-frame':{
+        const item=this.photo(p.id),framing=validatePhotoFrame(p.framing);item.framing=framing;this.touchMedia(item);
+        const people=Object.fromEntries(this.relatedPeople(item).map(id=>[id,this.snapshot(this.person(id),this.personMedia(id),false)]));return {saved:true,operation:'photo-frame',scope:this.mediaScope(item),item:this.mediaPublic(item),people};
       }
       case 'profile':{
         const person=this.person(p.id),photos=this.personPhotos(p.id),item=photos.find(item=>item.file===p.file);

@@ -55,16 +55,16 @@ function archiveFormat(head,name){
 }
 function filename(value){return String(value||'family').split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g,'_').slice(0,200)||'family';}
 async function saveThumbnail(request,env,db,ctx,id,variant='thumbnail'){
-  const item=await db('media.get',{id}),revision=new URL(request.url).searchParams.get('revision');
+  const item=await db('media.get',{id}),params=new URL(request.url).searchParams,revision=params.get('revision'),replace=params.get('replace')==='1';
   if((item.kind||(item.mime?.startsWith('image/')?'photo':null))!=='photo'||item.provider)throw new HttpError(400,'אפשר להכין תצוגה מקדימה לתמונה בלבד.');
   if(revision!==(item.photoRevision||'original'))throw new HttpError(409,'התמונה השתנתה בינתיים.');
-  if(item[variant]?.revision===revision)return json({saved:false,item:(await db('media.public',{id})).item});
+  if(item[variant]?.revision===revision&&!replace)return json({saved:false,item:(await db('media.public',{id})).item});
   const bytes=await boundedBody(request,(variant==='preview'?4:1)*1024*1024),format=sniff(new Uint8Array(bytes).subarray(0,128));
   if(!['image/jpeg','image/webp'].includes(format.mime)||!bytes.byteLength||item.size&&bytes.byteLength>=item.size)throw new HttpError(400,'התצוגה המקדימה אינה קטנה מהמקור.');
   const key=(variant==='preview'?'previews/':'thumbnails/')+id+'/'+uid()+format.ext;
   await putObject(env,key,bytes,bytes.byteLength,format.mime);
   try{
-    const result=await db('photo.thumbnail',{id,revision,variant,thumbnail:{key,size:bytes.byteLength,mime:format.mime,revision}});
+    const result=await db('photo.thumbnail',{id,revision,variant,replace,thumbnail:{key,size:bytes.byteLength,mime:format.mime,revision}});
     if(!result.saved)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));
     if(result.obsoleteKey)ctx.waitUntil(deleteObject(env,result.obsoleteKey).catch(()=>{}));
     const {obsoleteKey,...publicResult}=result;return json(publicResult);
@@ -358,6 +358,7 @@ export default {
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-upload$/.exec(path)))return await videoUploadFinalize(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/clip$/.exec(path)))return await videoClipRoute(request,env,db,ctx,match[1]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-edit$/.exec(path)))return await videoEditRoute(request,env,db,ctx,match[1]);
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/framing$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.photo-frame',{id:match[1],framing:body.framing}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(thumbnail|preview)$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1],match[2]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/ignore$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.ignore',{id:match[1],photoRevision:body.photoRevision,rect:body.rect,ignored:body.ignored,faceId:body.faceId,expectedRevision:body.expectedRevision}));}
         if(path==='/api/collections/cover'){const body=await readJSON(request,2000);return json(await db('collection.cover',{kind:body.collection,mediaId:body.mediaId}));}

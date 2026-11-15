@@ -605,7 +605,7 @@
     on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>{if(c.popup?.classList.contains('face-picker')&&c.active)revealFace(c,c.active);place(c);});on(window.visualViewport,'scroll',()=>queuePlace(c));}
     if(typeof ResizeObserver!=='undefined'){c.resize=new ResizeObserver(()=>queuePlace(c));c.resize.observe(image);c.resize.observe(stage);}
     c.loading=load(c).catch(error=>{c.loadError=true;if(error.name!=='AbortError')announce(c,tr('אפשר להוסיף תיוג פנים אחרי שהחיבור יחזור.','Face tags can be added when the connection returns.'));throw error;});c.loading.catch(()=>{});
-    const imageReady=()=>new Promise(resolve=>{if(imageWidth(image)&&(image.complete||image.tagName?.toLowerCase()==='canvas'))resolve();else on(image,'load',resolve,{once:true});});
+    const imageReady=()=>new Promise(resolve=>{const ready=()=>{if(imageWidth(image)&&(image.complete||image.tagName?.toLowerCase()==='canvas')&&window.FamilyPhotoThumbnails?.visiblePixels?.(image)!==false)resolve();};on(image,'load',ready);ready();});
     await imageReady();if(!live(c))return;if(zoom)setupZoom(c);c.initialized=true;window.FamilyPhotoViewerLayout?.faceControls(c);place(c);window.FamilyMedia?.refreshPhotoPresentation?.();c.resolvePaint();
     c.runDetection=async()=>{
     clearTimeout(c.detectionTimer);c.detectionTimer=null;

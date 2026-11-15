@@ -35,7 +35,7 @@
       pane.setAttribute('aria-hidden','true');if(!item)return;
       const image=document.createElement('img');image.alt='';image.decoding='async';image.fetchPriority='low';image.draggable=false;
       const constrained=navigator.connection?.saveData||/^(slow-)?2g$/.test(navigator.connection?.effectiveType||'');
-      const source=constrained?item.thumbnailSrc:item.previewSrc||item.thumbnailSrc||(item.size<1000000?item.src:null);
+      const source=constrained?item.thumbnailSrc:(item.previewSrc?(window.FamilyPhotoPresentation?.source?.(item)||item.previewSrc):null)||item.thumbnailSrc||(item.size<1000000?item.src:null);
       if(source&&item.kind==='photo'){image.src=source;pane.append(image);}
     };
     side(left,next);side(right,previous);

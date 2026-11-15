@@ -33,7 +33,7 @@
 
   function portraitHTML(p) {
     const src = getMedia(p).profile;
-    return `<span class="portrait" aria-hidden="true">${silhouette}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
+    return `<span class="portrait" aria-hidden="true">${silhouette}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" ${window.FamilyPhotoFraming?.profile({...p,...getMedia(p)})||''} src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
   }
   function birthdayHTML(p, editable = true, birthOnly = false) {
     const aliyah=p.aliyahMonth?new Intl.DateTimeFormat(I18n.locale,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(p.aliyahYear,p.aliyahMonth-1,1))):p.aliyahYear;

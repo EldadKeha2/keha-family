@@ -925,7 +925,7 @@ test('nursery albums isolate baby photos from profile pictures and other albums,
   const first=await upload('yona',1),second=await upload('yona',2),other=await upload('shlomo',3);
   assert.equal(first.scope,'nursery:yona');assert.equal(other.scope,'nursery:shlomo');assert.equal(first.kind,'photo');
   let album=await(await f.call('/api/nursery/yona')).json();assert.deepEqual(album.items.map(item=>item.id),[second.id,first.id]);assert.equal(album.count,2);
-  let summary=(await(await f.call('/api/nursery')).json()).albums;assert.deepEqual(summary.yona,{count:2,cover:second.src});assert.equal(summary.shlomo.cover,other.src);
+  let summary=(await(await f.call('/api/nursery')).json()).albums;assert.deepEqual(summary.yona,{count:2,cover:second.src,coverMediaId:second.id,coverFraming:{x:.5,y:.5,fit:'cover'}});assert.equal(summary.shlomo.cover,other.src);
   for(const id of ['yona','shlomo']){const p=await(await f.call('/api/people/'+id+'/page')).json();assert.equal(p.person.profile,null);assert.equal(p.albums.photos.total,0);}
   assert.equal((await(await f.call('/api/collections/gallery')).json()).count,0);
   let response=await f.call('/api/media/'+second.id+'/caption',{method:'POST',body:{caption:'A first smile',expectedCaption:''}});assert.equal(response.status,200);assert.equal((await response.json()).collection.items[0].caption,'A first smile');
@@ -2168,5 +2168,40 @@ test('video wizard metadata keeps unassigned uploads unassigned, changes the ord
    assert.equal((await f.call('/api/media/'+item.id+'/video-upload',{method:'POST',body:{operationId:uid(),metadata:{name:'Film',date:{day:31,month:2,year:1990},range:{start:0,end:1}}}})).status,400);assert.equal(f.objects.size,before);
    const saved=await(await f.call('/api/media/'+item.id+'/video-upload',{method:'POST',body:{operationId:uid(),metadata:{name:'Film',...metadata}}})).json();assert.equal(saved.item.id,item.id);assert.equal(f.objects.size,before);if(metadata.eventId==='')assert.deepEqual(saved.item.nostalgiaEventIds,[]);else assert.equal(saved.item.videoCategory,'special-birthdays');
   }
+ }finally{await f.close();}
+});
+
+test('edited copies reopen with intact bytes and share saved framing with the profile, nursery album and cover',async()=>{
+ const f=fixture();try{
+  await f.connect();const original=await taggedUpload(f,'/api/nursery/yona');await setTags(f,original,['yona']);
+  const designed=await(await photoEdit(f,original,{asCopy:true,rotation:0})).json(),item=designed.item;assert.notEqual(item.id,original.id);
+  assert.equal((await f.call('/api/people/yona/profile',{method:'POST',body:{file:item.file}})).status,200);
+  assert.equal((await f.call('/api/collections/cover',{method:'POST',body:{collection:'nursery:yona',mediaId:item.id}})).status,200);
+  const framing={x:.3,y:.12,fit:'contain'},response=await f.call('/api/media/'+item.id+'/framing',{method:'POST',body:{framing}});assert.equal(response.status,200,await response.clone().text());
+  const saved=await response.json();assert.equal(saved.operation,'photo-frame');assert.deepEqual(saved.item.framing,framing);assert.deepEqual(saved.people.yona.profileFraming,framing);assert.equal('gallery' in saved.people.yona,false);
+  const copiedBytes=Buffer.from(await(await f.call(item.src)).arrayBuffer());assert.deepEqual(copiedBytes,Buffer.concat([photo,Buffer.from('edited')]));assert.deepEqual(Buffer.from(await(await f.call(original.src)).arrayBuffer()),photo);
+  f.restart();assert.deepEqual((await(await f.call('/api/media/'+item.id+'/view')).json()).item.framing,framing);
+  assert.deepEqual((await(await f.call('/api/people/yona/page')).json()).person.profileFraming,framing);
+  const album=await(await f.call('/api/nursery/yona')).json();assert.equal(album.count,2);assert.deepEqual(album.coverFraming,framing);assert.equal(album.coverMediaId,item.id);assert.deepEqual(album.items.find(p=>p.id===item.id).framing,framing);
+  const summary=(await(await f.call('/api/nursery')).json()).albums.yona;assert.equal(summary.cover,item.src);assert.deepEqual(summary.coverFraming,framing);assert.equal(f.objects.size,2,'Framing changes metadata without producing or replacing image bytes');
+ }finally{await f.close();}
+});
+test('framing rejects invalid geometry, missing credentials and non-photo targets before changing anything',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),path='/api/media/'+item.id+'/framing';
+  for(const framing of [null,{}, {x:-1,y:.5,fit:'cover'},{x:.5,y:2,fit:'contain'},{x:.5,y:.5,fit:'anything'}])assert.equal((await f.call(path,{method:'POST',body:{framing}})).status,400);
+  const framing={x:.5,y:.2,fit:'cover'};assert.equal((await f.call(path,{method:'POST',body:{framing},clientHeaders:false})).status,403);
+  const uploadedResponse=await f.call('/api/collections/videos/upload?filename=clip.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}});assert.equal(uploadedResponse.status,201,await uploadedResponse.clone().text());const uploaded=await uploadedResponse.json();assert.equal((await f.call('/api/media/'+uploaded.collection.items[0].id+'/framing',{method:'POST',body:{framing}})).status,400);
+  assert.deepEqual((await(await f.call('/api/media/'+item.id+'/view')).json()).item.framing,{x:.5,y:.5,fit:'cover'});assert.deepEqual(Buffer.from(await(await f.call(item.src)).arrayBuffer()),photo);
+ }finally{await f.close();}
+});
+test('repairing a bad derived preview gets a fresh browser cache URL and preserves the original and edit revision',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f),path='/api/media/'+item.id+'/preview?revision=original';
+  const first=await(await f.call(path,{method:'POST',body:photo.subarray(0,48)})).json();assert.equal(first.saved,true);
+  const unchanged=await(await f.call(path,{method:'POST',body:photo.subarray(0,64)})).json();assert.equal(unchanged.saved,false);
+  const repaired=await(await f.call(path+'&replace=1',{method:'POST',body:photo.subarray(0,64)})).json();assert.equal(repaired.saved,true);assert.notEqual(repaired.item.previewSrc,first.item.previewSrc);assert.equal(repaired.item.photoRevision,item.photoRevision);assert.equal(repaired.item.src,item.src);assert.equal(repaired.item.modifiedAt,item.modifiedAt);
+  assert.deepEqual(Buffer.from(await(await f.call(repaired.item.previewSrc)).arrayBuffer()),photo.subarray(0,64));assert.deepEqual(Buffer.from(await(await f.call(item.src)).arrayBuffer()),photo);await f.flush();assert.equal(f.objects.size,2);
+  const edited=await(await photoEdit(f,item)).json();assert.ok(edited.item.photoRevision);assert.equal((await f.call(path+'&replace=1',{method:'POST',body:photo.subarray(0,64)})).status,409);
  }finally{await f.close();}
 });
