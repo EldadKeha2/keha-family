@@ -26,6 +26,8 @@
 /* Reserve horizontal gestures only at fit size; keep scrolling and pinch zoom. */
 #mediaStage.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
 #mediaStage.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pan-y pinch-zoom}
+/* Let vertical gestures over a fitted photo continue through the gallery. */
+#mediaViewer #mediaStage:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) .face-photo-scroll{overscroll-behavior-y:auto}
 #mediaStage:is(.photo-dragging,.photo-slide-running){position:relative;overflow:hidden}
 #mediaStage.photo-slide-running .face-layer{visibility:hidden}
 #mediaStage.photo-slide-running>img,#mediaStage.photo-slide-running .face-photo-scroll,#mediaStage.photo-slide-running .native-photo-strip{visibility:hidden}
