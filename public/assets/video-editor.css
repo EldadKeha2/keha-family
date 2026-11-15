@@ -41,3 +41,13 @@ html[dir=ltr] #videoClipEditor footer{direction:ltr}
 #videoClipEditor .video-clip-timeline input[type=range]::-moz-range-track{height:4px;border:0;border-radius:2px;background:#d6d0be}
 #videoClipEditor .video-clip-timeline input[type=range]::-moz-range-thumb{box-sizing:border-box;width:6px;height:26px;border:1px solid #52643c;border-radius:1px;background:#7e8965;box-shadow:0 1px 3px #39452c33}
 #videoClipEditor .video-clip-timeline input[type=range]:focus-visible{outline:2px solid #8d9d70;outline-offset:3px}
+
+#videoClipEditor[open]{height:auto}
+#videoClipEditor .video-clip-completion{display:flex;flex-direction:column;gap:8px}
+#videoClipEditor .video-clip-completion footer{margin:0;padding:0;border:0}
+#videoClipEditor #videoClipStatus:empty{display:none}
+#videoClipEditor .video-clip-name{display:flex;flex:1;min-width:0;flex-direction:column;gap:6px}
+#videoClipEditor .video-clip-name-editor{display:flex;align-items:flex-start;gap:2px;min-width:0;border:1px solid #cbb99a;border-radius:6px;background:#fffdf7}
+#videoClipEditor #videoClipName{display:block;flex:1;box-sizing:border-box;width:100%;min-width:0;height:40px;min-height:40px;max-height:180px;margin:0;padding:8px 9px;border:0;border-radius:6px;background:transparent;color:inherit;font:calc(16px * var(--a11y-text-scale,1))/1.4 var(--sans);overflow-wrap:anywhere;resize:vertical}
+#videoClipEditor #videoClipEditName{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;min-height:30px;margin:5px;padding:5px;border:1px solid #d0c8af;border-radius:5px;background:#fcfaf3;color:#61734d;cursor:pointer}
+#videoClipEditor #videoClipEditName svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
