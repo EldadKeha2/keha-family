@@ -15,7 +15,7 @@
   let ready = false;
   function canSave() {if (app()?.apiEnabled) return true;notify(I18n.t('כדי לשמור שינויים, פתחו את האתר באמצעות קובץ ההפעלה.'));return false;}
   async function request(path, options={}) {
-    const response = await I18n.fetch(path, {cache:'no-store', ...options, headers:{...(options.body ? {'X-Family-Token':window.FAMILY_API_TOKEN} : {}), ...options.headers}});
+    const fetcher=window.FamilyCollectionTransport?.fetch||I18n.fetch,response = await fetcher(path, {cache:'no-store', ...options, headers:{...(options.body ? {'X-Family-Token':window.FAMILY_API_TOKEN} : {}), ...options.headers}});
     if (response.status === 304) return null;
     let result;
     try {result = await response.json();} catch {console.error('Family API response',path,response.status,response.url,response.headers.get('Content-Type'));throw Error(I18n.t('לא התקבלה תשובה מהשרת. בדקו את החיבור ונסו שוב.'));}
@@ -79,7 +79,7 @@
   function videoTile(item){
     const title=item.caption||(I18n.isEnglish?'Play video':'ניגון הסרטון');
     const duration=Number(item.duration),time=Number.isFinite(duration)&&duration>0?Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0'):'';
-    const preview=item.provider==='youtube'?`<img src="${safe(item.poster)}" alt="" loading="lazy" decoding="async">`:`<video muted playsinline preload="metadata" tabindex="-1" aria-hidden="true"><source src="${safe(item.src.split('#')[0]+'#t=0.1')}" type="${safe(item.mime)}"></video>`;
+    const preview=item.poster?`<img src="${safe(item.poster)}" ${item.provider==='youtube'?'':`data-video-poster-src="${safe(item.src.split('#')[0]+'#t=0.1')}"`} alt="" loading="lazy" decoding="async">`:`<video muted playsinline preload="none" tabindex="-1" aria-hidden="true" data-preview-src="${safe(item.src.split('#')[0]+'#t=0.1')}"></video>`;
     const caption=item.caption||(I18n.isEnglish?'View and add details':'הצגה והוספת פרטים'),galleryIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="14" height="14" rx="2"/><path d="M17 21H5a2 2 0 0 1-2-2V7m4 6 4-4 4 4 2-2 4 4"/><circle cx="16.5" cy="7.5" r="1"/></svg>',trashIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/></svg>';
     return `<div class="video-tile-preview"><button type="button" class="video-tile-open" data-media-open="${safe(item.id||item.file)}" data-media-scope="videos" aria-label="${safe(title)}"><span class="video-tile-cover"><span class="video-tile-placeholder" aria-hidden="true">▤</span>${preview}<span class="video-tile-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 10 7-10 7Z"/></svg></span>${time?`<span class="video-tile-duration" aria-hidden="true">${time}</span>`:''}</span></button>${window.FamilyVideoPresentation?.controls(item,'videos')||''}</div><div class="video-tile-footer"><button type="button" class="video-tile-caption ${item.caption?'':'is-empty'}" data-media-open="${safe(item.id||item.file)}" data-media-scope="videos" title="${safe(caption)}">${galleryIcon}<span dir="auto">${safe(caption)}</span></button><button type="button" class="video-tile-delete" data-media-delete="${safe(item.id)}" data-media-scope="videos" aria-label="${I18n.isEnglish?'Delete video':'מחיקת הסרטון'}: ${safe(item.caption||I18n.mediaName(item))}">${trashIcon}</button></div>`;
   }
@@ -104,7 +104,7 @@
       empty.querySelector('p').textContent=I18n.t(complete?'תמונות שאישרתם בהן ״כל הפרצופים תויגו״ יופיעו כאן.':partial?'פתחו תמונה והוסיפו את השמות החסרים בלחיצה על הפנים. בסיום לחצו על ״כל הפרצופים תויגו״.':galleryPage.person||galleryPage.unit||galleryPage.labels?'אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':untagged||galleryPage.query?'אפשר להציג את כל התמונות או לשנות את החיפוש.':'אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.');
       for(const control of document.querySelectorAll('[data-gallery-pager]')){control.hidden=!p.total;control.querySelector('[data-gallery-page-label]').textContent=I18n.isEnglish?`Page ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} of ${p.total}`:`עמוד ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} מתוך ${p.total}`;control.querySelector('[data-gallery-prev]').disabled=control.querySelector('[data-gallery-next]').disabled=p.pages<2;control.querySelector('[data-gallery-size]').value=String(p.size);control.querySelector('[data-gallery-sort]').value=galleryPage.sort;}
     }
-    const tileVersion=item=>isVideo?JSON.stringify([I18n.mediaName(item),item.caption,item.videoCategory,item.duration]):'';
+    const tileVersion=item=>isVideo?JSON.stringify([I18n.mediaName(item),item.caption,item.videoCategory,item.duration,item.poster]):'';
     const signature = filtered.map(item=>item.file+'|'+item.src+'|'+tileVersion(item)).join('\u0000');
     if (signatures[kind] !== signature) {
       const active = document.activeElement, focusedFile = active?.dataset?.sharedFile;
@@ -142,6 +142,7 @@
       }
       if (!compact && !filtered.length && collection.items.length) grid.innerHTML=I18n.t('<p class="no-content-match">אין סרטונים או תמונות בבחירה הזו. אפשר לשנות את הקטגוריה או את החיפוש.</p>');
     }
+    if(isVideo)window.FamilyVideoPreviews?.watch($(collectionId(kind,'Grid')));
     window.FamilyTags.refresh($(collectionId(kind,'Grid')),filtered);
     if(compact)window.FamilyGalleryFilter?.render();
     for(const area of $(collectionId(kind,'Grid')).querySelectorAll('textarea')) {

@@ -4,7 +4,7 @@ const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEngl
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
 const state={open:false,people:new Set(),families:new Set(),categories:new Set(),sort:'uploaded-desc',seed:Math.floor(Math.random()*0x100000000)};
-let ready=false,roster=[],catalog=[],catalogSignature='',rosterLoaded=false;
+let ready=false,roster=[],catalog=[],catalogSignature='';
 function choices(id,items,selected,kind){
  $(id).innerHTML=items.map(item=>`<label class="gallery-check-option"><input type="checkbox" data-video-filter-${kind}="${safe(item.id)}"${selected.has(item.id)?' checked':''}><span>${safe(item.label)}</span></label>`).join('')||`<p class="gallery-filter-empty">${tr('לא נמצאו התאמות','No matches found')}</p>`;
 }
@@ -32,11 +32,12 @@ function setCategories(categories,{refresh:shouldRefresh=true}={}){state.categor
 function toggleCategory(id){if(state.categories.has(id))state.categories.delete(id);else state.categories.add(id);if(state.categories.size===1)$('videoUploadCategory').value=[...state.categories][0];refresh();}
 function init(){
  if(!$('videoFilterToggle'))return;
- roster=Object.values(window.FAMILY_DATA.people).filter(person=>!person.placeholder);ready=true;fillPeople();fillFamilies();render();
+ roster=window.FamilyPeopleRoster.snapshot().filter(person=>!person.placeholder);ready=true;fillPeople();fillFamilies();render();
  $('videoFilterToggle').addEventListener('click',async()=>{
-  state.open=!state.open;render();if(!state.open||rosterLoaded)return;
-  try{const response=await I.fetch('api/tag-people',{cache:'no-store'});if(response.ok){roster=(await response.json()).people;rosterLoaded=true;fillPeople();}}catch{}
+  state.open=!state.open;if(state.open)fillPeople();render();if(!state.open)return;
+  try{await window.FamilyPeopleRoster.load();}catch{}
  });
+ window.FamilyPeopleRoster.subscribe(people=>{roster=people.filter(person=>!person.placeholder);if(ready&&state.open)fillPeople();});
  $('videoPersonSearch').addEventListener('input',fillPeople);
  $('videoSort').addEventListener('change',event=>{if(!VIDEO_SORTS.includes(event.target.value))return;state.sort=event.target.value;if(state.sort==='random')state.seed=Math.floor(Math.random()*0x100000000);refresh();});
  $('videoFilterPanel').addEventListener('change',event=>{

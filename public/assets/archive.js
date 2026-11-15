@@ -25,7 +25,7 @@
   const toast=message=>app()?.toast(message);
   const canSave=()=>{if(app()?.apiEnabled)return true;toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן את הדף.'));return false;};
   async function request(path,options={}){
-    const response=await I18n.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
+    const fetcher=window.FamilyCollectionTransport?.fetch||I18n.fetch,response=await fetcher(path,{cache:'no-store',...options,headers:{...(options.body?{'X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
     if(response.status===304)return null;
     let result;try{result=await response.json();}catch{throw Error(I18n.t('לא התקבלה תשובה מהשרת. נסו לרענן את הדף.'));}
     if(!response.ok)throw Object.assign(Error(I18n.error(result.error)||I18n.t('לא ניתן לשמור את השינוי.')),{status:response.status,code:result.code});return result;
@@ -133,7 +133,7 @@
         let viewer;
         if(item.kind==='photo')viewer=I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(key)}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.thumbnailSrc||item.src)}" ${window.FamilyPhotoThumbnails?.attributes(item)||''} alt="${safe(item.caption||I18n.mediaName(item))}" loading="lazy" decoding="async"></button>`;
         else if(item.provider==='youtube')viewer=`<button type="button" class="archive-video-poster" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(key)}" aria-label="${safe((I18n.isEnglish?'Play ':'ניגון ')+I18n.mediaName(item))}"><img src="${safe(item.poster)}" alt="${safe(I18n.mediaName(item))}" loading="lazy" decoding="async"><span class="archive-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8 5 12 7-12 7Z"/></svg></span></button>`;
-        else if(item.kind==='video')viewer=I18n.html`<div class="video-frame"><video controls playsinline preload="metadata" aria-label="${safe(item.caption||I18n.mediaName(item))}"><source src="${safe(item.src)}" type="${safe(item.mime)}"></video></div><div class="video-file-info"><span>${safe(I18n.mediaName(item))}</span><a href="${safe(item.src)}" download="${safe(item.filename)}">הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הסרטון לא מתנגן כאן. אפשר להוריד את המקור או להעלות MP4 עם H.264.</p>`;
+        else if(item.kind==='video')viewer=I18n.html`<div class="video-frame"><video controls playsinline preload="none" ${item.poster?`poster="${safe(item.poster)}"`:''} data-preview-src="${safe(window.FamilyVideoDelivery?.src(item)||item.faststartSrc||item.src)}" aria-label="${safe(item.caption||I18n.mediaName(item))}"></video></div><div class="video-file-info"><span>${safe(I18n.mediaName(item))}</span><a href="${safe(item.src)}" download="${safe(item.filename)}">הורדת המקור ↗</a></div><p class="video-codec-note" hidden>הסרטון לא מתנגן כאן. אפשר להוריד את המקור או להעלות MP4 עם H.264.</p>`;
         else viewer=I18n.html`<a class="archive-document" href="${safe(item.src)}" download="${safe(item.filename)}"><span class="document-emblem" aria-hidden="true">▤</span><strong>${safe(I18n.mediaName(item))}</strong><small>${safe(item.filename.split('.').pop().toUpperCase())} · ${(item.size/1024/1024).toFixed(1)}MB</small><span>הורדת המסמך ↓</span></a>`;
         const captionId='archive-caption-'+item.file.replace(/[^a-zA-Z0-9-]/g,'-');
         card.innerHTML=item.kind==='photo'?viewer:viewer+`<div class="media-file-name">${safe(item.provider==='youtube'?I18n.mediaName(item):item.filename)}</div>`+window.FamilyMedia.controls(item,key)+I18n.html`<div class="caption-editor"><label for="${captionId}">${item.kind==='photo'?I18n.t('מי בתמונה? איפה ומתי?'):item.kind==='video'?I18n.t('מה רואים בסרטון?'):I18n.t('מה הסיפור של המסמך?')}</label><textarea dir="auto" id="${captionId}" rows="2" maxlength="5000" data-archive-caption="${safe(item.file)}" data-archive-scope="${safe(key)}" placeholder="כמה מילים שיעזרו לשמור את הזיכרון…"></textarea><div class="caption-toolbar"><span data-archive-caption-status role="status"></span><button data-save-archive-caption="${safe(item.file)}" data-archive-scope="${safe(key)}">שמירה</button></div></div>`;
@@ -146,6 +146,7 @@
           for(const event of ['loadeddata','canplay'])player.addEventListener(event,()=>{note.hidden=true;});
         }
       }
+      const player=card.querySelector('video');if(player?.controls)window.FamilyVideoDelivery?.bind(player,item);
       const draft=drafts.get(draftKey(key,item.file)),area=card.querySelector('textarea');
       if(area&&area!==document.activeElement)area.value=draft?.dirty?draft.value:item.caption||'';
       const dateLabel=card.querySelector('[data-archive-date-label]');if(dateLabel)dateLabel.textContent=captureLabel(item);
@@ -171,6 +172,7 @@
     const wanted=new Set(cards);for(const child of [...grid.children])if(!wanted.has(child))child.remove();
     let anchor=grid.firstElementChild;for(const card of cards){if(card===anchor)anchor=anchor.nextElementSibling;else grid.insertBefore(card,anchor);}
     grid.dataset.scope=key;grid.dataset.layout=layout;
+    window.FamilyVideoPreviews?.watch(grid);
     window.FamilyTags.refresh(grid,items);
     if(selection&&grid.contains(active)){active.focus({preventScroll:true});active.setSelectionRange(...selection);}
     const nostalgia=key==='nostalgia',empty=$(nostalgia?'nostalgiaEmpty':'weddingMediaEmpty');empty.hidden=nostalgia||collection.items.length>0;

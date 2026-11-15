@@ -1,17 +1,28 @@
-import {mountPuzzle,pausePuzzle} from './puzzle.js?v=return-lobby-v3';
-import {mountJachnun,pauseJachnun} from './jachnun.js?v=leaderboard-v3';
-import {mountRex,pauseRex} from './rex.js?v=4';
-import {mountSoup,pauseSoup} from './soup.js?v=clear-feedback-v10';
-import {mountNorth,pauseNorth} from './north.js?v=roei-elharizi-v1';
-import {mountNetoTetris,pauseNetoTetris} from './neto-tetris.js?v=4';
-import {mountRutiHouse,pauseRutiHouse} from './ruti-house.js?v=20-levels-circle-v2';
 import {quizGrade} from './quiz.mjs';
 import {QUIZ_ROUND_MS,quizScoreSummary} from './quiz-scoring.mjs';
 import {makeChickQuiz,withinChickTarget} from './chick.mjs?v=family-search-v4';
-import './differences.js?v=20261104.2';
 
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Fetch each independent game's code only when it is selected. Keep resolved
+// modules so returning to an already opened game is immediate and preserves it.
+const gameModules={
+  puzzle:{load:()=>import('./puzzle.js?v=return-lobby-v3'),mount:'mountPuzzle',pause:'pausePuzzle'},
+  jachnun:{load:()=>import('./jachnun.js?v=leaderboard-v3'),mount:'mountJachnun',pause:'pauseJachnun'},
+  rex:{load:()=>import('./rex.js?v=4'),mount:'mountRex',pause:'pauseRex'},
+  soup:{load:()=>import('./soup.js?v=clear-feedback-v10'),mount:'mountSoup',pause:'pauseSoup'},
+  north:{load:()=>import('./north.js?v=roei-elharizi-v1'),mount:'mountNorth',pause:'pauseNorth'},
+  'neto-tetris':{load:()=>import('./neto-tetris.js?v=4'),mount:'mountNetoTetris',pause:'pauseNetoTetris'},
+  'ruti-house':{load:()=>import('./ruti-house.js?v=20-levels-circle-v2'),mount:'mountRutiHouse',pause:'pauseRutiHouse'},
+  differences:{load:()=>import('./differences.js?v=20261104.2')}
+};
+function pauseGames(except=null){
+  for(const [id,entry]of Object.entries(gameModules))if(id!==except&&entry.module&&entry.pause)entry.module[entry.pause]();
+}
+function loadGame(game){
+  const entry=gameModules[game];
+  return entry.pending??=(entry.load().then(module=>{entry.module=module;return module;}).catch(error=>{entry.pending=null;throw error;}));
+}
 const ROUND_SECONDS=15;
 const state={view:'tree',phase:'welcome',game:null,questions:[],index:0,answers:[],imageReady:false,deadline:null,error:'',serial:0,renderToken:0,zoom:1,cursor:{x:.5,y:.5},lastRemaining:60,mistakes:0,autoNextAt:null};
 let clock=null,advanceClock=null,nextPhoto=null,preloaded='';
@@ -226,21 +237,13 @@ function imageReady(index,token){
 }
 function render(){
   stopClock();if(state.view!=='games')return;
-  if(state.phase==='ruti-house'){pauseNetoTetris();pauseNorth();pauseSoup();pauseRex();pauseJachnun();pausePuzzle();mountRutiHouse($('familyGamesContent'),showLobby);return;}
-  pauseRutiHouse();
-  if(state.phase==='neto-tetris'){pauseNorth();pauseSoup();pauseRex();pauseJachnun();pausePuzzle();mountNetoTetris($('familyGamesContent'),showLobby);return;}
-  pauseNetoTetris();
-  if(state.phase==='north'){pausePuzzle();pauseJachnun();pauseRex();pauseSoup();mountNorth($('familyGamesContent'),showLobby);return;}
-  pauseNorth();
-  if(state.phase==='soup'){pausePuzzle();pauseJachnun();pauseRex();mountSoup($('familyGamesContent'),showLobby);return;}
-  pauseSoup();
-  if(state.phase==='rex'){pausePuzzle();pauseJachnun();mountRex($('familyGamesContent'),showLobby);return;}
-  pauseRex();
-  if(state.phase==='jachnun'){pausePuzzle();mountJachnun($('familyGamesContent'),showLobby);return;}
-  pauseJachnun();
-  if(state.phase==='puzzle'){mountPuzzle($('familyGamesContent'),showLobby);return;}
-  pausePuzzle();
-  if(state.phase==='differences'){if(!window.FamilyDifferences?.activate('games'))window.FamilyDifferences?.open();return;}
+  pauseGames(state.phase);
+  const entry=gameModules[state.phase];
+  if(entry?.module){
+    if(entry.mount)entry.module[entry.mount]($('familyGamesContent'),showLobby);
+    else if(!window.FamilyDifferences?.activate('games'))window.FamilyDifferences?.open();
+    return;
+  }
   const token=++state.renderToken,index=state.index;
   $('familyGamesContent').innerHTML=(state.phase==='playing'||state.phase==='revealed')?question():state.phase==='finished'?result():state.phase==='trivia-home'?triviaHome():welcome();
   scheduleChickAdvance();
@@ -261,15 +264,21 @@ async function start(game='photos',sync=true){
   if(!gameIds.has(game))game='photos';
   if(sync)syncGameRoute(game);
   if(game!=='differences')window.FamilyDifferences?.close();
-  if(game==='ruti-house'){stopClock();state.serial++;state.game='ruti-house';state.phase='ruti-house';render();return;}
-  if(game==='neto-tetris'){stopClock();state.serial++;state.game='neto-tetris';state.phase='neto-tetris';render();return;}
-  if(game==='north'){stopClock();state.serial++;state.game='north';state.phase='north';render();return;}
-  if(game==='soup'){stopClock();pausePuzzle();pauseJachnun();pauseRex();state.serial++;state.game='soup';state.phase='soup';render();return;}
-  if(game==='rex'){stopClock();pausePuzzle();pauseJachnun();state.serial++;state.game='rex';state.phase='rex';render();return;}
-  if(game==='jachnun'){stopClock();pausePuzzle();state.serial++;state.game='jachnun';state.phase='jachnun';render();return;}
-  if(game==='puzzle'){stopClock();state.serial++;state.game='puzzle';state.phase='puzzle';render();return;}
-  pausePuzzle();
-  if(game==='differences'){stopClock();state.serial++;state.game='differences';state.phase='differences';render();return;}
+  if(gameModules[game]){
+    stopClock();const serial=++state.serial;state.game=game;state.error='';
+    if(gameModules[game].module){state.phase=game;render();return;}
+    state.phase='loading';render();
+    try{
+      await loadGame(game);
+      // A slow import must never reopen a game after Back or a newer selection.
+      if(serial!==state.serial||state.game!==game)return;
+      state.phase=game;render();
+    }catch{
+      if(serial!==state.serial||state.game!==game)return;
+      state.phase='welcome';state.error=tr('המשחק לא נטען. אפשר לנסות שוב.','The game could not load. Please try again.');render();
+    }
+    return;
+  }
   stopClock();const serial=++state.serial;state.game=['photos','kinship','missing','trivia','chick'].includes(game)?game:'photos';state.phase='loading';state.error='';render();
   try{let data;if(isChick())data={questions:makeChickQuiz()};else{const response=await I.fetch(isKinship()?'api/games/relationships':isMissing()?'api/games/who-is-missing':isTrivia()?'api/games/trivia?lang='+encodeURIComponent(I.language||'he'):'api/games/who-is-it',{cache:'no-store'});data=await response.json();if(!response.ok)throw Error(I.error(data.error));}if(serial!==state.serial)return;
     if(data.questions?.length!==10&&isTextGame())throw Error(tr('לא נמצאו מספיק שאלות כרגע. נסו שוב.','There are not enough questions available right now. Please try again.'));
@@ -279,13 +288,8 @@ async function start(game='photos',sync=true){
   }catch(error){if(serial===state.serial){state.phase=isTrivia()?'trivia-home':'welcome';state.error=error.message;render();}}
 }
 function activate(view){
-  if(view!=='games')pauseRutiHouse();
-  if(view!=='games')pauseNetoTetris();
-  if(view!=='games')pauseNorth();
-  if(view!=='games')pauseSoup();
-  if(view!=='games')pauseRex();
-  if(view!=='games')pauseJachnun();
-  stopClock();state.view=view;$('gamesView').hidden=view!=='games';if(view!=='games'){pausePuzzle();window.FamilyDifferences?.activate(view);return;}
+  if(view!=='games')pauseGames();
+  stopClock();state.view=view;$('gamesView').hidden=view!=='games';if(view!=='games'){window.FamilyDifferences?.activate(view);return;}
   lastRoute=window.location.href;
   if(window.FamilyNavigation){
     const game=routeGame();

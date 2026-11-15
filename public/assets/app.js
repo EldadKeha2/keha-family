@@ -327,18 +327,22 @@
         card=document.createElement('article');card.className='gallery-photo';card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;
         let viewer;
         if(item.provider==='youtube')viewer=I18n.html`<button class="personal-video-cover" data-media-open="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="ניגון ${safe(I18n.mediaName(item))} בגלריה"><span aria-hidden="true">▶</span><strong>${safe(I18n.mediaName(item))}</strong></button>`;
-        else if(item.kind==='video')viewer=I18n.html`<video class="person-gallery-video" controls playsinline preload="metadata" src="${safe(item.src)}" aria-label="${safe(I18n.mediaName(item))}"></video><p class="video-codec-note" hidden>הסרטון לא מתנגן בדפדפן הזה. אפשר לפתוח אותו בגלריה ולהוריד את המקור.</p><div class="personal-media-name">${safe(I18n.mediaName(item))}</div>`;
+        else if(item.kind==='video')viewer=I18n.html`<video class="person-gallery-video" controls playsinline preload="none" ${item.poster?`poster="${safe(item.poster)}"`:''} data-preview-src="${safe(window.FamilyVideoDelivery?.src(item)||item.faststartSrc||item.src)}" aria-label="${safe(I18n.mediaName(item))}"></video><p class="video-codec-note" hidden>הסרטון לא מתנגן בדפדפן הזה. אפשר לפתוח אותו בגלריה ולהוריד את המקור.</p><div class="personal-media-name">${safe(I18n.mediaName(item))}</div>`;
         else viewer=I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${safe(scope)}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.thumbnailSrc||item.src)}" ${window.FamilyPhotoThumbnails?.attributes(item)||''} alt="${safe(item.caption||I18n.mediaName(item))}" loading="lazy" decoding="async"></button>`;
         const captionId='caption-'+personId+'-'+encodeURIComponent(item.file);
         card.innerHTML=viewer+(item.linked?I18n.t('<p class="linked-media-note">מופיע באלבום הזה בזכות תיוג</p>'):'')+window.FamilyMedia.controls(item,scope)+I18n.html`<div class="caption-editor"><label class="visually-hidden" for="${safe(captionId)}">כיתוב ל${item.kind==='video'?I18n.t('סרטון'):I18n.t('תמונה')} ${safe(I18n.mediaName(item))}</label><textarea dir="auto" id="${safe(captionId)}" data-caption-file="${safe(item.file)}" data-owner="${personId}" rows="2" maxlength="5000" placeholder="מי מופיע כאן? איפה ומתי? כתבו כאן…" ${apiEnabled?'':'disabled'}></textarea><div class="caption-toolbar"><span data-caption-status role="status"></span><button data-save-caption="${safe(item.file)}" data-owner="${personId}">שמירה</button></div></div>`;
-        card.querySelector('video')?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;});
+        const player=card.querySelector('video');
+        player?.addEventListener('error',()=>{card.querySelector('.video-codec-note').hidden=false;});
+        for(const event of ['loadeddata','canplay'])player?.addEventListener(event,()=>{card.querySelector('.video-codec-note').hidden=true;});
       }
+      const player=card.querySelector('video');if(player)window.FamilyVideoDelivery?.bind(player,item);
       const area=card.querySelector('textarea'),draft=drafts.get(keyFor(personId,item.file));
       if(area!==document.activeElement)area.value=draft?.dirty?draft.value:item.caption||'';
       cards.push(card);
     }
     const wanted=new Set(cards);for(const card of [...grid.children])if(!wanted.has(card)){card.querySelectorAll('video').forEach(video=>video.pause());card.remove();}
     let anchor=grid.firstElementChild;for(const card of cards){if(card===anchor)anchor=anchor.nextElementSibling;else grid.insertBefore(card,anchor);}
+    window.FamilyVideoPreviews?.watch(grid);
     window.FamilyTags.refresh(grid,items);galleryRevision=item.revision;
   }
 

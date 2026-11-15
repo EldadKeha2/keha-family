@@ -7,7 +7,18 @@ const source=await readFile(new URL('../public/assets/home.js',import.meta.url),
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 const photos=['a','b','c'].map(id=>({id,src:'/'+id+'.jpg',name:id,caption:'Caption '+id,kind:'photo'}));
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-function fixture({items=photos,reduced=false,carousel=false,width=1120,height=190,desktop=true,swipe=false,random=()=>.999999,english=false}={}){
+test('home album revalidation reuses unchanged photos without downloading and registering the album again',async()=>{
+ const requests=[],f=fixture({fetcher:async(path,options)=>{requests.push(options);return requests.length===1?Response.json({items:photos},{headers:{ETag:'"album-1"'}}):new Response(null,{status:304});}});
+ await f.ready();const registrations=f.registered.length;f.window.FamilyHome.activate('tree');f.window.FamilyHome.activate('home');await f.ready();
+ assert.equal(requests[1].headers['If-None-Match'],'"album-1"');assert.equal(f.registered.length,registrations+1,'Returning home shuffles once; an unchanged server album does not reset it again');
+});
+test('a slow home album response cannot overwrite a newer local photo edit',async()=>{
+ let resolve;const f=fixture({fetcher:()=>new Promise(done=>resolve=done)});
+ const edited=photos.map(item=>({...item,caption:'New '+item.id}));await f.update(edited);const registrations=f.registered.length;
+ resolve(Response.json({items:photos},{headers:{ETag:'"old-album"'}}));await f.ready();assert.equal(f.registered.length,registrations);
+ assert.equal(f.window.FamilyHome.centeredPhoto()?.caption,undefined);await f.resolve('/a.jpg');assert.equal(f.window.FamilyHome.centeredPhoto().caption,'New a');
+});
+function fixture({items=photos,reduced=false,carousel=false,width=1120,height=190,desktop=true,swipe=false,random=()=>.999999,english=false,fetcher=null}={}){
  const nodes=[],images=[],timers=new Map(),opened=[],registered=[];let now=0,sequence=0;
  class Node extends EventTarget{
   constructor(){super();nodes.push(this);this.children=[];this.parent=null;this.id='';this.hidden=false;this.className='';this.textContent='';this.attrs={};this.dataset={};this.style={setProperty(name,value){this[name]=value;}};}
@@ -36,7 +47,7 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
  const document=new EventTarget();document.getElementById=get;document.createElement=()=>new Node();document.visibilityState='visible';
  const window=new EventTarget(),motion=new EventTarget(),desktopQuery=new EventTarget();motion.matches=reduced;desktopQuery.matches=desktop;
  window.FamilyApp={getView:()=> 'home'};
- window.FamilyI18n={t:String,isEnglish:english,mediaName:item=>item.name,fetch:async()=>Response.json({items})};
+ window.FamilyI18n={t:String,isEnglish:english,mediaName:item=>item.name,fetch:fetcher|| (async()=>Response.json({items}))};
  window.FamilyMedia={register(scope,list){registered.push({scope,ids:Array.from(list,item=>item.id)});},open:(list,index,scope)=>{opened.push({id:list[index].id,scope});get('mediaViewer').open=true;}};
  const setTimer=(fn,delay)=>{const id=++sequence;timers.set(id,{fn,time:now+delay});return id;};
  class Clock extends Date{static now(){return now;}}

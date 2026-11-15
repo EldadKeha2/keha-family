@@ -30,8 +30,11 @@
   }
   function preload(items,index){
     const connection=navigator.connection;
-    if(items.length<2||connection?.saveData||/^(slow-)?2g$/.test(connection?.effectiveType||''))return;
-    const distances=mobile()?[1,-1,2,-2,3]:[1,-1,2,3,-2,4],seen=new Set([source(items[index]||{})]);
+    if(items.length<2||(typeof document!=='undefined'&&document.hidden)||connection?.saveData||/^(slow-)?2g$/.test(connection?.effectiveType||''))return;
+    // On a weak link keep bandwidth for the visible photo and its two direct
+    // neighbours. Distant speculation must not delay the next finger stroke.
+    const constrained=connection?.effectiveType==='3g'||Number(connection?.downlink)>0&&Number(connection.downlink)<1.5;
+    const distances=constrained?[1,-1]:mobile()?[1,-1,2,-2,3]:[1,-1,2,3,-2,4],seen=new Set([source(items[index]||{})]);
     for(const distance of distances){const next=items[(index+distance+items.length)%items.length];if(mobile()&&Math.abs(distance)>1&&!next?.previewSrc&&Number(next?.size)>1000000)continue;if(next?.kind==='photo'&&!seen.has(source(next))&&!(Number(next.previewSize||next.size)>16*1024*1024)){seen.add(source(next));prepare(next,Math.abs(distance)===1?'high':'low')?.catch(()=>{});}}
   }
   function cancelDrag(){
@@ -44,12 +47,12 @@
       const node=document.createElement('div'),outgoing=document.createElement('div'),incoming=document.createElement('div');node.className='photo-queued-drag';node.setAttribute('aria-hidden','true');
       Object.assign(node.style,{position:'absolute',inset:'0',overflow:'hidden',pointerEvents:'none',zIndex:'8',backgroundColor:typeof getComputedStyle==='function'?getComputedStyle(stage).backgroundColor:'#ede5d4'});
       for(const [layer,item]of [[outgoing,current],[incoming,next]])Object.assign(layer.style,{position:'absolute',inset:'0',backgroundImage:item?'url('+JSON.stringify(source(item))+')':'none',backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat',willChange:'transform'});
-      node.append(outgoing,incoming);clearQueuedDrag();stage.append(node);queuedDrag={stage,node,outgoing,incoming,key,next};
+      const width=stage.clientWidth;node.append(outgoing,incoming);clearQueuedDrag();stage.append(node);queuedDrag={stage,node,outgoing,incoming,key,next,width};
       prepare(next,'high')?.catch(()=>{});
     }
-    const offset=Math.max(-stage.clientWidth,Math.min(stage.clientWidth,dx));
+    const width=queuedDrag.width,offset=Math.max(-width,Math.min(width,dx));
     queuedDrag.dx=offset;
-    queuedDrag.outgoing.style.transform='translateX('+offset+'px)';queuedDrag.incoming.style.transform='translateX('+(offset-direction*stage.clientWidth)+'px)';
+    queuedDrag.outgoing.style.transform='translateX('+offset+'px)';queuedDrag.incoming.style.transform='translateX('+(offset-direction*width)+'px)';
   }
   function clearHandoff(token=handoff){if(token&&handoff===token){handoff=null;token.node.remove();}}
   function holdNative(stage,fallback){
@@ -78,8 +81,8 @@
   }
   function drag(stage,dx){
     const node=stage.querySelector('.face-photo-scroll')||stage.querySelector('img');if(!node?.style)return;
-    if(motion)cancel();if(dragged?.node!==node){cancelDrag();dragged={node,stage};}
-    dragged.dx=Math.max(-stage.clientWidth,Math.min(stage.clientWidth,dx));stage.classList.add('photo-dragging');node.style.transform='translateX('+dragged.dx+'px)';
+    if(motion)cancel();if(dragged?.node!==node){cancelDrag();dragged={node,stage,width:stage.clientWidth};stage.classList.add('photo-dragging');}
+    dragged.dx=Math.max(-dragged.width,Math.min(dragged.width,dx));node.style.transform='translateX('+dragged.dx+'px)';
   }
   function settle(){
     clearQueuedDrag();

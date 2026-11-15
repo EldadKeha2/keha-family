@@ -2,7 +2,14 @@
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
   function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,photoButtons=false,videoSurface=null,strictStart=false}){
-    let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null;
+    let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
+    const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
+    const clearPreview=()=>{if(previewFrame!==null)cancelAnimationFrame(previewFrame);previewFrame=null;pendingPreview=null;};
+    const flushPreview=()=>{const pending=pendingPreview;clearPreview();if(pending)move?.(pending.dx,pending.options);};
+    // Input can arrive faster than the display refreshes (and some browsers
+    // emit both touch and pointer streams). Paint only the latest finger
+    // position once per frame; commit that position before release navigation.
+    const preview=(dx,options)=>{if(!move)return;if(!frames){move(dx,options);return;}pendingPreview={dx,options};if(previewFrame===null)previewFrame=requestAnimationFrame(()=>{previewFrame=null;const pending=pendingPreview;pendingPreview=null;if(pending)move(pending.dx,pending.options);});};
     const navigate=(dx,options)=>{const action=dx>0?right:left;return action?action(options):step(dx>0?1:-1,options);};
     const idle=new Set(),finished=()=>{for(const resolve of idle)resolve();idle.clear();};
     const controls='a,input,textarea,select,video,iframe,[contenteditable],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
@@ -14,7 +21,7 @@
       return rect&&event.clientY>=rect.top&&event.clientY<rect.bottom-72?video:null;
     };
     const freshVideoTouch=event=>{if(videoSurface&&event.target.closest('video')===videoSurface())suppressClickUntil=0;};
-    const reset=(preserveTouch=false)=>{gesture=null;nativePointer=null;stage.classList.remove('photo-pointer-dragging');clearTimeout(wheelTimer);wheelTimer=null;wheelGesture=null;if(preserveTouch!==true){touchStart=null;finished();cancel?.();}else if(!touchStart||touchStart.native)finished();};
+    const reset=(preserveTouch=false)=>{clearPreview();gesture=null;nativePointer=null;stage.classList.remove('photo-pointer-dragging');clearTimeout(wheelTimer);wheelTimer=null;wheelGesture=null;if(preserveTouch!==true){touchStart=null;finished();cancel?.();}else if(!touchStart||touchStart.native)finished();};
     const blockClick=()=>{suppressClickUntil=Date.now()+700;};
     const distance=()=>mouse()?Math.max(32,Math.min(56,stage.clientWidth*.06)):Math.max(40,Math.min(80,stage.clientWidth*.12));
     const nativeEnded=(start,event)=>{
@@ -31,7 +38,7 @@
       const control=event.target.closest(controls),video=control?.tagName==='VIDEO'?previewVideo(event):null;
       if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||control&&!video)return;
       suppressClickUntil=0;
-      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse(),video};
+      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse(),video,threshold:distance()};
       const ownership=claim?.(event)||'manual',mode=isMouse?'queued':ownership;
       if(mode==='native'){nativePointer=gesture;gesture=null;return mode;}
       // Capture the stable stage before face/image setup reparents the target.
@@ -55,7 +62,7 @@
         if(!g.vertical&&(Math.abs(dx)<10||Math.abs(dx)<Math.abs(dy)*(g.desktop?1.2:1.3)))return;
         // A video tap must still toggle native controls. Claim its stream only
         // after a deliberate horizontal stroke can actually change the file.
-        if(g.video&&!g.vertical&&Math.abs(dx)<distance())return;
+        if(g.video&&!g.vertical&&Math.abs(dx)<g.threshold)return;
       }
       if(g.vertical){blockClick();if(event.cancelable)event.preventDefault();vertical(g.lastY-event.clientY);g.lastY=event.clientY;return;}
       if(!g.dragged){
@@ -63,21 +70,22 @@
         if(typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       }
       blockClick();if(event.cancelable)event.preventDefault();
-      move?.(dx,{queued:g.mode==='queued'});
+      preview(dx,{queued:g.mode==='queued'});
     };
-    document.addEventListener('pointermove',event=>{if(!touchOnly())moved(event);},{capture:true,passive:false});
+    document.addEventListener('pointermove',event=>{if(!touchOnly()&&!touchStart)moved(event);},{capture:true,passive:false});
     const released=event=>{
       const g=gesture;if(!g){if(nativePointer?.id===event.pointerId){nativeEnded(nativePointer,event);nativePointer=null;}return;}if(event.pointerId!==g.id)return;
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
       if(g.vertical){blockClick();reset();return;}
-      if(g.dragged||Math.abs(dx)>(g.video?distance():10))blockClick();
-      if(!enabled()||!g.dragged&&Date.now()-g.time>4000||Math.abs(dx)<distance()||Math.abs(dx)<Math.abs(dy)*(g.desktop&&g.dragged?1:1.5)){reset();return;}
+      if(g.dragged||Math.abs(dx)>(g.video?g.threshold:10))blockClick();
+      if(!enabled()||!g.dragged&&Date.now()-g.time>4000||Math.abs(dx)<g.threshold||Math.abs(dx)<Math.abs(dy)*(g.desktop&&g.dragged?1:1.5)){reset();return;}
+      flushPreview();
       gesture=null;touchStart=null;stage.classList.remove('photo-pointer-dragging');finished();
       if(event.cancelable)event.preventDefault();
       // Use the gallery's actual Next/Previous actions for physical gestures.
       navigate(dx,{dragX:dx,queued:true,...(g.mode==='queued'?{native:true}:{})});
     };
-    document.addEventListener('pointerup',event=>{if(!touchOnly())released(event);},{capture:true,passive:false});
+    document.addEventListener('pointerup',event=>{if(!touchOnly()&&!touchStart)released(event);},{capture:true,passive:false});
     document.addEventListener('pointercancel',event=>{if(!touchOnly()&&gesture?.id===event.pointerId){blockClick();reset(true);}},{capture:true,passive:true});
     // Some Windows touch browsers interrupt the pointer stream when their
     // native photo scroller claims a gesture. Keep a single-touch fallback;
@@ -90,6 +98,7 @@
       if(!gesture){const mode=begin(touchStart);touchStart.native=mode==='native';if(strictStart&&!mode){touchStart=null;finished();}}
     },{capture:true,passive:true});
     document.addEventListener('touchmove',event=>{
+      if(!touchStart)return;
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
       if(!touchStart||touchStart.native)return;
       const touch=fromTouch(event,event.touches[0]);
@@ -112,8 +121,8 @@
       // deltas. Accumulate them, including the small momentum tail.
       if(!Number.isFinite(dx)||!dx||Math.abs(dx)<Math.abs(dy)*(wheelGesture?1:1.15))return;
       if(event.cancelable)event.preventDefault();blockClick();
-      wheelGesture||={dx:0};wheelGesture.dx+=dx;move?.(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
-      wheelTimer=setTimeout(()=>{wheelTimer=null;const dx=wheelGesture?.dx||0;wheelGesture=null;finished();if(enabled()&&Math.abs(dx)>=distance())navigate(dx,{dragX:dx,queued:true,native:true});else cancel?.();},120);
+      wheelGesture||={dx:0};wheelGesture.dx+=dx;preview(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
+      wheelTimer=setTimeout(()=>{wheelTimer=null;const dx=wheelGesture?.dx||0;wheelGesture=null;finished();if(enabled()&&Math.abs(dx)>=distance()){flushPreview();navigate(dx,{dragX:dx,queued:true,native:true});}else {clearPreview();cancel?.();}},120);
     },{capture:true,passive:false});
     // A swipe starting over a face must not also open or remove its tag.
     stage.addEventListener('click',event=>{

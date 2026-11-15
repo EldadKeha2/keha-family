@@ -7,6 +7,8 @@ on:
       - 'src/**'
       - 'public/assets/**'
       - 'public/index.html'
+      - 'public/_headers'
+      - 'scripts/**'
       - 'test/**'
       - 'package*.json'
       - 'wrangler.jsonc'

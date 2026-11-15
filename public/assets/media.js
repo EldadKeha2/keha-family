@@ -217,7 +217,7 @@
     window.FamilyPhotoPresentation?.cancel({preserveHandoff});
     renderedVersion=null;
     window.FamilyFaces?.clear({preserveControls:Boolean(nextItem?.id&&nextItem.kind==='photo'&&!state.fullscreen),item:nextItem});
-    $('mediaStage').querySelectorAll('video').forEach(video=>{video.pause();video.removeAttribute('src');video.load();});
+    $('mediaStage').querySelectorAll('video').forEach(video=>{window.FamilyVideoDelivery?.release(video);video.pause();video.removeAttribute('src');video.load();});
     $('mediaStage').replaceChildren();swipeHintNode=null;
   }
   function show(index,{direction=0,image=null,native=false,instant=false,effect=null}={}){
@@ -238,8 +238,9 @@
       $('mediaPlaybackNote').textContent=I18n.t('אם הסרטון אינו זמין לניגון כאן, אפשר לפתוח אותו ביוטיוב.');
       $('mediaPlaybackNote').hidden=false;
     }else if(item.kind==='video'){
-      const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.src=item.src;video.setAttribute('aria-label',I18n.mediaName(item));
-      video.addEventListener('error',()=>{$('mediaPlaybackNote').textContent=I18n.t('הסרטון לא מתנגן בדפדפן הזה. אפשר להוריד את המקור או להעלות MP4 עם H.264.');$('mediaPlaybackNote').hidden=false;});stage.append(video);
+      const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.setAttribute('aria-label',I18n.mediaName(item));stage.append(video);if(window.FamilyVideoDelivery)window.FamilyVideoDelivery.bind(video,item);else video.src=item.src;
+      video.addEventListener('error',()=>{$('mediaPlaybackNote').textContent=I18n.t('הסרטון לא מתנגן בדפדפן הזה. אפשר להוריד את המקור או להעלות MP4 עם H.264.');$('mediaPlaybackNote').hidden=false;});
+      video.addEventListener('loadeddata',()=>{$('mediaPlaybackNote').hidden=true;});
       $('mediaPlaybackNote').hidden=true;
     }else if(item.kind==='photo'||item.mime?.startsWith('image/')){
       const img=image||document.createElement('img');img.decoding='async';img.fetchPriority='high';img.draggable=false;if(!image)img.src=(item.kind==='photo'?item.previewSrc||item.src:item.src)+(item.kind==='document'?'?inline=1':'');img.alt=item.caption||I18n.mediaName(item);stage.append(img);$('mediaPlaybackNote').hidden=true;

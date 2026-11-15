@@ -96,16 +96,15 @@
   }
   const tagGroup=person=>person.isNew?'friends':personPriority(person)<=5?'family':personPriority(person)===6?'extended':'friends';
   const tagGroupLabel=group=>({all:I18n.isEnglish?'All':'הכול',family:I18n.isEnglish?'Family members':'בני משפחה',extended:I18n.isEnglish?'Extended family':'בני משפחה נוספים',friends:I18n.isEnglish?'Friends and acquaintances':'חברים ומכרים'})[group];
-  const stores=new Map(),roster=new Map();let rosterPromise=null,rosterTime=0,rosterFetched=false,rosterVersion=0,modalWidget=null,modalStore=null,closeRequested=false,newCounter=0;
+  const stores=new Map(),roster=new Map();let rosterVersion=0,modalWidget=null,modalStore=null,closeRequested=false,newCounter=0;
   async function request(path,options={}){
     const response=await I18n.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
     let result;try{result=await response.json();}catch{throw Error(I18n.t('לא התקבלה תשובה מהשרת. נסו שוב.'));}
     if(!response.ok)throw Error(I18n.error(result.error)||I18n.t('התיוג לא נשמר.'));return result;
   }
   function addPerson(person){if(!person?.id)return;const old=roster.get(person.id);roster.set(person.id,{...old,...person});rosterVersion++;}
-  async function loadRoster(force=false){
-    if(rosterPromise)return rosterPromise;if(!force&&roster.size&&Date.now()-rosterTime<300000)return;
-    rosterPromise=request('api/tag-people').then(result=>{result.people.forEach(addPerson);rosterTime=Date.now();rosterFetched=true;}).finally(()=>{rosterPromise=null;});return rosterPromise;
+  async function loadRoster(requireComplete=false){
+    const people=await window.FamilyPeopleRoster.load({requireComplete});people.forEach(addPerson);
   }
   class TagStore {
     constructor(id,item){this.id=id;this.item=item||{id,tags:[]};this.saved=new Map((item?.tags||[]).map(person=>[person.id,person]));this.queue=[];this.active=[];this.aliases=new Map();this.listeners=new Set();this.error='';this.status='';this.ready=Boolean(item?.tags&&item.tagsRevision);this.timer=null;this.loading=null;this.refreshPending=false;}
@@ -352,9 +351,9 @@
     $('tagPeopleDialog').addEventListener('close',()=>{if(modalWidget?.titleListener)modalStore.listeners.delete(modalWidget.titleListener);modalWidget?.destroy();modalWidget=null;modalStore=null;});
     window.addEventListener('beforeunload',event=>{if([...stores.values()].some(store=>store.busy)){event.preventDefault();event.returnValue='';}});
   }
-  for(const person of Object.values(window.FAMILY_DATA.people))addPerson(person);rosterTime=Date.now();
+  window.FamilyPeopleRoster.subscribe(people=>{people.forEach(addPerson);for(const store of stores.values())store.emit();});
   async function findPeople(query='',preferred=[]){
-    await loadRoster(!rosterFetched);const normalized=normalize(query),first=new Set(preferred);
+    await loadRoster(true);const normalized=normalize(query),first=new Set(preferred);
     return [...roster.values()].filter(person=>Number.isFinite(matchRank(person,normalized))).sort((a,b)=>comparePeople(a,b,normalized,first)).slice(0,50).map(person=>({...person,context:personContext(person)}));
   }
   async function flush(id){

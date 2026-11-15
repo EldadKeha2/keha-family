@@ -111,4 +111,4 @@ function init(){
   });
   document.addEventListener('visibilitychange',()=>document.visibilityState==='hidden'?stop():resume());
 }
-window.FamilyDifferences={open,close,activate};document.addEventListener('DOMContentLoaded',init);
+window.FamilyDifferences={open,close,activate};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();

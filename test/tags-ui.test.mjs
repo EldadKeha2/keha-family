@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import family from '../src/family.mjs';
+const rosterSource=await readFile(new URL('../public/assets/people-roster.js',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/tags.js',import.meta.url),'utf8');
 class NodeStub extends EventTarget{
  constructor(){super();this.dataset={};this.children=new Map();this.isConnected=true;this.scrollTop=0;this.className='';this.value='';this.hidden=false;}
@@ -20,7 +21,7 @@ function fixture(respond){
  const window={FAMILY_DATA:family,FamilyApp:{apiEnabled:true,toast(){}},addEventListener(type,fn){if(!windowHandlers.has(type))windowHandlers.set(type,[]);windowHandlers.get(type).push(fn);},dispatchEvent(event){events.push(event);for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
  window.FamilyI18n={t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),isEnglish:false,locale:'he-IL',personName:p=>p.name,searchNames:p=>p.name,branchName:p=>p?.title||'',error:v=>v,fetch:async(path,options)=>{requests.push({path,body:options?.body?JSON.parse(options.body):null});const id=path.split('/')[2];return respond?respond(id):Response.json({item:{id,kind:'photo',tags:[],tagsRevision:'new'},taggedPeople:[]});}};
  const document={addEventListener(type,fn){if(type==='DOMContentLoaded')init=fn;},getElementById(id){if(!nodes.has(id))nodes.set(id,new NodeStub());return nodes.get(id);}};
- const context=vm.createContext({window,document,Response,AbortController,CustomEvent,clearTimeout,setTimeout});vm.runInContext(source,context);
+ const context=vm.createContext({window,document,Response,AbortController,CustomEvent,clearTimeout,setTimeout});vm.runInContext(rosterSource,context);vm.runInContext(source,context);
  init();return {tags:window.FamilyTags,requests,events,emit:detail=>window.dispatchEvent(new CustomEvent('family-media-changed',{detail}))};
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});

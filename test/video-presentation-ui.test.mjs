@@ -41,3 +41,7 @@ test('event video tiles open their own gallery and fullscreen, show descriptions
  assert.match(markup,/data-video-fullscreen="event-film"/);assert.match(markup,/data-video-edit="event-film"/);
  assert.match(markup,/Dancing together/);assert.match(markup,/4:48/);assert.doesNotMatch(markup,/camera-original|data-archive-upload/);
 });
+test('prepared local posters render as lightweight images without starting a video download',()=>{
+ const f=fixture(),markup=f.api.tile({id:'local',kind:'video',src:'/media/local?v=original',poster:'/media/local?videoAsset=poster&v=original',mime:'video/mp4'},'nostalgia');
+ assert.match(markup,/<img src="\/media\/local\?videoAsset=poster&amp;v=original"/);assert.match(markup,/data-video-poster-src=/);assert.doesNotMatch(markup,/<video|<source/);
+});

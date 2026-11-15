@@ -42,7 +42,7 @@
   function categoryCards(){
     const grid=$('nostalgiaCategories');if(!grid||!state.library)return;
     const categories=state.library.categories.filter(c=>!state.query||normalize(categoryName(c)).includes(state.query)||matchingEvents(c.id).length);
-    const signature=JSON.stringify([state.query,categories,state.library.events,viewCategoryItems(state.collection,DIRECT_CATEGORY).map(item=>[item.id,item.src,item.name,item.caption,item.takenDate])]);if(grid.dataset.signature===signature)return;grid.dataset.signature=signature;
+    const signature=JSON.stringify([state.query,categories,state.library.events,viewCategoryItems(state.collection,DIRECT_CATEGORY).map(item=>[item.id,item.src,item.poster,item.name,item.caption,item.takenDate])]);if(grid.dataset.signature===signature)return;grid.dataset.signature=signature;
     grid.innerHTML=categories.map((category,index)=>{
       const events=matchingEvents(category.id),count=events.reduce((n,e)=>n+(e.videoCount||0),0),active=state.activeFolders[category.id];
       if(category.id===DIRECT_CATEGORY){
@@ -63,6 +63,7 @@
     buttons.forEach((button,index)=>{const active=index===selected,pose=stackPose(index,selected,buttons.length);button.classList.toggle('is-active',active);button.setAttribute('aria-current',active?'true':'false');button.setAttribute('aria-hidden',active?'false':'true');button.tabIndex=active?0:-1;
       for(const [key,value]of Object.entries({'--stack-x':pose.x+'px','--stack-y':pose.y+'px','--stack-angle':pose.angle+'deg','--stack-scale':pose.scale,'--stack-index':pose.z,'--stack-opacity':pose.visible?1:0}))button.style.setProperty(key,String(value));
     });
+    window.FamilyVideoPreviews?.watch($('nostalgiaCategories'));
   }
   function moveShelf(categoryId,direction){
     const ids=categoryId===DIRECT_CATEGORY?viewCategoryItems(state.collection,DIRECT_CATEGORY).map(item=>item.id):[...matchingEvents(categoryId).map(e=>e.id),'+'],index=ids.indexOf(state.activeFolders[categoryId]);if(!ids.length)return null;
@@ -102,8 +103,8 @@
     box.innerHTML=`<button type="button" draggable="true" class="nostalgia-assign-button" data-nostalgia-assign="${safe(item.id)}" data-nostalgia-drag="${safe(item.id)}" aria-haspopup="dialog"><span aria-hidden="true">▱</span><span>${names.length?safe(names.join(' · ')):tr('שיוך לאירוע','Assign to an event')}</span><b aria-hidden="true">＋</b></button>`;
   }
   function eventCover(event,category){
-    if(event.cover&&event.coverKind==='photo')return `<img src="${safe(event.cover)}" alt="" loading="lazy" decoding="async">`;
-    if(event.cover&&event.coverKind==='video')return `<video src="${safe(event.cover)}" preload="metadata" muted playsinline aria-hidden="true" tabindex="-1"></video>`;
+    if(event.cover&&event.coverKind==='photo')return `<img src="${safe(event.cover)}" ${event.cover.includes('?videoAsset=poster&')?`data-video-poster-src="${safe(event.cover.replace('?videoAsset=poster&','?')+'#t=0.1')}"`:''} alt="" loading="lazy" decoding="async">`;
+    if(event.cover&&event.coverKind==='video')return `<video data-preview-src="${safe(event.cover)}" preload="none" muted playsinline aria-hidden="true" tabindex="-1"></video>`;
     return `<span class="nostalgia-event-cover-icon">${icon(category.icon)}</span><span class="nostalgia-event-year">${safe(event.date?.year||'')}</span>`;
   }
   function renderCategory(){
@@ -115,13 +116,14 @@
     rail.dataset.categoryId=category.id;
     rail.innerHTML=events.map((event,index)=>`<div class="nostalgia-event-slot" style="--event-index:${Math.min(index,6)}"><button type="button" class="nostalgia-event-card theme-${safe(category.color)}" data-nostalgia-event="${safe(event.id)}"><span class="nostalgia-event-cover">${eventCover(event,category)}<span class="nostalgia-film-edge" aria-hidden="true"></span></span><span class="nostalgia-event-card-body"><span class="nostalgia-event-date">${dateText(event.date)?safe(dateText(event.date)):tr('מן האלבום המשפחתי','From the family album')}</span><strong>${safe(eventName(event))}</strong><span>${videosText(event.videoCount)}</span><small>${event.location?safe(event.location):tr('פותחים את האלבום','Open the album')} <b aria-hidden="true">↗</b></small></span></button></div>`).join('')+`<div class="nostalgia-event-slot"><button type="button" class="nostalgia-event-card nostalgia-add-event" data-nostalgia-new-event="${safe(category.id)}"><span class="nostalgia-plus-orbit" aria-hidden="true">＋</span><strong>${tr('עוד אירוע לספרייה','Another event for the library')}</strong><small>${tr('נותנים שם, ומוסיפים זיכרונות','Give it a name, then add memories')}</small></button></div>`;
     const behavior=rail.style.scrollBehavior;rail.style.scrollBehavior='auto';rail.scrollLeft=scroll;rail.style.scrollBehavior=behavior;
+    window.FamilyVideoPreviews?.watch(rail);
   }
   function openCategory(id){
     if($('nostalgiaView')?.hidden||!state.library?.categories.some(c=>c.id===id))return;
     if(getDirectCategory(id))return navigate(null);
     const dialog=$('nostalgiaCategoryDialog');if(document.querySelector('dialog[open]')&&!dialog.open)return;
     clearTimeout(state.hoverTimer);clearTimeout(state.closeTimer);state.closeTimer=null;state.categoryId=id;state.closing=false;dialog.classList.remove('is-closing');renderCategory();
-    if(!dialog.open){dialog.classList.remove('is-ready','is-closing');dialog.showModal();const paint=window.requestAnimationFrame||((fn)=>setTimeout(fn,0));paint(()=>paint(()=>dialog.classList.add('is-ready')));}
+    if(!dialog.open){dialog.classList.remove('is-ready','is-closing');dialog.showModal();const paint=window.requestAnimationFrame||((fn)=>setTimeout(fn,0));paint(()=>paint(()=>{dialog.classList.add('is-ready');window.FamilyVideoPreviews?.watch($('nostalgiaEventRail'));}));}
   }
   function closeCategory(immediate=false){
     const dialog=$('nostalgiaCategoryDialog');clearTimeout(state.hoverTimer);if(!dialog?.open)return;

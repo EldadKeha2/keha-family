@@ -6,7 +6,7 @@ const wand='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 12-12 3 3
 const icons={undo:'M8 4 3 9l5 5M3 9h10a7 7 0 0 1 0 14',redo:'m16 4 5 5-5 5m5-5H11a7 7 0 0 0 0 14',reset:'M4 10a8 8 0 1 1 1 8M4 4v6h6',close:'m6 6 12 12M18 6 6 18',compare:'M12 3v18M4 5h16v14H4Z',save:'M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4'};
 const svg=id=>'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+icons[id]+'"/></svg>';
 const groups=[['look','סגנונות','Looks',LOOKS],['art','אמנות','Art',ART],['light','אור','Light',LIGHT],['frame','מסגרות','Frames',FRAMES],['tune','כיוונון','Adjust',TUNING],['fun','כיף','Fun',[]]];
-let dialog=null,session=null,paintFrame=0,thumbSerial=0,funEditor=null;
+let dialog=null,session=null,paintFrame=0,thumbSerial=0,funEditor=null,syncFrame=null;
 function mount(){
   if(dialog)return;
   dialog=document.createElement('dialog');dialog.id='photoEffectsEditor';dialog.className='photo-effects-editor';dialog.dataset.i18nSkip='';dialog.setAttribute('aria-labelledby','photoEffectsTitle');dialog.dir=I.isEnglish?'ltr':'rtl';
@@ -142,14 +142,22 @@ function close(){
   dialog.close();$('Canvas').width=$('Canvas').height=1;$('Choices').replaceChildren();if(owner.focus?.isConnected)owner.focus.focus({preventScroll:true});sync();
 }
 function sync(){
+  if(syncFrame!==null){cancelAnimationFrame(syncFrame);syncFrame=null;}
   const viewer=document.getElementById('mediaViewer'),stage=document.getElementById('mediaStage'),item=window.FamilyMedia?.current();if(!viewer||!stage)return;
   let button=stage.querySelector('[data-photo-magic]');
   if(!viewer.open||item?.kind!=='photo'||!item.id){button?.remove();return;}
   if(!button){button=document.createElement('button');button.type='button';button.className='photo-magic-wand';button.dataset.photoMagic='';button.dataset.i18nSkip='';button.innerHTML=wand;button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();open(window.FamilyMedia.current());});stage.append(button);}
-  const label=tr('אשף עיצוב תמונה · אפקטים ומסגרות','Photo design studio · effects and frames');button.title=label;button.setAttribute('aria-label',label);button.disabled=Boolean(window.FamilyMedia.photoState().busy);
+  const label=tr('אשף עיצוב תמונה · אפקטים ומסגרות','Photo design studio · effects and frames');if(button.title!==label)button.title=label;if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);const disabled=Boolean(window.FamilyMedia.photoState().busy);if(button.disabled!==disabled)button.disabled=disabled;
   const image=stage._familyFaceContext?.image||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
-  if(image){const bounds=stage.getBoundingClientRect(),photo=image.getBoundingClientRect();if(photo.width&&photo.height){button.style.left=Math.min(Math.max(8,photo.left-bounds.left+8),Math.max(8,bounds.width-50))+'px';button.style.top=Math.min(Math.max(8,photo.top-bounds.top+8),Math.max(8,bounds.height-50))+'px';}}
+  if(image){const bounds=stage.getBoundingClientRect(),photo=image.getBoundingClientRect();if(photo.width&&photo.height){const left=Math.min(Math.max(8,photo.left-bounds.left+8),Math.max(8,bounds.width-50))+'px',top=Math.min(Math.max(8,photo.top-bounds.top+8),Math.max(8,bounds.height-50))+'px';if(button.style.left!==left)button.style.left=left;if(button.style.top!==top)button.style.top=top;}}
+}
+function queueSync(){
+  if(syncFrame!==null)return;
+  if(typeof requestAnimationFrame!=='function'||typeof cancelAnimationFrame!=='function'){sync();return;}
+  // Face labels and gallery metadata can mutate repeatedly during one frame.
+  // Measure the latest visible photo once, after those changes have settled.
+  syncFrame=requestAnimationFrame(()=>{syncFrame=null;sync();});
 }
 window.FamilyPhotoEffects={open,sync,isOpen:()=>Boolean(session)};
-function init(){const viewer=document.getElementById('mediaViewer');if(!viewer)return;new MutationObserver(sync).observe(viewer,{childList:true,subtree:true,attributes:true,attributeFilter:['open']});viewer.addEventListener('load',sync,true);window.addEventListener('resize',sync);sync();}
+function init(){const viewer=document.getElementById('mediaViewer');if(!viewer)return;new MutationObserver(queueSync).observe(viewer,{childList:true,subtree:true,attributes:true,attributeFilter:['open']});viewer.addEventListener('load',queueSync,true);window.addEventListener('resize',queueSync);sync();}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

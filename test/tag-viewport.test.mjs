@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import family from '../src/family.mjs';
+const rosterSource=await readFile(new URL('../public/assets/people-roster.js',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/tags.js',import.meta.url),'utf8');
 
 function fixture({mobile=true}={}){
@@ -27,6 +28,7 @@ function fixture({mobile=true}={}){
   const document={activeElement:input,addEventListener(){},getElementById(){return {open:false};}};
   const window={FAMILY_DATA:family,visualViewport:viewport,innerHeight:720,matchMedia:()=>({matches:mobile}),FamilyApp:{apiEnabled:true,toast(){}},addEventListener(){},dispatchEvent(){}};
   window.FamilyI18n={t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),isEnglish:false,locale:'he-IL',personName:p=>p.name,searchNames:p=>p.name,branchName:p=>p?.title||'',error:String,fetch:async(path)=>{requests.push(path);throw Error('No network needed');}};
+  vm.runInNewContext(rosterSource,{window});
   vm.runInNewContext(source,{window,document,AbortController,CustomEvent,clearTimeout,setTimeout,requestAnimationFrame:callback=>{const id=++frameId;frames.set(id,callback);return id;},cancelAnimationFrame:id=>frames.delete(id)});
   window.FamilyTags.mountInline(host,{id:'viewport-video',kind:'video',name:'Memory',tags:[],tagsRevision:'known'});
   const flush=()=>{for(const [id,callback]of [...frames]){frames.delete(id);callback();}};

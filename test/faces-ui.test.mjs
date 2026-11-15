@@ -9,8 +9,8 @@ import {createUploadFaceAdapter,faceDraftPeople} from '../public/assets/photo-up
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
  .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
-function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false,visualViewport=null}={}){
- const view={width:desktop?1200:360,height:800,frameHeight:null},created=[];
+function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false,visualViewport=null,framed=false}={}){
+ const view={width:desktop?1200:360,height:800,frameHeight:null},created=[],frames=new Map(),resizeCallbacks=[];let frameSerial=0,imageReads=0;
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={setProperty(key,value){this[key]=value;},getPropertyValue(key){return this[key]||'';}};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
   get parentNode(){return this.parent;}
@@ -34,6 +34,7 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
   get clientWidth(){return this.className==='face-photo-scroll'?view.width:this.getBoundingClientRect().width;}
   get clientHeight(){return this.className==='face-photo-scroll'?(view.frameHeight??Math.min(view.height*.43,parseFloat(this.children[0]?.style.height)||0)):this.getBoundingClientRect().height;}
   getBoundingClientRect(){
+   if(this===image)imageReads++;
    if(this===stage||this.className==='face-photo-scroll')return {x:0,y:100,left:0,top:100,width:view.width,height:this===stage?270:this.clientHeight};
    if(this.className==='face-photo-surface'){const width=parseFloat(this.style.width),height=parseFloat(this.style.height),left=Math.max(0,(view.width-width)/2)-this.parent.scrollLeft,top=100-this.parent.scrollTop;return {x:left,y:top,left,top,width,height};}
    if(this===image)return this.parent?.className==='face-photo-surface'?this.parent.getBoundingClientRect():{x:0,y:100,left:0,top:100,width:360,height:270};
@@ -48,11 +49,11 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
  const window=new Node();window.visualViewport=visualViewport;window.navigator=windows?{userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',userAgentData:{mobile:false,platform:'Windows'},maxTouchPoints:10}:{};window.FamilyApp={apiEnabled:true};window.FamilyTags={findPeople:async()=>[],flush:async()=>{}};window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:v=>v,fetch:async()=>Response.json({faces:[]})};
  let progress,detectionImage,detectionCalls=0;
  const detectorModule={detectFaces:async(key,img,signal,onProgress)=>{detectionCalls++;progress=onProgress;detectionImage=img;return detected;}};
- const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,matchMedia:query=>({matches:query.includes('display-mode')?installed:query.includes('hover:none')?hoverNone||!desktop:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
+ const reboot=()=>vm.runInNewContext(source,{window,document,geometryModule,detectorModule,crypto,AbortController,CustomEvent,Response,clearTimeout,setTimeout,...(framed?{requestAnimationFrame:fn=>{const id=++frameSerial;frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),ResizeObserver:class{constructor(fn){resizeCallbacks.push(fn);}observe(){}disconnect(){}}}:{}),matchMedia:query=>({matches:query.includes('display-mode')?installed:query.includes('hover:none')?hoverNone||!desktop:!desktop}),innerWidth:view.width,innerHeight:view.height,getComputedStyle:()=>({maxHeight:String(view.height*.43)})});reboot();
  document.dispatchEvent(new Event('DOMContentLoaded'));
  const find=className=>created.findLast(node=>node.className===className&&node.parent);
  const emit=(node,type,properties={})=>{const event=new Event(type,{cancelable:true});for(const [key,value]of Object.entries(properties))Object.defineProperty(event,key,{value});node.dispatchEvent(event);return event;};
- return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,footer,reboot,find,emit,get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
+ return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,footer,reboot,find,emit,frames,resizeCallbacks,get imageReads(){return imageReads;},paintFrames(){const batch=[...frames.values()];frames.clear();for(const fn of batch)fn();},get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
 test('fullscreen reads reuse saved face labels without mounting an editor or detector and reject stale pixels',async()=>{
@@ -974,4 +975,14 @@ test('small and large face frames keep their exact bounds and a thin screen-size
   }
   assert.equal(JSON.stringify([small,large]),original);f.faces.clear();
  }
+});
+
+test('face scroll and resize bursts share one geometry pass and cleared photos cancel pending work',async()=>{
+ const f=fixture([first,second],{framed:true});await f.mount('scroll-performance');
+ const scroller=f.find('face-photo-scroll'),before=f.imageReads;
+ for(let i=0;i<100;i++){scroller.scrollTop=i;f.emit(scroller,'scroll');f.emit(f.dialog,'scroll');for(const notify of f.resizeCallbacks)notify();}
+ assert.equal(f.frames.size,1);assert.equal(f.imageReads,before,'Scroll callbacks only enqueue work');
+ f.paintFrames();assert.equal(f.imageReads-before,1,'Every face reuses one image measurement in the frame');
+ f.emit(scroller,'scroll');assert.equal(f.frames.size,1);f.faces.clear();assert.equal(f.frames.size,0,'Leaving a photo cancels its scheduled positioning');
+ const after=f.imageReads;f.paintFrames();for(const notify of f.resizeCallbacks)notify();assert.equal(f.frames.size,0);assert.equal(f.imageReads,after,'A late observer from an old photo cannot measure or update its removed nodes');
 });

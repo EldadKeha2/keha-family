@@ -9,6 +9,9 @@ import {calendarResponse} from './calendar.mjs';
 import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {galleryRevision} from './gallery.mjs';
+import {collectionPageRevision} from './collection-pages.mjs';
+import {saveVideoAssetRoute,resolveVideoAsset} from './video-assets.mjs';
+import {multipartVideoAsset} from './video-assets-multipart.mjs';
 import {familyAiRoute,familyAiTick} from './family-ai-route.mjs';
 import {CUTOUT_MODEL_PATH,cutoutModelResponse} from './photo-cutout-model.mjs';
 import {zipStream} from './zip.mjs';
@@ -291,7 +294,10 @@ export default {
         if(request.headers.has('If-None-Match')){const {revision}=await db('people.revision');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
         return snapshot(request,await db('people'));
       }
-      if(path==='/api/tag-people'&&request.method==='GET')return json(await db('tag.people'));
+      if(path==='/api/tag-people'&&request.method==='GET'){
+        if(request.headers.has('If-None-Match')){const {revision}=await db('tag.people.revision');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
+        return snapshot(request,await db('tag.people'));
+      }
       if(path==='/api/photo-labels'&&request.method==='GET')return json(await db('photo.labels.catalog'));
       if(path==='/api/nursery'&&request.method==='GET')return json(await db('nursery'));
       if(path==='/api/memorial'&&request.method==='GET')return json(await db('memorial',{visitorId:/^[a-f0-9]{32}$/.test(request.headers.get('X-Candle-Visitor')||'')?request.headers.get('X-Candle-Visitor'):null}));
@@ -308,6 +314,7 @@ export default {
       if(path==='/api/export'&&request.method==='GET')return json(await db('export'),200,{'Content-Disposition':'attachment; filename="family-backup.json"'});
       let match;
       if(path==='/api/photo-assets'&&request.method==='GET')return json(await db('photo.assets.queue',{after:url.searchParams.get('after'),limit:url.searchParams.get('limit')}));
+      if(path==='/api/video-assets'&&request.method==='GET')return json(await db('video.assets.queue',{after:url.searchParams.get('after'),limit:url.searchParams.get('limit')}));
       if(path==='/api/gallery/face-scan'&&request.method==='GET')return json(await db('gallery.face.scan',{after:url.searchParams.get('after')}));
       if(path==='/api/gallery/selection'&&request.method==='GET')return json(await db('gallery.selection',{person:url.searchParams.get('person'),unit:url.searchParams.get('unit'),labels:url.searchParams.get('labels'),query:url.searchParams.get('q')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/versions$/.exec(path))&&request.method==='GET')return json(await db('photo.versions',{id:match[1]}));
@@ -322,27 +329,30 @@ export default {
       }
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){
-        const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all',person=url.searchParams.get('person'),unit=url.searchParams.get('unit'),labels=url.searchParams.get('labels'),sort=url.searchParams.get('sort'),seed=url.searchParams.get('seed');
+        const kind=match[1],page=url.searchParams.get('page'),size=url.searchParams.get('size'),paged=url.searchParams.get('paged')==='1',query=url.searchParams.get('q'),filter=url.searchParams.get('filter')||'all',person=url.searchParams.get('person'),unit=url.searchParams.get('unit'),labels=url.searchParams.get('labels'),sort=url.searchParams.get('sort'),seed=url.searchParams.get('seed');
         if(kind==='gallery'&&!['all','untagged','partial','complete'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
         if(request.headers.has('If-None-Match')){
           const current=await db('collection.revision',{kind});
-          const revision=kind==='gallery'?galleryRevision(current.revision,{page,size,query,filter,person,unit,labels,sort,seed}):current.revision;
+          const revision=kind==='gallery'?galleryRevision(current.revision,{page,size,query,filter,person,unit,labels,sort,seed}):collectionPageRevision(current.revision,{paged,page,size});
           if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});
         }
-        return snapshot(request,await db('collection',{kind,page,size,query,filter,person,unit,labels,sort,seed}));
+        return snapshot(request,await db('collection',{kind,page,size,paged,query,filter,person,unit,labels,sort,seed}));
       }
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
-      if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1])}));
-      if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia'}));
+      if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1]),paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
+      if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia',paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
         let item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]}),derived=false;
         const variant=url.searchParams.get('thumbnail')==='1'?'thumbnail':url.searchParams.get('preview')==='1'?'preview':null;
         if(variant&&!url.searchParams.has('version')&&item[variant]?.revision===(item.photoRevision||'original')){item={...item,...item[variant]};derived=true;}
+        const videoAsset=resolveVideoAsset(item,url.searchParams);if(videoAsset){item=videoAsset;derived=videoAsset.videoAsset==='poster';}
         if(item.provider==='youtube')return new Response(null,{status:302,headers:{Location:'https://www.youtube.com/watch?v='+item.youtubeId+(item.youtubeStart?'&t='+Math.floor(item.youtubeStart)+'s':''),'Cache-Control':'no-store'}});
         return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/video-assets\/(poster|faststart|low|medium)\/multipart\/(start|part|complete|abort)$/.exec(path)))return await multipartVideoAsset(request,env,db,ctx,{id:match[1],variant:match[2],action:match[3]});
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/video-assets\/(poster|faststart|low|medium)$/.exec(path)))return await saveVideoAssetRoute(request,env,db,ctx,match[1],match[2]);
         if(path==='/api/collections/videos/categories'){const body=await readJSON(request,2000);return json(await db('video.category.create',{name:body.name,nameEn:body.nameEn}),201);}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-category$/.exec(path))){const body=await readJSON(request,2000);return json(await db('video.category.assign',{id:match[1],group:body.group,expectedGroup:body.expectedGroup}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-upload$/.exec(path)))return await videoUploadFinalize(request,env,db,ctx,match[1]);

@@ -100,13 +100,14 @@ function init(){
   const barHTML='<button type="button" data-gallery-select-all>'+tr('בחר הכל','Select all')+'</button><button type="button" data-gallery-clear-selection>'+tr('ביטול הבחירה','Clear selection')+'</button><span class="gallery-selection-count" data-gallery-selected-count></span><button type="button" class="gallery-download-selected" data-gallery-download>'+downloadIcon+'<span>'+tr('הורדת הנבחרות','Download selected')+'</span></button>';
   for(const id of ['gallerySelectionTop','gallerySelectionBottom'])$(id).innerHTML=barHTML;
   $('gallerySelectionTop').querySelector('[data-gallery-selected-count]').setAttribute('aria-live','polite');
-  roster=Object.values(window.FAMILY_DATA.people).filter(p=>!p.placeholder);ready=true;fillFamilies();fillPeople();fillLabels();$('galleryLabelSummary').textContent=tr('תגיות','Labels');render();
+  roster=window.FamilyPeopleRoster.snapshot().filter(p=>!p.placeholder);ready=true;fillFamilies();fillPeople();fillLabels();$('galleryLabelSummary').textContent=tr('תגיות','Labels');render();
   $('galleryFilterToggle').addEventListener('click',async()=>{
     if(state.open){reset();window.FamilyPortal.refineGallery({person:'',unit:'',labels:''});return;}
-    state.open=true;render();
+    state.open=true;fillPeople();render();
     loadPhotoLabelCatalog().then(fillLabels);
-    try{const response=await I.fetch('api/tag-people',{cache:'no-store'});if(response.ok){const result=await response.json();roster=result.people;fillPeople();}}catch{}
+    try{await window.FamilyPeopleRoster.load();}catch{}
   });
+  window.FamilyPeopleRoster.subscribe(people=>{roster=people.filter(person=>!person.placeholder);if(ready&&state.open)fillPeople();});
   $('galleryPersonSearch').addEventListener('input',fillPeople);
   window.addEventListener('family-photo-label-catalog',()=>{if(ready)fillLabels();});
   $('galleryFilterPanel').addEventListener('change',event=>{

@@ -149,6 +149,7 @@
     c.hoverPopup=bubble;c.dialog.append(bubble);place(c);
   }
   function dispose(c,{preserveControls=false}={}){
+    if(c.placeFrame!=null){cancelAnimationFrame(c.placeFrame);c.placeFrame=null;}
     clearHoverLabel(c);
     clearTimeout(c.detectionTimer);
     c.resolvePaint?.();
@@ -183,21 +184,27 @@
     if(width/height>ratio)width=height*ratio;else height=width/ratio;
     return {x:r.left+(r.width-width)/2,y:r.top+(r.height-height)/2,width,height};
   }
-  function screenFace(c,face){const image=imageArea(c),r=face.rect;return {x:image.x+r.x*image.width,y:image.y+r.y*image.height,width:r.width*image.width,height:r.height*image.height};}
-  function styleFrame(c,face,node){
-    const rect=screenFace(c,face),scale=viewport().scale,size=Math.min(rect.width,rect.height)*scale;
+  function screenFace(c,face,image=imageArea(c)){const r=face.rect;return {x:image.x+r.x*image.width,y:image.y+r.y*image.height,width:r.width*image.width,height:r.height*image.height};}
+  function styleFrame(c,face,node,image,scale=viewport().scale){
+    const rect=screenFace(c,face,image),size=Math.min(rect.width,rect.height)*scale;
     node.style.setProperty('--face-stroke',(Math.max(.65,Math.min(1.1,size*.014))/scale)+'px');
     node.style.setProperty('--face-radius',(Math.max(2,Math.min(4,size*.08))/scale)+'px');
     node.style.setProperty('--face-handle-size',(Math.max(4,Math.min(7,size*.16))/scale)+'px');
   }
   function place(c){
-    if(!live(c)||!imageWidth(c.image))return;const image=imageArea(c),stage=(c.surface||c.stage).getBoundingClientRect();
+    if(c.placeFrame!=null){cancelAnimationFrame(c.placeFrame);c.placeFrame=null;}
+    if(!live(c)||!imageWidth(c.image))return;const image=imageArea(c),stage=(c.surface||c.stage).getBoundingClientRect(),scale=viewport().scale;
     Object.assign(c.hits.style,{left:(image.x-stage.left)+'px',top:(image.y-stage.top)+'px',width:image.width+'px',height:image.height+'px'});
     placeAnnotations(c,image);
-    for(const [index,face]of c.faces.entries()){const button=c.buttons.children[index];if(button?.dataset.faceId===face.id){styleFrame(c,face,button);button.classList.toggle('face-editor-active',Boolean(c.active?.id===face.id&&!c.selection.hidden));}}
-    if(c.active&&!c.selection.hidden){Object.assign(c.selection.style,{left:c.active.rect.x*100+'%',top:c.active.rect.y*100+'%',width:c.active.rect.width*100+'%',height:c.active.rect.height*100+'%'});styleFrame(c,c.active,c.selection);}
+    for(const [index,face]of c.faces.entries()){const button=c.buttons.children[index];if(button?.dataset.faceId===face.id){styleFrame(c,face,button,image,scale);button.classList.toggle('face-editor-active',Boolean(c.active?.id===face.id&&!c.selection.hidden));}}
+    if(c.active&&!c.selection.hidden){Object.assign(c.selection.style,{left:c.active.rect.x*100+'%',top:c.active.rect.y*100+'%',width:c.active.rect.width*100+'%',height:c.active.rect.height*100+'%'});styleFrame(c,c.active,c.selection,image,scale);}
     if(c.popup&&c.active)placePopup(c,c.popup,c.active);
     if(c.hoverPopup&&c.hoverFace)placePopup(c,c.hoverPopup,c.hoverFace,[c.popup]);
+  }
+  function queuePlace(c){
+    if(!live(c)||c.placeFrame!=null)return;
+    if(typeof requestAnimationFrame!=='function'||typeof cancelAnimationFrame!=='function'){place(c);return;}
+    c.placeFrame=requestAnimationFrame(()=>{c.placeFrame=null;if(live(c))place(c);});
   }
   function placePopup(c,popup,active,avoid=[]){
       // Native pinch zoom enlarges the document, including fixed elements.
@@ -308,7 +315,7 @@
     c.toolbar.querySelector('[data-face-zoom-in]').addEventListener('click',()=>setZoom(c,levels[Math.min(levels.length-1,levels.indexOf(c.zoom)+1)]),options);
     c.toolbar.querySelector('[data-face-zoom-out]').addEventListener('click',()=>setZoom(c,levels[Math.max(0,levels.indexOf(c.zoom)-1)]),options);
     c.toolbar.querySelector('[data-face-zoom-reset]').addEventListener('click',()=>setZoom(c,1),options);
-    c.scroller.addEventListener('scroll',()=>place(c),{passive:true,signal:c.events.signal});
+    c.scroller.addEventListener('scroll',()=>queuePlace(c),{passive:true,signal:c.events.signal});
     c.scroller.addEventListener('pointerdown',event=>{c.scrollStart={x:c.scroller.scrollLeft,y:c.scroller.scrollTop};},{passive:true,signal:c.events.signal});
     fitZoom(c);
   }
@@ -594,9 +601,9 @@
       if(startFaceSequence(c,event.target)){event.preventDefault();event.stopPropagation();}
     },{capture:true});
     for(const type of ['blur','pointerdown','wheel'])on(window,type,()=>{c.shiftTap=false;if(type==='blur')clearHoverLabel(c);},{capture:true,passive:true});
-    on(c.dialog,'scroll',()=>place(c),{passive:true});
-    on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>{if(c.popup?.classList.contains('face-picker')&&c.active)revealFace(c,c.active);place(c);});on(window.visualViewport,'scroll',()=>place(c));}
-    if(typeof ResizeObserver!=='undefined'){c.resize=new ResizeObserver(()=>place(c));c.resize.observe(image);c.resize.observe(stage);}
+    on(c.dialog,'scroll',()=>queuePlace(c),{passive:true});
+    on(window,'resize',()=>{fitZoom(c);place(c);});if(window.visualViewport){on(window.visualViewport,'resize',()=>{if(c.popup?.classList.contains('face-picker')&&c.active)revealFace(c,c.active);place(c);});on(window.visualViewport,'scroll',()=>queuePlace(c));}
+    if(typeof ResizeObserver!=='undefined'){c.resize=new ResizeObserver(()=>queuePlace(c));c.resize.observe(image);c.resize.observe(stage);}
     c.loading=load(c).catch(error=>{c.loadError=true;if(error.name!=='AbortError')announce(c,tr('אפשר להוסיף תיוג פנים אחרי שהחיבור יחזור.','Face tags can be added when the connection returns.'));throw error;});c.loading.catch(()=>{});
     const imageReady=()=>new Promise(resolve=>{if(imageWidth(image)&&(image.complete||image.tagName?.toLowerCase()==='canvas'))resolve();else on(image,'load',resolve,{once:true});});
     await imageReady();if(!live(c))return;if(zoom)setupZoom(c);c.initialized=true;window.FamilyPhotoViewerLayout?.faceControls(c);place(c);window.FamilyMedia?.refreshPhotoPresentation?.();c.resolvePaint();

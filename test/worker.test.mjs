@@ -60,6 +60,30 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('video viewing copies publish behind the existing media access route while original bytes stay unchanged',async()=>{
+ const f=fixture();try{
+  await f.connect();const uploaded=await(await f.call('/api/collections/videos/upload?filename=source.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json(),item=uploaded.collection.items[0];
+  const queue=await(await f.call('/api/video-assets?limit=5')).json();assert.equal(queue.version,1);assert.ok(queue.items.some(row=>row.id===item.id));
+  const denied=await f.call('/api/media/'+item.id+'/video-assets/poster?revision=original',{method:'POST',body:photo,clientHeaders:false,headers:{'Content-Length':String(photo.length)}});assert.equal(denied.status,403);
+  const saved=await f.call('/api/media/'+item.id+'/video-assets/poster?revision=original',{method:'POST',body:photo,headers:{'Content-Length':String(photo.length)}});assert.equal(saved.status,200);const poster=(await saved.json()).item.poster;
+  assert.match(poster,/videoAsset=poster/);const pixels=await f.call(poster);assert.equal(pixels.headers.get('Content-Type'),'image/jpeg');assert.deepEqual(Buffer.from(await pixels.arrayBuffer()),photo);
+  const copy=await f.call('/api/media/'+item.id+'/video-assets/faststart?revision=original',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}});assert.equal(copy.status,200);const result=(await copy.json()).item;
+  assert.equal(result.src,item.src);assert.match(result.faststartSrc,/videoAsset=faststart/);assert.deepEqual(Buffer.from(await(await f.call(item.src)).arrayBuffer()),video);assert.deepEqual(Buffer.from(await(await f.call(result.faststartSrc)).arrayBuffer()),video);
+  assert.equal((await f.call('/media/'+item.id+'?videoAsset=poster&v=old')).status,409);
+ }finally{await f.close();}
+});
+test('internal collection pages expose full counts and page validators without changing the legacy album',async()=>{
+ const f=fixture();try{
+  await f.connect();for(let index=0;index<53;index++){const id=index.toString(16).padStart(32,'0'),item={id,category:'photos',file:id+'.jpg',key:'photos/'+id+'.jpg',kind:'photo',mime:'image/jpeg',size:1000,filename:'image-'+index+'.jpg'};f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,'photos',null,JSON.stringify(item));}
+  const full=await(await f.call('/api/collections/photos')).json(),firstResponse=await f.call('/api/collections/photos?paged=1&size=25&page=1'),first=await firstResponse.json(),secondResponse=await f.call('/api/collections/photos?paged=1&size=25&page=2'),second=await secondResponse.json(),third=await(await f.call('/api/collections/photos?paged=1&size=25&page=3')).json();
+  assert.equal(first.count,full.count);assert.equal(first.items.length,25);assert.equal(third.items.length,3);assert.deepEqual([...first.items,...second.items,...third.items],full.items);
+  assert.equal((await f.call('/api/collections/photos?paged=1&size=25&page=2',{headers:{'If-None-Match':secondResponse.headers.get('ETag')}})).status,304);
+  assert.equal((await f.call('/api/collections/photos?paged=1&size=25&page=1',{headers:{'If-None-Match':secondResponse.headers.get('ETag')}})).status,200);
+ }finally{await f.close();}
+});
+test('shared people roster supports conditional HTTP refresh without returning stale names',async()=>{
+ const f=fixture();try{await f.connect();const first=await f.call('/api/tag-people'),body=await first.json();assert.ok(body.people.length);assert.ok(first.headers.get('ETag'));assert.equal((await f.call('/api/tag-people',{headers:{'If-None-Match':first.headers.get('ETag')}})).status,304);}finally{await f.close();}
+});
 test('saving video details atomically updates the same film and its tags without reading or duplicating its bytes',async()=>{
  const f=fixture();try{
   await f.connect();const item=await taggedUpload(f,'/api/nostalgia',video,'film.mp4');await setTags(f,item,['tomer']);

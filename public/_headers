@@ -28,3 +28,7 @@
 
 /assets/*.css
   Cache-Control: no-cache
+
+/assets/site-styles-*.css
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable

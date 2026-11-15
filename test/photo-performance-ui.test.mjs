@@ -70,6 +70,25 @@ test('desktop and mobile warm different browsing windows without duplicating the
   assert.deepEqual(images.map(image=>image.fetchPriority),mobile?['high','high','low','low','low']:['high','high','low','low','low','low']);await Promise.all(images.map(image=>image.onload()));
  }
 });
+test('weak links warm only adjacent photos and hidden tabs do not start speculative downloads',async()=>{
+ for(const connection of [{effectiveType:'3g'},{effectiveType:'4g',downlink:.7}]){
+  const images=[],window={},document={hidden:false};class Image{constructor(){images.push(this);this.naturalWidth=1200;}}
+  vm.runInNewContext(presentation,{window,document,Image,navigator:{connection},setTimeout,clearTimeout});
+  const items=Array.from({length:12},(_,id)=>({kind:'photo',src:'/original/'+id,previewSrc:'/preview/'+id}));
+  window.FamilyPhotoPresentation.preload(items,5);assert.deepEqual(images.map(image=>image.src),['/preview/6','/preview/4']);await Promise.all(images.map(image=>image.onload()));
+  document.hidden=true;window.FamilyPhotoPresentation.preload(items,9);assert.equal(images.length,2);
+  // Explicit navigation remains available even when speculation is suspended.
+  const selected=window.FamilyPhotoPresentation.prepare(items[9]);await images.at(-1).onload();await selected;assert.equal(images.at(-1).src,'/preview/9');
+ }
+});
+test('a drag measures its width once instead of forcing layout for every movement',()=>{
+ let measurements=0;const window={},node=()=>({style:{},setAttribute(){},append(){},remove(){}}),image=node(),classes={add(){},remove(){}};
+ const stage={get clientWidth(){measurements++;return 360;},classList:classes,querySelector:()=>image,append(){}};
+ vm.runInNewContext(presentation,{window,document:{createElement:node},navigator:{},setTimeout,clearTimeout});const p=window.FamilyPhotoPresentation;
+ for(let x=10;x<=100;x+=10)p.drag(stage,x);assert.equal(measurements,1);assert.equal(image.style.transform,'translateX(100px)');p.cancel();
+ const pair={current:{kind:'photo',src:'/a'},next:{kind:'photo',src:'/b'}};measurements=0;
+ for(let x=10;x<=100;x+=10)p.dragQueued(stage,x,pair);assert.equal(measurements,1);p.cancel();
+});
 test('slideshow effects animate independent layers, clean up on reversal and respect reduced motion',async()=>{
  let reduced=false,refreshed=0;const animations=[],layers=[],classes=new Set(),window={FamilyMedia:{refreshPhotoPresentation(){refreshed++;}}};
  const node=()=>({style:{},setAttribute(){},remove(){this.removed=true;},animate(frames,options){let resolve;const animation={owner:this,frames,options,finished:new Promise(done=>resolve=done),cancel(){this.cancelled=true;resolve();},finish:()=>resolve()};animations.push(animation);return animation;}});

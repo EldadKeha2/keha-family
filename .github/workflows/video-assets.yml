@@ -1,0 +1,35 @@
+name: Prepare video viewing copies
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '25,55 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: family-video-assets
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VIDEO_SITE_ORIGIN: https://keha-family.eldadkeha.workers.dev
+    steps:
+      - name: Read this source revision
+        run: |
+          git init source
+          git -C source remote add origin https://github.com/EldadKeha2/keha-family.git
+          git -C source fetch --depth=1 origin "$GITHUB_SHA"
+          git -C source checkout --detach FETCH_HEAD
+      - name: Prepare video tooling
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+      - name: Verify viewing copies retain their source
+        run: python3 -m unittest discover -s source/test -p test_video_assets.py
+      - name: Prepare missing posters and playback copies
+        run: python3 source/scripts/prepare-video-assets.py --origin "$VIDEO_SITE_ORIGIN" --max-seconds 1200 --max-items 30

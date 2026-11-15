@@ -16,7 +16,9 @@ test('maintenance overlay has no manually navigable page or trigger',()=>{
   const js=read('../public/assets/maintenance.js');
   const css=read('../public/assets/maintenance.css');
   assert.match(html,/assets\/maintenance\.js/);
-  assert.match(html,/assets\/maintenance\.css/);
+  const bundle=html.match(/href="(assets\/site-styles-[a-f0-9]+\.css)"/);
+  assert.ok(bundle,'The maintenance styles load with the complete shared stylesheet');
+  assert.ok(read('../public/'+bundle[1]).includes(css),'The bundle retains every maintenance style');
   assert.doesNotMatch(html,/<a\b[^>]*href="[^"]*maintenance/i);
   assert.match(js,/response\.status/);
   assert.match(js,/family-data/);

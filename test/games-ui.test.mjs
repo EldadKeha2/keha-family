@@ -8,12 +8,12 @@ import {makeChickQuiz,withinChickTarget} from '../public/assets/chick.mjs';
 import {webcrypto} from 'node:crypto';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
-const source=(await readFile(new URL('../public/assets/games.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
+const source=(await readFile(new URL('../public/assets/games.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'').replace(/\bimport\(/g,'loadGameModule(');
 const questions=Array.from({length:10},(_,i)=>({id:'photo-'+i,src:'/media/photo-'+i,correctId:'p0',options:Array.from({length:4},(_,j)=>({id:'p'+j,name:'אדם '+j,nameEn:'Person '+j}))}));
 const kinshipQuestions=questions.map(q=>({...q,kind:'kinship',subject:{id:'rivi',name:'ריוי גנדלמן',nameEn:'Revital Gandelman',gender:'f',profile:'/media/rivi'},reference:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha',gender:'m',profile:'/media/eldad'},options:[{id:'p0',name:'בת דודה',nameEn:'First cousin'},{id:'p1',name:'אחות',nameEn:'Sister'},{id:'p2',name:'אחיינית',nameEn:'Niece'},{id:'p3',name:'נכדה',nameEn:'Granddaughter'}]}));
 const triviaQuestions=questions.map(q=>({...q,kind:'trivia',subject:kinshipQuestions[0].subject,prompt:'באיזו שנה נולדה ריוי גנדלמן?',promptEn:'In which year was Revital Gandelman born?',options:q.options.map((o,i)=>({...o,name:String(1970+i),nameEn:String(1970+i)}))}));
-function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false,scoreSaveFailures=0,scoreLoadFailures=0}={}){
-  let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null,northMounts=0,northPauses=0,northBack=null,netoMounts=0,netoPauses=0,netoBack=null,rutiMounts=0,rutiPauses=0,rutiBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[];
+function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoImages=true,count=10,nativeShare=false,shareError=null,clipboardError=false,customTrivia=false,scoreSaveFailures=0,scoreLoadFailures=0,deferGameImports=false,gameImportFailures=0}={}){
+  let now=100000,intervalId=0,prevented=false,puzzleMounts=0,puzzlePauses=0,puzzleBack=null,jachnunMounts=0,jachnunPauses=0,jachnunBack=null,rexMounts=0,rexPauses=0,rexBack=null,soupMounts=0,soupPauses=0,soupBack=null,northMounts=0,northPauses=0,northBack=null,netoMounts=0,netoPauses=0,netoBack=null,rutiMounts=0,rutiPauses=0,rutiBack=null;const intervals=new Map(),nodes=new Map(),documentEvents=new Map(),requests=[],shared=[],copied=[],writes=[],gameImports=[],pendingGameImports=[];
   const chickQuestions=makeChickQuiz(()=>.5);
   class Node{
     constructor(){this.handlers=new Map();this.dataset={};this.style={setProperty(){}};this.attributes={};this.disabled=false;this.hidden=false;this.complete=autoImages;this.naturalWidth=autoImages?100:0;this.textContent='';}
@@ -47,12 +47,12 @@ function fixture({navigation=false,phone=false,entryUrl=null,english=false,autoI
   const navigator={clipboard:{async writeText(value){if(clipboardError)throw Error('Clipboard unavailable');copied.push(value);}}};
   if(nativeShare)navigator.share=async data=>{shared.push(data);if(shareError)throw Object.assign(Error('Share unavailable'),{name:shareError});};
   const FakeDate=class extends Date{static now(){return now;}};
-  const context=vm.createContext({window,document,navigator,URL,location:browser?.location,history:browser?.history,matchMedia:()=>({matches:phone}),crypto:webcrypto,mountPuzzle(_root,onBack){puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},mountRutiHouse(_root,onBack){rutiMounts++;rutiBack=onBack;},pauseRutiHouse(){rutiPauses++;},quizGrade,QUIZ_ROUND_MS,quizScoreSummary,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
+  const context=vm.createContext({window,document,navigator,URL,loadGameModule(specifier){gameImports.push(specifier);const complete=()=>{if(gameImportFailures-->0)throw Error('Network unavailable');return Object.fromEntries(Object.entries(context).filter(([key])=>/^mount|^pause/.test(key)));};if(deferGameImports)return new Promise((resolve,reject)=>pendingGameImports.push(()=>{try{resolve(complete());}catch(error){reject(error);}}));return Promise.resolve().then(complete);},location:browser?.location,history:browser?.history,matchMedia:()=>({matches:phone}),crypto:webcrypto,mountPuzzle(_root,onBack){_root.innerHTML='<div data-mounted-game="Puzzle"></div>';puzzleMounts++;puzzleBack=onBack;},pausePuzzle(){puzzlePauses++;},mountJachnun(_root,onBack){_root.innerHTML='<div data-mounted-game="Jachnun"></div>';jachnunMounts++;jachnunBack=onBack;},pauseJachnun(){jachnunPauses++;},mountRex(_root,onBack){_root.innerHTML='<div data-mounted-game="Rex"></div>';rexMounts++;rexBack=onBack;},pauseRex(){rexPauses++;},mountSoup(_root,onBack){_root.innerHTML='<div data-mounted-game="Soup"></div>';soupMounts++;soupBack=onBack;},pauseSoup(){soupPauses++;},mountNorth(_root,onBack){_root.innerHTML='<div data-mounted-game="North"></div>';northMounts++;northBack=onBack;},pauseNorth(){northPauses++;},mountNetoTetris(_root,onBack){_root.innerHTML='<div data-mounted-game="NetoTetris"></div>';netoMounts++;netoBack=onBack;},pauseNetoTetris(){netoPauses++;},mountRutiHouse(_root,onBack){_root.innerHTML='<div data-mounted-game="RutiHouse"></div>';rutiMounts++;rutiBack=onBack;},pauseRutiHouse(){rutiPauses++;},quizGrade,QUIZ_ROUND_MS,quizScoreSummary,makeChickQuiz:()=>chickQuestions,withinChickTarget,Date:FakeDate,Image:class{},setInterval(callback,ms){const id=++intervalId;intervals.set(id,{callback,ms,next:now+ms});return id;},clearInterval:id=>intervals.delete(id)});
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);
   documentEvents.get('DOMContentLoaded')();
   const root=nodes.get('familyGamesContent'),flush=()=>new Promise(resolve=>setImmediate(resolve));
   async function click(selector,node={},detail=1,position={}){prevented=false;root.handlers.get('click')({...position,detail,preventDefault(){prevented=true;},target:{closest:s=>s===selector?node:null}});await flush();}
-  return {window,browser,get view(){return view;},nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get rutiMounts(){return rutiMounts;},get rutiPauses(){return rutiPauses;},backFromRuti(){rutiBack();},get netoMounts(){return netoMounts;},get netoPauses(){return netoPauses;},backFromNeto(){netoBack();},get northMounts(){return northMounts;},get northPauses(){return northPauses;},backFromNorth(){northBack();},get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
+  return {window,browser,flush,gameImports,pendingGameImports,resolveImport(index=0){pendingGameImports[index]();return flush();},get view(){return view;},nodes,intervals,document,requests,shared,copied,writes,chickQuestions,get rutiMounts(){return rutiMounts;},get rutiPauses(){return rutiPauses;},backFromRuti(){rutiBack();},get netoMounts(){return netoMounts;},get netoPauses(){return netoPauses;},backFromNeto(){netoBack();},get northMounts(){return northMounts;},get northPauses(){return northPauses;},backFromNorth(){northBack();},get soupMounts(){return soupMounts;},get soupPauses(){return soupPauses;},backFromSoup(){soupBack();},get rexMounts(){return rexMounts;},get rexPauses(){return rexPauses;},backFromRex(){rexBack();},get jachnunMounts(){return jachnunMounts;},get jachnunPauses(){return jachnunPauses;},backFromJachnun(){jachnunBack();},get puzzleMounts(){return puzzleMounts;},get puzzlePauses(){return puzzlePauses;},backFromPuzzle(){puzzleBack();},get prevented(){return prevented;},get html(){return root.innerHTML;},get round(){return root.options?.[0]?.dataset.gameRound;},get seconds(){return nodes.get('familyGameSeconds')?.textContent;},
     messenger:()=>click('[data-game-share-messenger]'),
     openTrivia:()=>click('[data-game-start]',{dataset:{gameStart:'trivia',gameHome:'trivia'}}),
     click,input(id,value){nodes.get(id).value=value;root.handlers.get('input')({target:{id,value}});},
@@ -237,7 +237,7 @@ test('Shlomo’s bilingual dance can be paused and resumed without starting a ga
 
 test('a direct recipe link opens the kitchen intro in either language once and still allows returning to game selection',async()=>{
  for(const english of [false,true]){
-  const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=soup#games'});
+  const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=soup#games'});await f.flush();
   assert.equal(f.soupMounts,1);assert.equal(f.requests.length,0);f.backFromSoup();assert.match(f.html,/family-game-choices/);assert.equal(f.soupMounts,1);f.window.FamilyGames.activate('games');assert.equal(f.soupMounts,1);assert.match(f.html,/family-game-choices/);
  }
  const unknown=fixture({entryUrl:'https://family.test/?game=unknown#games'});assert.equal(unknown.soupMounts,0);assert.match(unknown.html,/family-game-choices/);assert.equal(unknown.requests.length,0);
@@ -254,9 +254,9 @@ test('Heading North opens its own bilingual memorial game, pauses on navigation 
   }
 });
 
-test('a direct northbound link opens once and still allows staying in the game selection lobby',()=>{
+test('a direct northbound link opens once and still allows staying in the game selection lobby',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=north#games'});
+    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=north#games'});await f.flush();
     assert.equal(f.northMounts,1);assert.equal(f.requests.length,0);f.backFromNorth();
     assert.match(f.html,/family-game-choices/);f.window.FamilyGames.activate('games');assert.equal(f.northMounts,1);
   }
@@ -273,9 +273,9 @@ test('Hashmal Neto Tetris has a bilingual lobby tile and an independent lifecycl
   }
 });
 
-test('a direct Neto Tetris link opens once in either language and allows staying in the lobby afterward',()=>{
+test('a direct Neto Tetris link opens once in either language and allows staying in the lobby afterward',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=neto-tetris#games'});
+    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=neto-tetris#games'});await f.flush();
     assert.equal(f.netoMounts,1);assert.equal(f.northMounts,0);assert.equal(f.soupMounts,0);assert.equal(f.requests.length,0);assert.equal(f.intervals.size,0);
     f.backFromNeto();assert.match(f.html,/family-game-choices/);f.window.FamilyGames.activate('games');assert.equal(f.netoMounts,1);assert.equal(f.intervals.size,0);
   }
@@ -303,9 +303,9 @@ test('Ruti’s House opens from the bilingual lobby, stops quiz clocks and pause
   }
 });
 
-test('a direct Ruti’s House link opens only once and allows returning to game selection',()=>{
+test('a direct Ruti’s House link opens only once and allows returning to game selection',async()=>{
   for(const english of [false,true]){
-    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=ruti-house#games'});
+    const f=fixture({english,entryUrl:'https://family.test/?lang='+(english?'en-US':'he')+'&game=ruti-house#games'});await f.flush();
     assert.equal(f.rutiMounts,1);assert.equal(f.netoMounts,0);assert.equal(f.requests.length,0);
     f.backFromRuti();assert.match(f.html,/family-game-choices/);f.window.FamilyGames.activate('games');assert.equal(f.rutiMounts,1);
   }
@@ -341,7 +341,7 @@ test('all game back buttons use the existing lobby entry and a second Back leave
 test('direct game links and legacy links return to the lobby without reopening the game on another visit',async()=>{
   for(const game of ['soup','north','neto-tetris','ruti-house','puzzle','chick','trivia'])for(const legacy of [false,true]){
     const f=fixture({navigation:true,phone:true,entryUrl:'https://family.test/?lang=en-GB'+(legacy?'&game='+game+'#games':'#games/'+game)});
-    await f.browser.flush();assert.equal(f.browser.location.hash,'#games/'+game);assert.doesNotMatch(f.html,/family-game-choices/);
+    await f.browser.flush();await f.flush();assert.equal(f.browser.location.hash,'#games/'+game);assert.doesNotMatch(f.html,/family-game-choices/);
     f.browser.history.back();await f.browser.flush();assert.match(f.html,/family-game-choices/);
     f.window.FamilyApp.setView('gallery');f.window.FamilyApp.setView('games');await f.browser.flush();
     assert.match(f.html,/family-game-choices/);assert.equal(f.browser.location.search,'?lang=en-GB');
@@ -354,4 +354,34 @@ test('Back from another section restores the game route and one more Back restor
   f.browser.history.back();await f.browser.flush();assert.equal(f.browser.location.hash,'#games/ruti-house');
   assert.equal(f.rutiMounts,mounts+1,'popstate and hashchange must not mount twice');
   f.browser.history.back();await f.browser.flush();assert.match(f.html,/family-game-choices/);
+});
+
+
+test('independent game modules are fetched only on selection and reused when returning',async()=>{
+  const f=fixture();assert.deepEqual(f.gameImports,[]);
+  await f.start('photos');assert.deepEqual(f.gameImports,[]);
+  await f.start('ruti-house');assert.equal(f.gameImports.length,1);assert.match(f.gameImports[0],/ruti-house\.js/);assert.equal(f.rutiMounts,1);
+  await f.lobby();await f.start('ruti-house');assert.equal(f.gameImports.length,1);assert.equal(f.rutiMounts,2);
+  await f.start('soup');assert.equal(f.gameImports.length,2);assert.match(f.gameImports[1],/soup\.js/);assert.equal(f.soupMounts,1);
+});
+test('slow imports cannot reopen a game after Back or replace a newer selection',async()=>{
+  const f=fixture({deferGameImports:true});await f.start('ruti-house');assert.equal(f.rutiMounts,0);
+  await f.lobby();await f.resolveImport();assert.equal(f.rutiMounts,0);assert.match(f.html,/family-game-choices/);
+  await f.start('ruti-house');assert.equal(f.rutiMounts,1);
+  await f.start('soup');const paused=f.rutiPauses;assert.ok(paused>0);await f.start('north');
+  await f.resolveImport(1);assert.equal(f.soupMounts,0);assert.equal(f.northMounts,0);
+  await f.resolveImport(2);assert.equal(f.northMounts,1);assert.equal(f.soupMounts,0);
+});
+test('navigation away during a module download defers mounting until returning to games',async()=>{
+  const f=fixture({deferGameImports:true});await f.start('soup');f.window.FamilyGames.activate('gallery');await f.resolveImport();assert.equal(f.soupMounts,0);
+  f.window.FamilyGames.activate('games');assert.equal(f.soupMounts,1);assert.equal(f.gameImports.length,1);
+});
+test('failed module downloads preserve the lobby and can be retried without fetching other games',async()=>{
+  const f=fixture({gameImportFailures:1});await f.start('puzzle');assert.equal(f.puzzleMounts,0);assert.match(f.html,/המשחק לא נטען/);
+  await f.start('puzzle');assert.equal(f.puzzleMounts,1);assert.equal(f.gameImports.length,2);assert.ok(f.gameImports.every(src=>src.includes('puzzle.js')));
+});
+
+test('repeated selection during one download shares that import and mounts the latest selection once',async()=>{
+  const f=fixture({deferGameImports:true});await f.start('puzzle');await f.start('puzzle');assert.equal(f.gameImports.length,1);assert.equal(f.puzzleMounts,0);
+  await f.resolveImport();assert.equal(f.puzzleMounts,1);assert.equal(f.gameImports.length,1);
 });

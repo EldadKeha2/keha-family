@@ -1,13 +1,14 @@
 (() => {
   'use strict';
   const scheduled=new Map(),attempted=new Set();let busy=false,pauseTimer=null;
+  const constrained=()=>typeof navigator!=='undefined'&&(navigator.connection?.saveData||/^(slow-)?2g$/.test(navigator.connection?.effectiveType||''));
   function schedule(item,image){
     if(item?.kind!=='photo'||item.thumbnailSrc&&(item.previewSrc||!(item.size>1000000))||!item.id||!window.FamilyApp?.apiEnabled||attempted.has(item.src)||scheduled.has(item.src)||scheduled.size>=3||!image?.naturalWidth)return;
     if(!(item.size>250000||image.naturalWidth*image.naturalHeight>2000000)||item.mime==='image/gif')return;
     scheduled.set(item.src,{item,image});setTimeout(run,1000);
   }
   async function run(){
-    if(busy||!scheduled.size||document.hidden)return;busy=true;
+    if(busy||!scheduled.size||document.hidden||constrained())return;busy=true;
     if(window.FamilyMedia?.isPhotoBrowsing?.()){busy=false;if(!pauseTimer)pauseTimer=setTimeout(()=>{pauseTimer=null;run();},400);return;}
     const [src,job]=scheduled.entries().next().value;const {item}=job;let image=job.image;scheduled.delete(src);attempted.add(src);
     try{
@@ -43,7 +44,7 @@
   // Existing photos acquire their thumbnail the first time their original is
   // read. Later visits to any grid download only the small shared copy.
   function watch(root){
-    for(const image of root.querySelectorAll('img[data-thumbnail-id]')){
+    for(const image of [...(root.matches?.('img[data-thumbnail-id]')?[root]:[]),...root.querySelectorAll('img[data-thumbnail-id]')]){
       const ready=()=>{
         if(!image.isConnected)return;
         schedule({id:image.dataset.thumbnailId,kind:'photo',mime:image.dataset.thumbnailMime,size:Number(image.dataset.thumbnailSize)||0,src:image.getAttribute('src'),photoRevision:image.dataset.thumbnailRevision},image);
@@ -58,8 +59,9 @@
   }
   document.addEventListener('DOMContentLoaded',()=>{
     watch(document);
-    if(typeof MutationObserver!=='undefined')new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)watch(node.parentElement||node);}).observe(document.body,{childList:true,subtree:true});
+    if(typeof MutationObserver!=='undefined')new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)watch(node);}).observe(document.body,{childList:true,subtree:true});
   });
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)run();});
+  if(typeof navigator!=='undefined')navigator.connection?.addEventListener?.('change',()=>run());
   window.FamilyPhotoThumbnails={schedule,attributes,watch,fromUpload};
 })();
