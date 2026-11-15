@@ -87,6 +87,13 @@
     if(p?.siblings?.length)return (I18n.isEnglish?'Sibling of ':'אח/אחות של ')+p.siblings.map(name).join(' / ');
     return person.extra?I18n.t('שם נוסף באלבומים'):branch||I18n.t('השורשים של כולנו');
   }
+  function personAvatar(person){
+    const summary=app()?.getPersonSummary?.(person.id),profile=summary?.profile!==undefined?summary.profile:person.profile;
+    const initials=String(I18n.personName(person)||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>Array.from(part)[0]).join('')||'?';
+    let src=typeof profile==='string'?profile:'';
+    if(/^\/media\/[a-f0-9]{32}(?:\?|$)/.test(src)&&!/[?&]thumbnail=/.test(src))src+=(src.includes('?')?'&':'?')+'thumbnail=1';
+    return `<span class="tag-person-avatar" aria-hidden="true"><span>${safe(initials)}</span>${src?`<img class="profile-photo" src="${safe(src)}" alt="" loading="lazy" decoding="async">`:''}</span>`;
+  }
   const tagGroup=person=>person.isNew?'friends':personPriority(person)<=5?'family':personPriority(person)===6?'extended':'friends';
   const tagGroupLabel=group=>({all:I18n.isEnglish?'All':'הכול',family:I18n.isEnglish?'Family members':'בני משפחה',extended:I18n.isEnglish?'Extended family':'בני משפחה נוספים',friends:I18n.isEnglish?'Friends and acquaintances':'חברים ומכרים'})[group];
   const stores=new Map(),roster=new Map();let rosterPromise=null,rosterTime=0,rosterFetched=false,rosterVersion=0,modalWidget=null,modalStore=null,closeRequested=false,newCounter=0;
@@ -215,7 +222,7 @@
       const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>(this.group==='all'||tagGroup(person)===this.group)&&Number.isFinite(matchRank(person,query))).sort((a,b)=>comparePeople(a,b,query));
       this.results.hidden=this.inline&&!query&&this.group==='all';
       const position=resetScroll?0:this.results.scrollTop;
-      let previousGroup=null;this.results.innerHTML=names.slice(0,150).map(person=>{const group=tagGroup(person),heading=!this.inline&&group!==previousGroup?`<h4 class="tag-group-heading">${tagGroupLabel(group)}</h4>`:'';previousGroup=group;return heading+`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}><span><strong>${safe(I18n.personName(person))}</strong><small>${safe(personContext(person))}</small></span></label>`;}).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
+      let previousGroup=null;this.results.innerHTML=names.slice(0,150).map(person=>{const group=tagGroup(person),heading=!this.inline&&group!==previousGroup?`<h4 class="tag-group-heading">${tagGroupLabel(group)}</h4>`:'';previousGroup=group;return heading+`<label class="tag-person-option"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}>${personAvatar(person)}<span class="tag-person-name"><strong dir="auto">${safe(I18n.personName(person))}</strong></span></label>`;}).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
       for(const button of this.host.querySelectorAll('[data-tag-group]'))button.setAttribute('aria-pressed',String(button.dataset.tagGroup===this.group));
       this.results.scrollTop=position;
       this.host.querySelector('[data-tag-search-count]').textContent=this.inline&&!query?'':I18n.html`${names.length} ${I18n.isEnglish?I18n.word(names.length,'name in the list','names in the list'):I18n.t('שמות ברשימה')}`;

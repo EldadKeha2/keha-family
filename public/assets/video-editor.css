@@ -52,8 +52,9 @@ html[dir=ltr] #videoClipEditor footer{direction:ltr}
 #videoClipEditor #videoClipEditName{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;min-height:30px;margin:5px;padding:5px;border:1px solid #d0c8af;border-radius:5px;background:#fcfaf3;color:#61734d;cursor:pointer}
 #videoClipEditor #videoClipEditName svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
-#videoClipEditor .video-clip-heading{flex:1;min-width:0}
+#videoClipEditor .video-clip-heading{flex:1;min-width:0;text-align:right}
 #videoClipEditor .video-clip-title-row{display:flex;align-items:center;gap:8px}
 #videoClipEditor .video-clip-title-row .section-diamond{flex:none;font-size:calc(32px * var(--a11y-text-scale,1));line-height:1}
 #videoClipEditor #videoClipTitle{margin:0;line-height:1.3}
-#videoClipEditor #videoClipSubtitle{max-width:none;margin:3px 0 0;color:#796b52;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans);white-space:pre-wrap;overflow-wrap:anywhere}
+#videoClipEditor #videoClipSubtitle{max-width:none;margin:3px 0 0;color:#796b52;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans);text-align:right;white-space:pre-wrap;overflow-wrap:anywhere}
+html[dir=ltr] #videoClipEditor .video-clip-heading,html[dir=ltr] #videoClipEditor #videoClipSubtitle{text-align:left}

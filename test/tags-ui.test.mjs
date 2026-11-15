@@ -108,11 +108,11 @@ test('rapid selections batch by image and collapse repeated changes to the same 
  assert.equal(f.requests.length,0);await store.run();assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/image-a/tags/patch');
  assert.deepEqual(f.requests[0].body.changes.map(c=>[c.personId,c.tagged]),[['shlomo',true],['yona',false]]);f.tags.clearInline(host);
 });
-test('name similarity precedes generation, resets search scroll, and shows family context',()=>{
+test('name similarity precedes generation and resets search scroll in the compact people list',()=>{
   const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('search-image'),kind:'video'});const widget=host._tagWidget;
   widget.results.scrollTop=500;widget.query='שי';widget.renderResults(true);
-  assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="shay"')<html.indexOf('data-tag-person="avishai"'));assert.match(html,/הורים:/);
-  widget.query='מתן';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="matan-g"/);assert.match(widget.results.innerHTML,/data-tag-person="matan-f"/);assert.match(widget.results.innerHTML,/גבי/);assert.match(widget.results.innerHTML,/תומר/);f.tags.clearInline(host);
+  assert.equal(widget.results.scrollTop,0);const html=widget.results.innerHTML;assert.ok(html.indexOf('data-tag-person="shay"')<html.indexOf('data-tag-person="avishai"'));assert.doesNotMatch(html,/<small|הורים:/);
+  widget.query='מתן';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="matan-g"/);assert.match(widget.results.innerHTML,/data-tag-person="matan-f"/);f.tags.clearInline(host);
 });
 test('video tagging retains its compact search field without repeated help text',()=>{
   const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('compact-image'),kind:'video'});const widget=host._tagWidget;
