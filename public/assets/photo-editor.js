@@ -9,7 +9,7 @@ const safe=value=>String(value??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&l
 const desktop=()=>matchMedia('(min-width:701px)').matches;
 const jobs=[];
 const fileMetadata=new WeakMap();
-let session=null,dialog,source=null,sourceUrl=null,loadId=0,drag=null;
+let session=null,dialog,source=null,sourceUrl=null,loadId=0,drag=null,uploadSwipe=null;
 const get=id=>document.getElementById('photoEdit'+id);
 const draft=()=>session?.drafts[session.index];
 
@@ -105,6 +105,7 @@ function mount(){
   window.addEventListener('resize',fitEditor);window.visualViewport?.addEventListener('resize',()=>{fitEditor();requestAnimationFrame(revealMetadata);});
   window.addEventListener('keydown',keyNavigate);
   window.FamilyPhotoKeyboard?.bindNavigation({available:canControlNavigate,capture:()=>({owner:session,draft:draft()}),navigate:controlNavigate});
+  uploadSwipe=window.FamilyPhotoSwipe?.bind(get('Image'),{enabled:canSwipeNavigate,strictStart:true,step:direction=>controlNavigate(direction,{owner:session,draft:draft()},canSwipeNavigate)});
   const layer=get('CropLayer');layer.addEventListener('pointerdown',pointerStart);layer.addEventListener('pointermove',pointerMove);
   layer.addEventListener('pointerup',pointerEnd);layer.addEventListener('pointercancel',pointerEnd);layer.addEventListener('lostpointercapture',()=>{drag=null;});
   layer.addEventListener('keydown',keyCrop);
@@ -122,6 +123,7 @@ async function decode(file){
 const dimensions=image=>({width:image.naturalWidth||image.width,height:image.naturalHeight||image.height});
 function setBusy(busy){
   session.loading=busy;
+  if(busy)uploadSwipe?.reset();
   for(const el of dialog.querySelectorAll('button,input,textarea'))el.disabled=busy;
   // Cancellation is safe while decoding; saving pixels is kept atomic.
   if(!session.saving){get('Close').disabled=false;get('Cancel').disabled=false;}
@@ -303,8 +305,9 @@ async function loadVersion(id){
 }
 function navigate(step){if(!session||session.loading||session.saving||!session.drafts.length)return;if(step>0&&session.mode!=='existing'&&showDateProblem(dateProblem(draft())))return;session.index=(session.index+step+session.drafts.length)%session.drafts.length;load();}
 function canControlNavigate(){return Boolean(session&&session.mode!=='existing'&&dialog?.open&&!session.loading&&!session.saving&&session.drafts.length>1&&!drag);}
-async function controlNavigate(direction,tap){
-  const active=()=>session===tap.owner&&draft()===tap.draft&&canControlNavigate();
+function canSwipeNavigate(){return Boolean(canControlNavigate()&&source&&!draft()?.cropping&&!(window.visualViewport?.scale>1)&&(window.FamilyFaces?.canNavigate?.(get('Image'))??true));}
+async function controlNavigate(direction,tap,allowed=canControlNavigate){
+  const active=()=>session===tap.owner&&draft()===tap.draft&&allowed();
   if(!active())return;
   try{await window.FamilyFaces?.flush?.();if(active())navigate(direction);}
   catch(error){if(active())get('Error').textContent=error.message||tr('לא ניתן להשלים את התיוג כרגע.','The tag could not be completed.');}
@@ -430,7 +433,7 @@ async function saveExisting(asCopy=false){
 }
 function cancel(){if(session?.saving)return;finish(null);}
 function finish(files){
-  if(!session)return;const resolve=session.resolve,focus=session.focus;session.abort?.abort();stopFaces();session=null;++loadId;drag=null;release();dialog.close();
+  if(!session)return;const resolve=session.resolve,focus=session.focus;session.abort?.abort();stopFaces();uploadSwipe?.reset();session=null;++loadId;drag=null;release();dialog.close();
   get('Canvas').width=get('Canvas').height=1;resolve(files);focus?.focus?.({preventScroll:true});queueMicrotask(run);
 }
 function run(){

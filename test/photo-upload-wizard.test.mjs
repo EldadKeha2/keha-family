@@ -9,18 +9,19 @@ import * as catalog from '../public/assets/photo-labels-catalog.mjs';
 
 const source=(await readFile(new URL('../public/assets/photo-editor.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 const keyboardSource=await readFile(new URL('../public/assets/photo-keyboard.js',import.meta.url),'utf8');
-function fixture({desktop=true,english=false,onUpload=async()=>{},fetch:fetcher,photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
+const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
+function fixture({desktop=true,english=false,onUpload=async()=>{},fetch:fetcher,decode:decodePhoto,photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
  const nodes=new Map(),all=[],mounts=[],uploaded=[],closed=[];
  const people=[{id:'yona',name:'יונה',nameEn:'Yona'},{id:'shlomo',name:'שלמה',nameEn:'Shlomo'}];
  class Node extends EventTarget{
-  constructor(tag='div',id=''){super();this.tagName=tag;this.id=id;this.dataset={};this.hidden=false;this.disabled=false;this.checked=false;this.value='';this.style={setProperty:(k,v)=>{this.style[k]=v;},removeProperty:k=>{delete this.style[k];}};this.classes=new Set();this.classList={toggle:(k,v)=>v?this.classes.add(k):this.classes.delete(k)};this.width=1000;this.height=800;all.push(this);}
+  constructor(tag='div',id=''){super();this.tagName=tag;this.id=id;this.dataset={};this.hidden=false;this.disabled=false;this.checked=false;this.value='';this.style={setProperty:(k,v)=>{this.style[k]=v;},removeProperty:k=>{delete this.style[k];}};this.classes=new Set();this.classList={toggle:(k,v)=>v?this.classes.add(k):this.classes.delete(k),add:k=>this.classes.add(k),remove:k=>this.classes.delete(k),contains:k=>this.classes.has(k)};this.width=1000;this.height=800;all.push(this);}
   set innerHTML(value){this.html=value;for(const match of value.matchAll(/<([a-z0-9]+)[^>]*\bid="([^"]+)"/g))if(!nodes.has(match[2]))nodes.set(match[2],new Node(match[1],match[2]));}
   get innerHTML(){return this.html||'';}
   setAttribute(key,value){this[key]=value;}
   querySelector(selector){if(selector.startsWith('#'))return node(selector.slice(1));return node(this.id+selector);}
   querySelectorAll(selector){if(selector==='button,input,textarea')return all.filter(n=>['button','input','textarea'].includes(n.tagName));return [];}
   contains(target){return target===this;}
-  closest(selector){return selector.split(',').some(part=>part===this.tagName||part==='[data-upload-remove-person]'&&this.dataset.uploadRemovePerson||part==='dialog[open]'&&this.tagName==='dialog'&&this.open||part==='[role="dialog"]'&&this.role==='dialog'||part==='[role="textbox"]'&&this.role==='textbox'||part.startsWith('.')&&this.classes.has(part.slice(1)))?this:null;}
+  closest(selector){return selector.split(',').some(part=>part===this.tagName||part.startsWith('button:not(')&&this.tagName==='button'&&[...part.matchAll(/:not\(\.([^)]+)\)/g)].every(match=>!this.classes.has(match[1]))||part==='[data-face-handle]'&&this.dataset.faceHandle||part==='[contenteditable]'&&this.isContentEditable||part==='[data-upload-remove-person]'&&this.dataset.uploadRemovePerson||part==='dialog[open]'&&this.tagName==='dialog'&&this.open||part==='[role="dialog"]'&&this.role==='dialog'||part==='[role="textbox"]'&&this.role==='textbox'||part.startsWith('.')&&this.classes.has(part.slice(1)))?this:null;}
   append(...children){for(const child of children)if(child.id)nodes.set(child.id,child);}
   replaceChildren(){}
   focus(){document.activeElement=this;}
@@ -33,13 +34,17 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},fetch:fetcher,
   toBlob(fn,type){fn(new Blob(['rendered pixels'],{type}));}
  }
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node('div',id));return nodes.get(id);};
- const document={activeElement:null,getElementById:node,createElement:tag=>new Node(tag),body:new Node()};
+ const document=Object.assign(new EventTarget(),{activeElement:null,getElementById:node,createElement:tag=>new Node(tag),body:new Node()});
  const window=new EventTarget();window.innerHeight=900;window.createImageBitmap=true;window.FamilyI18n={isEnglish:english,personName:p=>english?p.nameEn||p.name:p.name,fetch:fetcher,error:String};
  window.FamilyApp={apiEnabled:true,getPersonSummary:id=>people.find(p=>p.id===id)};window.FamilyTags={findPeople:async query=>people.filter(p=>!query||p.name.includes(query))};
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
- vm.runInNewContext(keyboardSource+'\n'+source,{...core,...metadata,...faceDraft,...catalog,window,document,navigator:{userAgent:desktop?'Windows NT 10.0':'Android Mobile'},File,Blob,URL,URLSearchParams,AbortController,crypto,queueMicrotask,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>({...photoSize,close(){closed.push(file.name);}})});
+ vm.runInNewContext(keyboardSource+'\n'+swipeSource+'\n'+source,{...core,...metadata,...faceDraft,...catalog,window,document,navigator:{userAgent:desktop?'Windows NT 10.0':'Android Mobile'},File,Blob,URL,URLSearchParams,AbortController,crypto,queueMicrotask,setTimeout,clearTimeout,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>decodePhoto?decodePhoto(file):({...photoSize,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
- return {node,mounts,uploaded,window,document,flush,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{type='keydown',target=document.body,...flags}={}){const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
+ const gesture=(type,fields={},target=node('photoEditCanvas'))=>{const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({target,...fields}))Object.defineProperty(event,name,{value});if(type==='pointerdown')document.dispatchEvent(event);(type==='pointerdown'||type==='touchstart'?node('photoEditImage'):document).dispatchEvent(event);return event;};
+ const pointer=(type,x=100,y=100,target)=>gesture(type,{pointerId:7,pointerType:'touch',isPrimary:true,button:0,clientX:x,clientY:y},target);
+ const touch=(type,points,target=node('photoEditCanvas'))=>{const touches=points.map(([identifier,x,y])=>({identifier,clientX:x,clientY:y,target}));return gesture(type,{touches:type==='touchend'?[]:touches,changedTouches:touches},target);};
+ const swipe=async(dx,{dy=0,stream='touch',target}={})=>{let moved;if(stream==='pointer'){pointer('pointerdown',100,100,target);moved=pointer('pointermove',100+dx,100+dy,target);pointer('pointerup',100+dx,100+dy,target);}else{touch('touchstart',[[7,100,100]],target);moved=touch('touchmove',[[7,100+dx,100+dy]],target);touch('touchend',[[7,100+dx,100+dy]],target);}await flush();return moved;};
+ return {node,mounts,uploaded,window,document,flush,gesture,pointer,touch,swipe,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{type='keydown',target=document.body,...flags}={}){const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
 }
 const image=name=>new File(['original pixels '+name],name,{type:'image/jpeg',lastModified:1234});
 async function details(entry){const bytes=new Uint8Array(await entry.payload.body.arrayBuffer()),n=Number(entry.payload.headers[metadata.PHOTO_METADATA_HEADER]);return {metadata:metadata.decodeUploadMetadata(bytes.subarray(0,n)),pixels:bytes.subarray(n)};}
@@ -158,6 +163,47 @@ test('Next wraps from last to first, metadata remains per photo, and individual 
   const f=fixture({desktop}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);assert.equal(f.node('photoEditSaveCurrent').hidden,false);
   f.node('photoEditCaption').value='first';f.node('photoEditCaption').dispatchEvent(new Event('input'));await f.click('Next');assert.equal(f.node('photoEditCaption').value,'');assert.equal(f.node('photoEditNext').disabled,false);await f.click('Next');assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditCaption').value,'first');await f.click('Cancel');assert.equal(await result,null);
  }
+});
+test('upload finger swipes follow Next and Previous in both languages and keep each photo draft while wrapping',async()=>{
+ for(const desktop of [false,true])for(const english of [false,true])for(const stream of ['touch','pointer']){
+  const f=fixture({desktop,english}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+  f.node('photoEditCaption').value='Keep this description';f.node('photoEditCaption').dispatchEvent(new Event('input'));enterDate(f,{day:12,month:7,year:1988});
+  await f.mounts.at(-1).options.adapter.save({faceId:'d'.repeat(32),personId:'yona',rect:{x:.2,y:.2,width:.1,height:.15}});
+  assert.equal((await f.swipe(140,{stream})).defaultPrevented,true);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');assert.equal(f.node('photoEditCaption').value,'');
+  await f.swipe(-140,{stream});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditCaption').value,'Keep this description');assert.equal(f.node('photoEditDateyear').value,1988);assert.equal((await f.mounts.at(-1).options.adapter.load()).faces[0].person.id,'yona');
+  await f.swipe(-140,{stream});assert.equal(f.node('photoEditFilename').textContent,'three.jpg');await f.swipe(140,{stream});assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.uploaded.length,0);
+  await f.click('Cancel');assert.equal(await result,null);
+ }
+});
+test('photo upload swipes preserve vertical scrolling, pinch, face editing, crop dragging and ordinary taps',async()=>{
+ const f=fixture({desktop:false}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ assert.equal((await f.swipe(8,{dy:140})).defaultPrevented,false);await f.swipe(0);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ f.touch('touchstart',[[7,100,100]]);f.touch('touchstart',[[7,100,100],[8,150,100]]);const pinch=f.touch('touchmove',[[7,40,100],[8,210,100]]);f.touch('touchend',[[7,40,100],[8,210,100]]);await f.flush();assert.equal(pinch.defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ for(const target of [f.node('photoEditCaption'),f.node('photoEditNext'),Object.assign(f.node('resizeHandle'),{dataset:{faceHandle:'e'}})])assert.equal((await f.swipe(140,{target})).defaultPrevented,false);
+ await f.click('CropToggle');assert.equal((await f.swipe(140)).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');await f.click('CropToggle');
+ f.window.FamilyFaces.canNavigate=()=>false;assert.equal((await f.swipe(140)).defaultPrevented,false);f.window.FamilyFaces.canNavigate=()=>true;
+ f.touch('touchstart',[[7,100,100]]);f.window.FamilyFaces.canNavigate=()=>false;f.touch('touchmove',[[7,240,100]]);f.touch('touchend',[[7,240,100]]);await f.flush();assert.equal(f.node('photoEditFilename').textContent,'one.jpg','A face picker opened by a long press owns the rest of that gesture');
+ f.window.FamilyFaces.canNavigate=()=>true;f.window.visualViewport={scale:2};assert.equal((await f.swipe(140)).defaultPrevented,false);f.window.visualViewport.scale=1;
+ await f.swipe(140);assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Cancel');await result;
+});
+test('photo upload swipes validate the next date and wait for face edits without skipping a newly selected photo',async()=>{
+ const f=fixture({desktop:false}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+ enterDate(f,{day:31,month:4,year:2000});await f.swipe(140);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');assert.equal(f.node('photoEditDateError').hidden,false);assert.equal(f.node('photoEditDateday').value,31);
+ enterDate(f,{day:30,month:4,year:2000});let finishTag;f.window.FamilyFaces.flush=()=>new Promise(resolve=>{finishTag=resolve;});
+ await f.swipe(140);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');await f.click('Next');finishTag();await f.flush();assert.equal(f.node('photoEditFilename').textContent,'two.jpg');
+ f.window.FamilyFaces.flush=async()=>{};await f.swipe(140);assert.equal(f.node('photoEditFilename').textContent,'three.jpg');await f.click('Cancel');await result;
+});
+test('a shared pointer and touch stream advances the photo upload wizard only once',async()=>{
+ const f=fixture({desktop:false}),{result}=await f.begin([image('one.jpg'),image('two.jpg'),image('three.jpg')]);
+ f.pointer('pointerdown');f.touch('touchstart',[[7,100,100]]);f.pointer('pointermove',240,100);f.touch('touchmove',[[7,240,100]]);f.touch('touchend',[[7,240,100]]);f.pointer('pointerup',240,100);await f.flush();
+ assert.equal(f.node('photoEditFilename').textContent,'two.jpg');await f.click('Cancel');await result;
+});
+test('photo upload gestures cannot begin while decoding, uploading, or showing a single file',async()=>{
+ let finishDecode,finishUpload,first=true;const f=fixture({desktop:false,decode:()=>{if(first){first=false;return new Promise(resolve=>{finishDecode=resolve;});}return {width:1000,height:800};},onUpload:()=>new Promise(resolve=>{finishUpload=resolve;})}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ assert.equal((await f.swipe(140)).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');
+ f.touch('touchstart',[[7,100,100]]);finishDecode({width:1000,height:800});await f.flush();f.touch('touchmove',[[7,240,100]]);f.touch('touchend',[[7,240,100]]);await f.flush();assert.equal(f.node('photoEditFilename').textContent,'one.jpg','A stroke begun while decoding cannot become navigation after decoding finishes');
+ await f.click('SaveCurrent');assert.equal((await f.swipe(140)).defaultPrevented,false);assert.equal(f.node('photoEditFilename').textContent,'one.jpg');finishUpload();await f.flush();assert.equal(f.node('photoEditFilename').textContent,'two.jpg');
+ const mounts=f.mounts.length;assert.equal((await f.swipe(140)).defaultPrevented,false);assert.equal(f.mounts.length,mounts,'A single-file swipe must not reload its preview');await f.click('Cancel');await result;
 });
 test('desktop upload keyboard arrows follow the physical direction in both languages and wrap with each photo draft intact',async()=>{
  for(const english of [false,true]){
@@ -322,6 +368,7 @@ test('every gallery editor offers the separate-photo action on phone and desktop
    requests.push({path,options});return Response.json(saved,{status:201});
   }}),pending=f.api.edit({id:'a',kind:'photo',scope});for(let i=0;i<10&&f.node('photoEditSaveCopy').disabled;i++)await f.flush();
   assert.equal(f.node('photoEditSaveCopy').hidden,false);assert.equal(f.node('photoEditSaveCopy').disabled,false);assert.equal(f.node('photoEditSaveCopy').textContent,english?'Save as a separate photo':'שמור כתמונה נפרדת');
+  assert.equal((await f.swipe(140)).defaultPrevented,false,'The existing-photo editor must not claim upload navigation gestures');
   assert.equal(f.node('photoEditSave').textContent,english?'Finish and save':'לסיום ושמירה');await f.click('Right');assert.equal(f.node('photoEditSave').textContent,english?'Finish and save':'לסיום ושמירה');await f.click('SaveCopy');assert.deepEqual(await pending,saved);assert.equal(requests.length,1);
   const query=new URL(requests[0].path,'https://family.test').searchParams;assert.equal(query.get('saveAs'),'copy');assert.equal(query.get('rotation'),'1');assert.equal(query.get('baseVersion'),'original');assert.equal(await requests[0].options.body.text(),'rendered pixels');
   assert.equal(f.node('photoUploadEditor').open,false);

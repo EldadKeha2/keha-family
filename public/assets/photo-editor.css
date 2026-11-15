@@ -14,6 +14,8 @@
 .photo-upload-editor:not(.is-face-tagging) .face-hit-buttons,.photo-upload-editor:not(.is-face-tagging) .face-selection{display:none}
 .photo-upload-editor.is-face-tagging .face-hit{outline:1.5px dashed #ffd76a;outline-offset:1px;background:#ffce4c10}
 .photo-edit-crop-layer.is-editing{z-index:6}
+#photoUploadEditor:not(.is-existing) .photo-edit-image{touch-action:pan-y pinch-zoom}
+#photoUploadEditor:not(.is-existing) .photo-edit-image:is(.face-adjusting,.face-resizing){touch-action:none}
 .photo-edit-tags{margin-top:14px;padding:12px 0 0;border-top:1px solid #e5d8bc;font:14px/1.5 var(--sans)}
 .photo-edit-tags strong{display:block;margin-bottom:5px;color:#61704d;font-weight:600}
 .photo-edit-tags details{margin-top:10px;padding-top:8px;border-top:1px solid #e9e0cf}

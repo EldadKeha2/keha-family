@@ -1,11 +1,19 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,photoButtons=false}){
+  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,photoButtons=false,videoSurface=null,strictStart=false}){
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null;
     const navigate=(dx,options)=>{const action=dx>0?right:left;return action?action(options):step(dx>0?1:-1,options);};
     const idle=new Set(),finished=()=>{for(const resolve of idle)resolve();idle.clear();};
     const controls='a,input,textarea,select,video,iframe,[contenteditable],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
+    const previewVideo=event=>{
+      const video=videoSurface?.();if(!video||event.target.closest('video')!==video)return null;
+      const rect=video.getBoundingClientRect?.();
+      // Native controls are retargeted to <video> outside its shadow tree.
+      // Keep their whole bottom strip available for playback and seeking.
+      return rect&&event.clientY>=rect.top&&event.clientY<rect.bottom-72?video:null;
+    };
+    const freshVideoTouch=event=>{if(videoSurface&&event.target.closest('video')===videoSurface())suppressClickUntil=0;};
     const reset=(preserveTouch=false)=>{gesture=null;nativePointer=null;stage.classList.remove('photo-pointer-dragging');clearTimeout(wheelTimer);wheelTimer=null;wheelGesture=null;if(preserveTouch!==true){touchStart=null;finished();cancel?.();}else if(!touchStart||touchStart.native)finished();};
     const blockClick=()=>{suppressClickUntil=Date.now()+700;};
     const distance=()=>mouse()?Math.max(32,Math.min(56,stage.clientWidth*.06)):Math.max(40,Math.min(80,stage.clientWidth*.12));
@@ -20,19 +28,20 @@
     const begin=event=>{
       const touch=['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents;
       const isMouse=!touch&&event.pointerType==='mouse'&&mouse()&&!event.ctrlKey&&!event.metaKey&&!event.altKey;
-      if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||event.target.closest(controls))return;
+      const control=event.target.closest(controls),video=control?.tagName==='VIDEO'?previewVideo(event):null;
+      if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||control&&!video)return;
       suppressClickUntil=0;
-      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse()};
+      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse(),video};
       const ownership=claim?.(event)||'manual',mode=isMouse?'queued':ownership;
       if(mode==='native'){nativePointer=gesture;gesture=null;return mode;}
       // Capture the stable stage before face/image setup reparents the target.
       // Touch browsers otherwise lose the end of an implicitly captured stream.
-      if(!isMouse&&typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
+      if(!isMouse&&!video&&typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       gesture.mode=mode;gesture.mouse=isMouse;return mode;
     };
     // Phone browsers report both PointerEvents and TouchEvents for one finger.
     // Let the real touch stream own the complete stroke, including its release.
-    stage.addEventListener('pointerdown',event=>{if(!touchOnly())begin(event);},{capture:true,passive:true});
+    stage.addEventListener('pointerdown',event=>{freshVideoTouch(event);if(!touchOnly())begin(event);},{capture:true,passive:true});
     const moved=event=>{
       const g=gesture;if(!g||event.pointerId!==g.id)return;
       if(!enabled()||g.mouse&&event.buttons===0){if(g.dragged)blockClick();reset();return;}
@@ -44,6 +53,9 @@
           if(g.desktop&&!g.mouse&&vertical)g.vertical=true;else {reset();return;}
         }
         if(!g.vertical&&(Math.abs(dx)<10||Math.abs(dx)<Math.abs(dy)*(g.desktop?1.2:1.3)))return;
+        // A video tap must still toggle native controls. Claim its stream only
+        // after a deliberate horizontal stroke can actually change the file.
+        if(g.video&&!g.vertical&&Math.abs(dx)<distance())return;
       }
       if(g.vertical){blockClick();if(event.cancelable)event.preventDefault();vertical(g.lastY-event.clientY);g.lastY=event.clientY;return;}
       if(!g.dragged){
@@ -58,7 +70,7 @@
       const g=gesture;if(!g){if(nativePointer?.id===event.pointerId){nativeEnded(nativePointer,event);nativePointer=null;}return;}if(event.pointerId!==g.id)return;
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
       if(g.vertical){blockClick();reset();return;}
-      if(g.dragged||Math.abs(dx)>10)blockClick();
+      if(g.dragged||Math.abs(dx)>(g.video?distance():10))blockClick();
       if(!enabled()||!g.dragged&&Date.now()-g.time>4000||Math.abs(dx)<distance()||Math.abs(dx)<Math.abs(dy)*(g.desktop&&g.dragged?1:1.5)){reset();return;}
       gesture=null;touchStart=null;stage.classList.remove('photo-pointer-dragging');finished();
       if(event.cancelable)event.preventDefault();
@@ -72,8 +84,10 @@
     // only one stream can finish a swipe, so normal phones never advance twice.
     const fromTouch=(event,touch)=>({pointerId:'touch-'+touch.identifier,pointerType:'touch',isPrimary:true,button:0,clientX:touch.clientX,clientY:touch.clientY,target:touch.target||event.target,cancelable:event.cancelable,preventDefault:()=>event.preventDefault()});
     stage.addEventListener('touchstart',event=>{
+      freshVideoTouch(event);
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
-      touchStart=fromTouch(event,event.touches[0]);touchStart.time=Date.now();if(!gesture)touchStart.native=begin(touchStart)==='native';
+      touchStart=fromTouch(event,event.touches[0]);touchStart.time=Date.now();
+      if(!gesture){const mode=begin(touchStart);touchStart.native=mode==='native';if(strictStart&&!mode){touchStart=null;finished();}}
     },{capture:true,passive:true});
     document.addEventListener('touchmove',event=>{
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}

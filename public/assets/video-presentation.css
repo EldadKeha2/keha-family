@@ -4,7 +4,7 @@ body[data-active-view=videos] #workspaceSubtitle,body[data-active-view=videos] #
 body[data-active-view=videos] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) 76px minmax(110px,180px);align-items:center;gap:10px;padding:13px 20px}
 body[data-active-view=videos] .workspace-title{min-width:0;gap:8px}
 body[data-active-view=videos] .workspace-title h2{font-size:calc(23px * var(--a11y-text-scale,1));line-height:1.25;margin:0}
-body[data-active-view=videos] .workspace-title .section-diamond{font-size:25px}
+body[data-active-view=videos] .workspace-title .section-diamond{display:block;flex:none;font-size:25px;line-height:1}
 body[data-active-view=videos] #videoHeaderUpload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:4px 8px;width:100%;min-height:36px;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.2}
 body[data-active-view=videos] .workspace-actions{display:block;width:100%;margin:0;min-width:0}
 body[data-active-view=videos] .workspace-actions .search-wrap{width:100%}
@@ -89,7 +89,7 @@ html:has(#mediaViewer.video-fullscreen[open]){overflow:hidden}
 @media(max-width:700px){
  body[data-active-view=videos] .workspace-header{grid-template-columns:minmax(0,1fr) 60px 95px;gap:7px;padding:10px 11px}
  body[data-active-view=videos] .workspace-title h2{font-size:calc(18px * var(--a11y-text-scale,1));line-height:1.25}
- body[data-active-view=videos] .workspace-title .section-diamond{display:none}
+ body[data-active-view=videos] .workspace-title .section-diamond{display:block;font-size:22px}
  body[data-active-view=videos] #videoHeaderUpload{font-size:calc(11px * var(--a11y-text-scale,1));min-height:32px;padding:3px 5px}
  body[data-active-view=videos] #searchInput{height:29px;font-size:calc(12px * var(--a11y-text-scale,1));padding-inline:24px 5px}
  body[data-active-view=videos] #videosView{padding:0 11px 18px;min-height:0}
