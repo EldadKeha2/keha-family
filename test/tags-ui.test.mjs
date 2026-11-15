@@ -11,6 +11,9 @@ class NodeStub extends EventTarget{
  replaceChildren(){}
  insertAdjacentHTML(position,html){this.adjacentHTML=(this.adjacentHTML||'')+html;}
  focus(){}
+ setAttribute(name,value){this.attributes??=new Map();this.attributes.set(name,String(value));}
+ getAttribute(name){return this.attributes?.get(name)??null;}
+ removeAttribute(name){this.attributes?.delete(name);}
 }
 function fixture(respond){
  const nodes=new Map(),requests=[],events=[],windowHandlers=new Map();let init;
@@ -21,6 +24,22 @@ function fixture(respond){
  init();return {tags:window.FamilyTags,requests,events,emit:detail=>window.dispatchEvent(new CustomEvent('family-media-changed',{detail}))};
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});
+test('Enter chooses the first displayed suggestion and arrow keys navigate that same ranked list with wrapping',async()=>{
+ const people=['Alpha','Beta','Gamma'].map((name,index)=>({id:'keyboard-'+index,name:'Keyboard '+name,extra:true})),f=fixture(()=>Response.json({people}));await f.tags.findPeople('Keyboard');
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('keyboard-video'),kind:'video'});const widget=host._tagWidget,input=widget.input,chosen=[];widget.store.enqueue=person=>chosen.push(person.id);
+ const type=query=>{input.value=query;input.dispatchEvent(new Event('input'));},key=(key,extra={})=>{const event=new Event('keydown',{cancelable:true});Object.defineProperties(event,Object.fromEntries(Object.entries({key,...extra}).map(([key,value])=>[key,{value}])));input.dispatchEvent(event);return event;};
+ type('Keyboard');const ids=Array.from(widget.results.innerHTML.matchAll(/data-tag-person="([^"]+)"/g),match=>match[1]);assert.equal(ids.length,3);assert.equal(key('Enter').defaultPrevented,true);assert.equal(chosen.at(-1),ids[0]);
+ type('Keyboard');assert.equal(key('ArrowDown').defaultPrevented,true);assert.equal(input.getAttribute('aria-activedescendant'),'inlineTagPersonOption1');key('Enter');assert.equal(chosen.at(-1),ids[1]);
+ type('Keyboard');key('ArrowUp');key('Enter');assert.equal(chosen.at(-1),ids.at(-1));
+ type('Keyboard');key('ArrowUp');key('ArrowDown');key('Enter');assert.equal(chosen.at(-1),ids[0]);
+ type('Keyboard');key('ArrowDown');type('Keyboard');key('Enter');assert.equal(chosen.at(-1),ids[0]);
+ type('Keyboard');key('Enter',{isComposing:true});assert.equal(chosen.length,5);f.tags.clearInline(host);
+});
+test('Enter still adds a new name when there are no matching people and leaves an empty search untouched',()=>{
+ const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('new-keyboard-name'),kind:'video'});const widget=host._tagWidget,chosen=[];widget.store.enqueue=person=>chosen.push(person);
+ const press=()=>{const event=new Event('keydown',{cancelable:true});Object.defineProperty(event,'key',{value:'Enter'});widget.input.dispatchEvent(event);return event;};
+ press();assert.equal(chosen.length,0);widget.input.value='A completely distinct archive guest';widget.input.dispatchEvent(new Event('input'));assert.equal(widget.matches.length,0);press();assert.equal(chosen.length,1);assert.equal(chosen[0].name,'A completely distinct archive guest');f.tags.clearInline(host);
+});
 test('video editor tags stay in a draft until Save and closing the editor never sends tag mutations',async()=>{
  const item={...photo('draft-film'),kind:'video',tags:[family.people.shlomo]},f=fixture(()=>Response.json({item,people:Object.values(family.people)})),host=new NodeStub();
  f.tags.mountDraft(host,item);await host._tagWidget.store.load();host._tagWidget.store.enqueue(family.people.yona,true);host._tagWidget.store.enqueue(family.people.shlomo,false);host._tagWidget.store.enqueue({id:'new:guest',name:'A guest'},true);

@@ -14,9 +14,15 @@
  function fitName(){
   if(!active||!dialog?.open)return;
   const field=$('videoClipName'),style=typeof getComputedStyle==='function'?getComputedStyle(field):null;
+  if(field.hidden)return;
   const minimum=parseFloat(style?.minHeight)||40,maximum=parseFloat(style?.maxHeight)||180,border=(parseFloat(style?.borderTopWidth)||0)+(parseFloat(style?.borderBottomWidth)||0);
-  field.style.height='auto';const height=active.nameExpanded?Math.min(maximum,Math.max(minimum,Math.ceil((field.scrollHeight||0)+border))):minimum;field.style.height=height+'px';
-  $('videoClipEditName').setAttribute('aria-expanded',String(height>minimum+1));
+  field.style.height='auto';field.style.height=Math.min(maximum,Math.max(minimum,Math.ceil((field.scrollHeight||0)+border)))+'px';
+ }
+ function editName(editing){
+  if(!active)return;
+  active.nameExpanded=editing;$('videoClipName').hidden=!editing;$('videoClipSubtitle').hidden=editing||!$('videoClipName').value.trim();
+  $('videoClipEditName').setAttribute('aria-expanded',String(editing));
+  if(editing){fitName();$('videoClipName').focus();}
  }
  function pausePlayer(){if(player?.tagName==='VIDEO')player.pause();}
  function flushSeek(){
@@ -33,11 +39,12 @@
   if(source==='ranges'){if(start>=end){if(boundary==='start')start=Math.max(0,end-.1);else end=Math.min(active.duration,start+.1);}$('videoClipStart').value=clock(start);$('videoClipEnd').value=clock(end);}
   const valid=Number.isFinite(start)&&Number.isFinite(end)&&start>=0&&end-start>=.099&&(!active.knownDuration||end<=active.duration+.01);
   active.start=start;active.end=end;active.valid=valid;
-  const name=$('videoClipName').value.trim();$('videoClipSubtitle').textContent=name;$('videoClipSubtitle').hidden=!name;
+  const name=$('videoClipName').value.trim();$('videoClipSubtitle').textContent=name;$('videoClipSubtitle').hidden=active.nameExpanded||!name;
   $('videoClipSave').disabled=saving||!valid||!name;$('videoClipSaveNew').disabled=saving||!valid||!name;
   if(valid){$('videoClipStartRange').value=start;$('videoClipEndRange').value=end;}
   const max=Math.max(active.duration,end||0,1);$('videoClipSelection').style.left=(Math.max(0,start)/max*100)+'%';$('videoClipSelection').style.width=(Math.max(0,end-start)/max*100)+'%';
-  $('videoClipLength').textContent=valid?tr('אורך הקטע: ','Clip length: ')+clock(end-start):tr('בחרו זמן התחלה וסיום תקינים','Choose a valid start and end');
+  $('videoClipLength').textContent=valid?clock(end-start):'—';
+  $('videoClipLength').setAttribute('aria-label',valid?tr('אורך הסרטון: ','Video length: ')+clock(end-start):tr('בחרו זמן התחלה וסיום תקינים','Choose a valid start and end'));
   if(boundary&&valid)showFrame(boundary==='end'?end:start);
  }
  function close(){if(saving)return;const previous=active;queuedSeek=null;pausePlayer();window.FamilyTags?.clearInline($('videoClipTags'));dialog.close();if(player?.tagName==='VIDEO'){player.removeAttribute('src');player.load();}else if(player)player.removeAttribute('src');active=null;if(previous?.objectURL)URL.revokeObjectURL(previous.objectURL);previous?.onCancel?.();}
@@ -53,6 +60,7 @@
   queuedSeek=null;active={item,scope,start:options.range?.start||0,end:options.range?.end||item.duration||60,duration:item.duration||60,knownDuration:Boolean(item.duration),valid:false,clipId:crypto.randomUUID().replaceAll('-',''),payload:null,...options};
   $('videoClipCategory').hidden=Boolean(options.selectionOnly)||!categoryPicker(item,scope)?.openAssign;
   $('videoClipName').maxLength=options.selectionOnly?140:5000;$('videoClipName').value=(options.name||item.caption||I.mediaName(item)||tr('סרטון','Video')).slice(0,$('videoClipName').maxLength);$('videoClipStart').value=clock(active.start);$('videoClipEnd').value=clock(active.end);
+  editName(false);dialog.classList.toggle('is-selection',Boolean(options.selectionOnly));
   active.initialStart=active.start;active.initialEnd=seconds(clock(active.end));
   $('videoClipPlayer').replaceChildren();feedback();$('videoClipSave').textContent=options.selectionOnly?tr('החלת בחירת הקטע','Apply selection'):tr('שמור','Save');$('videoClipSaveNew').hidden=Boolean(options.selectionOnly);$('videoClipTags').hidden=Boolean(options.selectionOnly);$('videoClipTags').inert=false;
   if(options.selectionOnly)window.FamilyTags?.clearInline($('videoClipTags'));else window.FamilyTags?.mountDraft($('videoClipTags'),item);
@@ -83,13 +91,27 @@
  }
  function init(){
   dialog=document.createElement('dialog');dialog.id='videoClipEditor';dialog.className='photo-upload-editor video-clip-editor is-existing';dialog.setAttribute('data-i18n-skip','');dialog.setAttribute('aria-labelledby','videoClipTitle');
-  dialog.innerHTML=`<form id="videoClipForm"><header><div class="video-clip-heading"><div class="video-clip-title-row"><span class="section-diamond" aria-hidden="true">◇</span><h2 id="videoClipTitle">${tr('עריכת הסרטון','Edit video')}</h2></div><p id="videoClipSubtitle" dir="auto"></p></div><button type="button" id="videoClipClose" aria-label="${tr('סגירת עורך הסרטונים','Close video editor')}">×</button></header><div id="videoClipPlayer"></div><div class="video-clip-timeline" id="videoClipTimeline"><div class="video-clip-track"><span id="videoClipSelection"></span></div><label>${tr('תחילת הקטע','Clip start')}<input type="range" min="0" max="60" step=".01" value="0" id="videoClipStartRange" aria-label="${tr('תחילת הקטע בציר הזמן','Clip start on timeline')}"></label><label>${tr('סיום הקטע','Clip end')}<input type="range" min="0" max="60" step=".01" value="60" id="videoClipEndRange" aria-label="${tr('סיום הקטע בציר הזמן','Clip end on timeline')}"></label></div><div class="video-clip-times"><div class="video-clip-time-row"><button type="button" id="videoClipMarkStart">${tr('סימון התחלה כאן','Set start here')}</button><label id="videoClipStartLabel" for="videoClipStart" hidden>${tr('תחילת הקטע','Clip start')}</label><input type="text" id="videoClipStart" value="00:00.00" dir="ltr" inputmode="decimal" aria-label="${tr('זמן תחילת הקטע','Clip start time')}"></div><div class="video-clip-time-row"><button type="button" id="videoClipMarkEnd">${tr('סימון סיום כאן','Set end here')}</button><label id="videoClipEndLabel" for="videoClipEnd" hidden>${tr('סיום הקטע','Clip end')}</label><input type="text" id="videoClipEnd" value="01:00.00" dir="ltr" inputmode="decimal" aria-label="${tr('זמן סיום הקטע','Clip end time')}"></div></div><p id="videoClipLength" role="status"></p><div class="video-clip-completion"><div class="video-clip-details"><div class="video-clip-name"><label for="videoClipName">${tr('כיתוב הסרטון','Video caption')}</label><div class="video-clip-name-editor"><textarea id="videoClipName" rows="1" maxlength="5000" dir="auto" required></textarea><button type="button" id="videoClipEditName" aria-label="${tr('עריכת שם הקטע','Edit clip name')}" aria-controls="videoClipName">${pencilIcon}</button></div></div><button type="button" class="secondary-button video-clip-category" id="videoClipCategory" hidden>${tr('שיוך לקטגוריה אחרת','Change video category')}</button></div><div id="videoClipTags" class="video-clip-tags"></div><footer><button type="submit" class="primary-button" id="videoClipSave">${tr('שמור','Save')}</button><button type="submit" class="secondary-button" id="videoClipSaveNew">${tr('שמור כקטע חדש','Save as new clip')}</button></footer><p id="videoClipStatus" role="status" aria-live="polite"></p></div></form>`;
+  dialog.innerHTML=`<form id="videoClipForm">
+   <header><div class="video-clip-heading">
+    <div class="video-clip-title-row"><span class="section-diamond" aria-hidden="true">◇</span><h2 id="videoClipTitle">${tr('עריכת הסרטון','Edit video')}</h2></div>
+    <div class="video-clip-subtitle-row"><button type="button" id="videoClipEditName" aria-label="${tr('עריכת שם הסרטון','Edit video name')}" aria-controls="videoClipName" aria-expanded="false">${pencilIcon}</button><p id="videoClipSubtitle" dir="auto"></p><textarea id="videoClipName" rows="1" maxlength="5000" dir="auto" required hidden aria-label="${tr('שם הסרטון','Video name')}"></textarea></div>
+   </div><button type="button" id="videoClipClose" aria-label="${tr('סגירת עורך הסרטונים','Close video editor')}">×</button></header>
+   <div id="videoClipPlayer"></div>
+   <div class="video-clip-timeline" id="videoClipTimeline"><div class="video-clip-track"><span id="videoClipSelection"></span></div><label>${tr('תחילת הקטע','Clip start')}<input type="range" min="0" max="60" step=".01" value="0" id="videoClipStartRange" aria-label="${tr('תחילת הקטע בציר הזמן','Clip start on timeline')}"></label><label>${tr('סיום הקטע','Clip end')}<input type="range" min="0" max="60" step=".01" value="60" id="videoClipEndRange" aria-label="${tr('סיום הקטע בציר הזמן','Clip end on timeline')}"></label></div>
+   <div class="video-clip-timing"><div class="video-clip-times">
+    <div class="video-clip-time-row"><button type="button" id="videoClipMarkStart">${tr('סימון התחלה כאן','Set start here')}</button><label id="videoClipStartLabel" for="videoClipStart" hidden>${tr('תחילת הקטע','Clip start')}</label><input type="text" id="videoClipStart" value="00:00.00" dir="ltr" inputmode="decimal" aria-label="${tr('זמן תחילת הקטע','Clip start time')}"></div>
+    <div class="video-clip-time-row"><button type="button" id="videoClipMarkEnd">${tr('סימון סיום כאן','Set end here')}</button><label id="videoClipEndLabel" for="videoClipEnd" hidden>${tr('סיום הקטע','Clip end')}</label><input type="text" id="videoClipEnd" value="01:00.00" dir="ltr" inputmode="decimal" aria-label="${tr('זמן סיום הקטע','Clip end time')}"></div>
+   </div><div class="video-clip-duration"><span>${tr('אורך הסרטון','Video length')}</span><output id="videoClipLength" for="videoClipStart videoClipEnd" dir="ltr" role="status" aria-live="polite"></output></div></div>
+   <div class="video-clip-completion"><div id="videoClipTags" class="video-clip-tags"></div>
+    <footer><button type="submit" class="primary-button" id="videoClipSave">${tr('שמור','Save')}</button><button type="submit" class="secondary-button" id="videoClipSaveNew">${tr('שמור כקובץ חדש','Save as new clip')}</button><button type="button" class="secondary-button video-clip-category" id="videoClipCategory" hidden>${tr('שיוך לקטגוריה אחרת','Change video category')}</button></footer>
+    <p id="videoClipStatus" role="status" aria-live="polite"></p>
+   </div></form>`;
   document.body.appendChild(dialog);$('videoClipClose').addEventListener('click',close);$('videoClipCategory').addEventListener('click',editCategory);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});$('videoClipForm').addEventListener('submit',save);
   dialog.addEventListener('keydown',event=>event.stopPropagation());
   for(const [id,boundary]of [['videoClipStart','start'],['videoClipEnd','end']])$(id).addEventListener('input',()=>sync('fields',boundary));
-  $('videoClipName').addEventListener('input',()=>{if(active)active.nameExpanded=true;fitName();sync();});
+  $('videoClipName').addEventListener('input',()=>{fitName();sync();});
   $('videoClipName').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,()=>{if(!$('videoClipSave').disabled)$('videoClipForm').requestSubmit();}));
-  $('videoClipEditName').addEventListener('click',()=>{if(active)active.nameExpanded=true;fitName();$('videoClipName').focus();});
+  $('videoClipEditName').addEventListener('click',()=>editName(!active?.nameExpanded));
   if(typeof ResizeObserver==='function'){let width=0;new ResizeObserver(entries=>{const next=entries[0]?.contentRect.width;if(next&&next!==width){width=next;fitName();}}).observe($('videoClipName'));}
   for(const [id,boundary]of [['videoClipStartRange','start'],['videoClipEndRange','end']])$(id).addEventListener('input',()=>sync('ranges',boundary));
   $('videoClipMarkStart').addEventListener('click',()=>{if(player?.tagName!=='VIDEO')return;$('videoClipStart').value=clock(player.currentTime);pausePlayer();sync();});

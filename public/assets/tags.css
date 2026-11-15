@@ -54,6 +54,7 @@
 :root[lang^=en] .tag-widget .tag-widget-heading h3{white-space:nowrap;flex-shrink:0}
 .video-person-age{font:inherit;white-space:nowrap;color:#77805f}
 .tag-search-popup[hidden]{display:none!important}
+.tag-person-option.is-keyboard-active,.tag-person-option.is-keyboard-active:has(input:checked){background:#e6eddb;outline:2px solid #8d9d78;outline-offset:-2px}
 @media(min-width:701px){
   .inline-tag-widget .tag-search-area{position:relative}
   .inline-tag-widget .tag-search-popup{position:absolute;z-index:30;inset-inline:0;bottom:calc(100% + 6px);display:flex;flex-direction:column;box-sizing:border-box;max-height:var(--tag-popup-max-height,360px);padding:8px;border:1px solid #c8ceb8;border-radius:8px;background:#fffdf6;box-shadow:0 -7px 24px #303b2526;overflow:hidden}

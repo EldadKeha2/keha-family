@@ -17,6 +17,8 @@ function fixture({mobile=true}={}){
     insertAdjacentHTML(position,html){this.adjacentHTML={position,html};}
     replaceChildren(){}
     focus(){}
+    setAttribute(name,value){this.attributes??=new Map();this.attributes.set(name,String(value));}
+    removeAttribute(name){this.attributes?.delete(name);}
   }
   const viewport=new EventTarget();Object.assign(viewport,{height:720,offsetTop:0});
   const dialog=new Node(),host=new Node(),input=host.querySelector('[data-tag-search]'),area=host.querySelector('[data-tag-search-area]'),label=new Node(),header=dialog.querySelector('.media-viewer-header'),widget=host.querySelector('.tag-widget');
