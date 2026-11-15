@@ -3,6 +3,7 @@
   const I=window.FamilyI18n,$=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const tr=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const excludedPeople=new Set(['adi']);
   const fresh=()=>Object.fromEntries(['birthdays','anniversaries','memorials'].map(key=>[key,{enabled:true,ids:null}]));
   const state={view:'tree',ready:false,loaded:false,loading:false,loadId:0,enabled:false,prefs:fresh(),mode:'register',token:null,revision:null,email:'',formEmail:'',linkEmail:'',consent:false,verified:false,confirmRemoval:false,language:I.language,busy:false,feedbackForm:'updatesForm',message:'',error:'',catalog:{}};
   const kinds=[['birthdays','🎈','ימי הולדת','Birthdays'],['anniversaries','💐','ימי נישואים','Wedding anniversaries'],['memorials','🕯','ימי זיכרון','Memorial days']];
@@ -17,10 +18,10 @@
     }return data;
   }
   function catalog(){
-    const people=app().getPeople().filter(p=>!p.extra&&!p.placeholder);
+    const people=app().getPeople().filter(p=>!excludedPeople.has(p.id)&&!p.extra&&!p.placeholder);
     state.catalog.birthdays=people.filter(p=>!p.deceased).map(p=>({id:p.id,name:app().nameOf(p.id),search:I.searchNames(p)}));
     state.catalog.memorials=people.filter(p=>p.deceased).map(p=>({id:p.id,name:app().nameOf(p.id),search:I.searchNames(p)}));
-    state.catalog.anniversaries=Object.values(window.FAMILY_DATA.units).filter(unit=>unit.people.length===2&&unit.people.every(id=>!app().getPerson(id)?.deceased)).map(unit=>({id:unit.id,name:unit.people.map(id=>app().nameOf(id)).join(tr(' ו',' & ')),search:unit.people.map(id=>I.searchNames(app().getPerson(id))).join(' ')}));
+    state.catalog.anniversaries=Object.values(window.FAMILY_DATA.units).filter(unit=>unit.people.length===2&&unit.people.every(id=>!excludedPeople.has(id)&&!app().getPerson(id)?.deceased)).map(unit=>({id:unit.id,name:unit.people.map(id=>app().nameOf(id)).join(tr(' ו',' & ')),search:unit.people.map(id=>I.searchNames(app().getPerson(id))).join(' ')}));
     for(const items of Object.values(state.catalog))items.sort((a,b)=>a.name.localeCompare(b.name,I.locale));
   }
   function selection(key){

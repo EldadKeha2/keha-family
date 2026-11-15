@@ -6,6 +6,7 @@ const token=()=>crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().repla
 const hex=value=>Array.from(value,b=>b.toString(16).padStart(2,'0')).join('');
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const langs=new Set(['he','en-US','en-GB']);
+const excludedPeople=new Set(['adi']);
 export const HEAD_REQUEST_RECIPIENT='eldadkeha@gmail.com';
 export function headRequestName(value){
   if(typeof value!=='string'||/[\u0000-\u001f\u007f]/.test(value))throw new HttpError(400,'יש להזין שם מלא תקין.');
@@ -52,14 +53,14 @@ function occurrence(value,day){
 export function eventsForDay(day,people,weddings){
   const events=[],byId=new Map(people.map(p=>[p.id,p]));
   for(const person of people){
-    if(person.extra)continue;
+    if(person.extra||excludedPeople.has(person.id))continue;
     const age=occurrence(person.birthday,day),years=occurrence(person.deathDate,day);
     if(!person.deceased&&age!==null)events.push({type:'birthdays',id:person.id,names:[person],years:age});
     if(person.deceased&&years!==null)events.push({type:'memorials',id:person.id,names:[person],years});
   }
   for(const record of weddings){
     const pair=couples.find(pair=>pair.id===record.id),years=occurrence(record.date,day);
-    if(pair&&years!==null&&pair.people.every(id=>byId.has(id)&&!byId.get(id).deceased))events.push({type:'anniversaries',id:record.id,names:pair.people.map(id=>byId.get(id)),years});
+    if(pair&&years!==null&&pair.people.every(id=>!excludedPeople.has(id)&&byId.has(id)&&!byId.get(id).deceased))events.push({type:'anniversaries',id:record.id,names:pair.people.map(id=>byId.get(id)),years});
   }
   return events;
 }
