@@ -92,5 +92,13 @@
     "source": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.22.0.tgz",
     "license": "MIT",
     "execution": "Single-threaded WASM; all runtime files hosted on this site"
+  },
+  "cutout_cpu_fallback": {
+    "model": "U2netp",
+    "source": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
+    "sha256": "309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
+    "bytes": 4574861,
+    "source_code": "https://github.com/danielgatis/rembg/blob/main/rembg/sessions/u2netp.py",
+    "execution": "Existing same-origin ONNX Runtime, single-threaded WASM. Public model downloaded through an integrity-verified cache; no visitor pixels forwarded."
   }
 }

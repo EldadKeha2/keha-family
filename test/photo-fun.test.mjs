@@ -47,3 +47,10 @@ test('closing during a background separation terminates its worker instead of pu
   try{const controller=new AbortController(),pending=separatePerson({width:100,height:100},controller.signal);controller.abort();await assert.rejects(pending,error=>error.name==='AbortError');await new Promise(resolve=>setImmediate(resolve));assert.equal(terminated,true);assert.equal(closed,true);assert.ok(worker);}
   finally{Object.assign(globalThis,originals);}
 });
+test('a browser without a GPU falls back to the CPU worker using local pixels only',async()=>{
+  const original={Worker:globalThis.Worker,createImageBitmap:globalThis.createImageBitmap,document:globalThis.document},workers=[];
+  globalThis.Worker=class{constructor(url){this.url=String(url);workers.push(this);}terminate(){}postMessage(message){if(this.url.includes('photo-fun-worker'))queueMicrotask(()=>this.onmessage({data:{error:'GPU unavailable'}}));else{assert.equal(message.pixels.length,320*320*4);assert.equal(message.width,320);queueMicrotask(()=>this.onmessage({data:{mask:{width:2,height:1,data:new Uint8Array([0,255])}}}));}}};
+  globalThis.createImageBitmap=async()=>({close(){}});globalThis.document={createElement:()=>({getContext:()=>({drawImage(){},getImageData:()=>({data:new Uint8ClampedArray(320*320*4)})})})};
+  try{const mask=await separatePerson({width:20,height:30});assert.deepEqual([...mask.data],[0,255]);assert.equal(workers.length,2);assert.match(workers[1].url,/photo-cutout-cpu-worker/);}
+  finally{Object.assign(globalThis,original);}
+});

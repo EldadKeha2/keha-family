@@ -1,5 +1,5 @@
 import {LOOKS,ART,LIGHT,FRAMES,TUNING,defaults,normalizeEffects,renderEffects} from './photo-effects-core.mjs?v=2';
-import {PhotoFunEditor} from './photo-fun.js?v=2';
+import {PhotoFunEditor} from './photo-fun.js?v=3';
 
 const I=window.FamilyI18n,$=id=>document.getElementById('photoEffects'+id),tr=(he,en)=>I.isEnglish?en:he;
 const wand='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 12-12 3 3L7 23ZM13 11l3 3M6 2v4M4 4h4M19 1v4M17 3h4M20 17v4M18 19h4"/></svg>';

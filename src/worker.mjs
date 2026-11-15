@@ -10,6 +10,7 @@ import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {galleryRevision} from './gallery.mjs';
 import {familyAiRoute,familyAiTick} from './family-ai-route.mjs';
+import {CUTOUT_MODEL_PATH,cutoutModelResponse} from './photo-cutout-model.mjs';
 import {zipStream} from './zip.mjs';
 import {PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES,decodeUploadMetadata} from '../public/assets/photo-upload-metadata.mjs';
 export {FamilyState} from './state.mjs';
@@ -227,6 +228,7 @@ export default {
   async fetch(request,env,ctx){
     try{
       const url=new URL(request.url),path=url.pathname;
+      if(path===CUTOUT_MODEL_PATH&&['GET','HEAD'].includes(request.method))return await cutoutModelResponse(request);
       if(!env.FAMILY_STATE)throw new HttpError(503,'צריך להשלים את הגדרת השמירה באתר.');
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
