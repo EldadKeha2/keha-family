@@ -53,3 +53,11 @@
 .tag-widget .tag-widget-heading{margin-bottom:8px}.tag-widget .tag-widget-heading h3{display:flex;align-items:center;gap:8px;font-size:calc(22px * var(--a11y-text-scale,1))}.tag-heading-icon{width:21px;height:21px;flex:0 0 21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}.tag-widget .tag-widget-heading>span:empty,.tag-widget .selected-people:empty,.tag-widget .tag-autosave-status:empty,.tag-widget .tag-search-count:empty{display:none}.tag-widget .tag-search-label{gap:0}.tag-widget .selected-people:not(:empty){margin-top:10px;margin-bottom:0}.tag-widget .tag-search-count{margin:5px 0}.tag-widget .tag-autosave-status{min-height:0;margin:7px 0 0;font-size:calc(13px * var(--a11y-text-scale,1))}@media(max-width:700px){.tag-widget .tag-widget-heading h3{font-size:calc(20px * var(--a11y-text-scale,1))}.tag-widget .tag-widget-heading>span{font-size:calc(12px * var(--a11y-text-scale,1))}}
 :root[lang^=en] .tag-widget .tag-widget-heading h3{white-space:nowrap;flex-shrink:0}
 .video-person-age{font:inherit;white-space:nowrap;color:#77805f}
+.tag-search-popup[hidden]{display:none!important}
+@media(min-width:701px){
+  .inline-tag-widget .tag-search-area{position:relative}
+  .inline-tag-widget .tag-search-popup{position:absolute;z-index:30;inset-inline:0;bottom:calc(100% + 6px);display:flex;flex-direction:column;box-sizing:border-box;max-height:var(--tag-popup-max-height,360px);padding:8px;border:1px solid #c8ceb8;border-radius:8px;background:#fffdf6;box-shadow:0 -7px 24px #303b2526;overflow:hidden}
+  .inline-tag-widget .tag-search-popup .tag-people-results{flex:1 1 auto;min-height:0;max-height:320px;margin:0;overflow:auto}
+  .inline-tag-widget .tag-search-popup .tag-search-count{flex:none;margin:0 3px 6px}
+  .inline-tag-widget .tag-search-popup .tag-add-name{flex:none;margin:6px 0 0;min-height:36px;padding:7px 10px}
+}
