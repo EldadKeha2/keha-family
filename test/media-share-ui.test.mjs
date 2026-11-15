@@ -783,7 +783,7 @@ test('gallery Enter saves multiline descriptions for photos, films and documents
   const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f);f.window.FamilyMedia.open([{...f.photo(),kind}],0,'photos');
   f.get('editOpenedCaption').handlers.get('click')();f.get('openedCaptionText').value='שורה ראשונה\nSecond line';
   assert.equal(captionEnter(f,{shiftKey:true}).defaultPrevented,false);assert.equal(captionEnter(f,{isComposing:true}).defaultPrevented,false);assert.equal(saved.length,0);
-  assert.equal(captionEnter(f).defaultPrevented,true);captionEnter(f,{repeat:true});await keyboardFlush();assert.equal(saved.length,1);assert.equal(saved[0].caption,'שורה ראשונה\nSecond line');assert.equal(f.get('openedCaptionForm').hidden,kind!=='photo');assert.equal(f.window.FamilyMedia.current().caption,'שורה ראשונה\nSecond line');
+  assert.equal(captionEnter(f).defaultPrevented,true);captionEnter(f,{repeat:true});await keyboardFlush();assert.equal(saved.length,1);assert.equal(saved[0].caption,'שורה ראשונה\nSecond line');assert.equal(f.get('openedCaptionForm').hidden,kind==='document');assert.equal(f.window.FamilyMedia.current().caption,'שורה ראשונה\nSecond line');
   f.get('editOpenedCaption').handlers.get('click')();f.navigator.userAgent='Android Mobile';f.get('openedCaptionText').value='Phone';assert.equal(captionEnter(f).defaultPrevented,false);assert.equal(saved.length,1);f.close();
  }
 });

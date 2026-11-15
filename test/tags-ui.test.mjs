@@ -22,13 +22,13 @@ function fixture(respond){
 }
 const photo=id=>({id,kind:'photo',name:'Memory',tags:[],tagsRevision:'empty'});
 
-test('video tagging separates family, extended family and friends while retaining saved selections',async()=>{
+test('video tagging searches all people without category controls or headings',async()=>{
  const extended=Object.values(family.people).find(person=>person.extended),friend={id:'qa-friend',name:'Archive Guest',extra:true};assert.ok(extended);
  const f=fixture(()=>Response.json({people:[family.people.yona,extended,friend]}));await f.tags.findPeople('');
  const host=new NodeStub();f.tags.mountInline(host,{...photo('archive-film'),kind:'video'});const widget=host._tagWidget;
- widget.group='family';widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="yona"/);assert.doesNotMatch(widget.results.innerHTML,/qa-friend/);
- widget.group='extended';widget.renderResults(true);assert.ok(widget.results.innerHTML.includes('data-tag-person="'+extended.id+'"'));assert.doesNotMatch(widget.results.innerHTML,/data-tag-person="yona"/);
- widget.group='friends';widget.renderResults(true);assert.match(widget.results.innerHTML,/qa-friend/);assert.match(widget.results.innerHTML,/חברים ומכרים/);assert.equal(widget.results.hidden,false);
+ widget.renderResults(true);assert.match(widget.results.innerHTML,/data-tag-person="yona"/);assert.ok(widget.results.innerHTML.includes('data-tag-person="'+extended.id+'"'));assert.match(widget.results.innerHTML,/qa-friend/);
+ assert.equal(widget.results.adjacentHTML,undefined);assert.doesNotMatch(widget.results.innerHTML,/tag-group-heading/);
+ widget.store.saved.set('yona',family.people.yona);widget.query='Archive';widget.renderResults(true);widget.render();assert.match(widget.results.innerHTML,/qa-friend/);assert.equal(widget.results.hidden,false);assert.match(widget.selectedHost.innerHTML,/data-remove-person-tag="yona"/);
  f.tags.clearInline(host);
 });
 
@@ -116,7 +116,7 @@ test('name similarity precedes generation, resets search scroll, and shows famil
 });
 test('video tagging retains its compact search field without repeated help text',()=>{
   const f=fixture(),host=new NodeStub();f.tags.mountInline(host,{...photo('compact-image'),kind:'video'});const widget=host._tagWidget;
-  assert.match(host.innerHTML,/תייגו מי מופיע כאן/);assert.match(host.innerHTML,/class="tag-heading-icon"/);assert.ok(host.innerHTML.indexOf('data-tag-search-area')<host.innerHTML.indexOf('data-selected-people'));assert.ok(host.innerHTML.indexOf('data-tag-save-status')<host.innerHTML.indexOf('data-selected-people'));assert.doesNotMatch(host.innerHTML,/tag-add-help|התיוגים נשמרים אוטומטית|בחרו את האנשים/);assert.equal(widget.selectedHost.innerHTML,'');assert.equal(widget.status.textContent,'');assert.equal(host.querySelector('[data-tag-count]').textContent,'');
+  assert.match(host.innerHTML,/תיוג אנשים/);assert.doesNotMatch(host.innerHTML,/tag-group-filters|data-tag-group=/);assert.match(host.innerHTML,/class="tag-heading-icon"/);assert.ok(host.innerHTML.indexOf('data-tag-search-area')<host.innerHTML.indexOf('data-selected-people'));assert.ok(host.innerHTML.indexOf('data-tag-save-status')<host.innerHTML.indexOf('data-selected-people'));assert.doesNotMatch(host.innerHTML,/tag-add-help|התיוגים נשמרים אוטומטית|בחרו את האנשים/);assert.equal(widget.selectedHost.innerHTML,'');assert.equal(widget.status.textContent,'');assert.equal(host.querySelector('[data-tag-count]').textContent,'');
   widget.store.saved.set('yona',family.people.yona);widget.render();assert.match(widget.selectedHost.innerHTML,/יונה/);assert.match(widget.selectedHost.innerHTML,/data-remove-person-tag/);assert.equal(host.querySelector('[data-tag-count]').textContent,'אדם אחד תויג');f.tags.clearInline(host);
 });
 test('newest tags stay first while saving, after the response and when reopening the image',async()=>{

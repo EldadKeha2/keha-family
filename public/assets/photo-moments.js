@@ -87,8 +87,8 @@ function render(){
   host.hidden=!item?.id||!['photo','video'].includes(item.kind);if(host.hidden){host.replaceChildren();return;}
   const known=Boolean(item.takenDate?.year),date=photoDateText(item.takenDate,I.locale);
   if(item.kind==='video'){
-    const label=tr('תאריך צילום','Recording date');
-    host.innerHTML=`<button id="editPhotoDate" class="photo-moment-button${date?' has-date':''}" type="button" aria-haspopup="dialog" aria-controls="photoDateDialog" aria-label="${label}" ${window.FamilyApp?.apiEnabled?'':'disabled'}>${calendar}<span class="photo-moment-label">${label}</span></button><span class="photo-taken-date">${safe(date||tr('טרם צוין','Not set'))}</span>`;
+    const label=tr('הזן תאריך','Add date'),help=tr('עריכת תאריך הצילום','Edit recording date')+(date?': '+date:'');
+    host.innerHTML=`<button id="editPhotoDate" class="photo-moment-button${date?' has-date':''}" type="button" aria-haspopup="dialog" aria-controls="photoDateDialog" aria-label="${safe(help)}" title="${safe(help)}" ${window.FamilyApp?.apiEnabled?'':'disabled'}>${calendar}<span class="photo-moment-label">${safe(date||label)}</span></button>`;
     renderInlineDate();return;
   }
   const dateLabel=tr('תאריך צילום','Photo date'),nameLabel=showNames?tr('הסתרת שמות בתמונה','Hide names in photo'):tr('הצגת שמות בתמונה','Show names in photo'),ageLabel=showAges&&known?tr('הסתרת גילים','Hide ages'):tr('הצגת גילים','Show ages');
