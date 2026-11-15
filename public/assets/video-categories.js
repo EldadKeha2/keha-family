@@ -5,7 +5,7 @@ const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 const categoryIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h7l2 2h9v13H3Z"/><path d="M8 13h8m-4-4v8"/></svg>';
 let catalog=DEFAULT_VIDEO_CATEGORIES,createDialog,assignDialog,assignment,afterCreate;
 const CREATE_CATEGORY='__create_category__';
-const name=category=>I.isEnglish?category.nameEn||category.name:category.name;
+const name=category=>category.id==='special-birthdays'?tr('ימי הולדת עגולים','Milestone birthdays'):I.isEnglish?category.nameEn||category.name:category.name;
 function options({allowCreate=false}={}){return catalog.map(category=>`<option value="${safe(category.id)}">${safe(name(category))}</option>`).join('')+(allowCreate?`<option value="${CREATE_CATEGORY}">＋ ${tr('הוסף קטגוריה','Add category')}</option>`:'');}
 function render(categories,selected='all'){
  if(Array.isArray(categories))catalog=categories;
