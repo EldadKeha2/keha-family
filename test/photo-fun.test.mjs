@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {BACKGROUNDS,HEADS,PROPS,funDefaults,normalizeFun,hitSticker,placedSticker,drawBackground,drawSticker} from '../public/assets/photo-fun-core.mjs';
+import {EMOJIS,PROP_STYLES,PALETTE_SIZE,palettePages,palettePage} from '../public/assets/photo-fun-catalog.mjs';
+import {EXTRA_SCENE_IDS} from '../public/assets/photo-fun-scenes.mjs';
+import {PhotoFunEditor} from '../public/assets/photo-fun.js';
 import {separatePerson} from '../public/assets/photo-fun-segment.mjs';
 
 test('fun state round-trips through undo snapshots without sharing mutable sticker or brush arrays',()=>{
@@ -28,9 +31,35 @@ test('hit testing uses topmost sticker order and its rotation without changing t
 });
 function drawingContext(){const commands=[],ctx=new Proxy({commands},{get(target,key){if(key in target)return target[key];if(key==='createLinearGradient'||key==='createRadialGradient')return (...args)=>{commands.push([key,...args]);return {addColorStop:(...args)=>commands.push(['stop',...args])};};return (...args)=>commands.push([key,...args]);},set(target,key,value){target[key]=value;return true;}});return ctx;}
 test('every illustrated destination and sticker draws with the same deterministic preview/export coordinates',()=>{
-  for(const [id]of BACKGROUNDS){const a=drawingContext(),b=drawingContext();drawBackground(a,600,400,id);drawBackground(b,600,400,id);assert.deepEqual(a.commands,b.commands);assert.ok(a.commands.length>2);}
-  for(const p of [...HEADS,...PROPS]){const ctx=drawingContext(),sticker=placedSticker(p,HEADS.includes(p)?'head':'prop',null,1000,800,'s');drawSticker(ctx,sticker,1000,800);assert.deepEqual(ctx.commands.find(([name])=>name==='translate'),['translate',sticker.x*1000,sticker.y*800]);assert.ok(ctx.commands.some(([name])=>name==='fillText'||name==='fill'));}
+  for(const [id]of BACKGROUNDS){const a=drawingContext(),b=drawingContext();drawBackground(a,600,400,id);drawBackground(b,600,400,id);assert.deepEqual(a.commands,b.commands,id);assert.ok(a.commands.length>2,id);for(const command of a.commands)for(const value of command)if(typeof value==='number')assert.ok(Number.isFinite(value),id+' has a non-finite drawing coordinate');}
+  for(const p of [...HEADS,...PROPS]){const ctx=drawingContext(),sticker=placedSticker(p,HEADS.includes(p)?'head':'prop',null,1000,800,'s');drawSticker(ctx,sticker,1000,800);assert.deepEqual(ctx.commands.find(([name])=>name==='translate'),['translate',sticker.x*1000,sticker.y*800]);assert.ok(ctx.commands.some(([name])=>['fillText','fill','stroke','fillRect'].includes(name)),p[0]);}
 });
+
+test('expanded palettes have unique choices, real destination painters and complete bilingual labels',()=>{
+  for(const list of [BACKGROUNDS,HEADS,PROPS,EMOJIS]){assert.equal(new Set(list.map(p=>p[0])).size,list.length);for(const p of list)assert.ok(p.every(v=>typeof v==='string'&&v.length>0),p[0]);}
+  assert.ok(BACKGROUNDS.length>=48);assert.ok(HEADS.length>=80);assert.ok(PROPS.length>=64);assert.ok(EMOJIS.length>=160);
+  assert.equal(new Set(HEADS.map(p=>p[3])).size,HEADS.length);assert.equal(new Set(EMOJIS.map(p=>p[3])).size,EMOJIS.length);
+  assert.deepEqual(new Set(EXTRA_SCENE_IDS),new Set(BACKGROUNDS.slice(8).map(p=>p[0])));
+  for(const [id,spec]of Object.entries(PROP_STYLES)){assert.ok(PROPS.some(p=>p[0]===id));assert.ok(spec.shape);assert.equal(spec.anchor.length,2);}
+});
+test('every destination, late-page prop and emoji survives the same normalized copy-save state',()=>{
+  for(const [background]of BACKGROUNDS)assert.equal(normalizeFun({background}).background,background);
+  for(const preset of PROPS){const s=placedSticker(preset,'prop',{x:.25,y:.3,width:.2,height:.25},1800,1200,preset[0]),saved=normalizeFun(JSON.parse(JSON.stringify({stickers:[s]}))).stickers[0];assert.deepEqual(saved,s);assert.equal(saved.prop,preset[0]);}
+  for(const preset of EMOJIS)assert.equal(placedSticker(preset,'sticker',null,800,1200,preset[0]).glyph,preset[3]);
+  const face={x:.3,y:.25,width:.2,height:.22},find=id=>PROPS.find(p=>p[0]===id);
+  assert.ok(placedSticker(find('wizard-hat'),'prop',face,1200,1800,'hat').y<face.y);
+  assert.ok(placedSticker(find('gold-necklace'),'prop',face,1200,1800,'necklace').y>face.y+face.height);
+  assert.ok(placedSticker(find('microphone'),'prop',face,1200,1800,'mic').x>face.x+face.width);
+});
+test('palette paging reaches every option and wraps in both directions with eight fixed visible slots',()=>{
+  for(const list of [BACKGROUNDS,HEADS,PROPS,EMOJIS]){let page=0;const seen=[];for(let i=0;i<palettePages(list.length);i++){seen.push(...list.slice(page*PALETTE_SIZE,(page+1)*PALETTE_SIZE));page=palettePage(page,1,list.length);}assert.equal(page,0);assert.deepEqual(seen,list);assert.equal(palettePage(0,-1,list.length),palettePages(list.length)-1);assert.equal(palettePage(palettePages(list.length)-1,1,list.length),0);}
+  assert.equal(palettePage(0,1,0),0);assert.equal(palettePage(0,-1,1),0);assert.equal(palettePage(0,-1,9),1);
+});
+test('switching tools remembers each palette page without changing the photo edit or history',()=>{
+  let renders=0;const editor=Object.create(PhotoFunEditor.prototype);Object.assign(editor,{pages:{},section:'background',page:0,mode:'erase',data:funDefaults(),render(){renders++;}});
+  editor.turnPage(4);editor.showSection('prop');editor.turnPage(-1);assert.equal(editor.page,7);editor.showSection('background');assert.equal(editor.page,4);editor.showSection('prop');assert.equal(editor.page,7);assert.equal(editor.mode,'move');assert.deepEqual(editor.data,funDefaults());assert.equal(renders,5);
+});
+
 const workerSource=(await readFile(new URL('../public/assets/photo-fun-worker.mjs',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
 test('person segmentation keeps the selfie probability orientation, transfers a copy and closes input pixels',async()=>{
   const sent=[],fetches=[];let options,closed=false;

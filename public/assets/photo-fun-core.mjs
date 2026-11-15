@@ -1,7 +1,7 @@
-export const BACKGROUNDS=[['none','הרקע המקורי','Original','↩'],['beach','חוף טרופי','Tropical beach','🏝️'],['space','על הירח','On the moon','🚀'],['paris','פריז','Paris','🗼'],['snow','הרים מושלגים','Snowy mountains','🏔️'],['forest','יער קסום','Magic forest','🌳'],['desert','שקיעה במדבר','Desert sunset','🌵'],['party','מסיבת דיסקו','Disco party','🪩']];
-export const HEADS=[['lion','ראש אריה','Lion','🦁'],['robot','ראש רובוט','Robot','🤖'],['alien','חייזר','Alien','👽'],['cat','ראש חתול','Cat','🐱'],['panda','פנדה','Panda','🐼'],['laugh','מצחיק בטירוף','Laughing','😂'],['dog','ראש כלב','Dog','🐶'],['disguise','בלש סמוי','Disguise','🥸']];
-export const PROPS=[['glasses','משקפי שמש','Sunglasses','🕶️'],['crown','כתר מלכותי','Royal crown','👑'],['mustache','שפם מפואר','Mustache','🥸'],['hat','כובע מסיבה','Party hat','🥳'],['bunny','אוזני ארנב','Bunny ears','🐰'],['pirate','רטיית פיראט','Pirate patch','🏴‍☠️'],['bowtie','פפיון','Bow tie','🎀'],['bubble','בועת דיבור','Speech bubble','💬']];
-export const EMOJIS=['❤️','😂','🥳','⭐','🌈','🦄','🔥','💩','🎈','💋','🌸','🦋','🍉','🍕','🏆','🎉','😍','🤩','🤪','😱','👻','🛸','☀️','🌙','🎵','💎','🫶','🐣','💐','🕊️','💥','☕'].map((glyph,i)=>['emoji-'+i,glyph,glyph,glyph]);
+import {BACKGROUNDS,HEADS,PROPS,EMOJIS,PROP_STYLES} from './photo-fun-catalog.mjs?v=1';
+import {drawExtraScene} from './photo-fun-scenes.mjs?v=1';
+import {drawExtraProp} from './photo-fun-props.mjs?v=1';
+export {BACKGROUNDS,HEADS,PROPS,EMOJIS};
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const number=(value,fallback,min,max)=>Number.isFinite(Number(value))?clamp(Number(value),min,max):fallback;
 export const funDefaults=()=>({background:'none',stickers:[],strokes:[],feather:2});
@@ -23,7 +23,7 @@ export function placedSticker(preset,kind,face,width,height,id){
   const rect=face?.rect||face,short=Math.min(width,height),hasFace=rect&&rect.width>0&&rect.height>0;
   const s={id,kind:kind==='head'||kind==='sticker'?'emoji':preset[0]==='bubble'?'text':'prop',glyph:preset[3],prop:preset[0],text:'איזה קטע!',x:.5,y:.35,size:kind==='prop'?.3:.26,rotation:0};
   if(hasFace){s.x=rect.x+rect.width/2;s.y=rect.y+rect.height*.48;s.size=rect.width*width/short*(kind==='head'?1.55:1.25);
-    if(kind==='prop'){const pos={crown:[-.17,1.4],hat:[-.22,1.5],bunny:[-.22,1.5],mustache:[.76,.8],bowtie:[1.3,.8],bubble:[-.3,2.6],glasses:[.42,1.18],pirate:[.42,1.25]}[preset[0]]||[.45,1.2];s.y=rect.y+rect.height*pos[0];s.size=rect.width*width/short*pos[1];}
+    if(kind==='prop'){const spec=PROP_STYLES[preset[0]],pos=spec?.anchor||{crown:[-.17,1.4],hat:[-.22,1.5],bunny:[-.22,1.5],mustache:[.76,.8],bowtie:[1.3,.8],bubble:[-.3,2.6],glasses:[.42,1.18],pirate:[.42,1.25]}[preset[0]]||[.45,1.2];s.x=rect.x+rect.width*(spec?.x??.5);s.y=rect.y+rect.height*pos[0];s.size=rect.width*width/short*pos[1];}
   }
   return normalizeFun({stickers:[s]}).stickers[0];
 }
@@ -63,7 +63,7 @@ export function drawBackground(ctx,w,h,id){
     gradient(ctx,w,h,[[0,'#391d5f'],[.5,'#8e447d'],[1,'#342348']]);for(let j=0;j<5;j++){ctx.fillStyle=['#3cafd12b','#e3b9ff30','#ffdb6f24'][j%3];polygon(ctx,[[w*(.1+j*.2),0],[w*(j*.25-.2),h],[w*(j*.25+.3),h]],ctx.fillStyle);}
     circle(ctx,w*.5,h*.16,m*.12,'#d7cbe6');for(let y=-4;y<=4;y++)for(let x=-4;x<=4;x++)if(x*x+y*y<17){ctx.fillStyle=(x+y)%2?'#8e84ae':'#f4e7ed';ctx.fillRect(w*.5+x*m*.024,h*.16+y*m*.024,m*.019,m*.019);}
     for(let j=0;j<95;j++){ctx.save();ctx.translate(rand()*w,rand()*h);ctx.rotate(rand()*4);ctx.fillStyle=['#e7ba72','#85d7ce','#e887ad','#ab91de'][j%4];ctx.fillRect(0,0,m*.008,m*.023);ctx.restore();}
-  }else gradient(ctx,w,h,[[0,'#e7e1d3'],[1,'#f5eddd']]);ctx.restore();
+  }else if(!drawExtraScene(ctx,w,h,id))gradient(ctx,w,h,[[0,'#e7e1d3'],[1,'#f5eddd']]);ctx.restore();
 }
 function bubble(ctx,s,size){
   ctx.fillStyle='#fffdf7';ctx.strokeStyle='#544b66';ctx.lineWidth=.014;ctx.beginPath();ctx.moveTo(-.4,-.27);ctx.lineTo(.4,-.27);ctx.quadraticCurveTo(.5,-.27,.5,-.17);ctx.lineTo(.5,.13);ctx.quadraticCurveTo(.5,.23,.4,.23);ctx.lineTo(-.4,.23);ctx.quadraticCurveTo(-.5,.23,-.5,.13);ctx.lineTo(-.5,-.17);ctx.quadraticCurveTo(-.5,-.27,-.4,-.27);ctx.fill();ctx.stroke();polygon(ctx,[[.08,.22],[.15,.38],[.27,.22]],'#fffdf7');
@@ -74,7 +74,7 @@ export function drawSticker(ctx,s,w,h){
   const size=s.size*Math.min(w,h);ctx.save();ctx.translate(s.x*w,s.y*h);ctx.rotate(s.rotation*Math.PI/180);ctx.shadowColor='#22132b33';ctx.shadowBlur=.02*size;ctx.shadowOffsetY=.012*size;
   if(s.kind==='emoji'){ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s.glyph,0,0);}
   else if(s.kind==='text'){ctx.scale(size,size);bubble(ctx,s,size);}
-  else{ctx.scale(size,size);ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=.025;
+  else if(!drawExtraProp(ctx,s,size)){ctx.scale(size,size);ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=.025;
     if(s.prop==='glasses'){ctx.fillStyle='#17242f';ctx.strokeStyle='#101923';for(const x of [-.27,.27]){ctx.beginPath();ctx.ellipse(x,0,.22,.17,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.strokeStyle='#a2d0d1';ctx.lineWidth=.018;ctx.beginPath();ctx.moveTo(x-.12,-.08);ctx.lineTo(x+.06,-.13);ctx.stroke();ctx.strokeStyle='#101923';}ctx.lineWidth=.04;ctx.beginPath();ctx.moveTo(-.06,-.04);ctx.quadraticCurveTo(0,-.1,.06,-.04);ctx.moveTo(-.49,-.06);ctx.lineTo(-.56,-.15);ctx.moveTo(.49,-.06);ctx.lineTo(.56,-.15);ctx.stroke();}
     if(s.prop==='crown'){polygon(ctx,[[-.48,.2],[-.5,-.3],[-.22,-.06],[0,-.43],[.22,-.06],[.5,-.3],[.48,.2]],'#eac568');ctx.fillStyle='#b98732';ctx.fillRect(-.48,.16,.96,.1);for(const x of [-.3,0,.3])circle(ctx,x,.04,.047,x?'#cd7188':'#64a5a3');}
     if(s.prop==='mustache'){ctx.fillStyle='#372b29';ctx.beginPath();ctx.moveTo(0,-.07);ctx.bezierCurveTo(-.2,-.28,-.25,.18,-.5,-.02);ctx.bezierCurveTo(-.46,.35,-.12,.3,0,.1);ctx.bezierCurveTo(.12,.3,.46,.35,.5,-.02);ctx.bezierCurveTo(.25,.18,.2,-.28,0,-.07);ctx.fill();}
