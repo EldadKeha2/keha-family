@@ -258,6 +258,7 @@
       const note=document.createElement('p');note.className='media-document-preview';note.textContent='▤ '+item.filename+I18n.t(' · לפתיחת המסמך בחרו ״הורדת המקור״.');stage.append(note);$('mediaPlaybackNote').hidden=true;
     }
     window.FamilyVideoPresentation?.present(item,state.scope);
+    fitVideoCaption();
     renderSwipeHint();
   }
   function open(items,index=0,scope){
@@ -269,7 +270,7 @@
     state.swipeHintId=null;if(phone&&items[index]?.kind==='photo'&&(albumPages.get(state.scope)?.total||items.length)>1&&!swipeHintsSeen.has(state.scope)){swipeHintsSeen.add(state.scope);state.swipeHintId=identity(items[index]);}
     state.opener=document.activeElement;
     document.querySelectorAll('video').forEach(video=>video.pause());
-    show(index);if(!$('mediaViewer').open){syncMediaRoute(current());$('mediaViewer').showModal();}window.FamilyPhotoViewerLayout?.sync();refreshPhotoPresentation();window.FamilyPhotoFullscreen?.sync();return true;
+    show(index);if(!$('mediaViewer').open){syncMediaRoute(current());$('mediaViewer').showModal();}window.FamilyPhotoViewerLayout?.sync();refreshPhotoPresentation();window.FamilyPhotoFullscreen?.sync();fitVideoCaption();return true;
   }
   function syncMediaRoute(item,replace=false){
     if(!window.FamilyNavigation||!item?.id)return;
@@ -381,6 +382,17 @@
     restoringLink=href;
     try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));const loaded=registeredLink(id);if(loaded)open(loaded.items,loaded.index,loaded.scope);else open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
+  function fitVideoCaption(){
+    if(current()?.kind!=='video')return;
+    const input=$('openedCaptionText'),form=$('openedCaptionForm'),style=typeof getComputedStyle==='function'?getComputedStyle(input):null;
+    const minimum=parseFloat(style?.minHeight)||40,maximum=parseFloat(style?.maxHeight)||280,border=(parseFloat(style?.borderTopWidth)||1)+(parseFloat(style?.borderBottomWidth)||1);
+    // Reset the old editor height before measuring, so shorter captions shrink too.
+    input.style.height='auto';
+    const height=Math.min(maximum,Math.max(minimum,Math.ceil((input.scrollHeight||0)+border)));
+    input.style.height=height+'px';input.scrollTop=0;
+    form.classList.toggle('caption-expanded',height>minimum+1);
+    $('editSavedCaption')?.setAttribute('aria-expanded',String(height>minimum+1));
+  }
   function captionControls(){
     const inline=inlineCaption(),video=current()?.kind==='video',input=$('openedCaptionText'),form=$('openedCaptionForm');
     $('mediaViewer').classList.toggle('media-caption-inline',inline);$('editOpenedCaption').hidden=inline;
@@ -392,14 +404,14 @@
     form.querySelector('label').textContent=current()?.kind==='video'?tr('תיאור הסרטון','Video description'):inline?tr('תיאור התמונה','Photo description'):tr('כיתוב לתמונה או לקובץ','Photo or file description');
     input.setAttribute('dir',I18n.isEnglish?'ltr':'rtl');
     input.placeholder=tr('הקלידו כאן תיאור...','Type a description here...');input.rows=current()?.kind==='video'?1:inline?2:3;
+    if(video&&!captionEditing)fitVideoCaption();
   }
   function expandVideoCaption(){
     if(current()?.kind!=='video')return;
     const form=$('openedCaptionForm'),input=$('openedCaptionText');
-    if(!form.classList.contains('caption-expanded')){
-      form.classList.add('caption-expanded');input.style.height=Math.min(240,Math.max(100,(input.scrollHeight||0)+2))+'px';
-    }
     captionLocked=false;captionControls();
+    form.classList.add('caption-expanded');input.style.height=Math.min(280,Math.max(100,parseFloat(input.style.height)||0,(input.scrollHeight||0)+2))+'px';
+    $('editSavedCaption')?.setAttribute('aria-expanded','true');
   }
   function beginCaptionEdit(preserveValue=false){
     const item=current();if(!item||captionEditing)return;
@@ -482,8 +494,11 @@
     $('cancelOpenedCaption').addEventListener('click',()=>{captionEditing=false;captionLocked=false;captionEditor++;captionSave=null;$('openedCaptionForm').querySelector('[type=submit]').disabled=false;captionControls();});
     $('openedCaptionText').addEventListener('click',()=>{if(current()?.kind==='video'){expandVideoCaption();return;}if(inlineCaption()&&captionLocked){beginCaptionEdit(true);$('openedCaptionText').focus();}});
     $('openedCaptionText').addEventListener('input',()=>{if(inlineCaption())beginCaptionEdit(true);expandVideoCaption();});
+    let captionWidth=0;
     if(typeof ResizeObserver==='function')new ResizeObserver(()=>{
       if(current()?.kind!=='video')return;
+      const width=$('openedCaptionText').clientWidth;
+      if(width!==captionWidth){captionWidth=width;if(!captionEditing)fitVideoCaption();}
       const input=$('openedCaptionText'),expanded=input.getBoundingClientRect().height>(parseFloat(getComputedStyle(input).minHeight)||40)+1;
       $('openedCaptionForm').classList.toggle('caption-expanded',expanded);$('editSavedCaption')?.setAttribute('aria-expanded',String(expanded));
     }).observe($('openedCaptionText'));
