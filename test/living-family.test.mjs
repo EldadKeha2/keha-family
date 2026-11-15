@@ -6,7 +6,7 @@ import {FamilyState} from '../src/state.mjs';
 import {livingPhotos,livingActions} from '../src/living-family-catalog.mjs';
 import {livingFamilyRoute} from '../src/living-family-route.mjs';
 import {livingVideoInfo} from '../src/living-family-video.mjs';
-import {uid} from '../src/http.mjs';
+import {uid,HttpError} from '../src/http.mjs';
 
 const video=new Uint8Array(await readFile(new URL('./fixtures/living-family-5s.mp4',import.meta.url)));
 const longVideo=new Uint8Array(await readFile(new URL('./fixtures/living-family-too-long.mp4',import.meta.url)));
@@ -27,7 +27,7 @@ function fixture(){
     const range=request.headers.get('Range');if(range){const [,start,end]=/^bytes=(\d+)-(\d+)$/.exec(range);return new Response(bytes.slice(Number(start),Number(end)+1),{status:206,headers:{'Content-Range':`bytes ${start}-${end}/${bytes.length}`,'Content-Length':String(Number(end)-Number(start)+1)}});}
     return new Response(request.method==='HEAD'?null:bytes,{headers:{'Content-Length':String(bytes.length)}});
   };
-  const call=async(path,{bytes=video,method='GET',headers={}}={})=>livingFamilyRoute(new Request('https://family.test'+path,{method,headers,...(method==='POST'?{body:bytes}:{})}),env,async(action,p)=>run(action,p),ctx,fetcher);
+  const call=async(path,{bytes=video,method='GET',headers={}}={})=>livingFamilyRoute(new Request('https://family.test'+path,{method,headers,...(method==='POST'?{body:bytes}:{})}),env,async(action,p)=>{const response=await state.fetch(new Request('https://state.internal/',{method:'POST',body:JSON.stringify({...p,action}),headers:{'Content-Type':'application/json'}}));const result=await response.json();if(!response.ok)throw new HttpError(response.status,result.error,result.code);return result;},ctx,fetcher);
   const path=(id,action,operation=uid(),expected='none',revision='original')=>`/api/family-ai/photos/${id}/clips/${action}?revision=${revision}&operation=${operation}&expected=${expected}&filename=memory.mp4`;
   return {state,database,run,objects,calls,pending,call,path,close(){database.close();}};
 }
@@ -65,7 +65,7 @@ test('a delayed import cannot replace a newer action or reuse its operation for 
   const f=fixture(),id=livingPhotos[0].id;try{
     const oldPath=f.path(id,'smile');const first=await(await f.call(oldPath,{method:'POST'})).json();
     const second=await(await f.call(f.path(id,'smile',uid(),first.clip.version),{method:'POST'})).json();
-    const retry=await(await f.call(oldPath,{method:'POST'})).json();assert.equal(retry.clip.version,second.clip.version);assert.equal(f.run('family-ai.living.get',{id,action:'smile'}).clip.version,second.clip.version);
+    const retry=await(await f.call(oldPath,{method:'POST'})).json();assert.equal(retry.clip.version,second.clip.version);assert.equal(f.run('family-ai.living.get',{id,variant:'smile'}).clip.version,second.clip.version);
     await assert.rejects(f.call(f.path(id,'smile'),{method:'POST'}),e=>e.code==='LIVING_CLIP_CHANGED');
     await assert.rejects(f.call(oldPath.replace('/smile?','/wave?'),{method:'POST'}),e=>e.code==='LIVING_OPERATION');
     await assert.rejects(f.call(first.clip.videoSrc),e=>e.code==='LIVING_CLIP_CHANGED');

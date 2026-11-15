@@ -15,7 +15,7 @@ export async function livingFamilyRoute(request,env,db,ctx,fetcher=fetch){
     if(declared!==null&&(!/^\d+$/.test(declared)||Number(declared)>LIVING_VIDEO_MAX_BYTES))throw new HttpError(413,'אפשר להעלות הנפשה עד 25MB.','LIVING_SIZE');
     const bytes=await boundedBody(request,LIVING_VIDEO_MAX_BYTES);
     if(!bytes.byteLength||declared!==null&&Number(declared)!==bytes.byteLength)throw new HttpError(400,'הסרטון לא התקבל במלואו.','LIVING_SIZE');
-    const input={id,action,revision,operation,expected:expected==='none'?null:expected,filename:cleanName(url.searchParams.get('filename')),...await livingVideoInfo(bytes),digest:await sha256(bytes)};
+    const input={id,variant:action,revision,operation,expected:expected==='none'?null:expected,filename:cleanName(url.searchParams.get('filename')),...await livingVideoInfo(bytes),digest:await sha256(bytes)};
     const prepared=await db('family-ai.living.prepare',input);
     const publicResult=result=>({saved:true,alreadySaved:Boolean(result.alreadySaved),clip:{action:result.clip.action,status:'ready',version:result.clip.version,duration:result.clip.video.duration,videoSrc:'/api/family-ai/video/'+id+'/'+action+'?v='+result.clip.version}});
     if(prepared.alreadySaved)return json(publicResult(prepared));
@@ -25,7 +25,7 @@ export async function livingFamilyRoute(request,env,db,ctx,fetcher=fetch){
     catch(error){if(error.status>=400&&error.status<500)ctx.waitUntil(deleteObject(env,key,fetcher).catch(()=>{}));throw error;}
   }
   if((match=/^\/api\/family-ai\/video\/([a-f0-9]{32})\/(smile|wave|dance)$/.exec(path))&&['GET','HEAD'].includes(request.method)){
-    const {clip}=await db('family-ai.living.get',{id:match[1],action:match[2]});
+    const {clip}=await db('family-ai.living.get',{id:match[1],variant:match[2]});
     if(!clip)throw new HttpError(404,'ההנפשה הזאת עדיין בהכנה.','LIVING_PENDING');
     if(url.searchParams.has('v')&&url.searchParams.get('v')!==clip.version)throw new HttpError(409,'ההנפשה עודכנה. רעננו את העמוד.','LIVING_CLIP_CHANGED');
     const response=await getObject(env,clip.video,request,fetcher),headers=new Headers(response.headers);

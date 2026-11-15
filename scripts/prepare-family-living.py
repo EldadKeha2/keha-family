@@ -8,6 +8,7 @@ reconciliation rather than duplicate generation. Originals are never edited.
 import argparse
 import json
 import pathlib
+import re
 import shutil
 import subprocess
 import time
@@ -45,6 +46,7 @@ def main():
     parser.add_argument('--plan', type=pathlib.Path, required=True)
     parser.add_argument('--work-dir', type=pathlib.Path, required=True)
     parser.add_argument('--limit', type=int, default=30)
+    parser.add_argument('--resume-free-after-reset', action='store_true', help='Resume only a confirmed free quota rejection after its recorded reset time')
     args = parser.parse_args()
     args.work_dir.mkdir(parents=True, exist_ok=True)
     journal_path = args.work_dir / 'jobs.json'
@@ -66,8 +68,15 @@ def main():
             if completed >= args.limit:
                 return
             if job.get('status') == 'blocked':
-                log(status='blocked', reason='Review the saved rejection before retrying', photo=photo['id'], action=action['id'])
-                return
+                reset = job.get('retryAfter')
+                if not (args.resume_free_after_reset and 'exceeded your ZeroGPU quota' in job.get('error', '') and isinstance(reset, (int, float)) and time.time() >= reset):
+                    log(status='blocked', reason='Review the saved rejection or wait for the recorded free quota reset', photo=photo['id'], action=action['id'], retryAfter=reset)
+                    return
+                state.setdefault('priorRejectedAttempts', []).append(dict(job))
+                state['jobs'].pop(key)
+                state.pop('blocked', None)
+                save(journal_path, state)
+                job = {}
             elif job:
                 log(status='blocked', reason='Uncertain submission: reconcile before another generation', photo=photo['id'], action=action['id'])
                 return
@@ -112,6 +121,10 @@ def main():
                 # No account rotation, alternate Space, or paid fallback on a
                 # quota/billing/auth block. Keep the event ID for reconciliation.
                 job.update(status='blocked', error=str(error), blockedAt=time.time())
+                quota = re.search(r'Try again in (\d+):(\d+):(\d+)', str(error))
+                if 'exceeded your ZeroGPU quota' in str(error) and quota:
+                    hours, minutes, seconds = map(int, quota.groups())
+                    job['retryAfter'] = job['blockedAt'] + hours * 3600 + minutes * 60 + seconds + 60
                 state['jobs'][key] = job
                 state['blocked'] = {'photoId': photo['id'], 'actionId': action['id'], 'reason': str(error), 'time': time.time()}
                 save(journal_path, state)

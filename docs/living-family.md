@@ -28,7 +28,10 @@ work directory. Do not commit family image or video bytes to this public
 repository. The official `gradio_client` SDK handles uploads and queue sessions;
 `token=False` prevents using any cached account token. Existing completed jobs
 are skipped. Interrupted submissions and rejected requests stop the batch for
-reconciliation before another job is submitted. A public demo may throttle, exhaust its free
+reconciliation before another job is submitted. A confirmed free-quota rejection
+records the provider reset time; `--resume-free-after-reset` can resume it only
+after that timestamp. It never retries early or rotates accounts. A public demo
+may throttle, exhaust its free
 allowance, or fail; a submitted job is not a completed video. Do not purchase
 credits, switch to paid APIs, or rotate accounts/Spaces to bypass a limit.
 
