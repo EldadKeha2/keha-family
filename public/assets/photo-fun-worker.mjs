@@ -14,5 +14,5 @@ self.onmessage=async event=>{
       for(let i=0;i<values.length;i++)data[i]=Math.round(Math.max(0,Math.min(1,(values[i]-.1)/.8))*255);
       self.postMessage({id,mask:{width:mask.width,height:mask.height,data}},[data.buffer]);
     });
-  }catch{self.postMessage({id,error:'Person separation unavailable'});}finally{bitmap?.close?.();}
+  }catch(error){self.postMessage({id,error:'Person separation unavailable: '+(error?.message||'unknown error')});}finally{bitmap?.close?.();}
 };

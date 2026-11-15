@@ -1,5 +1,5 @@
-import {BACKGROUNDS,HEADS,PROPS,EMOJIS,funDefaults,normalizeFun,hitSticker,placedSticker,drawBackground,drawSticker,paintMask} from './photo-fun-core.mjs?v=1';
-import {separatePerson} from './photo-fun-segment.mjs?v=1';
+import {BACKGROUNDS,HEADS,PROPS,EMOJIS,funDefaults,normalizeFun,hitSticker,placedSticker,drawBackground,drawSticker,paintMask} from './photo-fun-core.mjs?v=2';
+import {separatePerson} from './photo-fun-segment.mjs?v=2';
 const sections=[['background','רקעים','Scenes',BACKGROUNDS],['head','ראשים','Heads',HEADS],['prop','אביזרים','Props',PROPS],['sticker','מדבקות','Stickers',EMOJIS]];
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 export class PhotoFunEditor {
@@ -85,7 +85,7 @@ export class PhotoFunEditor {
     if(reset&&this.mask){this.data.strokes=[];this.changed();this.renderTools();return;}
     this.job=separatePerson(source,this.signal);this.onBusy();this.renderTools();
     try{const mask=await this.job;if(this.source!==source)return;this.mask=mask;this.maskFailed=false;}
-    catch(error){if(this.source===source&&error.name!=='AbortError')this.maskFailed=true;}
+    catch(error){if(this.source===source&&error.name!=='AbortError'){this.maskFailed=true;console.warn('Photo cutout: '+error.message);}}
     finally{if(this.source===source){this.job=null;this.onBusy();this.renderTools();this.paint();}}
   }
   remove(){if(this.locked||!this.current())return;this.data.stickers=this.data.stickers.filter(s=>s.id!==this.selected);this.selected=null;this.changed();this.renderTools();this.layout();}

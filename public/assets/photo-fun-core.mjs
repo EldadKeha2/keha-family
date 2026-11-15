@@ -71,10 +71,10 @@ function bubble(ctx,s){
   lines.forEach((line,i)=>ctx.fillText(line,0,(i-(lines.length-1)/2)*.18,.88));
 }
 export function drawSticker(ctx,s,w,h){
-  const size=s.size*Math.min(w,h);ctx.save();ctx.translate(s.x*w,s.y*h);ctx.rotate(s.rotation*Math.PI/180);ctx.scale(size,size);ctx.shadowColor='#22132b33';ctx.shadowBlur=.02*size;ctx.shadowOffsetY=.012*size;
-  if(s.kind==='emoji'){ctx.font='1px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s.glyph,0,0);}
-  else if(s.kind==='text')bubble(ctx,s);
-  else{ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=.025;
+  const size=s.size*Math.min(w,h);ctx.save();ctx.translate(s.x*w,s.y*h);ctx.rotate(s.rotation*Math.PI/180);ctx.shadowColor='#22132b33';ctx.shadowBlur=.02*size;ctx.shadowOffsetY=.012*size;
+  if(s.kind==='emoji'){ctx.font=size+'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s.glyph,0,0);}
+  else if(s.kind==='text'){ctx.scale(size,size);bubble(ctx,s);}
+  else{ctx.scale(size,size);ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=.025;
     if(s.prop==='glasses'){ctx.fillStyle='#17242f';ctx.strokeStyle='#101923';for(const x of [-.27,.27]){ctx.beginPath();ctx.ellipse(x,0,.22,.17,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.strokeStyle='#a2d0d1';ctx.lineWidth=.018;ctx.beginPath();ctx.moveTo(x-.12,-.08);ctx.lineTo(x+.06,-.13);ctx.stroke();ctx.strokeStyle='#101923';}ctx.lineWidth=.04;ctx.beginPath();ctx.moveTo(-.06,-.04);ctx.quadraticCurveTo(0,-.1,.06,-.04);ctx.moveTo(-.49,-.06);ctx.lineTo(-.56,-.15);ctx.moveTo(.49,-.06);ctx.lineTo(.56,-.15);ctx.stroke();}
     if(s.prop==='crown'){polygon(ctx,[[-.48,.2],[-.5,-.3],[-.22,-.06],[0,-.43],[.22,-.06],[.5,-.3],[.48,.2]],'#eac568');ctx.fillStyle='#b98732';ctx.fillRect(-.48,.16,.96,.1);for(const x of [-.3,0,.3])circle(ctx,x,.04,.047,x?'#cd7188':'#64a5a3');}
     if(s.prop==='mustache'){ctx.fillStyle='#372b29';ctx.beginPath();ctx.moveTo(0,-.07);ctx.bezierCurveTo(-.2,-.28,-.25,.18,-.5,-.02);ctx.bezierCurveTo(-.46,.35,-.12,.3,0,.1);ctx.bezierCurveTo(.12,.3,.46,.35,.5,-.02);ctx.bezierCurveTo(.25,.18,.2,-.28,0,-.07);ctx.fill();}
