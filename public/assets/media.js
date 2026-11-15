@@ -320,7 +320,7 @@
   function canNavigatePhoto({pending=false}={}){
     const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&!captionEditing&&
       (pending||!stage.classList.contains?.('photo-slide-running'))&&(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1&&
-      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open]')&&(window.FamilyFaces?.canNavigate?.(stage)??true);
+      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(window.FamilyFaces?.canNavigate?.(stage)??true);
   }
   function refreshPhotoPresentation(){
     const stage=$('mediaStage');
@@ -446,7 +446,7 @@
     return owner.promise;
   }
   function canControlNavigate(){
-    return Boolean($('mediaViewer').open&&current()&&!state.deleting&&(state.items.length>1||(albumPages.get(state.scope)?.total||0)>1)&&!document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open]'));
+    return Boolean($('mediaViewer').open&&current()&&!state.deleting&&(state.items.length>1||(albumPages.get(state.scope)?.total||0)>1)&&!document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]'));
   }
   async function controlNavigate(direction,owner){
     const active=()=>owner.session===state.session&&owner.navigation===state.navigation&&owner.id===identity(current()||{})&&canControlNavigate();
@@ -553,7 +553,7 @@
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
     $('mediaViewer').addEventListener('close',()=>{hideSwipeHint();const returnPage=state.returnPage;state.returnPage=null;state.session++;state.navigation++;state.paging=false;state.pageTarget=null;state.pageRequest=null;state.photoLoading=false;state.photoTarget=null;state.fullscreen=false;$('mediaViewer').classList.toggle('photo-fullscreen',false);window.FamilyPhotoFullscreen?.closed();instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(returnPage&&paginatedAlbum(state.scope)&&(pagingApi()?.galleryQuery?.().page??albumPages.get(state.scope)?.page)!==returnPage)pagingApi()?.pageGallery?.(returnPage)?.catch?.(()=>notify(tr('לא ניתן לחזור לעמוד התמונות כרגע.','The original photo page could not be restored.')));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
-      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open]')||event.target.closest('input,textarea,select'))return;
+      if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')||event.target.closest('input,textarea,select'))return;
       if(event.key==='ArrowLeft'){event.preventDefault();step(-1);}
       if(event.key==='ArrowRight'){event.preventDefault();step(1);}
     });

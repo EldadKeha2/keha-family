@@ -72,7 +72,7 @@
   }
   function matchRank(person,query){
     if(!query)return 5;
-    const canonical=window.FAMILY_DATA.people[person.id],aliases=[...new Set([person.name,person.nameEn,canonical?.name,canonical?.nameEn,...(tagAliases[person.id]||[])].filter(Boolean).map(normalize))];
+    const canonical=window.FAMILY_DATA.people[person.id],aliases=[...new Set([person.name,person.nameEn,canonical?.name,canonical?.nameEn,...(person.aliases||[]),...(canonical?.aliases||[]),...(tagAliases[person.id]||[])].filter(Boolean).map(normalize))];
     // A real English spelling wins ties; a correct keyboard interpretation
     // still ranks above unrelated fuzzy matches. The same two-edit limit
     // applies independently to each interpretation, never cumulatively.

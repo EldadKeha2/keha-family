@@ -22,7 +22,7 @@ function fillFamilies(){
   }
 }
 function fillPeople(){
-  const query=normalize($('galleryPersonSearch').value),people=roster.filter(p=>state.people.has(p.id)||!query||normalize(p.name+' '+(p.nameEn||'')).includes(query)).map(p=>({id:p.id,label:I.personName(p)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale));
+  const query=normalize($('galleryPersonSearch').value),people=roster.filter(p=>state.people.has(p.id)||!query||normalize(I.searchNames(p)).includes(query)).map(p=>({id:p.id,label:I.personName(p)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale));
   checkboxes($('galleryPersonFilter'),people,state.people,'person');
 }
 function apply(){clearSelection();window.FamilyPortal.refineGallery(criteria());}

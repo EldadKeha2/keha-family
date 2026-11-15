@@ -18,7 +18,7 @@
   const getEvent=id=>state.library?.events.find(event=>event.id===id);
   const getDirectCategory=id=>id===DIRECT_CATEGORY?state.library?.categories.find(category=>category.id===id):null;
   const uploadEvents=()=>state.library?.events.filter(event=>event.categoryId!==DIRECT_CATEGORY||event.id===DIRECT_DESTINATION)||[];
-  const mediaSearch=item=>normalize([item.name,item.nameEn,item.caption,...(item.tags||[]).flatMap(tag=>[tag.name,tag.nameEn])].join(' '));
+  const mediaSearch=item=>normalize([item.name,item.nameEn,item.caption,...(item.tags||[]).map(tag=>I.searchNames(tag))].join(' '));
   function sequence(item){const match=/(?:קטע|חלק|part|segment|seg)\s*(\d+)/i.exec(item.name||item.filename||'');return match?Number(match[1]):null;}
   function viewItems(collection,eventId){
     const items=collection.items.filter(item=>eventId?(item.nostalgiaEventIds||[]).includes(eventId):!(item.nostalgiaEventIds||[]).length);

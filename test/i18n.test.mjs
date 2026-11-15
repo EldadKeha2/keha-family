@@ -76,3 +76,7 @@ test('the compatible scanner matches the prior longest-match semantics for autho
   for(const key of Object.keys(dictionary))for(const input of [`לפני: ${key}; ${key} אחרי.`,`א${key} ב${key}`,`${key}|${key}`,`לפני ${key}ש אחרי`])assert.equal(i18n.t(input),reference(input),input);
  }
 });
+
+test('all shared name searches include Tidhar Fish nicknames even for abbreviated API tag records',()=>{
+ for(const language of ['he','en-US']){const {i18n}=languageContext(language),names=i18n.searchNames({id:'tidhar',name:'תדהר פיש'});for(const nickname of ['טדי','תדי','טדי פיש','תדי פיש','Tedi','Teddy'])assert.ok(names.includes(nickname));}
+});

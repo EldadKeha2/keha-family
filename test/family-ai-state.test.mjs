@@ -70,3 +70,15 @@ test('poll leases reject overlapping output saves and stale writes after lease t
     record=f.run('family-ai.job.get',{id:photo.id}).job;assert.equal(record.status,'SUCCEEDED');assert.equal(record.pollToken,null);assert.equal(record.pollLeaseUntil,0);
   }finally{f.close();}
 });
+
+test('nickname searches find Tidhar photos across server-paginated gallery and vintage albums',()=>{
+ const f=fixture();try{
+  const photo=f.add({labels:['black-and-white']});f.add({labels:['black-and-white']});
+  f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(photo.id,'tidhar');
+  for(const query of ['טדי','תדי','טדי פיש','תדי פיש','Tedi','Teddy']){
+   assert.deepEqual(f.run('collection',{kind:'gallery',query}).items.map(item=>item.id),[photo.id]);
+   assert.deepEqual(f.run('family-ai.list',{query}).items.map(item=>item.id),[photo.id]);
+  }
+  assert.equal(f.run('collection',{kind:'gallery',query:'טדי%'}).count,0);
+ }finally{f.close();}
+});

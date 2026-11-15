@@ -19,7 +19,7 @@ function fixture(english=false){
  }
  const get=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
  const collection={items:[],count:0,pagination:{person:'',unit:'',query:''}};
- const window={FAMILY_DATA:family,addEventListener(){},FamilyI18n:{isEnglish:english,locale:english?'en-US':'he',personName:p=>english?p.nameEn||p.name:p.name,fetch:async path=>{requests.push(path);return Response.json({people:Object.values(family.people).filter(p=>!p.placeholder)});}},FamilyPortal:{getCollection:()=>collection,galleryQuery:()=>({...query}),refineGallery:value=>{query={...query,...value};collection.pagination={...query};window.FamilyGalleryFilter.render();}}};
+ const window={FAMILY_DATA:family,addEventListener(){},FamilyI18n:{isEnglish:english,locale:english?'en-US':'he',personName:p=>english?p.nameEn||p.name:p.name,searchNames:p=>[p.name,p.nameEn,...(family.people[p.id]?.aliases||[])].filter(Boolean).join(' '),fetch:async path=>{requests.push(path);return Response.json({people:Object.values(family.people).filter(p=>!p.placeholder)});}},FamilyPortal:{getCollection:()=>collection,galleryQuery:()=>({...query}),refineGallery:value=>{query={...query,...value};collection.pagination={...query};window.FamilyGalleryFilter.render();}}};
  window.FamilyMedia={register:(scope,items,options)=>registered.push({scope,items,options}),openFrom:(scope,id)=>opened.push({scope,id})};
  const document={readyState:'complete',getElementById:get,addEventListener:(name,callback)=>{if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(callback);}};
  vm.runInNewContext(source,{...labelCatalog,window,document,familyOptions,familyLabel,URLSearchParams});
@@ -67,4 +67,8 @@ test('opening the filtered gallery replaces a stale album with matching photos a
  assert.deepEqual(f.opened,[{scope:'gallery',id:'matching-b'}]);
  f.preview('outside-the-filter');assert.equal(f.opened.length,1);
  f.collection.pagination.labels='holidays';f.window.FamilyGalleryFilter.render();f.preview('matching-a');assert.equal(f.opened.length,1,'A pending filter response cannot open the previous album');
+});
+
+for(const english of [false,true])test('person filter resolves both Tedi nicknames to Tidhar Fish '+english,async()=>{
+ const f=fixture(english);await f.open();for(const query of ['טדי','תדי','טדי פיש','תדי פיש']){f.search(query);assert.match(f.get('galleryPersonFilter').innerHTML,/tidhar/);}
 });

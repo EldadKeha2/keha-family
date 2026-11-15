@@ -3,6 +3,11 @@ import {HttpError,text} from './http.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION} from '../public/assets/face-coverage.mjs';
 import {familyMemberIds,hasFamily} from '../public/assets/gallery-family.mjs';
 import {MAX_PHOTO_LABELS,normalizePhotoLabel} from '../public/assets/photo-labels-catalog.mjs';
+// Nicknames resolve to people, including in server-paginated gallery searches.
+export function aliasPersonIds(query){
+  const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
+  const value=normalize(query);return value?Object.values(family.people).filter(person=>(person.aliases||[]).some(alias=>normalize(alias).includes(value))).map(person=>person.id):[];
+}
 export function galleryOrdering(options={}){
   // Legacy clients omit sort; the gallery interface explicitly defaults to random.
   const sort=options.sort||'uploaded-desc';

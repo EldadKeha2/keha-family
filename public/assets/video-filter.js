@@ -10,7 +10,7 @@ function choices(id,items,selected,kind){
 }
 function fillPeople(){
  const query=normalize($('videoPersonSearch').value);
- choices('videoPersonFilter',roster.filter(person=>state.people.has(person.id)||!query||normalize(person.name+' '+(person.nameEn||'')).includes(query)).map(person=>({id:person.id,label:I.personName(person)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale)),state.people,'person');
+ choices('videoPersonFilter',roster.filter(person=>state.people.has(person.id)||!query||normalize(I.searchNames(person)).includes(query)).map(person=>({id:person.id,label:I.personName(person)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale)),state.people,'person');
 }
 function fillFamilies(){for(const generation of [2,3,4])choices('videoFamily'+generation,familyOptions(window.FAMILY_DATA,generation).map(unit=>({id:unit.id,label:familyLabel(window.FAMILY_DATA,unit,person=>I.personName(person),I.isEnglish)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale)),state.families,'family');}
 function fillCategories(){choices('videoCategoryFilter',catalog.map(category=>({id:category.id,label:category.id==='special-birthdays'?tr('ימי הולדת עגולים','Milestone birthdays'):I.isEnglish?category.nameEn||category.name:category.name})),state.categories,'category');}

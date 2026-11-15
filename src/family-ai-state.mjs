@@ -1,3 +1,4 @@
+import {aliasPersonIds} from './gallery.mjs';
 import {HttpError,text,uid} from './http.mjs';
 import {photoLabelFromName} from '../public/assets/photo-labels-catalog.mjs';
 
@@ -40,8 +41,8 @@ export class FamilyAiState {
     if(filter==='ready')where+=" AND EXISTS (SELECT 1 FROM family_ai_jobs j WHERE j.media_id=m.id AND json_extract(j.data,'$.status')='SUCCEEDED' AND json_extract(j.data,'$.video.key') IS NOT NULL)";
     if(query){
       const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%';
-      where+=" AND (COALESCE(json_extract(m.data,'$.name'),'') LIKE ? ESCAPE '\\' OR COALESCE(json_extract(m.data,'$.caption'),'') LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (json_extract(p.data,'$.name') LIKE ? ESCAPE '\\' OR json_extract(p.data,'$.nameEn') LIKE ? ESCAPE '\\')))";
-      bindings.push(like,like,like,like);
+      where+=" AND (COALESCE(json_extract(m.data,'$.name'),'') LIKE ? ESCAPE '\\' OR COALESCE(json_extract(m.data,'$.caption'),'') LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (json_extract(p.data,'$.name') LIKE ? ESCAPE '\\' OR json_extract(p.data,'$.nameEn') LIKE ? ESCAPE '\\' OR p.id IN (SELECT value FROM json_each(?)))))";
+      bindings.push(like,like,like,like,JSON.stringify(aliasPersonIds(query)));
     }
     const total=this.owner.rows('SELECT count(*) AS n FROM media m WHERE '+where,...bindings)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(pageRequested,pages);
     const items=this.owner.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...bindings,size,(page-1)*size).map(row=>this.publicItem(JSON.parse(row.data)));

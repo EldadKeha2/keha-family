@@ -24,7 +24,7 @@ import {nurseryCollection} from './nursery.mjs';
 import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
-import {galleryRefinement,galleryRevision,galleryLabels,galleryOrdering} from './gallery.mjs';
+import {aliasPersonIds,galleryRefinement,galleryRevision,galleryLabels,galleryOrdering} from './gallery.mjs';
 import {MAX_PHOTO_LABELS,normalizePhotoLabel,photoLabelKey,photoLabelOptions,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
 import {photoDate} from '../public/assets/photo-date.mjs';
 import {nameCorrectionKey,normalizedName,matchingPeople,correctPersonName,correctNamedContent} from './name-corrections.mjs';
@@ -474,8 +474,8 @@ export class FamilyState {
     if(filter==='partial')where+=' AND '+partial;
     if(filter==='complete')where+=' AND NOT ('+unfinished+')';
     if(query){
-      where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\')))";
-      args.push(like,like,like,like);
+      where+=" AND (lower(json_extract(m.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(m.data,'$.caption')) LIKE lower(?) ESCAPE '\\' OR EXISTS (SELECT 1 FROM media_tags t JOIN people p ON p.id=t.person_id WHERE t.media_id=m.id AND (lower(json_extract(p.data,'$.name')) LIKE lower(?) ESCAPE '\\' OR lower(json_extract(p.data,'$.nameEn')) LIKE lower(?) ESCAPE '\\' OR p.id IN (SELECT value FROM json_each(?)))))";
+      args.push(like,like,like,like,JSON.stringify(aliasPersonIds(query)));
     }
     if(options.selection)return {ids:this.rows('SELECT m.id FROM media m WHERE '+where+' ORDER BY m.rowid DESC',...args).map(row=>row.id)};
     const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+untagged+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];

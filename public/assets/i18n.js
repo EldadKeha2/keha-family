@@ -26,7 +26,7 @@
   }
   function html(strings,...values){return strings.reduce((result,part,index)=>result+t(part)+(index<values.length?String(values[index]):''),'');}
   function personName(person){if(!person)return '';const canonical=window.FAMILY_DATA?.people[person.id];return isEnglish?(person.nameEn||canonical?.nameEn||person.name||''):(person.name||canonical?.name||'');}
-  function searchNames(person){return [person?.name,person?.nameEn,window.FAMILY_DATA?.people[person?.id]?.nameEn,window.FAMILY_DATA?.people[person?.id]?.name].filter(Boolean).join(' ');}
+  function searchNames(person){const canonical=window.FAMILY_DATA?.people[person?.id];return [person?.name,person?.nameEn,canonical?.nameEn,canonical?.name,...(person?.aliases||[]),...(canonical?.aliases||[])].filter(Boolean).join(' ');}
   function branchName(branch){return branch?(isEnglish?branch.titleEn||t(branch.title):branch.title):'';}
   function mediaName(item){return isEnglish&&item?.nameEn?item.nameEn:item?.name||'';}
   function date(value){if(!isEnglish)return value;const match=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(value));if(!match)return value;const [day,month,year]=match.slice(1).map(Number);return new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:'numeric'}).format(new Date(year,month-1,day,12));}
