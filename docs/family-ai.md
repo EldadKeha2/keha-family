@@ -1,6 +1,6 @@
 # Family AI / בינה משפחתית
 
-The `#family-ai` section collects vintage, black-and-white and old dated family photos. Removing a card excludes it from this section without changing the original picture or its other albums. Excluded photos can be restored.
+The `#family-ai` section collects only photographs marked black-and-white. A vintage tag or an old date alone never qualifies; the Vintage filter is a subset of the black-and-white collection. Removing a card excludes it from this section without changing the original picture or its other albums. Excluded photos can be restored.
 
 Real animation uses Runway Gen-4 Turbo image-to-video. The Worker always requests a 10-second clip, preserves the photograph's original appearance in the prompt, and copies successful MP4 output into the existing Hugging Face media bucket. Videos are played and downloaded through the site's own origin. Provider output links and storage keys are never exposed to visitors.
 

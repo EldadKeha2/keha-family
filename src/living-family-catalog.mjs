@@ -1,4 +1,5 @@
-// Curated first and second generations. Media originals stay in the existing gallery.
+// Visually reviewed original black-and-white sources from generations one and two.
+// Media originals stay in the existing gallery; color selections are not eligible.
 export const livingActions = [
   {
     "id": "smile",
@@ -21,60 +22,70 @@ export const livingPhotos = [
     "id": "1352f9b2c9a24129b286c274e3fada45",
     "title": "יונה ושלמה ביום החתונה",
     "titleEn": "Yona and Shlomo on their wedding day",
-    "generation": 1
+    "generation": 1,
+    "originalBlackAndWhite": true
   },
   {
-    "id": "69af11cd81634789b926acff99dd37b1",
-    "title": "יונה ושלמה יחד",
-    "titleEn": "Yona and Shlomo together",
-    "generation": 1
+    "id": "b03503bf343d468e9df0139d13fc242d",
+    "title": "יונה ושלמה בחגיגה משפחתית",
+    "titleEn": "Yona and Shlomo at a family celebration",
+    "generation": 1,
+    "originalBlackAndWhite": true
   },
   {
     "id": "c13866c07aab410f97fd34be589aa7bb",
     "title": "יונה",
     "titleEn": "Yona",
-    "generation": 1
+    "generation": 1,
+    "originalBlackAndWhite": true
   },
   {
-    "id": "593ae5f58cb74de389ab387b0e6c8eff",
-    "title": "שלמה",
-    "titleEn": "Shlomo",
-    "generation": 1
+    "id": "7f80a774ddd94d2c8ae629264f284b27",
+    "title": "שלמה בצעירותו",
+    "titleEn": "Young Shlomo",
+    "generation": 1,
+    "originalBlackAndWhite": true
   },
   {
-    "id": "8002969bd642436089a78b045da2d4fe",
-    "title": "רותי",
-    "titleEn": "Ruti",
-    "generation": 2
+    "id": "aee7645f62674c94b3adb5d773ae11f7",
+    "title": "רותי בצעירותה",
+    "titleEn": "Young Ruti",
+    "generation": 2,
+    "originalBlackAndWhite": true
   },
   {
     "id": "47f3a2974b4e48f2a931651aa34dc2f9",
     "title": "אלישבע",
     "titleEn": "Elisheva",
-    "generation": 2
+    "generation": 2,
+    "originalBlackAndWhite": true
   },
   {
-    "id": "38526015914c4738943e7ad543275d2a",
-    "title": "יחיאל",
-    "titleEn": "Yehiel",
-    "generation": 2
+    "id": "4bb8ca807d0c44d5960a4bff734d785f",
+    "title": "אורה בצעירותה",
+    "titleEn": "Young Ora",
+    "generation": 2,
+    "originalBlackAndWhite": true
   },
   {
-    "id": "0427f8c68f454d50b2f867ce4f24675f",
-    "title": "אביגיל",
-    "titleEn": "Avigail",
-    "generation": 2
+    "id": "330e7699c49a4fe6bd50c52bb9ec866f",
+    "title": "יונה ואורה ביום החתונה",
+    "titleEn": "Yona and Ora on the wedding day",
+    "generation": 2,
+    "originalBlackAndWhite": true
   },
   {
     "id": "b2ecffca4580493783e188232ddeb006",
     "title": "אורה בחינה",
     "titleEn": "Ora at her henna celebration",
-    "generation": 2
+    "generation": 2,
+    "originalBlackAndWhite": true
   },
   {
-    "id": "193c0accaa7a41e8bd3c2b0a6f5e71be",
-    "title": "שוש",
-    "titleEn": "Shosh",
-    "generation": 2
+    "id": "a1e9162209384402b481b7a487ca5cf9",
+    "title": "אורה ואדי ביום חתונתם",
+    "titleEn": "Ora and Eddie on their wedding day",
+    "generation": 2,
+    "originalBlackAndWhite": true
   }
 ];

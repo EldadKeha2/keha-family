@@ -9,6 +9,7 @@ import json
 import pathlib
 import urllib.parse
 import urllib.request
+from family_living_source import verified_source
 
 
 def main():
@@ -18,12 +19,17 @@ def main():
     args=parser.parse_args()
     journal=args.work_dir/'jobs.json'
     state=json.loads(journal.read_text())
+    plan=json.loads((args.work_dir/'plan.json').read_text())
+    approved={photo['id']:photo for photo in plan['photos']}
+    for photo in approved.values():verified_source(photo)
     origin=args.origin.rstrip('/')
     with urllib.request.urlopen(urllib.request.Request(origin+'/api/family-ai/featured',headers={'User-Agent':'Mozilla/5.0'}),timeout=30)as response:album=json.load(response)
     items={item['id']:item for item in album['items']}
     for key,job in state['jobs'].items():
-        if job.get('status')!='complete' or not job.get('reviewed'):
+        if job['photoId'] not in approved or job.get('status')!='complete' or not job.get('reviewed') or not job.get('monochromeReviewed'):
             continue
+        if job.get('sourceRevision','original')!=approved[job['photoId']].get('revision','original'):
+            raise RuntimeError('Clip does not match the reviewed black-and-white source revision: '+key)
         item=items.get(job['photoId'])
         if not item:raise RuntimeError('The photo is absent from the curated album: '+job['photoId'])
         action=next(a for a in item['animations']if a['id']==job['actionId'])

@@ -1,7 +1,9 @@
 # Ten family photographs, three prepared actions
 
-The main `#family-ai` view now presents a curated set of ten photographs from
-the first and second generations. `src/living-family-catalog.mjs` identifies
+The main `#family-ai` view now presents a curated set of ten visually verified,
+original black-and-white photographs from the first and second generations.
+Color photographs are ineligible even if vintage, old, or converted to grayscale.
+`src/living-family-catalog.mjs` identifies
 the photographs and the three actions: smile, wave, and a little dance.
 The existing larger archival collection remains available below the curated
 album. Original photographs open in the normal shared gallery.
@@ -19,7 +21,7 @@ The owner approved sending these family photographs to Hugging Face for free
 animation generation. The initial approved wedding clip uses the public
 `zerogpu-aoti/wan2-2-fp8da-aoti-faster` Space, eight inference steps, seed 42,
 and five seconds (the encoded output is 5.0625 seconds). Two other actions use
-their own movement prompts. Preserve original monochrome or color tones,
+their own movement prompts. Preserve original monochrome tones without colorization,
 recognizable people, apparent ages, clothing, framing, and setting.
 
 `scripts/prepare-family-living.py` keeps the production plan, source images,
@@ -35,8 +37,17 @@ may throttle, exhaust its free
 allowance, or fail; a submitted job is not a completed video. Do not purchase
 credits, switch to paid APIs, or rotate accounts/Spaces to bypass a limit.
 
-Inspect generated frames for identity, natural motion, extra people, and hand
-artifacts. Set `reviewed: true` only for inspected successful clips. The
+Every production-plan photo requires a `blackAndWhiteReview` recording
+`kind: "original-black-and-white"`, `reviewed: true`, its reviewed `revision`,
+and the SHA-256 of the actual original source bytes. Record this only after
+visually inspecting the image. Both scripts reject missing reviews, changed
+source revisions, or changed bytes. Replacement color jobs remain archived in
+`excludedJobs`, and their provider quota reset still blocks all new submissions.
+The generator adds a monochrome-only instruction to every new movement prompt.
+
+Inspect generated frames for identity, natural motion, monochrome preservation,
+extra people, and hand artifacts. Set `reviewed: true` and
+`monochromeReviewed: true` only for inspected successful clips. The
 attachment script imports only reviewed completed outputs:
 
 ```sh

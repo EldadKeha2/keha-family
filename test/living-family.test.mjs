@@ -34,10 +34,19 @@ function fixture(){
 
 test('the curated album has ten photos, three honest pending actions, and leaves gallery metadata intact',()=>{
   const f=fixture();try{
-    assert.equal(livingPhotos.length,10);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.every(p=>[1,2].includes(p.generation)));
+    assert.equal(livingPhotos.length,10);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.every(p=>[1,2].includes(p.generation)&&p.originalBlackAndWhite===true));
     const before=f.database.prepare('SELECT data FROM media ORDER BY id').all();const album=f.run('family-ai.living.list');
     assert.equal(album.total,10);assert.equal(album.totalClips,30);assert.equal(album.readyClips,0);assert.ok(album.items.every(item=>item.animations.length===3&&item.animations.every(a=>a.status==='pending'&&!a.videoSrc)));
     assert.equal('key'in album.items[0],false);assert.deepEqual(f.database.prepare('SELECT data FROM media ORDER BY id').all(),before);
+  }finally{f.close();}
+});
+
+test('the replaced color sources cannot be featured, animated, or served as prepared clips',async()=>{
+  const f=fixture();try{
+    for(const id of ['69af11cd81634789b926acff99dd37b1','593ae5f58cb74de389ab387b0e6c8eff','8002969bd642436089a78b045da2d4fe','38526015914c4738943e7ad543275d2a','0427f8c68f454d50b2f867ce4f24675f','193c0accaa7a41e8bd3c2b0a6f5e71be']){
+      assert.ok(!livingPhotos.some(photo=>photo.id===id));
+      await assert.rejects(f.call(`/api/family-ai/video/${id}/smile`),e=>e.code==='LIVING_PHOTO');
+    }
   }finally{f.close();}
 });
 

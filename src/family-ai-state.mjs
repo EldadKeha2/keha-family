@@ -10,9 +10,10 @@ const active=job=>job&&!['SUCCEEDED','FAILED','CANCELLED'].includes(job.status);
 const photoClause="COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' ELSE '' END)='photo' AND json_extract(m.data,'$.provider') IS NULL";
 const bwClause="EXISTS (SELECT 1 FROM json_each(m.data,'$.labels') l WHERE l.value='black-and-white')";
 const vintageClause="(EXISTS (SELECT 1 FROM json_each(m.data,'$.labels') l WHERE lower(l.value) IN (SELECT value FROM json_each(?))) OR CAST(json_extract(m.data,'$.takenDate.year') AS INTEGER) BETWEEN 1910 AND 1969)";
-const candidateClause=photoClause+' AND ('+bwClause+' OR '+vintageClause+')';
+// Vintage tags and an old date alone do not identify a black-and-white source.
+const candidateClause=photoClause+' AND '+bwClause;
 const excludedClause='EXISTS (SELECT 1 FROM family_ai_exclusions e WHERE e.media_id=m.id)';
-const args=()=>[JSON.stringify(vintageLabels)];
+const vintageArgs=()=>[JSON.stringify(vintageLabels)];
 
 // Kept separate from media metadata: removing a photograph here never removes
 // its pixels, tags, album membership, or original gallery entry.
@@ -26,7 +27,7 @@ export class FamilyAiState {
     this.owner.sql.exec('CREATE INDEX IF NOT EXISTS family_ai_claims_created ON family_ai_claims(created_at)');
   }
   isExcluded(id){return Boolean(this.owner.rows('SELECT media_id FROM family_ai_exclusions WHERE media_id=?',id).length);}
-  eligible(id){return Boolean(this.owner.rows('SELECT m.id FROM media m WHERE m.id=? AND '+candidateClause,id,...args()).length);}
+  eligible(id){return Boolean(this.owner.rows('SELECT m.id FROM media m WHERE m.id=? AND '+candidateClause,id).length);}
   job(id){const row=this.owner.rows('SELECT data FROM family_ai_jobs WHERE media_id=?',id)[0];return row?JSON.parse(row.data):null;}
   publicJob(job,item){
     if(!job)return null;
@@ -37,9 +38,9 @@ export class FamilyAiState {
     const pageRequested=Number(p.page||1),size=Number(p.size||40),query=text(p.query||'','חיפוש',120),filter=p.filter||'all',excluded=p.excluded===true;
     if(!Number.isSafeInteger(pageRequested)||pageRequested<1||![12,24,40,80].includes(size))throw new HttpError(400,'בחרו עמוד תקין ועד 80 תמונות בעמוד.');
     if(!['all','black-and-white','vintage','ready'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
-    const bindings=args();let where=candidateClause+' AND '+(excluded?'':'NOT ')+excludedClause;
+    const bindings=[];let where=candidateClause+' AND '+(excluded?'':'NOT ')+excludedClause;
     if(filter==='black-and-white')where+=' AND '+bwClause;
-    if(filter==='vintage'){where+=' AND '+vintageClause;bindings.push(...args());}
+    if(filter==='vintage'){where+=' AND '+vintageClause;bindings.push(...vintageArgs());}
     if(filter==='ready')where+=" AND EXISTS (SELECT 1 FROM family_ai_jobs j WHERE j.media_id=m.id AND json_extract(j.data,'$.status')='SUCCEEDED' AND json_extract(j.data,'$.video.key') IS NOT NULL)";
     if(query){
       const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%';
@@ -48,7 +49,7 @@ export class FamilyAiState {
     }
     const total=this.owner.rows('SELECT count(*) AS n FROM media m WHERE '+where,...bindings)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(pageRequested,pages);
     const items=this.owner.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',...bindings,size,(page-1)*size).map(row=>this.publicItem(JSON.parse(row.data)));
-    const excludedCount=this.owner.rows('SELECT count(*) AS n FROM media m WHERE '+candidateClause+' AND '+excludedClause,...args())[0].n;
+    const excludedCount=this.owner.rows('SELECT count(*) AS n FROM media m WHERE '+candidateClause+' AND '+excludedClause)[0].n;
     return {items,count:total,excludedCount,pagination:{page,size,total,pages},filter};
   }
   exclude(p){

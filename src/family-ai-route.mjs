@@ -5,7 +5,7 @@ const API='https://api.dev.runwayml.com/v1',VERSION='2024-11-06';
 const ACTIVE=new Set(['SUBMITTING','PENDING','THROTTLED','RUNNING','SAVING']);
 const PHOTO_TYPES=new Set(['image/jpeg','image/png','image/webp']);
 const MAX_INPUT=16*1024*1024,MAX_VIDEO=90*1024*1024;
-export const FAMILY_AI_PROMPT="The people in this archival family photograph gently come to life with natural blinking, subtle breathing and small warm smiles. Preserve each person's facial features, age, clothing, the original composition and monochrome or vintage tones. Fixed camera. Gentle realistic motion. No speaking, no new people or objects, no scene changes.";
+export const FAMILY_AI_PROMPT="The people in this original black-and-white archival family photograph gently come to life with natural blinking, subtle breathing and small warm smiles. Preserve each person's facial features, age, clothing, the original composition and original monochrome photographic tones throughout the entire clip. Black-and-white only. No colorization or added color. Fixed camera. Gentle realistic motion. No speaking, no new people or objects, no scene changes.";
 const ERRORS={
   PROVIDER_AUTH:'שירות יצירת הסרטונים אינו מחובר כרגע. יש לבדוק את חיבור השירות.',
   PROVIDER_CREDITS:'אין כרגע יתרה זמינה ליצירת סרטונים. אפשר לנסות שוב לאחר חידוש היתרה.',

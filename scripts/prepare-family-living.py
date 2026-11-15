@@ -13,9 +13,11 @@ import shutil
 import subprocess
 import time
 import uuid
+from family_living_source import verified_source, free_quota_reset
 
 SPACE = 'https://zerogpu-aoti-wan2-2-fp8da-aoti-faster.hf.space'
 NEGATIVE = 'colorization, exaggerated expressions, facial distortion, changed identity, deformed hands, extra fingers, extra people, camera movement, abrupt motion, morphing, flicker, text, watermark'
+MONOCHROME = 'Preserve this original black-and-white photograph and its original monochrome tones throughout the entire video. Black-and-white only. No colorization or added color. '
 
 
 def read_json(path, fallback):
@@ -52,6 +54,12 @@ def main():
     journal_path = args.work_dir / 'jobs.json'
     state = read_json(journal_path, {'provider': SPACE, 'paid_credentials_used': False, 'jobs': {}, 'uploads': {}})
     plan = read_json(args.plan, {})
+    for photo in plan['photos']:
+        verified_source(photo)
+    reset = free_quota_reset(state)
+    if reset and (time.time() < reset or not args.resume_free_after_reset):
+        log(status='blocked', reason='Wait for the recorded provider-wide free quota reset, then use --resume-free-after-reset', retryAfter=reset)
+        return
     completed = 0
     # The official SDK carries the queue/session protocol and uploads the file
     # on the same replica. The REST demo returned opaque null errors on replicas.
@@ -59,7 +67,7 @@ def main():
     from gradio_client import Client, handle_file
     client = None
     for photo in plan['photos']:
-        source = pathlib.Path(photo['source'])
+        source = verified_source(photo)
         for action in photo['actions']:
             key = photo['id'] + ':' + action['id']
             job = state['jobs'].get(key, {})
@@ -87,11 +95,12 @@ def main():
                                     analytics_enabled=False, max_workers=1,
                                     download_files=str(args.work_dir / 'sdk-output'),
                                     httpx_kwargs={'timeout': 60.0})
-                job = {'photoId': photo['id'], 'actionId': action['id'], 'sourceRevision': photo.get('revision', 'original'), 'prompt': action['prompt'], 'createdAt': time.time(), 'status': 'submitting', 'operationId': uuid.uuid4().hex, 'protocol': 'official-gradio-sdk', 'sessionHash': client.session_hash}
+                prompt = MONOCHROME + action['prompt']
+                job = {'photoId': photo['id'], 'actionId': action['id'], 'sourceRevision': photo.get('revision', 'original'), 'prompt': prompt, 'createdAt': time.time(), 'status': 'submitting', 'operationId': uuid.uuid4().hex, 'protocol': 'official-gradio-sdk', 'sessionHash': client.session_hash}
                 state['jobs'][key] = job
                 save(journal_path, state)
                 prediction = client.submit(input_image=handle_file(str(source)),
-                    prompt=action['prompt'], steps=8, negative_prompt=NEGATIVE,
+                    prompt=prompt, steps=8, negative_prompt=NEGATIVE,
                     duration_seconds=5, guidance_scale=1, guidance_scale_2=1,
                     seed=action.get('seed', 42), randomize_seed=False,
                     api_name='/generate_video')
@@ -113,7 +122,7 @@ def main():
                 save(journal_path, state)
                 target = args.work_dir / (photo['id'] + '-' + action['id'] + '.mp4')
                 shutil.copyfile(result[0], target)
-                job.update(status='complete', file=str(target.resolve()), info=check_video(target), reviewed=False, completedAt=time.time())
+                job.update(status='complete', file=str(target.resolve()), info=check_video(target), reviewed=False, monochromeReviewed=False, completedAt=time.time())
                 save(journal_path, state)
                 completed += 1
                 log(photo=photo['id'], action=action['id'], status='complete', file=str(target), info=job['info'])
@@ -125,6 +134,7 @@ def main():
                 if 'exceeded your ZeroGPU quota' in str(error) and quota:
                     hours, minutes, seconds = map(int, quota.groups())
                     job['retryAfter'] = job['blockedAt'] + hours * 3600 + minutes * 60 + seconds + 60
+                    state['freeQuotaResetAt'] = job['retryAfter']
                 state['jobs'][key] = job
                 state['blocked'] = {'photoId': photo['id'], 'actionId': action['id'], 'reason': str(error), 'time': time.time()}
                 save(journal_path, state)

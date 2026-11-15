@@ -12,14 +12,16 @@ function fixture(){
   let state=new FamilyState({storage},{});
   return {database,get state(){return state;},run(action,p={}){return storage.transactionSync(()=>state.run(action,p));},restart(){state=new FamilyState({storage},{});},add(extra={}){const id=uid(),item={id,category:'gallery',filename:'family.jpg',name:'Family photo',file:id+'.jpg',key:'photos/'+id+'.jpg',mime:'image/jpeg',kind:'photo',size:1000,caption:'',createdAt:new Date().toISOString(),...extra};database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,item.category,item.personId||null,JSON.stringify(item));return item;},close(){database.close();}};
 }
-test('AI album selects vintage and monochrome photographs across albums, with bounded search and pagination',()=>{
+test('AI album requires black-and-white sources across albums; vintage labels and dates alone never qualify',()=>{
   const f=fixture();try{
-    const mono=f.add({labels:['black-and-white']}),vintage=f.add({category:'personal',personId:'yona',labels:[photoLabelFromName("וינטג'")]}),english=f.add({labels:[photoLabelFromName('ViNtAgE')]}),old=f.add({category:'photos',takenDate:{year:1969}});
+    const mono=f.add({labels:['black-and-white']}),vintage=f.add({category:'personal',personId:'yona',labels:['black-and-white',photoLabelFromName("וינטג'")]}),english=f.add({labels:[photoLabelFromName('ViNtAgE')]}),old=f.add({category:'photos',labels:['black-and-white'],takenDate:{year:1969}});
+    const colorVintage=f.add({labels:[photoLabelFromName("וינטג'")]}),colorOld=f.add({takenDate:{year:1940}});
     f.add({takenDate:{year:1970}});f.add({takenDate:{year:1111}});f.add({kind:'video',mime:'video/mp4',labels:['black-and-white']});f.add({category:'attachment',kind:'document',mime:'application/pdf',labels:['black-and-white']});f.add({labels:[photoLabelFromName('unrelated')]});
-    const list=f.run('family-ai.list');assert.equal(list.count,4);assert.deepEqual(new Set(list.items.map(item=>item.id)),new Set([mono.id,vintage.id,english.id,old.id]));assert.equal(list.items.find(item=>item.id===vintage.id).scope,'personal:yona');assert.match(list.items[0].src,/^\/media\//);assert.equal('key' in list.items[0],false);
-    assert.equal(f.run('family-ai.list',{filter:'black-and-white'}).count,1);assert.equal(f.run('family-ai.list',{filter:'vintage'}).count,3);
+    const list=f.run('family-ai.list');assert.equal(list.count,3);assert.deepEqual(new Set(list.items.map(item=>item.id)),new Set([mono.id,vintage.id,old.id]));assert.equal(list.items.find(item=>item.id===vintage.id).scope,'personal:yona');assert.match(list.items[0].src,/^\/media\//);assert.equal('key' in list.items[0],false);
+    assert.equal(f.run('family-ai.list',{filter:'black-and-white'}).count,3);assert.equal(f.run('family-ai.list',{filter:'vintage'}).count,2);
+    for(const photo of [english,colorVintage,colorOld])assert.throws(()=>f.run('family-ai.job.claim',{id:photo.id,revision:'original',claimId:uid()}),e=>e.code==='AI_PHOTO_UNAVAILABLE');
     assert.equal(f.run('family-ai.list',{query:'%'}).count,0);assert.throws(()=>f.run('family-ai.list',{size:999}),e=>e.status===400);
-    for(let n=0;n<15;n++)f.add({labels:['black-and-white']});const first=f.run('family-ai.list',{size:12}),second=f.run('family-ai.list',{size:12,page:2});assert.equal(first.items.length,12);assert.equal(second.items.length,7);assert.equal(new Set([...first.items,...second.items].map(item=>item.id)).size,19);
+    for(let n=0;n<15;n++)f.add({labels:['black-and-white']});const first=f.run('family-ai.list',{size:12}),second=f.run('family-ai.list',{size:12,page:2});assert.equal(first.items.length,12);assert.equal(second.items.length,6);assert.equal(new Set([...first.items,...second.items].map(item=>item.id)).size,18);
   }finally{f.close();}
 });
 test('removing an AI album photo is durable and reversible without changing original gallery data',()=>{
