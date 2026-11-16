@@ -522,6 +522,7 @@
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
       enabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),mouse:desktopPhotoInput,touchOnly:phoneTouchInput,preferPointer:desktopPhotoInput,claim:()=> 'queued',
       nativeScroll:()=>window.FamilyPhotoNative?.has?.(stage)===true,strictStart:true,
+      wheelRoot:()=>$('mediaViewer'),
       videoSurface:()=>current()?.kind==='video'?stage.querySelector('video'):null,
       vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
       step,right:options=>swipePhoto(1,options),left:options=>swipePhoto(-1,options),

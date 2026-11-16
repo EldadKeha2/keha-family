@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,photoButtons=false,videoSurface=null,strictStart=false}){
+  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
     const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
     const clearPreview=()=>{if(previewFrame!==null)cancelAnimationFrame(previewFrame);previewFrame=null;pendingPreview=null;};
@@ -12,7 +12,7 @@
     const preview=(dx,options)=>{if(!move)return;if(!frames){move(dx,options);return;}pendingPreview={dx,options};if(previewFrame===null)previewFrame=requestAnimationFrame(()=>{previewFrame=null;const pending=pendingPreview;pendingPreview=null;if(pending)move(pending.dx,pending.options);});};
     const desktopBridge=()=>mouse()?window.FamilyGalleryInput:null;
     const touchDirection=dx=>desktopBridge()?.touchAction?.(Math.sign(dx))??Math.sign(dx);
-    const wheelMotion=dx=>desktopBridge()?.padMotion?.(dx)??dx;
+    const wheelMotion=dx=>dx;
     const navigate=(dx,options={})=>{
       const bridge=desktopBridge();
       if(options.input==='wheel')bridge?.commitPadGesture?.(dx);
@@ -140,9 +140,9 @@
     },{capture:true,passive:false});
     document.addEventListener('touchcancel',()=>{touchStart=null;blockClick();reset();},{capture:true,passive:true});
     stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!controlAt(event))event.preventDefault();});
-    stage.addEventListener('wheel',event=>{
+    const onWheel=event=>{
       if(nativeScroll())return;
-      const control=controlAt(event);
+      const outside=typeof stage.contains==='function'&&!stage.contains(event.target),candidate=outside?event.target.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]'):controlAt(event),control=outside&&(candidate?.readOnly||candidate?.disabled)?null:candidate;
       if(!mouse()||!enabled()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;
       const rawDx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=event.shiftKey&&!event.deltaX?0:(event.deltaY||0)*unit;
@@ -161,7 +161,9 @@
       if(sample?.split&&wheelGesture){clearTimeout(wheelTimer);const done=wheelGesture;wheelGesture={dx:0,episode:sample.episode};complete(done);}
       wheelGesture||={dx:0,episode:sample?.episode};wheelGesture.dx+=dx;desktopBridge()?.observePadGesture?.(wheelGesture.dx);preview(wheelMotion(wheelGesture.dx),{queued:true,actionDirection:Math.sign(wheelGesture.dx)});clearTimeout(wheelTimer);
       wheelTimer=setTimeout(finish,120);
-    },{capture:true,passive:false});
+    };
+    stage.addEventListener('wheel',onWheel,{capture:true,passive:false});
+    document.addEventListener('wheel',event=>{const root=wheelRoot();if(!root||stage.contains(event.target)||!window.FamilyPhotoNative?.wheelScope?.(stage,event,root))return;onWheel(event);},{capture:true,passive:false});
     // A swipe starting over a face must not also open or remove its tag.
     stage.addEventListener('click',event=>{
       if(event.detail!==0&&Date.now()<suppressClickUntil){event.preventDefault();event.stopImmediatePropagation();}

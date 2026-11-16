@@ -3,6 +3,21 @@
   let active=null,ignoredTouchStage=null,ignoredTouchIds=new Set();
   const boundStages=new WeakSet();
   const completedPointerStarts=new WeakSet();
+  let padFinish=null;
+  function clearPadFinish(){const old=padFinish;if(!old)return;padFinish=null;clearTimeout(old.timer);for(const animation of old.animations)animation.cancel();old.node.remove();}
+  // Only wheel input is widened to the open viewer. The established screen
+  // contact owners, coordinates and saved touch direction stay unchanged.
+  function wheelScope(stage,event,root=stage?.closest?.('dialog')){
+    const target=event?.target;if(!stage||!target)return false;
+    const inside=stage.contains(target);if(!inside&&!root)return false;
+    if(root&&(root.hidden||root.tagName==='DIALOG'&&!root.open))return false;
+    const other=target.closest?.('dialog');if(root&&other&&other!==root)return false;
+    if(!inside){const editor=target.closest?.('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]');if(editor&&!editor.readOnly&&!editor.disabled)return false;}
+    return true;
+  }
+  document.addEventListener('wheel',event=>{const b=active;if(b&&wheelScope(b.stage,event))b.handleWheel(event);},{capture:true,passive:false});
+  document.addEventListener('pointerdown',clearPadFinish,{capture:true,passive:true});
+  document.addEventListener('touchstart',clearPadFinish,{capture:true,passive:true});
   // A pad keeps emitting momentum after the finger lifts, including packets
   // separated by more than the paint/commit deadline. Keep its episode on the
   // stable stage so rebuilding a photograph cannot turn that tail into Next.
@@ -91,7 +106,6 @@
       if(event.touches.length!==1)return;
       b.begin(touchPoint(event,event.touches[0]),false);
     },{capture:true,passive:true});
-    stage.addEventListener('wheel',event=>{const b=active;if(b?.stage===stage)b.handleWheel(event);},{capture:true,passive:false});
   }
   function holdPreview(b,pane){
     const source=previewSource(pane._item);if(!source)return;
@@ -117,6 +131,20 @@
     return true;
   }
   function arrange(b){const forward=(window.FamilyGalleryInput?.touchAction?.(1)??1)>0;side(b.viewport.children[0],forward?b.next:b.previous);side(b.viewport.children[2],forward?b.previous:b.next);}
+  function arrangePad(b){side(b.viewport.children[0],b.next);side(b.viewport.children[2],b.previous);}
+  function finishPadPaint(b,direction){
+    const host=b.stage.closest?.('dialog'),oldImage=b.node.querySelector?.('img'),pane=b.viewport.children[direction>0?0:2],nextImage=[...pane.children].find(node=>node.tagName==='IMG'&&node.complete&&node.naturalWidth);
+    if(!host||!oldImage?.complete||!oldImage.naturalWidth||!nextImage||typeof oldImage.animate!=='function'||typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const rect=b.viewport.getBoundingClientRect(),width=b.width,offset=Math.max(-width,Math.min(width,width-b.viewport.scrollLeft));
+    if(!rect.width||!rect.height)return;
+    clearPadFinish();const node=document.createElement('div'),outgoing=oldImage.cloneNode(false),incoming=nextImage.cloneNode(false);node.className='native-pad-finish';node.setAttribute('aria-hidden','true');
+    Object.assign(node.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',overflow:'hidden',pointerEvents:'none',zIndex:'9',backgroundColor:typeof getComputedStyle==='function'?getComputedStyle(b.stage).backgroundColor:'#ede5d4'});
+    for(const image of [outgoing,incoming]){image.removeAttribute('id');image.className='';image.style.cssText='';Object.assign(image.style,{position:'absolute',inset:'0',width:'100%',height:'100%',maxWidth:'100%',maxHeight:'100%',objectFit:'contain',willChange:'transform'});}
+    node.append(outgoing,incoming);host.append(node);
+    const duration=Math.max(65,140*(1-Math.min(.6,Math.abs(offset)/width))),options={duration,easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};
+    const animations=[outgoing.animate([{transform:'translateX('+offset+'px)'},{transform:'translateX('+(direction*width)+'px)'}],options),incoming.animate([{transform:'translateX('+(offset-direction*width)+'px)'},{transform:'translateX(0)'}],options)];
+    const token=padFinish={node,animations,timer:null},done=()=>{if(padFinish===token)clearPadFinish();};token.timer=setTimeout(done,duration+60);Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(done);
+  }
   function releaseCapture(b,g){if(g?.pointerId!=null)try{b.stage.releasePointerCapture?.(g.pointerId);}catch{}}
   function reset(stage){
     if(!active||stage&&active.stage!==stage)return;
@@ -149,8 +177,8 @@
       const bridge=window.FamilyGalleryInput;
       if(input==='wheel')bridge?.commitPadGesture?.(direction);else bridge?.commitTouchGesture?.(direction);
       const actionDirection=input==='touch'?(bridge?.touchAction?.(direction)??direction):direction;
-      const motionDirection=input==='wheel'?(bridge?.padMotion?.(direction)??direction):direction;
-      arrange(b);
+      const motionDirection=direction;
+      if(input==='wheel'){arrangePad(b);finishPadPaint(b,direction);}else arrange(b);
       // Copy the selected preview before step() can update logical neighbours.
       // Input ownership is already complete, so image preparation can paint.
       holdPreview(b,viewport.children[motionDirection>0?0:2]);recenter();resolveIdle(b);b.pending++;
@@ -321,16 +349,10 @@
       }
       if(active!==b)return;b.wheel||={dx:0,episode:sample.episode};b.wheel.dx+=dx;
       b.lastDecision='wheel-owned';
-      window.FamilyGalleryInput?.observePadGesture?.(b.wheel.dx);arrange(b);
-      // A completed desktop reference pair shares the exact screen-touch
-      // painting path, while preserving the pad's existing navigation action.
-      if(window.FamilyGalleryInput?.desktopBridgeActive?.()){
-        clearWheelPaint();draw({dx:window.FamilyGalleryInput.padMotion(b.wheel.dx)});
-      }else{
-        viewport.scrollLeft=b.width;
-        const x=Math.max(-b.width,Math.min(b.width,b.wheel.dx));
-        for(const pane of viewport.children){pane.style.willChange='transform';pane.style.transform='translateX('+x+'px)';}
-      }
+      window.FamilyGalleryInput?.observePadGesture?.(b.wheel.dx);arrangePad(b);
+      // The pad keeps its working Next/Previous selection. Paint that action
+      // in its own direction, independently of the saved touchscreen mapping.
+      clearPadFinish();clearWheelPaint();draw({dx:b.wheel.dx});
       clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);
     };
     bindStage(stage);
@@ -340,5 +362,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:14,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:15,mount,reset,has,claim,note,supported,diagnostics,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();

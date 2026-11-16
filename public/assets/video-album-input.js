@@ -17,6 +17,7 @@
     };
     const manual=window.FamilyPhotoSwipe?.bind(stage,{enabled,mouse:()=>!mobile(),preferPointer:()=>!mobile(),touchOnly:()=>mobile()&&'ontouchstart' in window,
       nativeScroll:()=>native()?.has?.(stage)===true,strictStart:true,videoSurface:()=>video,vertical,
+      wheelRoot:()=>stage.closest('dialog'),
       right:()=>navigate(mobile()?-1:1),left:()=>navigate(mobile()?1:-1)});
     window.addEventListener?.('resize',refresh);
     return {
