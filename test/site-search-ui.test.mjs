@@ -6,12 +6,13 @@ import {parseHTML} from 'linkedom';
 import {suggestPeople,SEARCH_TYPES} from '../public/assets/site-search-core.mjs';
 
 const source=(await readFile(new URL('../public/assets/site-search.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
+const navigation=(await readFile(new URL('../public/index.html',import.meta.url),'utf8')).match(/<nav class="main-nav"[^>]*>[\s\S]*?<\/nav>/)[0];
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const empty={items:[],count:0,page:1,pages:1,size:24,facets:{types:[],branches:[],years:[],labels:[]}};
 function press(window,field,key,extra={}){const event=new window.Event('keydown',{bubbles:true,cancelable:true});Object.assign(event,{key,...extra});field.dispatchEvent(event);return event;}
 function fixture({fetcher}={}){
-  const {window,document}=parseHTML('<html><body><header class="site-header"><a id="homeLink"><span>בית משפחת קהא</span></a><section id="homeInstall"><div data-home-install-actions></div></section></header><section id="siteSearchView" hidden></section></body></html>');
-  const url=new URL('https://family.example/#home'),requests=[],profiles=[];let currentView='home';
+  const {window,document}=parseHTML('<html><body><header class="site-header"><a id="homeLink"><span>בית משפחת קהא</span></a><section id="homeInstall"><div data-home-install-actions></div></section>'+navigation+'</header><section id="siteSearchView" hidden></section></body></html>');
+  const url=new URL('https://family.example/#home'),requests=[],profiles=[],views=[];let currentView='home';
   const create=document.createElement.bind(document);document.createElement=tag=>{
     const element=create(tag);if(tag==='dialog'){element.showModal=()=>{element.open=true;};element.close=()=>{element.open=false;element.dispatchEvent(new window.Event('close'));};}return element;
   };
@@ -20,9 +21,9 @@ function fixture({fetcher}={}){
   window.FamilyPeopleRoster={snapshot:()=>people,load:async()=>people};
   const go=route=>{url.href=new URL(route,url).href;};
   window.FamilyNavigation={go};
-  window.FamilyApp={getView:()=>currentView,setView(view){currentView=view;window.FamilySiteSearch?.activate(view);},openPerson(id){profiles.push(id);currentView='person';window.FamilySiteSearch?.activate('person');}};
+  window.FamilyApp={getView:()=>currentView,setView(view,syncRoute=true){views.push(view);if(syncRoute)go('#'+view);currentView=view;window.FamilySiteSearch?.activate(view);},openPerson(id){profiles.push(id);currentView='person';window.FamilySiteSearch?.activate('person');}};
   vm.runInContext(source,vm.createContext({window,document,location:url,history:{pushState:(state,unused,route)=>go(route)},URL,URLSearchParams,AbortController,Event:window.Event,suggestPeople,SEARCH_TYPES}));
-  return {window,document,url,requests,profiles,$:id=>document.getElementById(id),input(value){const field=document.getElementById('siteSearchQuickInput');field.value=value;field.dispatchEvent(new window.Event('input'));},route(route){go(route);window.dispatchEvent(new window.Event('popstate'));}};
+  return {window,document,url,requests,profiles,views,$:id=>document.getElementById(id),input(value){const field=document.getElementById('siteSearchQuickInput');field.value=value;field.dispatchEvent(new window.Event('input'));},route(route){go(route);window.dispatchEvent(new window.Event('popstate'));}};
 }
 test('the phone search opens on demand and shows separate portrait/profile and all-content actions',async()=>{
   const f=fixture();assert.equal(f.requests.length,0);
@@ -105,6 +106,33 @@ for(const mode of ['Desktop','Quick']){
     assert.equal(press(f.window,f.field,'Enter').defaultPrevented,true);
     assert.deepEqual(f.profiles,['roi']);assert.equal(f.requests.length,0);
     assert.equal(f.field.hasAttribute('aria-activedescendant'),false);
+  });
+  test(mode+' category suggestions reuse each live navigation title and its illustrated icon',()=>{
+    const f=open();
+    for(const category of f.document.querySelectorAll('#mainNav [data-view]')){
+      f.type(category.textContent);
+      const choice=f.host.querySelector('[data-site-search-section="'+category.dataset.view+'"]');
+      assert.ok(choice,category.textContent);assert.equal(choice.querySelector('strong').textContent,category.textContent);
+      assert.equal(choice.getAttribute('href'),'#'+category.dataset.view);
+      assert.equal(choice.querySelector('use').getAttribute('href'),'assets/home-icons.svg?v=voices-v2#'+category.dataset.view);
+      assert.equal(f.selected(),choice,'An exact category name is selected first');
+    }
+    assert.equal(f.requests.length,0);
+  });
+  test(mode+' category Enter navigates directly while Down then Enter still performs a free content search',async()=>{
+    const f=open();f.type('סרטונים');assert.equal(f.selected().dataset.siteSearchSection,'videos');
+    press(f.window,f.field,'Enter');assert.equal(f.url.hash,'#videos');assert.deepEqual(f.views,['videos']);assert.equal(f.requests.length,0);
+    assert.equal(f.$('siteSearchDialog').open||false,false);assert.equal(f.$('siteSearchDesktopMenu').hidden,true);
+    if(mode==='Quick')f.document.querySelector('[data-site-search-open]').click();
+    f.type('סרטונים');press(f.window,f.field,'ArrowDown');assert.equal(f.selected().classList.contains('site-search-free'),true);
+    press(f.window,f.field,'Enter');await tick();assert.equal(new URLSearchParams(f.url.hash.slice(8)).get('q'),'סרטונים');assert.equal(f.requests.length,1);
+  });
+  test(mode+' familiar short and English category names show the correct destinations',()=>{
+    const f=open();
+    for(const [query,id]of [['גלריה','gallery'],['משחקים','games'],['הקלטות','voices'],['Family AI','family-ai'],['תינוקיה','nursery']]){
+      f.type(query);assert.equal(f.selected().dataset.siteSearchSection,id,query);
+    }
+    f.selected().click();assert.equal(f.url.hash,'#nursery');assert.equal(f.requests.length,0);
   });
   test(mode+' Up and Down visibly select each action and Enter activates that selection',async()=>{
     const f=open();f.type('רועי');

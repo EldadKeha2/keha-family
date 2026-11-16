@@ -106,6 +106,8 @@
 .person-gallery-album .media-grid-header-actions{justify-content:flex-start}
 .person-gallery-album .gallery-pager{margin:8px 0 14px}
 .person-gallery-album [data-person-grid]{direction:ltr;grid-auto-flow:row}
+/* Hebrew profile albums start at the right edge, including incomplete rows. */
+html[dir=rtl] .person-gallery-album [data-person-grid="videos"],html[dir=rtl] .person-grid-documents{direction:rtl;grid-auto-flow:row}
 html[dir=rtl] .person-gallery-card{direction:rtl}
 .person-gallery-videos{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px;align-items:start}
 .person-gallery-videos .video-tile{border-radius:6px;background:#fffdf7;overflow:hidden}
