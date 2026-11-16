@@ -2,6 +2,14 @@
   'use strict';
   let active=null;
   const supported=()=>typeof CSS!=='undefined'&&CSS.supports('scroll-snap-type','x mandatory');
+  function side(pane,item){
+    const constrained=navigator.connection?.saveData||/^(slow-)?2g$/.test(navigator.connection?.effectiveType||'');
+    const source=item?.kind==='photo'?((constrained?item.thumbnailSrc:null)||(window.FamilyPhotoPresentation?.source?.(item)||item.previewSrc||item.thumbnailSrc||item.src)):null;
+    if(pane._photoSource===source)return;pane._photoSource=source;
+    for(const child of [...pane.children])child.remove();
+    pane.setAttribute('aria-hidden','true');if(!source)return;
+    const image=document.createElement('img');image.alt='';image.decoding='async';image.fetchPriority='low';image.draggable=false;image.src=source;pane.append(image);
+  }
   function reset(stage){
     if(!active||stage&&active.stage!==stage)return;
     const b=active;active=null;clearTimeout(b.timer);clearTimeout(b.releaseTimer);b.resize?.disconnect();
@@ -25,35 +33,32 @@
   }
   function mount(stage,{previous,next,enabled,step,busy}){
     if(stage?.nodeType!==1||!supported()||!enabled()){reset(stage);return false;}
-    const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?stage.querySelector('img'):null);
+    // In fullscreen the first <img> is a neighbour preview after mounting.
+    // Keep the actual center image when metadata or layout refreshes again.
+    const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?(active?.stage===stage?active.node:stage.querySelector('img')):null);
     if(!node)return false;
-    if(active?.stage===stage&&active.node===node)return true;
+    if(active?.stage===stage&&active.node===node){
+      Object.assign(active,{enabled,step,busy});side(active.viewport.children[0],next);side(active.viewport.children[2],previous);return true;
+    }
     reset();const viewport=document.createElement('div');viewport.className='native-photo-strip';viewport.dir='ltr';
     const left=document.createElement('div'),center=document.createElement('div'),right=document.createElement('div');
     for(const pane of [left,center,right]){pane.className='native-photo-pane';viewport.append(pane);}
-    const side=(pane,item)=>{
-      pane.setAttribute('aria-hidden','true');if(!item)return;
-      const image=document.createElement('img');image.alt='';image.decoding='async';image.fetchPriority='low';image.draggable=false;
-      const constrained=navigator.connection?.saveData||/^(slow-)?2g$/.test(navigator.connection?.effectiveType||'');
-      const source=constrained?item.thumbnailSrc:(item.previewSrc?(window.FamilyPhotoPresentation?.source?.(item)||item.previewSrc):null)||item.thumbnailSrc||(item.size<1000000?item.src:null);
-      if(source&&item.kind==='photo'){image.src=source;pane.append(image);}
-    };
     side(left,next);side(right,previous);
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
-    const b=active={stage,node,viewport,center,width:viewport.clientWidth,locked:false,timer:null};
+    const b=active={stage,node,viewport,center,enabled,step,busy,width:viewport.clientWidth,locked:false,timer:null};
     viewport.scrollLeft=b.width;
     const finish=b.finish=()=>{
       if(active!==b||b.locked||!b.width)return;
       const page=Math.round(viewport.scrollLeft/b.width);
       if(page===1)return;if(Math.abs(viewport.scrollLeft-page*b.width)>2)return;
-      if(!enabled()){viewport.scrollLeft=b.width;return;}
+      if(!b.enabled()){viewport.scrollLeft=b.width;return;}
       // Browser momentum/restoration can snap to the other pane. A completed
       // finger stroke owns Next/Previous, just like the manual swipe handler.
       const target=b.releasedPage!=null&&Date.now()-b.releasedAt<750?b.releasedPage:page;
       clearTimeout(b.releaseTimer);b.releasedPage=null;b.locked=true;viewport.style.overflowX='hidden';
       if(target!==page)viewport.scrollLeft=target*b.width;
       const direction=target<1?1:-1;
-      Promise.resolve(step(direction,{native:true})).finally(()=>{if(active===b&&!busy?.()){b.locked=false;viewport.style.overflowX='';viewport.scrollLeft=b.width;}});
+      Promise.resolve(b.step(direction,{native:true,queued:true})).finally(()=>{if(active===b&&!b.busy?.()){b.locked=false;viewport.style.overflowX='';viewport.scrollLeft=b.width;}});
     };
     // Native scrollend waits for the finger and momentum to finish. Only older
     // browsers need a timer; committing a half-finished snap causes a jump.
@@ -65,5 +70,5 @@
     }
     return true;
   }
-  window.FamilyPhotoNative={mount,reset,has,claim,note};
+  window.FamilyPhotoNative={mount,reset,has,claim,note,supported};
 })();

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,photoButtons=false,videoSurface=null,strictStart=false}){
+  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,photoButtons=false,videoSurface=null,strictStart=false}){
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
     const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
     const clearPreview=()=>{if(previewFrame!==null)cancelAnimationFrame(previewFrame);previewFrame=null;pendingPreview=null;};
@@ -34,6 +34,9 @@
     },{capture:true,passive:true});
     const begin=event=>{
       const touch=['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents;
+      // A CSS snap strip owns real touch and precision-trackpad input. Do not
+      // capture or replay those events; mouse dragging remains available.
+      if(touch&&nativeScroll())return;
       const isMouse=!touch&&event.pointerType==='mouse'&&mouse()&&!event.ctrlKey&&!event.metaKey&&!event.altKey;
       const control=event.target.closest(controls),video=control?.tagName==='VIDEO'?previewVideo(event):null;
       if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||control&&!video)return;
@@ -94,6 +97,7 @@
     const fromTouch=(event,touch)=>({pointerId:'touch-'+touch.identifier,pointerType:'touch',isPrimary:true,button:0,clientX:touch.clientX,clientY:touch.clientY,target:touch.target||event.target,cancelable:event.cancelable,preventDefault:()=>event.preventDefault()});
     stage.addEventListener('touchstart',event=>{
       freshVideoTouch(event);
+      if(nativeScroll())return;
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
       touchStart=fromTouch(event,event.touches[0]);touchStart.time=Date.now();
       if(!gesture){const mode=begin(touchStart);touchStart.native=mode==='native';if(strictStart&&!mode){touchStart=null;finished();}}
@@ -115,6 +119,7 @@
     document.addEventListener('touchcancel',()=>{touchStart=null;blockClick();reset();},{capture:true,passive:true});
     stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!event.target.closest(controls))event.preventDefault();});
     stage.addEventListener('wheel',event=>{
+      if(nativeScroll())return;
       const control=event.target.closest(controls);
       if(!mouse()||!enabled()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;

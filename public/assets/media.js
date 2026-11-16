@@ -329,11 +329,16 @@
   }
   function refreshPhotoPresentation(){
     const stage=$('mediaStage');
-    // All devices use the same physical swipe and album order as Next/Previous.
-    // Phones retain native vertical scrolling and pinch zoom; only desktop
-    // touch needs its vertical movement handled by the pointer controller.
-    stage.classList.toggle('photo-manual-swipes',desktopPhotoInput());
-    window.FamilyPhotoNative?.reset(stage);
+    const native=window.FamilyPhotoNative,desktop=desktopPhotoInput();
+    // Use the same browser-owned scrolling as the working CSS-mode demo on
+    // laptops. Faces call this again after their image wrapper is ready.
+    const browserScroll=desktop&&current()?.kind==='photo'&&native?.supported?.()===true;
+    stage.classList.toggle('photo-manual-swipes',desktop&&!browserScroll);
+    if(browserScroll){
+      native.mount(stage,{previous:photoNeighbour(-1),next:photoNeighbour(1),
+        enabled:()=>canNavigatePhoto(),step,
+        busy:()=>state.paging||state.photoLoading});
+    }else native?.reset(stage);
   }
   function requestDelete(scope,id){
     if(['family-ai','living-family'].includes(scope)){window.FamilyAI?.exclude(id);return;}
@@ -481,6 +486,7 @@
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
       enabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo(),mouse:desktopPhotoInput,touchOnly:phoneTouchInput,preferPointer:desktopPhotoInput,claim:()=> 'queued',
+      nativeScroll:()=>window.FamilyPhotoNative?.has?.(stage)===true,strictStart:true,
       videoSurface:()=>current()?.kind==='video'?stage.querySelector('video'):null,
       vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
       step,right:options=>swipePhoto(1,options),left:options=>swipePhoto(-1,options),
