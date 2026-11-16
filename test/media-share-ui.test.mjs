@@ -289,6 +289,30 @@ test('desktop video body swipes browse the album while native playback controls 
   assert.equal(f.window.FamilyMedia.current().id,dx>0?'c':'a');f.close();
  }
 });
+test('desktop trackpad swipes over the actual video body navigate every video album and preserve playback controls',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const english of [false,true])for(const scope of ['videos','nostalgia:event','personal:ruti','gallery']){
+  const f=fixture({english,touchscreen:true}),stage=f.get('mediaStage');f.navigator.userAgent='Windows NT 10.0';stage.clientWidth=1200;
+  f.window.FamilyMedia.open(['a','b','c'].map(id=>({...f.photo(id),kind:'video',mime:'video/mp4'})),1,scope);
+  const player=()=>{
+   const video=stage.content[0];video.tagName='VIDEO';video.getBoundingClientRect=()=>({top:100,bottom:700});
+   video.closest=selector=>selector.includes('video')?video:null;stage.children.set('video',video);return video;
+  };
+  const wheel=(deltaX,clientY,extra={})=>{
+   const event={deltaX,deltaY:0,deltaMode:0,clientX:500,clientY,target:player(),cancelable:true,preventDefault(){this.prevented=true;},...extra};
+   stage.handlers.get('wheel')(event);return event;
+  };
+  assert.equal(wheel(140,670).prevented,undefined,'The native seeking strip retains horizontal input');
+  assert.equal(wheel(140,300,{ctrlKey:true}).prevented,undefined,'Trackpad pinch remains native');
+  t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,'b');
+  for(const [deltaX,expected]of [[30,'c'],[-30,'b']]){
+   for(let i=0;i<4;i++)assert.equal(wheel(deltaX,300).prevented,true,'The video body accepts the horizontal trackpad stroke');
+   t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,expected,scope);
+   t.mock.timers.tick(500);assert.equal(f.window.FamilyMedia.current().id,expected,'Momentum cannot advance a second video');
+  }
+  f.close();
+ }
+});
 test('desktop button presses switch prepared photos and rebind their controls synchronously',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture(),mounts=[],tags=[];let preparations=0;
  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});f.window.FamilyPhotoPresentation.prepare=()=>{preparations++;return null;};f.window.FamilyPhotoPresentation.preload=()=>{};
@@ -401,6 +425,23 @@ test('Windows precision trackpads accumulate fractional horizontal deltas instea
  for(const [dx,expected]of [[.75,'b'],[-.75,'a']]){
   for(let i=0;i<96;i++){stage.handlers.get('wheel')({deltaX:dx,deltaY:.1,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){}});t.mock.timers.tick(8);}
   t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,expected);t.mock.timers.tick(500);assert.equal(f.window.FamilyMedia.current().id,expected,'One continuous gesture must advance only once');
+ }
+ f.close();
+});
+test('a horizontal trackpad stroke retains its direction through diagonal motion in the same burst',t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture(),stage=f.get('mediaStage');stage.clientWidth=1440;f.navigator.userAgent='Windows NT 10.0';
+ f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
+ const wheel=(deltaX,deltaY)=>{
+  const event={deltaX,deltaY,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){this.prevented=true;}};
+  stage.handlers.get('wheel')(event);return event;
+ };
+ assert.equal(wheel(0,120).prevented,undefined,'An ordinary vertical scroll does not start album navigation');
+ for(const [direction,expected]of [[1,'b'],[-1,'a']]){
+  assert.equal(wheel(direction*20,2).prevented,true);
+  for(let i=0;i<5;i++)assert.equal(wheel(direction*20,24).prevented,true,'A small diagonal wobble must not discard the remaining horizontal distance');
+  t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,expected);
+  t.mock.timers.tick(500);assert.equal(f.window.FamilyMedia.current().id,expected,'One continuous trackpad stroke advances once');
  }
  f.close();
 });
@@ -793,6 +834,34 @@ test('desktop caption drafts save before the Next button and remain available if
   f.get('openedCaptionText').value='Draft before next';f.get('openedCaptionText').handlers.get('input')();await f.window.FamilyMedia.step(1);assert.equal(saved.length,1);
   assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');if(fail)assert.equal(f.get('openedCaptionText').value,'Draft before next');
   f.get('cancelOpenedCaption').handlers.get('click')();assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.get('openedCaptionText').value,f.window.FamilyMedia.current().caption||'');f.close();
+ }
+});
+test('desktop photo and video swipes still navigate after opening an unchanged inline caption',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const kind of ['photo','video'])for(const stream of ['pointer','wheel']){
+  const f=fixture(),stage=f.get('mediaStage');f.navigator.userAgent='Windows NT 10.0';stage.clientWidth=1440;
+  const saved=captionServer(f);f.window.FamilyMedia.open(['a','b'].map(id=>({...f.photo(id),kind,caption:'Description '+id})),0,kind==='photo'?'photos':'videos');
+  f.get('editOpenedCaption').handlers.get('click')();
+  if(stream==='pointer')swipe(f,140);
+  else {stage.handlers.get('wheel')({deltaX:140,deltaY:0,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){}});t.mock.timers.tick(200);}
+  await keyboardFlush();assert.equal(f.window.FamilyMedia.current().id,'b',kind+' '+stream);
+  assert.equal(saved.length,0,'Opening the editor without changing its text needs no save request');f.close();
+ }
+});
+test('desktop photo and video swipes save inline caption drafts before navigation and preserve failed drafts',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const kind of ['photo','video'])for(const stream of ['pointer','wheel'])for(const fail of [false,true]){
+  const f=fixture(),stage=f.get('mediaStage');f.navigator.userAgent='Windows NT 10.0';stage.clientWidth=1440;
+  const saved=captionServer(f,{fail});f.window.FamilyMedia.open(['a','b'].map(id=>({...f.photo(id),kind})),0,kind==='photo'?'photos':'videos');
+  f.get('openedCaptionText').value='Keep this draft';f.get('openedCaptionText').handlers.get('input')();
+  if(stream==='pointer')swipe(f,140);
+  else {stage.handlers.get('wheel')({deltaX:140,deltaY:0,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){}});t.mock.timers.tick(200);}
+  await keyboardFlush();assert.equal(saved.length,1,kind+' '+stream+' must attempt to save before changing files');
+  assert.equal(saved[0].caption,'Keep this draft');assert.equal(saved[0].path,'api/media/a/caption');
+  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');
+  if(fail){assert.equal(f.get('openedCaptionText').value,'Keep this draft');assert.equal(f.get('openedCaptionError').textContent,'Try again');}
+  else {assert.equal(f.window.FamilyMedia.lookup(kind==='photo'?'photos':'videos','a').caption,'Keep this draft');}
+  f.close();
  }
 });
 test('gallery Control and Shift+Control navigate from every focused control across family, personal and archive albums',async()=>{

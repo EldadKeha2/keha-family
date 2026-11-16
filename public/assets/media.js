@@ -319,12 +319,12 @@
     try{state.pageRequest=Promise.resolve(pagingApi().pageGallery(state.pageTarget)).then(()=>state.pageRender);await state.pageRequest;}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;state.pageRequest=null;state.pageRender=null;if($('mediaViewer').open)metadata();}}
   }
   function canNavigatePhoto({pending=false}={}){
-    const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&!captionEditing&&
+    const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&
       (pending||!stage.classList.contains?.('photo-slide-running'))&&(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1&&
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(window.FamilyFaces?.canNavigate?.(stage)??true);
   }
   function canNavigateVideo(){
-    return $('mediaViewer').open&&current()?.kind==='video'&&!captionEditing&&!state.paging&&state.items.length>1&&
+    return $('mediaViewer').open&&current()?.kind==='video'&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&!state.paging&&state.items.length>1&&
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#videoClipEditor[open],#photoDateDialog[open]');
   }
   function refreshPhotoPresentation(){
@@ -465,9 +465,15 @@
   function init(){
     const stage=$('mediaStage');
     const previousPhoto=()=>step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true}),nextPhoto=()=>step(1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true});
-    const swipePhoto=(direction,options)=>{
+    const swipePhoto=async(direction,options)=>{
       direction=swipeDirection(direction);
-      if(!phoneTouchInput())return step(direction,options);
+      if(!phoneTouchInput()){
+        // Inline descriptions use the same save-before-navigation path as the
+        // arrows. A failed save leaves the current item and its draft in place.
+        const session=state.session,navigation=state.navigation;
+        try{return await step(direction,options);}
+        finally{if(session===state.session&&navigation===state.navigation&&!photoSwipe?.isActive())window.FamilyPhotoPresentation?.settle();}
+      }
       const button=$(direction>0?'mediaNext':'mediaPrevious');
       if(button.disabled){window.FamilyPhotoPresentation?.settle();return;}
       button.click();

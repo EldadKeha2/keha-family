@@ -1482,6 +1482,10 @@ body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-
 /* The video body can browse the album; its native playback controls keep taps
    and seeking because the gesture controller excludes their bottom strip. */
 #mediaViewer.video-gallery-viewer #mediaStage,#mediaViewer.video-gallery-viewer #mediaStage>video{touch-action:pan-y pinch-zoom}
+/* Hybrid laptops keep diagonal video strokes in the pointer controller too.
+   Its vertical callback scrolls the viewer; native taps and seeking are kept. */
+#mediaViewer.video-gallery-viewer #mediaStage.photo-manual-swipes,
+#mediaViewer.video-gallery-viewer #mediaStage.photo-manual-swipes>video{touch-action:pinch-zoom}
 .media-stage.is-video{aspect-ratio:16/9;max-height:64vh;max-height:64dvh;min-height:200px;width:100%;margin:auto}
 .media-stage video,.media-stage iframe{display:block;width:100%;height:100%;min-height:200px;border:0;object-fit:contain}
 .media-viewer-footer{padding:14px 22px 18px}
