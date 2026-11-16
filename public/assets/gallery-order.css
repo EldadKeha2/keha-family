@@ -44,11 +44,14 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
   .gallery-page-buttons button>span{display:block;order:1;font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.2;white-space:nowrap}.gallery-page-buttons svg{display:block;width:16px;height:16px}
   html[dir=rtl] .gallery-page-buttons svg{transform:rotate(180deg)}
   .gallery-pager :is([data-gallery-page-label],[data-person-page-label]){grid-column:1/-1;grid-row:2;font-size:12px;line-height:1.4;margin:0}
-  body[data-active-view=gallery] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:12px 14px 8px}
-  body[data-active-view=gallery] .workspace-title{min-width:0;gap:6px}
-  body[data-active-view=gallery] .workspace-title>div{min-width:0}
-  body[data-active-view=gallery] .workspace-title h2{font-size:20px;line-height:1.25}
-  body[data-active-view=gallery] .workspace-title p{font-size:12px;line-height:1.4;margin-top:5px}
+  body[data-active-view=gallery] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px 16px;padding:12px 14px 8px}
+  body[data-active-view=gallery] .workspace-title{display:grid;grid-template-columns:18px minmax(0,1fr);min-width:0;gap:6px 8px}
+  body[data-active-view=gallery] .workspace-title>div{display:contents}
+  body[data-active-view=gallery] .workspace-title>.section-diamond{grid-column:1;grid-row:1;align-self:center;line-height:1}
+  body[data-active-view=gallery] .workspace-title h2{grid-column:2;grid-row:1;font-size:20px;line-height:1.25}
+  body[data-active-view=gallery] .workspace-title p{grid-column:2;min-width:0;font-size:12px;line-height:1.5;margin:0;padding-inline-end:8px;text-wrap:balance}
+  body[data-active-view=gallery] #workspaceSubtitle{max-inline-size:22ch}
+  body[data-active-view=gallery] .gallery-header-upload-actions{align-self:start;margin-top:2px}
   body[data-active-view=gallery] .workspace-actions,body[data-active-view=gallery] #galleryView>.collection-heading{display:none}
   body[data-active-view=gallery] .gallery-header-upload{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-height:49px;min-width:65px;padding:6px 8px;font-size:13px;line-height:1.25}
   body[data-active-view=gallery] #galleryView{padding-top:0}

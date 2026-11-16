@@ -315,6 +315,7 @@ window.FAMILY_TRANSLATIONS={
   "הנתונים אינם תקינים": "The data is invalid",
   "אפשר להציג שנים בין": "You can display years between",
   "פתיחת תפריט העמודים": "Open page menu",
+  "תפריט": "Menu",
   "הבית שלנו מתחיל כאן": "Our home begins here",
   "יש לכם סרטון משפחתי": "Have a family video",
   "יום אחד, שמחה גדולה": "One day, so much joy",

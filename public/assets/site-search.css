@@ -140,3 +140,34 @@ body[data-active-view=search] .workspace-actions{display:none}
   html[data-a11y-text] .site-header .brand{justify-self:center}
   html[data-a11y-text] body:not([data-active-view=home]) .site-header .brand>span{max-width:none}
 }
+
+/* One compact phone masthead: tools left, current language centered, Home right. */
+.phone-menu-label,.brand-home-label,.mobile-language-button,.a11y-mobile-header-label{display:none}
+.mobile-language-options{display:grid;gap:9px}
+.mobile-language-options button{display:flex;align-items:center;gap:12px;min-height:48px;padding:10px 13px;border:1px solid #d2c9b2;border-radius:9px;background:#fffdf8;color:#536647;font:16px/1.4 var(--sans);text-align:start}
+.mobile-language-options button[aria-pressed=true]{border-color:#7c8f68;background:#edf1e4}
+.mobile-language-options img{width:28px;height:20px;object-fit:contain}
+@media(max-width:700px){
+ body:not([data-active-view=home]) .site-header,html[data-a11y-text] body:not([data-active-view=home]) .site-header{position:relative;display:grid;grid-template-columns:40px 40px 40px minmax(0,1fr);grid-template-areas:"menu search access brand";align-items:center;column-gap:0;row-gap:0;height:auto;min-height:62px;padding:7px 1px;direction:ltr}
+ body:not([data-active-view=home]) .site-header .phone-navigation,body:not([data-active-view=home]) .site-header .header-preferences{display:contents;margin:0;padding:0;border:0}
+ body:not([data-active-view=home]) .site-header .phone-home-button,body:not([data-active-view=home]) #mobileViewTitle{display:none}
+ body:not([data-active-view=home]) .site-header #mobileMenuToggle,body:not([data-active-view=home]) .site-search-header-slot [data-site-search-open],body:not([data-active-view=home]) .site-header #accessibilityButton{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-sizing:border-box;width:40px;min-width:40px;min-height:48px;height:48px;margin:0;padding:4px 0;border:0;border-radius:5px;background:transparent;color:#746744;font:11px/1.2 var(--sans);white-space:nowrap;box-shadow:none}
+ body:not([data-active-view=home]) .site-header #mobileMenuToggle{grid-area:menu}
+ body:not([data-active-view=home]) .site-header .site-search-header-slot{grid-area:search;justify-self:start}
+ body:not([data-active-view=home]) .site-header #accessibilityButton{grid-area:access;direction:rtl}
+ body:not([data-active-view=home]) .phone-menu-label,body:not([data-active-view=home]) .a11y-mobile-header-label{display:block;order:2}
+ body:not([data-active-view=home]) #mobileMenuToggle>span:last-child{order:1;font-size:22px;line-height:1}
+ body:not([data-active-view=home]) .site-header #accessibilityButton>svg,body:not([data-active-view=home]) .site-search-header-slot svg{width:22px;height:22px;flex:0 0 22px;stroke-width:1.6}
+ body:not([data-active-view=home]) #accessibilityButton>span:not(.a11y-mobile-header-label):not(.a11y-active-dot){display:none}
+ body:not([data-active-view=home]) .site-header #accessibilityButton>.a11y-mobile-header-label{position:static;display:block;width:auto;height:auto;overflow:visible;clip-path:none;white-space:nowrap}
+ body:not([data-active-view=home]) .site-header .language-selector{position:absolute;left:max(144px,50%);top:50%;transform:translate(-50%,-50%);width:46px;min-width:46px;margin:0;direction:ltr}
+ body:not([data-active-view=home]) .language-selector>.language-switcher-label,body:not([data-active-view=home]) .language-selector>.language-switcher{display:none}
+ body:not([data-active-view=home]) .mobile-language-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:46px;min-width:46px;min-height:48px;padding:4px 0;border:0;border-radius:5px;background:transparent;color:#746744;font:11px/1.2 var(--sans);white-space:nowrap}
+ body:not([data-active-view=home]) .mobile-language-button img{width:25px;height:18px;object-fit:contain}
+ body:not([data-active-view=home]) .site-header .brand,html[data-a11y-text] body:not([data-active-view=home]) .site-header .brand{grid-area:brand;justify-self:end;direction:rtl;gap:4px;width:max-content;min-width:0;max-width:100%;font:500 13px/1.2 var(--sans);white-space:nowrap}
+ body:not([data-active-view=home]) .site-header .brand img{width:24px;height:24px;flex:0 0 24px}
+ body:not([data-active-view=home]) .site-header .brand>span{max-width:none;white-space:nowrap}
+ body:not([data-active-view=home]) .brand-family-label{display:none}
+ body:not([data-active-view=home]) .brand-home-label{display:inline;white-space:nowrap}
+ body[data-active-view=gallery] #workspaceSubtitle{display:none}
+}

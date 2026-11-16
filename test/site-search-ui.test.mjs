@@ -7,24 +7,34 @@ import {suggestPeople,SEARCH_TYPES} from '../public/assets/site-search-core.mjs'
 
 const source=(await readFile(new URL('../public/assets/site-search.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
 const navigation=(await readFile(new URL('../public/index.html',import.meta.url),'utf8')).match(/<nav class="main-nav"[^>]*>[\s\S]*?<\/nav>/)[0];
+const authoredHeader=parseHTML(await readFile(new URL('../public/index.html',import.meta.url),'utf8')).document.querySelector('.header-preferences').outerHTML;
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const empty={items:[],count:0,page:1,pages:1,size:24,facets:{types:[],branches:[],years:[],labels:[]}};
 function press(window,field,key,extra={}){const event=new window.Event('keydown',{bubbles:true,cancelable:true});Object.assign(event,{key,...extra});field.dispatchEvent(event);return event;}
-function fixture({fetcher}={}){
-  const {window,document}=parseHTML('<html><body><header class="site-header"><a id="homeLink"><span>בית משפחת קהא</span></a><section id="homeInstall"><div data-home-install-actions></div></section>'+navigation+'</header><section id="siteSearchView" hidden></section></body></html>');
-  const url=new URL('https://family.example/#home'),requests=[],profiles=[],views=[];let currentView='home';
+function fixture({fetcher,headerControls=false,language='he'}={}){
+  const {window,document}=parseHTML('<html><body><header class="site-header"><a id="homeLink"><span>בית משפחת קהא</span></a>'+(headerControls?authoredHeader:'')+'<section id="homeInstall"><div data-home-install-actions></div></section>'+navigation+'</header><section id="siteSearchView" hidden></section></body></html>');
+  const url=new URL('https://family.example/#home'),requests=[],profiles=[],views=[],selectedLanguages=[];let currentView='home';
   const create=document.createElement.bind(document);document.createElement=tag=>{
     const element=create(tag);if(tag==='dialog'){element.showModal=()=>{element.open=true;};element.close=()=>{element.open=false;element.dispatchEvent(new window.Event('close'));};}return element;
   };
   const people=[{id:'roi',name:'רועי אלחריזי',nameEn:'Roei Elharizi',profile:'/media/123',branch:'harizi'}];
-  window.FamilyI18n={isEnglish:false,personName:p=>p.name,error:value=>value,async fetch(path,options){requests.push({path,options});return fetcher?fetcher(path,options):Response.json({...empty,query:new URL(path,url).searchParams.get('q')||'',person:new URL(path,url).searchParams.has('person')?people[0]:null});}};
+  window.FamilyI18n={language,isEnglish:language!=='he',setLanguage:next=>selectedLanguages.push(next),personName:p=>p.name,error:value=>value,async fetch(path,options){requests.push({path,options});return fetcher?fetcher(path,options):Response.json({...empty,query:new URL(path,url).searchParams.get('q')||'',person:new URL(path,url).searchParams.has('person')?people[0]:null});}};
   window.FamilyPeopleRoster={snapshot:()=>people,load:async()=>people};
   const go=route=>{url.href=new URL(route,url).href;};
   window.FamilyNavigation={go};
   window.FamilyApp={getView:()=>currentView,setView(view,syncRoute=true){views.push(view);if(syncRoute)go('#'+view);currentView=view;window.FamilySiteSearch?.activate(view);},openPerson(id){profiles.push(id);currentView='person';window.FamilySiteSearch?.activate('person');}};
   vm.runInContext(source,vm.createContext({window,document,location:url,history:{pushState:(state,unused,route)=>go(route)},URL,URLSearchParams,AbortController,Event:window.Event,suggestPeople,SEARCH_TYPES}));
-  return {window,document,url,requests,profiles,views,$:id=>document.getElementById(id),input(value){const field=document.getElementById('siteSearchQuickInput');field.value=value;field.dispatchEvent(new window.Event('input'));},route(route){go(route);window.dispatchEvent(new window.Event('popstate'));}};
+  return {window,document,url,requests,profiles,views,selectedLanguages,$:id=>document.getElementById(id),input(value){const field=document.getElementById('siteSearchQuickInput');field.value=value;field.dispatchEvent(new window.Event('input'));},route(route){go(route);window.dispatchEvent(new window.Event('popstate'));}};
 }
+test('the compact language flag reflects the current language and opens all supported choices without a content search',()=>{
+  for(const language of ['he','en-US','en-GB']){
+    const f=fixture({headerControls:true,language}),trigger=f.document.querySelector('.mobile-language-button'),panel=f.$('mobileLanguageDialog');
+    assert.equal(trigger.querySelector('img').getAttribute('src'),'assets/flag-'+({he:'il','en-US':'us','en-GB':'gb'}[language])+'.svg'+(language==='he'?'?v=small-star-v1':''));assert.equal(trigger.textContent,'Language');
+    trigger.click();assert.equal(panel.open,true);assert.equal(trigger.getAttribute('aria-expanded'),'true');assert.equal(panel.querySelectorAll('[data-header-language]').length,3);assert.equal(panel.querySelector('[aria-pressed=true]').dataset.headerLanguage,language);
+    panel.querySelector('[data-header-language="en-US"]').click();assert.deepEqual(f.selectedLanguages,['en-US']);assert.equal(panel.open,false);assert.equal(trigger.getAttribute('aria-expanded'),'false');assert.equal(f.requests.length,0);
+    assert.equal(f.document.querySelector('.a11y-mobile-header-label').textContent,language==='he'?'נגישות':'Access');
+  }
+});
 test('the phone search opens on demand and shows separate portrait/profile and all-content actions',async()=>{
   const f=fixture();assert.equal(f.requests.length,0);
   f.document.querySelector('[data-site-search-open]').click();assert.equal(f.$('siteSearchDialog').open,true);
