@@ -5,12 +5,13 @@ const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 const labels={person:['בני משפחה','People'],photo:['תמונות','Photos'],video:['סרטונים','Videos'],document:['מסמכים','Documents'],story:['זיכרונות','Memories'],voice:['הקלטות','Recordings'],wedding:['חתונות','Weddings'],event:['אירועים','Events']};
 const typeLabel=type=>tr(...(labels[type]||['תוכן','Content']));
 const magnifier='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>';
+const contentSearchIcon='<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21H3V4h17v2M8 25H6V8h17v3"/><rect x="10" y="12" width="15" height="15" rx="2"/><path d="m12 22 3-3 3 3M14 15h.01"/><circle cx="24" cy="23" r="5" fill="#edf1e4"/><path d="m28 27 3 3"/></svg>';
 const roster=()=>window.FamilyPeopleRoster?.snapshot()||Object.values(window.FAMILY_DATA?.people||{});
 const personName=person=>I.personName(person);
 const safeURL=value=>{try{const url=new URL(value,location.href);return url.origin===location.origin&&/^https?:$/.test(url.protocol)?url.pathname+url.search+url.hash:'';}catch{return '';}};
 const initials=person=>personName(person).split(' ').slice(0,2).map(part=>part[0]||'').join('');
 function portrait(person){const src=safeURL(person.profile),frame=person.profileFraming||{},position=key=>Number.isFinite(frame[key])?Math.min(1,Math.max(0,frame[key]))*100:50,style='object-position:'+position('x')+'% '+position('y')+'%;object-fit:'+(frame.fit==='contain'?'contain':'cover');return '<span class="site-search-avatar"><span aria-hidden="true">'+safe(initials(person))+'</span>'+(src?'<img style="'+style+'" src="'+safe(src)+'" alt="" loading="lazy" decoding="async">':'')+'</span>';}
-let dialog,view,button,controller,epoch=0,lastKey=null,result=null,pending=false,params=new URLSearchParams();
+let dialog,view,button,headerSlot,controller,epoch=0,lastKey=null,result=null,pending=false,params=new URLSearchParams();
 const active=()=>window.FamilyApp?.getView()==='search';
 const routeParams=()=>new URLSearchParams(location.hash.startsWith('#search/')?location.hash.slice(8):'');
 function navigate(next){
@@ -24,10 +25,10 @@ function closeDialog(){if(dialog?.open)dialog.close();}
 function openProfile(id){closeDialog();window.FamilyApp?.openPerson(id);}
 function suggestions(){
   const query=$('siteSearchQuickInput').value.trim(),people=suggestPeople(roster(),query),host=$('siteSearchSuggestions');
-  host.innerHTML=people.map(person=>'<li class="site-search-suggestion"><a class="site-search-person" href="#person/'+encodeURIComponent(person.id)+'" data-site-search-person="'+safe(person.id)+'">'+portrait(person)+'<span><strong>'+safe(personName(person))+'</strong><small>'+tr('לפתיחת הפרופיל','Open profile')+'</small></span><span class="site-search-chevron" aria-hidden="true">'+(I.isEnglish?'→':'←')+'</span></a><button class="site-search-related" type="button" data-site-search-related="'+safe(person.id)+'">'+magnifier+'<span>'+tr('חיפוש חופשי של ','Search all content for ')+safe(personName(person))+'</span></button></li>').join('');
+  host.innerHTML=people.map(person=>'<li class="site-search-suggestion"><a class="site-search-person" href="#person/'+encodeURIComponent(person.id)+'" data-site-search-person="'+safe(person.id)+'">'+portrait(person)+'<span><strong>'+safe(personName(person))+'</strong><small>'+tr('לפתיחת הפרופיל','Open profile')+'</small></span><span class="site-search-chevron" aria-hidden="true">'+(I.isEnglish?'→':'←')+'</span></a></li><li class="site-search-suggestion site-search-content-suggestion"><button class="site-search-person site-search-content-action" type="button" data-site-search-related="'+safe(person.id)+'"><span class="site-search-content-icon">'+contentSearchIcon+'</span><span><strong>'+tr('כל התכנים של ','All content for ')+safe(personName(person))+'</strong><small>'+tr('תמונות, סרטונים, זיכרונות ועוד','Photos, videos, memories and more')+'</small></span><span class="site-search-chevron" aria-hidden="true">'+(I.isEnglish?'→':'←')+'</span></button></li>').join('');
   $('siteSearchQuickInput').setAttribute('aria-expanded',String(people.length>0));
   const free=$('siteSearchFree');free.hidden=!query;free.querySelector('span').textContent=tr('חיפוש חופשי של ״','Search all content for “')+query+tr('״','”');
-  $('siteSearchQuickHint').textContent=!query?tr('חפשו בן משפחה, מקום, אירוע או זיכרון','Search for a person, place, event or memory'):!people.length?tr('אפשר לחפש את המילים האלה בכל תכני האתר','Search these words across the family website'):tr('הקישו על התמונה לפרופיל, או על החיפוש שמתחתיה לכל התכנים','Tap a portrait for the profile, or search below it for all related content');
+  $('siteSearchQuickHint').textContent=!query?tr('חפשו בן משפחה, מקום, אירוע או זיכרון','Search for a person, place, event or memory'):!people.length?tr('אפשר לחפש את המילים האלה בכל תכני האתר','Search these words across the family website'):tr('בחרו פרופיל, את כל התכנים של האדם, או חיפוש חופשי של הטקסט','Choose a profile, all content for that person, or a free text search');
 }
 function openQuick(){
   $('siteSearchQuickInput').value=active()?params.get('q')||'':'';suggestions();
@@ -100,11 +101,15 @@ function openResult(index){
 function listAttachments(items){return (items||[]).map(item=>{const url=safeURL(item.src);return url?'<p><a href="'+safe(url)+'" target="_blank" rel="noopener">'+safe(item.name)+'</a></p>':'';}).join('');}
 function activate(name){
   if(!view)return;view.hidden=name!=='search';
+  const host=name==='home'?document.querySelector('[data-home-install-actions]'):headerSlot;
+  if(button&&host&&button.parentElement!==host)host.append(button);
   if(name==='search')load();else if(controller){controller.abort();epoch++;lastKey=null;pending=false;view.removeAttribute('aria-busy');}
 }
 function init(){
   view=$('siteSearchView');if(!view)return;renderShell();
   button=document.createElement('button');button.type='button';button.dataset.siteSearchOpen='';button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','siteSearchDialog');button.setAttribute('aria-expanded','false');button.setAttribute('aria-label',tr('חיפוש בכל האתר','Search the family website'));button.innerHTML=magnifier+'<span>'+tr('חיפוש','Search')+'</span>';
+  headerSlot=document.createElement('div');headerSlot.className='site-search-header-slot';document.querySelector('.site-header')?.append(headerSlot);
+  const brand=document.querySelector('#homeLink>span');if(brand)brand.innerHTML='<span class="brand-title-line">'+tr('בית משפחת','Keha Family')+'</span> <span class="brand-title-line">'+tr('קהא','Home')+'</span>';
   document.querySelector('[data-home-install-actions]')?.append(button);button.addEventListener('click',openQuick);
   dialog=document.createElement('dialog');dialog.id='siteSearchDialog';dialog.className='site-search-dialog';dialog.setAttribute('aria-labelledby','siteSearchQuickTitle');dialog.setAttribute('data-i18n-skip','');
   dialog.innerHTML='<header class="site-search-dialog-heading"><h2 id="siteSearchQuickTitle">'+tr('מה מחפשים במשפחה?','What are you looking for?')+'</h2><button type="button" class="site-search-close" data-site-search-close aria-label="'+tr('סגירה','Close')+'">×</button></header><form id="siteSearchQuickForm" role="search"><label for="siteSearchQuickInput" class="site-search-sr">'+tr('שם או מילות חיפוש','Name or search words')+'</label><div class="site-search-field">'+magnifier+'<input id="siteSearchQuickInput" type="search" inputmode="search" maxlength="200" autocomplete="off" aria-controls="siteSearchSuggestions" aria-expanded="false" placeholder="'+tr('למשל: רועי','For example: Roei')+'"><button type="submit" aria-label="'+tr('חיפוש חופשי','Search all content')+'">'+tr('חיפוש','Search')+'</button></div></form><p class="site-search-hint" id="siteSearchQuickHint" role="status"></p><ul id="siteSearchSuggestions" class="site-search-suggestions"></ul><button type="button" class="site-search-free" id="siteSearchFree" hidden>'+magnifier+'<span></span></button>';
@@ -117,7 +122,7 @@ function init(){
   $('siteSearchFree').addEventListener('click',()=>search($('siteSearchQuickInput').value));
   dialog.addEventListener('click',event=>{const person=event.target.closest('[data-site-search-person]');if(person){event.preventDefault();openProfile(person.dataset.siteSearchPerson);return;}const related=event.target.closest('[data-site-search-related]');if(related){const p=roster().find(p=>p.id===related.dataset.siteSearchRelated);if(p)search(personName(p),p.id);}});
   dialog.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp'].includes(event.key)||event.target===$('siteSearchQuickInput'))return;const choices=[...$('siteSearchSuggestions').querySelectorAll('a,button')],at=choices.indexOf(document.activeElement);if(at<0)return;event.preventDefault();if(at===0&&event.key==='ArrowUp')$('siteSearchQuickInput').focus();else choices[(at+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length]?.focus();});
-  dialog.addEventListener('close',()=>{button.setAttribute('aria-expanded','false');if(!button.closest('[hidden]')&&window.FamilyApp?.getView()==='home')button.focus();});
+  dialog.addEventListener('close',()=>{button.setAttribute('aria-expanded','false');if(!button.closest('[hidden]'))button.focus();});
   for(const name of ['hashchange','popstate'])window.addEventListener(name,()=>{closeDialog();if($('siteSearchContentDialog')?.open)$('siteSearchContentDialog').close();if(location.hash.split('/')[0]==='#search'){window.FamilyApp?.setView('search',false);activate('search');}});
   for(const name of ['family-media-changed','family-person-changed'])window.addEventListener(name,()=>{lastKey=null;if(active())load();});
   const content=document.createElement('dialog');content.id='siteSearchContentDialog';content.className='site-search-dialog site-search-content-dialog';content.setAttribute('aria-labelledby','siteSearchContentTitle');content.addEventListener('close',()=>content.querySelector('audio')?.pause());document.body.append(content);

@@ -9,7 +9,7 @@ const source=(await readFile(new URL('../public/assets/site-search.js',import.me
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const empty={items:[],count:0,page:1,pages:1,size:24,facets:{types:[],branches:[],years:[],labels:[]}};
 function fixture({fetcher}={}){
-  const {window,document}=parseHTML('<html><body><div data-home-install-actions></div><section id="siteSearchView" hidden></section></body></html>');
+  const {window,document}=parseHTML('<html><body><header class="site-header"><a id="homeLink"><span>בית משפחת קהא</span></a><section id="homeInstall"><div data-home-install-actions></div></section></header><section id="siteSearchView" hidden></section></body></html>');
   const url=new URL('https://family.example/#home'),requests=[],profiles=[];let currentView='home';
   const create=document.createElement.bind(document);document.createElement=tag=>{
     const element=create(tag);if(tag==='dialog'){element.showModal=()=>{element.open=true;};element.close=()=>{element.open=false;element.dispatchEvent(new window.Event('close'));};}return element;
@@ -30,8 +30,23 @@ test('the phone search opens on demand and shows separate portrait/profile and a
   assert.equal(host.querySelector('[data-site-search-person]').getAttribute('href'),'#person/roi');
   assert.equal(host.querySelector('img').getAttribute('src'),'/media/123');
   assert.equal(host.querySelector('img').hasAttribute('data-photo-frame'),false,'Search portraits preserve framing without enabling album edits');
-  assert.match(host.querySelector('[data-site-search-related]').textContent,/חיפוש חופשי של רועי אלחריזי/);
+  assert.equal(host.children.length,2);
+  const content=host.querySelector('[data-site-search-related]');
+  assert.match(content.textContent,/כל התכנים של רועי אלחריזי/);assert.equal(content.querySelector('img'),null);assert.ok(content.querySelector('.site-search-content-icon svg'));
+  assert.match(f.$('siteSearchFree').textContent,/חיפוש חופשי של ״רועי״/);
   host.querySelector('[data-site-search-person]').click();assert.deepEqual(f.profiles,['roi']);assert.equal(f.$('siteSearchDialog').open,false);
+});
+test('one search button follows every internal view and search results disappear on navigation',async()=>{
+  const f=fixture(),button=f.document.querySelector('[data-site-search-open]');
+  assert.equal(button.parentElement.hasAttribute('data-home-install-actions'),true);
+  for(const name of ['person','gallery','videos','stories','calendar','games','weddings']){
+    f.window.FamilyApp.setView(name);assert.equal(button.parentElement.className,'site-search-header-slot');assert.equal(f.document.querySelectorAll('[data-site-search-open]').length,1);
+    button.click();assert.equal(f.$('siteSearchDialog').open,true);f.$('siteSearchDialog').close();
+  }
+  f.route('#search/q=רועי');await tick();assert.equal(f.$('siteSearchView').hidden,false);
+  f.window.FamilyApp.setView('person');assert.equal(f.$('siteSearchView').hidden,true);
+  f.window.FamilyApp.setView('home');assert.equal(button.parentElement.hasAttribute('data-home-install-actions'),true);
+  assert.deepEqual([...f.document.querySelectorAll('.brand-title-line')].map(el=>el.textContent),['בית משפחת','קהא']);
 });
 test('the selected person search uses the full-site route once and renders a persistent subject',async()=>{
   const f=fixture();f.document.querySelector('[data-site-search-open]').click();f.input('רועי');f.document.querySelector('[data-site-search-related]').click();await tick();
