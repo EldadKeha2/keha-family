@@ -8,6 +8,7 @@ import {suggestPeople,SEARCH_TYPES} from '../public/assets/site-search-core.mjs'
 const source=(await readFile(new URL('../public/assets/site-search.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const empty={items:[],count:0,page:1,pages:1,size:24,facets:{types:[],branches:[],years:[],labels:[]}};
+function press(window,field,key,extra={}){const event=new window.Event('keydown',{bubbles:true,cancelable:true});Object.assign(event,{key,...extra});field.dispatchEvent(event);return event;}
 function fixture({fetcher}={}){
   const {window,document}=parseHTML('<html><body><header class="site-header"><a id="homeLink"><span>בית משפחת קהא</span></a><section id="homeInstall"><div data-home-install-actions></div></section></header><section id="siteSearchView" hidden></section></body></html>');
   const url=new URL('https://family.example/#home'),requests=[],profiles=[];let currentView='home';
@@ -89,3 +90,40 @@ test('desktop Enter searches arbitrary text and clearing or navigating dismisses
   field.value='רועי';field.dispatchEvent(new f.window.Event('input'));menu.querySelector('[data-site-search-person]').click();assert.deepEqual(f.profiles,['roi']);assert.equal(menu.hidden,true);
   field.value='';field.dispatchEvent(new f.window.Event('input'));assert.equal(menu.hidden,true);assert.equal(field.getAttribute('aria-expanded'),'false');
 });
+for(const mode of ['Desktop','Quick']){
+  function open(){
+    const f=fixture();if(mode==='Quick')f.document.querySelector('[data-site-search-open]').click();
+    const field=f.$('siteSearch'+mode+'Input'),host=f.$(mode==='Desktop'?'siteSearchDesktopMenu':'siteSearchQuickOptions');
+    const type=value=>{field.value=value;field.dispatchEvent(new f.window.Event('input'));};
+    const selected=()=>host.querySelector('[aria-selected="true"]');
+    return {...f,field,host,type,selected};
+  }
+  test(mode+' Enter from the input opens the first displayed profile without a content search',()=>{
+    const f=open();f.type('רועי');
+    const first=f.host.querySelector('[data-site-search-person]');
+    assert.equal(f.selected(),first);assert.equal(f.field.getAttribute('aria-activedescendant'),first.id);
+    assert.equal(press(f.window,f.field,'Enter').defaultPrevented,true);
+    assert.deepEqual(f.profiles,['roi']);assert.equal(f.requests.length,0);
+    assert.equal(f.field.hasAttribute('aria-activedescendant'),false);
+  });
+  test(mode+' Up and Down visibly select each action and Enter activates that selection',async()=>{
+    const f=open();f.type('רועי');
+    assert.equal(press(f.window,f.field,'ArrowUp').defaultPrevented,true);
+    assert.equal(f.selected().classList.contains('site-search-free'),true);
+    press(f.window,f.field,'ArrowDown');assert.equal(f.selected().dataset.siteSearchPerson,'roi');
+    press(f.window,f.field,'ArrowDown');assert.equal(f.selected().dataset.siteSearchRelated,'roi');
+    press(f.window,f.field,'ArrowUp');assert.equal(f.selected().dataset.siteSearchPerson,'roi');
+    press(f.window,f.field,'ArrowDown');
+    if(mode==='Desktop'){f.field.dispatchEvent(new f.window.Event('focus'));await tick();assert.equal(f.selected().dataset.siteSearchRelated,'roi','Late roster refresh preserves the selected action');}
+    assert.equal(f.field.getAttribute('aria-activedescendant'),f.selected().id);
+    press(f.window,f.field,'Enter');await tick();
+    assert.equal(new URLSearchParams(f.url.hash.slice(8)).get('person'),'roi');assert.equal(f.profiles.length,0);assert.equal(f.requests.length,1);
+  });
+  test(mode+' typing resets the selection and Enter preserves free search without a person match',async()=>{
+    const f=open();f.type('רועי');press(f.window,f.field,'ArrowDown');f.type('רועי אלחריזי');assert.equal(f.selected().dataset.siteSearchPerson,'roi');
+    press(f.window,f.field,'Enter',{isComposing:true});assert.equal(f.profiles.length,0);
+    f.type('חופשה רחוקה');assert.equal(f.selected().classList.contains('site-search-free'),true);
+    press(f.window,f.field,'Enter');await tick();assert.equal(new URLSearchParams(f.url.hash.slice(8)).get('q'),'חופשה רחוקה');assert.equal(f.profiles.length,0);
+    f.type('');press(f.window,f.field,'Enter');assert.equal(f.requests.length,1);
+  });
+}

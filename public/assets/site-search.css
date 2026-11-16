@@ -56,6 +56,7 @@ html[dir=ltr] .site-search-content-suggestion{box-shadow:inset 3px 0 #8b9d74}
 .site-search-related,.site-search-free{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;padding:10px 12px;border:0;border-top:1px solid #e5deca;background:#f4f1e5;color:#586c45;text-decoration:none;font:13px/1.5 var(--sans);cursor:pointer}
 .site-search-free{margin-top:12px;border:1px solid #c8c2ac;border-radius:11px;background:#eeeddf}
 .site-search-related:hover,.site-search-person:hover,.site-search-free:hover{background:#e9eddf}
+:is(#siteSearchDesktopMenu,#siteSearchQuickOptions) :is(.site-search-person,.site-search-free)[aria-selected=true]{background:#e1ead2;outline:2px solid #72855b;outline-offset:-3px;border-radius:10px}
 .site-search-subject{display:flex;align-items:center;justify-content:space-between;gap:7px;border:1px solid #c5cdb5;background:#eef1e7;border-radius:13px;margin:14px 0;padding:9px}
 .site-search-subject>a{display:flex;align-items:center;gap:9px;color:#435838;text-decoration:none;font-size:14px}
 .site-search-subject .site-search-avatar{width:38px;height:38px;flex-basis:38px;font-size:14px}
