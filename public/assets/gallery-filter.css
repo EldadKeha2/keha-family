@@ -65,12 +65,12 @@
 
 /* Draw attention to newly opened gallery filters on desktop without moving their contents. */
 @media(min-width:701px){
-  #galleryFilterPanel{position:relative;padding:20px;border-color:#aeb699;border-radius:12px;background:linear-gradient(135deg,#fcfbf4,#f0f2e5);box-shadow:0 4px 14px #48593914,0 0 0 3px #bca46718}
-  #galleryFilterPanel::before{content:'';position:absolute;inset:5px;border:1px solid #d5c7a64d;border-radius:7px;pointer-events:none}
+  #galleryFilterPanel{position:relative;padding:20px;border-color:#586d45;border-radius:12px;background:linear-gradient(135deg,#fcfbf4,#f0f2e5);box-shadow:0 4px 14px #48593914,0 0 0 3px #586d4518}
+  #galleryFilterPanel::before{content:'';position:absolute;inset:5px;border:1px solid #586d4540;border-radius:7px;pointer-events:none}
   #galleryFilterPanel:not([hidden]){animation:gallery-filter-open-glow 1.5s ease-in-out 1}
   @keyframes gallery-filter-open-glow{
-    0%,50%,100%{border-color:#aeb699;box-shadow:0 4px 14px #48593914,0 0 0 3px #bca46718}
-    25%,75%{border-color:#a8894e;box-shadow:0 4px 14px #48593914,0 0 0 5px #bca4672e,0 0 18px #bca46733}
+    0%,50%,100%{border-color:#586d45;box-shadow:0 4px 14px #48593914,0 0 0 3px #586d4518}
+    25%,75%{border-color:#40562f;box-shadow:0 4px 14px #48593914,0 0 0 5px #586d4533,0 0 18px #586d4529}
   }
 }
 
