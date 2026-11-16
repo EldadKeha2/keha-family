@@ -72,3 +72,20 @@ test('result cards show real thumbnails, links and mixed-media viewer items',asy
   assert.equal(f.$('siteSearchGrid').querySelector('img').getAttribute('src'),'/media/image');assert.equal(f.$('siteSearchGrid').querySelector('script'),null);
   f.document.querySelector('[data-site-search-result]').click();assert.equal(opened[0][0][0].id,'image');assert.equal(opened[0][1],0);
 });
+test('desktop typing suggests the same profiles and canonical all-content searches without fetching results early',async()=>{
+  const f=fixture(),field=f.$('siteSearchDesktopInput'),menu=f.$('siteSearchDesktopMenu');
+  assert.equal(field.getAttribute('placeholder'),'חיפוש');assert.equal(menu.hidden,true);assert.equal(f.requests.length,0);
+  field.value='רועי';field.dispatchEvent(new f.window.Event('input'));
+  assert.equal(menu.hidden,false);assert.equal(field.getAttribute('aria-expanded'),'true');assert.equal(menu.querySelector('[data-site-search-person]').getAttribute('href'),'#person/roi');
+  assert.equal(menu.querySelector('img').getAttribute('src'),'/media/123');assert.equal(f.requests.length,0);
+  menu.querySelector('[data-site-search-related]').click();await tick();
+  const params=new URLSearchParams(f.url.hash.slice(8));assert.equal(params.get('person'),'roi');assert.equal(params.get('q'),'רועי אלחריזי');assert.equal(menu.hidden,true);assert.equal(f.requests.length,1);
+});
+test('desktop Enter searches arbitrary text and clearing or navigating dismisses suggestions',async()=>{
+  const f=fixture(),field=f.$('siteSearchDesktopInput'),menu=f.$('siteSearchDesktopMenu');
+  field.value='<img src=x onerror=bad>';field.dispatchEvent(new f.window.Event('input'));assert.equal(menu.querySelector('img'),null);assert.match(f.$('siteSearchDesktopFree').textContent,/<img src=x onerror=bad>/);
+  f.$('siteSearchDesktopForm').dispatchEvent(new f.window.Event('submit',{cancelable:true}));await tick();
+  assert.equal(new URLSearchParams(f.url.hash.slice(8)).get('q'),'<img src=x onerror=bad>');assert.equal(f.requests.length,1);assert.equal(menu.hidden,true);
+  field.value='רועי';field.dispatchEvent(new f.window.Event('input'));menu.querySelector('[data-site-search-person]').click();assert.deepEqual(f.profiles,['roi']);assert.equal(menu.hidden,true);
+  field.value='';field.dispatchEvent(new f.window.Event('input'));assert.equal(menu.hidden,true);assert.equal(field.getAttribute('aria-expanded'),'false');
+});
