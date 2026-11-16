@@ -2340,3 +2340,27 @@ test('category-only memory changes preserve text, tags, dates and attachments an
   f.restart();const item=(await (await f.call('/api/stories')).json()).stories[0];assert.equal(item.category,'roots');assert.equal(item.body,original.body);assert.deepEqual(item.personIds,original.personIds);assert.equal(f.objects.size,1);
  }finally{await f.close();}
 });
+
+test('personal gallery controls paginate, filter, sort and select the whole owned or tagged album independently by kind',async()=>{
+ const f=fixture();try{
+  const records={photos:[],videos:[]};
+  for(const [key,kind,count]of [['photos','photo',135],['videos','video',103]])for(let i=1;i<=count;i++){
+   const id=(key==='photos'?20000+i:30000+i).toString(16).padStart(32,'0'),owned=i%2===1,item={id,kind,category:owned?'personal':'gallery',personId:owned?'yehiel':null,file:id+(kind==='photo'?'.jpg':'.mp4'),mime:kind==='photo'?'image/jpeg':'video/mp4',name:key+i,createdAt:new Date(2020,0,i).toISOString(),takenDate:{year:1900+i},labels:i%2===0?['holidays']:[]};
+   f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,item.category,item.personId,JSON.stringify(item));
+   f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(id,'yehiel');if(i%3===0)f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(id,'yona');records[key].push(item);
+  }
+  const outside='f'.repeat(32);f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(outside,'personal','yona',JSON.stringify({id:outside,category:'personal',personId:'yona',kind:'photo',mime:'image/jpeg',file:outside+'.jpg',labels:['holidays']}));f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(outside,'yona');
+  const params='photosSize=100&photosSort=uploaded-asc&videosSize=100&videosSort=uploaded-desc';
+  const firstResponse=await f.call('/api/people/yehiel/page?'+params),first=await firstResponse.json();assert.equal(firstResponse.status,200);assert.equal(first.albums.photos.total,135);assert.equal(first.albums.photos.items.length,100);assert.equal(first.albums.videos.total,103);assert.equal(first.albums.videos.items.length,100);assert.equal(first.albums.photos.items[0].id,records.photos[0].id);
+  const second=await(await f.call('/api/people/yehiel/page?'+params+'&photos=2&videos=2')).json();assert.equal(second.albums.photos.items.length,35);assert.equal(second.albums.videos.items.length,3);assert.equal(second.albums.photos.items[0].id,records.photos[100].id);
+  const all=await(await f.call('/api/people/yehiel/page?photosSize=all&photosSort=random&photosSeed=100')).json();assert.equal(all.albums.photos.items.length,135);assert.equal(all.albums.photos.all,true);assert.equal(new Set(all.albums.photos.items.map(item=>item.id)).size,135);
+  const focus=records.photos[120].id,rank=all.albums.photos.items.findIndex(item=>item.id===focus),focused=await(await f.call('/api/people/yehiel/page?photosSize=100&photosSort=random&photosSeed=100&focus='+focus)).json();assert.equal(focused.albums.photos.page,Math.floor(rank/100)+1);assert.ok(focused.albums.photos.items.some(item=>item.id===focus));
+  const filter='photosPerson=yona&photosLabels=holidays',filtered=await(await f.call('/api/people/yehiel/page?'+params+'&'+filter)).json();assert.equal(filtered.albums.photos.total,22);assert.equal(filtered.person.photoCount,135);assert.ok(filtered.albums.photos.items.every(item=>Number(item.name.slice(6))%6===0));assert.ok(!filtered.albums.photos.items.some(item=>item.id===outside));assert.equal(filtered.albums.videos.total,103);
+  const selection=await(await f.call('/api/people/yehiel/selection?kind=photos&photos=2&photosSize=100&'+filter)).json();assert.equal(selection.ids.length,22);assert.deepEqual(new Set(selection.ids),new Set(filtered.albums.photos.items.map(item=>item.id)));
+  const videos=await(await f.call('/api/people/yehiel/selection?kind=videos')).json();assert.equal(videos.ids.length,103);assert.ok(videos.ids.every(id=>records.videos.some(item=>item.id===id)));
+  const etag=firstResponse.headers.get('ETag');assert.equal((await f.call('/api/people/yehiel/page?'+params,{headers:{'If-None-Match':etag}})).status,304);
+  for(const extra of ['photosSize=all','photosSort=taken-desc',filter,'photosSort=random&photosSeed=2']){const changed=new URLSearchParams(params);for(const [key,value]of new URLSearchParams(extra))changed.set(key,value);assert.equal((await f.call('/api/people/yehiel/page?'+changed,{headers:{'If-None-Match':etag}})).status,200,extra);}
+  for(const bad of ['photosSize=11','photosSort=bad','photosSort=random&photosSeed=-1','photosPerson=missing-person','videos=0'])assert.equal((await f.call('/api/people/yehiel/page?'+bad)).status,400,bad);
+  assert.equal((await f.call('/api/people/yehiel/selection?kind=documents')).status,400);
+ }finally{await f.close();}
+});

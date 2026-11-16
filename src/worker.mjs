@@ -10,6 +10,7 @@ import {calendarResponse} from './calendar.mjs';
 import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {galleryRevision} from './gallery.mjs';
+import {personPageParams,personPageRevision} from './person-albums.mjs';
 import {collectionPageRevision} from './collection-pages.mjs';
 import {saveVideoAssetRoute,resolveVideoAsset} from './video-assets.mjs';
 import {multipartVideoAsset} from './video-assets-multipart.mjs';
@@ -164,7 +165,7 @@ async function upload(request,env,db,ctx,{category,personId=null,mixed=false,med
   await Promise.all([putObject(env,item.key,body,item.size,item.mime),transfer]);
   try{const registered=await db('media.add',{item,idempotentUpload:Boolean(uploadId),familyPhoto:metadata?.familyPhoto===true,faces:metadata?.faces,complete:metadata?.complete===true});if(registered.existingKey&&registered.existingKey!==item.key)ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));}
   catch(error){ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));throw error;}
-  if(personId){const url=new URL(request.url);if(url.searchParams.get('layout')==='page')return json({saved:true,file:item.file,...await db('person.page',{id:personId,photos:url.searchParams.get('photos'),videos:url.searchParams.get('videos'),documents:url.searchParams.get('documents')})},201);return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);}
+  if(personId){const url=new URL(request.url);if(url.searchParams.get('layout')==='page')return json({saved:true,file:item.file,...await db('person.page',{id:personId,...personPageParams(url.searchParams)})},201);return json({saved:true,file:item.file,person:await db('person',{id:personId})},201);}
   return json({saved:true,file:item.file,collection:await db('collection',{kind:category})},201);
 }
 async function editPhoto(request,env,db,ctx,id){
@@ -334,10 +335,11 @@ export default {
       if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page'),focus:url.searchParams.get('focus')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/view$/.exec(path))&&request.method==='GET')return json(await db('media.public',{id:match[1]}));
+      if((match=/^\/api\/people\/([^/]+)\/selection$/.exec(path))&&request.method==='GET')return json(await db('person.selection',{id:decodeURIComponent(match[1]),kind:url.searchParams.get('kind'),...personPageParams(url.searchParams)}));
       if((match=/^\/api\/people\/([^/]+)\/page$/.exec(path))&&request.method==='GET'){
-        const id=decodeURIComponent(match[1]),pages=Object.fromEntries(['photos','videos','documents'].map(key=>[key,url.searchParams.get(key)])),focus=url.searchParams.get('focus');
-        if(!focus&&request.headers.has('If-None-Match')){const current=await db('person.revision',{id}),revision=current.revision+':photos25:'+Object.values(pages).map(value=>Number(value||1)).join(':');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
-        const result=await db('person.page',{id,...pages,focus});return snapshot(request,{...result,revision:result.person.revision+':photos25:'+['photos','videos','documents'].map(key=>result.albums[key].page).join(':')+(focus?':focus:'+focus:'')});
+        const id=decodeURIComponent(match[1]),pages=personPageParams(url.searchParams),focus=url.searchParams.get('focus');
+        if(!focus&&request.headers.has('If-None-Match')){const current=await db('person.revision',{id}),revision=personPageRevision(current.revision,pages);if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
+        const result=await db('person.page',{id,...pages,focus}),resolved={...pages,...Object.fromEntries(['photos','videos','documents'].map(key=>[key,result.albums[key].page]))};return snapshot(request,{...result,revision:personPageRevision(result.person.revision,resolved)+(focus?':focus:'+focus:'')});
       }
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){

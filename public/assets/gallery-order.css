@@ -4,7 +4,7 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
 .gallery-header-upload,.gallery-page-size-mobile{display:none}
 .gallery-pager-wrap{position:relative;display:flow-root}
 .gallery-mobile-filter-dock{display:none}
-.gallery-pager[data-gallery-pager]{display:grid;grid-template-columns:auto minmax(145px,220px) minmax(0,1fr) auto;align-items:center;gap:12px}
+.gallery-pager:is([data-gallery-pager],[data-person-pager]){display:grid;grid-template-columns:auto minmax(145px,220px) minmax(0,1fr) auto;align-items:center;gap:12px}
 .gallery-pager .gallery-page-size{display:flex;align-items:center;gap:7px;min-width:0}
 .gallery-page-size>span{display:flex;flex-direction:column;line-height:1.15;text-align:center}
 .gallery-pager .gallery-page-size select{box-sizing:border-box;min-width:90px;width:90px;flex:0 0 90px;min-height:44px;padding:6px 10px}
@@ -12,7 +12,7 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
 .gallery-sort-field>span{position:absolute;inset-inline-start:10px;top:3px;z-index:1;color:#8c7d60;font-size:10px;line-height:1.2;pointer-events:none}
 .gallery-pager .gallery-sort-field select{box-sizing:border-box;appearance:none;width:100%;max-width:100%;min-width:0;height:44px;min-height:44px;padding:17px 10px 3px;padding-inline-end:28px;text-overflow:ellipsis;font-size:13px;line-height:1.2;cursor:pointer}
 .gallery-sort-field>svg{position:absolute;inset-inline-end:8px;top:17px;width:15px;height:15px;pointer-events:none;fill:none;stroke:currentColor;stroke-width:1.8}
-.gallery-pager [data-gallery-page-label]{min-width:0;font-size:13px;text-align:center;overflow-wrap:anywhere}
+.gallery-pager :is([data-gallery-page-label],[data-person-page-label]){min-width:0;font-size:13px;text-align:center;overflow-wrap:anywhere}
 .gallery-pager .gallery-page-buttons{display:flex;align-items:center;gap:7px;min-width:0}
 .gallery-page-buttons svg{display:none;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
 @media(min-width:701px){
@@ -20,7 +20,7 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
   .gallery-page-buttons svg{display:block;flex:none}
 }
 @media(max-width:700px){
-  .gallery-pager[data-gallery-pager]{grid-template-columns:66px minmax(0,1fr) 84px;gap:8px 6px;padding:12px 0;margin:10px 0 14px}
+  .gallery-pager:is([data-gallery-pager],[data-person-pager]){grid-template-columns:66px minmax(0,1fr) 84px;gap:8px 6px;padding:12px 0;margin:10px 0 14px}
   .gallery-pager .gallery-sort-field{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;border:1px solid #cfc2a2;border-radius:6px;background:#fffdf6;color:#6e7059}
   .gallery-sort-field>span{position:static;padding-inline-end:12px;color:inherit;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.2;white-space:nowrap}
   .gallery-pager .gallery-sort-field select{position:absolute;inset:0;z-index:1;opacity:0;padding:0;font-size:16px}
@@ -34,7 +34,7 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
   .gallery-pager .gallery-page-buttons button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex:1 1 0;width:40px;min-width:0;height:44px;min-height:44px;padding:2px}
   .gallery-page-buttons button>span{display:block;order:1;font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.2;white-space:nowrap}.gallery-page-buttons svg{display:block;width:16px;height:16px}
   html[dir=rtl] .gallery-page-buttons svg{transform:rotate(180deg)}
-  .gallery-pager [data-gallery-page-label]{grid-column:1/-1;grid-row:2;font-size:12px;line-height:1.4;margin:0}
+  .gallery-pager :is([data-gallery-page-label],[data-person-page-label]){grid-column:1/-1;grid-row:2;font-size:12px;line-height:1.4;margin:0}
   body[data-active-view=gallery] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:12px 14px 8px}
   body[data-active-view=gallery] .workspace-title{min-width:0;gap:6px}
   body[data-active-view=gallery] .workspace-title>div{min-width:0}
@@ -61,7 +61,7 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
   html[data-a11y-text] body[data-active-view=gallery] .gallery-tag-filters{grid-template-columns:1fr}
 }
 @media(max-width:360px){
-  .gallery-pager[data-gallery-pager]{grid-template-columns:60px minmax(0,1fr) 76px;column-gap:4px}
+  .gallery-pager:is([data-gallery-pager],[data-person-pager]){grid-template-columns:60px minmax(0,1fr) 76px;column-gap:4px}
   .gallery-pager-wrap:has(.gallery-refine-toggle:not([hidden]))>.gallery-pager{grid-template-columns:36px 60px minmax(0,1fr) 76px}
   .gallery-mobile-filter-dock .gallery-refine-toggle{width:36px;padding:7px}
   .gallery-pager .gallery-page-size{font-size:calc(10px * var(--a11y-text-scale,1));gap:2px}
