@@ -5,7 +5,7 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const keys=['photos','videos','documents'];
   const state={view:'tree',id:null,data:null,ready:false,loading:false,loadingKey:null,queued:false,pages:{photos:1,videos:1,documents:1},revision:null,aboutEditing:false,aboutDraft:'',aboutExpected:'',running:false,queue:[],status:'',error:''};
-  let picker=null,refreshTimer,tagsDirty=false,refreshPending=false;
+  let picker=null,refreshTimer,tagsDirty=false,refreshPending=false,portraitRequest=0,albumEpoch=0,albumRequest=0,viewerCloseEpoch=0;
   const aboutKey=()=>I.isEnglish?'aboutEn':'about';
   const biography=()=>window.FamilyBiography,editing=()=>state.aboutEditing||biography()?.isEditing();
   const finishEditing=()=>{if(refreshPending){refreshPending=false;load(true);}};
@@ -15,6 +15,20 @@
     if(!response.ok)throw Error(I.error(result.error));return result;
   }
   function dates(){return app().getPerson(state.id)?app().birthdayHTML(state.id):'';}
+  function registerAlbum(key,album,owner=albumEpoch){
+    if(!album)return;
+    const personId=state.id,scope='personal:'+personId,{items,...pagination}=album;
+    const active=()=>state.id===personId&&state.view==='person'&&owner===albumEpoch;
+    const loadPage=async page=>{
+      if(!active())throw Error(tr('האלבום השתנה. פתחו אותו שוב.','The album changed. Please reopen it.'));
+      const request=++albumRequest,closeEpoch=viewerCloseEpoch,startedOpen=Boolean($('mediaViewer').open),params=new URLSearchParams({...state.pages,[key]:page});
+      const result=await api('api/people/'+encodeURIComponent(personId)+'/page?'+params);
+      if(!active()||request!==albumRequest||viewerCloseEpoch!==closeEpoch||Boolean($('mediaViewer').open)!==startedOpen||startedOpen&&window.FamilyMedia?.isOpen?.(scope)===false)throw Error(tr('האלבום השתנה. פתחו אותו שוב.','The album changed. Please reopen it.'));
+      state.partial=false;state.data=result;state.revision=result.revision;for(const kind of keys)state.pages[kind]=result.albums[kind].page;
+      app().updatePerson(personId,result.person);state.error='';render();registerAlbum(key,result.albums[key],owner);return result.albums[key];
+    };
+    window.FamilyMedia?.register?.(scope,items,{pagination,loadPage});
+  }
   function pager(key,album){return `<nav class="person-album-pager" aria-label="${tr('דפדוף באלבום','Album pages')}"><button type="button" class="secondary-button" data-person-page="${key}" data-step="-1" ${(key==='photos'?album.pages<2:album.page<=1)?'disabled':''}>${tr('הקודם','Previous')}</button><span>${tr('עמוד','Page')} ${album.page} ${tr('מתוך','of')} ${album.pages} · ${album.total} ${tr('פריטים','items')}</span><button type="button" class="secondary-button" data-person-page="${key}" data-step="1" ${(key==='photos'?album.pages<2:album.page>=album.pages)?'disabled':''}>${tr('הבא','Next')}</button></nav>`;}
   function card(key,item){
     let content;
@@ -50,7 +64,7 @@
     // A shared photo may have opened before this page finished loading. Offer
     // its own media album without mixing photos, videos and documents.
     const requestedMedia=new URLSearchParams(location.search||'').get('media');
-    if(requestedMedia)for(const key of keys){const album=state.data.albums?.[key];if(album?.items.some(item=>item.id===requestedMedia)){window.FamilyMedia?.register?.('personal:'+state.id,album.items);break;}}
+    if(requestedMedia)for(const key of keys){const album=state.data.albums?.[key];if(album?.items.some(item=>item.id===requestedMedia)){registerAlbum(key,album);break;}}
     if(p.extra){
       $('workspaceTitle').textContent=tr('אלבום תמונות','Photo album');$('mobileViewTitle').textContent=tr('אלבום תמונות','Photo album');$('workspaceSubtitle').textContent=tr('מכרים וחברי משפחה','Family friends and acquaintances');
       root.innerHTML=`<nav class="person-page-breadcrumb"><a href="#directory" data-person-back>${I.isEnglish?'←':'→'} ${tr('חזרה','Back')}</a><span aria-hidden="true">›</span><span>${safe(name)}</span><button class="quiet-button" type="button" data-copy-person-link>${tr('העתקת קישור לאלבום','Copy album link')} ↗</button></nav><header class="person-page-hero"><button type="button" class="person-page-portrait" data-person-portrait aria-label="${tr('פתיחת תמונה מהאלבום','Open an album photo')}" ${p.profile?'':'disabled'}>${p.profile?`<img ${window.FamilyPhotoFraming?.profile(p)||''} src="${safe(p.profile)}" alt="${safe(name)}">`:`<span>${safe(initials)}</span>`}</button><div><span class="small-eyebrow">${tr('מכרים וחברי משפחה','Family friends and acquaintances')}</span><h2>${safe(name)}</h2><p>${tr('התמונות והסרטונים שבהם תויגו','Photos and videos in which they are tagged')}</p></div></header><p class="person-page-status" id="personPageStatus" role="status">${safe(state.status||state.error)}${state.partial?`<button class="secondary-button person-page-retry" type="button" data-person-retry>${tr('ניסיון נוסף','Try again')}</button>`:''}</p>${state.partial?`<p class="person-page-unavailable">${tr('התמונות יופיעו כשהחיבור לשמירה יחזור.','Photos will appear when the connection returns.')}</p>`:keys.map(album).join('')}`;
@@ -60,13 +74,15 @@
   }
   async function load(force=false){
     if(!state.id)return;if(editing()){refreshPending=true;return;}const id=state.id,params=new URLSearchParams(state.pages),key=id+params;
+    const requestedFocus=!state.data&&/^#person\//.test(location.hash)?new URLSearchParams(location.search||'').get('media'):null;
+    const focus=/^[a-f0-9]{32}$/.test(requestedFocus||'')?requestedFocus:null;if(focus)params.set('focus',focus);
     if(state.loading){if(force||state.loadingKey!==key)state.queued=true;return;}
     state.loading=true;state.loadingKey=key;
     try{
       const response=await I.fetch('api/people/'+encodeURIComponent(id)+'/page?'+params,{cache:'no-store',headers:!force&&state.revision?{'If-None-Match':'"'+state.revision+'"'}:{}});
       if(response.status===304)return;
       const result=await response.json();if(!response.ok)throw Error(I.error(result.error));
-      if(state.id!==id||id+new URLSearchParams(state.pages)!==key)return;
+      if(state.id!==id||id+new URLSearchParams(state.pages)!==key||focus&&new URLSearchParams(location.search||'').get('media')!==focus)return;
       if(editing()){refreshPending=true;return;}
       state.partial=false;state.data=result;state.revision=result.revision;for(const key of keys)state.pages[key]=result.albums[key].page;
       app().updatePerson(id,result.person);state.error='';render();
@@ -74,6 +90,7 @@
   }
   function open(id,sync=true){
     if(!app().getPerson(id))return;
+    portraitRequest++;albumEpoch++;
     if($('calendarDayDialog').open)$('calendarDayDialog').close();if($('mediaViewer').open)$('mediaViewer').close();if($('personDialog').open)$('personDialog').close();
     if(state.id!==id){biography()?.reset();refreshPending=false;state.partial=false;state.id=id;state.data=null;state.pages={photos:1,videos:1,documents:1};state.revision=null;state.aboutEditing=false;state.aboutDraft='';state.status='';state.error='';}
     if(sync){const hash='#person/'+encodeURIComponent(id);if(window.FamilyNavigation)window.FamilyNavigation.go(hash);else if(location.hash!==hash)history.pushState(null,'',hash);}
@@ -81,6 +98,7 @@
   }
   function route(){const match=/^#person\/([^/]+)$/.exec(location.hash);if(match)try{const id=decodeURIComponent(match[1]);if(state.view!=='person'||state.id!==id)open(id,false);}catch{app().toast(tr('הקישור לעמוד אינו תקין.','This page link is invalid.'));}}
   function activate(view){
+    if(view!=='person'){portraitRequest++;albumEpoch++;}
     state.view=view;$('personView').hidden=view!=='person';if(view!=='person'||!state.ready)return;
     const match=/^#person\/([^/]+)$/.exec(location.hash);let requested;try{requested=match?decodeURIComponent(match[1]):null;}catch{return;}
     if(requested&&requested!==state.id&&app().getPerson(requested)){open(requested,false);return;}
@@ -93,6 +111,24 @@
       xhr.upload.onprogress=event=>{if(event.lengthComputable)progress(Math.round(event.loaded/event.total*100));};
       xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText);}catch{reject(Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Please try again.')));return;}if(xhr.status>=200&&xhr.status<300)Promise.resolve(window.FamilyPhotoThumbnails?.fromUpload?.(result,file)).then(()=>resolve(result),()=>resolve(result));else reject(Error(I.error(result.error)));};xhr.onerror=()=>reject(Error(tr('ההעלאה נקטעה. נסו שוב.','The upload was interrupted. Please try again.')));const payload=window.FamilyPhotoEditor?.upload?.(file)||{body:file};for(const [name,value]of Object.entries(payload.headers||{}))xhr.setRequestHeader(name,value);xhr.send(payload.body);
     });
+  }
+  async function openPortrait(){
+    const personId=state.id,profile=state.data?.person.profile;if(!profile)return;
+    const request=++portraitRequest,id=profile.split('?')[0].split('/').pop();albumEpoch++;
+    const active=()=>request===portraitRequest&&state.id===personId&&state.view==='person'&&state.data?.person.profile===profile;
+    try{
+      const params=new URLSearchParams({...state.pages,focus:id});
+      const [result,page]=await Promise.all([api('api/media/'+id+'/view'),api('api/people/'+encodeURIComponent(personId)+'/page?'+params)]);
+      if(!active()||$('mediaViewer').open)return;
+      state.partial=false;state.data=page;state.revision=page.revision;for(const kind of keys)state.pages[kind]=page.albums[kind].page;
+      app().updatePerson(personId,page.person);state.error='';render();
+      const album=page.albums.photos,items=[...album.items],index=items.findIndex(item=>item.id===result.item.id);
+      // Focus locates the profile's real photo page, so browsing can continue
+      // through all pages without changing video or document position.
+      if(index<0)items.unshift(result.item);else items[index]={...items[index],...result.item};
+      registerAlbum('photos',{...album,items,total:Math.max(album.total,items.length)});
+      window.FamilyMedia.open(items,index<0?0:index,'personal:'+personId);
+    }catch(error){if(active()&&!$('mediaViewer').open)app().toast(error.message);}
   }
   function applyUploaded(id,result){app().updatePerson(id,result.person);
         if(id===state.id){state.data=result;state.revision=null;for(const key of keys)state.pages[key]=result.albums[key].page;state.status=tr('נשמר ✓ ','Saved ✓ ')+file.name;render();}}
@@ -127,9 +163,9 @@
       }
       if(event.target.closest('[data-person-back]')){event.preventDefault();if(!window.FamilyNavigation?.back('#directory'))app().setView('directory',false);return;}
       if(event.target.closest('[data-person-retry]')){load(true);return;}
-      const page=event.target.closest('[data-person-page]');if(page&&!page.disabled){const key=page.dataset.personPage,pages=state.data.albums[key].pages;state.pages[key]=key==='photos'?(state.pages[key]-1+Number(page.dataset.step)+pages)%pages+1:state.pages[key]+Number(page.dataset.step);await load(true);$('personAlbum-'+key)?.scrollIntoView({block:'start',behavior:'instant'});return;}
-      const item=event.target.closest('[data-person-item]');if(item){const items=state.data.albums[item.dataset.personKind].items;window.FamilyMedia.open(items,items.findIndex(p=>p.id===item.dataset.personItem),'personal:'+state.id);return;}
-      if(event.target.closest('[data-person-portrait]')&&state.data.person.profile){const id=state.data.person.profile.split('?')[0].split('/').pop();try{const result=await api('api/media/'+id+'/view');window.FamilyMedia.open([result.item],0,'personal:'+state.id);}catch(error){app().toast(error.message);}return;}
+      const page=event.target.closest('[data-person-page]');if(page&&!page.disabled){portraitRequest++;albumEpoch++;const key=page.dataset.personPage,pages=state.data.albums[key].pages;state.pages[key]=key==='photos'?(state.pages[key]-1+Number(page.dataset.step)+pages)%pages+1:state.pages[key]+Number(page.dataset.step);await load(true);$('personAlbum-'+key)?.scrollIntoView({block:'start',behavior:'instant'});return;}
+      const item=event.target.closest('[data-person-item]');if(item){portraitRequest++;albumEpoch++;const key=item.dataset.personKind,album=state.data.albums[key],items=album.items;registerAlbum(key,album);window.FamilyMedia.open(items,items.findIndex(p=>p.id===item.dataset.personItem),'personal:'+state.id);return;}
+      if(event.target.closest('[data-person-portrait]')){await openPortrait();return;}
       if(event.target.closest('[data-edit-about]')&&!state.partial&&!biography()?.isEditing()){state.aboutEditing=true;state.aboutExpected=state.data.person[aboutKey()]||'';state.aboutDraft=state.aboutExpected;render();$('personAboutText').focus();return;}
       if(event.target.closest('[data-cancel-about]')){state.aboutEditing=false;render();finishEditing();return;}
       const upload=event.target.closest('[data-person-upload]');if(upload){picker={id:state.id,kind:upload.dataset.personUpload};const input=$('personPageUpload');input.accept=picker.kind==='photos'?'image/jpeg,image/png,image/webp,image/gif,image/avif':picker.kind==='videos'?'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov':'.pdf,.doc,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif,image/avif';input.value='';input.click();return;}
@@ -151,7 +187,9 @@
     window.addEventListener('family-person-changed',event=>{if(event.detail.id===state.id)refresh();});
     window.addEventListener('family-media-changed',event=>{if(['labels','photo-frame'].includes(event.detail.operation)&&event.detail.item){const item=event.detail.item;if(event.detail.people?.[state.id]&&state.data?.person)Object.assign(state.data.person,event.detail.people[state.id]);for(const album of Object.values(state.data?.albums||{}))album.items=album.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);return;}if(event.detail.affectedPersonIds?.includes(state.id)){tagsDirty=true;if(!$('mediaViewer').open&&!$('tagPeopleDialog').open){tagsDirty=false;refresh();}}else if(event.detail.people?.[state.id]||event.detail.person?.id===state.id)refresh();});
     const finishTags=()=>{if(tagsDirty&&!document.querySelector('dialog[open]')){tagsDirty=false;refresh();}};
-    $('mediaViewer').addEventListener('close',finishTags);$('tagPeopleDialog').addEventListener('close',finishTags);
+    // Invalidate pending viewer loads before the shared close handler requests
+    // the original grid page. That new closed-viewer restoration stays valid.
+    $('mediaViewer').addEventListener('close',()=>{viewerCloseEpoch++;portraitRequest++;finishTags();},{capture:true});$('tagPeopleDialog').addEventListener('close',finishTags);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.view==='person')load();});
     setInterval(()=>{if(document.visibilityState==='visible'&&state.view==='person'&&!editing()&&!document.querySelector('dialog[open]'))load();},120000);
     window.addEventListener('beforeunload',event=>{if(state.running||biography()?.isDirty()||(state.aboutEditing&&state.aboutDraft!==state.aboutExpected)){event.preventDefault();event.returnValue='';}});

@@ -3,7 +3,7 @@
   const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const state={active:false,loaded:false,loading:false,items:[],error:'',query:'',signature:'',archive:false};
-  let timer,dialog,currentPhoto=null,currentAction=null;
+  let timer,dialog,videoAlbumInput,currentPhoto=null,currentAction=null;
   const symbols={smile:'<circle cx="12" cy="12" r="9"/><path d="M8 14c2 3 6 3 8 0M8 9h.01M16 9h.01"/>',wave:'<path d="M8 12V6a1.5 1.5 0 0 1 3 0v5-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v6-3a1.5 1.5 0 0 1 3 0v5c0 5-3 8-7 8-3 0-5-2-7-5l-2-3a1.5 1.5 0 0 1 2.4-1.8L8 15"/>',dance:'<path d="M14 3v12a3 3 0 1 1-3-3c1 0 2 .4 3 1M14 4l7-2v10a3 3 0 1 1-3-3c1 0 2 .4 3 1"/>'};
   const icon=id=>`<svg viewBox="0 0 24 24" aria-hidden="true">${symbols[id]||symbols.smile}</svg>`;
   const title=item=>I.isEnglish?item.titleEn||item.title:item.title;
@@ -52,16 +52,19 @@
       dialog.innerHTML=`<button type="button" class="dialog-close" data-living-close aria-label="${tr('סגירה','Close')}">×</button><div class="living-player-heading"><span aria-hidden="true">❖</span><h2 id="livingFamilyPlayerTitle"></h2></div><div id="livingFamilyPlayerActions" class="living-player-actions" role="group" aria-label="${tr('בחירת הנפשה','Choose an animation')}"></div><video id="livingFamilyVideo" controls playsinline loop preload="metadata"></video><p id="livingFamilyPlayerNote" class="living-player-note"></p><p id="livingFamilyPlayerError" class="family-ai-form-error" role="alert"></p><div class="family-ai-dialog-actions"><button type="button" class="secondary-button" id="livingFamilyOriginal">${tr('התמונה המקורית','Original photo')}</button><a class="primary-button" id="livingFamilyDownload" download>${tr('הורדת הסרטון','Download video')}</a></div>`;
       document.body.append(dialog);
       dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-living-close]'))dialog.close();const button=event.target.closest('[data-living-action]');if(button&&!button.disabled){const photo=state.items.find(photo=>photo.id===button.dataset.livingPhoto),selected=photo?.animations.find(action=>action.id===button.dataset.livingAction);if(selected)showVideo(photo,selected);}});
-      dialog.addEventListener('close',()=>{const video=$('livingFamilyVideo');video.pause();video.removeAttribute('src');video.load();currentPhoto=null;currentAction=null;});
+      dialog.addEventListener('close',()=>{videoAlbumInput?.close();const video=$('livingFamilyVideo');video.pause();video.removeAttribute('src');video.load();currentPhoto=null;currentAction=null;});
       $('livingFamilyOriginal').addEventListener('click',()=>{const id=currentPhoto;dialog.close();openOriginal(id);});
       $('livingFamilyVideo').addEventListener('error',()=>{$('livingFamilyPlayerError').textContent=tr('הסרטון לא נטען. אפשר לנסות אפשרות אחרת או להוריד אותו.','The video could not load. Try another action or download it.');});
+      videoAlbumInput=window.FamilyVideoAlbumInput?.bind($('livingFamilyVideo'),{isOpen:()=>dialog.open,select:clip=>showVideo(clip.photo,clip.action)});
     }
     currentPhoto=item.id;currentAction=action.id;
     $('livingFamilyPlayerTitle').textContent=title(item);$('livingFamilyPlayerActions').innerHTML=item.animations.map(variant=>actionButton(item,variant,true)).join('');
     $('livingFamilyPlayerNote').textContent=tr(`${action.label} · כ־${Math.round(action.duration)} שניות${action.stale?' · מבוסס על גרסה קודמת של התמונה':''}`,`${action.labelEn} · about ${Math.round(action.duration)} seconds${action.stale?' · based on a previous version of the photo':''}`);
     $('livingFamilyPlayerError').textContent='';const video=$('livingFamilyVideo');video.pause();video.poster=preview(item);video.src=action.videoSrc;
     $('livingFamilyDownload').href=action.videoSrc+'&download=1';$('livingFamilyDownload').download='family-memory-'+item.id+'-'+action.id+'.mp4';
-    if(!dialog.open)dialog.showModal();video.play()?.catch(()=>{});
+    if(!dialog.open)dialog.showModal();
+    const available=state.items.flatMap(photo=>photo.animations.filter(ready).map(action=>({key:photo.id+':'+action.id,kind:'video',poster:preview(photo),caption:title(photo)+' · '+actionTitle(action),photo,action})));
+    videoAlbumInput?.sync(available,item.id+':'+action.id);video.play()?.catch(()=>{});
   }
   function init(){
     const host=$('familyAiView'),original=window.FamilyAI;if(!host||!original)return;

@@ -7,6 +7,7 @@ const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',impor
 function fixture({mobile=false,english=false,supported=true,scrollEnd=false,width=mobile?360:800}={}){
  class Node{
   constructor(){this.nodeType=1;this.children=[];this.handlers=new Map();this.clientWidth=width;this.scrollLeft=0;this.className='';this.parent=null;this.style={};if(scrollEnd)this.onscrollend=null;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)};}
+  get parentNode(){return this.parent;}
   setAttribute(name,value){this[name]=value;}
   addEventListener(type,handler){this.handlers.set(type,handler);}
   append(...nodes){for(const node of nodes){node.remove();node.parent=this;this.children.push(node);}}

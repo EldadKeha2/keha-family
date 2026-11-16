@@ -7,14 +7,15 @@ import {parseHTML} from 'linkedom';
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const names=['photo-native.js','photo-swipe.js','media.js'];
 const sources=new Map(await Promise.all(names.map(async name=>[name,await readFile(new URL('../public/assets/'+name,import.meta.url),'utf8')])));
+const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
 const flush=async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>setImmediate(resolve));};
 
 // Browser geometry and image readiness are the boundaries modeled here. The
 // production index, DOM tree, native scroller, gesture binding and media state
 // machine are real, so missing script wiring or reparenting cannot be hidden
 // by the lightweight object fixtures used in the individual unit suites.
-function fixture({supported=true,mobile=false,width=1200,delayedFaces=false}={}){
- const {window,document}=parseHTML(html),requests=[],captures=[],observers=[],faceReady=[],faceMounts=[];let failSave=false;
+function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,realPresentation=false}={}){
+ const {window,document}=parseHTML(html),requests=[],captures=[],observers=[],faceReady=[],faceMounts=[],animations=[];let failSave=false;
  const get=id=>document.getElementById(id);
  for(const dialog of document.querySelectorAll('dialog')){
   dialog.showModal=()=>{dialog.open=true;dialog.setAttribute('open','');};
@@ -28,6 +29,16 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false}={})
  window.HTMLElement.prototype.blur=function(){if(document.activeElement===this)Object.defineProperty(document,'activeElement',{value:document.body,configurable:true});};
  window.HTMLElement.prototype.pause=function(){this.paused=true;};
  window.HTMLElement.prototype.load=function(){};
+ if(realPresentation){
+  Object.defineProperty(window.HTMLImageElement.prototype,'complete',{configurable:true,get:()=>true});
+  Object.defineProperty(window.HTMLImageElement.prototype,'naturalWidth',{configurable:true,get:()=>1200});
+  Object.defineProperty(window.HTMLImageElement.prototype,'naturalHeight',{configurable:true,get:()=>800});
+  window.HTMLImageElement.prototype.decode=()=>Promise.resolve();
+  window.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){}});
+  window.HTMLElement.prototype.animate=function(){
+   let finish;const animation={node:this,cancelled:false,finished:new Promise(resolve=>{finish=resolve;}),cancel(){this.cancelled=true;finish();},finish(){finish();}};animations.push(animation);return animation;
+  };
+ }
  const emit=(node,type,props={})=>{const event=new window.Event(type,{bubbles:true,cancelable:true});Object.assign(event,props);node.dispatchEvent(event);return event;};
  const navigator={userAgent:mobile?'Android Mobile':'Windows NT 10.0',maxTouchPoints:5};
  window.ontouchstart=null;
@@ -52,7 +63,7 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false}={})
     };
     if(delayedFaces)faceReady.push(ready);else queueMicrotask(ready);
    },
-   clear(){delete get('mediaStage')._familyFaceContext;},update(){},
+   clear(){delete get('mediaStage')._familyFaceContext;},update(){},fit(){},
    canNavigate(stage){const c=stage._familyFaceContext;return !c||c.zoom===1&&!c.saving&&!c.adjust;}
   }
  });
@@ -61,18 +72,23 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false}={})
   observe(node){this.nodes.add(node);}
   disconnect(){this.nodes.clear();}
  }
- const context=vm.createContext({window,document,navigator,CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location:{origin:'https://family.test',href:'https://family.test/#photos'},matchMedia:()=>({matches:mobile}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280'}),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
+ function Image(){
+  const image=document.createElement('img');Object.defineProperty(image,'src',{configurable:true,get(){return this.getAttribute('src')||'';},set(value){this.setAttribute('src',value);queueMicrotask(()=>{image.onload?.();image.dispatchEvent(new window.Event('load'));});}});return image;
+ }
+ const context=vm.createContext({window,document,navigator,...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location:{origin:'https://family.test',href:'https://family.test/#photos'},matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{queueMicrotask(fn);return 1;},cancelAnimationFrame(){},setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
  // Follow production ordering when loading the scripts under test.
  const loaded=[];
  for(const script of document.querySelectorAll('script[src]')){
   const name=script.getAttribute('src').split('/').at(-1).split('?')[0];
+  if(name==='photo-presentation.js'&&realPresentation)vm.runInContext(presentationSource,context,{filename:name});
   if(sources.has(name)){vm.runInContext(sources.get(name),context,{filename:name});loaded.push(name);}
  }
  document.dispatchEvent(new window.Event('DOMContentLoaded'));
  const photo=id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,previewSrc:'/media/'+id+'?preview=1',name:id,tags:[]});
- const video=id=>({...photo(id),kind:'video',mime:'video/mp4'});
+ const video=id=>({...photo(id),kind:'video',mime:'video/mp4',poster:'/posters/'+id+'.jpg'});
  const strip=()=>get('mediaStage').querySelector('.native-photo-strip');
- return {window,document,get,emit,requests,captures,loaded,photo,video,strip,faceReady,faceMounts,
+ return {window,document,get,emit,requests,captures,loaded,photo,video,strip,faceReady,faceMounts,animations,
+  finishAnimations(){for(const animation of animations)animation.finish();},
   open:async(kind='photo',scope=kind==='photo'?'photos':'videos',index=0)=>{window.FamilyMedia.open(['a','b','c'].map(kind==='photo'?photo:video),index,scope);await flush();},
   async snap(page){const viewport=strip();assert.ok(viewport,'The active media must be inside a browser scroll-snap strip');viewport.scrollLeft=page*viewport.clientWidth;emit(viewport,'scroll');emit(viewport,'scrollend');await flush();},
   resize(value){const viewport=strip();viewport._testWidth=value;for(const observer of observers)if(observer.nodes.has(viewport))observer.callback([{target:viewport}]);},
@@ -106,13 +122,43 @@ test('desktop photo viewers use browser scrolling for both touch and trackpad in
  }
 });
 
-test('desktop videos retain the working manual touch and trackpad navigation',async()=>{
- const f=fixture();await f.open('video');const stage=f.get('mediaStage');assert.equal(f.strip(),null);
- const player=stage.querySelector('video');
- for(const [type,x]of [['pointerdown',200],['pointermove',350],['pointerup',350]])f.emit(player,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY:250});
- await flush();assert.equal(f.window.FamilyMedia.current().id,'b','The established video screen gesture still works');assert.equal(f.strip(),null);
- const wheel=f.emit(stage.querySelector('video'),'wheel',{deltaX:-140,deltaY:0,deltaMode:0,clientX:400,clientY:250});assert.equal(wheel.defaultPrevented,true);
- await new Promise(resolve=>setTimeout(resolve,150));await flush();assert.equal(f.window.FamilyMedia.current().id,'a','The established video trackpad path still works');assert.equal(f.strip(),null);f.close();
+test('desktop local video galleries use native scrolling and preserve playback controls without duplicate players',async()=>{
+ for(const scope of ['videos','nostalgia:life','nostalgia:event','personal:ruti','wedding:parents','nursery:ruti','home:photos']){
+  const f=fixture();await f.open('video',scope);const stage=f.get('mediaStage'),viewport=f.strip();assert.ok(viewport,scope+' must share the native gallery controller');
+  const player=viewport.children[1].querySelector('video');assert.ok(player);assert.equal(player.controls,true);player.currentTime=42;
+  assert.equal(stage.querySelectorAll('video').length,1,'Neighbor panes use still posters, never extra video players');
+  assert.equal(viewport.children[0].querySelector('img')?.getAttribute('src'),'/posters/b.jpg');assert.equal(viewport.children[2].querySelector('img')?.getAttribute('src'),'/posters/c.jpg');
+  for(const clientY of [250,680]){
+   for(const [type,x]of [['pointerdown',200],['pointermove',350],['pointerup',350]])assert.equal(f.emit(player,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY}).defaultPrevented,false,'The browser owns video body gestures and the native seeking strip');
+   assert.equal(f.emit(player,'wheel',{deltaX:140,deltaY:0,deltaMode:0,clientX:400,clientY}).defaultPrevented,false);
+  }
+  assert.equal(player.currentTime,42);assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.captures.length,0);
+  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(stage.querySelectorAll('video').length,1);
+  f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A late native completion never skips a second film');
+  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+ }
+});
+
+test('native navigation moves through mixed photos and local videos in family, profile and archive albums',async()=>{
+ for(const scope of ['gallery','personal:ruti','nostalgia:life','wedding:parents','home:photos']){
+  const f=fixture(),items=[f.photo('a'),f.video('b'),f.photo('c')];f.window.FamilyMedia.open(items,0,scope);await flush();
+  assert.equal(f.strip().children[0].querySelector('img')?.getAttribute('src'),'/posters/b.jpg');
+  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.get('mediaStage').querySelectorAll('video').length,1);
+  assert.equal(f.strip().children[0].querySelector('img')?.getAttribute('src'),'/media/c?preview=1');
+  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaStage').querySelectorAll('video').length,0);
+  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'b');await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+ }
+});
+
+test('real photo handoffs never leave a still-image cover over a neighboring video',async()=>{
+ for(const scope of ['personal:ruti','nostalgia:life','home:photos']){
+  const f=fixture({realPresentation:true}),items=[f.photo('a'),f.video('b'),f.photo('c')];f.window.FamilyMedia.open(items,0,scope);await flush();
+  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');assert.ok(f.strip().children[1].querySelector('video'));
+  assert.equal(f.get('mediaViewer').querySelectorAll('.photo-transition-cover').length,0,'A photo-to-video swipe must reveal the live player instead of retaining its poster cover');
+  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'c');assert.ok(f.strip().children[1].querySelector('img'));
+  assert.equal(f.get('mediaViewer').querySelectorAll('.photo-transition-cover').length,0,'A completed video-to-photo handoff clears its temporary cover');
+  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.get('mediaViewer').querySelectorAll('.photo-transition-cover').length,0);f.close();
+ }
 });
 
 test('the native strip mounts after asynchronous face wrapping and is rebuilt around the next photo',async()=>{
@@ -160,6 +206,57 @@ test('native photo scrolling survives fullscreen reparenting, resize and return 
  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
 });
 
+test('native swiping remains available after repeated Next and Previous clicks with the real presentation lifecycle',async()=>{
+ for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ruti','wedding:parents','home:photos']){
+  const f=fixture({realPresentation:true});await f.open('photo',scope);f.get('mediaViewer').classList.add('personal-photo-desktop');
+  if(fullscreen){assert.equal(f.window.FamilyMedia.setFullscreen(true),true);await flush();}
+  const assertNative=expected=>{
+   const stage=f.get('mediaStage'),viewport=f.strip();assert.equal(f.window.FamilyMedia.current().id,expected,scope);
+   assert.ok(viewport,'A working native strip must remain after every arrow or native completion');assert.equal(f.window.FamilyPhotoNative.has(stage),true);
+   assert.equal(stage.classList.contains('photo-slide-running'),false,'No completed desktop button leaves a transition blocking native input');
+   assert.equal(viewport.children[1].querySelector('img').getAttribute('src'),'/media/'+expected+'?preview=1');
+  };
+  for(let repeat=0;repeat<3;repeat++){
+   assertNative('a');await f.snap(0);assertNative('b');
+   f.emit(f.get('mediaNext'),'click');await flush();assertNative('c');
+   await f.snap(0);assertNative('a');f.emit(f.get('mediaPrevious'),'click');await flush();assertNative('c');
+   await f.snap(2);assertNative('b');f.emit(f.get('mediaPrevious'),'click');await flush();assertNative('a');
+  }
+  const previous=f.strip();previous.scrollLeft=previous.clientWidth*.7;
+  f.emit(f.get('mediaNext'),'click');await flush();assertNative('b');f.emit(previous,'scrollend');await flush();assertNative('b');
+  f.finishAnimations();await flush();assertNative('b');await f.snap(0);assertNative('c');f.close();
+ }
+});
+
+test('a native raw image moved into its completed face wrapper is not extracted by the previous strip reset',async()=>{
+ const f=fixture();await f.open();const stage=f.get('mediaStage'),image=stage._familyFaceContext.image;
+ f.window.FamilyPhotoNative.reset(stage);stage.replaceChildren(image);delete stage._familyFaceContext;f.window.FamilyMedia.refreshPhotoPresentation();
+ const previous=f.strip();assert.ok(previous.children[1].firstElementChild===image);
+ const scroller=f.document.createElement('div'),surface=f.document.createElement('div');scroller.className='face-photo-scroll';surface.className='face-photo-surface';surface.append(image);scroller.append(surface);stage.append(scroller);
+ stage._familyFaceContext={image,item:f.window.FamilyMedia.current(),zoom:1};f.window.FamilyMedia.refreshPhotoPresentation();
+ assert.ok(f.strip()!==previous);assert.ok(f.strip().children[1].querySelector('.face-photo-surface img')===image,'Resetting the old strip must respect the newer face wrapper ownership');
+ assert.equal(stage.querySelector(':scope > img'),null,'The viewed photo must not be stranded outside its new scrolling surface');
+ await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+});
+
+test('a narrow Windows arrow transition finishing before delayed face setup preserves subsequent native swipes',async()=>{
+ const f=fixture({width:600,realPresentation:true});await f.open();f.get('mediaViewer').classList.add('personal-photo-desktop');
+ for(const [button,expected,swipeExpected]of [['mediaNext','b','c'],['mediaPrevious','b','c']]){
+  f.emit(f.get(button),'click');await flush();f.finishAnimations();await flush();
+  await new Promise(resolve=>setTimeout(resolve,210));await flush();
+  assert.equal(f.window.FamilyMedia.current().id,expected);assert.ok(f.strip());
+  assert.equal(f.strip().children[1].querySelector('.face-photo-surface img')?.getAttribute('src'),'/media/'+expected+'?preview=1','The delayed face wrapper must retain the actual image after the arrow transition');
+  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,swipeExpected);
+ }
+ f.close();
+});
+
+test('cancelling presentation effects does not dismantle a live browser-owned gallery strip',async()=>{
+ const f=fixture({realPresentation:true});await f.open();const viewport=f.strip();f.window.FamilyPhotoPresentation.cancel();
+ assert.ok(f.strip()===viewport,'An effects-only cancellation preserves the active native strip');assert.equal(f.window.FamilyPhotoNative.has(f.get('mediaStage')),true);
+ await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+});
+
 test('native photo scrolling saves descriptions before moving and retains failed drafts at center',async()=>{
  for(const fail of [false,true]){
   const f=fixture();await f.open('photo');f.failSaving(fail);
@@ -180,6 +277,20 @@ test('native scrolling loops and crosses gallery pages without duplicate complet
  f.emit(old,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'c','An obsolete native completion cannot advance the new album page');
  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'a');assert.deepEqual(visited,[2,1]);
  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'c');assert.deepEqual(visited,[2,1,2]);f.close();
+});
+
+test('profile page loaders retain native swiping on the final single-item photo or video page',async()=>{
+ for(const kind of ['photo','video']){
+  const f=fixture(),scope='personal:ruti',make=kind==='photo'?f.photo:f.video,pages=[['a','b'].map(make),['c'].map(make)],visited=[];
+  const loadPage=async page=>{visited.push(page);register(page);};
+  const register=page=>f.window.FamilyMedia.register(scope,pages[page-1],{pagination:{page,pages:2,size:2,total:3},loadPage});
+  register(1);f.window.FamilyMedia.openFrom(scope,'b');await flush();await f.snap(0);
+  assert.equal(f.window.FamilyMedia.current().id,'c');assert.deepEqual(visited,[2]);assert.ok(f.strip(),'A single visible '+kind+' on the last page still has adjacent album pages');
+  assert.equal(f.strip().children[0].querySelector('img')?.getAttribute('src'),kind==='photo'?'/media/a?preview=1':'/posters/a.jpg','The known first-page neighbor remains visible across the album loop');
+  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'a');assert.deepEqual(visited,[2,1]);
+  assert.equal(f.strip().children[2].querySelector('img')?.getAttribute('src'),kind==='photo'?'/media/c?preview=1':'/posters/c.jpg');
+  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'c');assert.deepEqual(visited,[2,1,2]);f.close();
+ }
 });
 
 test('native scrolling recenters on resize and yields cleanly to photo zoom and unsupported browsers',async()=>{

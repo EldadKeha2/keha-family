@@ -331,13 +331,13 @@ export default {
       if(path==='/api/gallery/selection'&&request.method==='GET')return json(await db('gallery.selection',{person:url.searchParams.get('person'),unit:url.searchParams.get('unit'),labels:url.searchParams.get('labels'),query:url.searchParams.get('q'),filter:url.searchParams.get('filter')||'all'}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/versions$/.exec(path))&&request.method==='GET')return json(await db('photo.versions',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/faces$/.exec(path))&&request.method==='GET')return json(await db('media.faces',{id:match[1]}));
-      if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page')}));
+      if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page'),focus:url.searchParams.get('focus')}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/tags$/.exec(path))&&request.method==='GET')return json(await db('media.tags',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/view$/.exec(path))&&request.method==='GET')return json(await db('media.public',{id:match[1]}));
       if((match=/^\/api\/people\/([^/]+)\/page$/.exec(path))&&request.method==='GET'){
-        const id=decodeURIComponent(match[1]),pages=Object.fromEntries(['photos','videos','documents'].map(key=>[key,url.searchParams.get(key)]));
-        if(request.headers.has('If-None-Match')){const current=await db('person.revision',{id}),revision=current.revision+':photos25:'+Object.values(pages).map(value=>Number(value||1)).join(':');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
-        const result=await db('person.page',{id,...pages});return snapshot(request,{...result,revision:result.person.revision+':photos25:'+['photos','videos','documents'].map(key=>result.albums[key].page).join(':')});
+        const id=decodeURIComponent(match[1]),pages=Object.fromEntries(['photos','videos','documents'].map(key=>[key,url.searchParams.get(key)])),focus=url.searchParams.get('focus');
+        if(!focus&&request.headers.has('If-None-Match')){const current=await db('person.revision',{id}),revision=current.revision+':photos25:'+Object.values(pages).map(value=>Number(value||1)).join(':');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
+        const result=await db('person.page',{id,...pages,focus});return snapshot(request,{...result,revision:result.person.revision+':photos25:'+['photos','videos','documents'].map(key=>result.albums[key].page).join(':')+(focus?':focus:'+focus:'')});
       }
       if((match=/^\/api\/people\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('person',{id:decodeURIComponent(match[1])}));
       if((match=/^\/api\/collections\/(photos|videos|gallery)$/.exec(path))&&request.method==='GET'){

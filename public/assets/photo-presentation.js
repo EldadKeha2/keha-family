@@ -75,7 +75,6 @@
     if(!token)return;try{await Promise.all([image.decode?.().catch(()=>{}),ready]);await paintedFrame();await paintedFrame();}finally{clearHandoff(token);}
   }
   function cancel({preserveHandoff=false}={}){
-    window.FamilyPhotoNative?.reset();
     if(!preserveHandoff)clearHandoff();
     cancelDrag();clearQueuedDrag();if(!motion)return;const previous=motion;motion=null;clearTimeout(previous.timer);
     for(const animation of previous.animations)animation.cancel();previous.ghost.remove();previous.incoming.remove();previous.stage.classList.remove('photo-slide-running');

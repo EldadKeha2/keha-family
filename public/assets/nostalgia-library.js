@@ -77,6 +77,10 @@
   }
   function select(collection,{query='',filter='all'}={}){
     state.collection=collection;state.library=collection.library;state.query=normalize(query);
+    // The direct-video shelf opens its own album, separate from the unassigned
+    // nostalgia grid. Keep that viewer's sequence in sync after assignments,
+    // uploads and deletions, even when the grid has a search or kind filter.
+    window.FamilyMedia?.register?.('nostalgia-everyday-life',viewCategoryItems(collection,DIRECT_CATEGORY));
     const requested=routeEvent(),legacy=getEvent(requested),event=legacy?.categoryId===DIRECT_CATEGORY?null:legacy,eventId=event?.id||null;
     if(state.eventId!==eventId){state.eventId=eventId;state.uploadChoice=eventId||'';}
     if(event)state.homeActive=false;else if(!state.homeActive){state.homeActive=true;state.activeFolders={};$('nostalgiaCategories').dataset.signature='';}

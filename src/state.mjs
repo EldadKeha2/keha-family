@@ -446,27 +446,39 @@ export class FamilyState {
   personPage(id,options={}){
     const person=this.person(id),owner="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?)";
     const kind="COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(m.data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)";
+    const focus=options.focus||null;
+    if(focus&&(typeof focus!=='string'||!/^[a-f0-9]{32}$/.test(focus)))throw new HttpError(400,'בחרו פריט תקין לפתיחה באלבום.');
+    // Locate a profile/deep-linked item without materializing its whole album.
+    // The same ownership filter and row order are used for rank and page reads.
+    const focused=focus?this.rows('SELECT m.id,m.rowid AS position,'+kind+' AS kind FROM media m WHERE m.id=? AND '+owner,focus,id,id)[0]:null;
     const counts=Object.fromEntries(this.rows('SELECT '+kind+' AS kind,count(*) AS n FROM media m WHERE '+owner+' GROUP BY '+kind,id,id).map(row=>[row.kind,row.n]));
     const albums={};
     for(const [key,type]of [['photos','photo'],['videos','video'],['documents','document']]){
       const requested=Number(options[key]||1);if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
-      const size=key==='photos'?25:10,total=counts[type]||0,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
+      const size=key==='photos'?25:10,total=counts[type]||0,pages=Math.max(1,Math.ceil(total/size));
+      const newer=focused?.kind===type?this.rows('SELECT count(*) AS n FROM media m WHERE '+owner+' AND '+kind+'=? AND m.rowid>?',id,id,type,focused.position)[0].n:null;
+      const page=Math.min(newer===null?requested:Math.floor(newer/size)+1,pages);
       const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE '+owner+' AND '+kind+'=? ORDER BY m.rowid DESC LIMIT ? OFFSET ?',id,id,type,size,(page-1)*size).map(row=>JSON.parse(row.data)));
       albums[key]={items,page,pages,total,size};
     }
     const row=this.rows('SELECT m.data FROM media m WHERE '+owner+" AND "+kind+"='photo' ORDER BY CASE WHEN m.id=? THEN 0 WHEN m.category='personal' AND m.person_id=? THEN 1 ELSE 2 END,m.rowid LIMIT 1",id,id,person.profileId||'',id)[0];
     const candidate=row?JSON.parse(row.data):null,profile=person.profileCleared&&candidate?.id!==person.profileId?null:candidate;
-    return {person:{...person,about:person.about||'',profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileFraming:profile?photoFrame(profile.framing):null,profileMediaId:profile?.id||null,profileIsManual:Boolean(profile&&profile.id===person.profileId),photoCount:counts.photo||0,videoCount:counts.video||0,documentCount:counts.document||0,mediaCount:Object.values(counts).reduce((n,v)=>n+v,0)},albums};
+    return {person:{...person,about:person.about||'',profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileFraming:profile?photoFrame(profile.framing):null,profileMediaId:profile?.id||null,profileIsManual:Boolean(profile&&profile.id===person.profileId),photoCount:counts.photo||0,videoCount:counts.video||0,documentCount:counts.document||0,mediaCount:Object.values(counts).reduce((n,v)=>n+v,0)},albums,...(focused?{focusId:focused.id}:{})};
   }
   collection(kind,options={}){
     validCollection(kind);
     const revision=this.rows('SELECT value FROM meta WHERE id=?','collection:'+kind)[0]?.value||'empty';
     if(kind.startsWith('nursery:')){
-      const requested=Number(options.page||1),size=10;
+      const requested=Number(options.page||1),size=10,focus=options.focus||null;
       if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
-      const total=this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?)',kind,kind)[0].n,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requested,pages);
-      const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?) ORDER BY m.rowid DESC LIMIT ? OFFSET ?',kind,kind,size,(page-1)*size).map(row=>JSON.parse(row.data)));
-      const cover=this.albumCover(kind),coverMediaId=/\/media\/([a-f0-9]{32})/.exec(cover||'')?.[1],coverPhoto=coverMediaId?this.photo(coverMediaId):null;return {kind,items,count:total,cover,coverMediaId:coverPhoto?.id||null,coverFraming:coverPhoto?photoFrame(coverPhoto.framing):null,revision:revision+':'+page,pagination:{page,pages,size,total}};
+      if(focus&&(typeof focus!=='string'||!/^[a-f0-9]{32}$/.test(focus)))throw new HttpError(400,'בחרו פריט תקין לפתיחה באלבום.');
+      const where='(m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?))';
+      const focused=focus?this.rows("SELECT m.id,m.rowid AS position FROM media m WHERE "+where+" AND m.id=? AND COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' ELSE 'document' END)='photo'",kind,kind,focus)[0]:null;
+      const total=this.rows('SELECT count(*) AS n FROM media m WHERE '+where,kind,kind)[0].n,pages=Math.max(1,Math.ceil(total/size));
+      const newer=focused?this.rows('SELECT count(*) AS n FROM media m WHERE '+where+' AND m.rowid>?',kind,kind,focused.position)[0].n:null;
+      const page=Math.min(newer===null?requested:Math.floor(newer/size)+1,pages);
+      const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY m.rowid DESC LIMIT ? OFFSET ?',kind,kind,size,(page-1)*size).map(row=>JSON.parse(row.data)));
+      const cover=this.albumCover(kind),coverMediaId=/\/media\/([a-f0-9]{32})/.exec(cover||'')?.[1],coverPhoto=coverMediaId?this.photo(coverMediaId):null;return {kind,items,count:total,cover,coverMediaId:coverPhoto?.id||null,coverFraming:coverPhoto?photoFrame(coverPhoto.framing):null,revision:revision+':'+page+(focus?':focus:'+focus:''),pagination:{page,pages,size,total},...(focused?{focusId:focused.id}:{})};
     }
     if(kind!=='gallery'){
       const where='m.category=? OR m.id IN (SELECT media_id FROM media_collections WHERE collection=?)';
