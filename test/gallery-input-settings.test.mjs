@@ -31,3 +31,22 @@ test('old direction attempts cannot silently keep reversing the new controller',
  const ordinary=fixture({stored:storage});assert.equal(ordinary.api.wheelDelta(120),120);assert.equal(ordinary.api.isCalibrating(),false);
  const setup=fixture({checking:'7',stored:storage});assert.equal(setup.api.isCalibrating(),true);assert.equal(setup.api.wheelDelta(120),120);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'1');
 });
+
+test('the guided link replaces an unconfirmed wrong direction on the first rightward pad gesture and keeps it on reload',()=>{
+ for(const raw of [-120,120]){
+  const stored=new Map([['keha-gallery-pad-direction-v2',String(-Math.sign(raw))]]),f=fixture({checking:'10',stored});
+  assert.equal(f.api.isCalibrating(),true,'A saved sign from a failed earlier attempt must not skip the requested setup');
+  assert.equal(f.api.wheelDelta(raw),120);assert.equal(f.api.isCalibrating(),false);
+  const reload=fixture({checking:'10',stored});assert.equal(reload.api.isCalibrating(),false);
+  assert.equal(reload.api.wheelDelta(-raw),-120,'Reload cannot misinterpret a later left swipe as calibration');
+  const ordinary=fixture({stored});assert.equal(ordinary.api.wheelDelta(raw),120);assert.equal(ordinary.events.size,0);
+ }
+});
+
+test('the direct reverse action switches the pad immediately, saves it and cancels pending calibration',()=>{
+ const stored=new Map([['keha-gallery-pad-direction-v2','1']]),f=fixture({checking:'10',stored});
+ assert.equal(f.api.isCalibrating(),true);f.api.reverseWheelDirection();
+ assert.equal(f.api.wheelDelta(-120),120);assert.equal(f.api.isCalibrating(),false);
+ const reload=fixture({checking:'10',stored});assert.equal(reload.api.wheelFactor(),-1);assert.equal(reload.api.isCalibrating(),false);
+ reload.api.reverseWheelDirection();assert.equal(reload.api.wheelDelta(120),120);
+});

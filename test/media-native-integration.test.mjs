@@ -617,7 +617,7 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,140,'A calibrated negative device packet moves the current pixels right');
  assert.equal(settings.wheelFactor(),-1);assert.equal(settings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
- const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 9/);assert.match(trace,/native implementation 9/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
+ const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 10/);assert.match(trace,/native implementation 9/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
  const restored=fixture({storage});assert.equal(restored.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(restored.window.FamilyGalleryInput.isCalibrating(),false);assert.equal(restored.get('galleryGestureCheck'),null,'Ordinary browsing shows no diagnostic or calibration interface');
  await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,140);
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(restored.window.FamilyMedia.current().id,'c');restored.close();
@@ -632,6 +632,23 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  await setupReload.open('photo','photos',1);const recalibratedRail=setupReload.strip(),right=browserWheel(setupReload,recalibratedRail.children[1].querySelector('img'),140);
  assert.equal(recalibratedRail.clientWidth-right.after,140);assert.equal(reloadedSettings.wheelFactor(),1);assert.equal(reloadedSettings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(setupReload.window.FamilyMedia.current().id,'c');setupReload.close();
+});
+
+test('guided direction repair accepts the very first rightward pad swipe despite the old saved sign, then arrows and screen touch retain Next',async()=>{
+ for(const kind of ['photo','video']){
+  const storage=new Map([[directionKey,'1']]),f=fixture({query:'?gesture-check=10',storage});
+  assert.equal(f.window.FamilyGalleryInput.isCalibrating(),true);
+  await f.open(kind,kind==='photo'?'photos':'nostalgia',0);
+  assert.match(f.get('galleryGestureCheck').querySelector('[data-gesture-instruction]').textContent,/החליקו עכשיו ימינה/);
+  const rail=f.strip(),sample=browserWheel(f,rail.children[1].querySelector('img,video'),-140);
+  assert.equal(rail.clientWidth-sample.after,140);await finishWheel(f,rail);assert.equal(f.window.FamilyMedia.current().id,'b');
+  f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
+  nativeStroke(f,140);await flush();assert.equal(f.window.FamilyMedia.current().id,'a','Screen touch right still selects Next with the pad sign reversed');
+  const reverse=f.get('galleryGestureCheck').querySelector('[data-gesture-reverse]');assert.equal(reverse.hidden,false);f.emit(reverse,'click');await flush();
+  assert.equal(f.window.FamilyGalleryInput.wheelFactor(),1);
+  const nextRail=f.strip();browserWheel(f,nextRail.children[1].querySelector('img,video'),140);await finishWheel(f,nextRail);assert.equal(f.window.FamilyMedia.current().id,'b');
+  f.close();
+ }
 });
 
 test('an orphan compatibility touchstart without a pointer stream or end cannot block later wheel input',async()=>{
