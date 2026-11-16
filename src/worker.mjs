@@ -427,6 +427,7 @@ export default {
           if(match[2]==='upload')return await upload(request,env,db,ctx,{category:match[1]});
           const body=await readJSON(request,40000);return json(await db('media.caption',{kind:match[1],file:body.file,caption:body.caption}));
         }
+        if((match=/^\/api\/stories\/([a-f0-9]{24})\/category$/.exec(path))){const body=await readJSON(request,2000);return json(await db('memory.story.category',{id:match[1],category:body.category,expectedUpdatedAt:body.expectedUpdatedAt}));}
         if((match=/^\/api\/stories(?:\/([a-f0-9]{24}))?$/.exec(path)))return await story(request,env,db,ctx,match[1]||null);
         throw new HttpError(404,'הפעולה לא נמצאה.');
       }

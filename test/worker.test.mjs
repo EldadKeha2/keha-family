@@ -2302,3 +2302,17 @@ test('a new tagged memory cannot lose its people or chapter to an older state ve
   assert.equal((await (await f.call('/api/stories')).json()).stories.length,0);
  }finally{await f.close();}
 });
+
+test('category-only memory changes preserve text, tags, dates and attachments and reject stale edits',async()=>{
+ const f=fixture();try{
+  await f.connect();const form=new FormData();form.set('title','זיכרון משפחתי');form.set('body','התוכן המקורי');form.set('author','המשפחה');form.set('year','1980');form.set('category','family');form.set('personIds',JSON.stringify(['yona','shlomo']));form.append('files',new File(['המסמך המקורי'],'story.txt',{type:'text/plain'}));
+  const created=await f.call('/api/stories',{method:'POST',body:form});assert.equal(created.status,201);const original=(await created.json()).story;
+  const response=await f.call('/api/stories/'+original.id+'/category',{method:'POST',body:{category:'roots',expectedUpdatedAt:original.updatedAt}});assert.equal(response.status,200,await response.clone().text());
+  const changed=(await response.json()).story;assert.equal(changed.category,'roots');assert.notEqual(changed.updatedAt,original.updatedAt);
+  for(const key of ['title','body','author','year','createdAt','personIds','attachments','tags'])assert.deepEqual(changed[key],original[key],key+' must be preserved');
+  assert.equal(await (await f.call(changed.attachments[0].src)).text(),'המסמך המקורי');
+  assert.equal((await f.call('/api/stories/'+original.id+'/category',{method:'POST',body:{category:'funny',expectedUpdatedAt:original.updatedAt}})).status,409);
+  assert.equal((await f.call('/api/stories/'+original.id+'/category',{method:'POST',body:{category:'invalid',expectedUpdatedAt:changed.updatedAt}})).status,400);
+  f.restart();const item=(await (await f.call('/api/stories')).json()).stories[0];assert.equal(item.category,'roots');assert.equal(item.body,original.body);assert.deepEqual(item.personIds,original.personIds);assert.equal(f.objects.size,1);
+ }finally{await f.close();}
+});

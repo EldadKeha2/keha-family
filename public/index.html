@@ -15,11 +15,11 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-b53c569e71ee1905.css">
+  <link rel="stylesheet" href="assets/site-styles-d82f8b1bcffd4b50.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
-  <script src="assets/translations.js?v=storybook-v1-family-ai-v1-video-library-labels-v7" defer></script>
+  <script src="assets/translations.js?v=category-picker-v3-family-ai-v1-video-library-labels-v7" defer></script>
   <script src="assets/i18n.js?v=person-aliases-v2" defer></script>
   <script src="assets/people-roster.js?v=shared-roster-v1" defer></script>
   <script src="assets/collection-transport.js?v=internal-pages-v1" defer></script>
@@ -57,7 +57,7 @@
   <script src="assets/living-family.js?v=compact-tedhar-v2" defer></script>
   <script src="assets/video-categories.js?v=milestone-category-v5" type="module"></script>
   <script src="assets/video-filter.js?v=selection-reset-v3" type="module"></script>
-  <script src="assets/memories.js?v=storybook-v2" defer></script>
+  <script src="assets/memories.js?v=category-picker-v3" defer></script>
   <script src="assets/portal.js?v=storybook-v1" defer></script>
   <script src="assets/gallery-filter.js?v=long-press-v3" type="module"></script>
   <script src="assets/media-selection.js?v=desktop-select-v3" type="module"></script>
@@ -198,7 +198,7 @@
           </section>
         </section>
         <section id="voicesView" class="portal-view voices-view" aria-label="בקולם" hidden>
-          <header class="voices-intro"><div class="voice-emblem" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 9 61 22 78 22 78 39 91 50 78 61 78 78 61 78 50 91 39 78 22 78 22 61 9 50 22 39 22 22 39 22Z"/><circle cx="50" cy="50" r="28"/><path d="M29 46v8m8-17v26m9-35v44m9-39v34m9-26v18m8-11v4"/></svg></div><div><span class="small-eyebrow">שומעים. נזכרים. שומרים.</span><h3>יש זיכרונות שאפשר לשמוע</h3><p>הסיפורים, השירים והצחוק — בקולות של המשפחה שלנו.</p></div><button type="button" class="primary-button" id="newRecording">＋ העלאת הקלטה</button></header>
+          <header class="voices-intro"><div class="voice-emblem" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 9 61 22 78 22 78 39 91 50 78 61 78 78 61 78 50 91 39 78 22 78 22 61 9 50 22 39 22 22 39 22Z"/><circle cx="50" cy="50" r="28"/><path d="M29 46v8m8-17v26m9-35v44m9-39v34m9-26v18m8-11v4"/></svg></div><div><span class="small-eyebrow">שומעים. נזכרים. שומרים.</span><h3>ההקלטות בקולם של בני המשפחה</h3><p>הסיפורים, השירים והצחוק — בקולות של המשפחה שלנו.</p></div><button type="button" class="primary-button" id="newRecording">＋ העלאת הקלטה</button></header>
           <div class="memory-filters"><label>מי בהקלטה?<select id="voicePersonFilter"><option value="all">כל האנשים</option></select></label><span id="voicesCount" role="status"></span></div>
           <p id="voicesStatus" class="memory-status" role="status"></p><div id="voiceList" class="voice-list"></div>
           <div id="voicesEmpty" class="memory-empty" hidden><span aria-hidden="true">♫</span><h4>כאן שומרים את הקולות שלנו</h4><p>יש לכם הקלטה משפחתית? העלו אותה וסמנו את מי ששומעים בה.</p><button type="button" class="secondary-button" data-new-recording>מוסיפים את ההקלטה הראשונה</button></div>

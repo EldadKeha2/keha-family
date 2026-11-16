@@ -13,6 +13,7 @@
   ];
   const category=id=>categories.find(c=>c.id===id)||categories[2];
   const state={view:null,query:'',category:'all',stories:[],recordings:[],revisions:{},loading:{},loaded:{},story:null,recording:null,uploadId:null,savingStory:false,savingVoice:false,flipTimer:null};
+  const categorySaves=new Map(),categoryNotes=new Map();let storyEdits=0;
   const reduced=()=>window.FamilyAccessibility?.isReducedMotion?.()??matchMedia('(prefers-reduced-motion: reduce)').matches;
   async function request(path,options={}){
     const response=await I.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
@@ -79,6 +80,20 @@
     const old=select.value;select.innerHTML=`<option value="all">${safe(allLabel)}</option>`+values.map(([id,label])=>`<option value="${safe(id)}">${safe(label)}</option>`).join('');select.value=values.some(([id])=>String(id)===old)?old:'all';
   }
   function peopleOptions(items){const people=new Map(items.flatMap(item=>(item.tags||[]).map(p=>[p.id,p])));return [...people.values()].sort((a,b)=>I.personName(a).localeCompare(I.personName(b),I.locale)).map(p=>[p.id,I.personName(p)]);}
+  function categoryControl(item){
+    const busy=categorySaves.has(item.id),note=categoryNotes.get(item.id),id='storyCategory-'+item.id;
+    return `<div class="memory-card-category"><label for="${id}">${t('שיוך לקטגוריה','Memory category')}</label><select id="${id}" data-story-category="${item.id}" aria-label="${t('שיוך הזיכרון ','Category for ')+safe(item.title)}" aria-describedby="${id}Status" ${busy||!window.FamilyApp?.apiEnabled?'disabled':''}>${categories.map(c=>`<option value="${c.id}" ${(categorySaves.get(item.id)||category(item.category).id)===c.id?'selected':''}>${safe(c.title)}</option>`).join('')}</select><span id="${id}Status" class="memory-category-status${note?.failed?' is-error':''}" role="status">${safe(busy?t('שומר…','Saving…'):note?.message||'')}</span></div>`;
+  }
+  async function assignCategory(id,value){
+    const item=state.stories.find(item=>item.id===id);if(!item||categorySaves.has(id)||category(item.category).id===value||!categories.some(c=>c.id===value)||!canWrite())return;
+    categorySaves.set(id,value);categoryNotes.delete(id);storyEdits++;renderStories();
+    try{
+      const data=await request('api/stories/'+id+'/category',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:value,expectedUpdatedAt:item.updatedAt})});
+      state.stories=state.stories.map(item=>item.id===id?data.story:item);state.revisions.stories=null;
+      categoryNotes.set(id,{message:t('נשמר ✓','Saved ✓')});window.FamilyApp.toast(t('הזיכרון שויך ל','Memory moved to ')+category(value).title+' ✓');
+    }catch(error){categoryNotes.set(id,{message:error.message,failed:true});}
+    finally{categorySaves.delete(id);storyEdits++;renderStories();}
+  }
   function renderStories(){
     const selected=state.category==='all'?null:category(state.category),all=state.stories.filter(item=>!selected||category(item.category).id===selected.id);
     $('memoryCollectionTitle').textContent=selected?.title||t('כל הזיכרונות שלנו','All our memories');
@@ -92,7 +107,7 @@
     $('storiesCount').textContent=state.loaded.stories?`${items.length} ${t(items.length===1?'זיכרון':'זיכרונות',items.length===1?'memory':'memories')}`:'';
     $('storiesEmpty').hidden=!state.loaded.stories||items.length>0;
     $('memoryEmptyText').textContent=all.length?t('לא נמצאו זיכרונות בסינון הזה. אפשר לשנות את הסינון או להוסיף זיכרון.','No memories match these filters. Change them or add a memory.'):selected?.intro||t('סיפור קטן, רגע גדול, או משהו שרק אתם זוכרים.','A small story, a big moment, or something only you remember.');
-    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div></article>`).join('');
+    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div>${categoryControl(item)}</article>`).join('');
   }
   function renderVoices({background=false}={}){
     if(background&&[...$('voiceList').querySelectorAll('audio')].some(a=>!a.paused))return;
@@ -107,9 +122,9 @@
     $('voicesEmpty').querySelector('h4').textContent=state.recordings.length?t('לא נמצאו הקלטות בבחירה הזו','No recordings match your selection'):t('כאן שומרים את הקולות שלנו','A home for our family voices');
   }
   async function refresh(kind,force=false){
-    if(!window.FamilyApp?.apiEnabled||state.loading[kind])return;state.loading[kind]=true;const status=$(kind==='stories'?'memoryStatus':'voicesStatus');
+    if(!window.FamilyApp?.apiEnabled||state.loading[kind])return;state.loading[kind]=true;const startedEdit=storyEdits,status=$(kind==='stories'?'memoryStatus':'voicesStatus');
     if(!state.loaded[kind])status.textContent=t('פותחים את האלבום…','Opening the album…');
-    try{const data=await request('api/'+(kind==='stories'?'stories':'voices'),{headers:!force&&state.revisions[kind]?{'If-None-Match':'"'+state.revisions[kind]+'"'}:{}});if(data){state[kind==='stories'?'stories':'recordings']=data[kind==='stories'?'stories':'recordings'];state.revisions[kind]=data.revision;state.loaded[kind]=true;if(kind==='stories')renderStories();else renderVoices({background:!force});}status.textContent='';}
+    try{const data=await request('api/'+(kind==='stories'?'stories':'voices'),{headers:!force&&state.revisions[kind]?{'If-None-Match':'"'+state.revisions[kind]+'"'}:{}});if(data){if(kind==='stories'&&(categorySaves.size||startedEdit!==storyEdits))return;state[kind==='stories'?'stories':'recordings']=data[kind==='stories'?'stories':'recordings'];state.revisions[kind]=data.revision;state.loaded[kind]=true;if(kind==='stories')renderStories();else renderVoices({background:!force});}status.textContent='';}
     catch(error){status.textContent=error.message;}finally{state.loading[kind]=false;}
   }
   function openStory(id){
@@ -183,6 +198,7 @@
       if(event.target.closest('#newRecording,[data-new-recording]')){editRecording();return;}
       const person=event.target.closest('[data-memory-filter-person]');if(person){const voices=person.dataset.memoryKind==='voices',filter=$(voices?'voicePersonFilter':'storyPersonFilter');filter.value=person.dataset.memoryFilterPerson;if($('storyReader').open)$('storyReader').close();if(voices)renderVoices();else{$('storyYearFilter').value='all';renderStories();$('memoryCollection').scrollIntoView({block:'start',behavior:reduced()?'instant':'smooth'});}}
     });
+    $('storyTimeline').addEventListener('change',event=>{if(event.target.matches('[data-story-category]'))assignCategory(event.target.dataset.storyCategory,event.target.value);});
     $('storyForm').addEventListener('submit',saveStory);$('voiceForm').addEventListener('submit',saveRecording);
     for(const id of ['storyPersonFilter','storyYearFilter','storySort'])$(id).addEventListener('change',renderStories);$('voicePersonFilter').addEventListener('change',()=>renderVoices());
     $('voiceFile').addEventListener('change',()=>{state.uploadId=crypto.randomUUID().replaceAll('-','');const file=$('voiceFile').files[0];if(file&&!$('voiceTitle').value)$('voiceTitle').value=file.name.replace(/\.[^.]+$/,'').replaceAll('_',' ');});
@@ -191,7 +207,7 @@
     $('voiceList').addEventListener('ended',()=>renderVoices({background:true}),true);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&['stories','voices'].includes(state.view))refresh(state.view);});
     setInterval(()=>{if(document.visibilityState!=='hidden'&&['stories','voices'].includes(state.view))refresh(state.view);},30000);
-    window.addEventListener('beforeunload',event=>{if(state.savingStory||state.savingVoice||$('voiceEditor').open&&($('voiceFile').files.length||$('voiceTitle').value||$('voiceBody').value)){event.preventDefault();event.returnValue='';}});
+    window.addEventListener('beforeunload',event=>{if(state.savingStory||state.savingVoice||categorySaves.size||$('voiceEditor').open&&($('voiceFile').files.length||$('voiceTitle').value||$('voiceBody').value)){event.preventDefault();event.returnValue='';}});
     activate(window.FamilyApp?.getView?.()||'tree');
   }
   window.FamilyMemories={activate,search(query){state.query=query;if(state.view==='stories')renderStories();if(state.view==='voices')renderVoices();}};

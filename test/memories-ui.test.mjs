@@ -12,20 +12,24 @@ const story={id:'a'.repeat(24),title:'הדרך הביתה',body:'סיפור מש
 const recording={id:'b'.repeat(32),title:'בקולה של סבתא',body:'זיכרון מוקלט',author:'משפחה',year:1985,personIds:['yona'],tags:[person],filename:'voice.mp3',src:'/api/voices/'+('b'.repeat(32))+'/audio',createdAt:'2026-11-01T00:00:00Z',updatedAt:'2026-11-01T00:00:00Z'};
 const tick=async()=>{for(let n=0;n<5;n++)await new Promise(resolve=>setImmediate(resolve));};
 
-function fixture({english=false,reduced=false,stories=[story],recordings=[recording],fail=false}={}){
+function fixture({english=false,reduced=false,stories=[story],recordings=[recording],fail=false,categoryError=0}={}){
   const {window,document}=parseHTML(html),requests=[],timers=new Map(),scrolls=[],uploads=[],notices=[];let timer=0;
   // Native browser methods, modeled only at the UI boundary.
   for(const dialog of document.querySelectorAll('dialog')){dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;};}
   window.HTMLElement.prototype.scrollIntoView=function(){scrolls.push(this.id);};
   window.HTMLElement.prototype.focus=function(){Object.defineProperty(document,'activeElement',{value:this,configurable:true});};
   window.HTMLElement.prototype.pause=function(){this.paused=true;};
-  Object.defineProperty(window.HTMLSelectElement.prototype,'value',{get(){return this._value??this.querySelector('option')?.value??'';},set(value){this._value=String(value);},configurable:true});
+  Object.defineProperty(window.HTMLSelectElement.prototype,'value',{get(){return this._value??this.querySelector('option[selected]')?.value??this.querySelector('option')?.value??'';},set(value){this._value=String(value);},configurable:true});
   for(const input of document.querySelectorAll('input[type=file]'))input.files=[];
   for(const form of document.querySelectorAll('form'))form.reset=()=>{for(const input of form.querySelectorAll('input,textarea')){input.value='';if(input.type==='file')input.files=[];}};
   class Form extends FormData{constructor(form){super();if(form)for(const el of form.querySelectorAll('[name]')){if(el.type==='file')for(const file of el.files||[])this.append(el.name,file);else this.set(el.name,el.value||'');}}}
   const api=async(path,options={})=>{
     requests.push({path,options});if(fail&&options.method!=='POST')return Response.json({error:'Offline'},{status:503});
     if(options.method==='POST'){
+      if(/^api\/stories\/[^/]+\/category$/.test(path)){
+        if(categoryError)return Response.json({error:'This memory has changed. Refresh and try again.'},{status:categoryError});
+        const body=JSON.parse(options.body);return Response.json({story:{...story,category:body.category,updatedAt:'2026-11-16T00:00:00Z'}});
+      }
       if(path.startsWith('api/stories')){const body=options.body;return Response.json({story:{...story,title:body.get('title'),body:body.get('body'),year:body.get('year')||null,category:body.get('category'),personIds:JSON.parse(body.get('personIds')),tags:JSON.parse(body.get('personIds')).map(()=>person)}});}
       if(path.startsWith('api/voices/')){const body=JSON.parse(options.body);return Response.json({recording:{...recording,...body,tags:body.personIds.map(()=>person)}});}
     }
@@ -89,6 +93,27 @@ test('voices use native seekable players, allow metadata editing and expose down
   f.get('voiceTitle').value='כותרת חדשה';f.emit('voiceForm','submit');await f.flush();const mutation=f.requests.find(r=>r.options.method==='POST');
   assert.equal(mutation.path,'api/voices/'+recording.id);assert.equal(JSON.parse(mutation.options.body).expectedUpdatedAt,recording.updatedAt);assert.equal(f.uploads.length,0);
   await f.activate('stories');assert.equal(f.get('voicesView').hidden,true);
+});
+test('each memory has five category choices at its bottom and saves only its category',async()=>{
+  const f=fixture();await f.activate('stories');const id='storyCategory-'+story.id,select=f.get(id);
+  assert.equal(select.closest('.memory-card').lastElementChild.className,'memory-card-category');
+  assert.deepEqual([...select.querySelectorAll('option')].map(option=>option.value),['roots','people','family','childhood','funny']);assert.equal(select.value,'roots');
+  select.value='childhood';f.emit(id,'change');assert.equal(f.get(id).disabled,true);assert.equal(f.get(id).value,'childhood');await f.flush();
+  const mutation=f.requests.find(r=>r.options.method==='POST');assert.equal(mutation.path,'api/stories/'+story.id+'/category');assert.deepEqual(JSON.parse(mutation.options.body),{category:'childhood',expectedUpdatedAt:story.updatedAt});
+  assert.equal(f.get(id).value,'childhood');assert.equal(f.get(id).disabled,false);assert.match(f.get('storyTimeline').textContent,/סיפור משפחתי/);assert.match(f.get('storyTimeline').textContent,/יונה נקאש קהא/);assert.match(f.get(id+'Status').textContent,/נשמר/);
+});
+test('moving a memory updates its chapter without switching the reader out of the chosen chapter',async()=>{
+  const f=fixture();await f.activate('stories');f.click('[data-memory-category="roots"]');const id='storyCategory-'+story.id;f.get(id).value='funny';f.emit(id,'change');await f.flush();
+  assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי שורשים');assert.equal(f.get('storyTimeline').children.length,0);assert.match(f.notices.at(-1),/סיפורים מצחיקים/);
+  f.click('[data-memory-category="funny"]');assert.match(f.get('storyTimeline').textContent,/הדרך הביתה/);assert.equal(f.get(id).value,'funny');
+});
+test('a stale category change restores the saved category and keeps the memory available for retry',async()=>{
+  const f=fixture({categoryError:409});await f.activate('stories');const id='storyCategory-'+story.id;f.get(id).value='people';f.emit(id,'change');await f.flush();
+  assert.equal(f.get(id).value,'roots');assert.equal(f.get(id).disabled,false);assert.match(f.get(id+'Status').textContent,/Refresh/);assert.match(f.get('storyTimeline').textContent,/סיפור משפחתי/);
+  assert.equal(f.requests.filter(r=>r.options.method==='POST').length,1);
+});
+test('the voices introduction uses the requested family recordings heading',async()=>{
+  const f=fixture();await f.activate('voices');assert.equal(f.document.querySelector('.voices-intro h3').textContent,'ההקלטות בקולם של בני המשפחה');
 });
 test('audio uploads send original bytes, Hebrew metadata, people and a stable retry identity',async()=>{
   const f=fixture({recordings:[]});await f.activate('voices');f.click('#newRecording');

@@ -928,3 +928,5 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   "שנת ההקלטה (אם יודעים)": "Recording year (if known)",
   "MP3, M4A, WAV, OGG, AAC, FLAC או WebM · עד 90MB": "MP3, M4A, WAV, OGG, AAC, FLAC or WebM · Up to 90MB"
 });
+
+Object.assign(window.FAMILY_TRANSLATIONS,{'ההקלטות בקולם של בני המשפחה':'Recordings in our family members’ own voices','הזיכרון עודכן בינתיים. רעננו את העמוד ונסו שוב.':'This memory has changed. Refresh the page and try again.'});

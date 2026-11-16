@@ -6,7 +6,10 @@ turn before scrolling to the selected memories. Reduced-motion preferences
 skip the animation. The centre book restores all chapters.
 
 Stories keep the existing `/api/stories` endpoints and attachments. Category
-and `personIds` are now saved alongside authored content; the year is optional.
+can also be changed directly with the selector at the bottom of each memory.
+`POST /api/stories/<id>/category` accepts only the category and expected update
+timestamp; it preserves the latest text, people, year and attachments.
+Category and `personIds` are now saved alongside authored content; the year is optional.
 Legacy rows without a category appear under family memories. Editing through
 an older client preserves the existing chapter and tags. `expectedUpdatedAt`
 continues to prevent concurrent overwrites.
