@@ -7,9 +7,11 @@ const names='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r
 let item=null,showNames=false,showAges=false,editing=null,saving=false;
 let inlineEnabled=false;
 const inlineDrafts=new Map(),dateFields=['day','month','year'];
+const desktopVideo=()=>item?.kind==='video'&&window.matchMedia?.('(min-width:701px)').matches===true;
+const inlineActive=()=>Boolean(item?.id)&&(item.kind==='photo'&&inlineEnabled||desktopVideo());
 
 function inlineDraft(){
-  if(!item?.id||item.kind!=='photo')return null;
+  if(!item?.id||!['photo','video'].includes(item.kind))return null;
   let draft=inlineDrafts.get(item.id);
   if(!draft||!draft.dirty&&!draft.pending){
     draft={id:item.id,revision:item.takenDateRevision||'empty',values:photoDate(item.takenDate),dirty:false,error:'',status:draft?.status||''};inlineDrafts.set(item.id,draft);
@@ -18,9 +20,13 @@ function inlineDraft(){
 }
 function renderInlineDate(){
   const form=$('photoInlineDateForm');if(!form)return;
-  form.hidden=!inlineEnabled||!item?.id||item.kind!=='photo';
-  const dateButton=$('editPhotoDate');if(dateButton)dateButton.hidden=inlineEnabled&&!form.hidden;
+  form.hidden=!inlineActive();
+  const dateButton=$('editPhotoDate');if(dateButton)dateButton.hidden=!form.hidden;
   if(form.hidden)return;
+  if(desktopVideo()){
+    const footer=$('mediaViewer')?.querySelector('.media-viewer-footer');
+    if(footer&&form.parentNode!==footer)footer.append(form);
+  }
   const draft=inlineDraft(),disabled=Boolean(draft.pending)||!window.FamilyApp?.apiEnabled;
   form.dir=I.isEnglish?'ltr':'rtl';
   for(const field of dateFields){const input=$('photoInlineDate'+field);if(input.value!==String(draft.values[field]??''))input.value=draft.values[field]??'';input.disabled=disabled;}
@@ -43,7 +49,7 @@ async function persistDate(target,date){
   window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));return result;
 }
 async function saveInlineDate(event){
-  event?.preventDefault();const draft=inlineDraft();if(!inlineEnabled||!draft?.dirty)return true;if(draft.pending)return draft.pending;
+  event?.preventDefault();const draft=inlineDraft();if(!inlineActive()||!draft?.dirty)return true;if(draft.pending)return draft.pending;
   let date;
   try{date=photoDate(Object.fromEntries(dateFields.map(field=>[field,draft.values[field]===''||draft.values[field]===null?null:Number(draft.values[field])])));}
   catch{draft.error=tr('התאריך אינו תקין. אפשר להשאיר שדות לא ידועים ריקים.','Invalid date. Leave unknown fields blank.');renderInlineDate();return false;}
@@ -164,10 +170,10 @@ function init(){
   $('clearPhotoDate').addEventListener('click',()=>{for(const field of ['day','month','year'])$('photoDate'+field).value='';$('photoDateError').textContent='';$('photoDateday').focus();});
   dialog.addEventListener('cancel',event=>{if(saving)event.preventDefault();});
   dialog.addEventListener('close',()=>{editing=null;});
-  viewer.addEventListener('close',()=>{item=null;showNames=false;showAges=false;if(dialog.open&&!saving)dialog.close();});
-  window.visualViewport?.addEventListener('resize',placeDateDialog);window.visualViewport?.addEventListener('scroll',placeDateDialog);window.addEventListener('resize',placeDateDialog);
+  viewer.addEventListener('close',()=>{item=null;showNames=false;showAges=false;renderInlineDate();if(dialog.open&&!saving)dialog.close();});
+  window.visualViewport?.addEventListener('resize',placeDateDialog);window.visualViewport?.addEventListener('scroll',placeDateDialog);window.addEventListener('resize',()=>{placeDateDialog();renderInlineDate();});
   window.addEventListener('family-media-changed',event=>{const photo=event.detail.item;if(photo?.id===item?.id){item={...item,...photo};if(!item.takenDate?.year)showAges=false;render();}});
   if(viewer.open&&window.FamilyMedia?.current?.())mount(window.FamilyMedia.current());
 }
-window.FamilyPhotoDate={mount,decorate,ageFor,videoTagAge,overlays,setDesktopInline,open:openDate,text:date=>photoDateText(date,I.locale)};
+window.FamilyPhotoDate={mount,decorate,ageFor,videoTagAge,overlays,setDesktopInline,syncInline:renderInlineDate,open:openDate,text:date=>photoDateText(date,I.locale)};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

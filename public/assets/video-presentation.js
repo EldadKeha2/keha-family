@@ -44,6 +44,7 @@
  function present(item,scope){
   mount();const video=item?.kind==='video';$('mediaViewer')?.classList.toggle('video-gallery-viewer',video);
   if(!video){exit({focus:false});return;}
+  window.FamilyPhotoDate?.syncInline?.();
   const stage=$('mediaStage');stage.querySelector('.video-overlay-tools')?.remove();stage.insertAdjacentHTML('beforeend',controls(item,scope));
   if(root)for(const selector of ['.video-fullscreen-previous','.video-fullscreen-next'])root.querySelector(selector).hidden=$('mediaNext').hidden;
  }

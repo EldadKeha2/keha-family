@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {photoDate,photoAge,photoDateText} from '../public/assets/photo-date.mjs';
 
 const source=(await readFile(new URL('../public/assets/photo-moments.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
-function fixture(english=false){
+function fixture(english=false,{desktop=false}={}){
  const nodes=new Map(),changes=[],requests=[],messages=[];
  class Node extends EventTarget{
   constructor(id=''){super();this.id=id;this.open=false;this.value='';this.dataset={};this.classList={contains:()=>false};this.properties=new Map();this.style={setProperty:(key,value)=>this.properties.set(key,value)};}
@@ -14,6 +14,8 @@ function fixture(english=false){
   set innerHTML(value){this.html=value;for(const match of value.matchAll(/<([a-z]+)[^>]*\bid="([^"]+)"/g)){const child=node(match[2]);child.tagName=match[1];child.parentNode=this;}}
   get innerHTML(){return this.html||'';}
   setAttribute(key,value){this[key]=value;}
+  append(child){child.parentNode=this;}
+  querySelector(selector){return selector==='.media-viewer-footer'?node('mediaFooter'):null;}
   querySelectorAll(selector){return [...nodes.values()].filter(child=>child!==this&&this.contains(child)&&selector.split(',').includes(child.tagName));}
   closest(selector){return selector==='#'+this.id?this:null;}
   focus(){document.activeElement=this;}
@@ -22,13 +24,33 @@ function fixture(english=false){
  }
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node(id));return nodes.get(id);};
  const document={readyState:'complete',activeElement:null,getElementById:node,createElement:()=>new Node(),body:{append:value=>nodes.set(value.id,value)}};
- const window=new EventTarget();window.innerHeight=800;window.visualViewport=new EventTarget();Object.assign(window.visualViewport,{height:800,offsetTop:0});
+ const window=new EventTarget();window.innerHeight=800;window.matchMedia=()=>({matches:desktop});window.visualViewport=new EventTarget();Object.assign(window.visualViewport,{height:800,offsetTop:0});
  window.FamilyI18n={isEnglish:english,locale:english?'en-US':'he-IL',error:String,fetch:async(path,options)=>{requests.push({path,options});const body=JSON.parse(options.body);return Response.json({operation:'photo-date',item:{id:path.split('/')[2],kind:'photo',takenDate:body.date,takenDateRevision:'saved'}});}};window.FamilyApp={apiEnabled:true,toast:message=>messages.push(message)};
  window.addEventListener('family-photo-overlays-changed',event=>changes.push(event.detail));
  vm.runInNewContext(source,{window,document,photoDate,photoAge,photoDateText,CustomEvent});
  const click=id=>{const event=new Event('click');Object.defineProperty(event,'target',{value:node(id)});node('photoMomentTools').dispatchEvent(event);};
- return {window,document,node,changes,requests,messages,click,api:window.FamilyPhotoDate,mount:photo=>window.FamilyPhotoDate.mount({kind:'photo',tags:[],...photo}),flush:()=>new Promise(resolve=>setImmediate(resolve)),enter(field,value){const input=node('photoInlineDate'+field);input.value=value;const event=new Event('input');Object.defineProperty(event,'target',{value:input});input.dispatchEvent(event);},submit(){const event=new Event('submit',{cancelable:true});node('photoInlineDateForm').dispatchEvent(event);return event;},resize(height,top=0){Object.assign(window.visualViewport,{height,offsetTop:top});window.visualViewport.dispatchEvent(new Event('resize'));}};
+ return {window,document,node,changes,requests,messages,click,api:window.FamilyPhotoDate,mount:photo=>window.FamilyPhotoDate.mount({kind:'photo',tags:[],...photo}),flush:()=>new Promise(resolve=>setImmediate(resolve)),enter(field,value){const input=node('photoInlineDate'+field);input.value=value;const event=new Event('input');Object.defineProperty(event,'target',{value:input});input.dispatchEvent(event);},submit(){const event=new Event('submit',{cancelable:true});node('photoInlineDateForm').dispatchEvent(event);return event;},resizeDesktop(value){desktop=value;window.dispatchEvent(new Event('resize'));},resize(height,top=0){Object.assign(window.visualViewport,{height,offsetTop:top});window.visualViewport.dispatchEvent(new Event('resize'));}};
 }
+
+test('desktop videos expose editable day/month/year in the footer and save the recording date revision',async()=>{
+ for(const english of [false,true]){
+  const f=fixture(english,{desktop:true});
+  f.window.FamilyI18n.fetch=async(path,options)=>{f.requests.push({path,options});return Response.json({item:{id:'film',kind:'video',takenDate:JSON.parse(options.body).date,takenDateRevision:'saved'}});};
+  f.mount({id:'film',kind:'video',takenDate:{month:6,year:1994},takenDateRevision:'film-original'});
+  assert.equal(f.node('photoInlineDateForm').hidden,false);assert.equal(f.node('photoInlineDateForm').parentNode,f.node('mediaFooter'));assert.equal(f.node('editPhotoDate').hidden,true);assert.equal(f.node('photoInlineDateday').value,'');
+  f.enter('day','12');f.submit();await f.flush();
+  assert.equal(f.requests[0].path,'api/media/film/photo-date');assert.deepEqual(JSON.parse(f.requests[0].options.body),{date:{day:12,month:6,year:1994},expectedRevision:'film-original'});
+  assert.equal(f.node('photoInlineDateForm').hidden,false);assert.equal(f.node('photoDateDialog').open,false);
+ }
+});
+test('video date drafts survive desktop/phone resizing and switching to a photo restores the photo layout contract',()=>{
+ const f=fixture(false,{desktop:true});f.mount({id:'film',kind:'video',takenDate:{year:1994}});f.enter('day','12');
+ f.api.setDesktopInline(false);assert.equal(f.node('photoInlineDateForm').hidden,false);
+ f.resizeDesktop(false);assert.equal(f.node('photoInlineDateForm').hidden,true);assert.equal(f.node('editPhotoDate').hidden,false);
+ f.resizeDesktop(true);assert.equal(f.node('photoInlineDateForm').hidden,false);assert.equal(f.node('photoInlineDateday').value,'12');
+ f.mount({id:'photo',takenDate:{year:2001}});assert.equal(f.node('photoInlineDateForm').hidden,true);f.api.setDesktopInline(true);assert.equal(f.node('photoInlineDateyear').value,2001);
+ f.node('mediaViewer').dispatchEvent(new Event('close'));assert.equal(f.node('photoInlineDateForm').hidden,true);
+});
 test('video tag ages use the recording date and gender and omit people with no known birthday',()=>{
  const f=fixture(),video={takenDate:{day:15,month:6,year:2020},tags:[]};
  assert.equal(f.api.videoTagAge({id:'male',gender:'m',birthday:'14.6.2000'},video),'(בן 20)');assert.equal(f.api.videoTagAge({id:'female',gender:'f',birthday:'16.6.2000'},video),'(בת 19)');assert.equal(f.api.videoTagAge({birthday:'1.1.1111'},video),'');assert.equal(f.api.videoTagAge({birthday:'1.1.2000'},{tags:[]}),'');assert.equal(fixture(true).api.videoTagAge({birthday:'1.1.2000'},video),'(age 20)');
