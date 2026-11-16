@@ -11,9 +11,11 @@ const pendingPointers=new Set();
 const menus=new Map();
 const desktop=()=>window.FamilyPhotoKeyboard?.desktop?.()??matchMedia('(min-width:701px)').matches;
 const lookup=(scope,id)=>window.FamilyMedia?.lookup(scope,id);
-const context=scope=>{if(scope!=='gallery')return '';const q=window.FamilyPortal.galleryQuery();return JSON.stringify([q.query,q.person,q.unit,q.labels||'',q.filter||'all']);};
+const context=scope=>{if(state.grid?.dataset.personGrid)return window.FamilyPeople.selectionContext(state.grid);if(scope!=='gallery')return '';const q=window.FamilyPortal.galleryQuery();return JSON.stringify([q.query,q.person,q.unit,q.labels||'',q.filter||'all']);};
 const cards=()=>[...document.querySelectorAll('[data-select-id]')];
 function candidate(card){
+  const personal=card.querySelector('[data-person-item]');
+  if(personal){const grid=card.parentElement,id=personal.dataset.personItem,item=window.FamilyPeople?.selectionItem(grid,id);return item?.id&&['photo','video'].includes(item.kind)?{id:item.id,scope:'personal:'+grid.dataset.personOwner,item,grid}:null;}
   const open=card.querySelector('[data-media-open],[data-living-original],[data-ai-open]');
   if(!open)return null;
   const id=open.dataset.mediaOpen||open.dataset.livingOriginal||open.dataset.aiOpen;
@@ -38,11 +40,11 @@ function startSelection(grid){
 function mountMenu(grid){
   const existing=menus.get(grid);if(existing?.button.isConnected)return;
   const siblings=[...grid.parentElement.children],preceding=siblings.slice(0,siblings.indexOf(grid));
-  let host=preceding.find(node=>node.matches('.gallery-category-row')),fallback=false;
-  if(host){
+  let host=preceding.find(node=>node.matches('.person-gallery-toolbar'))?.querySelector('.media-grid-header-actions')||preceding.find(node=>node.matches('.gallery-category-row')),fallback=false;
+  if(host&&!host.matches('.media-grid-header-actions')){
     const row=host;host=row.querySelector('.media-grid-header-actions');
     if(!host){host=document.createElement('div');host.className='media-grid-header-actions';const filter=row.querySelector('.gallery-refine-toggle');row.append(host);if(filter)host.append(filter);}
-  }else host=[...preceding].reverse().find(node=>node.matches('.video-filter-toolbar,.collection-heading,.archive-toolbar,.archive-filters,.family-ai-toolbar,.living-family-meta'));
+  }else if(!host)host=[...preceding].reverse().find(node=>node.matches('.video-filter-toolbar,.collection-heading,.archive-toolbar,.archive-filters,.family-ai-toolbar,.living-family-meta'));
   if(!host){host=document.createElement('div');host.className='media-grid-selection-menu';grid.before(host);fallback=true;}
   const button=document.createElement('button');button.type='button';button.className='media-grid-selection-toggle';button.dataset.selectionStart='';button.setAttribute('data-i18n-skip','');button.setAttribute('aria-controls','mediaSelectionActions');button.innerHTML=icon('select')+'<span></span>';
   button.addEventListener('click',()=>startSelection(grid));host.append(button);menus.set(grid,{host,button,fallback});
@@ -80,7 +82,7 @@ function render(){
   const show=desktop();
   for(const [grid,{host,button,fallback}]of menus){
     const selecting=active&&state.grid===grid,label=selecting?tr('סיום בחירה','Done selecting'):tr('בחירה','Select');
-    button.hidden=!show;button.disabled=state.busy;button.setAttribute('aria-pressed',String(selecting));button.setAttribute('aria-label',label);button.title=label;button.querySelector('span').textContent=label;
+    button.hidden=!show&&!grid.dataset.personGrid;button.disabled=state.busy;button.setAttribute('aria-pressed',String(selecting));button.setAttribute('aria-label',label);button.title=label;button.querySelector('span').textContent=label;
     if(fallback)host.hidden=!show;
   }
 }
@@ -116,7 +118,7 @@ function pointerDown(event){
   if(event.target.closest('input,textarea,select,[contenteditable=true]'))return;
   // Small edit, delete and fullscreen tools keep their usual click behavior.
   const tool=event.target.closest('button,a');
-  if(tool&&!tool.matches('[data-media-open],[data-living-original],[data-ai-open],[data-selection-check]')&&event.target.tagName!=='VIDEO')return;
+  if(tool&&!tool.matches('[data-media-open],[data-person-item],[data-living-original],[data-ai-open],[data-selection-check]')&&event.target.tagName!=='VIDEO')return;
   cancelPress();const pending={card,id:event.pointerId,x:event.clientX,y:event.clientY,fired:false,timer:null};press=pending;
   pending.timer=setTimeout(()=>{
     if(press!==pending||!card.isConnected)return;
@@ -143,9 +145,10 @@ async function selectAll(){
     if(state.scope==='gallery'){
       const q=window.FamilyPortal.galleryQuery(),response=await I.fetch('api/gallery/selection?'+new URLSearchParams({q:q.query,person:q.person,unit:q.unit,labels:q.labels||'',filter:q.filter||'all'}),{cache:'no-store'}),result=await response.json();
       if(!response.ok)throw Error(I.error(result.error));ids=result.ids;
-    }else ids=cards().filter(card=>card.parentElement===state.grid).map(card=>card.dataset.selectId);
+    }else if(state.grid.dataset.personGrid)ids=await window.FamilyPeople.selectAlbum(state.grid);
+    else ids=cards().filter(card=>card.parentElement===state.grid).map(card=>card.dataset.selectId);
     if(epoch!==state.epoch)return;
-    for(const id of ids){state.ids.add(id);const item=lookup(state.scope,id);if(item)state.items.set(id,item);}status();
+    for(const id of ids){state.ids.add(id);const item=state.grid.dataset.personGrid?window.FamilyPeople.selectionItem(state.grid,id):lookup(state.scope,id);if(item)state.items.set(id,item);}status();
   }catch(error){status(error.message,true);}finally{state.busy=false;render();}
 }
 function download(){
@@ -166,7 +169,7 @@ async function apply(action,label){
   try{
     for(const [index,id]of ids.entries()){
       status(tr('שומר ','Saving ')+(index+1)+' / '+ids.length);
-      results.push(await post(id,action,action==='labels'?{label,tagged:true}:{scope:state.items.get(id)?.scope||state.scope}));
+      results.push(await post(id,action,action==='labels'?{label,tagged:true}:{scope:state.scope?.startsWith('personal:')?state.scope:state.items.get(id)?.scope||state.scope}));
       state.ids.delete(id);state.items.delete(id);
     }
     status(tr('הפעולה הושלמה ✓','Changes saved ✓'));
@@ -189,6 +192,7 @@ function confirmDelete(){
     confirmation.innerHTML=`<h2 id="mediaSelectionDeleteTitle">${tr('למחוק את הפריטים שנבחרו?','Delete selected items?')}</h2><p data-selection-delete-count></p><p>${tr('הפריטים יוסרו מכל האלבומים ויועברו לסל המחזור.','These items will be removed from all albums and moved to the recycle bin.')}</p><div class="media-selection-dialog-actions"><button type="button" class="secondary-button" data-selection-cancel>${tr('ביטול','Cancel')}</button><button type="button" class="media-selection-danger" data-selection-confirm>${tr('מחק את הנבחרים','Delete selected')}</button></div>`;
     document.body.append(confirmation);confirmation.querySelector('[data-selection-cancel]').addEventListener('click',()=>confirmation.close());confirmation.querySelector('[data-selection-confirm]').addEventListener('click',()=>void apply('delete'));
   }
+  confirmation.querySelector('p:not([data-selection-delete-count])').textContent=state.scope?.startsWith('personal:')?tr('פריטים שהועלו ישירות לאלבום יועברו לסל המחזור. פריטים מקושרים יוסרו מהאלבום האישי בלבד.','Items uploaded to this album will move to the recycle bin. Linked items will only be removed from this personal album.'):tr('הפריטים יוסרו מכל האלבומים ויועברו לסל המחזור.','These items will be removed from all albums and moved to the recycle bin.');
   confirmation.querySelector('[data-selection-delete-count]').textContent=tr('נבחרו ','Selected: ')+state.ids.size;confirmation.showModal();confirmation.querySelector('[data-selection-cancel]').focus();
 }
 async function chooseLabel(){

@@ -32,6 +32,7 @@ import {faceRect,sameFaceRegion,FACE_LIMIT} from './faces.mjs';
 import {FACE_SCAN_VERSION,GALLERY_FILTER_VERSION,faceCoverage,detectionRegions,withoutIgnored} from '../public/assets/face-coverage.mjs';
 import {photoVersionId,photoSource,photoTransform,transformPhotoFaces} from './photo-versions.mjs';
 import {aliasPersonIds,galleryRefinement,galleryRevision,galleryLabels,galleryOrdering} from './gallery.mjs';
+import {personAlbumOptions} from './person-albums.mjs';
 import {MAX_PHOTO_LABELS,normalizePhotoLabel,photoLabelKey,photoLabelOptions,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
 import {photoDate} from '../public/assets/photo-date.mjs';
 import {nameCorrectionKey,normalizedName,matchingPeople,correctPersonName,correctNamedContent} from './name-corrections.mjs';
@@ -443,6 +444,22 @@ export class FamilyState {
     return {...person,invalidBirthday:false,profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileFraming:profile?photoFrame(profile.framing):null,profileMediaId:profile?.id||null,profileIsManual:Boolean(selected),photoCount:photos.length,videoCount:videos.length,documentCount:items.filter(item=>mediaKind(item)==='document').length,mediaCount:items.length,
       ...(includeGallery?{gallery:this.mediaPublicMany(items).map(item=>({...item,linked:item.scope!=='personal:'+person.id}))}:{})};
   }
+  personAlbumQuery(id,key,options={}){
+    const config=personAlbumOptions(options,key),type={photos:'photo',videos:'video',documents:'document'}[key];
+    if(!type)throw new HttpError(400,'בחרו אלבום תקין.');
+    let where="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?) AND COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(m.data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)=?";
+    const args=[id,id,type],{refinement,labels}=config;
+    if(refinement.people.length&&this.rows('SELECT id FROM people WHERE id IN (SELECT value FROM json_each(?))',JSON.stringify(refinement.people)).length!==refinement.people.length)throw new HttpError(400,'בחרו אדם מהרשימה.');
+    if(refinement.members.length){where+=' AND EXISTS (SELECT 1 FROM media_tags f WHERE f.media_id=m.id AND f.person_id IN (SELECT value FROM json_each(?)))';args.push(JSON.stringify(refinement.members));}
+    if(labels.length){where+=" AND EXISTS (SELECT 1 FROM json_each(m.data,'$.labels') label WHERE label.value IN (SELECT value FROM json_each(?)))";args.push(JSON.stringify(labels));}
+    return {...config,where,args};
+  }
+  personSelection(id,options={}){
+    this.person(id);
+    if(!['photos','videos'].includes(options.kind))throw new HttpError(400,'בחרו אלבום תקין.');
+    const {where,args}=this.personAlbumQuery(id,options.kind,options);
+    return {ids:this.rows('SELECT m.id FROM media m WHERE '+where+' ORDER BY m.rowid DESC',...args).map(row=>row.id)};
+  }
   personPage(id,options={}){
     const person=this.person(id),owner="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?)";
     const kind="COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(m.data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)";
@@ -454,12 +471,13 @@ export class FamilyState {
     const counts=Object.fromEntries(this.rows('SELECT '+kind+' AS kind,count(*) AS n FROM media m WHERE '+owner+' GROUP BY '+kind,id,id).map(row=>[row.kind,row.n]));
     const albums={};
     for(const [key,type]of [['photos','photo'],['videos','video'],['documents','document']]){
-      const requested=Number(options[key]||1);if(!Number.isSafeInteger(requested)||requested<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
-      const size=key==='photos'?25:10,total=counts[type]||0,pages=Math.max(1,Math.ceil(total/size));
-      const newer=focused?.kind===type?this.rows('SELECT count(*) AS n FROM media m WHERE '+owner+' AND '+kind+'=? AND m.rowid>?',id,id,type,focused.position)[0].n:null;
-      const page=Math.min(newer===null?requested:Math.floor(newer/size)+1,pages);
-      const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE '+owner+' AND '+kind+'=? ORDER BY m.rowid DESC LIMIT ? OFFSET ?',id,id,type,size,(page-1)*size).map(row=>JSON.parse(row.data)));
-      albums[key]={items,page,pages,total,size};
+      const query=this.personAlbumQuery(id,key,options),{where,args,order,refinement,labels}=query;
+      const refined=refinement.members.length||labels.length,total=refined?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:counts[type]||0;
+      const size=query.all?Math.max(1,total):query.size,pages=Math.max(1,Math.ceil(total/size));
+      const position=focused?.kind===type?(order.sql==='m.rowid DESC'?1+this.rows('SELECT count(*) AS n FROM media m WHERE '+where+' AND m.rowid>?',...args,focused.position)[0].n:this.rows('SELECT position FROM (SELECT m.id,row_number() OVER (ORDER BY '+order.sql+') AS position FROM media m WHERE '+where+') WHERE id=?',...order.args,...args,focus)[0]?.position):null;
+      const page=Math.min(position?Math.floor((position-1)/size)+1:query.page,pages);
+      const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY '+order.sql+' LIMIT ? OFFSET ?',...args,...order.args,size,(page-1)*size).map(row=>JSON.parse(row.data)));
+      albums[key]={items,page,pages,total,size,...(query.all?{all:true}:{}),sort:order.sort,seed:order.seed,person:refinement.person,unit:refinement.unit,labels:labels.join(',')};
     }
     const row=this.rows('SELECT m.data FROM media m WHERE '+owner+" AND "+kind+"='photo' ORDER BY CASE WHEN m.id=? THEN 0 WHEN m.category='personal' AND m.person_id=? THEN 1 ELSE 2 END,m.rowid LIMIT 1",id,id,person.profileId||'',id)[0];
     const candidate=row?JSON.parse(row.data):null,profile=person.profileCleared&&candidate?.id!==person.profileId?null:candidate;
@@ -684,6 +702,7 @@ export class FamilyState {
       case 'people.revision':return {revision:this.peopleRevision};
       case 'person':return this.snapshot(this.person(p.id),this.personMedia(p.id));
       case 'person.page':return this.personPage(p.id,p);
+      case 'person.selection':return this.personSelection(p.id,p);
       case 'person.revision':return {revision:this.person(p.id).revision};
       case 'person.about':{
         const person=this.person(p.id),about=text(p.about,'אודות',10000),field=contentField('about',p.language);

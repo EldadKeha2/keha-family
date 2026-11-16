@@ -100,3 +100,24 @@
   #mediaShareActions .share-icon{width:26px;height:26px;flex-basis:26px}
   #mediaShareActions .media-share-heading{font-size:calc(11px * var(--a11y-text-scale,1));gap:4px}
 }
+
+/* Personal albums share the gallery's controls, cards and responsive layout. */
+.person-gallery-toolbar{display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-bottom:8px}
+.person-gallery-album .media-grid-header-actions{justify-content:flex-start}
+.person-gallery-album .gallery-pager{margin:8px 0 14px}
+.person-gallery-album [data-person-grid]{direction:ltr;grid-auto-flow:row}
+html[dir=rtl] .person-gallery-card{direction:rtl}
+.person-gallery-videos{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:11px;align-items:start}
+.person-gallery-videos .video-tile{border-radius:6px;background:#fffdf7;overflow:hidden}
+.person-gallery-album .person-gallery-filter[hidden]{display:none}
+.person-gallery-card .gallery-image{cursor:pointer}
+@media(max-width:700px){
+  .person-gallery-toolbar{margin-bottom:4px}
+  .person-gallery-toolbar .gallery-refine-toggle span{position:static;clip-path:none;width:auto;height:auto;overflow:visible}
+  .person-gallery-toolbar .gallery-refine-toggle{width:auto;min-height:40px;padding:6px 11px}
+  .person-gallery-album .gallery-refine-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .person-gallery-album .gallery-filter-field:last-child{grid-column:1/-1}
+  .person-gallery-album .gallery-filter-field summary{min-height:44px}
+  .person-gallery-album .compact-gallery-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .person-gallery-videos{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+}
