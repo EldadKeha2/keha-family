@@ -132,3 +132,7 @@ an excluded card does not require it. Exclusion leaves original media and all
 other album memberships intact. The generator checks the live featured list
 before each action; the importer skips absent/excluded photos and the server
 rejects imports for excluded photos, including an import racing a removal.
+
+The same password gate covers AI-viewer deletion and multiple-photo selection.
+Legacy deletion requests naming an AI scope or a dedicated AI-only source are
+protected by the same server verifier and resolve to AI-only exclusion.

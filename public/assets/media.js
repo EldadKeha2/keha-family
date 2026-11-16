@@ -172,7 +172,7 @@
     if(item.provider==='youtube'){link.removeAttribute('download');link.target='_blank';link.rel='noopener';}
     else {link.download=item.filename||'';link.removeAttribute('target');link.removeAttribute('rel');}
     $('mediaViewerDelete').hidden=!item.id;
-    const deleteLabel=state.scope==='family-ai'?tr('הסרה מבינה משפחתית','Remove from Artificial Family'):I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,state.scope)?I18n.t('הסרה מהאלבום'):tr('מחק פריט','Delete item');
+    const deleteLabel=['family-ai','living-family'].includes(state.scope)?tr('הסרה מבינה משפחתית','Remove from Artificial Family'):I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,state.scope)?I18n.t('הסרה מהאלבום'):tr('מחק פריט','Delete item');
     $('mediaViewerDelete').querySelector('span').textContent=deleteLabel;$('mediaViewerDelete').title=deleteLabel;$('mediaViewerDelete').setAttribute('aria-label',deleteLabel);
     window.FamilyTags.mountInline($('mediaTagPanel'),item);
     window.FamilyPhotoLabels?.mount(item);
@@ -336,7 +336,7 @@
     window.FamilyPhotoNative?.reset(stage);
   }
   function requestDelete(scope,id){
-    if(scope==='family-ai'){window.FamilyAI?.exclude(id);return;}
+    if(['family-ai','living-family'].includes(scope)){window.FamilyAI?.exclude(id);return;}
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
     const item=(albums.get(scope)||[]).find(item=>item.id===id)||(state.scope===scope&&current()?.id===id?current():null);if(!item)return;
     const isLinked=linked(item,scope),personName=isLinked?app().nameOf(scope.slice(9)):'';

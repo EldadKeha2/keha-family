@@ -42,5 +42,10 @@ export class FamilyAiRemovalAccess {
     });
     if(typeof p.password!=='string'||p.password.length>128||!equal(await verifier(p.password,config.salt),config.hash))throw new HttpError(401,'הסיסמה אינה נכונה.','AI_REMOVAL_PASSWORD');
     this.state.sql.exec('DELETE FROM family_ai_access WHERE id=?',client);
+    this.state.ctx.storage.transactionSync(()=>{
+      const global=this.get('attempt:global');
+      if(global?.count>1){this.set('attempt:global',{...global,count:global.count-1});this.state.sql.exec('UPDATE family_ai_access SET expires_at=? WHERE id=?',global.until,'attempt:global');}
+      else this.state.sql.exec('DELETE FROM family_ai_access WHERE id=?','attempt:global');
+    });
   }
 }

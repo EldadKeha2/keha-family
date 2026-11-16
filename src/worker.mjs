@@ -398,7 +398,7 @@ export default {
           const body=await readJSON(request,match[2]==='tags'?64000:2000);
           if(match[2]==='tags')return json(await db('media.tags.save',{id:match[1],personIds:body.personIds,newNames:body.newNames,expectedRevision:body.expectedRevision}));
           if(match[2]==='tag')return json(await db('media.tag',{id:match[1],personId:body.personId,name:body.name,tagged:body.tagged}));
-          return json(await db('media.'+match[2],{id:match[1],scope:body.scope,restoreProfile:body.restoreProfile}));
+          return json(await db('media.'+match[2],{id:match[1],scope:body.scope,restoreProfile:body.restoreProfile,...(match[2]==='delete'?{password:body.password,client:request.headers.get('CF-Connecting-IP')||'unknown'}:{})}));
         }
         if((match=/^\/api\/weddings\/([^/]+)\/(date|greetings|upload|caption)$/.exec(path))){
           const id=decodeURIComponent(match[1]),action=match[2],kind=weddingCollection(id);

@@ -131,7 +131,7 @@ function captureClick(event){
   const card=cardFor(event.target);if(!card)return;
   if(suppress?.card===card&&Date.now()<suppress.until){event.preventDefault();event.stopImmediatePropagation();suppress=null;return;}
   const check=event.target.closest('[data-selection-check]');
-  if(check||state.grid===card.parentElement&&!event.target.closest('input,textarea,select,a,[data-media-delete],[data-video-edit],[data-living-action],[data-ai-create],[data-ai-remove],[data-ai-restore]')){
+  if(check||state.grid===card.parentElement&&!event.target.closest('input,textarea,select,a,[data-media-delete],[data-video-edit],[data-living-action],[data-living-remove],[data-ai-create],[data-ai-remove],[data-ai-restore]')){
     event.preventDefault();event.stopImmediatePropagation();if(state.grid===card.parentElement)toggle(card);else enter(card);
   }
 }
@@ -180,6 +180,10 @@ async function apply(action,label){
 }
 function confirmDelete(){
   if(!state.ids.size||state.busy)return;
+  if(['family-ai','living-family'].includes(state.scope)){
+    const items=[...state.ids].map(id=>state.items.get(id)||lookup(state.scope,id)).filter(Boolean);
+    window.FamilyAI?.removeMany?.(items,clear);return;
+  }
   if(!confirmation){
     confirmation=document.createElement('dialog');confirmation.className='media-selection-dialog';confirmation.setAttribute('data-i18n-skip','');confirmation.setAttribute('aria-labelledby','mediaSelectionDeleteTitle');
     confirmation.innerHTML=`<h2 id="mediaSelectionDeleteTitle">${tr('למחוק את הפריטים שנבחרו?','Delete selected items?')}</h2><p data-selection-delete-count></p><p>${tr('הפריטים יוסרו מכל האלבומים ויועברו לסל המחזור.','These items will be removed from all albums and moved to the recycle bin.')}</p><div class="media-selection-dialog-actions"><button type="button" class="secondary-button" data-selection-cancel>${tr('ביטול','Cancel')}</button><button type="button" class="media-selection-danger" data-selection-confirm>${tr('מחק את הנבחרים','Delete selected')}</button></div>`;

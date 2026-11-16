@@ -23,7 +23,7 @@
   };
   const errorText=(code,fallback='')=>errors[code]?tr(...errors[code]):fallback;
   const jobFor=item=>state.jobs.get(item.id)||item.aiJob;
-  const titleOf=item=>item.caption||I.mediaName?.(item)||tr('רגע מהאלבום המשפחתי','A moment from the family album');
+  const titleOf=item=>(I.isEnglish?item.titleEn||item.title:item.title)||item.caption||I.mediaName?.(item)||tr('רגע מהאלבום המשפחתי','A moment from the family album');
   const previewOf=item=>item.preview?.src||item.previewSrc||item.thumbnailSrc||item.src;
   const videoOf=job=>job?.videoSrc||job?.src||'';
   async function request(path,options={}){
@@ -136,23 +136,26 @@
     }catch(error){if(generationDialog.open)$('familyAiGenerateError').textContent=error.message;else window.FamilyApp?.toast(error.message);}
     finally{state.submitting.delete(item.id);$('familyAiGenerateSubmit').disabled=false;render();schedulePoll();}
   }
-  function confirmRemoval(item){
-    if(removing)return;
+  function confirmRemoval(item,onRemoved){
+    const items=(Array.isArray(item)?item:[item]).filter(photo=>photo?.id);
+    if(removing||!items.length)return;
     if(!removeDialog){
-      removeDialog=ensureDialog('familyAiRemoveDialog',`<button type="button" class="dialog-close" data-ai-close aria-label="${tr('סגירה','Close')}">×</button><span class="family-ai-dialog-emblem" aria-hidden="true">❖</span><h2 id="familyAiRemoveTitle">${tr('להסיר מבינה משפחתית?','Remove from Artificial Family?')}</h2><p id="familyAiRemoveCaption" dir="auto"></p><p>${tr('התמונה תוסר רק מהעמוד הזה. היא תישאר בגלריה, ואפשר יהיה להחזיר אותה דרך ״תמונות שהוסרו״.','The photo will be removed from this section. It stays in the gallery and can be restored through Removed photos.')}</p><p id="familyAiRemoveError" class="family-ai-form-error" role="alert"></p><div class="family-ai-dialog-actions"><button type="button" class="secondary-button" data-ai-close>${tr('ביטול','Cancel')}</button><button type="button" id="familyAiRemoveConfirm" class="primary-button">${tr('הסרה מהעמוד','Remove from section')}</button></div>`);
+      removeDialog=ensureDialog('familyAiRemoveDialog',`<button type="button" class="dialog-close" data-ai-close aria-label="${tr('סגירה','Close')}">×</button><span class="family-ai-dialog-emblem" aria-hidden="true">❖</span><h2 id="familyAiRemoveTitle">${tr('להסיר מבינה משפחתית?','Remove from Artificial Family?')}</h2><p id="familyAiRemoveCaption" dir="auto"></p><p>${tr('ההסרה היא מעמוד הבינה ומהתור. תמונות שנמצאות באלבומים אחרים יישארו בהם. אפשר להחזיר אותן דרך ״תמונות שהוסרו״.','Removal applies to this page and queue. Photos in other albums stay there. You can restore them through Removed photos.')}</p><p id="familyAiRemoveError" class="family-ai-form-error" role="alert"></p><div class="family-ai-dialog-actions"><button type="button" class="secondary-button" data-ai-close>${tr('ביטול','Cancel')}</button><button type="button" id="familyAiRemoveConfirm" class="primary-button">${tr('הסרה מהעמוד','Remove from section')}</button></div>`);
       removeDialog.setAttribute('aria-labelledby','familyAiRemoveTitle');removeDialog.querySelectorAll('[data-ai-close]').forEach(button=>button.addEventListener('click',()=>removeDialog.close()));
       const password=document.createElement('div');password.className='family-ai-removal-password';
       password.innerHTML=`<label for="familyAiRemovePassword">${tr('סיסמת מחיקה','Removal password')}</label><input id="familyAiRemovePassword" type="password" autocomplete="off" inputmode="numeric" maxlength="128" required><p>${tr('הזינו את הסיסמה כדי להסיר את התמונה ואת האפקטים שלה מהעמוד ומהתור.','Enter the password to remove this photo and its effects from the page and queue.')}</p>`;
       removeDialog.querySelector('.family-ai-dialog-actions').before(password);
-      const submit=async()=>{if(!pendingRemoval||removing)return;const id=pendingRemoval.id,code=$('familyAiRemovePassword').value;if(!code){$('familyAiRemoveError').textContent=tr('יש להזין את סיסמת המחיקה.','Enter the removal password.');$('familyAiRemovePassword').focus();return;}removing=true;$('familyAiRemoveConfirm').disabled=true;$('familyAiRemovePassword').value='';try{await changeExclusion(id,true,code);removeDialog.close();void window.FamilyAI.refresh();}catch(error){$('familyAiRemoveError').textContent=error.message;$('familyAiRemovePassword').focus();}finally{removing=false;$('familyAiRemoveConfirm').disabled=false;}};
+      const submit=async()=>{if(!pendingRemoval||removing)return;const selection=pendingRemoval,ids=selection.items.map(photo=>photo.id),code=$('familyAiRemovePassword').value;if(!code){$('familyAiRemoveError').textContent=tr('יש להזין את סיסמת המחיקה.','Enter the removal password.');$('familyAiRemovePassword').focus();return;}removing=true;$('familyAiRemoveConfirm').disabled=true;$('familyAiRemovePassword').value='';try{await changeExclusion(ids,true,code);selection.onRemoved?.();removeDialog.close();}catch(error){$('familyAiRemoveError').textContent=error.message;$('familyAiRemovePassword').focus();}finally{removing=false;$('familyAiRemoveConfirm').disabled=false;}};
       $('familyAiRemoveConfirm').addEventListener('click',submit);
       $('familyAiRemovePassword').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();void submit();}});
       removeDialog.addEventListener('close',()=>{$('familyAiRemovePassword').value='';pendingRemoval=null;});
     }
-    pendingRemoval=item;$('familyAiRemoveCaption').textContent=titleOf(item);$('familyAiRemoveError').textContent='';$('familyAiRemovePassword').value='';removeDialog.showModal();$('familyAiRemovePassword').focus();
+    pendingRemoval={items,onRemoved};$('familyAiRemoveCaption').textContent=items.length===1?titleOf(items[0]):tr(`${items.length} תמונות נבחרות`,`${items.length} selected photos`);$('familyAiRemoveError').textContent='';$('familyAiRemovePassword').value='';removeDialog.showModal();$('familyAiRemovePassword').focus();
   }
   async function changeExclusion(id,excluded,password){
-    await post('api/family-ai/exclude',{id,excluded,...(excluded?{password}:{})});state.items=state.items.filter(item=>item.id!==id);render({advanceRemoved:true});await load();window.FamilyApp?.toast(tr(excluded?'התמונה הוסרה מהעמוד ומהתור.':'התמונה חזרה לבינה משפחתית.',excluded?'Photo removed from this section and queue.':'Photo restored to Artificial Family.'));
+    const ids=Array.isArray(id)?id:[id];
+    try{for(const photoId of ids){await post('api/family-ai/exclude',{id:photoId,excluded,...(excluded?{password}:{})});state.items=state.items.filter(item=>item.id!==photoId);render({advanceRemoved:true});}}finally{await load();void window.FamilyAI.refresh();}
+    window.FamilyApp?.toast(tr(excluded?(ids.length>1?'התמונות הוסרו מהעמוד ומהתור.':'התמונה הוסרה מהעמוד ומהתור.'):'התמונה חזרה לבינה משפחתית.',excluded?'Photos removed from this section and queue.':'Photo restored to Artificial Family.'));
   }
   function play(item){
     const src=videoOf(jobFor(item));if(!src)return;
@@ -189,6 +192,6 @@
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.active){void load();}else clearTimeout(pollTimer);});
     render();activate(window.FamilyApp?.getView?.()||location.hash.slice(1).split('/')[0]);
   }
-  window.FamilyAI={activate,search,refresh:()=>load(),remove:confirmRemoval,pageGallery:page=>{state.page=page;return load();},galleryQuery:()=>({page:state.page}),exclude:id=>{const item=state.items.find(item=>item.id===id)||window.FamilyMedia?.lookup('family-ai',id)||window.FamilyMedia?.lookup('living-family',id);if(item)confirmRemoval(item);},statusOf,isBusy};
+  window.FamilyAI={activate,search,refresh:()=>load(),remove:confirmRemoval,removeMany:confirmRemoval,pageGallery:page=>{state.page=page;return load();},galleryQuery:()=>({page:state.page}),exclude:id=>{const item=state.items.find(item=>item.id===id)||window.FamilyMedia?.lookup('family-ai',id)||window.FamilyMedia?.lookup('living-family',id);if(item)confirmRemoval(item);},statusOf,isBusy};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

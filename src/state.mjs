@@ -1123,6 +1123,10 @@ export class FamilyState {
       const {action,...p}=await request.json();
       if(action==='family-ai.removal.setup')return json(await new FamilyAiRemovalAccess(this).setup(p));
       if(action==='family-ai.exclude'&&p.excluded!==false)await new FamilyAiRemovalAccess(this).authorize(p);
+      if(action==='media.delete'&&(['family-ai','living-family'].includes(p.scope)||this.media(p.id).category==='family-ai')){
+        await new FamilyAiRemovalAccess(this).authorize(p);
+        return json(this.ctx.storage.transactionSync(()=>this.familyAi.exclude({id:p.id,excluded:true})));
+      }
       if(action?.startsWith('trash.')){
         const access=new RecycleAccess(this);
         if(action==='trash.setup')return json(await access.setup(p));

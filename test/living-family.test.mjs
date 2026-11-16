@@ -123,6 +123,10 @@ test('AI removal requires the private configured password, persists and leaves o
     assert.equal((await call('family-ai.removal.setup',{setupKey,password:'test-removal-password'})).status,200);
     assert.equal((await call('family-ai.removal.setup',{setupKey,password:'0000'})).status,409);
     const original=f.database.prepare('SELECT data FROM media WHERE id=?').get(id).data;
+    assert.equal((await call('media.delete',{id,scope:'living-family',client:'owner'})).status,401);
+    assert.equal((await call('media.delete',{id,scope:'family-ai',password:'test-removal-password',client:'owner'})).status,200);
+    assert.equal(f.database.prepare('SELECT data FROM media WHERE id=?').get(id).data,original);
+    assert.equal((await call('family-ai.exclude',{id,excluded:false})).status,200);
     for(const password of [undefined,'0000'])assert.equal((await call('family-ai.exclude',{id,excluded:true,password,client:'owner'})).status,401);
     assert.ok(f.run('family-ai.living.list').items.some(p=>p.id===id));
     const result=await call('family-ai.exclude',{id,excluded:true,password:'test-removal-password',client:'owner'});assert.equal(result.status,200);

@@ -91,3 +91,16 @@ test('an immediate provider credit failure is never announced as a successful cr
   const ui=model({job:{status:'FAILED',revision:'original',errorCode:'PROVIDER_CREDITS'}});await ui.activate();await ui.click({aiCreate:photo.id});ui.nodes.get('familyAiAccessCode').value='private-code';await ui.nodes.get('familyAiGenerateForm').emit('submit');await tick();
   assert.match(ui.notices.at(-1),/balance is empty/);assert.doesNotMatch(ui.notices.at(-1),/coming to life/);
 });
+
+
+test('bulk AI removal shares the password gate and never submits a general media deletion',async()=>{
+  const ui=model();await ui.activate();let cleared=false;
+  const other={...photo,id:'b'.repeat(32)};ui.api.removeMany([photo,other],()=>{cleared=true;});
+  assert.match(ui.nodes.get('familyAiRemoveCaption').textContent,/2 selected photos/);
+  assert.equal(ui.requests.some(r=>r.options.method==='POST'),false);
+  ui.nodes.get('familyAiRemovePassword').value='test-removal-password';
+  await ui.nodes.get('familyAiRemoveConfirm').emit('click');await tick();
+  const writes=ui.requests.filter(r=>r.options.method==='POST');assert.equal(writes.length,2);
+  assert.ok(writes.every(r=>r.path==='api/family-ai/exclude'&&JSON.parse(r.options.body).password==='test-removal-password'));
+  assert.equal(cleared,true);assert.equal(ui.nodes.get('familyAiRemovePassword').value,'');
+});

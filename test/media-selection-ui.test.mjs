@@ -121,3 +121,15 @@ test('dynamic grids get their own top menu and an emptied grid removes its stale
  const menu=section.querySelector('.media-grid-selection-menu');assert.ok(menu);menu.querySelector('[data-selection-start]').click();f.tap(card);assert.deepEqual(Array.from(f.api.ids()),['c'.repeat(32)]);
  card.remove();f.api.refresh();f.flush();assert.equal(section.querySelector('[data-selection-start]'),null);
 });
+
+
+test('AI selections open the shared password gate instead of general cross-album deletion',()=>{
+ const f=fixture(),calls=[],lookup=f.window.FamilyMedia.lookup;
+ f.window.FamilyMedia.lookup=(scope,id)=>lookup(scope==='living-family'?'gallery':scope,id);
+ f.window.FamilyAI={removeMany:(items,done)=>calls.push({items,done})};
+ f.button(f.a).dataset.mediaScope='living-family';f.button(f.b).dataset.mediaScope='living-family';f.api.refresh();f.flush();
+ f.hold(f.a);f.hold(f.b);f.action('delete');
+ assert.equal(calls.length,1);assert.deepEqual(Array.from(calls[0].items,item=>item.id),['a'.repeat(32),'b'.repeat(32)]);
+ assert.equal(f.requests.length,0);assert.equal(f.document.querySelector('.media-selection-dialog[open]'),null);
+ calls[0].done();assert.equal(f.api.ids().length,0);
+});
