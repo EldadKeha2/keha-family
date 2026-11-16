@@ -33,7 +33,7 @@ function routeGame(){const id=new URL(window.location.href).hash.slice(1).split(
 function syncGameRoute(game){initialGameLink=null;window.FamilyNavigation?.go(game?'#games/'+game:'#games');lastRoute=window.location.href;}
 const editor={language:I.isEnglish?'en':'he',languageChosen:false,question:'',options:['','','',''],correctIndex:null,requestId:null,saving:false,status:'',error:''};
 const name=person=>I.personName(person);
-function stopClock(){if(clock!==null)clearInterval(clock);if(advanceClock!==null)clearInterval(advanceClock);clock=null;advanceClock=null;}
+function stopClock(){if(clock!==null)clearInterval(clock);if(advanceClock!==null)clearInterval(advanceClock);clock=null;advanceClock=null;stopLobbyBoards();}
 const isKinship=()=>state.game==='kinship';
 const isMissing=()=>state.game==='missing';
 const isTrivia=()=>state.game==='trivia';
@@ -42,17 +42,53 @@ const isTextGame=()=>isKinship()||isTrivia();
 const total=()=>state.questions.length;
 const roundSeconds=()=>isChick()?60:ROUND_SECONDS;
 const scorePaths={photos:'who-is-it',kinship:'relationships',missing:'who-is-missing',trivia:'trivia'};
-const scoreTitles={photos:['מי זה?','Who is it?'],kinship:['מה הקשר?','What’s the relation?'],missing:['מי חסר?','Who’s missing?'],trivia:['טריוויה משפחתית','Family Trivia']};
-const quizBoards=Object.fromEntries(Object.keys(scorePaths).map(game=>[game,{rows:[],loaded:false,loading:false,error:'',serial:0}]));
-let boardGame=null,playerName='';
+const scoreTitles={photos:['מי זה?','Who is it?'],kinship:['מה הקשר?','What’s the relation?'],missing:['מי חסר?','Who’s missing?'],trivia:['טריוויה משפחתית','Family Trivia'],jachnun:['תפוס תג׳חנון','Catch the Jachnun'],rex:['תימנירקס','Yemeanite Rex'],'neto-tetris':['חשמל נטו טטריס','Hashmal Neto Tetris'],'ruti-house':['הבית של רותי','Ruti’s House']};
+const quizBoards=Object.fromEntries(Object.keys(scoreTitles).map(game=>[game,{rows:[],loaded:false,loading:false,error:'',serial:0}]));
+let boardGame=null,playerName='',boardRotation=true,boardOrder=[],boardTimer=null,boardObserver=null,boardVisible=false;
 const speedScoring=()=>Boolean(scorePaths[state.game]);
 const points=value=>Number(value).toLocaleString(I.isEnglish?'en-US':'he-IL');
 function scoringHint(){return `<p class="quiz-scoring-hint">${tr('תשובה נכונה = 100 נקודות + עד 100 נקודות בונוס על מהירות','Correct answer = 100 points + up to 100 speed bonus points')}</p>`;}
+function scoreTable(game,rows){
+  const timed=Boolean(scorePaths[game]),tetris=game==='neto-tetris',house=game==='ruti-house';
+  const heading=label=>`<th scope="col">${label}</th>`;
+  return `<div class="quiz-table-wrap" tabindex="0" role="region" aria-label="${tr('תוצאות המשחק','Game scores')}"><table><thead><tr>${heading(tr('מקום','Rank'))}${heading(tr('שם','Name'))}${heading(game==='jachnun'?tr('ג׳חנונים','Jachnun'):tr('ניקוד','Points'))}${timed?heading(tr('נכונות','Correct'))+heading(tr('זמן מענה','Answer time')):tetris?heading(tr('שורות','Lines'))+heading(tr('שלב','Level')):house?heading(tr('שלב','Level')):''}</tr></thead><tbody>${rows.map((row,index)=>`<tr${state.run?.saved&&state.run.game===game&&row.id===state.run.id?' class="quiz-own-score"':''}><td><span class="quiz-rank" data-rank="${index+1}">${index+1}</span></td><th scope="row" dir="auto">${safe(row.name)}</th><td><strong>${points(row.score)}</strong></td>${timed?`<td><bdi>${safe(row.correct)} / ${safe(row.total)}</bdi></td><td><bdi>${(row.elapsedMs/1000).toFixed(1)}</bdi> ${tr('ש׳','s')}</td>`:tetris?`<td>${points(row.lines)}</td><td>${points(row.level)}</td>`:house?`<td>${points(row.level)}</td>`:''}</tr>`).join('')}</tbody></table></div>`;
+}
 function quizBoardInner(game,choose=false){
   const board=quizBoards[game],title=game?tr(...scoreTitles[game]):'';
-  return `<header><h4>${tr('טבלת השיאים','Leaderboard')}${title?' · '+title:''}</h4>${board?`<button type="button" class="secondary-button" data-quiz-refresh="${game}" ${board.loading?'disabled':''}>${board.loading?tr('טוענים…','Loading…'):board.loaded?tr('רענון','Refresh'):tr('הצגת הטבלה','Show leaderboard')}</button>`:''}</header>${choose?`<div class="quiz-board-games" role="group" aria-label="${tr('בחירת טבלת שיאים','Choose a leaderboard')}">${Object.keys(scorePaths).map(id=>`<button type="button" data-quiz-board="${id}" aria-pressed="${id===game}">${tr(...scoreTitles[id])}</button>`).join('')}</div>`:''}${!board?`<p>${tr('בחרו משחק כדי לראות את 20 השיאים המובילים של המשפחה.','Choose a game to see the family’s top 20 scores.')}</p>`:`<p class="quiz-board-status" role="status">${safe(board.error||(!board.loaded?(board.loading?tr('טוענים את השיאים…','Loading scores…'):tr('הטבלה משותפת לכל המבקרים. לחצו להצגה.','Scores are shared by all visitors. Select Show leaderboard to view them.')):!board.rows.length?tr('הטבלה מחכה לאלופים הראשונים!','Be the first to join the leaderboard!'):''))}</p>${board.rows.length?`<div class="quiz-table-wrap" tabindex="0" role="region" aria-label="${tr('תוצאות המשחק','Game scores')}"><table><thead><tr><th scope="col">${tr('מקום','Rank')}</th><th scope="col">${tr('שם','Name')}</th><th scope="col">${tr('ניקוד','Points')}</th><th scope="col">${tr('נכונות','Correct')}</th><th scope="col">${tr('זמן מענה','Answer time')}</th></tr></thead><tbody>${board.rows.map((row,index)=>`<tr${state.run?.saved&&row.id===state.run.id?' class="quiz-own-score"':''}><td>${index+1}</td><th scope="row" dir="auto">${safe(row.name)}</th><td><strong>${points(row.score)}</strong></td><td><bdi>${row.correct} / ${row.total}</bdi></td><td><bdi>${(row.elapsedMs/1000).toFixed(1)}</bdi> ${tr('ש׳','s')}</td></tr>`).join('')}</tbody></table></div>`:''}`}`;
+  return `<header><h4>${tr('טבלת השיאים','Leaderboard')}${title?' · <bdi>'+title+'</bdi>':''}</h4>${board?`<button type="button" class="secondary-button" data-quiz-refresh="${game}" ${board.loading?'disabled':''}>${board.loading?tr('טוענים…','Loading…'):board.loaded?tr('רענון','Refresh'):tr('הצגת הטבלה','Show leaderboard')}</button>`:''}</header>${choose?`<div class="quiz-board-rotation"><p>${tr('השיאים של המשפחה, בכל פעם משחק אחר','Family records, a different game each time')}</p><button type="button" data-quiz-rotate aria-pressed="${boardRotation}">${boardRotation?tr('עצירת ההחלפה','Pause rotation'):tr('החלפה אוטומטית','Auto rotate')}</button></div><div class="quiz-board-games" role="group" aria-label="${tr('בחירת טבלת שיאים','Choose a leaderboard')}">${Object.keys(scoreTitles).map(id=>`<button type="button" data-quiz-board="${id}" aria-pressed="${id===game}"><bdi>${tr(...scoreTitles[id])}</bdi></button>`).join('')}</div>`:''}${!board?`<p>${tr('בחרו משחק כדי לראות את 20 השיאים המובילים של המשפחה.','Choose a game to see the family’s top 20 scores.')}</p>`:`<p class="quiz-board-status" role="status">${safe(board.error||(!board.loaded?(board.loading?tr('טוענים את השיאים…','Loading scores…'):tr('הטבלה משותפת לכל המבקרים. לחצו להצגה.','Scores are shared by all visitors. Select Show leaderboard to view them.')):!board.rows.length?tr('הטבלה מחכה לאלופים הראשונים!','Be the first to join the leaderboard!'):''))}</p>${board.rows.length?scoreTable(game,board.rows):''}`}`;
 }
 function quizBoard(game,choose=false){return `<section id="quizLeaderboard" class="quiz-leaderboard">${quizBoardInner(game,choose)}</section>`;}
+function lobbyRecords(){
+  if(!boardGame)boardGame=nextLobbyBoard();
+  return `<section id="gamesLobbyRecords" class="game-lobby-records" aria-label="${tr('אלופי המשפחה וטבלאות השיאים','Family champions and leaderboards')}"><img class="game-record-champion game-record-champion-left" src="assets/games/yemeni-champion.webp" width="1024" height="1536" loading="lazy" decoding="async" alt="${tr('אלוף תימני מאויר עם גביע ומדליית זהב','Illustrated Yemeni champion with a trophy and gold medal')}">${quizBoard(boardGame,true)}<img class="game-record-champion game-record-champion-right" src="assets/games/yemeni-champion-woman.webp" width="1024" height="1536" loading="lazy" decoding="async" alt="${tr('אלופה תימנייה מאוירת עם גביע ומדליית זהב','Illustrated Yemeni champion with a trophy and gold medal')}"></section>`;
+}
+function nextLobbyBoard(){
+  if(!boardOrder.length){
+    boardOrder=Object.keys(scoreTitles);
+    for(let i=boardOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[boardOrder[i],boardOrder[j]]=[boardOrder[j],boardOrder[i]];}
+    if(boardOrder[0]===boardGame)[boardOrder[0],boardOrder[1]]=[boardOrder[1],boardOrder[0]];
+  }
+  return boardOrder.shift();
+}
+function stopBoardTimer(){if(boardTimer!==null)clearInterval(boardTimer);boardTimer=null;}
+function stopLobbyBoards(){stopBoardTimer();boardObserver?.disconnect();boardObserver=null;boardVisible=false;}
+function startBoardTimer(){
+  stopBoardTimer();
+  if(!boardVisible||!boardRotation||state.view!=='games'||state.phase!=='welcome'||document.visibilityState==='hidden')return;
+  boardTimer=setInterval(()=>{
+    // Let visitors finish reading, scrolling or using the keyboard before replacing a table.
+    if(!boardVisible||document.visibilityState==='hidden'||document.activeElement?.closest?.('#quizLeaderboard')||$('quizLeaderboard')?.matches?.(':hover'))return;
+    boardGame=nextLobbyBoard();syncQuizBoard();loadQuizScores(boardGame);
+  },12000);
+}
+function startLobbyBoards(){
+  if(state.view!=='games'||state.phase!=='welcome'||document.visibilityState==='hidden')return;
+  const panel=$('gamesLobbyRecords'),token=state.renderToken;if(!panel)return;
+  const visible=value=>{if(token!==state.renderToken||state.view!=='games'||state.phase!=='welcome')return;boardVisible=value;if(value){loadQuizScores(boardGame);startBoardTimer();}else stopBoardTimer();};
+  if(typeof IntersectionObserver==='function'){
+    boardObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.target===panel)visible(entry.isIntersecting);},{rootMargin:'80px 0px'});boardObserver.observe(panel);
+  }else visible(true);
+}
 function currentBoard(){return state.phase==='welcome'?boardGame:state.game;}
 function syncQuizBoard(game=currentBoard()){
   const node=$('quizLeaderboard');if(state.view==='games'&&node&&game===currentBoard())node.innerHTML=quizBoardInner(game,state.phase==='welcome');
@@ -60,7 +96,7 @@ function syncQuizBoard(game=currentBoard()){
 async function loadQuizScores(game,force=false){
   const board=quizBoards[game];if(!board||board.loading||board.loaded&&!force)return;
   const serial=++board.serial;board.loading=true;board.error='';syncQuizBoard(game);
-  try{const response=await I.fetch('api/games/'+scorePaths[game]+'/scores',{cache:'no-store'}),data=await response.json();if(!response.ok||!Array.isArray(data.scores))throw Error();if(serial===board.serial){board.rows=data.scores;board.loaded=true;}}
+  try{const response=await I.fetch('api/games/'+(scorePaths[game]||game)+'/scores',{cache:'no-store'}),data=await response.json();if(!response.ok||!Array.isArray(data.scores))throw Error();if(serial===board.serial){board.rows=data.scores;board.loaded=true;}}
   catch{if(serial===board.serial)board.error=tr('הטבלה לא נטענה. אפשר לנסות שוב בלחיצה על רענון.','The leaderboard could not load. Select Refresh to retry.');}
   finally{if(serial===board.serial){board.loading=false;syncQuizBoard(game);}}
 }
@@ -83,7 +119,7 @@ async function saveQuizScore(event){
 const gameTitle=()=>isChick()?tr('איפה הגוזל?','Where’s the little bird?'):isKinship()?tr('מה הקשר?','What’s the relation?'):isMissing()?tr('מי חסר?','Who’s missing?'):isTrivia()?tr('טריוויה משפחתית','Family Trivia'):tr('מי זה?','Who is it?');
 const photoPrompt=()=>isMissing()?tr('מי חסר?','Who’s missing?'):tr('מי מופיע בתמונה?','Who appears in this photo?');
 function sideDancer(side){
-  return `<figure class="game-lobby-welcome game-lobby-side game-lobby-side-${side}" data-dancing="true"><figcaption class="game-side-speech">${tr('בואו נשחק!','Let’s play!')}</figcaption><div class="game-lobby-dancer" role="img" aria-label="${tr('סבא שלמה רוקד','Grandpa Shlomo dancing')}"><span class="shlomo-dance-frames" aria-hidden="true"></span></div><button type="button" class="game-dance-toggle" data-shlomo-dance aria-pressed="true">${tr('עצירת הריקוד','Pause dance')}</button></figure>`;
+  return `<figure class="game-lobby-welcome game-lobby-side game-lobby-side-${side}" data-dancing="true"><figcaption class="game-side-speech"><bdi dir="${I.isEnglish?'ltr':'rtl'}">${tr('בואו נשחק!','Let’s play!')}</bdi></figcaption><div class="game-lobby-dancer" role="img" aria-label="${tr('סבא שלמה רוקד','Grandpa Shlomo dancing')}"><span class="shlomo-dance-frames" aria-hidden="true"></span></div><button type="button" class="game-dance-toggle" data-shlomo-dance aria-pressed="true">${tr('עצירת הריקוד','Pause dance')}</button></figure>`;
 }
 function lobbyGameCard([id,icon,title,description,preparing=false]){
   return `<button type="button" class="family-game-choice game-choice-${id}" ${preparing?'disabled aria-disabled="true"':`data-game-start="${id}"`} ${id==='trivia'?'data-game-home="trivia"':''} ${state.phase==='loading'?'disabled':''}><span class="game-choice-icon" aria-hidden="true"><svg viewBox="0 0 48 48">${id==='ruti-house'?'<path d="m5 23 19-16 19 16M10 19v22h28V19M20 41V29h9v12" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 22c-6-4-4-10 1-7 5-3 7 3-1 7Z"/>':id==='neto-tetris'?'<path d="M8 8h10v10H8zm10 0h10v10H18zm0 10h10v10H18zm10 0h10v10H28z"/><path d="m8 37 5-8h-5l5-8" fill="none"/>':id==='north'?'<path d="M11 35V16l4-9h18l4 9v19M11 21h26M16 29h4m8 0h4M15 35v5m18-5v5M17 12h14"/><path d="m24 18 4 5h-8Z"/>':id==='soup'?'<path d="M10 21h28v17q-14 9-28 0Z"/><ellipse cx="24" cy="21" rx="14" ry="5"/><path d="M10 25H4v9h6m28-9h6v9h-6M16 14q-5-5 0-9m8 9q-5-5 0-9m8 9q-5-5 0-9" fill="none"/>':id==='rex'?'<path d="M7 36h9l5-9 7 6h8M20 27V17m-1 7-8 4m9-5 9-4" fill="none" stroke-linecap="round" stroke-width="4"/><circle cx="21" cy="10" r="7"/><path d="M38 39V22m0 9-7-6m7 2 6-8m-6 2-5-6" fill="none" stroke-linecap="round"/>':id==='jachnun'?'<path d="M7 33c-7-12 7-18 16-12l12-10c9-7 16 5 10 11L25 39c-7 6-14 2-18-6Z"/><path d="M12 30c-2-5 5-8 9-4s1 9-3 9-5-4-2-5" fill="none"/>':id==='baby'?'<circle cx="24" cy="26" r="16"/><path d="M21 10c-6-9 9-9 5-1M17 24h1m12 0h1M18 32q6 6 12 0" fill="none" stroke-linecap="round"/>':id==='puzzle'?'<path d="M5 6h13v4a5 5 0 1 0 10 0V6h14v13h-4a5 5 0 1 0 0 10h4v13H28v-4a5 5 0 1 0-10 0v4H5V29h4a5 5 0 1 0 0-10H5Z"/>':`<use href="assets/home-icons.svg#${icon}"></use>`}</svg></span><span><strong>${title}</strong><span class="game-choice-description">${description}</span><b>${preparing?tr('בהכנה','Coming soon'):state.phase==='loading'&&state.game===id?tr('מכין את האתגר…','Preparing your challenge…'):tr('בואו נשחק','Let’s play')} ${preparing?'':I.isEnglish?'→':'←'}</b></span></button>`;
@@ -111,7 +147,7 @@ function welcome(){
       ['differences','photos',tr('מצא את ההבדלים','Spot the differences'),tr('גלו מה השתנה בין שתי התמונות.','Spot what changed between two photos.')]
     ]}
   ];
-  return `<header class="family-game-intro"><span class="game-medallion" aria-hidden="true">❖</span><span class="small-eyebrow">${tr('המשפחה שלנו, מזווית קצת אחרת','Our family, from a different angle')}</span><h3>${tr('במה משחקים היום?','What shall we play?')}</h3><p>${tr('מזהים פנים או מפענחים קשרים? בחרו את האתגר שלכם.','Recognize faces or untangle family ties? Choose your challenge.')}</p></header><div class="game-lobby-desktop-stage">${sideDancer('left')}${sideDancer('right')}<div class="family-game-groups">${groups.map(group=>`<section class="family-game-group game-group-${group.id}" aria-labelledby="gameGroup-${group.id}"><h4 id="gameGroup-${group.id}" class="game-group-title"><span aria-hidden="true">❖</span>${group.title}</h4><div class="family-game-choices">${group.games.map(lobbyGameCard).join('')}</div></section>`).join('')}</div></div><figure class="game-lobby-welcome" data-dancing="true"><img src="assets/games/yemeni-courtyard.webp" width="1536" height="1024" loading="eager" decoding="async" alt="${tr('בניינים תימניים מסורתיים וחצר מוארת','Traditional Yemeni buildings and a sunlit courtyard')}"><div class="game-lobby-dancer" role="img" aria-label="${tr('סבא שלמה עם תרבוש אדום רוקד צעד תימני','Grandpa Shlomo in a red fez dances a Yemeni step')}"><span class="shlomo-dance-frames" aria-hidden="true"></span></div><figcaption class="game-lobby-speech">${tr('בואו נשחק!','Let’s play!')}</figcaption><button type="button" class="game-dance-toggle" data-shlomo-dance aria-pressed="true">${tr('עצירת הריקוד','Pause dance')}</button></figure>${state.error?`<p class="game-error" role="alert">${safe(state.error)}</p>`:''}${quizBoard(boardGame,true)}`;
+  return `<header class="family-game-intro"><span class="game-medallion" aria-hidden="true">❖</span><span class="small-eyebrow">${tr('המשפחה שלנו, מזווית קצת אחרת','Our family, from a different angle')}</span><h3>${tr('במה משחקים היום?','What shall we play?')}</h3><p>${tr('מזהים פנים או מפענחים קשרים? בחרו את האתגר שלכם.','Recognize faces or untangle family ties? Choose your challenge.')}</p></header><div class="game-lobby-desktop-stage">${sideDancer('left')}${sideDancer('right')}<div class="family-game-groups">${groups.map(group=>`<section class="family-game-group game-group-${group.id}" aria-labelledby="gameGroup-${group.id}"><h4 id="gameGroup-${group.id}" class="game-group-title"><span aria-hidden="true">❖</span>${group.title}</h4><div class="family-game-choices">${group.games.map(lobbyGameCard).join('')}</div></section>`).join('')}</div></div><figure class="game-lobby-welcome" data-dancing="true"><img src="assets/games/yemeni-courtyard.webp" width="1536" height="1024" loading="eager" decoding="async" alt="${tr('בניינים תימניים מסורתיים וחצר מוארת','Traditional Yemeni buildings and a sunlit courtyard')}"><div class="game-lobby-dancer" role="img" aria-label="${tr('סבא שלמה עם תרבוש אדום רוקד צעד תימני','Grandpa Shlomo in a red fez dances a Yemeni step')}"><span class="shlomo-dance-frames" aria-hidden="true"></span></div><figcaption class="game-lobby-speech"><bdi dir="${I.isEnglish?'ltr':'rtl'}">${tr('בואו נשחק!','Let’s play!')}</bdi></figcaption><button type="button" class="game-dance-toggle" data-shlomo-dance aria-pressed="true">${tr('עצירת הריקוד','Pause dance')}</button></figure>${state.error?`<p class="game-error" role="alert">${safe(state.error)}</p>`:''}${lobbyRecords()}`;
 }
 function openTrivia(sync=true){if(sync)syncGameRoute('trivia');window.FamilyDifferences?.close();stopClock();state.serial++;Object.assign(state,{game:'trivia',phase:'trivia-home',questions:[],answers:[],deadline:null,error:''});render();}
 function triviaHome(){
@@ -268,6 +304,7 @@ function render(){
   const token=++state.renderToken,index=state.index;
   $('familyGamesContent').innerHTML=(state.phase==='playing'||state.phase==='revealed')?question():state.phase==='finished'?result():state.phase==='trivia-home'?triviaHome():welcome();
   scheduleChickAdvance();
+  if(state.phase==='welcome')startLobbyBoards();
   if(state.phase==='finished'&&speedScoring())loadQuizScores(state.game);
   for(const image of $('familyGamesContent').querySelectorAll('[data-kinship-photo]')){image.addEventListener('load',()=>{image.hidden=false;});image.addEventListener('error',()=>image.remove());if(image.complete&&image.naturalWidth)image.hidden=false;}
   if(state.phase==='playing'){
@@ -323,7 +360,8 @@ function init(){
   const route=()=>{if(!/^#games(?:\/|$)/.test(new URL(window.location.href).hash))return;if(lastRoute===window.location.href&&state.view==='games')return;if(window.FamilyApp.getView()!=='games')window.FamilyApp.setView('games',false);else activate('games');};
   window.addEventListener?.('popstate',route);window.addEventListener?.('hashchange',route);
   $('familyGamesContent').addEventListener('click',event=>{
-    const boardButton=event.target.closest('[data-quiz-board]');if(boardButton&&quizBoards[boardButton.dataset.quizBoard]){boardGame=boardButton.dataset.quizBoard;syncQuizBoard();loadQuizScores(boardGame,true);return;}
+    const boardButton=event.target.closest('[data-quiz-board]');if(boardButton&&quizBoards[boardButton.dataset.quizBoard]){boardRotation=false;stopBoardTimer();boardGame=boardButton.dataset.quizBoard;boardOrder=boardOrder.filter(id=>id!==boardGame);syncQuizBoard();loadQuizScores(boardGame,true);return;}
+    if(event.target.closest('[data-quiz-rotate]')){boardRotation=!boardRotation;syncQuizBoard();startBoardTimer();return;}
     const refresh=event.target.closest('[data-quiz-refresh]');if(refresh){loadQuizScores(refresh.dataset.quizRefresh,true);return;}
     const startButton=event.target.closest('[data-game-start]');if(startButton){if(startButton.dataset?.gameHome==='trivia')openTrivia();else start(startButton.dataset?.gameStart||state.game||'photos');return;}
     const dance=event.target.closest('[data-shlomo-dance]');if(dance){const stage=dance.closest('.game-lobby-welcome'),running=stage.dataset.dancing!=='true';stage.dataset.dancing=String(running);dance.setAttribute('aria-pressed',String(running));dance.textContent=running?tr('עצירת הריקוד','Pause dance'):tr('ממשיכים לרקוד','Resume dance');return;}
@@ -348,7 +386,7 @@ function init(){
     if(['Enter',' '].includes(event.key)){event.preventDefault();findChick(state.cursor.x,state.cursor.y);return;}
     const direction={ArrowLeft:[-.02,0],ArrowRight:[.02,0],ArrowUp:[0,-.03],ArrowDown:[0,.03]}[event.key];if(!direction)return;event.preventDefault();state.cursor={x:Math.max(0,Math.min(1,state.cursor.x+direction[0])),y:Math.max(0,Math.min(1,state.cursor.y+direction[1]))};const marker=$('chickProbe');marker.hidden=false;marker.style.left=state.cursor.x*100+'%';marker.style.top=state.cursor.y*100+'%';marker.scrollIntoView({block:'nearest',inline:'nearest'});
   });
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){stopClock();return;}if(state.view!=='games')return;if(state.phase==='revealed'){scheduleChickAdvance();return;}if(state.phase!=='playing')return;if(state.deadline&&Date.now()>=state.deadline){if(isChick())finishChick(false);else finishRound(null);}else startClock();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){stopClock();return;}if(state.view!=='games')return;if(state.phase==='welcome'){startLobbyBoards();return;}if(state.phase==='revealed'){scheduleChickAdvance();return;}if(state.phase!=='playing')return;if(state.deadline&&Date.now()>=state.deadline){if(isChick())finishChick(false);else finishRound(null);}else startClock();});
   activate(window.FamilyApp.getView());
 }
 function showLobby(sync=true){if(sync&&window.FamilyNavigation?.returnTo('#games'))return;if(sync)syncGameRoute(null);stopClock();window.FamilyDifferences?.close();state.serial++;Object.assign(state,{phase:'welcome',game:null,questions:[],answers:[],run:null,deadline:null,imageReady:false,error:'',mistakes:0,autoNextAt:null});render();}

@@ -2508,6 +2508,37 @@ body[data-active-view="memorial"] .search-wrap{display:none}
 .quiz-leaderboard :is(button,.quiz-table-wrap):focus-visible,.quiz-score-entry input:focus-visible{outline:3px solid #7c9460;outline-offset:3px}
 @media(max-width:700px){.quiz-leaderboard{padding:14px 10px}.quiz-leaderboard h4{font-size:calc(24px * var(--a11y-text-scale,1))}.quiz-leaderboard th,.quiz-leaderboard td{padding:10px 7px;font-size:calc(13px * var(--a11y-text-scale,1))}.quiz-score-entry{padding:15px}.quiz-score-breakdown{gap:6px 15px}.quiz-scoring-hint{font-size:calc(13px * var(--a11y-text-scale,1))}.game-score:has(+.quiz-score-breakdown) strong{font-size:calc(70px * var(--a11y-text-scale,1))}}
 
+/* The champions and rotating records stay after the complete game selection. */
+.game-side-speech bdi,.game-lobby-speech bdi{unicode-bidi:isolate}
+.game-lobby-records{position:relative;display:grid;grid-template-columns:1fr 1fr;align-items:end;gap:0 16px;margin:34px 0 0;min-width:0}
+.game-lobby-records>.quiz-leaderboard{grid-column:1/-1;grid-row:2;min-width:0;min-height:300px;margin:0}
+.game-record-champion{display:block;grid-row:1;width:115px;height:173px;object-fit:contain;justify-self:center;margin-bottom:12px;pointer-events:none;user-select:none}
+.game-record-champion-left{grid-column:1}
+.game-record-champion-right{grid-column:2}
+.quiz-board-rotation{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin:10px 0}
+.quiz-board-rotation p{margin:0;color:#8c7954}
+.quiz-board-rotation button{min-height:40px;padding:6px 13px;border:1px solid #d9ccb1;border-radius:22px;background:#f4f0e2;color:#64744c;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.quiz-board-rotation button[aria-pressed=false]{background:#fffdf8}
+.game-lobby-records .quiz-board-games{margin:14px 0 18px}
+.quiz-board-status:empty{display:none}
+.quiz-rank{display:inline-grid;place-items:center;min-width:28px;height:28px;border-radius:50%;font-variant-numeric:tabular-nums}
+.quiz-rank[data-rank="1"]{color:#78561d;background:#f3e1a8;border:1px solid #d7b45e}
+.quiz-rank[data-rank="2"]{color:#5c625d;background:#e6e9e3;border:1px solid #bfc6bc}
+.quiz-rank[data-rank="3"]{color:#875535;background:#eed6bf;border:1px solid #c8a07d}
+@media(min-width:1180px){
+ .game-lobby-records{display:block;margin-top:38px}
+ .game-record-champion{position:absolute;top:28px;width:clamp(90px,calc((100vw - 1000px)/2),230px);height:auto;max-height:350px;margin:0}
+ .game-record-champion-left{right:calc(100% + 12px)}
+ .game-record-champion-right{left:calc(100% + 12px)}
+}
+@media(max-width:700px){
+ .game-lobby-records{margin-top:24px}
+ .game-record-champion{width:96px;height:144px;margin-bottom:8px}
+ .game-lobby-records>.quiz-leaderboard{min-height:280px}
+ .quiz-board-games button{flex-basis:130px;font-size:calc(13px * var(--a11y-text-scale,1));padding:8px}
+ .quiz-board-rotation p{font-size:calc(13px * var(--a11y-text-scale,1))}
+}
+
 /* Three ordered game groups share the existing cards and Yemeni ornament. */
 .family-game-groups{display:grid;gap:30px;min-width:0}
 .family-game-group{min-width:0}
