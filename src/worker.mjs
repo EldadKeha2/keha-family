@@ -1,4 +1,5 @@
 import family from './family.mjs';
+import {uploadRecording} from './voices-route.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {multipartVideo} from './video-multipart.mjs';
@@ -195,6 +196,8 @@ async function story(request,env,db,ctx,id){
   }else if(contentType.startsWith('multipart/form-data')){
     let form;try{form=await new Response(bytes,{headers:{'Content-Type':contentType}}).formData();}catch{throw new HttpError(400,'הטופס לא נקלט. נסו שוב.');}
     for(const key of ['title','body','author','year','expectedUpdatedAt']){const value=form.get(key);if(value!==null&&typeof value!=='string')throw new HttpError(400,'פרטי הסיפור אינם תקינים.');fields[key]=value||'';}
+    if(form.has('category'))fields.category=form.get('category');
+    if(form.has('personIds')){try{fields.personIds=JSON.parse(form.get('personIds'));}catch{throw new HttpError(400,'בחרו אנשים מהרשימה.');}}
     files=form.getAll('files').filter(file=>typeof file!=='string'&&file.size>0);
   }else throw new HttpError(415,'יש לשלוח טופס סיפור תקין.');
   fields.title=text(fields.title,'כותרת',200,true);fields.author=text(fields.author||'','שם המספר או המספרת',100);fields.body=text(fields.body||'','תוכן הסיפור',100000);
@@ -340,6 +343,12 @@ export default {
         return snapshot(request,await db('collection',{kind,page,size,paged,query,filter,person,unit,labels,sort,seed}));
       }
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
+      if(path==='/api/voices'&&request.method==='GET')return snapshot(request,await db('recordings'));
+      if((match=/^\/api\/voices\/([a-f0-9]{32})\/audio$/.exec(path))&&['GET','HEAD'].includes(request.method)){
+        const item=await db('recording.get',{id:match[1]}),response=await getObject(env,item,request);
+        if(!url.searchParams.has('download'))return response;
+        const headers=new Headers(response.headers);headers.set('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(item.filename));return new Response(response.body,{status:response.status,headers});
+      }
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1]),paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia',paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
@@ -352,6 +361,8 @@ export default {
         return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
+        if(path==='/api/voices/upload')return await uploadRecording(request,env,db,ctx,streamUpload);
+        if((match=/^\/api\/voices\/([a-f0-9]{32})$/.exec(path)))return json(await db('recording.edit',{...await readJSON(request,40000),id:match[1]}));
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-assets\/(poster|faststart|low|medium)\/multipart\/(start|part|complete|abort)$/.exec(path)))return await multipartVideoAsset(request,env,db,ctx,{id:match[1],variant:match[2],action:match[3]});
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-assets\/(poster|faststart|low|medium)$/.exec(path)))return await saveVideoAssetRoute(request,env,db,ctx,match[1],match[2]);
         if(path==='/api/collections/videos/categories'){const body=await readJSON(request,2000);return json(await db('video.category.create',{name:body.name,nameEn:body.nameEn}),201);}

@@ -6,7 +6,7 @@
   const app = () => window.FamilyApp;
   const notify = message => app()?.toast(message);
   const normalize = value => String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g, '').toLowerCase().trim();
-  const state = {view:'tree', query:'', collections:{photos:{items:[]},videos:{items:[]},gallery:{items:[]}}, stories:[], storyRevision:null, editingStory:null, birthdayId:null};
+  const state = {view:'tree', query:'', collections:{photos:{items:[]},videos:{items:[]},gallery:{items:[]}}, birthdayId:null};
   const collectionId=(kind,suffix)=>kind==='gallery'&&['Grid','Count','Empty'].includes(suffix)?'sharedGallery'+suffix:kind+suffix;
   const gallerySeed=()=>Math.floor(Math.random()*0x100000000);
   const galleryPage={page:1,size:100,query:'',filter:'all',person:'',unit:'',labels:'',sort:'random',seed:gallerySeed()};let gallerySearchTimer,galleryDeferred=false;
@@ -33,7 +33,6 @@
     }
     if (!ready) return;
     if (['photos','videos','gallery'].includes(view)) {renderCollection(view);refreshCollection(view,true);}
-    if (view === 'stories') {renderStories();refreshStories(true);}
     if (view !== 'videos') $('videosGrid').querySelectorAll('video').forEach(video=>video.pause());
     flushCaptions();
   }
@@ -41,7 +40,6 @@
     state.query = query;
     if(state.view==='gallery'){if(galleryPage.query!==query)window.FamilyGalleryFilter?.clearSelection();galleryPage.page=1;galleryPage.query=query;window.FamilyGalleryFilter?.render();clearTimeout(gallerySearchTimer);gallerySearchTimer=setTimeout(()=>refreshCollection('gallery',true),300);return;}
     if (['photos','videos','gallery'].includes(state.view)) renderCollection(state.view);
-    else if (state.view === 'stories') renderStories();
   }
   function captionKey(kind, file) {return kind + '\u001f' + file;}
   function captionStatus(kind,file,message,failed=false) {
@@ -289,47 +287,6 @@
     try{const death=state.dateMode==='death',result=await jsonPost('api/people/'+encodeURIComponent(state.birthdayId)+(death?'/death-date':'/birthday'),death?{date:clear?'':birthdayValue(),expectedDate:state.birthdayExpected}:{birthday:clear?'':birthdayValue(),expectedBirthday:state.birthdayExpected});app().updatePerson(state.birthdayId,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id:state.birthdayId}}));$('birthdayDialog').close();notify(I18n.t(death?'תאריך הפטירה עודכן ✓':'יום ההולדת עודכן ✓'));}
     catch(error){$('birthdayError').textContent=error.message;}finally{button.disabled=false;}
   }
-  async function refreshStories(force=false){
-    if(!app()?.apiEnabled||loading.stories)return;loading.stories=true;
-    try{const result=await request('api/stories',{headers:!force&&state.storyRevision?{'If-None-Match':'"'+state.storyRevision+'"'}:{}});if(result){state.stories=result.stories;state.storyRevision=result.revision;renderStories();}}
-    catch(error){if(force)notify(error.message);}finally{loading.stories=false;}
-  }
-  function renderStories(){
-    const yearFilter=$('storyYearFilter'),previousYear=yearFilter.value;
-    const years=[...new Set(state.stories.map(story=>story.year))].sort((a,b)=>a-b);
-    yearFilter.innerHTML=I18n.t('<option value="all">כל השנים</option>')+years.map(year=>`<option value="${year}">${year}</option>`).join('');
-    if(years.includes(Number(previousYear)))yearFilter.value=previousYear;
-    const query=normalize(state.query),year=yearFilter.value,descending=$('storySort').value==='newest';
-    const stories=state.stories.filter(story=>(year==='all'||story.year===Number(year))&&(!query||normalize(story.title+' '+story.body+' '+story.author+' '+story.year).includes(query))).sort((a,b)=>(a.year-b.year||a.createdAt.localeCompare(b.createdAt))*(descending?-1:1));
-    $('storiesCount').textContent=state.stories.length?(stories.length===1?I18n.t('סיפור אחד ביומן'):I18n.html`${stories.length} סיפורים ביומן`):'';
-    $('storiesEmpty').hidden=state.stories.length>0;
-    const groups=new Map();for(const story of stories){if(!groups.has(story.year))groups.set(story.year,[]);groups.get(story.year).push(story);}
-    $('storyTimeline').innerHTML=[...groups].map(([year,entries])=>`<section class="timeline-year"><h4><bdi>${year}</bdi><span class="year-diamond" aria-hidden="true">◆</span></h4><div class="year-stories">${entries.map(story=>I18n.html`<article class="story-card"><span class="story-overline">${safe(story.author||I18n.t('מהיומן המשפחתי'))}</span><h3><button data-open-story="${story.id}">${safe(story.title)}</button></h3><p>${safe(story.body.slice(0,230))}${story.body.length>230?'…':''}</p><div class="story-card-footer"><button class="read-story" data-open-story="${story.id}">לסיפור המלא ←</button>${story.attachments.length?I18n.html`<span>${story.attachments.length} מסמכים מצורפים</span>`:''}<button class="edit-story" data-edit-story="${story.id}" aria-label="עריכת הסיפור ${safe(story.title)}">✎ עריכה</button></div></article>`).join('')}</div></section>`).join('');
-    if(!stories.length&&state.stories.length)$('storyTimeline').innerHTML=I18n.t('<p class="no-content-match">לא נמצאו סיפורים בבחירה הזו.</p>');
-  }
-  const attachmentHTML=attachments=>attachments.map(file=>`<a href="${safe(file.src)}" target="_blank" rel="noopener" download="${safe(file.name)}">▤ ${safe(file.name)} <span>↓</span></a>`).join('');
-  function openStory(id){
-    const story=state.stories.find(item=>item.id===id);if(!story)return;
-    $('storyReaderBody').innerHTML=I18n.html`<span class="story-reader-year"><bdi>${story.year}</bdi></span><h2 id="storyReaderTitle">${safe(story.title)}</h2>${story.author?I18n.html`<p class="story-reader-author">סיפור מאת ${safe(story.author)}</p>`:''}<div class="story-full-text" dir="auto">${safe(story.body)}</div>${story.attachments.length?I18n.html`<div class="attachment-list"><h3>המסמכים שמלווים את הסיפור</h3>${attachmentHTML(story.attachments)}</div>`:''}<button class="secondary-button" data-edit-story="${story.id}">✎ עריכת הסיפור</button>`;
-    $('storyReader').showModal();
-  }
-  function editStory(id=null){
-    if(!canSave())return;const story=id?state.stories.find(item=>item.id===id):null;if(id&&!story)return;
-    if($('storyReader').open)$('storyReader').close();state.editingStory=id;$('storyForm').reset();
-    state.editingStoryUpdatedAt=story?.updatedAt||null;
-    $('storyEditorTitle').textContent=story?I18n.t('עורכים סיפור משפחתי'):I18n.t('מוסיפים סיפור משלנו');
-    $('storyYear').value=story?.year||'';$('storyTitle').value=story?.title||'';$('storyAuthor').value=story?.author||'';$('storyBody').value=story?.body||'';
-    $('existingStoryFiles').innerHTML=story?.attachments.length?I18n.t('<span>מסמכים שכבר צורפו לסיפור:</span>')+attachmentHTML(story.attachments):'';
-    $('storyError').textContent='';$('storyEditor').showModal();
-  }
-  async function saveStory(event){
-    event.preventDefault();const button=$('saveStory'),files=[...$('storyFiles').files];
-    $('storyError').textContent='';
-    if(files.length>10||files.some(file=>file.size>10*1024*1024)||files.reduce((sum,file)=>sum+file.size,0)>20*1024*1024){$('storyError').textContent=I18n.t('אפשר לצרף עד 10 קבצים, עד 10MB לקובץ ועד 20MB יחד.');return;}
-    button.disabled=true;button.textContent=I18n.t('שומר את הסיפור…');
-    try{const form=new FormData($('storyForm'));if(state.editingStory)form.set('expectedUpdatedAt',state.editingStoryUpdatedAt);await request('api/stories'+(state.editingStory?'/'+state.editingStory:''),{method:'POST',body:form});$('storyEditor').close();$('storyYearFilter').value='all';state.query='';$('searchInput').value='';await refreshStories(true);notify(I18n.t('עוד זיכרון נשמר ביומן המשפחתי ✓'));}
-    catch(error){$('storyError').textContent=error.message;}finally{button.disabled=false;button.textContent=I18n.t('שמירת הסיפור');}
-  }
   function init(){
     ready=true;
     document.addEventListener('click',event=>{
@@ -362,9 +319,7 @@
       const cancelCaption=event.target.closest('[data-cancel-shared-caption]');if(cancelCaption){cancelPhotoCaption(cancelCaption);return;}
       const category=event.target.closest('[data-video-category]');if(category){window.FamilyVideoFilter?.toggleCategory(category.dataset.videoCategory);return;}
       const photo=event.target.closest('[data-shared-open]');if(photo){const items=state.collections.photos.items;app().openSharedGallery(items,items.findIndex(item=>item.file===photo.dataset.sharedOpen));return;}
-      const read=event.target.closest('[data-open-story]');if(read){openStory(read.dataset.openStory);return;}
-      const edit=event.target.closest('[data-edit-story]');if(edit){editStory(edit.dataset.editStory);return;}
-      if(event.target.closest('#newStory,[data-new-story]'))editStory();
+
     });
     document.addEventListener('change',event=>{if(event.target.matches('[data-gallery-sort]')){sortGallery(event.target.value);return;}if(!event.target.matches('[data-gallery-size]'))return;galleryPage.size=Number(event.target.value);galleryPage.page=1;refreshCollection('gallery',true);});
     document.addEventListener('input',event=>{if(event.target.matches('textarea[data-shared-file]'))editCaption(event.target);if(event.target.closest('#birthdayForm'))previewBirthday();});
@@ -376,7 +331,7 @@
       if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)event.target.close();
     });
     for(const kind of ['photos','videos','gallery'])$(kind+'Dropzone').addEventListener('dragleave',event=>{if(!event.relatedTarget||!$(kind+'Dropzone').contains(event.relatedTarget))$(kind+'Dropzone').classList.remove('drag-over');});
-    $('birthdayForm').addEventListener('submit',saveBirthday);$('storyForm').addEventListener('submit',saveStory);
+    $('birthdayForm').addEventListener('submit',saveBirthday);
     $('clearBirthday').addEventListener('click',event=>saveBirthday(event,true));
     window.addEventListener('family-media-changed',event=>{
       if(event.detail.operation==='collection'&&event.detail.item){
@@ -425,11 +380,10 @@
       if(state.view===kind)renderCollection(kind);else window.FamilyMedia.register(kind,result.collection.items);
     });
     $('mediaViewer').addEventListener('close',()=>{if(!galleryDeferred)return;galleryDeferred=false;revisions.gallery=null;refreshCollection('gallery',true);});
-    $('storyYearFilter').addEventListener('change',renderStories);$('storySort').addEventListener('change',renderStories);
     for(const id of ['birthdayDialog','storyEditor','storyReader'])$(id).addEventListener('click',event=>{if(event.target!==$(id))return;const rect=$(id).getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)$(id).close();});
     // Returning from the phone's gallery/camera refreshes the current shared view.
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(['photos','videos','gallery'].includes(state.view))refreshCollection(state.view);if(state.view==='stories')refreshStories();}});
-    setInterval(()=>{if(document.visibilityState==='hidden')return;if(['photos','videos','gallery'].includes(state.view))refreshCollection(state.view);if(state.view==='stories')refreshStories();},30000);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(['photos','videos','gallery'].includes(state.view))refreshCollection(state.view);}});
+    setInterval(()=>{if(document.visibilityState==='hidden')return;if(['photos','videos','gallery'].includes(state.view))refreshCollection(state.view);},30000);
     window.addEventListener('pagehide',flushCaptions);
     window.addEventListener('beforeunload',event=>{const dirtyStory=$('storyEditor').open&&([...$('storyForm').querySelectorAll('input:not([type=file]),textarea')].some(field=>field.value)||$('storyFiles').files.length);if(running.photos||running.videos||running.gallery||dirtyStory){event.preventDefault();event.returnValue='';}});
     activate(state.view);

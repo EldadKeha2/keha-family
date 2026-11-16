@@ -2231,3 +2231,64 @@ test('repairing a bad derived preview gets a fresh browser cache URL and preserv
   const edited=await(await photoEdit(f,item)).json();assert.ok(edited.item.photoRevision);assert.equal((await f.call(path+'&replace=1',{method:'POST',body:photo.subarray(0,64)})).status,409);
  }finally{await f.close();}
 });
+
+test('memory chapters and tagged people survive restarts, while older stories retain their content',async()=>{
+ const f=fixture();try{
+  await f.connect();
+  const legacy=(await (await f.call('/api/stories',{method:'POST',body:{title:'זיכרון ותיק',body:'נשמר ללא שינוי',year:1962}})).json()).story;
+  // Reproduce an actual pre-category database row, not just a new default.
+  const old=JSON.parse(f.database.prepare('SELECT data FROM stories WHERE id=?').get(legacy.id).data);delete old.category;delete old.personIds;
+  f.database.prepare('UPDATE stories SET data=? WHERE id=?').run(JSON.stringify(old),legacy.id);
+  const form=new FormData();form.set('category','roots');form.set('title','הדרך שלנו');form.set('body','סיפורי השורשים שלנו');form.set('year','');form.set('personIds',JSON.stringify(['yona','shlomo','yona']));
+  let response=await f.call('/api/stories',{method:'POST',body:form});assert.equal(response.status,201,await response.clone().text());
+  const item=(await response.json()).story;assert.equal(item.year,null);assert.equal(item.category,'roots');assert.deepEqual(item.tags.map(p=>p.id),['yona','shlomo']);
+  f.restart();const snapshot=await f.call('/api/stories'),data=await snapshot.json();assert.equal(data.stories.length,2);
+  assert.equal(data.stories.find(p=>p.id===legacy.id).body,'נשמר ללא שינוי');assert.equal(data.stories.find(p=>p.id===legacy.id).category,'family');
+  assert.equal(data.stories.find(p=>p.id===item.id).tags[0].id,'yona');
+  assert.equal((await f.call('/api/stories',{headers:{'If-None-Match':snapshot.headers.get('ETag')}})).status,304);
+  response=await f.call('/api/stories/'+item.id,{method:'POST',body:{title:item.title,body:item.body,year:1990,expectedUpdatedAt:item.updatedAt}});assert.equal(response.status,200);
+  const updated=(await response.json()).story;assert.equal(updated.category,'roots');assert.deepEqual(updated.personIds,['yona','shlomo']);
+  response=await f.call('/api/stories/'+item.id,{method:'POST',body:{...updated,category:'funny',personIds:['yona'],expectedUpdatedAt:updated.updatedAt}});assert.equal(response.status,200);assert.equal((await response.json()).story.tags.length,1);
+  assert.equal((await f.call('/api/stories/'+item.id,{method:'POST',body:{...updated,category:'childhood',expectedUpdatedAt:updated.updatedAt}})).status,409);
+ }finally{await f.close();}
+});
+test('invalid memory tags and categories cannot create partial stories or attachment records',async()=>{
+ const f=fixture();try{await f.connect();
+  for(const change of [{category:'unknown'},{personIds:['no-such-person']},{personIds:'yona'},{year:new Date().getUTCFullYear()+1}]){
+   const response=await f.call('/api/stories',{method:'POST',body:{title:'בדיקה',body:'זיכרון',category:'family',...change}});assert.ok([400,404].includes(response.status));
+  }
+  assert.equal((await (await f.call('/api/stories')).json()).stories.length,0);
+ }finally{await f.close();}
+});
+test('recordings stream intact, keep Hebrew metadata and tags, support seeking and edit without replacing audio',async()=>{
+ const f=fixture();try{
+  await f.connect();const id=uid(),bytes=new Uint8Array(1024);bytes.set(new TextEncoder().encode('ID3\x04\0\0family voice'));
+  const fields={title:'סבתא מספרת',body:'הבית הראשון',author:'המשפחה',year:'',personIds:['yona','shlomo']};
+  const headers={'Content-Length':String(bytes.length),'X-Family-Recording':Buffer.from(JSON.stringify(fields)).toString('base64')};
+  const upload=()=>f.call('/api/voices/upload?uploadId='+id+'&filename='+encodeURIComponent('סבתא.mp3'),{method:'POST',body:bytes,headers});
+  let response=await upload();assert.equal(response.status,201,await response.clone().text());const item=(await response.json()).recording;
+  assert.equal(item.title,'סבתא מספרת');assert.equal(item.year,null);assert.deepEqual(item.tags.map(p=>p.id),['yona','shlomo']);assert.equal(item.key,undefined);assert.equal(item.uploadFields,undefined);
+  assert.equal((await f.call(item.src,{headers:{Range:'bytes=10-31'}})).status,206);
+  const audio=await f.call(item.src);assert.deepEqual(new Uint8Array(await audio.arrayBuffer()),bytes);assert.equal(audio.headers.get('Content-Type'),'audio/mpeg');
+  assert.equal((await f.call(item.src,{method:'HEAD'})).headers.get('Content-Length'),'1024');assert.equal((await f.call(item.src+'?download=1')).headers.get('Content-Disposition').startsWith('attachment;'),true);
+  const stored=f.objects.size;response=await upload();assert.equal(response.status,200);assert.equal(f.objects.size,stored);
+  // Recordings have their own archive and never appear in photo/video collections.
+  assert.equal((await (await f.call('/api/collections/gallery')).json()).items.length,0);assert.equal((await (await f.call('/api/collections/videos')).json()).items.some(v=>v.id===id),false);
+  f.restart();const list=await f.call('/api/voices'),data=await list.json();assert.equal(data.recordings.length,1);assert.equal(data.recordings[0].title,item.title);
+  assert.equal((await f.call('/api/voices',{headers:{'If-None-Match':list.headers.get('ETag')}})).status,304);
+  response=await f.call('/api/voices/'+id,{method:'POST',body:{...fields,title:'סיפור השורשים בקולה',personIds:['yona'],year:1980,expectedUpdatedAt:item.updatedAt}});assert.equal(response.status,200,await response.clone().text());
+  const updated=(await response.json()).recording;assert.equal(updated.year,1980);assert.deepEqual(updated.tags.map(p=>p.id),['yona']);assert.equal(f.objects.size,stored);
+  assert.equal((await f.call('/api/voices/'+id,{method:'POST',body:{...fields,expectedUpdatedAt:item.updatedAt}})).status,409);
+  assert.equal((await (await f.call('/api/voices')).json()).recordings[0].title,updated.title);
+ }finally{await f.close();}
+});
+test('recording validation rejects bad files, unknown people, empty uploads and external writes before storing bytes',async()=>{
+ const f=fixture();try{
+  await f.connect();const fields={title:'הקלטה',personIds:['yona']},id=uid(),upload=(bytes,change={},extra={})=>f.call('/api/voices/upload?uploadId='+id+'&filename=voice.mp3',{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length),'X-Family-Recording':Buffer.from(JSON.stringify({...fields,...change})).toString('base64'),...extra}});
+  let response=await upload(new TextEncoder().encode('<script>not audio</script>'));assert.equal(response.status,415);
+  response=await upload(new TextEncoder().encode('ID3valid'),{personIds:['unknown']});assert.equal(response.status,404);
+  response=await upload(new Uint8Array());assert.equal(response.status,400);
+  response=await upload(new TextEncoder().encode('ID3valid'),{}, {Origin:'https://external.example'});assert.equal(response.status,403);
+  assert.equal(f.objects.size,0);assert.equal((await (await f.call('/api/voices')).json()).recordings.length,0);
+ }finally{await f.close();}
+});
