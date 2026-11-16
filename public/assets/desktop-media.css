@@ -10,7 +10,7 @@
  #mediaViewer.video-gallery-viewer:not(.video-fullscreen) #mediaHeaderCaption{max-height:44px}
  #mediaViewer.video-gallery-viewer:not(.video-fullscreen)>#mediaStage{box-sizing:border-box;width:calc(100% - 32px);margin:12px 16px;align-self:stretch;height:calc(100% - 24px);border:1px solid #e0d6c1;border-radius:12px;background:#ede6d6}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop):not(.video-fullscreen):not(.photo-fullscreen) .media-viewer-footer{box-sizing:border-box;min-height:0;max-height:none;padding:18px clamp(18px,2vw,36px) 22px;border-top:1px solid #ded2b7;background:linear-gradient(180deg,#fcf9f0,#f6f1e5);box-shadow:0 -5px 20px #66543c0b;scroll-padding-block:18px;scrollbar-width:thin}
- #mediaViewer.video-gallery-viewer:not(.video-fullscreen) .media-viewer-footer{--video-details-height:116px;grid-template-columns:minmax(0,1fr) clamp(280px,25vw,400px) var(--desktop-media-control);gap:7px 14px;align-content:start}
+ #mediaViewer.video-gallery-viewer:not(.video-fullscreen) .media-viewer-footer{--video-details-height:116px;grid-template-columns:minmax(0,1fr) clamp(280px,25vw,400px) var(--desktop-media-control);gap:14px;align-content:start}
  #mediaViewer.video-gallery-viewer #photoMomentTools:has(#editPhotoDate[hidden]){display:none}
  #mediaViewer.video-gallery-viewer #photoInlineDateForm{grid-area:1/2;margin:0;min-width:0;min-height:var(--video-details-height);align-content:center}
  #mediaViewer.video-gallery-viewer #openedCaptionForm{align-self:start;gap:8px}
@@ -19,11 +19,14 @@
  #mediaViewer.video-gallery-viewer #mediaViewerDelete{height:var(--video-details-height);min-height:var(--video-details-height);border:1px solid #d5afa0;border-radius:12px;background:#fff1e9;color:#a14f36;box-shadow:0 3px 9px #985c3c0b}
  #mediaViewer.video-gallery-viewer #mediaViewerDelete:hover{background:#f9e3d7;border-color:#bc8d79}
  #mediaViewer.video-gallery-viewer #mediaViewerDelete svg{width:30px;height:30px}
- #mediaViewer.video-gallery-viewer #mediaShareActions{grid-template-columns:auto auto repeat(6,36px);gap:5px;margin:0;align-self:start}
- #mediaViewer.video-gallery-viewer #mediaShareActions>#mediaOriginal{width:auto;inline-size:auto;max-width:none;min-height:38px;height:38px;padding:6px 11px;gap:7px;border:1px solid #c3cbb4;border-radius:7px;background:#edf1e3;color:#566c42;font-size:calc(14px * var(--a11y-text-scale,1));white-space:nowrap}
- #mediaViewer.video-gallery-viewer #mediaShareActions>#mediaOriginal svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8}
- #mediaViewer.video-gallery-viewer #mediaShareActions .media-share-heading{font-size:calc(14px * var(--a11y-text-scale,1));gap:7px}
- #mediaViewer.video-gallery-viewer #mediaTagPanel{padding-top:6px;border-top:1px solid #e1d7c2}
+ #mediaViewer.video-gallery-viewer #mediaShareActions{grid-template-columns:auto auto repeat(6,42px);gap:7px;margin:0;align-self:start}
+ #mediaViewer.video-gallery-viewer #mediaShareActions>:is(a,button)[id]{max-width:42px;height:44px;min-height:44px;min-block-size:44px}
+ #mediaViewer.video-gallery-viewer #mediaShareActions .share-icon{width:32px;height:32px;flex-basis:32px}
+ #mediaViewer.video-gallery-viewer #mediaShareActions>#mediaOriginal{width:auto;inline-size:auto;max-width:none;min-height:44px;height:44px;padding:7px 14px;gap:8px;border:1px solid #c3cbb4;border-radius:7px;background:#edf1e3;color:#566c42;font-size:calc(16px * var(--a11y-text-scale,1));white-space:nowrap}
+ #mediaViewer.video-gallery-viewer #mediaShareActions>#mediaOriginal svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
+ #mediaViewer.video-gallery-viewer #mediaShareActions .media-share-heading{font-size:calc(16px * var(--a11y-text-scale,1));gap:7px}
+ #mediaViewer.video-gallery-viewer #mediaShareActions .media-share-heading svg{width:18px;height:18px;flex-basis:18px}
+ #mediaViewer.video-gallery-viewer #mediaTagPanel{padding-top:10px;border-top:1px solid #e1d7c2}
  #mediaViewer.video-gallery-viewer #mediaTagPanel .inline-tag-widget{padding:0}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #mediaTagPanel .tag-widget-heading h3{font-size:calc(clamp(20px,1.25vw,25px) * var(--a11y-text-scale,1));line-height:1.4}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #mediaTagPanel .tag-heading-icon{width:24px;height:24px;flex-basis:24px}
