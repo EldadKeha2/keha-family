@@ -47,10 +47,12 @@
  #mediaViewer.personal-photo-desktop #personalPhotoActions{grid-template-columns:minmax(220px,.85fr) minmax(280px,.9fr) minmax(0,1.65fr);gap:12px 16px}
  #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-button,.face-regions-toggle){min-height:72px;font-size:calc(15px * var(--a11y-text-scale,1));border-radius:10px}
  #mediaViewer.personal-photo-desktop #openedCaptionText{min-height:82px;font-size:var(--desktop-media-font);border-radius:10px}
+ #mediaViewer.personal-photo-desktop #openedCaptionForm{padding:0;border:0;background:transparent}
  #mediaViewer.personal-photo-desktop #personalPhotoPrimary>button{min-height:48px;font-size:calc(16px * var(--a11y-text-scale,1))}
  #mediaViewer.personal-photo-desktop #personalPhotoTrash>#personalPhotoTrashButton{border-radius:11px;background:#fff1e9;color:#a14f36}
 }
 @media(min-width:1101px){
+ #mediaViewer.personal-photo-desktop.media-caption-inline.personal-photo-shared #personalPhotoActions{grid-template-rows:auto}
  #mediaViewer.personal-photo-desktop.media-caption-inline.personal-photo-shared #personalPhotoPrimary{display:none}
  #mediaViewer.personal-photo-desktop.media-caption-inline.personal-photo-shared :is(#personalPhotoInformation,#photoInlineDateForm,#openedCaptionForm){grid-row:1}
 }
