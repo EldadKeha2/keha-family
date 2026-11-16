@@ -144,10 +144,15 @@ function close(){
 function sync(){
   if(syncFrame!==null){cancelAnimationFrame(syncFrame);syncFrame=null;}
   const viewer=document.getElementById('mediaViewer'),stage=document.getElementById('mediaStage'),item=window.FamilyMedia?.current();if(!viewer||!stage)return;
-  let button=stage.querySelector('[data-photo-magic]');
+  const rail=viewer.classList?.contains('personal-photo-desktop')?document.getElementById('personalPhotoLeft'):null,host=rail||stage;
+  let button=viewer.querySelector?.('[data-photo-magic]')||stage.querySelector('[data-photo-magic]');
   if(!viewer.open||item?.kind!=='photo'||!item.id){button?.remove();return;}
-  if(!button){button=document.createElement('button');button.type='button';button.className='photo-magic-wand';button.dataset.photoMagic='';button.dataset.i18nSkip='';button.innerHTML=wand;button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();open(window.FamilyMedia.current());});stage.append(button);}
+  if(!button){button=document.createElement('button');button.type='button';button.className='photo-magic-wand';button.dataset.photoMagic='';button.dataset.i18nSkip='';button.innerHTML=wand;button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();open(window.FamilyMedia.current());});}
+  if(button.parentNode!==host){if(rail)host.insertBefore(button,host.firstChild);else host.append(button);}
   const label=tr('אשף עיצוב תמונה · אפקטים ומסגרות','Photo design studio · effects and frames');if(button.title!==label)button.title=label;if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);const disabled=Boolean(window.FamilyMedia.photoState().busy);if(button.disabled!==disabled)button.disabled=disabled;
+  // The desktop wand belongs to the stationary left controls, so navigation
+  // and face-wrapper changes never measure or reposition it against a photo.
+  if(rail){button.hidden=false;if(button.style.left)button.style.left='';if(button.style.top)button.style.top='';return;}
   const image=stage._familyFaceContext?.image||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
   button.hidden=!image?.complete||!image.naturalWidth||window.FamilyPhotoThumbnails?.visiblePixels?.(image)===false;
   if(!button.hidden){const bounds=stage.getBoundingClientRect(),photo=image.getBoundingClientRect();if(photo.width&&photo.height){const left=Math.min(Math.max(8,photo.left-bounds.left+8),Math.max(8,bounds.width-50))+'px',top=Math.min(Math.max(8,photo.top-bounds.top+8),Math.max(8,bounds.height-50))+'px';if(button.style.left!==left)button.style.left=left;if(button.style.top!==top)button.style.top=top;}}
@@ -156,7 +161,7 @@ function queueSync(){
   if(syncFrame!==null)return;
   if(typeof requestAnimationFrame!=='function'||typeof cancelAnimationFrame!=='function'){sync();return;}
   // Face labels and gallery metadata can mutate repeatedly during one frame.
-  // Measure the latest visible photo once, after those changes have settled.
+  // Update the current photo action once, after those changes have settled.
   syncFrame=requestAnimationFrame(()=>{syncFrame=null;sync();});
 }
 window.FamilyPhotoEffects={open,sync,isOpen:()=>Boolean(session)};
