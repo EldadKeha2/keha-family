@@ -29,6 +29,7 @@ test('the phone search opens on demand and shows separate portrait/profile and a
   f.input('רועי');const host=f.$('siteSearchSuggestions');
   assert.equal(host.querySelector('[data-site-search-person]').getAttribute('href'),'#person/roi');
   assert.equal(host.querySelector('img').getAttribute('src'),'/media/123');
+  assert.equal(host.querySelector('img').hasAttribute('data-photo-frame'),false,'Search portraits preserve framing without enabling album edits');
   assert.match(host.querySelector('[data-site-search-related]').textContent,/חיפוש חופשי של רועי אלחריזי/);
   host.querySelector('[data-site-search-person]').click();assert.deepEqual(f.profiles,['roi']);assert.equal(f.$('siteSearchDialog').open,false);
 });

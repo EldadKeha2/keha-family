@@ -9,7 +9,7 @@ const roster=()=>window.FamilyPeopleRoster?.snapshot()||Object.values(window.FAM
 const personName=person=>I.personName(person);
 const safeURL=value=>{try{const url=new URL(value,location.href);return url.origin===location.origin&&/^https?:$/.test(url.protocol)?url.pathname+url.search+url.hash:'';}catch{return '';}};
 const initials=person=>personName(person).split(' ').slice(0,2).map(part=>part[0]||'').join('');
-function portrait(person){const src=safeURL(person.profile);return '<span class="site-search-avatar"><span aria-hidden="true">'+safe(initials(person))+'</span>'+(src?'<img '+(window.FamilyPhotoFraming?.profile(person)||'')+' src="'+safe(src)+'" alt="" loading="lazy" decoding="async">':'')+'</span>';}
+function portrait(person){const src=safeURL(person.profile),frame=person.profileFraming||{},position=key=>Number.isFinite(frame[key])?Math.min(1,Math.max(0,frame[key]))*100:50,style='object-position:'+position('x')+'% '+position('y')+'%;object-fit:'+(frame.fit==='contain'?'contain':'cover');return '<span class="site-search-avatar"><span aria-hidden="true">'+safe(initials(person))+'</span>'+(src?'<img style="'+style+'" src="'+safe(src)+'" alt="" loading="lazy" decoding="async">':'')+'</span>';}
 let dialog,view,button,controller,epoch=0,lastKey=null,result=null,pending=false,params=new URLSearchParams();
 const active=()=>window.FamilyApp?.getView()==='search';
 const routeParams=()=>new URLSearchParams(location.hash.startsWith('#search/')?location.hash.slice(8):'');
