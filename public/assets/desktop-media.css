@@ -49,7 +49,8 @@
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateStatus:empty{display:none}
  #mediaViewer.video-gallery-viewer #photoInlineDateForm{padding:7px 12px;row-gap:4px}
  #mediaViewer.video-gallery-viewer #photoInlineDateForm .photo-date-fields label{gap:2px;text-align:center;line-height:1.3}
- #mediaViewer.video-gallery-viewer #photoInlineDateForm .photo-date-fields input{height:38px;min-height:38px;padding:4px 2px;text-align:center;text-indent:0;line-height:1.2}
+ #mediaViewer.video-gallery-viewer #photoInlineDateForm .photo-date-fields input{height:38px;min-height:38px;padding:4px 2px;text-align:center!important;text-indent:0;line-height:1.2}
+ #mediaViewer.video-gallery-viewer #photoInlineDateForm .photo-date-fields input::placeholder{text-align:center!important}
  #mediaViewer.video-gallery-viewer #photoInlineDateForm .photo-date-fields input::-webkit-outer-spin-button{appearance:none;margin:0}
  #mediaViewer.personal-photo-desktop #personalPhotoActions{grid-template-columns:minmax(220px,.85fr) minmax(280px,.9fr) minmax(0,1.65fr);gap:12px 16px}
  #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-button,.face-regions-toggle){min-height:72px;font-size:calc(15px * var(--a11y-text-scale,1));border-radius:10px}
