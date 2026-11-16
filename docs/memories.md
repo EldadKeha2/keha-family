@@ -10,6 +10,10 @@ and `personIds` are now saved alongside authored content; the year is optional.
 Legacy rows without a category appear under family memories. Editing through
 an older client preserves the existing chapter and tags. `expectedUpdatedAt`
 continues to prevent concurrent overwrites.
+New chapter/tag payloads use a distinct `memory.story.save` state action, so a
+still-active older state object cannot silently drop fields during deployment.
+The state-code rollout has a 30-second grace period for active requests, keeping
+new screens and their storage actions close together across deployments.
 
 `#voices` is an independent audio archive. It supports original MP3, M4A, WAV,
 OGG, AAC, FLAC and audio WebM uploads, tagged people, optional year, description,

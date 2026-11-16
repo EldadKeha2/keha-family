@@ -1059,6 +1059,7 @@ export class FamilyState {
       case 'recording.add':return this.recordings.add(p);
       case 'recording.edit':return this.recordings.edit(p);
       case 'stories':return {stories:this.rows('SELECT data FROM stories').map(row=>publicStory(JSON.parse(row.data),id=>this.person(id))).sort((a,b)=>(a.year??9999)-(b.year??9999)||a.createdAt.localeCompare(b.createdAt)),revision:this.rows("SELECT value FROM meta WHERE id='stories'")[0]?.value||'empty'};
+      case 'memory.story.save':
       case 'story.save':{
         const fields=p.fields,title=text(fields.title,'כותרת',200,true),author=text(fields.author||'','שם המספר או המספרת',100),body=text(fields.body||'','תוכן הסיפור',100000);
         const year=memoryYear(fields.year);

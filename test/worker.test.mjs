@@ -2292,3 +2292,13 @@ test('recording validation rejects bad files, unknown people, empty uploads and 
   assert.equal(f.objects.size,0);assert.equal((await (await f.call('/api/voices')).json()).recordings.length,0);
  }finally{await f.close();}
 });
+
+test('a new tagged memory cannot lose its people or chapter to an older state version during rollout',async()=>{
+ const f=fixture();try{
+  await f.connect();const state=f.env.FAMILY_STATE.get(),actions=[];
+  f.env.FAMILY_STATE.get=()=>({fetch:async request=>{const payload=await request.clone().json();actions.push(payload.action);if(payload.action==='memory.story.save')return Response.json({error:'הפעולה אינה זמינה.'},{status:404});return state.fetch(request);}});
+  const response=await f.call('/api/stories',{method:'POST',body:{title:'זיכרון',body:'תוכן חשוב',category:'roots',personIds:['yona']}});
+  assert.equal(response.status,503);assert.equal((await response.json()).code,'MEMORY_UPDATING');assert.equal(actions.includes('story.save'),false);
+  assert.equal((await (await f.call('/api/stories')).json()).stories.length,0);
+ }finally{await f.close();}
+});

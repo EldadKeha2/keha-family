@@ -222,8 +222,14 @@ async function story(request,env,db,ctx,id){
       attachments.push({name,size:file.size,src:'/media/'+mediaId});
     }
     if(!fields.body&&texts.length)fields.body=text(texts.join('\n\n'),'תוכן הסיפור',100000);
-    const result=await db('story.save',{id,fields,attachments,files:metadata});return json(result,id?200:201);
-  }catch(error){for(const key of uploaded)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));throw error;}
+    // Older active state objects must reject new tagged memories, rather than
+    // silently saving their text while dropping chapter/person fields.
+    const action=fields.category!==undefined||fields.personIds!==undefined?'memory.story.save':'story.save';
+    let result;
+    try{result=await db(action,{id,fields,attachments,files:metadata});}
+    catch(error){if(action==='memory.story.save'&&error.status===404&&error.message==='הפעולה אינה זמינה.')throw new HttpError(503,'לא ניתן לשמור כרגע. הזיכרון נשאר בטופס; נסו שוב בעוד רגע.','MEMORY_UPDATING');throw error;}
+    return json(result,id?200:201);
+  }catch(error){if(error.status>=400&&error.status<500||error.code==='MEMORY_UPDATING')for(const key of uploaded)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));throw error;}
 }
 function snapshot(request,result){const etag='"'+result.revision+'"';return request.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag,'Cache-Control':'no-store'}}):json(result,200,{ETag:etag});}
 function secure(response){

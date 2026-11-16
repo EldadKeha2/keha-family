@@ -15,6 +15,10 @@
     ]
   },
   "durable_objects": {
+    "code_update_strategy": {
+      "mode": "deferred",
+      "max_delay": 30
+    },
     "bindings": [
       {
         "name": "FAMILY_STATE",
