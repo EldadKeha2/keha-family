@@ -132,10 +132,11 @@ test('horizontal trackpad input moves physical pixels, prevents browser default 
 
 test('pad paint and touchscreen action have separate paths without changing the v11 touch animation',async t=>{
  t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true}),touchCalls=[];
+ f.window.FamilyGalleryInput={touchAction:direction=>-direction,padMotion:dx=>-dx};
  f.options.touchStep=(direction,options)=>touchCalls.push({direction,input:options.input});f.api.mount(f.stage,f.options);const rail=f.stage.children[0];
- wheel(f,120);assert.equal(rail.scrollLeft,800,'Pad movement leaves browser scroll direction out of its paint path');assert.equal(rail.children[1].style.transform,'translateX(120px)');t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);assert.deepEqual(touchCalls,[]);
+ wheel(f,120);assert.equal(viewPosition(rail),680,'Pad Next moves right independently of the inverse saved touchscreen direction');assert.equal(rail.children[0]._item.previewSrc,'/next-small');t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);assert.deepEqual(touchCalls,[]);
  pointer(f,'pointerdown');pointer(f,'pointermove',340);assert.equal(rail.scrollLeft,660,'Touch retains its v11 rail movement');assert.equal(rail.children[1].style.transform,'');pointer(f,'pointerup',340);await flush();
- assert.deepEqual(touchCalls,[{direction:1,input:'touch'}]);assert.deepEqual(directions(f),[1],'Touch cannot go through the calibrated pad action');f.api.reset();
+ assert.deepEqual(touchCalls,[{direction:-1,input:'touch'}]);assert.deepEqual(directions(f),[1],'Touch cannot go through the calibrated pad action');f.api.reset();
 });
 
 test('fractional trackpad input is valid without a pixel threshold or a browser scrollend',async t=>{
@@ -239,7 +240,7 @@ test('an unclaimed cancelled Windows pointer retains its joined TouchEvent conta
 });
 
 test('diagnostics expose the actual mounted controller and current input owner',()=>{
- const f=fixture();assert.equal(f.api.version,14);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
+ const f=fixture();assert.equal(f.api.version,15);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
 });
 
 test('a tiny fallback TouchMove after pointercancel releases idle without navigation after quiet',async t=>{

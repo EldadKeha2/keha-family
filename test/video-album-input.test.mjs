@@ -66,7 +66,7 @@ test('generated video galleries retain the same pad action and screen animation 
   if(supported){assert.equal(player.strip().scrollLeft,800-touch*140);assert.equal(player.strip().children[touch>0?0:2]._item.key,expected);}
   f.emit(player.video,'pointerup',{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:300+touch*140,clientY:200});await tick();assert.equal(f.selected.at(-1),expected);player.close();
   const reopened=f.mount('second');f.emit(reopened.video,'wheel',{deltaX:pad*140,deltaY:0,clientX:400,clientY:200});
-  if(supported){assert.equal(reopened.strip().scrollLeft,800-touch*140);assert.equal(reopened.strip().children[touch>0?0:2]._item.key,expected);}
+  if(supported){assert.equal(reopened.strip().scrollLeft,800-pad*140);assert.equal(reopened.strip().children[pad>0?0:2]._item.key,expected);}
   await new Promise(resolve=>setTimeout(resolve,150));await tick();assert.equal(f.selected.at(-1),expected);reopened.close();
  }
 });
@@ -77,4 +77,14 @@ test('a desktop reference pair cannot change the phone video fallback direction'
   const point={identifier:4,clientX:x,clientY:200,target:player.video};f.emit(player.video,type,{touches:type==='touchend'?[]:[point],changedTouches:[point]});
  }
  await tick();assert.equal(f.selected.at(-1),'b');player.close();
+});
+
+test('generated video galleries accept pad navigation over their dialog controls and background',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported,bridge:{pad:-1,touch:1},threeItems:true}),player=f.mount('first'),button=f.document.createElement('button');button.textContent='Download';player.dialog.append(button);
+  f.emit(button,'wheel',{deltaX:100,deltaY:0,clientX:400,clientY:200});f.emit(player.dialog,'wheel',{deltaX:40,deltaY:0,clientX:400,clientY:200});
+  if(supported){assert.equal(player.strip().scrollLeft,660);assert.equal(player.strip().children[0]._item.key,'b');}
+  await new Promise(resolve=>setTimeout(resolve,150));await tick();assert.deepEqual(f.selected,['b']);
+  f.emit(button,'wheel',{deltaX:-140,deltaY:0,clientX:400,clientY:200});await new Promise(resolve=>setTimeout(resolve,150));await tick();assert.deepEqual(f.selected,['b','a']);player.close();
+ }
 });
