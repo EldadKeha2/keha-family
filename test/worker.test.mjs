@@ -79,11 +79,11 @@ test('deleting an interior video segment saves both retained sections in place a
   await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url)),item=await taggedUpload(f,'/api/collections/videos',bytes,'film.mp4');
   const source=(await(await f.call('/api/media/'+item.id+'/view')).json()).item,objectCount=f.objects.size;
   const body={operationId:uid(),name:source.name,caption:source.caption,range:{start:2.125,end:5.875,remove:true},expectedVideoRevision:source.videoRevision};
-  const response=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(response.status,200,await response.clone().text());const saved=(await response.json()).item;
+  const response=await f.call('/api/media/'+item.id+'/video-remove',{method:'POST',body});assert.equal(response.status,200,await response.clone().text());const saved=(await response.json()).item;
   assert.equal(saved.id,item.id);assert.equal(saved.duration,4.25);assert.equal(f.objects.size,objectCount+1);
   const original=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data).videoOriginal;assert.ok(original.key);
-  const retry=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(retry.status,200);assert.equal((await retry.json()).alreadySaved,true);assert.equal(f.objects.size,objectCount+1);
-  const second=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body:{...body,operationId:uid(),expectedVideoRevision:saved.videoRevision,range:{start:1,end:3,remove:true}}});assert.equal(second.status,200,await second.clone().text());assert.equal((await second.json()).item.duration,2.25);
+  const retry=await f.call('/api/media/'+item.id+'/video-remove',{method:'POST',body});assert.equal(retry.status,200);assert.equal((await retry.json()).alreadySaved,true);assert.equal(f.objects.size,objectCount+1);
+  const second=await f.call('/api/media/'+item.id+'/video-remove',{method:'POST',body:{...body,operationId:uid(),expectedVideoRevision:saved.videoRevision,range:{start:1,end:3,remove:true}}});assert.equal(second.status,200,await second.clone().text());assert.equal((await second.json()).item.duration,2.25);
  }finally{await f.close();}
 });
 test('video viewing copies publish behind the existing media access route while original bytes stay unchanged',async()=>{

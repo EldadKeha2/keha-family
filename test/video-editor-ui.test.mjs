@@ -101,7 +101,7 @@ test('segment deletion arms red selection first, then requires a separate confir
  await f.get('videoClipDeleteRange').emit('click');assert.equal(f.requests.length,0);assert.equal(f.get('videoClipDeleteRange')['aria-pressed'],'true');assert.equal(f.get('videoClipDeleteLabel').textContent,'אשר מחיקה');assert.equal(f.get('videoClipLength').textContent,'01:30.00');assert.equal(f.get('videoClipSave').disabled,true);
  await f.get('videoClipDeleteRange').emit('click');assert.equal(f.requests.length,0);assert.equal(f.document.body.children.at(-1).open,true);
  await f.get('videoClipDeleteConfirm').emit('click');await new Promise(resolve=>setImmediate(resolve));
- assert.equal(f.requests.length,1);assert.deepEqual(f.requests[0].body.range,{start:10,end:40,remove:true});assert.equal(f.requests[0].path,'api/media/film/video-edit');
+ assert.equal(f.requests.length,1);assert.deepEqual(f.requests[0].body.range,{start:10,end:40,remove:true});assert.equal(f.requests[0].path,'api/media/film/video-remove');
 });
 test('canceling segment deletion restores green selection, and the entire video cannot be deleted as a segment',async()=>{
  const f=editorFixture();await f.open();assert.equal(f.get('videoClipDeleteRange').disabled,true);

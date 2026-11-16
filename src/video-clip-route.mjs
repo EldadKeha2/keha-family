@@ -39,8 +39,10 @@ export async function videoClipRoute(request,env,db,ctx,id){
  }catch(error){if(key&&error.status>=400&&error.status<500)ctx.waitUntil(deleteObject(env,key).catch(()=>{}));throw error;}
 }
 
-export async function videoEditRoute(request,env,db,ctx,id){
- const body=await readJSON(request,100000),prepared=await db('video.edit.prepare',{...body,id});
+export async function videoEditRoute(request,env,db,ctx,id,{removeOnly=false}={}){
+ const body=await readJSON(request,100000);
+ if(removeOnly&&body.range?.remove!==true)throw new HttpError(400,'סמנו את הקטע שברצונכם למחוק.');
+ const prepared=await db('video.edit.prepare',{...body,id});
  if(prepared.existing)return json(prepared.existing);
  const source=prepared.source;let rendered=null;
  if(prepared.range&&source.provider!=='youtube')rendered=await renderVideoRange(request,env,ctx,source,prepared.range,id);
@@ -51,8 +53,10 @@ export async function videoEditRoute(request,env,db,ctx,id){
  }catch(error){if(rendered&&error.status>=400&&error.status<500)ctx.waitUntil(deleteObject(env,rendered.key).catch(()=>{}));throw error;}
 }
 
-export async function videoUploadFinalize(request,env,db,ctx,id){
- const body=await readJSON(request,100000),prepared=await db('video.upload.prepare',{...body,id});
+export async function videoUploadFinalize(request,env,db,ctx,id,{removeOnly=false}={}){
+ const body=await readJSON(request,100000);
+ if(removeOnly&&body.metadata?.range?.remove!==true)throw new HttpError(400,'סמנו את הקטע שברצונכם למחוק.');
+ const prepared=await db('video.upload.prepare',{...body,id});
  if(prepared.existing)return json(prepared.existing);
  const source=prepared.source;let rendered=null;
  if(prepared.metadata.range)rendered=await renderVideoRange(request,env,ctx,source,prepared.metadata.range,id);

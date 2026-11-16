@@ -92,6 +92,7 @@ function pointerDown(event){
   pending.timer=setTimeout(()=>{
     if(press!==pending||!card.isConnected)return;
     pending.fired=true;enter(card);suppress={card,until:Date.now()+1600};
+    try{card.setPointerCapture?.(pending.id);}catch{}
     card.querySelector('video')?.pause();
   },600);
 }

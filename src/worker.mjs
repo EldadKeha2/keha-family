@@ -356,9 +356,9 @@ export default {
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-assets\/(poster|faststart|low|medium)$/.exec(path)))return await saveVideoAssetRoute(request,env,db,ctx,match[1],match[2]);
         if(path==='/api/collections/videos/categories'){const body=await readJSON(request,2000);return json(await db('video.category.create',{name:body.name,nameEn:body.nameEn}),201);}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-category$/.exec(path))){const body=await readJSON(request,2000);return json(await db('video.category.assign',{id:match[1],group:body.group,expectedGroup:body.expectedGroup}));}
-        if((match=/^\/api\/media\/([a-f0-9]{32})\/video-upload$/.exec(path)))return await videoUploadFinalize(request,env,db,ctx,match[1]);
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/(video-upload|video-upload-remove)$/.exec(path)))return await videoUploadFinalize(request,env,db,ctx,match[1],{removeOnly:match[2]==='video-upload-remove'});
         if((match=/^\/api\/media\/([a-f0-9]{32})\/clip$/.exec(path)))return await videoClipRoute(request,env,db,ctx,match[1]);
-        if((match=/^\/api\/media\/([a-f0-9]{32})\/video-edit$/.exec(path)))return await videoEditRoute(request,env,db,ctx,match[1]);
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/(video-edit|video-remove)$/.exec(path)))return await videoEditRoute(request,env,db,ctx,match[1],{removeOnly:match[2]==='video-remove'});
         if((match=/^\/api\/media\/([a-f0-9]{32})\/framing$/.exec(path))){const body=await readJSON(request,2000);return json(await db('media.photo-frame',{id:match[1],framing:body.framing}));}
         if((match=/^\/api\/media\/([a-f0-9]{32})\/(thumbnail|preview)$/.exec(path)))return await saveThumbnail(request,env,db,ctx,match[1],match[2]);
         if((match=/^\/api\/media\/([a-f0-9]{32})\/faces\/ignore$/.exec(path))){const body=await readJSON(request,4096);return json(await db('media.face.ignore',{id:match[1],photoRevision:body.photoRevision,rect:body.rect,ignored:body.ignored,faceId:body.faceId,expectedRevision:body.expectedRevision}));}
