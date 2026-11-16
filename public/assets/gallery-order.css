@@ -42,7 +42,6 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
   .gallery-pager .gallery-page-buttons{grid-column:3;grid-row:1;gap:4px}
   .gallery-pager .gallery-page-buttons button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex:1 1 0;width:40px;min-width:0;height:44px;min-height:44px;padding:2px}
   .gallery-page-buttons button>span{display:block;order:1;font-size:calc(10px * var(--a11y-text-scale,1));line-height:1.2;white-space:nowrap}.gallery-page-buttons svg{display:block;width:16px;height:16px}
-  html[dir=rtl] .gallery-page-buttons svg{transform:rotate(180deg)}
   .gallery-pager :is([data-gallery-page-label],[data-person-page-label]){grid-column:1/-1;grid-row:2;font-size:12px;line-height:1.4;margin:0}
   body[data-active-view=gallery] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px 16px;padding:12px 14px 8px}
   body[data-active-view=gallery] .workspace-title{display:grid;grid-template-columns:18px minmax(0,1fr);min-width:0;gap:6px 8px}
