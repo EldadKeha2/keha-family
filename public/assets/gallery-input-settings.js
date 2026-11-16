@@ -1,14 +1,28 @@
 (() => {
   'use strict';
-  const key='keha-gallery-pad-direction-v2',setup=new URL(location.href).searchParams.get('gesture-check'),steady=setup==='11',confirmationKey='keha-gallery-pad-right-confirmed-v'+(steady?'11':'10'),guided=['10','11'].includes(setup),checking=['6','7','8','9','10','11'].includes(setup);
+  const key='keha-gallery-pad-direction-v2',setup=new URL(location.href).searchParams.get('gesture-check'),bridgeSetup=setup==='14',steady=setup==='11',confirmationKey='keha-gallery-pad-right-confirmed-v'+(steady?'11':'10'),guided=['10','11','14'].includes(setup),checking=['6','7','8','9','10','11','14'].includes(setup);
   // Wheel signs depend on device scrolling preferences. Preserve the gallery's
   // convention until an explicit physical-right sample sets this device's sign.
-  let factor=1,calibrating=checking,last='waiting',rawWheel='none',lastPointer='none',lastTouch='none',panel=null,scheduled=false;
+  let factor=1,calibrating=checking&&!bridgeSetup,last='waiting',rawWheel='none',lastPointer='none',lastTouch='none',panel=null,scheduled=false;
   let calibrationTotal=0,calibrationPeak=0;
+  const bridgeKey='keha-desktop-gesture-bridge-v14';
+  let bridgeActive=bridgeSetup,bridgePhase=bridgeSetup?'pad':'off',padRight=1,touchRight=1;
   try{
     const saved=window.localStorage?.getItem(key);
-    if(saved==='-1'||saved==='1'){factor=Number(saved);calibrating=guided&&window.localStorage?.getItem(confirmationKey)!==saved;}
+    if(saved==='-1'||saved==='1'){factor=Number(saved);calibrating=!bridgeSetup&&guided&&window.localStorage?.getItem(confirmationKey)!==saved;}
+    const savedBridge=JSON.parse(window.localStorage?.getItem(bridgeKey)||'null');
+    if(savedBridge&&[-1,1].includes(savedBridge.pad)&&[-1,1].includes(savedBridge.touch)){padRight=savedBridge.pad;touchRight=savedBridge.touch;bridgeActive=true;bridgePhase='ready';calibrating=false;}
   }catch{}
+  function observePadGesture(dx){if(bridgeActive&&bridgePhase==='pad'&&Number.isFinite(dx)&&dx){padRight=Math.sign(dx);schedule();}}
+  function commitPadGesture(dx){if(bridgeActive&&bridgePhase==='pad'&&Number.isFinite(dx)&&dx){padRight=Math.sign(dx);bridgePhase='touch';schedule();}}
+  function observeTouchGesture(dx){if(bridgeActive&&bridgePhase==='touch'&&Number.isFinite(dx)&&dx){touchRight=Math.sign(dx);schedule();}}
+  function commitTouchGesture(dx){
+    if(!bridgeActive||bridgePhase!=='touch'||!Number.isFinite(dx)||!dx)return;
+    touchRight=Math.sign(dx);bridgePhase='ready';try{window.localStorage?.setItem(bridgeKey,JSON.stringify({pad:padRight,touch:touchRight}));}catch{}schedule();
+  }
+  function resetBridge(){bridgeActive=true;bridgePhase='pad';padRight=touchRight=1;clearCalibration();try{window.localStorage?.removeItem(bridgeKey);}catch{}schedule();}
+  const touchAction=direction=>bridgeActive?direction*touchRight*padRight:direction;
+  const padMotion=dx=>bridgeActive?dx*padRight*touchRight:dx;
   function saveDirection(){
     try{window.localStorage?.setItem(key,String(factor));window.localStorage?.setItem(confirmationKey,String(factor));}catch{}
   }
@@ -42,11 +56,13 @@
     if(!panel)return;
     const viewer=document.getElementById('mediaViewer'),stage=document.getElementById('mediaStage'),strip=stage?.querySelector('.native-photo-strip');
     const parent=viewer?.open?viewer:document.body;if(panel.parentNode!==parent)parent.append(panel);
-    const native=window.FamilyPhotoNative,version=native?.version||11;
+    const native=window.FamilyPhotoNative,version=native?.version||14;
     panel.querySelector('[data-gesture-instruction]').textContent=calibrating?
       (viewer?.open?'גרסה 11 · החליקו עכשיו ימינה פעם אחת בפאד, על התמונה. ההחלקה הזו תקבע: ימינה = הבא.':'גרסה 11 · פתחו תמונה והחליקו ימינה פעם אחת בפאד. הכיוון יותאם ויישמר אוטומטית במחשב הזה.'):
       'גרסה 11 · הגדרת הפאד נשמרה. ימינה מעביר תמונה אחת להבא. אם הכיוון הפוך, לחצו על ״הפוך כיוון הפאד״.';
     panel.querySelector('[data-gesture-instruction]').textContent=panel.querySelector('[data-gesture-instruction]').textContent.replace('גרסה 11','גרסה '+version);
+    if(bridgeActive)panel.querySelector('[data-gesture-instruction]').textContent='גרסה '+version+' · '+(bridgePhase==='pad'?(viewer?.open?'שלב 1 מתוך 2: החליקו ימינה פעם אחת בפאד. נשמור את בחירת התמונה שעובדת אצלכם.':'שלב 1 מתוך 2: פתחו תמונה, ואז החליקו ימינה פעם אחת בפאד.'):
+      bridgePhase==='touch'?'שלב 2 מתוך 2: החליקו ימינה פעם אחת ישירות על מסך המגע של המחשב. נשמור את האנימציה שעובדת אצלכם.':'ההתאמה נשמרה במחשב הזה: בחירת התמונה של הפאד והאנימציה של מסך המגע משותפות עכשיו לשניהם.');
     const face=stage?._familyFaceContext;
     const source=[...document.scripts].map(script=>script.getAttribute('src')).find(src=>src?.includes('photo-native.js'))||'native missing';
     const counter=document.getElementById('mediaViewerCounter')?.textContent||'—';
@@ -56,10 +72,12 @@
       ' | input '+(native?.isActive?.(stage)?'active':'idle')+' | loading '+(stage?.getAttribute('aria-busy')||'false')+
       ' | face '+(face?(face.saving?'saving':face.zoom||1):'none')+' | '+source+
       '\npointer '+lastPointer+' | touch '+lastTouch+'\ncontroller '+(diagnostic?JSON.stringify(diagnostic):'not available');
-    panel.querySelector('[data-gesture-recalibrate]').hidden=calibrating;
-    panel.querySelector('[data-gesture-reverse]').hidden=calibrating;
+    panel.querySelector('output').textContent+='\nbridge '+bridgePhase+' padRightAction '+padRight+' touchRightMotion '+touchRight;
+    panel.querySelector('[data-gesture-recalibrate]').hidden=calibrating||bridgeActive;
+    panel.querySelector('[data-gesture-reverse]').hidden=calibrating||bridgeActive;
+    panel.querySelector('[data-gesture-bridge-reset]').hidden=!bridgeActive||bridgePhase!=='ready';
   }
-  window.FamilyGalleryInput={wheelDelta,wheelFactor:()=>factor,isCalibrating:()=>calibrating,reverseWheelDirection,finishWheelDirection};
+  window.FamilyGalleryInput={wheelDelta,wheelFactor:()=>factor,isCalibrating:()=>calibrating,reverseWheelDirection,finishWheelDirection,observePadGesture,commitPadGesture,observeTouchGesture,commitTouchGesture,touchAction,padMotion,resetBridge,desktopBridgeActive:()=>bridgeActive,desktopBridgePhase:()=>bridgePhase};
   if(!checking)return;
   function init(){
     panel=document.createElement('aside');panel.id='galleryGestureCheck';panel.setAttribute('aria-label','כיוון ובדיקת ההחלקה');
@@ -68,6 +86,7 @@
     const reverse=document.createElement('button');reverse.type='button';reverse.textContent='הפוך כיוון הפאד';reverse.setAttribute('data-gesture-reverse','');Object.assign(reverse.style,{padding:'6px 12px',fontSize:'15px'});reverse.addEventListener('click',reverseWheelDirection);panel.append(reverse);
     const again=document.createElement('button');again.type='button';again.textContent='התאמה מחדש לפי החלקה ימינה';again.setAttribute('data-gesture-recalibrate','');Object.assign(again.style,{marginInlineStart:'12px',padding:'6px 10px'});
     again.addEventListener('click',()=>{calibrating=true;clearCalibration();last='waiting for RIGHT swipe';schedule();});panel.append(again);
+    const bridgeReset=document.createElement('button');bridgeReset.type='button';bridgeReset.textContent='התאמת שתי ההחלקות מחדש';bridgeReset.setAttribute('data-gesture-bridge-reset','');Object.assign(bridgeReset.style,{padding:'6px 12px',fontSize:'15px'});bridgeReset.addEventListener('click',resetBridge);panel.append(bridgeReset);
     const copy=document.createElement('button');copy.type='button';copy.textContent='העתקת פרטי הבדיקה';Object.assign(copy.style,{marginInlineStart:'12px',padding:'3px 10px'});
     copy.addEventListener('click',async()=>{render();try{await navigator.clipboard.writeText(panel.querySelector('output').textContent);copy.textContent='פרטי הבדיקה הועתקו';}catch{copy.textContent='אפשר לסמן ולהעתיק את הפרטים למטה';}});
     const output=document.createElement('output');output.dir='ltr';Object.assign(output.style,{display:'block',fontSize:'11px',textAlign:'left',overflowWrap:'anywhere',whiteSpace:'pre-wrap',userSelect:'text'});

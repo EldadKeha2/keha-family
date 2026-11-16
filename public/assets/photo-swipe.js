@@ -10,7 +10,17 @@
     // emit both touch and pointer streams). Paint only the latest finger
     // position once per frame; commit that position before release navigation.
     const preview=(dx,options)=>{if(!move)return;if(!frames){move(dx,options);return;}pendingPreview={dx,options};if(previewFrame===null)previewFrame=requestAnimationFrame(()=>{previewFrame=null;const pending=pendingPreview;pendingPreview=null;if(pending)move(pending.dx,pending.options);});};
-    const navigate=(dx,options)=>{const action=dx>0?right:left;return action?action(options):step(dx>0?1:-1,options);};
+    const desktopBridge=()=>mouse()?window.FamilyGalleryInput:null;
+    const touchDirection=dx=>desktopBridge()?.touchAction?.(Math.sign(dx))??Math.sign(dx);
+    const wheelMotion=dx=>desktopBridge()?.padMotion?.(dx)??dx;
+    const navigate=(dx,options={})=>{
+      const bridge=desktopBridge();
+      if(options.input==='wheel')bridge?.commitPadGesture?.(dx);
+      else if(options.input==='touch')bridge?.commitTouchGesture?.(dx);
+      const direction=options.input==='touch'?touchDirection(dx):Math.sign(dx),action=direction>0?right:left;
+      stage.setAttribute?.('data-gallery-last-input',options.input||'manual');stage.setAttribute?.('data-gallery-last-action',direction>0?'next':'previous');
+      return action?action(options):step(direction,options);
+    };
     const idle=new Set(),finished=()=>{for(const resolve of idle)resolve();idle.clear();};
     const controls='a,input,textarea,select,video,iframe,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
     const controlAt=event=>{
@@ -82,7 +92,8 @@
         if(typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       }
       blockClick();if(event.cancelable)event.preventDefault();
-      preview(dx,{queued:g.mode==='queued'});
+      if(!g.mouse&&g.desktop)desktopBridge()?.observeTouchGesture?.(dx);
+      preview(dx,{queued:g.mode==='queued',actionDirection:g.mouse?Math.sign(dx):touchDirection(dx)});
     };
     document.addEventListener('pointermove',event=>{if(!touchOnly()&&(!touchStart||preferPointer()))moved(event);},{capture:true,passive:false});
     const released=event=>{
@@ -95,7 +106,7 @@
       gesture=null;touchStart=null;stage.classList.remove('photo-pointer-dragging');finished();
       if(event.cancelable)event.preventDefault();
       // Use the gallery's actual Next/Previous actions for physical gestures.
-      navigate(dx,{dragX:dx,queued:true,...(g.mode==='queued'?{native:true}:{})});
+      navigate(dx,{dragX:dx,queued:true,input:g.mouse?'mouse':'touch',...(g.mode==='queued'?{native:true}:{})});
     };
     document.addEventListener('pointerup',event=>{if(!touchOnly()&&(!touchStart||preferPointer()))released(event);},{capture:true,passive:false});
     document.addEventListener('pointercancel',event=>{if(!touchOnly()&&gesture?.id===event.pointerId){blockClick();reset(true);}},{capture:true,passive:true});
@@ -143,12 +154,12 @@
       const dx=window.FamilyGalleryInput?.wheelDelta?.(rawDx)??rawDx;
       if(event.cancelable)event.preventDefault();blockClick();
       const sample=window.FamilyPhotoNative?.wheelSample?.(stage,dx);
-      const complete=done=>{if(!done)return;window.FamilyPhotoNative?.finishWheelEpisode?.(stage,done.episode);window.FamilyGalleryInput?.finishWheelDirection?.();if(!wheelGesture)finished();if(enabled()&&Math.abs(done.dx)>=distance()){flushPreview();navigate(done.dx,{dragX:done.dx,queued:true,native:true});}else {clearPreview();cancel?.();}};
+      const complete=done=>{if(!done)return;window.FamilyPhotoNative?.finishWheelEpisode?.(stage,done.episode);window.FamilyGalleryInput?.finishWheelDirection?.();if(!wheelGesture)finished();if(enabled()&&Math.abs(done.dx)>=distance()){flushPreview();navigate(done.dx,{dragX:wheelMotion(done.dx),queued:true,native:true,input:'wheel'});}else {clearPreview();cancel?.();}};
       const finish=()=>{wheelTimer=null;const done=wheelGesture;wheelGesture=null;complete(done);};
       if(sample?.ignore){if(wheelGesture){clearTimeout(wheelTimer);wheelTimer=setTimeout(finish,120);}return;}
       if(sample?.replace&&wheelGesture)wheelGesture.dx=0;
       if(sample?.split&&wheelGesture){clearTimeout(wheelTimer);const done=wheelGesture;wheelGesture={dx:0,episode:sample.episode};complete(done);}
-      wheelGesture||={dx:0,episode:sample?.episode};wheelGesture.dx+=dx;preview(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
+      wheelGesture||={dx:0,episode:sample?.episode};wheelGesture.dx+=dx;desktopBridge()?.observePadGesture?.(wheelGesture.dx);preview(wheelMotion(wheelGesture.dx),{queued:true,actionDirection:Math.sign(wheelGesture.dx)});clearTimeout(wheelTimer);
       wheelTimer=setTimeout(finish,120);
     },{capture:true,passive:false});
     // A swipe starting over a face must not also open or remove its tag.

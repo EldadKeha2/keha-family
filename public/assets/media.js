@@ -525,10 +525,10 @@
       videoSurface:()=>current()?.kind==='video'?stage.querySelector('video'):null,
       vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
       step,right:options=>swipePhoto(1,options),left:options=>swipePhoto(-1,options),
-      move:(dx,{queued=false}={})=>{
+      move:(dx,{queued=false,actionDirection=Math.sign(dx)}={})=>{
         if(current()?.kind!=='photo')return;
         if(!queued){window.FamilyPhotoPresentation?.drag(stage,dx);return;}
-        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=swipeDirection(dx>0?1:-1),next=photoNeighbour(direction,from);
+        const waiting=state.items.findIndex(item=>identity(item)===state.photoTarget),from=waiting>=0?waiting:state.index,direction=swipeDirection(actionDirection),next=photoNeighbour(direction,from);
         window.FamilyPhotoPresentation?.dragQueued?.(stage,dx,{current:state.items[from],next});
       },cancel:()=>window.FamilyPhotoPresentation?.settle()
     });

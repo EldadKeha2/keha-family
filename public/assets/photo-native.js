@@ -116,7 +116,7 @@
     if(!b.anchored||Math.abs(width-b.width)>1){b.width=width;b.viewport.scrollLeft=width;b.anchored=true;b.viewport.style.visibility='';}
     return true;
   }
-  function arrange(b){side(b.viewport.children[0],b.next);side(b.viewport.children[2],b.previous);}
+  function arrange(b){const forward=(window.FamilyGalleryInput?.touchAction?.(1)??1)>0;side(b.viewport.children[0],forward?b.next:b.previous);side(b.viewport.children[2],forward?b.previous:b.next);}
   function releaseCapture(b,g){if(g?.pointerId!=null)try{b.stage.releasePointerCapture?.(g.pointerId);}catch{}}
   function reset(stage){
     if(!active||stage&&active.stage!==stage)return;
@@ -146,12 +146,17 @@
     const navigate=b.navigate=(direction,input='touch')=>{
       if(active!==b||!anchor(b))return;
       if(!direction||!b.enabled()){recenter();resolveIdle(b);return;}
+      const bridge=window.FamilyGalleryInput;
+      if(input==='wheel')bridge?.commitPadGesture?.(direction);else bridge?.commitTouchGesture?.(direction);
+      const actionDirection=input==='touch'?(bridge?.touchAction?.(direction)??direction):direction;
+      const motionDirection=input==='wheel'?(bridge?.padMotion?.(direction)??direction):direction;
+      arrange(b);
       // Copy the selected preview before step() can update logical neighbours.
       // Input ownership is already complete, so image preparation can paint.
-      holdPreview(b,viewport.children[direction>0?0:2]);recenter();resolveIdle(b);b.pending++;
-      stage.setAttribute('data-gallery-last-input',input);stage.setAttribute('data-gallery-last-action',direction>0?'next':'previous');
+      holdPreview(b,viewport.children[motionDirection>0?0:2]);recenter();resolveIdle(b);b.pending++;
+      stage.setAttribute('data-gallery-last-input',input);stage.setAttribute('data-gallery-last-action',actionDirection>0?'next':'previous');
       const action=input==='touch'?(b.touchStep||b.step):b.step;
-      let request;try{request=action(direction,{native:true,queued:true,input});}catch{request=null;}
+      let request;try{request=action(actionDirection,{native:true,queued:true,input});}catch{request=null;}
       Promise.resolve(request).catch(()=>{}).finally(()=>{if(active!==b)return;b.pending--;if(!b.pending&&!b.busy?.())clearCover(b);});
     };
     const nativeControl=event=>{
@@ -204,6 +209,7 @@
       if(g.axis==='y'){b.lastDecision='vertical';blockClick(b);prevent(event);b.vertical?.(g.lastY-event.clientY);g.lastY=event.clientY;return;}
       if(g.axis!=='x'){b.lastDecision='await-axis';return;}
       b.lastDecision='horizontal';
+      window.FamilyGalleryInput?.observeTouchGesture?.(g.dx);arrange(b);
       blockClick(b);prevent(event);draw(g);
     };
     b.release=event=>{
@@ -315,12 +321,16 @@
       }
       if(active!==b)return;b.wheel||={dx:0,episode:sample.episode};b.wheel.dx+=dx;
       b.lastDecision='wheel-owned';
-      // Pad paint uses physical CSS translation, separately from its already
-      // calibrated navigation action. Screen-touch painting stays on v11's
-      // existing finger-following rail path.
-      viewport.scrollLeft=b.width;
-      const x=Math.max(-b.width,Math.min(b.width,b.wheel.dx));
-      for(const pane of viewport.children){pane.style.willChange='transform';pane.style.transform='translateX('+x+'px)';}
+      window.FamilyGalleryInput?.observePadGesture?.(b.wheel.dx);arrange(b);
+      // A completed desktop reference pair shares the exact screen-touch
+      // painting path, while preserving the pad's existing navigation action.
+      if(window.FamilyGalleryInput?.desktopBridgeActive?.()){
+        clearWheelPaint();draw({dx:window.FamilyGalleryInput.padMotion(b.wheel.dx)});
+      }else{
+        viewport.scrollLeft=b.width;
+        const x=Math.max(-b.width,Math.min(b.width,b.wheel.dx));
+        for(const pane of viewport.children){pane.style.willChange='transform';pane.style.transform='translateX('+x+'px)';}
+      }
       clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);
     };
     bindStage(stage);
@@ -330,5 +340,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:13,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:14,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();
