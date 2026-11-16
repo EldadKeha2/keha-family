@@ -9,7 +9,7 @@ export function personPageParams(params){
 export function personAlbumOptions(options,key){
   const page=Number(options[key]||1),value=options[key+'Size'],all=value==='all',size=all?null:Number(value||(key==='photos'?25:10));
   if(!Number.isSafeInteger(page)||page<1)throw new HttpError(400,'בחרו מספר עמוד תקין.');
-  if(!all&&(!Number.isSafeInteger(size)||![10,25,100,200,300,400,500].includes(size)))throw new HttpError(400,'בחרו מספר פריטים תקין בעמוד.');
+  if(!all&&(!Number.isSafeInteger(size)||![10,20,25,50,100,200,300,400,500].includes(size)))throw new HttpError(400,'בחרו מספר פריטים תקין בעמוד.');
   const sort=options[key+'Sort'],order=sort?galleryOrdering({sort,seed:options[key+'Seed']}):{sort:'uploaded-desc',seed:null,sql:'m.rowid DESC',args:[]};
   const refinement=galleryRefinement({person:options[key+'Person'],unit:options[key+'Unit']}),labels=galleryLabels(options[key+'Labels']);
   return {page,size,all,order,refinement,labels};

@@ -114,3 +114,17 @@ test('nursery focused requests have independent validators and normal paging is 
   assert.equal((await f.call('/api/nursery/yona?focus=bad')).status,400);
  }finally{f.close();}
 });
+
+test('personal album page sizes include 10, 20, 50 and 100 with correct page boundaries and validators',async()=>{
+ const f=fixture();try{
+  for(let n=1;n<=63;n++)f.insert(n);
+  for(const size of [10,20,50,100]){
+   const response=await f.call('/api/people/yona/page?photosSize='+size),first=await response.json();
+   assert.equal(response.status,200);assert.equal(first.albums.photos.size,size);assert.equal(first.albums.photos.items.length,Math.min(size,63));assert.equal(first.albums.photos.pages,Math.ceil(63/size));assert.equal(first.albums.photos.total,63);
+   const second=await(await f.call('/api/people/yona/page?photosSize='+size+'&photos=2')).json();
+   if(size<63){assert.equal(second.albums.photos.page,2);assert.equal(second.albums.photos.items.length,Math.min(size,63-size));assert.ok(second.albums.photos.items.every(item=>!first.albums.photos.items.some(other=>other.id===item.id)));}
+   assert.equal((await f.call('/api/people/yona/page?photosSize='+size,{'If-None-Match':response.headers.get('ETag')})).status,304);
+  }
+  const smaller=await f.call('/api/people/yona/page?photosSize=20');assert.equal((await f.call('/api/people/yona/page?photosSize=50',{'If-None-Match':smaller.headers.get('ETag')})).status,200);
+ }finally{f.close();}
+});
