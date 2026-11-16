@@ -4529,7 +4529,7 @@ img.photo-framing-active{cursor:grabbing!important;outline:2px dashed #657950;ou
  #videoClipEditor #videoClipClose{display:grid;place-items:center;box-sizing:border-box;width:44px;height:44px;min-height:44px;padding:0;border-radius:9px;font-size:30px}
  #videoClipEditor #videoClipPlayer{flex:1 1 32dvh;min-height:120px;height:auto;max-height:48dvh;border-radius:12px}
  #videoClipEditor .video-clip-player{height:100%;min-height:0}
- #videoClipEditor .video-clip-timeline label{gap:16px;min-height:36px;font-size:calc(15px * var(--a11y-text-scale,1))}
+ #videoClipEditor .video-clip-timeline label{gap:16px;min-height:36px;font-size:calc(15px * var(--a11y-text-scale,1));white-space:nowrap}
  #videoClipEditor .video-clip-track{height:7px;margin-bottom:5px}
  #videoClipEditor .video-clip-timeline input[type=range]{height:36px;min-height:36px}
  #videoClipEditor .video-clip-timing{grid-template-columns:minmax(0,2fr) minmax(130px,1fr) minmax(180px,1.2fr);gap:14px;padding:14px;border:1px solid #e1d5bd;border-radius:12px;background:#f5efe2}
