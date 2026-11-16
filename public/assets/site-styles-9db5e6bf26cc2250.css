@@ -1593,6 +1593,9 @@ html[dir=rtl] #mediaViewer .media-viewer-paging{direction:ltr}
 .photo-edit-date-fields label{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:12px;color:#8a795c}
 .photo-edit-date-fields input,.photo-edit-caption textarea{box-sizing:border-box;min-width:0;width:100%;border:1px solid #d5c9ae;border-radius:6px;background:#fffdf8;color:#554c39;font:16px/1.4 var(--sans);padding:7px 9px}
 .photo-edit-date-fields input{height:41px;text-align:center;padding-inline:4px;appearance:textfield;-moz-appearance:textfield}
+/* Numeric date parts stay centered even when Hebrew form fields align right. */
+.photo-upload-editor .photo-edit-date-fields input[type=number]{direction:ltr;text-align:center!important;text-indent:0}
+.photo-upload-editor .photo-edit-date-fields input[type=number]::placeholder{text-align:center!important}
 .photo-edit-date-fields input::-webkit-inner-spin-button,.photo-edit-date-fields input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .photo-edit-copy-date{display:grid;place-items:center;align-self:end;box-sizing:border-box;width:36px;height:41px;padding:6px;border:1px solid #b7c49d;border-radius:6px;background:#f2f5eb;color:#5f7446;cursor:pointer}
 .photo-edit-copy-date:hover:not(:disabled){background:#e7eedb;border-color:#8da46e}
