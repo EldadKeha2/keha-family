@@ -1,6 +1,29 @@
 (() => {
   'use strict';
   const players=new WeakMap();
+  const durations=new Map(),validDuration=value=>Number.isFinite(Number(value))&&Number(value)>0?Number(value):null;
+  const durationKey=item=>String(item.id||item.file||item.src)+'|'+(item.videoRevision||'original');
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function duration(item){
+    const explicit=validDuration(item.duration);if(explicit)return explicit;
+    if(item.youtubeStart!==undefined&&item.youtubeEnd!==undefined){const clipped=validDuration(Number(item.youtubeEnd)-Number(item.youtubeStart));if(clipped)return clipped;}
+    for(const source of item.playbackSources||[]){const revision=source?.src?.match(/[?&]v=([^&#]*)/);if(revision&&revision[1]!==encodeURIComponent(item.videoRevision||'original'))continue;const value=validDuration(source?.duration);if(value)return value;}
+    return durations.get(durationKey(item))||null;
+  }
+  function durationText(value){const seconds=Math.floor(value);return Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');}
+  function durationBadge(item){
+    const value=duration(item),key=escape(durationKey(item));
+    // Prepared posters carry no media metadata. Only a local film still
+    // missing its duration needs a metadata request through the preview queue.
+    const probe=!value&&item.poster&&item.provider!=='youtube'?`<video class="video-duration-probe" muted playsinline preload="none" tabindex="-1" aria-hidden="true" data-preview-src="${escape(src(item))}"></video>`:'';
+    return probe+`<span class="video-tile-duration" data-video-duration="${key}" aria-hidden="true"${value?'':' hidden'}>${value?durationText(value):''}</span>`;
+  }
+  function rememberDuration(video,item=players.get(video)?.item){
+    const value=validDuration(video?.duration);if(!value)return;
+    const badge=video.closest?.('.video-tile-cover')?.querySelector('.video-tile-duration'),key=item?durationKey(item):badge?.dataset.videoDuration;if(!key)return;
+    durations.delete(key);durations.set(key,value);if(durations.size>256)durations.delete(durations.keys().next().value);
+    if(typeof document!=='undefined')for(const label of document.querySelectorAll?.('.video-tile-duration[data-video-duration]')||[])if(label.dataset.videoDuration===key){label.textContent=durationText(value);label.hidden=false;}
+  }
   function sources(item){
     const rows=[{quality:'original',src:item.faststartSrc||item.src,mime:item.mime,rank:3}];
     for(const entry of item.playbackSources||[]){
@@ -37,6 +60,7 @@
       current=next;video.src=next.src;video.load();return true;
     }
     on('loadedmetadata',()=>{
+      rememberDuration(video,item);
       if(!restoring)return;const saved=restoring;restoring=null;
       try{video.currentTime=Number.isFinite(video.duration)?Math.min(saved.time,Math.max(0,video.duration-.05)):saved.time;}catch{}
       video.playbackRate=saved.rate;video.volume=saved.volume;video.muted=saved.muted;
@@ -69,5 +93,6 @@
     return state;
   }
   function release(video){players.get(video)?.dispose();}
-  window.FamilyVideoDelivery={src,bind,release};
+  if(typeof document!=='undefined')document.addEventListener('loadedmetadata',event=>rememberDuration(event.target),true);
+  window.FamilyVideoDelivery={src,bind,release,duration,durationBadge};
 })();

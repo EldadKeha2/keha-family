@@ -12,7 +12,8 @@ export function videoAssetsPublic(item){
   if(!isVideo(item))return {};
   const revision=revisionOf(item),url=variant=>'/media/'+item.id+'?videoAsset='+variant+'&v='+encodeURIComponent(revision),poster=currentVideoAsset(item,'poster'),faststart=currentVideoAsset(item,'faststart');
   const playbackSources=['low','medium'].flatMap(quality=>{const asset=currentVideoAsset(item,quality);if(!asset)return [];return [{quality,src:url(quality),mime:asset.mime,size:asset.size,...Object.fromEntries(['width','height','duration','bitrate'].filter(key=>Number.isFinite(asset[key])).map(key=>[key,asset[key]]))}];});
-  return {...(poster?{poster:url('poster'),posterSize:poster.size}:{}),...(faststart?{faststartSrc:url('faststart')}:{}),...(playbackSources.length?{playbackSources}:{})};
+  const duration=[item.duration,faststart?.duration,...playbackSources.map(source=>source.duration)].find(value=>Number.isFinite(value)&&value>0);
+  return {...(duration?{duration}:{}),...(poster?{poster:url('poster'),posterSize:poster.size}:{}),...(faststart?{faststartSrc:url('faststart')}:{}),...(playbackSources.length?{playbackSources}:{})};
 }
 export function videoAssetsQueue(state,p={}){
   const after=Math.max(0,Math.floor(Number(p.after)||0)),limit=Math.min(25,Math.max(1,Math.floor(Number(p.limit)||10)));

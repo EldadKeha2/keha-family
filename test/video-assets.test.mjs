@@ -28,6 +28,14 @@ test('queue completion and skipped copies are revision scoped and never replace 
     assert.throws(()=>saveVideoAsset(f.state,{id,variant:'poster',revision,asset:asset('poster')}),error=>error.status===409);
   }finally{f.close();}
 });
+test('public metadata exposes prepared durations without rewriting originals and ignores stale or skipped copies',()=>{
+ const item={...video(),videoAssets:{low:asset('low',{duration:147.605}),medium:asset('medium',{duration:147.605})}};
+ assert.equal(videoAssetsPublic(item).duration,147.605);assert.equal(item.duration,undefined);
+ assert.equal(videoAssetsPublic({...item,duration:24.54}).duration,24.54,'A saved clip length remains authoritative');
+ item.videoAssets.faststart=asset('faststart',{duration:148});assert.equal(videoAssetsPublic(item).duration,148);
+ item.videoRevision='edited';assert.equal(videoAssetsPublic(item).duration,undefined);
+ assert.equal(videoAssetsPublic({...video(),videoAssets:{low:{revision,skipped:true,duration:100}}}).duration,undefined);
+});
 test('derived media reads reject stale URLs, missing variants and invalid asset names',()=>{
   const item={...video(),videoAssets:{poster:asset('poster')}};
   assert.equal(resolveVideoAsset(item,new URLSearchParams()),null);
