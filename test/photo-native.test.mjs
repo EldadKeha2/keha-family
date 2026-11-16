@@ -163,6 +163,35 @@ test('one pad stroke with sparse decaying momentum cannot advance three photogra
  wheel(f,160);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1,1],'A renewed deliberate stroke works immediately');f.api.reset();
 });
 
+test('a new light pad stroke is recognized during the preceding momentum without a resting interval',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);
+ wheel(f,160);wheel(f,80);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
+ for(const dx of [24,8,2]){t.mock.timers.tick(15);wheel(f,dx);}
+ for(const dx of [.25,.75,2,5]){t.mock.timers.tick(4);wheel(f,dx);}
+ assert.equal(f.api.isActive(f.stage),true,'An accelerating fresh stroke is accepted while the old momentum window remains open');assert.ok(viewPosition(f.stage.children[0])<800);
+ t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1,1]);f.api.reset();
+});
+
+test('one irregular momentum fluctuation cannot masquerade as another pad gesture',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);wheel(f,160);t.mock.timers.tick(80);await flush();
+ for(const tail of [24,8,10,7,12,5,2]){t.mock.timers.tick(20);wheel(f,tail);assert.equal(f.api.isActive(f.stage),false);}
+ await flush();assert.deepEqual(directions(f),[1]);f.api.reset();
+});
+
+test('a continuous pad stroke with sparse browser packets still advances only one photo',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);
+ for(const dx of [90,85,78,65]){wheel(f,dx);t.mock.timers.tick(55);assert.deepEqual(directions(f),[],'Painting starts immediately, but one ongoing stroke cannot become several actions');}
+ t.mock.timers.tick(25);await flush();assert.deepEqual(directions(f),[1]);f.api.reset();
+});
+
+test('pad preview and the first small gesture survive face-wrapper setup without changing touchscreen references',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.window.FamilyGalleryInput={touchAction:direction=>-direction};f.api.mount(f.stage,f.options);
+ wheel(f,.75);f.api.mount(f.stage,f.options);assert.equal(f.stage.children[0].children[0]._item.previewSrc,'/next-small','A metadata refresh cannot restore the opposite touchscreen neighbor during pad input');
+ t.mock.timers.tick(4);const wrapper=new f.scroll.constructor();wrapper.className='face-photo-scroll';wrapper.append(f.scroll);f.stage.append(wrapper);f.api.mount(f.stage,f.options);
+ assert.equal(f.api.isActive(f.stage),true,'Changing from raw image to face wrapper retains the first pad stroke');assert.equal(viewPosition(f.stage.children[0]),799.25);
+ t.mock.timers.tick(75);assert.deepEqual(directions(f),[]);t.mock.timers.tick(1);await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.isActive(f.stage),false);f.api.reset();
+});
+
 test('small reverse-sign pad tremors neither flip the preview nor create extra navigation',async t=>{
  t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
  wheel(f,120);const position=viewPosition(strip);wheel(f,-1);assert.equal(viewPosition(strip),position);wheel(f,8);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
@@ -240,7 +269,7 @@ test('an unclaimed cancelled Windows pointer retains its joined TouchEvent conta
 });
 
 test('diagnostics expose the actual mounted controller and current input owner',()=>{
- const f=fixture();assert.equal(f.api.version,15);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
+ const f=fixture();assert.equal(f.api.version,16);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
 });
 
 test('a tiny fallback TouchMove after pointercancel releases idle without navigation after quiet',async t=>{

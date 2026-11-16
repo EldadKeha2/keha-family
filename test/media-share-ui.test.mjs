@@ -422,8 +422,8 @@ test('horizontal trackpad bursts navigate once while vertical scrolling and pinc
   const f=fixture({english}),stage=f.get('mediaStage');stage.clientWidth=1440;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'photos');
   const wheel=(dx,dy=0,extra={})=>{const event={deltaX:dx,deltaY:dy,deltaMode:0,cancelable:true,target:{closest:()=>null},preventDefault(){this.prevented=true;},...extra};stage.handlers.get('wheel')(event);return event;};
   assert.equal(wheel(0,120).prevented,undefined);assert.equal(wheel(80,0,{ctrlKey:true}).prevented,undefined);assert.equal(wheel(80,0,{target:{closest:()=>({})}}).prevented,undefined);
-  const dx=35;wheel(dx);wheel(dx);wheel(dx);t.mock.timers.tick(119);assert.equal(f.window.FamilyMedia.current().id,'a');t.mock.timers.tick(1);assert.equal(f.window.FamilyMedia.current().id,'b');t.mock.timers.tick(300);assert.equal(f.window.FamilyMedia.current().id,'b');
-  wheel(-dx);wheel(-dx);wheel(-dx);t.mock.timers.tick(120);assert.equal(f.window.FamilyMedia.current().id,'a');wheel(dx);f.close();t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,'a');
+  const dx=35;wheel(dx);wheel(dx);wheel(dx);t.mock.timers.tick(79);assert.equal(f.window.FamilyMedia.current().id,'a');t.mock.timers.tick(1);assert.equal(f.window.FamilyMedia.current().id,'b');t.mock.timers.tick(300);assert.equal(f.window.FamilyMedia.current().id,'b');
+  wheel(-dx);wheel(-dx);wheel(-dx);t.mock.timers.tick(80);assert.equal(f.window.FamilyMedia.current().id,'a');wheel(dx);f.close();t.mock.timers.tick(200);assert.equal(f.window.FamilyMedia.current().id,'a');
  }
 });
 test('Windows precision trackpads accumulate fractional horizontal deltas instead of discarding every event',t=>{
