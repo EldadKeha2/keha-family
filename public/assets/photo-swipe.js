@@ -12,7 +12,15 @@
     const preview=(dx,options)=>{if(!move)return;if(!frames){move(dx,options);return;}pendingPreview={dx,options};if(previewFrame===null)previewFrame=requestAnimationFrame(()=>{previewFrame=null;const pending=pendingPreview;pendingPreview=null;if(pending)move(pending.dx,pending.options);});};
     const navigate=(dx,options)=>{const action=dx>0?right:left;return action?action(options):step(dx>0?1:-1,options);};
     const idle=new Set(),finished=()=>{for(const resolve of idle)resolve();idle.clear();};
-    const controls='a,input,textarea,select,video,iframe,[contenteditable],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
+    const controls='a,input,textarea,select,video,iframe,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
+    const controlAt=event=>{
+      let control=event.target.closest(controls);
+      if(control&&typeof stage.contains==='function'&&!stage.contains(event.target))return control;
+      // Fitted photo wrappers and image pixels remain browsing surfaces even
+      // if their host adds editing/accessibility attributes to them.
+      while(control?.matches?.('img,.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface'))control=control.parentElement?.closest?.(controls)||null;
+      return control&&control!==stage&&(typeof stage.contains!=='function'||stage.contains(control))?control:null;
+    };
     const previewVideo=event=>{
       const video=videoSurface?.();if(!video||event.target.closest('video')!==video)return null;
       const rect=video.getBoundingClientRect?.();
@@ -38,7 +46,7 @@
       // capture or replay those events; mouse dragging remains available.
       if(touch&&nativeScroll())return;
       const isMouse=!touch&&event.pointerType==='mouse'&&mouse()&&!event.ctrlKey&&!event.metaKey&&!event.altKey;
-      const control=event.target.closest(controls),video=control?.tagName==='VIDEO'?previewVideo(event):null;
+      const control=controlAt(event),video=control?.tagName==='VIDEO'?previewVideo(event):null;
       if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||control&&!video)return;
       suppressClickUntil=0;
       gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse(),video,threshold:distance()};
@@ -117,10 +125,10 @@
       touchStart=null;if(!gesture)finished();
     },{capture:true,passive:false});
     document.addEventListener('touchcancel',()=>{touchStart=null;blockClick();reset();},{capture:true,passive:true});
-    stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!event.target.closest(controls))event.preventDefault();});
+    stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!controlAt(event))event.preventDefault();});
     stage.addEventListener('wheel',event=>{
       if(nativeScroll())return;
-      const control=event.target.closest(controls);
+      const control=controlAt(event);
       if(!mouse()||!enabled()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;
       const rawDx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=event.shiftKey&&!event.deltaX?0:(event.deltaY||0)*unit;

@@ -1,7 +1,8 @@
 (() => {
   'use strict';
-  let active=null;
+  let active=null,ignoredTouchStage=null,ignoredTouchIds=new Set();
   const boundStages=new WeakSet();
+  const completedPointerStarts=new WeakSet();
   const supported=()=>typeof CSS!=='undefined'&&CSS.supports('scroll-snap-type','x mandatory');
   const previewSource=item=>item?.kind==='photo'?((navigator.connection?.saveData||/^(slow-)?2g$/.test(navigator.connection?.effectiveType||'')?item.thumbnailSrc:null)||(window.FamilyPhotoPresentation?.source?.(item)||item.previewSrc||item.thumbnailSrc||item.src)):item?.kind==='video'?item.poster||null:null;
   function side(pane,item){
@@ -23,36 +24,53 @@
   const touchPoint=(event,touch)=>({identifier:touch.identifier,clientX:touch.clientX,clientY:touch.clientY,target:touch.target||event.target,cancelable:event.cancelable,preventDefault:()=>event.preventDefault?.()});
   const targetLabel=target=>{const tag=target?.tagName?.toLowerCase?.()||'element',classes=typeof target?.className==='string'?target.className.trim().split(/\s+/).filter(Boolean).slice(0,4).join('.'):'';return tag+(classes?'.'+classes:'');};
   function record(b,type,event,decision){b.lastEvent=type+' '+targetLabel(event?.target);b.lastDecision=decision;}
-  document.addEventListener('pointerdown',event=>{const b=active;if(b?.contact&&b.contact.pointerId!=null&&b.contact.pointerId!==event.pointerId)b.cancel();},{capture:true,passive:true});
-  document.addEventListener('pointermove',event=>{const b=active;if(b?.contact?.pointerId===event.pointerId)b.move(event);},{capture:true,passive:false});
-  document.addEventListener('pointerup',event=>{const b=active;if(b?.contact?.pointerId===event.pointerId)b.release(event);},{capture:true,passive:false});
-  document.addEventListener('pointercancel',event=>{const b=active;if(b?.contact?.pointerId===event.pointerId)b.pointerCancelled(event);},{capture:true,passive:true});
+  const clearTouchTail=()=>{ignoredTouchStage=null;ignoredTouchIds.clear();};
+  const ignoreTouchTail=(stage,touches)=>{ignoredTouchStage=touches.length?stage:null;ignoredTouchIds=new Set([...touches].map(touch=>touch.identifier));};
+  const tailRemains=touches=>[...touches].some(touch=>ignoredTouchIds.has(touch.identifier));
+  document.addEventListener('pointerdown',event=>{
+    const b=active;if(!b?.contact||event.isPrimary===false)return;
+    const touch=['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents;
+    if(b.contact.group&&(!touch||!b.stage.contains(event.target)||b.isProtected(event))){completedPointerStarts.add(event);record(b,'pointerdown',event,'new-control-owner');b.release();return;}
+    if(!b.contact.group&&b.contact.pointerId!=null&&b.contact.pointerId!==event.pointerId)b.cancel();
+  },{capture:true,passive:true});
+  document.addEventListener('pointermove',event=>{const b=active;if(!b?.contact?.group&&b?.contact?.pointerId===event.pointerId)b.move(event);},{capture:true,passive:false});
+  document.addEventListener('pointerup',event=>{const b=active;if(!b?.contact?.group&&b?.contact?.pointerId===event.pointerId)b.release(event);},{capture:true,passive:false});
+  document.addEventListener('pointercancel',event=>{const b=active;if(!b?.contact?.group&&b?.contact?.pointerId===event.pointerId)b.pointerCancelled(event);},{capture:true,passive:true});
   document.addEventListener('touchmove',event=>{
-    const b=active,g=b?.contact;if(!g||g.pointerId!=null)return;
+    const b=active,g=b?.contact;if(!g||ignoredTouchStage===b.stage||g.pointerId!=null)return;
+    if(g.group){b.moveGroup(event);return;}
     if(event.touches.length!==1){b.cancel();return;}
     const touch=[...event.touches].find(touch=>touch.identifier===g.touchId);if(touch)b.move(touchPoint(event,touch));
   },{capture:true,passive:false});
   document.addEventListener('touchend',event=>{
+    if(ignoredTouchStage){const ignored=active?.stage===ignoredTouchStage;if(!tailRemains(event.touches))clearTouchTail();if(ignored)return;}
     const b=active,g=b?.contact;if(!g||g.pointerId!=null)return;
+    if(g.group){b.endGroup(event);return;}
     const touch=[...event.changedTouches].find(touch=>touch.identifier===g.touchId);if(touch)b.release(touchPoint(event,touch));
   },{capture:true,passive:false});
-  document.addEventListener('touchcancel',event=>{const b=active,g=b?.contact;if(g&&g.pointerId==null&&[...event.changedTouches].some(touch=>touch.identifier===g.touchId))b.cancel();},{capture:true,passive:true});
+  document.addEventListener('touchcancel',event=>{if(ignoredTouchStage){const ignored=active?.stage===ignoredTouchStage;if(!tailRemains(event.touches))clearTouchTail();if(ignored)return;}const b=active,g=b?.contact;if(g?.group){b.cancelGroup(event);return;}if(g&&g.pointerId==null&&[...event.changedTouches].some(touch=>touch.identifier===g.touchId))b.cancel();},{capture:true,passive:true});
   document.addEventListener('click',event=>{
     if(event.detail===0)return;
     for(let node=event.target;node;node=node.parentNode){if(Date.now()<(blockedClicks.get(node)||0)){event.preventDefault();event.stopImmediatePropagation();return;}}
   },{capture:true});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)active?.cancel();});
-  window.addEventListener?.('blur',()=>active?.cancel());
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTouchTail();active?.cancel();}});
+  window.addEventListener?.('blur',()=>{clearTouchTail();active?.cancel();});
   function bindStage(stage){
     if(boundStages.has(stage))return;boundStages.add(stage);
     stage.addEventListener('pointerdown',event=>{
       const b=active;if(b?.stage!==stage)return;
+      if(completedPointerStarts.has(event))return;
+      if(ignoredTouchStage===stage){if(event.isPrimary===false)return;clearTouchTail();}
+      if(event.isPrimary===false){record(b,'pointerdown',event,'await-touch-group');return;}
       if(['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents)b.begin(event);
       else record(b,'pointerdown',event,'manual-mouse');
     },{capture:true,passive:true});
     stage.addEventListener('touchstart',event=>{
       const b=active;if(b?.stage!==stage)return;
-      if(event.touches.length!==1){record(b,'touchstart',event,'multitouch-cancel');b.cancel();return;}
+      if(ignoredTouchStage===stage){if(event.touches.length!==1&&tailRemains(event.touches))return;clearTouchTail();}
+      if(event.touches.length>2){record(b,'touchstart',event,'multitouch-cancel');b.cancelGroup(event);return;}
+      if(event.touches.length===2){b.beginGroup(event);return;}
+      if(event.touches.length!==1)return;
       b.begin(touchPoint(event,event.touches[0]),false);
     },{capture:true,passive:true});
     stage.addEventListener('wheel',event=>{const b=active;if(b?.stage===stage)b.handleWheel(event);},{capture:true,passive:false});
@@ -103,7 +121,7 @@
     const left=document.createElement('div'),center=document.createElement('div'),right=document.createElement('div');
     for(const pane of [left,center,right]){pane.className='native-photo-pane';viewport.append(pane);}
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
-    const b=active={stage,node,viewport,center,enabled,step,busy,vertical,previous,next,width:0,anchored:false,pending:0,idle:new Set(),contact:null,wheel:null,lastDecision:'mounted',lastEvent:'mount'};
+    const b=active={stage,node,viewport,center,enabled,step,busy,vertical,previous,next,width:0,anchored:false,pending:0,idle:new Set(),contact:null,wheel:null,lastDecision:'mounted',lastEvent:'mount',protectedMatch:null};
     arrange(b);anchor(b);
     const recenter=()=>{if(b.anchored)viewport.scrollLeft=b.width;};
     const navigate=b.navigate=direction=>{
@@ -117,9 +135,22 @@
     };
     const nativeControl=event=>{
       const target=event.target;
-      if(target?.closest?.('a,input,textarea,select,iframe,[contenteditable],[role="textbox"],[data-face-handle],.face-picker,.face-name,.face-label-list,.face-adjust-guide,button:not(.face-hit)'))return true;
-      const video=target?.closest?.('video'),rect=video?.getBoundingClientRect?.();return Boolean(rect&&event.clientY>=rect.bottom-72);
+      b.protectedMatch=null;let nonEditable=false;
+      const protect=(node,reason)=>{b.protectedMatch=targetLabel(node)+' role='+(node.getAttribute?.('role')||'none')+' contenteditable='+(node.getAttribute?.('contenteditable')??'none')+' '+reason;return true;};
+      // Controls outside this viewer cannot own its image gestures. In
+      // particular, contenteditable="false" is not an editing control.
+      for(let node=target;node&&node!==stage;node=node.parentNode){
+        if(!stage.contains(node))break;
+        const editable=node.getAttribute?.('contenteditable');
+        if(editable==='false')nonEditable=true;
+        if(node.matches?.('img,video,.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface'))continue;
+        if(node.matches?.('a,input,textarea,select,iframe,[data-face-handle],.face-picker,.face-name,.face-label-list,.face-adjust-guide,button:not(.face-hit)'))return protect(node,'control');
+        if(!nonEditable&&(editable===''||editable==='true'||editable==='plaintext-only'))return protect(node,'editable');
+        if(node.getAttribute?.('role')==='textbox')return protect(node,'textbox');
+      }
+      const video=target?.closest?.('video'),rect=video&&stage.contains(video)?video.getBoundingClientRect?.():null;return Boolean(rect&&event.clientY>=rect.bottom-72&&protect(video,'native-video-controls'));
     };
+    b.isProtected=nativeControl;
     const endContact=()=>{const g=b.contact;b.contact=null;clearTimeout(b.contactTimer);releaseCapture(b,g);stage.classList.remove('photo-pointer-dragging');return g;};
     const touchQuiet=g=>{
       clearTimeout(b.contactTimer);
@@ -139,7 +170,7 @@
       // A compatibility stream can continue after Windows cancelled its
       // pointer, then omit touchend. Actual touch positions extend its quiet
       // deadline; a healthy held pointer never gets this fallback deadline.
-      if(g.pointerId==null)touchQuiet(g);
+      if(g.pointerId==null&&!g.group)touchQuiet(g);
       if(!g.axis||g.axis==='y'&&Math.abs(g.dx)>=16&&Math.abs(g.dx)>=Math.abs(g.dy)*1.2){
         if(Math.abs(g.dx)>=8&&Math.abs(g.dx)>=Math.abs(g.dy)*.8)g.axis='x';
         else if(Math.abs(g.dy)>=24&&Math.abs(g.dy)>=Math.abs(g.dx)*1.4)g.axis='y';
@@ -169,6 +200,45 @@
       }
       b.release();
     };
+    const pair=touches=>{
+      const [a,c]=touches,dx=c.clientX-a.clientX,dy=c.clientY-a.clientY;
+      return {clientX:(a.clientX+c.clientX)/2,clientY:(a.clientY+c.clientY)/2,distance:Math.hypot(dx,dy),angle:Math.atan2(dy,dx)};
+    };
+    b.cancelGroup=event=>{ignoreTouchTail(stage,event.touches);b.lastDecision='multitouch-or-pinch-cancel';b.cancel();};
+    b.beginGroup=event=>{
+      record(b,'touchstart',event,'group-start');
+      if(!b.enabled()){b.lastDecision='disabled';return;}
+      if(!anchor(b)){b.lastDecision='zero-width';return;}
+      if(nativeControl(event)){b.lastDecision='protected-control';return;}
+      if(![...event.touches].every(coordinate)){b.lastDecision='invalid-coordinates';return;}
+      const ids=[...event.touches].map(touch=>touch.identifier);
+      if(b.contact?.group&&b.contact.group.ids.every(id=>ids.includes(id)))return;
+      const point=pair([...event.touches]),old=b.contact,offset=!old?.group&&old?.axis==='x'?old.dx:0;
+      endContact();
+      b.contact={pointerId:null,touchId:null,group:{ids,distance:point.distance,angle:point.angle},x:point.clientX-offset,y:point.clientY,lastY:point.clientY,dx:offset,dy:0,axis:!old?.group&&old?.axis==='x'?'x':null};
+      b.lastDecision='two-touch-started';
+      // A different pair proves the preceding group ended even when Windows
+      // omitted its TouchEnd. Reserve the replacement before queued painting.
+      if(old?.group){const threshold=Math.max(32,Math.min(56,b.width*.06));navigate(old.axis==='x'&&Math.abs(old.dx)>=threshold?Math.sign(old.dx):0);}
+      if(b.wheel)finishWheel();
+    };
+    b.moveGroup=(event,positions=event.touches)=>{
+      const g=b.contact;if(!g?.group)return;
+      const touches=g.group.ids.map(id=>[...positions].find(touch=>touch.identifier===id));
+      if(positions.length>2||touches.some(touch=>!coordinate(touch))){b.cancelGroup(event);return;}
+      const point=pair(touches),span=Math.abs(point.distance-g.group.distance),rotation=Math.abs(Math.atan2(Math.sin(point.angle-g.group.angle),Math.cos(point.angle-g.group.angle)));
+      if(span>12&&span>g.group.distance*.12||point.distance>12&&g.group.distance>12&&rotation>Math.PI/15){record(b,'touchmove',event,'pinch-or-rotation');b.cancelGroup(event);return;}
+      b.move({clientX:point.clientX,clientY:point.clientY,target:event.target,cancelable:event.cancelable,preventDefault:()=>event.preventDefault?.()});
+    };
+    b.endGroup=event=>{
+      const g=b.contact;if(!g?.group||![...event.changedTouches].some(touch=>g.group.ids.includes(touch.identifier)))return;
+      // Keep both final positions while membership changes, avoiding a false
+      // centroid jump when one finger lifts. Ignore its remaining tail even
+      // when step() synchronously replaces the controller and current image.
+      const positions=[...event.touches,...event.changedTouches].filter((touch,index,all)=>all.findIndex(other=>other.identifier===touch.identifier)===index);
+      b.moveGroup(event,positions);if(b.contact!==g)return;
+      ignoreTouchTail(stage,event.touches);b.release();
+    };
     const begin=b.begin=(event,pointer=true)=>{
       record(b,pointer?'pointerdown':'touchstart',event,'start');
       if(active!==b)return;
@@ -177,6 +247,7 @@
       if(!coordinate(event)){b.lastDecision='invalid-coordinates';return;}
       if(nativeControl(event)){b.lastDecision='protected-control';return;}
       if(event.isPrimary===false){b.lastDecision='multitouch-cancel';b.cancel();return;}
+      const completed=b.contact?.group?endContact():null;
       if(b.contact){
         // Pointer and compatibility TouchEvents describe one contact. Joining
         // the second stream must never replace its origin or select an item.
@@ -186,6 +257,10 @@
         b.cancel();
       }
       b.contact={pointerId:pointer?event.pointerId:null,touchId:pointer?null:event.identifier,x:event.clientX,y:event.clientY,lastY:event.clientY,dx:0,dy:0,axis:null};b.lastDecision='contact-started';
+      // A new primary pointer or one-contact TouchStart cannot be a member of
+      // the preceding two-contact group. Its live ownership must be visible
+      // before completing that group's last controlled position.
+      if(completed){const threshold=Math.max(32,Math.min(56,b.width*.06));navigate(completed.axis==='x'&&Math.abs(completed.dx)>=threshold?Math.sign(completed.dx):0);}
       // Reserve the new finger before completing an earlier wheel burst; a
       // warm cached target must wait for this new contact to be released.
       if(b.wheel)finishWheel();
@@ -224,6 +299,6 @@
     if(typeof ResizeObserver!=='undefined'){b.resize=new ResizeObserver(()=>{if(active===b)anchor(b);});b.resize.observe(viewport);}
     return true;
   }
-  function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null,wheel:Boolean(b?.wheel),width:b?.width||0};}
-  window.FamilyPhotoNative={version:8,mount,reset,has,claim,note,supported,diagnostics,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0};}
+  window.FamilyPhotoNative={version:9,mount,reset,has,claim,note,supported,diagnostics,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();

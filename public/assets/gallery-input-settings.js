@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const key='keha-gallery-pad-direction-v2',checking=['6','7','8'].includes(new URL(location.href).searchParams.get('gesture-check'));
+  const key='keha-gallery-pad-direction-v2',checking=['6','7','8','9'].includes(new URL(location.href).searchParams.get('gesture-check'));
   // Wheel signs depend on device scrolling preferences. Preserve the gallery's
   // convention until an explicit physical-right sample sets this device's sign.
   let factor=1,calibrating=checking,last='waiting',rawWheel='none',lastPointer='none',lastTouch='none',panel=null,scheduled=false;
@@ -29,13 +29,13 @@
     const viewer=document.getElementById('mediaViewer'),stage=document.getElementById('mediaStage'),strip=stage?.querySelector('.native-photo-strip');
     const parent=viewer?.open?viewer:document.body;if(panel.parentNode!==parent)parent.append(panel);
     panel.querySelector('[data-gesture-instruction]').textContent=calibrating?
-      (viewer?.open?'גרסה 8 · לכיוון הפאד במחשב הזה: החליקו ימינה פעם אחת על התמונה.':'גרסה 8 · פתחו תמונה, ואז החליקו ימינה פעם אחת בפאד כדי לכוון אותו במחשב הזה.'):
-      'גרסה 8 · כיוון הפאד נשמר. אפשר לבדוק החלקה על התמונה או בשוליים שלה.';
+      (viewer?.open?'גרסה 9 · לכיוון הפאד במחשב הזה: החליקו ימינה פעם אחת על התמונה.':'גרסה 9 · פתחו תמונה, ואז החליקו ימינה פעם אחת בפאד כדי לכוון אותו במחשב הזה.'):
+      'גרסה 9 · כיוון הפאד נשמר. אפשר לבדוק החלקה על התמונה או בשוליים שלה.';
     const native=window.FamilyPhotoNative,face=stage?._familyFaceContext;
     const source=[...document.scripts].map(script=>script.getAttribute('src')).find(src=>src?.includes('photo-native.js'))||'native missing';
     const counter=document.getElementById('mediaViewerCounter')?.textContent||'—';
     const diagnostic=native?.diagnostics?.(stage);
-    panel.querySelector('output').textContent='build 8 | native implementation '+(native?.version??'unknown')+' | '+last+' | raw wheel '+rawWheel+' | factor '+factor+' | '+counter+
+    panel.querySelector('output').textContent='build 9 | native implementation '+(native?.version??'unknown')+' | '+last+' | raw wheel '+rawWheel+' | factor '+factor+' | '+counter+
       ' | rail '+(strip?compact(strip.scrollLeft)+'/'+strip.clientWidth:'none')+
       ' | input '+(native?.isActive?.(stage)?'active':'idle')+' | loading '+(stage?.getAttribute('aria-busy')||'false')+
       ' | face '+(face?(face.saving?'saving':face.zoom||1):'none')+' | '+source+
