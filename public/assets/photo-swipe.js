@@ -105,7 +105,10 @@
     const fromTouch=(event,touch)=>({pointerId:'touch-'+touch.identifier,pointerType:'touch',isPrimary:true,button:0,clientX:touch.clientX,clientY:touch.clientY,target:touch.target||event.target,cancelable:event.cancelable,preventDefault:()=>event.preventDefault()});
     stage.addEventListener('touchstart',event=>{
       freshVideoTouch(event);
-      if(nativeScroll())return;
+      // Some hybrid laptops emit a mouse-like pointer before the real touch
+      // stream. Once the native touch owner is present, discard that manual
+      // companion so it cannot commit a second or reversed action on release.
+      if(nativeScroll()){if(gesture||nativePointer||touchStart)reset();return;}
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
       touchStart=fromTouch(event,event.touches[0]);touchStart.time=Date.now();
       if(!gesture){const mode=begin(touchStart);touchStart.native=mode==='native';if(strictStart&&!mode){touchStart=null;finished();}}

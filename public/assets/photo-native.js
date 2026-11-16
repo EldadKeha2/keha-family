@@ -129,26 +129,29 @@
   // never has authority to select a neighbouring item.
   function note(stage,dx){const b=active;if(b?.stage===stage&&Number.isFinite(dx)&&dx){b.cancel();b.navigate(Math.sign(dx));}}
   function claim(stage){return active?.stage===stage?'queued':'manual';}
-  function mount(stage,{previous,next,enabled,step,busy,vertical,pending=false}){
+  function mount(stage,{previous,next,enabled,step,touchStep,busy,vertical,pending=false}){
     if(stage?.nodeType!==1||!supported()||!enabled()){reset(stage);return false;}
     const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?(active?.stage===stage?active.node:stage.querySelector('video,iframe,img')):null);
     if(!node)return false;
-    if(active?.stage===stage&&active.node===node){Object.assign(active,{enabled,step,busy,vertical,previous,next});if(!pending)clearCover(active);arrange(active);anchor(active);return true;}
+    if(active?.stage===stage&&active.node===node){Object.assign(active,{enabled,step,touchStep,busy,vertical,previous,next});if(!pending)clearCover(active);arrange(active);anchor(active);return true;}
     reset();const viewport=document.createElement('div');viewport.className='native-photo-strip';viewport.dir='ltr';
     Object.assign(viewport.style,{scrollBehavior:'auto',scrollSnapType:'none',touchAction:'pinch-zoom',visibility:'hidden',overflowX:'hidden'});
     const left=document.createElement('div'),center=document.createElement('div'),right=document.createElement('div');
     for(const pane of [left,center,right]){pane.className='native-photo-pane';viewport.append(pane);}
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
-    const b=active={stage,node,viewport,center,enabled,step,busy,vertical,previous,next,width:0,anchored:false,pending:0,idle:new Set(),contact:null,wheel:null,lastDecision:'mounted',lastEvent:'mount',protectedMatch:null};
+    const b=active={stage,node,viewport,center,enabled,step,touchStep,busy,vertical,previous,next,width:0,anchored:false,pending:0,idle:new Set(),contact:null,wheel:null,lastDecision:'mounted',lastEvent:'mount',protectedMatch:null};
     arrange(b);anchor(b);
-    const recenter=()=>{if(b.anchored)viewport.scrollLeft=b.width;};
-    const navigate=b.navigate=direction=>{
+    const clearWheelPaint=()=>{for(const pane of viewport.children){pane.style.transform='';pane.style.willChange='';}};
+    const recenter=()=>{clearWheelPaint();if(b.anchored)viewport.scrollLeft=b.width;};
+    const navigate=b.navigate=(direction,input='touch')=>{
       if(active!==b||!anchor(b))return;
       if(!direction||!b.enabled()){recenter();resolveIdle(b);return;}
       // Copy the selected preview before step() can update logical neighbours.
       // Input ownership is already complete, so image preparation can paint.
       holdPreview(b,viewport.children[direction>0?0:2]);recenter();resolveIdle(b);b.pending++;
-      let request;try{request=b.step(direction,{native:true,queued:true});}catch{request=null;}
+      stage.setAttribute('data-gallery-last-input',input);stage.setAttribute('data-gallery-last-action',direction>0?'next':'previous');
+      const action=input==='touch'?(b.touchStep||b.step):b.step;
+      let request;try{request=action(direction,{native:true,queued:true,input});}catch{request=null;}
       Promise.resolve(request).catch(()=>{}).finally(()=>{if(active!==b)return;b.pending--;if(!b.pending&&!b.busy?.())clearCover(b);});
     };
     const nativeControl=event=>{
@@ -177,7 +180,7 @@
     const finishWheel=()=>{
       const wheel=b.wheel;if(!wheel)return;b.wheel=null;clearTimeout(b.wheelTimer);
       finishWheelEpisode(stage,wheel.episode);window.FamilyGalleryInput?.finishWheelDirection?.();
-      navigate(Math.sign(wheel.dx));
+      navigate(Math.sign(wheel.dx),'wheel');
     };
     b.cancel=()=>{endContact();b.wheel=null;clearTimeout(b.wheelTimer);recenter();resolveIdle(b);};
     const draw=g=>{viewport.scrollLeft=Math.max(0,Math.min(b.width*2,b.width-g.dx));};
@@ -308,11 +311,16 @@
         navigate(g?.axis==='x'&&Math.abs(g.dx)>=threshold?Math.sign(g.dx):0);
       }
       if(b.wheel?.dx&&sample.split){
-        const previous=b.wheel;b.wheel={dx:0,episode:sample.episode};clearTimeout(b.wheelTimer);finishWheelEpisode(stage,previous.episode);navigate(Math.sign(previous.dx));
+        const previous=b.wheel;b.wheel={dx:0,episode:sample.episode};clearTimeout(b.wheelTimer);finishWheelEpisode(stage,previous.episode);navigate(Math.sign(previous.dx),'wheel');
       }
       if(active!==b)return;b.wheel||={dx:0,episode:sample.episode};b.wheel.dx+=dx;
       b.lastDecision='wheel-owned';
-      viewport.scrollLeft=Math.max(0,Math.min(b.width*2,b.width-b.wheel.dx));
+      // Pad paint uses physical CSS translation, separately from its already
+      // calibrated navigation action. Screen-touch painting stays on v11's
+      // existing finger-following rail path.
+      viewport.scrollLeft=b.width;
+      const x=Math.max(-b.width,Math.min(b.width,b.wheel.dx));
+      for(const pane of viewport.children){pane.style.willChange='transform';pane.style.transform='translateX('+x+'px)';}
       clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);
     };
     bindStage(stage);
@@ -321,6 +329,6 @@
     if(typeof ResizeObserver!=='undefined'){b.resize=new ResizeObserver(()=>{if(active===b)anchor(b);});b.resize.observe(viewport);}
     return true;
   }
-  function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0};}
-  window.FamilyPhotoNative={version:11,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
+  window.FamilyPhotoNative={version:13,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();

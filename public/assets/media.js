@@ -13,7 +13,7 @@
   const pagingApi=()=>albumLoaders.get(state.scope)||(state.scope==='family-ai'?window.FamilyAI:window.FamilyPortal);
   const desktopPhotoInput=()=>window.FamilyPhotoPresentation?.desktop?.()===true||navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||'');
   const phonePhotoInput=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
-  const swipeDirection=direction=>phonePhotoInput()?-direction:direction;
+  const swipeDirection=direction=>!desktopPhotoInput()&&phonePhotoInput()?-direction:direction;
   const phoneTouchInput=()=>!desktopPhotoInput()&&'ontouchstart' in window;
   const inlineCaption=()=>!state.fullscreen&&(current()?.kind==='video'||current()?.kind==='photo'&&(window.FamilyPhotoKeyboard?.desktop?.()??desktopPhotoInput()));
   function photoIndex(direction,wrap=true,from=state.index){
@@ -350,7 +350,7 @@
     if(browserScroll&&faceTimer===null){
       const waiting=state.photoLoading?state.items.findIndex(item=>identity(item)===state.photoTarget):-1,from=waiting>=0?waiting:state.index;
       native.mount(stage,{previous:photoNeighbour(-1,from),next:photoNeighbour(1,from),pending:state.photoLoading||state.paging,
-        enabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),step,
+        enabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),step,touchStep:arrowStep,
         vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
         busy:()=>state.paging||state.photoLoading});
     }else native?.reset(stage);
@@ -501,16 +501,17 @@
     };
     try{api?.pageGallery?.(page)?.catch?.(failed);}catch{failed();}
   }
+  function arrowStep(direction,options={}){return step(direction,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true,...options});}
   function init(){
     const stage=$('mediaStage');
-    const previousPhoto=()=>step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true}),nextPhoto=()=>step(1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true});
+    const previousPhoto=()=>arrowStep(-1),nextPhoto=()=>arrowStep(1);
     const swipePhoto=async(direction,options)=>{
       direction=swipeDirection(direction);
       if(!phoneTouchInput()){
         // Inline descriptions use the same save-before-navigation path as the
         // arrows. A failed save leaves the current item and its draft in place.
         const session=state.session,navigation=state.navigation;
-        try{return await step(direction,options);}
+        try{return await arrowStep(direction,options);}
         finally{if(session===state.session&&navigation===state.navigation&&!photoSwipe?.isActive())window.FamilyPhotoPresentation?.settle();}
       }
       const button=$(direction>0?'mediaNext':'mediaPrevious');

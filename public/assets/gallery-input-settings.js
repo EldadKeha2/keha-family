@@ -42,14 +42,16 @@
     if(!panel)return;
     const viewer=document.getElementById('mediaViewer'),stage=document.getElementById('mediaStage'),strip=stage?.querySelector('.native-photo-strip');
     const parent=viewer?.open?viewer:document.body;if(panel.parentNode!==parent)parent.append(panel);
+    const native=window.FamilyPhotoNative,version=native?.version||11;
     panel.querySelector('[data-gesture-instruction]').textContent=calibrating?
       (viewer?.open?'גרסה 11 · החליקו עכשיו ימינה פעם אחת בפאד, על התמונה. ההחלקה הזו תקבע: ימינה = הבא.':'גרסה 11 · פתחו תמונה והחליקו ימינה פעם אחת בפאד. הכיוון יותאם ויישמר אוטומטית במחשב הזה.'):
       'גרסה 11 · הגדרת הפאד נשמרה. ימינה מעביר תמונה אחת להבא. אם הכיוון הפוך, לחצו על ״הפוך כיוון הפאד״.';
-    const native=window.FamilyPhotoNative,face=stage?._familyFaceContext;
+    panel.querySelector('[data-gesture-instruction]').textContent=panel.querySelector('[data-gesture-instruction]').textContent.replace('גרסה 11','גרסה '+version);
+    const face=stage?._familyFaceContext;
     const source=[...document.scripts].map(script=>script.getAttribute('src')).find(src=>src?.includes('photo-native.js'))||'native missing';
     const counter=document.getElementById('mediaViewerCounter')?.textContent||'—';
     const diagnostic=native?.diagnostics?.(stage);
-    panel.querySelector('output').textContent='build 11 | native implementation '+(native?.version??'unknown')+' | '+last+' | raw wheel '+rawWheel+' | factor '+factor+' | '+counter+
+    panel.querySelector('output').textContent='build '+version+' | native implementation '+(native?.version??'unknown')+' | '+last+' | raw wheel '+rawWheel+' | factor '+factor+' | '+counter+
       ' | rail '+(strip?compact(strip.scrollLeft)+'/'+strip.clientWidth:'none')+
       ' | input '+(native?.isActive?.(stage)?'active':'idle')+' | loading '+(stage?.getAttribute('aria-busy')||'false')+
       ' | face '+(face?(face.saving?'saving':face.zoom||1):'none')+' | '+source+

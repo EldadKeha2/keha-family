@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const mobile=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
+  const mobile=()=>!(navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||''))&&(navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1));
   // The generated-video dialogs keep their own captions, download links and
   // animation buttons. Only their existing player receives a shared input layer.
   function bind(video,{isOpen,select}){
@@ -12,7 +12,7 @@
     const native=()=>window.FamilyPhotoNative;
     const vertical=dy=>{const dialog=stage.closest('dialog');if(dialog)dialog.scrollTop=(dialog.scrollTop||0)+dy;};
     const refresh=()=>{
-      if(!mobile()&&native()?.supported?.()===true&&enabled())native().mount(stage,{previous:items[(index-1+items.length)%items.length],next:items[(index+1)%items.length],enabled,step:navigate,vertical});
+      if(!mobile()&&native()?.supported?.()===true&&enabled())native().mount(stage,{previous:items[(index-1+items.length)%items.length],next:items[(index+1)%items.length],enabled,step:navigate,touchStep:navigate,vertical});
       else native()?.reset(stage);
     };
     const manual=window.FamilyPhotoSwipe?.bind(stage,{enabled,mouse:()=>!mobile(),preferPointer:()=>!mobile(),touchOnly:()=>mobile()&&'ontouchstart' in window,
