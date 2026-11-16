@@ -1,7 +1,9 @@
 (() => {
   'use strict';
-  const key='keha-gallery-pad-direction',checking=new URL(location.href).searchParams.get('gesture-check')==='6';
-  let factor=1,calibrating=checking,last='waiting',panel=null,scheduled=false;
+  const key='keha-gallery-pad-direction-v2',checking=['6','7'].includes(new URL(location.href).searchParams.get('gesture-check'));
+  // Wheel signs depend on device scrolling preferences. Preserve the gallery's
+  // convention until an explicit physical-right sample sets this device's sign.
+  let factor=1,calibrating=checking,last='waiting',rawWheel='none',panel=null,scheduled=false;
   try{
     const saved=window.localStorage?.getItem(key);
     if(saved==='-1'||saved==='1'){factor=Number(saved);calibrating=false;}
@@ -27,12 +29,12 @@
     const viewer=document.getElementById('mediaViewer'),stage=document.getElementById('mediaStage'),strip=stage?.querySelector('.native-photo-strip');
     const parent=viewer?.open?viewer:document.body;if(panel.parentNode!==parent)parent.append(panel);
     panel.querySelector('[data-gesture-instruction]').textContent=calibrating?
-      (viewer?.open?'לכיוון הפאד במחשב הזה: החליקו ימינה פעם אחת על התמונה.':'פתחו תמונה, ואז החליקו ימינה פעם אחת בפאד כדי לכוון אותו במחשב הזה.'):
-      'הפאד כוון: החלקה ימינה מעבירה ל״הבא״. הכיוון נשמר במחשב הזה.';
+      (viewer?.open?'גרסה 7 · לכיוון הפאד במחשב הזה: החליקו ימינה פעם אחת על התמונה.':'גרסה 7 · פתחו תמונה, ואז החליקו ימינה פעם אחת בפאד כדי לכוון אותו במחשב הזה.'):
+      'גרסה 7 · הפאד כוון: החלקה ימינה מעבירה ל״הבא״. הכיוון נשמר במחשב הזה.';
     const native=window.FamilyPhotoNative,face=stage?._familyFaceContext;
     const source=[...document.scripts].map(script=>script.getAttribute('src')).find(src=>src?.includes('photo-native.js'))||'native missing';
     const counter=document.getElementById('mediaViewerCounter')?.textContent||'—';
-    panel.querySelector('output').textContent='build 6 | '+last+' | factor '+factor+' | '+counter+
+    panel.querySelector('output').textContent='build 7 | '+last+' | raw wheel '+rawWheel+' | factor '+factor+' | '+counter+
       ' | rail '+(strip?compact(strip.scrollLeft)+'/'+strip.clientWidth:'none')+
       ' | input '+(native?.isActive?.(stage)?'active':'idle')+' | loading '+(stage?.getAttribute('aria-busy')||'false')+
       ' | face '+(face?(face.saving?'saving':face.zoom||1):'none')+' | '+source;
@@ -51,6 +53,7 @@
     if(Observer){if(viewer)new Observer(schedule).observe(viewer,{attributes:true,attributeFilter:['open']});if(counter)new Observer(schedule).observe(counter,{childList:true,subtree:true,characterData:true});}
     const starts=new Map();
     const inStage=target=>Boolean(viewer?.open&&document.getElementById('mediaStage')?.contains(target));
+    document.addEventListener('wheel',event=>{if(!inStage(event.target))return;rawWheel=compact(event.deltaX)+','+compact(event.deltaY)+' cancelable '+(event.cancelable!==false);schedule();},{capture:true,passive:true});
     document.addEventListener('pointerdown',event=>{if(!inStage(event.target))return;starts.set(event.pointerId,{x:event.clientX,y:event.clientY});last='pointer '+(event.pointerType||'?')+' down';schedule();},{capture:true,passive:true});
     document.addEventListener('pointermove',event=>{const start=starts.get(event.pointerId);if(!start)return;last='pointer '+(event.pointerType||'?')+' dx '+compact(event.clientX-start.x)+' dy '+compact(event.clientY-start.y);schedule();},{capture:true,passive:true});
     for(const type of ['pointerup','pointercancel'])document.addEventListener(type,event=>{const start=starts.get(event.pointerId);if(!start)return;last=type+' dx '+compact(event.clientX-start.x)+' dy '+compact(event.clientY-start.y);starts.delete(event.pointerId);schedule();},{capture:true,passive:true});

@@ -3,37 +3,45 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=await readFile(new URL('../public/assets/photo-native.js',import.meta.url),'utf8');
-const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
-function fixture({mobile=false,english=false,supported=true,scrollEnd=false,width=mobile?360:800}={}){
+
+function fixture({supported=true,width=800,keep=false}={}){
  class Node{
-  constructor(){this.nodeType=1;this.children=[];this.handlers=new Map();this.clientWidth=width;this.scrollLeft=0;this.className='';this.parent=null;this.style={};if(scrollEnd)this.onscrollend=null;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)};}
+  constructor(){this.nodeType=1;this.children=[];this.handlers=new Map();this.clientWidth=width;this.scrollLeft=0;this.className='';this.parent=null;this.style={};const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)};}
   get parentNode(){return this.parent;}
   setAttribute(name,value){this[name]=value;}
-  addEventListener(type,handler){this.handlers.set(type,handler);}
+  addEventListener(type,handler){const previous=this.handlers.get(type);this.handlers.set(type,event=>{previous?.(event);handler(event);});}
   append(...nodes){for(const node of nodes){node.remove();node.parent=this;this.children.push(node);}}
   before(node){const parent=this.parent,index=parent.children.indexOf(this);node.remove();node.parent=parent;parent.children.splice(index,0,node);}
   remove(){if(this.parent){this.parent.children=this.parent.children.filter(x=>x!==this);this.parent=null;}}
+  contains(node){return node===this||this.children.some(child=>child.contains(node));}
+  setPointerCapture(id){this.captured=id;}
+  releasePointerCapture(){this.captured=null;}
+  closest(){return null;}
   querySelector(selector){if(selector==='.face-photo-scroll')return this.children.flatMap(n=>[n,...n.children.flatMap(c=>[c,...c.children])]).find(n=>n.className==='face-photo-scroll')||null;return null;}
  }
  const events=new Map(),stage=new Node(),scroll=new Node(),window={addEventListener(){}},document={createElement:()=>new Node(),addEventListener:(type,handler)=>{const previous=events.get(type);events.set(type,event=>{previous?.(event);handler(event);});}},calls=[];scroll.className='face-photo-scroll';stage.append(scroll);let enabled=true;
- const context=vm.createContext({window,document,navigator:{userAgent:mobile?'Android':'Windows NT'},CSS:{supports:()=>supported},matchMedia:()=>({matches:mobile}),Date,setTimeout,clearTimeout});vm.runInContext(source,context);vm.runInContext(swipeSource,context);
- const options={previous:{kind:'photo',previewSrc:'/prev-small'},next:{kind:'photo',previewSrc:'/next-small'},isEnglish:english,enabled:()=>enabled,step(direction,opts){calls.push({direction,native:opts.native});window.FamilyPhotoNative.reset(stage);}};
- return {window,api:window.FamilyPhotoNative,swipe:window.FamilyPhotoSwipe,events,stage,scroll,calls,options,disable(){enabled=false;}};
+ const context=vm.createContext({window,document,navigator:{userAgent:'Windows NT'},CSS:{supports:()=>supported},getComputedStyle:()=>({backgroundColor:'rgb(237, 229, 212)'}),Date,setTimeout,clearTimeout});vm.runInContext(source,context);
+ const options={previous:{kind:'photo',previewSrc:'/prev-small'},next:{kind:'photo',previewSrc:'/next-small'},enabled:()=>enabled,step(direction,opts){calls.push({direction,native:opts.native});if(!keep)window.FamilyPhotoNative.reset(stage);}};
+ const f={window,api:window.FamilyPhotoNative,events,stage,scroll,calls,options,disable(){enabled=false;}};
+ f.fire=(type,values={})=>{
+  const event={target:scroll,cancelable:true,preventDefault(){this.defaultPrevented=true;},stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=true;},...values};
+  events.get(type)?.(event);
+  const path=[];for(let node=event.target;node;node=node.parentNode)path.push(node);
+  for(const node of path.reverse()){if(event.stopped)break;node.handlers?.get(type)?.(event);}
+  return event;
+ };
+ return f;
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-const pointer=(f,type,x=200,y=100,id=7,target)=>{
- const event={pointerType:'touch',pointerId:id,isPrimary:true,clientX:x,clientY:y,target};
- (type==='pointerdown'?f.stage.children[0].handlers:f.events).get(type)(event);return event;
-};
-const wheel=(strip,dx,extra={})=>{const event={deltaX:dx,deltaY:0,cancelable:true,preventDefault(){this.prevented=true;},...extra};strip.handlers.get('wheel')(event);return event;};
+const pointer=(f,type,x=200,y=100,id=7,target=f.scroll)=>f.fire(type,{pointerType:'touch',pointerId:id,isPrimary:true,clientX:x,clientY:y,target});
+const touch=(f,type,x=200,y=100,id=9)=>{const point={identifier:id,clientX:x,clientY:y,target:f.scroll};return f.fire(type,{touches:type==='touchend'||type==='touchcancel'?[]:[point],changedTouches:[point]});};
+const wheel=(f,dx,extra={})=>f.fire('wheel',{deltaX:dx,deltaY:0,...extra});
+const stroke=(f,dx,dy=0)=>{pointer(f,'pointerdown');pointer(f,'pointermove',200+dx,100+dy);return pointer(f,'pointerup',200+dx,100+dy);};
+const directions=f=>f.calls.map(call=>call.direction);
 
-test('fixed native panes always place Next on the left and Previous on the right',async()=>{
- for(const mobile of [false,true])for(const english of [false,true])for(const page of [0,2]){
-  const f=fixture({mobile,english});f.api.mount(f.stage,f.options);const strip=f.stage.children[0],width=strip.clientWidth;
-  assert.equal(strip.children[0].children[0].src,'/next-small');assert.equal(strip.children[2].children[0].src,'/prev-small');assert.equal(strip.children[1].children[0],f.scroll);
-  f.api.claim(f.stage);strip.scrollLeft=page*width;strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();await flush();
-  assert.deepEqual(f.calls,[{direction:page===0?1:-1,native:true}]);assert.equal(f.scroll.parent,f.stage);
- }
+test('the controlled strip keeps fixed Next-left panes and the actual face scroller in the center',()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ assert.equal(strip.children[0].children[0].src,'/next-small');assert.equal(strip.children[2].children[0].src,'/prev-small');assert.equal(strip.children[1].children[0],f.scroll);assert.equal(strip.scrollLeft,800);f.api.reset();assert.equal(f.scroll.parent,f.stage);
 });
 
 test('unsupported browsers and disabled editing unwrap the actual face scroller safely',()=>{
@@ -41,144 +49,115 @@ test('unsupported browsers and disabled editing unwrap the actual face scroller 
  const f=fixture();f.api.mount(f.stage,f.options);f.disable();assert.equal(f.api.mount(f.stage,f.options),false);assert.equal(f.stage.children[0],f.scroll);
 });
 
-test('screen touch follows the completed finger in both directions and ignores obsolete completion',async()=>{
- for(const direction of [-1,1])for(const page of [0,2]){
-  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
-  pointer(f,'pointerdown');pointer(f,'pointermove',200+direction*140);pointer(f,'pointerup',200+direction*140);
-  strip.scrollLeft=page*800;strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();await flush();assert.deepEqual(f.calls,[{direction,native:true}]);
+test('physical right and left touch moves the actual pixels with the finger and commits once on release',async()=>{
+ for(const direction of [-1,1]){
+  const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+  pointer(f,'pointerdown');pointer(f,'pointermove',200+direction*140);assert.equal(strip.scrollLeft,800-direction*140);assert.deepEqual(f.calls,[]);
+  pointer(f,'pointerup',200+direction*140);await flush();assert.deepEqual(f.calls,[{direction,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);
  }
 });
 
-test('horizontal trackpad input moves the actual pixels with the gesture and settles on the matching fixed pane',async t=>{
+test('moving back under the threshold cancels an earlier horizontal drag',async()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ pointer(f,'pointerdown');pointer(f,'pointermove',340);pointer(f,'pointermove',205);pointer(f,'pointerup',205);await flush();assert.deepEqual(f.calls,[]);assert.equal(strip.scrollLeft,800);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+});
+
+test('vertical and multiple-contact touch gestures cannot navigate the gallery',async()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ stroke(f,20,150);pointer(f,'pointerdown');f.fire('touchstart',{touches:[{identifier:9,clientX:200,clientY:100},{identifier:10,clientX:250,clientY:100}]});pointer(f,'pointerup',340);await flush();assert.deepEqual(f.calls,[]);assert.equal(strip.scrollLeft,800);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+});
+
+test('compatibility touch events join the pointer stream without resetting its origin or counting twice',async()=>{
+ const f=fixture({keep:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ pointer(f,'pointerdown');pointer(f,'pointermove',250);touch(f,'touchstart',250);pointer(f,'pointermove',340);assert.equal(strip.scrollLeft,660);pointer(f,'pointerup',340);touch(f,'touchend',340);await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+});
+
+test('TouchEvent-only fallback follows actual positions and commits on touchend',async()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ touch(f,'touchstart');touch(f,'touchmove',340);assert.equal(strip.scrollLeft,660);touch(f,'touchend',340);await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);
+});
+
+test('native non-enumerable Touch identifiers remain attached to their fallback contact',async()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);const point=x=>{const value={clientX:x,clientY:100,target:f.scroll};Object.defineProperty(value,'identifier',{value:9});return value;};
+ f.fire('touchstart',{touches:[point(200)]});f.fire('touchmove',{touches:[point(340)]});assert.equal(f.stage.children[0].scrollLeft,660);f.fire('touchend',{touches:[],changedTouches:[point(340)]});await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);
+});
+
+test('cancellation releases ownership and cannot turn unowned browser scrolling into a navigation',async()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ pointer(f,'pointerdown');pointer(f,'pointermove',208);pointer(f,'pointercancel',208);strip.scrollLeft=0;strip.handlers.get('scroll')?.({});strip.handlers.get('scrollend')?.({});await flush();assert.deepEqual(f.calls,[]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+});
+
+test('a cancelled already-claimed horizontal stroke completes once from its last controlled position',async()=>{
+ for(const direction of [-1,1]){
+  const f=fixture({keep:true});f.api.mount(f.stage,f.options);pointer(f,'pointerdown');pointer(f,'pointermove',200+direction*140);pointer(f,'pointercancel',0,0);pointer(f,'pointerup',200+direction*140);await flush();assert.deepEqual(directions(f),[direction]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+ }
+});
+
+test('a completed horizontal swipe suppresses its accidental face or playback click',async()=>{
+ const f=fixture({keep:true});f.api.mount(f.stage,f.options);stroke(f,140);const event=f.fire('click');await flush();assert.equal(event.defaultPrevented,true);assert.equal(event.stopped,true);assert.deepEqual(directions(f),[1]);f.api.reset();
+});
+
+test('rapid complete touch gestures each remain available while earlier media preparation is pending',async()=>{
+ const f=fixture({keep:true}),finishes=[];f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(resolve=>finishes.push(resolve));};f.api.mount(f.stage,f.options);
+ for(const direction of [1,1,-1])stroke(f,direction*140);assert.deepEqual(directions(f),[1,1,-1]);assert.equal(f.api.whenIdle(f.stage),null);for(const finish of finishes)finish();await flush();f.api.reset();
+});
+
+test('preview covers hide old letterbox pixels once ready while retaining the old photo during loading',()=>{
+ for(const ready of [false,true]){
+  const f=fixture({keep:true});f.options.step=()=>new Promise(()=>{});f.api.mount(f.stage,f.options);const strip=f.stage.children[0],neighbor=strip.children[0].children[0];
+  if(ready)Object.assign(neighbor,{tagName:'IMG',complete:true,naturalWidth:200,naturalHeight:400});
+  stroke(f,140);const cover=strip.children[1].children.find(node=>node.className==='native-pending-cover'),image=cover.children[0];
+  assert.equal(strip.children[1].children.includes(f.scroll),true,'The decoded current photo stays behind an unready preview');
+  if(ready)assert.equal(image,neighbor,'A ready neighbour keeps its already-painted image node');
+  else {assert.equal(image.style.opacity,'0');assert.equal(cover.style.backgroundColor,undefined);image.naturalWidth=200;image.handlers.get('load')({});}
+  assert.equal(image.style.opacity,'1');assert.equal(cover.style.backgroundColor,'rgb(237, 229, 212)','Ready preview letterboxing must conceal the previous image');f.api.reset();
+ }
+});
+
+test('horizontal trackpad input moves physical pixels, prevents browser default and commits after 80ms quiet',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const direction of [-1,1]){
-  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
-  const event=wheel(strip,direction*120);assert.equal(event.prevented,true);assert.equal(strip.scrollLeft,800-direction*120);assert.equal(strip.style.scrollSnapType,'none');
-  t.mock.timers.tick(80);assert.equal(strip.style.scrollSnapType,'');assert.equal(strip.scrollLeft,direction>0?0:1600);strip.handlers.get('scrollend')();await flush();
-  assert.deepEqual(f.calls,[{direction,native:true}]);
+  const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];const event=wheel(f,direction*120);assert.equal(event.defaultPrevented,true);assert.equal(strip.scrollLeft,800-direction*120);t.mock.timers.tick(79);assert.deepEqual(f.calls,[]);t.mock.timers.tick(1);await flush();assert.deepEqual(directions(f),[direction]);assert.equal(f.api.whenIdle(f.stage),null);
  }
 });
 
-test('a released touch commits within its bounded deadline without scrollend or a completed snap',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- pointer(f,'pointerdown');pointer(f,'pointerup',340);strip.scrollLeft=680;
- const wait=f.api.whenIdle(f.stage);assert.ok(wait);t.mock.timers.tick(249);assert.deepEqual(f.calls,[]);t.mock.timers.tick(1);await wait;await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);
+test('fractional trackpad input is valid without a pixel threshold or a browser scrollend',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);wheel(f,.75);const wait=f.api.whenIdle(f.stage);assert.ok(wait);t.mock.timers.tick(80);await wait;await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);
 });
 
-test('controlled wheel including fractional input commits within 300ms without scrollend',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- for(const dx of [120,.75]){
-  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];wheel(strip,dx);const wait=f.api.whenIdle(f.stage);
-  t.mock.timers.tick(80);t.mock.timers.tick(219);assert.deepEqual(f.calls,[]);t.mock.timers.tick(1);await wait;await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
- }
+test('moderately diagonal horizontal input starts ownership and later diagonal tails stay owned',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(wheel(f,90,{deltaY:100}).defaultPrevented,true);assert.equal(wheel(f,5,{deltaY:30}).defaultPrevented,true);assert.equal(strip.scrollLeft,705);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
 });
 
-test('an owned completed neighboring edge counts even when fractional wheel samples sum below the old threshold',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- wheel(strip,.75);strip.scrollLeft=0;t.mock.timers.tick(80);strip.handlers.get('scrollend')();await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);
+test('separate quiet wheel bursts each commit without any browser completion event',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);
+ for(const dx of [120,120,-120]){wheel(f,dx);t.mock.timers.tick(80);}await flush();assert.deepEqual(directions(f),[1,1,-1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
 });
 
-test('a stale partial wheel completion cannot finish its newer target animation early',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- strip.scrollTo=()=>{};wheel(strip,120);t.mock.timers.tick(80);strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[]);t.mock.timers.tick(220);await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);
+test('wheel reversal reserves the new input before the previous action can render a cached target',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true}),waits=[];f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});const wait=f.api.whenIdle(f.stage);if(wait)waits.push(wait);return wait;};f.api.mount(f.stage,f.options);
+ wheel(f,120);wheel(f,-140);assert.deepEqual(directions(f),[1]);assert.equal(waits.length,1);t.mock.timers.tick(80);await Promise.all(waits);await flush();assert.deepEqual(directions(f),[1,-1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
 });
 
-test('a second touch is retained while earlier media preparation remains pending',async()=>{
- const f=fixture({scrollEnd:true}),finishes=[];f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(resolve=>finishes.push(resolve));};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- for(const direction of [1,1,-1]){pointer(f,'pointerdown');pointer(f,'pointerup',200+direction*140);strip.scrollLeft=direction>0?0:1600;strip.handlers.get('scrollend')();assert.equal(strip.scrollLeft,800);assert.equal(strip.style.overflowX,'');}
- assert.deepEqual(f.calls.map(call=>call.direction),[1,1,-1]);for(const finish of finishes)finish();await flush();f.api.reset();
+test('late compatibility touchcancel cannot cancel a new wheel episode after pointer release',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);pointer(f,'pointerdown');touch(f,'touchstart');pointer(f,'pointermove',340);pointer(f,'pointerup',340);wheel(f,120);const wait=f.api.whenIdle(f.stage);
+ f.fire('touchcancel',{touches:[],changedTouches:[{identifier:9,clientX:340,clientY:100}]});assert.equal(f.stage.children[0].scrollLeft,680);assert.equal(f.api.isActive(f.stage),true);t.mock.timers.tick(80);await wait;await flush();assert.deepEqual(directions(f),[1,1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
 });
 
-test('new contact is reserved before a previous completed swipe can paint a warm cached target',async()=>{
- const f=fixture({scrollEnd:true}),waits=[];f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});const wait=f.api.whenIdle(f.stage);if(wait)waits.push(wait);return wait;};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- pointer(f,'pointerdown');pointer(f,'pointerup',340);pointer(f,'pointerdown');assert.equal(waits.length,1);assert.deepEqual(f.calls.map(call=>call.direction),[1]);
- pointer(f,'pointerup',340);strip.scrollLeft=0;strip.handlers.get('scrollend')();await Promise.all(waits);await flush();assert.deepEqual(f.calls.map(call=>call.direction),[1,1]);f.api.reset();
+test('playback controls, vertical wheel and pinch keep their browser actions',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);const video={parentNode:f.scroll,getBoundingClientRect:()=>({bottom:500}),closest:selector=>selector==='video'?video:null};
+ pointer(f,'pointerdown',200,480,7,video);pointer(f,'pointermove',350,480,7,video);pointer(f,'pointerup',350,480,7,video);assert.equal(wheel(f,140,{target:video,clientY:480}).defaultPrevented,undefined);assert.equal(wheel(f,0,{deltaY:140}).defaultPrevented,undefined);assert.equal(wheel(f,140,{ctrlKey:true}).defaultPrevented,undefined);t.mock.timers.tick(100);await flush();assert.deepEqual(f.calls,[]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
 });
 
-test('separate wheel episodes retain two actions before one coalesced browser completion without relying on a coalesced browser end',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- for(const second of [[90,45],[-90,-45]]){
-  const f=fixture({scrollEnd:true});f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(()=>{});};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
-  for(const dx of [90,45]){wheel(strip,dx);t.mock.timers.tick(8);}t.mock.timers.tick(110);
-  for(const dx of second){wheel(strip,dx);t.mock.timers.tick(8);}t.mock.timers.tick(80);t.mock.timers.tick(220);strip.handlers.get('scrollend')();await flush();
-  assert.deepEqual(f.calls.map(call=>call.direction),[1,Math.sign(second[0])]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
- }
+test('trackpad mapping applies only to owned horizontal input and never changes actual screen-touch direction',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true}),mapped=[];f.window.FamilyGalleryInput={wheelDelta:dx=>{mapped.push(dx);return -dx;}};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ wheel(f,0,{deltaY:140});wheel(f,120,{ctrlKey:true});assert.deepEqual(mapped,[]);wheel(f,120,{deltaMode:1});assert.deepEqual(mapped,[1920]);assert.equal(strip.scrollLeft,1600);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[-1]);stroke(f,140);await flush();assert.deepEqual(directions(f),[-1,1]);assert.deepEqual(mapped,[1920]);f.api.reset();
 });
 
-test('wheel reversal preserves the new physical episode before committing the preceding direction',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true}),waits=[];f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});const wait=f.api.whenIdle(f.stage);if(wait)waits.push(wait);return wait;};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- wheel(strip,120);wheel(strip,-140);assert.equal(waits.length,1);t.mock.timers.tick(80);t.mock.timers.tick(220);await Promise.all(waits);await flush();assert.deepEqual(f.calls.map(call=>call.direction),[1,-1]);f.api.reset();
+test('zero-width startup waits for geometry and unowned scrollend never selects a photograph',()=>{
+ const f=fixture({width:0});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(strip.style.visibility,'hidden');strip.handlers.get('scrollend')?.({});assert.deepEqual(f.calls,[]);strip.clientWidth=800;f.api.mount(f.stage,f.options);assert.equal(strip.scrollLeft,800);assert.equal(strip.style.visibility,'');strip.scrollLeft=0;strip.handlers.get('scrollend')?.({});assert.deepEqual(f.calls,[]);f.api.reset();
 });
 
-test('native playback controls, vertical scrolling and pinch zoom retain their browser actions',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0],video={getBoundingClientRect:()=>({bottom:500}),closest:selector=>selector==='video'?video:null};
- const event={target:video,pointerType:'touch',pointerId:7,isPrimary:true,clientX:200,clientY:480};strip.handlers.get('pointerdown')(event);f.events.get('pointerup')({...event,clientX:350});
- assert.equal(wheel(strip,140,{target:video,clientY:480}).prevented,undefined);assert.equal(wheel(strip,0,{deltaY:140}).prevented,undefined);assert.equal(wheel(strip,140,{ctrlKey:true}).prevented,undefined);
- pointer(f,'pointerdown');strip.handlers.get('touchstart')({touches:[{identifier:7},{identifier:8}]});t.mock.timers.tick(350);await flush();assert.deepEqual(f.calls,[]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
-});
-
-test('zero-width startup cannot select a pane, and reset resolves every pending input waiter',async()=>{
- const f=fixture({width:0,scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(strip.style.visibility,'hidden');strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[]);
- strip.clientWidth=800;f.api.mount(f.stage,f.options);assert.equal(strip.scrollLeft,800);assert.equal(strip.style.visibility,'');strip.scrollLeft=0;strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[]);
- pointer(f,'pointerdown');const waiting=f.api.whenIdle(f.stage);f.api.reset();await waiting;assert.equal(f.api.whenIdle(f.stage),null);
-});
-
-
-test('Windows pointer cancellation with a ghost compatibility touch is bounded and a new wheel packet takes ownership',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- for(const wheelNext of [false,true]){
-  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
-  pointer(f,'pointerdown');strip.handlers.get('touchstart')({touches:[{identifier:7,clientX:200,clientY:100}]});f.events.get('pointercancel')({pointerId:7});
-  const wait=f.api.whenIdle(f.stage);
-  if(wheelNext){wheel(strip,.75);t.mock.timers.tick(80);t.mock.timers.tick(220);}else t.mock.timers.tick(250);
-  await wait;await flush();assert.equal(f.api.whenIdle(f.stage),null);assert.deepEqual(f.calls.map(call=>call.direction),wheelNext?[1]:[]);f.api.reset();
- }
-});
-
-test('a normal Windows pointer release completes a compatibility touch even when touchend never arrives',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- for(const lateTouchEnd of [false,true]){
-  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
-  pointer(f,'pointerdown');strip.handlers.get('touchstart')({touches:[{identifier:9,clientX:200,clientY:100}]});
-  pointer(f,'pointermove',340);pointer(f,'pointerup',340);const wait=f.api.whenIdle(f.stage);
-  t.mock.timers.tick(250);await wait;await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);
-  if(lateTouchEnd){f.events.get('touchend')({changedTouches:[{identifier:9,clientX:340,clientY:100}]});t.mock.timers.tick(300);await flush();assert.equal(f.calls.length,1,'A late companion touchend cannot count the same gesture twice');}
-  f.api.reset();
- }
-});
-
-test('Windows browser-owned native pan survives early pointer cancellation and continuous real scroll samples',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- for(const compatibility of [false,true]){
-  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
-  pointer(f,'pointerdown');if(compatibility)strip.handlers.get('touchstart')({touches:[{identifier:7,clientX:200,clientY:100}]});pointer(f,'pointermove',208);f.events.get('pointercancel')({pointerId:7});
-  for(let i=1;i<=6;i++){t.mock.timers.tick(60);strip.scrollLeft=800-i*30;strip.handlers.get('scroll')();assert.deepEqual(f.calls,[]);assert.equal(strip.scrollLeft,800-i*30,'A fixed cancellation timer cannot recenter a still-moving native pan');}
-  const wait=f.api.whenIdle(f.stage);t.mock.timers.tick(249);assert.deepEqual(f.calls,[]);t.mock.timers.tick(1);await wait;await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);
- }
-});
-
-test('native automatic snapback retains inferred physical direction while an explicit actual release can reverse or cancel it',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});
- for(const release of ['missing','cancel','reverse']){
-  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
-  pointer(f,'pointerdown');strip.handlers.get('touchstart')({touches:[{identifier:7,clientX:200,clientY:100}]});pointer(f,'pointermove',208);f.events.get('pointercancel')({pointerId:7});
-  strip.scrollLeft=620;strip.handlers.get('scroll')();
-  if(release!=='missing')f.events.get('touchend')({changedTouches:[{identifier:7,clientX:release==='cancel'?205:60,clientY:100}]});
-  strip.scrollLeft=800;strip.handlers.get('scroll')();strip.handlers.get('scrollend')();t.mock.timers.tick(350);await flush();
-  assert.deepEqual(f.calls.map(call=>call.direction),release==='missing'?[1]:release==='reverse'?[-1]:[]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
- }
-});
-
-test('an orphan touchstart releases idle without discarding ownership of a later actual native pan',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- strip.handlers.get('touchstart')({touches:[{identifier:7,clientX:200,clientY:100}]});const wait=f.api.whenIdle(f.stage);t.mock.timers.tick(350);await wait;assert.equal(f.api.whenIdle(f.stage),null);assert.deepEqual(f.calls,[]);
- strip.scrollLeft=650;strip.handlers.get('scroll')();assert.equal(f.api.isActive(f.stage),true);t.mock.timers.tick(250);await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);
-});
-
-
-test('trackpad mapping applies only after horizontal ownership and never changes actual screen-touch direction',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true}),mapped=[];f.window.FamilyGalleryInput={wheelDelta:dx=>{mapped.push(dx);return -dx;}};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- wheel(strip,0,{deltaY:140});wheel(strip,120,{ctrlKey:true});assert.deepEqual(mapped,[]);
- wheel(strip,120,{deltaMode:1});assert.deepEqual(mapped,[1920]);assert.equal(strip.scrollLeft,1600);t.mock.timers.tick(80);strip.handlers.get('scrollend')();await flush();assert.deepEqual(f.calls,[{direction:-1,native:true}]);
- const touch=fixture({scrollEnd:true});touch.window.FamilyGalleryInput={wheelDelta:()=>{throw Error('Screen touch must never be calibrated');}};touch.api.mount(touch.stage,touch.options);const rail=touch.stage.children[0];pointer(touch,'pointerdown');pointer(touch,'pointerup',340);rail.scrollLeft=0;rail.handlers.get('scrollend')();await flush();assert.deepEqual(touch.calls,[{direction:1,native:true}]);
+test('reset resolves pending input waiters and cannot steal an image reparented by a newer face context',async()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);pointer(f,'pointerdown');const wait=f.api.whenIdle(f.stage);const newer=f.stage.children[0].children[2];newer.append(f.scroll);f.api.reset();await wait;assert.equal(f.scroll.parent,newer);assert.equal(f.api.whenIdle(f.stage),null);
 });

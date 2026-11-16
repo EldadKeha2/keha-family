@@ -341,8 +341,8 @@
   function refreshPhotoPresentation(){
     const stage=$('mediaStage');
     const native=window.FamilyPhotoNative,desktop=desktopPhotoInput();
-    // Use the same browser-owned scrolling as the working CSS-mode demo on
-    // laptops. Faces call this again after their image wrapper is ready.
+    // The shared strip owns horizontal input and navigation together. The
+    // browser only keeps vertical panning; face setup refreshes its wrapper.
     const browserScroll=desktop&&['photo','video'].includes(current()?.kind)&&native?.supported?.()===true;
     stage.classList.toggle('photo-manual-swipes',desktop&&!browserScroll);
     if(browserScroll&&faceTimer===null){

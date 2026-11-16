@@ -27,16 +27,19 @@ function fixture({mobile=false}={}){
  return {window,document,items,emit,mount,captures,selected,get restored(){return restored;}};
 }
 
-test('generated video input uses the same native strip while retaining one real player and native controls',async()=>{
+test('generated video input owns horizontal movement and release while retaining one real player and native controls',async()=>{
  const f=fixture(),player=f.mount('first'),strip=player.strip();
  assert.ok(strip);assert.equal(player.controller.stage.querySelectorAll('video').length,1);assert.equal(strip.children[1].querySelector('video'),player.video);
  assert.equal(strip.children[0].querySelector('img').src,'/poster-b');assert.equal(strip.children[2].querySelector('img').src,'/poster-b');
  assert.equal(f.emit(player.video,'wheel',{deltaX:120,deltaY:0,clientX:200,clientY:470}).defaultPrevented,false,'The seeking strip still gets native wheel input');
- for(const [type,x]of [['pointerdown',200],['pointermove',350],['pointerup',350]])assert.equal(f.emit(player.video,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY:200}).defaultPrevented,false);
- assert.deepEqual(f.captures,[]);
- strip.scrollLeft=0;f.emit(strip,'scrollend');await tick();assert.deepEqual(f.selected,['b']);assert.equal(player.video.src,'/b.mp4');assert.equal(player.strip(),strip);assert.equal(strip.scrollLeft,800);
+ const pointer=(type,x,id=1)=>f.emit(player.video,type,{pointerType:'touch',pointerId:id,isPrimary:true,button:0,clientX:x,clientY:200});
+ assert.equal(pointer('pointerdown',200).defaultPrevented,false);assert.equal(pointer('pointermove',350).defaultPrevented,true);assert.equal(strip.scrollLeft,650,'The first rightward motion moves actual pixels right');
+ assert.deepEqual(f.captures,[1]);assert.equal(pointer('pointerup',350).defaultPrevented,true);
+ await tick();assert.deepEqual(f.selected,['b']);assert.equal(player.video.src,'/b.mp4');assert.equal(player.strip(),strip);assert.equal(strip.scrollLeft,800);
  for(const [type,x]of [['pointerdown',350],['pointermove',200],['pointerup',200]])f.emit(player.video,type,{pointerType:'touch',pointerId:2,isPrimary:true,button:0,clientX:x,clientY:200});
- strip.scrollLeft=1600;f.emit(strip,'scrollend');await tick();assert.deepEqual(f.selected,['b','a']);assert.equal(player.video.src,'/a.mp4');
+ await tick();assert.deepEqual(f.selected,['b','a']);assert.equal(player.video.src,'/a.mp4');
+ assert.equal(f.emit(player.video,'wheel',{deltaX:120,deltaY:0,clientX:200,clientY:200}).defaultPrevented,true,'The video body owns horizontal wheel input');
+ await new Promise(resolve=>setTimeout(resolve,100));await tick();assert.deepEqual(f.selected,['b','a','b'],'Wheel navigation commits without scrollend');
  player.close();assert.equal(player.strip(),null);assert.equal(player.video.parentNode,player.controller.stage);assert.equal(f.restored,1);
 });
 
