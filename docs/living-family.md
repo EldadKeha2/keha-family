@@ -1,7 +1,7 @@
-# Ten family photographs, three prepared actions
+# Family photographs, three prepared actions
 
-The main `#family-ai` view presents ten reviewed photographs: eight original
-black-and-white sources and two explicitly owner-selected color exceptions.
+The main `#family-ai` view presents nineteen reviewed photographs: eight original
+black-and-white sources and eleven exact owner-selected color or sepia sources.
 Tedhar in the red toy car (`89b5dd6a048342ecb9cd4b29b73ca197`) replaced the
 Ora/Eddie wedding selection. The restored family picnic
 (`d76e78dc736a404fac0f36d68d2a760f`) replaces the young-Shlomo card while the
@@ -50,10 +50,10 @@ visually inspecting the image. Both scripts reject missing reviews, changed
 source revisions, or changed bytes. Replacement color jobs remain archived in
 `excludedJobs`, and their provider quota reset still blocks all new submissions.
 The generator adds a monochrome-only instruction to every new movement prompt.
-Each named owner-selected color exception instead requires `requestedColorException: true`
+Each exact owner-selected color or sepia exception instead requires `requestedColorException: true`
 and `sourceReview` with `kind: "owner-requested-color"`, its unchanged revision
 and SHA-256. Its output requires `colorPreservationReviewed: true` in place of
-`monochromeReviewed`. The shared helper accepts exceptions only for these two exact photo IDs;
+`monochromeReviewed`. The shared helper accepts exceptions only for the exact eleven owner-selected photo IDs;
 it cannot relax the rule for another selection.
 
 Inspect generated frames for identity, natural motion, monochrome preservation,
@@ -107,3 +107,28 @@ album, profile, or collection membership. The original portrait is never edited
 or deleted. The prepared source and its three pending actions appear only on
 the selected AI card. Repeating the same bytes is idempotent; changing an
 existing source or importing into another photo ID is rejected.
+
+
+## Explicit owner uploads and protected removal — 16 November 2026
+
+The owner explicitly added nine original PNG photographs (seven from the supplied
+media ZIP, plus Photo_05_Page_02.png and Photo_10_Page_02.png). The exact IDs,
+source SHA-256 digests and original filenames are in the catalog. The curated
+album now has nineteen photos with fifty-seven planned actions. These exact nine
+uploads are additional owner-selected exceptions preserving their existing colors
+or sepia; independent future selections remain originally black-and-white.
+Sources use the dedicated family-ai category, never public repository image bytes.
+Source upload is idempotent, validates actual PNG structure up to 32 MiB and
+32 megapixels, and rejects bytes not matching the catalog's source digest.
+
+Each card has a small, separate trash control beside the effects. Removal uses
+the shared styled password dialog. The server validates a salted PBKDF2 verifier
+in private Durable Object storage, with per-client and global attempt limits.
+No password is embedded in client code, stored in the browser or included in
+public backups. A one-time challenge initializes the verifier through
+POST /api/family-ai/removal/setup; subsequent setup attempts are rejected.
+The existing exclusion endpoint requires the password on every removal. Restoring
+an excluded card does not require it. Exclusion leaves original media and all
+other album memberships intact. The generator checks the live featured list
+before each action; the importer skips absent/excluded photos and the server
+rejects imports for excluded photos, including an import racing a removal.

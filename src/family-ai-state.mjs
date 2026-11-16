@@ -2,6 +2,7 @@ import {aliasPersonIds} from './gallery.mjs';
 import {HttpError,text,uid} from './http.mjs';
 import {photoLabelFromName} from '../public/assets/photo-labels-catalog.mjs';
 import {LivingFamilyState} from './living-family-state.mjs';
+import {livingPhotos} from './living-family-catalog.mjs';
 
 const vintageNames=['vintage','וינטג','וינטג׳',"וינטג'",'וינטג’','וינטאג','וינטאג׳',"וינטאג'",'וינטאג’'];
 const vintageLabels=[...new Set(vintageNames.map(name=>photoLabelFromName(name).toLowerCase()))];
@@ -11,7 +12,8 @@ const photoClause="COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract
 const bwClause="EXISTS (SELECT 1 FROM json_each(m.data,'$.labels') l WHERE l.value='black-and-white')";
 const vintageClause="(EXISTS (SELECT 1 FROM json_each(m.data,'$.labels') l WHERE lower(l.value) IN (SELECT value FROM json_each(?))) OR CAST(json_extract(m.data,'$.takenDate.year') AS INTEGER) BETWEEN 1910 AND 1969)";
 // Vintage tags and an old date alone do not identify a black-and-white source.
-const candidateClause=photoClause+' AND '+bwClause;
+const selectedClause="m.id IN ("+livingPhotos.map(photo=>"'"+photo.id+"'").join(',')+")";
+const candidateClause=photoClause+' AND ('+bwClause+' OR '+selectedClause+')';
 const excludedClause='EXISTS (SELECT 1 FROM family_ai_exclusions e WHERE e.media_id=m.id)';
 const vintageArgs=()=>[JSON.stringify(vintageLabels)];
 
@@ -21,6 +23,7 @@ export class FamilyAiState {
   constructor(owner){this.owner=owner;this.living=new LivingFamilyState(owner);}
   initialize(){
     this.living.initialize();
+    this.owner.sql.exec('CREATE TABLE IF NOT EXISTS family_ai_access(id TEXT PRIMARY KEY,value TEXT NOT NULL,expires_at INTEGER NOT NULL DEFAULT 0)');
     this.owner.sql.exec('CREATE TABLE IF NOT EXISTS family_ai_exclusions(media_id TEXT PRIMARY KEY,created_at TEXT NOT NULL)');
     this.owner.sql.exec('CREATE TABLE IF NOT EXISTS family_ai_jobs(media_id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.owner.sql.exec('CREATE TABLE IF NOT EXISTS family_ai_claims(claim_id TEXT PRIMARY KEY,media_id TEXT NOT NULL,created_at TEXT NOT NULL)');

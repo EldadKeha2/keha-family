@@ -7,7 +7,7 @@ const source=await readFile(new URL('../public/assets/living-family.js',import.m
 const photo={id:'a'.repeat(32),title:'יונה ושלמה',titleEn:'Yona and Shlomo',generation:1,src:'/media/source',thumbnailSrc:'/media/thumb',tags:[],animations:[{id:'smile',label:'מבט וחיוך',labelEn:'A look and a smile',status:'ready',duration:5.0625,videoSrc:'/api/family-ai/video/source/smile?v=one'},{id:'wave',label:'נפנוף לשלום',labelEn:'A little wave',status:'ready',duration:5.0625,videoSrc:'/api/family-ai/video/source/wave?v=two'},{id:'dance',label:'ריקוד קטן',labelEn:'A little dance',status:'pending',duration:5}]};
 const tick=async()=>{for(let i=0;i<6;i++)await new Promise(resolve=>setImmediate(resolve));};
 function fixture(){
-  const nodes=new Map(),listeners=new Map(),requests=[],opened=[],registered=[];let fail=false;
+  const nodes=new Map(),listeners=new Map(),requests=[],opened=[],registered=[],removed=[];let fail=false;
   class Element{
     constructor(){this.children=[];this.listeners=new Map();this.attrs={};this.hidden=false;this.open=false;this.disabled=false;this.dataset={};this.paused=true;this.classList={add(){}};}
     get firstChild(){return this.children[0]||null;}
@@ -28,10 +28,10 @@ function fixture(){
   }
   const host=new Element();host.id='familyAiView';host.append(new Element());nodes.set(host.id,host);
   const document={readyState:'loading',visibilityState:'visible',getElementById:id=>nodes.get(id),createElement:()=>new Element(),body:new Element(),addEventListener:(name,callback)=>listeners.set(name,callback)};
-  const window={FamilyI18n:{isEnglish:true,fetch:async(path,options)=>{requests.push({path,options});if(fail)throw Error('Offline');return {ok:true,json:async()=>({items:[photo],total:1,totalClips:3,readyClips:2})};}},FamilyAI:{activate(){},search(){},refresh(){}},FamilyApp:{getView:()=> 'tree'},FamilyMedia:{register:(...args)=>registered.push(args),open:(...args)=>opened.push(args)},addEventListener(){}};
+  const window={FamilyI18n:{isEnglish:true,fetch:async(path,options)=>{requests.push({path,options});if(fail)throw Error('Offline');return {ok:true,json:async()=>({items:[photo],total:1,totalClips:3,readyClips:2})};}},FamilyAI:{activate(){},search(){},refresh(){},remove:item=>removed.push(item)},FamilyApp:{getView:()=> 'tree'},FamilyMedia:{register:(...args)=>registered.push(args),open:(...args)=>opened.push(args)},addEventListener(){}};
   vm.runInNewContext(source,{window,document,location:{hash:'#tree'},setTimeout:()=>1,clearTimeout(){}});listeners.get('DOMContentLoaded')();
   const click=async(data,{inDialog=false,disabled=false}={})=>{const button={dataset:data,disabled,hasAttribute:name=>name==='data-living-refresh'&&'livingRefresh'in data};await nodes.get(inDialog?'livingFamilyPlayer':'livingFamilySection').emit('click',{target:{closest:selector=>selector==='[data-living-close]'?null:button}});await tick();};
-  return {nodes,requests,opened,registered,api:window.FamilyAI,click,set fail(value){fail=value;},activate:async()=>{window.FamilyAI.activate('family-ai');await tick();}};
+  return {nodes,requests,opened,registered,removed,api:window.FamilyAI,click,set fail(value){fail=value;},activate:async()=>{window.FamilyAI.activate('family-ai');await tick();}};
 }
 
 test('visitors see three actions with accurate readiness and only GET requests',async()=>{
@@ -56,4 +56,12 @@ test('a failed refresh retains the album and a later success clears its error',a
   const f=fixture();await f.activate();f.fail=true;await f.click({livingRefresh:''});assert.equal(f.nodes.get('livingFamilyError').hidden,false);assert.match(f.nodes.get('livingFamilyGrid').innerHTML,/Yona and Shlomo/);
   f.fail=false;await f.click({livingRefresh:''});assert.equal(f.nodes.get('livingFamilyError').hidden,true);
   f.api.search('does not match');assert.equal(f.nodes.get('livingFamilyEmpty').hidden,false);assert.equal(f.nodes.get('livingFamilyGrid').innerHTML,'');
+});
+
+
+test('a separate trash button under each original opens the shared password dialog without starting generation',async()=>{
+  const f=fixture();await f.activate();const html=f.nodes.get('livingFamilyGrid').innerHTML;
+  assert.match(html,/living-card-tools/);assert.match(html,/data-living-remove=/);
+  await f.click({livingRemove:photo.id});assert.equal(f.removed.length,1);assert.equal(f.removed[0].id,photo.id);
+  assert.ok(f.requests.every(request=>!request.options.method||request.options.method==='GET'));
 });

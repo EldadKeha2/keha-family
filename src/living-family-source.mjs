@@ -1,6 +1,6 @@
 import {HttpError} from './http.mjs';
 
-export const LIVING_SOURCE_MAX_BYTES=16*1024*1024;
+export const LIVING_SOURCE_MAX_BYTES=32*1024*1024;
 export function livingSourceInfo(bytes){
   const bad=()=>{throw new HttpError(415,'בחרו תמונת PNG תקינה.','LIVING_SOURCE_FORMAT');};
   if(bytes.byteLength<57||bytes.byteLength>LIVING_SOURCE_MAX_BYTES||![137,80,78,71,13,10,26,10].every((n,i)=>bytes[i]===n))bad();

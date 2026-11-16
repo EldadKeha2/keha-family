@@ -17,6 +17,7 @@ function model({enabled=true,job=null,english=true}={}){
     removeAttribute(name){delete this.attrs[name];}
     querySelectorAll(selector){if(this.id==='familyAiFilters')return ['all','black-and-white','vintage','ready'].map(value=>({dataset:{aiFilter:value},setAttribute(){}}));if(selector==='[data-ai-close]')return [new Element('button')];return [];}
     querySelector(){return new Element('button');}
+    before(){}
     append(node){nodes.set(node.id,node);}
     showModal(){this.open=true;}
     close(){this.open=false;this.listeners.get('close')?.({});}
@@ -56,7 +57,11 @@ test('photo removal requires confirmation and sends section exclusion instead of
   assert.equal(ui.nodes.get('familyAiRemoveDialog').open,true);
   assert.equal(ui.requests.filter(request=>request.options.method==='POST').length,0);
   await ui.nodes.get('familyAiRemoveConfirm').emit('click');await tick();
-  const mutation=ui.requests.find(request=>request.options.method==='POST');assert.equal(mutation.path,'api/family-ai/exclude');assert.deepEqual(JSON.parse(mutation.options.body),{id:photo.id,excluded:true});
+  assert.equal(ui.requests.some(request=>request.options.method==='POST'),false);
+  ui.nodes.get('familyAiRemovePassword').value='test-removal-password';
+  await ui.nodes.get('familyAiRemoveConfirm').emit('click');await tick();
+  assert.equal(ui.nodes.get('familyAiRemovePassword').value,'');
+  const mutation=ui.requests.find(request=>request.options.method==='POST');assert.equal(mutation.path,'api/family-ai/exclude');assert.deepEqual(JSON.parse(mutation.options.body),{id:photo.id,excluded:true,password:'test-removal-password'});
   assert.equal(ui.requests.some(request=>/api\/media\/.*\/delete/.test(request.path)),false);
   assert.equal(ui.registered.some(([, ,options])=>options.advanceRemoved===true),true);
 });

@@ -6,7 +6,7 @@ import {FamilyState} from '../src/state.mjs';
 import {livingPhotos,livingActions} from '../src/living-family-catalog.mjs';
 import {livingFamilyRoute} from '../src/living-family-route.mjs';
 import {livingVideoInfo} from '../src/living-family-video.mjs';
-import {uid,HttpError} from '../src/http.mjs';
+import {uid,HttpError,sha256} from '../src/http.mjs';
 
 const video=new Uint8Array(await readFile(new URL('./fixtures/living-family-5s.mp4',import.meta.url)));
 const longVideo=new Uint8Array(await readFile(new URL('./fixtures/living-family-too-long.mp4',import.meta.url)));
@@ -32,11 +32,11 @@ function fixture(){
   return {state,database,run,objects,calls,pending,call,path,close(){database.close();}};
 }
 
-test('the curated album has ten photos, three honest pending actions, and leaves gallery metadata intact',()=>{
+test('the curated album has nineteen photos, three honest pending actions, and leaves gallery metadata intact',()=>{
   const f=fixture();try{
-    assert.equal(livingPhotos.length,10);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.filter(p=>!p.requestedColorException).every(p=>p.originalBlackAndWhite===true));assert.deepEqual(livingPhotos.filter(p=>p.requestedColorException).map(p=>p.id),['d76e78dc736a404fac0f36d68d2a760f','89b5dd6a048342ecb9cd4b29b73ca197']);assert.ok(!livingPhotos.some(p=>['a1e9162209384402b481b7a487ca5cf9','7f80a774ddd94d2c8ae629264f284b27'].includes(p.id)));
+    assert.equal(livingPhotos.length,19);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.filter(p=>!p.requestedColorException).every(p=>p.originalBlackAndWhite===true));assert.deepEqual(livingPhotos.filter(p=>p.requestedColorException).map(p=>p.id),['d76e78dc736a404fac0f36d68d2a760f','89b5dd6a048342ecb9cd4b29b73ca197',...livingPhotos.filter(p=>p.ownerUploadedSource).map(p=>p.id)]);assert.ok(!livingPhotos.some(p=>['a1e9162209384402b481b7a487ca5cf9','7f80a774ddd94d2c8ae629264f284b27'].includes(p.id)));
     const before=f.database.prepare('SELECT data FROM media ORDER BY id').all();const album=f.run('family-ai.living.list');
-    assert.equal(album.total,10);assert.equal(album.totalClips,30);assert.equal(album.readyClips,0);assert.ok(album.items.every(item=>item.animations.length===3&&item.animations.every(a=>a.status==='pending'&&!a.videoSrc)));
+    assert.equal(album.total,19);assert.equal(album.totalClips,57);assert.equal(album.readyClips,0);assert.ok(album.items.every(item=>item.animations.length===3&&item.animations.every(a=>a.status==='pending'&&!a.videoSrc)));
     assert.equal('key'in album.items[0],false);assert.deepEqual(f.database.prepare('SELECT data FROM media ORDER BY id').all(),before);
   }finally{f.close();}
 });
@@ -108,7 +108,48 @@ test('source edits, exclusion, and absent actions remain visible as stale, hidde
     const row=f.database.prepare('SELECT data FROM media WHERE id=?').get(id),item=JSON.parse(row.data);item.photoRevision='edited';f.database.prepare('UPDATE media SET data=? WHERE id=?').run(JSON.stringify(item),id);
     assert.equal(f.run('family-ai.living.list').items[0].animations[0].stale,true);
     await assert.rejects(f.call(f.path(id,'wave'),{method:'POST'}),e=>e.code==='LIVING_SOURCE_CHANGED');
-    f.run('family-ai.exclude',{id,excluded:true});assert.equal(f.run('family-ai.living.list').total,9);await assert.rejects(f.call(saved.clip.videoSrc),e=>e.code==='LIVING_PHOTO');
+    f.run('family-ai.exclude',{id,excluded:true});assert.equal(f.run('family-ai.living.list').total,18);await assert.rejects(f.call(saved.clip.videoSrc),e=>e.code==='LIVING_PHOTO');
     assert.ok(f.database.prepare('SELECT data FROM media WHERE id=?').get(id));
+  }finally{f.close();}
+});
+
+
+test('AI removal requires the private configured password, persists and leaves originals and other albums intact',async()=>{
+  const f=fixture(),id=livingPhotos.find(p=>p.ownerUploadedSource).id;
+  const call=async(action,p={})=>f.state.fetch(new Request('https://state.internal/',{method:'POST',body:JSON.stringify({action,...p})}));
+  try{
+    const setupKey='1'.repeat(64);f.state.env.FAMILY_AI_REMOVAL_SETUP_DIGEST=await sha256(setupKey);
+    assert.equal((await call('family-ai.removal.setup',{setupKey:'wrong',password:'test-removal-password'})).status,403);
+    assert.equal((await call('family-ai.removal.setup',{setupKey,password:'test-removal-password'})).status,200);
+    assert.equal((await call('family-ai.removal.setup',{setupKey,password:'0000'})).status,409);
+    const original=f.database.prepare('SELECT data FROM media WHERE id=?').get(id).data;
+    for(const password of [undefined,'0000'])assert.equal((await call('family-ai.exclude',{id,excluded:true,password,client:'owner'})).status,401);
+    assert.ok(f.run('family-ai.living.list').items.some(p=>p.id===id));
+    const result=await call('family-ai.exclude',{id,excluded:true,password:'test-removal-password',client:'owner'});assert.equal(result.status,200);
+    assert.ok(!f.run('family-ai.living.list').items.some(p=>p.id===id));
+    assert.equal(f.database.prepare('SELECT data FROM media WHERE id=?').get(id).data,original);
+    await assert.rejects(f.call(f.path(id,'smile'),{method:'POST'}),error=>error.code==='LIVING_PHOTO');
+    assert.equal((await call('family-ai.exclude',{id,excluded:false})).status,200);
+    assert.ok(f.run('family-ai.living.list').items.some(p=>p.id===id));
+    for(let i=0;i<5;i++)assert.equal((await call('family-ai.exclude',{id,excluded:true,password:'wrong',client:'guesser'})).status,401);
+    const limited=await call('family-ai.exclude',{id,excluded:true,password:'test-removal-password',client:'guesser'});assert.equal(limited.status,429);assert.ok(limited.headers.get('Retry-After'));
+    assert.ok(!JSON.stringify(f.run('export')).includes('test-removal-password'));
+    assert.ok(!f.database.prepare('SELECT value FROM family_ai_access WHERE id=?').get('config').value.includes('test-removal-password'));
+  }finally{f.close();}
+});
+
+test('explicit uploaded sources are bound to the exact owner-selected digest and cannot be substituted',()=>{
+  const f=fixture(),entry=livingPhotos.find(p=>p.ownerUploadedSource);
+  try{
+    f.database.prepare('DELETE FROM media WHERE id=?').run(entry.id);
+    const input={id:entry.id,digest:'a'.repeat(64),mime:'image/png',size:100};
+    assert.throws(()=>f.run('family-ai.living.source.prepare',input),error=>error.code==='LIVING_SOURCE_CHANGED');
+    input.digest=entry.sourceDigest;
+    assert.equal(f.run('family-ai.living.source.prepare',input).alreadySaved,false);
+    const saved=f.run('family-ai.living.source.save',{...input,key:'family-ai/'+entry.id+'/source/'+entry.sourceDigest+'.png'});
+    assert.equal(saved.item.scope,'family-ai');assert.equal(saved.item.filename,entry.sourceFilename);
+    assert.equal(f.run('family-ai.living.source.prepare',input).alreadySaved,true);
+    assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections WHERE media_id=?').get(entry.id).n,0);
+    assert.ok(f.run('family-ai.list',{excluded:false}).items.some(p=>p.id===entry.id));
   }finally{f.close();}
 });

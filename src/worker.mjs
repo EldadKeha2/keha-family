@@ -259,7 +259,8 @@ export default {
         if(!equal(request.headers.get('X-Family-Token'),PUBLIC_WRITE_TOKEN))throw new HttpError(403,'יש לרענן את הדף לפני שמירת השינוי.');
       }
       if(path==='/api/family-ai'&&request.method==='GET')return json(await db('family-ai.list',{page:url.searchParams.get('page'),size:url.searchParams.get('size'),filter:url.searchParams.get('filter')||'all',query:url.searchParams.get('q')||'',excluded:url.searchParams.get('excluded')==='1'}));
-      if(path==='/api/family-ai/exclude'&&request.method==='POST')return json(await db('family-ai.exclude',await readJSON(request,2000)));
+      if(path==='/api/family-ai/removal/setup'&&request.method==='POST')return json(await db('family-ai.removal.setup',await readJSON(request,2000)));
+      if(path==='/api/family-ai/exclude'&&request.method==='POST')return json(await db('family-ai.exclude',{...await readJSON(request,2000),client:request.headers.get('CF-Connecting-IP')||'unknown'}));
       if(path.startsWith('/api/family-ai/'))return await livingFamilyRoute(request,env,db,ctx)||await familyAiRoute(request,env,db,ctx);
       if(path==='/api/trash'||path.startsWith('/api/trash/'))return await recycleRoute(request,env,db);
       if(path.startsWith('/api/updates/'))return await updatesRoute(request,env,db);

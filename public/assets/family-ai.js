@@ -4,7 +4,7 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icons={spark:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 6.2L21 12l-6.2 2.8L12 21l-2.8-6.2L3 12l6.2-2.8Z"/><path d="m20 2 .7 1.3L22 4l-1.3.7L20 6l-.7-1.3L18 4l1.3-.7Z"/></svg>',trash:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/></svg>',play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7Z"/></svg>',gallery:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 17 6-6 4 4 3-3 5 5"/><circle cx="15.5" cy="7.5" r="1"/></svg>',download:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>',restore:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6M12 8v5l3 2"/></svg>'};
   const state={active:false,ready:false,loaded:false,loading:false,error:'',items:[],filter:'all',excluded:false,excludedCount:0,query:'',page:1,pagination:{page:1,pages:1,total:0},request:0,config:null,configError:false,jobs:new Map(),submitting:new Set(),polling:false};
-  let pollTimer,searchTimer,loadController,generationDialog,removeDialog,videoDialog,pendingPhoto=null,pendingRemoval=null;
+  let pollTimer,searchTimer,loadController,generationDialog,removeDialog,videoDialog,pendingPhoto=null,pendingRemoval=null,removing=false;
   const statusOf=job=>String(job?.status||'').toUpperCase();
   const isBusy=job=>['SUBMITTING','PENDING','THROTTLED','RUNNING','SAVING'].includes(statusOf(job));
   const shouldPoll=job=>isBusy(job)&&job?.errorCode!=='SUBMISSION_UNCERTAIN';
@@ -137,15 +137,22 @@
     finally{state.submitting.delete(item.id);$('familyAiGenerateSubmit').disabled=false;render();schedulePoll();}
   }
   function confirmRemoval(item){
+    if(removing)return;
     if(!removeDialog){
       removeDialog=ensureDialog('familyAiRemoveDialog',`<button type="button" class="dialog-close" data-ai-close aria-label="${tr('סגירה','Close')}">×</button><span class="family-ai-dialog-emblem" aria-hidden="true">❖</span><h2 id="familyAiRemoveTitle">${tr('להסיר מבינה משפחתית?','Remove from Artificial Family?')}</h2><p id="familyAiRemoveCaption" dir="auto"></p><p>${tr('התמונה תוסר רק מהעמוד הזה. היא תישאר בגלריה, ואפשר יהיה להחזיר אותה דרך ״תמונות שהוסרו״.','The photo will be removed from this section. It stays in the gallery and can be restored through Removed photos.')}</p><p id="familyAiRemoveError" class="family-ai-form-error" role="alert"></p><div class="family-ai-dialog-actions"><button type="button" class="secondary-button" data-ai-close>${tr('ביטול','Cancel')}</button><button type="button" id="familyAiRemoveConfirm" class="primary-button">${tr('הסרה מהעמוד','Remove from section')}</button></div>`);
       removeDialog.setAttribute('aria-labelledby','familyAiRemoveTitle');removeDialog.querySelectorAll('[data-ai-close]').forEach(button=>button.addEventListener('click',()=>removeDialog.close()));
-      $('familyAiRemoveConfirm').addEventListener('click',async()=>{if(!pendingRemoval)return;const id=pendingRemoval.id;$('familyAiRemoveConfirm').disabled=true;try{await changeExclusion(id,true);removeDialog.close();}catch(error){$('familyAiRemoveError').textContent=error.message;}finally{$('familyAiRemoveConfirm').disabled=false;}});
+      const password=document.createElement('div');password.className='family-ai-removal-password';
+      password.innerHTML=`<label for="familyAiRemovePassword">${tr('סיסמת מחיקה','Removal password')}</label><input id="familyAiRemovePassword" type="password" autocomplete="off" inputmode="numeric" maxlength="128" required><p>${tr('הזינו את הסיסמה כדי להסיר את התמונה ואת האפקטים שלה מהעמוד ומהתור.','Enter the password to remove this photo and its effects from the page and queue.')}</p>`;
+      removeDialog.querySelector('.family-ai-dialog-actions').before(password);
+      const submit=async()=>{if(!pendingRemoval||removing)return;const id=pendingRemoval.id,code=$('familyAiRemovePassword').value;if(!code){$('familyAiRemoveError').textContent=tr('יש להזין את סיסמת המחיקה.','Enter the removal password.');$('familyAiRemovePassword').focus();return;}removing=true;$('familyAiRemoveConfirm').disabled=true;$('familyAiRemovePassword').value='';try{await changeExclusion(id,true,code);removeDialog.close();void window.FamilyAI.refresh();}catch(error){$('familyAiRemoveError').textContent=error.message;$('familyAiRemovePassword').focus();}finally{removing=false;$('familyAiRemoveConfirm').disabled=false;}};
+      $('familyAiRemoveConfirm').addEventListener('click',submit);
+      $('familyAiRemovePassword').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();void submit();}});
+      removeDialog.addEventListener('close',()=>{$('familyAiRemovePassword').value='';pendingRemoval=null;});
     }
-    pendingRemoval=item;$('familyAiRemoveCaption').textContent=titleOf(item);$('familyAiRemoveError').textContent='';removeDialog.showModal();removeDialog.querySelector('.secondary-button').focus();
+    pendingRemoval=item;$('familyAiRemoveCaption').textContent=titleOf(item);$('familyAiRemoveError').textContent='';$('familyAiRemovePassword').value='';removeDialog.showModal();$('familyAiRemovePassword').focus();
   }
-  async function changeExclusion(id,excluded){
-    await post('api/family-ai/exclude',{id,excluded});state.items=state.items.filter(item=>item.id!==id);render({advanceRemoved:true});await load();window.FamilyApp?.toast(tr(excluded?'התמונה הוסרה מהעמוד. אפשר להחזיר אותה בכל רגע.':'התמונה חזרה לבינה משפחתית.',excluded?'Photo removed from this section. You can restore it at any time.':'Photo restored to Artificial Family.'));
+  async function changeExclusion(id,excluded,password){
+    await post('api/family-ai/exclude',{id,excluded,...(excluded?{password}:{})});state.items=state.items.filter(item=>item.id!==id);render({advanceRemoved:true});await load();window.FamilyApp?.toast(tr(excluded?'התמונה הוסרה מהעמוד ומהתור.':'התמונה חזרה לבינה משפחתית.',excluded?'Photo removed from this section and queue.':'Photo restored to Artificial Family.'));
   }
   function play(item){
     const src=videoOf(jobFor(item));if(!src)return;
@@ -182,6 +189,6 @@
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.active){void load();}else clearTimeout(pollTimer);});
     render();activate(window.FamilyApp?.getView?.()||location.hash.slice(1).split('/')[0]);
   }
-  window.FamilyAI={activate,search,refresh:()=>load(),pageGallery:page=>{state.page=page;return load();},galleryQuery:()=>({page:state.page}),exclude:id=>{const item=state.items.find(item=>item.id===id)||window.FamilyMedia?.lookup('family-ai',id);if(item)confirmRemoval(item);},statusOf,isBusy};
+  window.FamilyAI={activate,search,refresh:()=>load(),remove:confirmRemoval,pageGallery:page=>{state.page=page;return load();},galleryQuery:()=>({page:state.page}),exclude:id=>{const item=state.items.find(item=>item.id===id)||window.FamilyMedia?.lookup('family-ai',id)||window.FamilyMedia?.lookup('living-family',id);if(item)confirmRemoval(item);},statusOf,isBusy};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

@@ -6,6 +6,7 @@ import {RecycleAccess} from './recycle-access.mjs';
 import {NostalgiaLibrary} from './nostalgia-library.mjs';
 import {VideoCategories} from './video-categories.mjs';
 import {FamilyAiState} from './family-ai-state.mjs';
+import {FamilyAiRemovalAccess} from './family-ai-access.mjs';
 import {VideoEdits,videoEditorPeople} from './video-edits.mjs';
 import {videoAssetsPublic,videoAssetsQueue,saveVideoAsset} from './video-assets-state.mjs';
 import {MEDIA_PUBLIC_BATCH_SIZE,mediaPublicMetadata} from './media-public-batch.mjs';
@@ -1120,6 +1121,8 @@ export class FamilyState {
       if(this.initializationError&&Date.now()>=this.nextInitializationAttempt)this.initializeState();
       if(this.initializationError)throw this.initializationError;
       const {action,...p}=await request.json();
+      if(action==='family-ai.removal.setup')return json(await new FamilyAiRemovalAccess(this).setup(p));
+      if(action==='family-ai.exclude'&&p.excluded!==false)await new FamilyAiRemovalAccess(this).authorize(p);
       if(action?.startsWith('trash.')){
         const access=new RecycleAccess(this);
         if(action==='trash.setup')return json(await access.setup(p));

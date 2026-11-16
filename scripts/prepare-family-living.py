@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import time
 import uuid
+import urllib.request
 from family_living_source import verified_source, free_quota_reset, owner_color_exception
 
 SPACE = 'https://zerogpu-aoti-wan2-2-fp8da-aoti-faster.hf.space'
@@ -33,6 +34,12 @@ def save(path, value):
 def log(**values):
     print(json.dumps(values, ensure_ascii=False), flush=True)
 
+def active_photo_ids(origin):
+    request = urllib.request.Request(origin.rstrip('/') + '/api/family-ai/featured',
+                                     headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return {item['id'] for item in json.load(response)['items']}
+
 
 def check_video(path):
     info = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-show_format', '-show_streams', '-of', 'json', str(path)]))
@@ -48,6 +55,7 @@ def main():
     parser.add_argument('--plan', type=pathlib.Path, required=True)
     parser.add_argument('--work-dir', type=pathlib.Path, required=True)
     parser.add_argument('--limit', type=int, default=30)
+    parser.add_argument('--origin', default='https://keha-family.eldadkeha.workers.dev')
     parser.add_argument('--resume-free-after-reset', action='store_true', help='Resume only a confirmed free quota rejection after its recorded reset time')
     args = parser.parse_args()
     args.work_dir.mkdir(parents=True, exist_ok=True)
@@ -69,6 +77,11 @@ def main():
     for photo in plan['photos']:
         source = verified_source(photo)
         for action in photo['actions']:
+            # Recheck durable removal before every new action, including a
+            # removal made while an earlier action was being generated.
+            if photo['id'] not in active_photo_ids(args.origin):
+                log(status='excluded', photo=photo['id'], action=action['id'])
+                continue
             key = photo['id'] + ':' + action['id']
             job = state['jobs'].get(key, {})
             if job.get('status') == 'complete' and pathlib.Path(job['file']).is_file():

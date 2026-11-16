@@ -31,7 +31,9 @@ def main():
         if job.get('sourceRevision','original')!=approved[job['photoId']].get('revision','original'):
             raise RuntimeError('Clip does not match the reviewed source revision: '+key)
         item=items.get(job['photoId'])
-        if not item:raise RuntimeError('The photo is absent from the curated album: '+job['photoId'])
+        if not item:
+            print(json.dumps({'photo':job['photoId'],'action':job['actionId'],'status':'excluded'},ensure_ascii=False),flush=True)
+            continue
         action=next(a for a in item['animations']if a['id']==job['actionId'])
         if action.get('version')==job['operationId']:
             job['imported']=True
