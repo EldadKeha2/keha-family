@@ -156,7 +156,7 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
 
 test('production loads the native controller before the gallery binds gesture input',()=>{
  const f=fixture();for(const name of names)assert.ok(f.loaded.includes(name),name+' must be loaded by the production page');
- assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,16,'The loaded implementation, not only its script URL, must be version sixteen');
+ assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,17,'The loaded implementation, not only its script URL, must be version seventeen');
 });
 
 test('a cold gallery link adopts a retained random page even when that page omits the opened photo',async()=>{
@@ -404,7 +404,7 @@ test('rightward trackpad input moves the actual current pixels right before choo
   const sample=browserWheel(f,target,140);
   assert.equal(sample.event.defaultPrevented,true,'The default browser wheel movement would send the pixels left');
   assert.ok(sample.after<sample.before,'Positive rightward input must move the viewed pixels right');
-  assert.equal(viewport.clientWidth-sample.after,140,'The center pane moves 140 pixels right, before any completed navigation');
+  assert.equal(viewport.clientWidth-sample.after,238,'The center pane moves 140 pixels right, before any completed navigation');
   assert.equal(f.window.FamilyMedia.current().id,'b','Spatial movement is verified before committing a new item');
   assert.equal(viewport.children[0].querySelector('img')?.getAttribute('src'),next,'Trackpad input does not swap neighbor panes to hide reversed pixel movement');
   assert.equal(viewport.children[2].querySelector('img')?.getAttribute('src'),previous);
@@ -422,7 +422,7 @@ test('stage backgrounds and face overlays outside the strip share the actual hor
  for(const kind of ['photo','video'])for(const wheel of [false,true])for(const overlay of [false,true]){
   const f=fixture();await f.open(kind);const stage=f.get('mediaStage'),viewport=f.strip();let target=stage;
   if(overlay){const layer=f.document.createElement('div');layer.className='face-layer';const area=f.document.createElement('div');area.className='face-image-area';target=f.document.createElement('button');target.className='face-hit';area.append(target);layer.append(area);stage.append(layer);assert.equal(target.closest('.native-photo-strip'),null,'The input target is a stage sibling, just as a face overlay before wrapping can be');}
-  if(wheel){const sample=browserWheel(f,target,140);assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,140);await finishWheel(f,viewport);}
+  if(wheel){const sample=browserWheel(f,target,140);assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,238);await finishWheel(f,viewport);}
   else {
    const finger={pointerType:'touch',pointerId:4,isPrimary:true,button:0,clientY:250};f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-viewPosition(viewport),140,'The actual viewed pixels follow a drag even when it starts outside the inner strip');f.emit(target,'pointerup',{...finger,clientX:340});await flush();
   }
@@ -436,7 +436,7 @@ test('noneditable host and scroller attributes never classify ordinary gallery i
   if(mode==='body-false')f.document.body.setAttribute('contenteditable','false');
   else if(mode==='surface-false')target.setAttribute('contenteditable','false');
   else {const host=f.document.createElement(mode==='outer-link'?'a':'div');if(mode==='outer-link')host.setAttribute('href','#gallery');else host.setAttribute('role','textbox');stage.before(host);host.append(stage);}
-  if(wheel){const sample=browserWheel(f,target,140);assert.equal(sample.event.defaultPrevented,true,mode+' must not protect a control outside the stage or a noneditable surface');assert.equal(viewport.clientWidth-sample.after,140);await finishWheel(f,viewport);}
+  if(wheel){const sample=browserWheel(f,target,140);assert.equal(sample.event.defaultPrevented,true,mode+' must not protect a control outside the stage or a noneditable surface');assert.equal(viewport.clientWidth-sample.after,238);await finishWheel(f,viewport);}
   else {
    touchEvent(f,target,'touchstart',[[11,200,250]]);const move=touchEvent(f,target,'touchmove',[[11,340,250]]);assert.equal(move.defaultPrevented,true);assert.equal(viewport.clientWidth-viewPosition(viewport),140,'The recorded div.face-photo-scroll target must actually move');touchEvent(f,target,'touchend',[],[[11,340,250]]);await flush();
   }
@@ -531,7 +531,7 @@ test('repeated native remounts keep one stage input handler and one navigation a
  const f=fixture();await f.open();const stage=f.get('mediaStage');
  for(let cycle=0;cycle<5;cycle++){
   f.window.FamilyPhotoNative.reset(stage);for(let refresh=0;refresh<3;refresh++)f.window.FamilyMedia.refreshPhotoPresentation();
-  const viewport=f.strip(),sample=browserWheel(f,stage,140);assert.equal(viewport.clientWidth-sample.after,140,'Repeated mounts cannot multiply the wheel delta');
+  const viewport=f.strip(),sample=browserWheel(f,stage,140);assert.equal(viewport.clientWidth-sample.after,238,'Repeated mounts cannot multiply the wheel delta');
   await finishWheel(f,viewport);assert.equal(f.window.FamilyMedia.current().id,['b','c','a','b','c'][cycle],'Only the current stage controller submits navigation');
  }
  f.close();
@@ -544,7 +544,7 @@ test('declined or noncancelable wheel events cannot send pixels left through bro
   const extra={deltaY:mode.includes('diagonal')?180:0,...(mode==='pinch'?{ctrlKey:true}:{}),...(mode.startsWith('noncancelable')?{cancelable:false}:{})};
   const sample=browserWheel(f,target,140,extra);
   if(mode==='noncancelable-horizontal'){
-   assert.equal(sample.event.defaultPrevented,false);assert.equal(viewport.clientWidth-sample.after,140,'Script moves noncancelable horizontal input once and hidden overflow prevents an opposite default pan');
+   assert.equal(sample.event.defaultPrevented,false);assert.equal(viewport.clientWidth-sample.after,238,'Script moves noncancelable horizontal input once and hidden overflow prevents an opposite default pan');
   }else assert.equal(sample.after,sample.before,mode+' must never leak a default browser pan into the neighbor pane');
   await new Promise(resolve=>setTimeout(resolve,120));await flush();
   assert.equal(f.window.FamilyMedia.current().id,mode==='noncancelable-horizontal'?'b':'a');
@@ -555,16 +555,16 @@ test('declined or noncancelable wheel events cannot send pixels left through bro
 
 test('diagonal samples continue the already owned trackpad episode without leaking a reverse default pan',async()=>{
  const f=fixture();await f.open();const viewport=f.strip(),target=viewport.children[1].querySelector('img');
- const start=browserWheel(f,target,80,{deltaY:2});assert.equal(start.event.defaultPrevented,true);assert.equal(viewport.clientWidth-start.after,80);
+ const start=browserWheel(f,target,80,{deltaY:2});assert.equal(start.event.defaultPrevented,true);assert.equal(viewport.clientWidth-start.after,136);
  const tail=browserWheel(f,target,20,{deltaY:90});assert.equal(tail.event.defaultPrevented,true,'A diagonal tail remains in the established horizontal episode');
- assert.equal(viewport.clientWidth-tail.after,100,'Every accepted sample moves the actual pixels in the same physical direction');
+ assert.equal(viewport.clientWidth-tail.after,170,'Every accepted sample moves the actual pixels in the same physical direction');
  await finishWheel(f,viewport);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
 });
 
 test('a fresh uncalibrated laptop preserves positive owned wheel mapping to rightward pixels and Next',async()=>{
  const f=fixture({storage:new Map()});await f.open('photo','photos',1);assert.equal(f.window.FamilyGalleryInput.wheelFactor(),1);assert.equal(f.window.FamilyGalleryInput.isCalibrating(),false);
  const viewport=f.strip(),sample=browserWheel(f,viewport.children[1].querySelector('img'),140);
- assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,140);
+ assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,238);
  await finishWheel(f,viewport);assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
 });
 
@@ -636,23 +636,23 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  assert.equal(settings.isCalibrating(),true);assert.equal(settings.wheelFactor(),1);assert.ok(f.get('galleryGestureCheck'));
  settings.wheelDelta(-140);assert.equal(settings.isCalibrating(),true,'Calibration waits for an open media viewer');assert.equal(storage.has('keha-gallery-pad-direction-v2'),false);
  await f.open('photo','photos',1);const viewport=f.strip(),sample=browserWheel(f,viewport.children[1].querySelector('img'),-140);
- assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,140,'A calibrated negative device packet moves the current pixels right');
+ assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,238,'A calibrated negative device packet moves the current pixels right');
  assert.equal(settings.wheelFactor(),-1);assert.equal(settings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
- const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 16/);assert.match(trace,/native implementation 16/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
+ const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 17/);assert.match(trace,/native implementation 17/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
  const restored=fixture({storage});assert.equal(restored.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(restored.window.FamilyGalleryInput.isCalibrating(),false);assert.equal(restored.get('galleryGestureCheck'),null,'Ordinary browsing shows no diagnostic or calibration interface');
- await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,140);
+ await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,238);
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(restored.window.FamilyMedia.current().id,'c');restored.close();
  const setupReload=fixture({query:'?gesture-check=9',storage}),reloadedSettings=setupReload.window.FamilyGalleryInput;
  assert.equal(reloadedSettings.wheelFactor(),-1);assert.equal(reloadedSettings.isCalibrating(),false,'Reloading the setup URL must preserve an already calibrated device');
  await setupReload.open('photo','photos',1);const reloadedRail=setupReload.strip(),left=browserWheel(setupReload,reloadedRail.children[1].querySelector('img'),140);
- assert.equal(reloadedRail.clientWidth-left.after,-140,'A physical-left packet remains left after reloading the setup page');assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
+ assert.equal(reloadedRail.clientWidth-left.after,-238,'A physical-left packet remains left after reloading the setup page');assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(setupReload.window.FamilyMedia.current().id,'a','A left gesture on reload must select Previous, not recalibrate the device');
  assert.equal(reloadedSettings.wheelFactor(),-1);assert.equal(reloadedSettings.isCalibrating(),false);
  const recalibrate=setupReload.get('galleryGestureCheck').querySelector('[data-gesture-recalibrate]');assert.equal(recalibrate.hidden,false);setupReload.emit(recalibrate,'click');await flush();assert.equal(reloadedSettings.isCalibrating(),true);
  assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1','Pressing recalibrate waits for a new physical-right sample');
  await setupReload.open('photo','photos',1);const recalibratedRail=setupReload.strip(),right=browserWheel(setupReload,recalibratedRail.children[1].querySelector('img'),140);
- assert.equal(recalibratedRail.clientWidth-right.after,140);assert.equal(reloadedSettings.wheelFactor(),1);assert.equal(reloadedSettings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'1');
+ assert.equal(recalibratedRail.clientWidth-right.after,238);assert.equal(reloadedSettings.wheelFactor(),1);assert.equal(reloadedSettings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(setupReload.window.FamilyMedia.current().id,'c');setupReload.close();
 });
 
@@ -663,7 +663,7 @@ test('guided direction repair accepts the very first rightward pad swipe despite
   await f.open(kind,kind==='photo'?'photos':'nostalgia',0);
   assert.match(f.get('galleryGestureCheck').querySelector('[data-gesture-instruction]').textContent,/החליקו עכשיו ימינה/);
   const rail=f.strip(),sample=browserWheel(f,rail.children[1].querySelector('img,video'),-140);
-  assert.equal(rail.clientWidth-sample.after,140);await finishWheel(f,rail);assert.equal(f.window.FamilyMedia.current().id,'b');
+  assert.equal(rail.clientWidth-sample.after,238);await finishWheel(f,rail);assert.equal(f.window.FamilyMedia.current().id,'b');
   f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
   nativeStroke(f,140);await flush();assert.equal(f.window.FamilyMedia.current().id,'a','Screen touch right still selects Next with the pad sign reversed');
   const reverse=f.get('galleryGestureCheck').querySelector('[data-gesture-reverse]');assert.equal(reverse.hidden,false);f.emit(reverse,'click');await flush();
@@ -684,7 +684,7 @@ test('an orphan compatibility touchstart without a pointer stream or end cannot 
 });
 
 test('fractional wheel input moves the pixels and completes without requiring a forced edge or native end event',async()=>{
- const f=fixture();await f.open();const viewport=f.strip(),target=viewport.children[1].querySelector('img'),sample=browserWheel(f,target,.75);assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,.75,'Fractional input moves the pixels in the requested physical direction');
+ const f=fixture();await f.open();const viewport=f.strip(),target=viewport.children[1].querySelector('img'),sample=browserWheel(f,target,.75);assert.equal(sample.event.defaultPrevented,true);assert.ok(Math.abs(viewport.clientWidth-sample.after-1.275)<.001,'Fractional input moves the pixels in the requested physical direction');
  await new Promise(resolve=>setTimeout(resolve,120));await flush();
  assert.equal(f.window.FamilyMedia.current().id,'b','Owned fractional horizontal input still completes one requested action');
  assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);assert.equal(f.window.FamilyPhotoNative.whenIdle(f.get('mediaStage')),null);
@@ -747,7 +747,7 @@ test('sparse pad momentum cannot skip images after a photo or video is rebuilt, 
 test('guided right setup with an opposite first packet keeps rightward pixels and advances exactly once',async()=>{
  const storage=new Map([[directionKey,'1']]),f=fixture({query:'?gesture-check=11',storage,realPresentation:true});await f.open();
  const rail=f.strip(),target=rail.children[1].querySelector('img');browserWheel(f,target,.4);browserWheel(f,target,-120);browserWheel(f,target,-40);
- assert.ok(Math.abs(rail.clientWidth-viewPosition(rail)-160.4)<.001,'Every setup packet moves right despite the initial sign jitter');
+ assert.ok(Math.abs(rail.clientWidth-viewPosition(rail)-272.68)<.001,'Every setup packet moves right despite the initial sign jitter');
  await finishWheel(f,rail);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(f.window.FamilyGalleryInput.isCalibrating(),false);
  const current=f.strip(),tail=browserWheel(f,current.children[1].querySelector('img'),-8);assert.equal(tail.after,current.clientWidth);await finishWheel(f,current);assert.equal(f.window.FamilyMedia.current().id,'b');
  f.close();const reload=fixture({query:'?gesture-check=11',storage});await reload.open();assert.equal(reload.window.FamilyGalleryInput.isCalibrating(),false);
@@ -782,7 +782,7 @@ test('desktop reference gestures share the pad selection and exact screen motion
   assert.equal(f.window.FamilyMedia.current().id,expected,'Screen-right selects exactly the photo chosen by pad-right');assert.equal(f.window.FamilyGalleryInput.desktopBridgePhase(),'ready');
   assert.deepEqual(JSON.parse(storage.get(bridgeKey)),{pad,touch});assert.equal(storage.get(directionKey),String(factor));
   f.close();await f.open(kind,kind==='photo'?'photos':'nostalgia',1);const padMotion=await padStroke(pad);
-  if(supported||kind==='photo')assert.equal(padMotion,pad*140*(supported?1:1.7),'Pad animation follows its existing action without changing the saved touchscreen mapping');
+  if(supported||kind==='photo')assert.equal(padMotion,pad*238,'Pad animation follows its existing action without changing the saved touchscreen mapping');
   assert.equal(f.window.FamilyMedia.current().id,expected);
   f.close();await f.open(kind,kind==='photo'?'photos':'nostalgia',1);await padStroke(-pad);assert.equal(f.window.FamilyMedia.current().id,pad>0?'a':'c','The opposite pad gesture reverses selection');f.close();
   const reopened=fixture({supported,storage});await reopened.open(kind,kind==='photo'?'photos':'nostalgia',1);
@@ -820,7 +820,7 @@ test('pad input follows the same episode across the viewer header, details, back
   await f.open(kind,kind==='photo'?'personal:ruti':'nostalgia');const stage=f.get('mediaStage'),caption=f.get('openedCaptionText');caption.readOnly=true;
   const points=[f.get('mediaNext'),f.get('mediaViewerCaption'),caption,f.document.body,supported?f.strip().children[1].querySelector('img,video'):stage.querySelector('img,video')];
   for(const target of points){const event=f.emit(target,'wheel',{deltaX:28,deltaY:0,clientX:400,clientY:250});assert.equal(event.defaultPrevented,true,`${supported?'native':'fallback'} ${kind} ${target.tagName}#${target.id} must own horizontal pad input; ${JSON.stringify(f.window.FamilyPhotoNative.diagnostics(stage))}`);}
-  if(supported){assert.equal(f.strip().clientWidth-viewPosition(f.strip()),140);assert.equal(f.strip().children[0]._item.id,'b','The rightward incoming preview is Next even with an inverse saved touch mapping');}
+  if(supported){assert.equal(f.strip().clientWidth-viewPosition(f.strip()),238);assert.equal(f.strip().children[0]._item.id,'b','The rightward incoming preview is Next even with an inverse saved touch mapping');}
   await new Promise(resolve=>setTimeout(resolve,150));await flush();assert.equal(f.window.FamilyMedia.current().id,'b','Moving the cursor between surfaces must not duplicate or lose the gesture');
   for(const target of points.slice(0,4)){f.emit(target,'wheel',{deltaX:2,deltaY:0,clientX:400,clientY:250});}
   await new Promise(resolve=>setTimeout(resolve,150));await flush();assert.equal(f.window.FamilyMedia.current().id,'b','Momentum arriving over the details cannot become another photo');
@@ -844,7 +844,7 @@ test('viewer-wide pad handling preserves vertical scrolling, editors, other dial
 
 test('pad completion continues the last physical offset smoothly while touch retains its exact saved behavior',async()=>{
  const saved=JSON.stringify({pad:-1,touch:1}),storage=new Map([[directionKey,'1'],['keha-desktop-gesture-bridge-v14',saved]]),f=fixture({storage,realPresentation:true});await f.open('photo','gallery',1);
- const rail=nativeStroke(f,180,{wheel:true});assert.equal(rail.clientWidth-viewPosition(rail),180);await finishWheel(f,rail);
+ const rail=nativeStroke(f,180,{wheel:true});assert.equal(rail.clientWidth-viewPosition(rail),306);await finishWheel(f,rail);
  assert.equal(f.window.FamilyMedia.current().id,'c');const finish=f.get('mediaViewer').querySelector('.native-pad-finish');assert.ok(finish,'Decoded pad pixels survive the photo being rebuilt');
  const animations=f.animations.filter(animation=>animation.node.parentNode===finish);assert.equal(animations.length,2);
  assert.equal(animations[0].keyframes[0].transform,'translateX(306px)');assert.equal(animations[0].keyframes[1].transform,'translateX(1200px)');assert.equal(animations[1].keyframes[0].transform,'translateX(-894px)');assert.equal(animations[1].keyframes[1].transform,'translateX(0)');
@@ -860,6 +860,7 @@ test('the first pad packet moves independent visible pixels immediately in the r
  for(const direction of [-1,1]){
   const saved=JSON.stringify({pad:-1,touch:1}),storage=new Map([[directionKey,'1'],['keha-desktop-gesture-bridge-v14',saved]]),f=fixture({storage,realPresentation:true});await f.open('photo','personal:ruti',1);
   const packet=direction*.75;f.emit(f.get('mediaNext'),'wheel',{deltaX:packet,deltaY:0,clientX:400,clientY:250});
+  assert.equal(f.strip().scrollLeft,f.strip().clientWidth,'The pad never relies on browser scroll direction');for(const pane of f.strip().children)assert.equal(pane.style.transform,'translateX('+direction*1.275+'px)','Every real pane moves in the same screen direction as the pad overlay');
   const layer=f.get('mediaViewer').querySelector('.native-pad-drag');assert.ok(layer,'Pixels are painted in the same event task, without a contact dwell or release');
   const displacement=Number(layer.children[0].style.transform.match(/translateX\(([-.\d]+)px/)[1]);assert.equal(Math.sign(displacement),direction);assert.ok(Math.abs(displacement)>Math.abs(packet),'The pad moves the photo faster than its previous one-to-one travel');
   assert.equal(layer.children[1].getAttribute('src'),'/media/'+(direction>0?'c':'a')+'?preview=1','The incoming visible photo follows the already-correct item order');

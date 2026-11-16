@@ -126,7 +126,7 @@ test('preview covers hide old letterbox pixels once ready while retaining the ol
 test('horizontal trackpad input moves physical pixels, prevents browser default and commits after 80ms quiet',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const direction of [-1,1]){
-  const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];const event=wheel(f,direction*120);assert.equal(event.defaultPrevented,true);assert.equal(viewPosition(strip),800-direction*120);t.mock.timers.tick(79);assert.deepEqual(f.calls,[]);t.mock.timers.tick(1);await flush();assert.deepEqual(directions(f),[direction]);assert.equal(f.api.whenIdle(f.stage),null);
+  const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];const event=wheel(f,direction*120);assert.equal(event.defaultPrevented,true);assert.equal(strip.scrollLeft,800);assert.equal(strip.children[1].style.transform,'translateX('+direction*204+'px)');assert.equal(viewPosition(strip),800-direction*204);t.mock.timers.tick(79);assert.deepEqual(f.calls,[]);t.mock.timers.tick(1);await flush();assert.deepEqual(directions(f),[direction]);assert.equal(f.api.whenIdle(f.stage),null);
  }
 });
 
@@ -134,7 +134,7 @@ test('pad paint and touchscreen action have separate paths without changing the 
  t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true}),touchCalls=[];
  f.window.FamilyGalleryInput={touchAction:direction=>-direction,padMotion:dx=>-dx};
  f.options.touchStep=(direction,options)=>touchCalls.push({direction,input:options.input});f.api.mount(f.stage,f.options);const rail=f.stage.children[0];
- wheel(f,120);assert.equal(viewPosition(rail),680,'Pad Next moves right independently of the inverse saved touchscreen direction');assert.equal(rail.children[0]._item.previewSrc,'/next-small');t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);assert.deepEqual(touchCalls,[]);
+ wheel(f,120);assert.equal(viewPosition(rail),596,'Pad Next moves right independently of the inverse saved touchscreen direction');assert.equal(rail.children[0]._item.previewSrc,'/next-small');t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);assert.deepEqual(touchCalls,[]);
  pointer(f,'pointerdown');pointer(f,'pointermove',340);assert.equal(rail.scrollLeft,660,'Touch retains its v11 rail movement');assert.equal(rail.children[1].style.transform,'');pointer(f,'pointerup',340);await flush();
  assert.deepEqual(touchCalls,[{direction:-1,input:'touch'}]);assert.deepEqual(directions(f),[1],'Touch cannot go through the calibrated pad action');f.api.reset();
 });
@@ -144,7 +144,7 @@ test('fractional trackpad input is valid without a pixel threshold or a browser 
 });
 
 test('moderately diagonal horizontal input starts ownership and later diagonal tails stay owned',async t=>{
- t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(wheel(f,90,{deltaY:100}).defaultPrevented,true);assert.equal(wheel(f,5,{deltaY:30}).defaultPrevented,true);assert.equal(viewPosition(strip),705);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(wheel(f,90,{deltaY:100}).defaultPrevented,true);assert.equal(wheel(f,5,{deltaY:30}).defaultPrevented,true);assert.equal(viewPosition(strip),638.5);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
 });
 
 test('separate quiet wheel bursts each commit without any browser completion event',async t=>{
@@ -188,7 +188,7 @@ test('pad preview and the first small gesture survive face-wrapper setup without
  t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.window.FamilyGalleryInput={touchAction:direction=>-direction};f.api.mount(f.stage,f.options);
  wheel(f,.75);f.api.mount(f.stage,f.options);assert.equal(f.stage.children[0].children[0]._item.previewSrc,'/next-small','A metadata refresh cannot restore the opposite touchscreen neighbor during pad input');
  t.mock.timers.tick(4);const wrapper=new f.scroll.constructor();wrapper.className='face-photo-scroll';wrapper.append(f.scroll);f.stage.append(wrapper);f.api.mount(f.stage,f.options);
- assert.equal(f.api.isActive(f.stage),true,'Changing from raw image to face wrapper retains the first pad stroke');assert.equal(viewPosition(f.stage.children[0]),799.25);
+ assert.equal(f.api.isActive(f.stage),true,'Changing from raw image to face wrapper retains the first pad stroke');assert.equal(viewPosition(f.stage.children[0]),798.725);
  t.mock.timers.tick(75);assert.deepEqual(directions(f),[]);t.mock.timers.tick(1);await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.isActive(f.stage),false);f.api.reset();
 });
 
@@ -200,7 +200,7 @@ test('small reverse-sign pad tremors neither flip the preview nor create extra n
 
 test('a subpixel start in the opposite sign is replaced by the deliberate stroke instead of counting another image',async t=>{
  t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);
- wheel(f,.4);wheel(f,-120);assert.equal(viewPosition(f.stage.children[0]),920);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[-1]);f.api.reset();
+ wheel(f,.4);wheel(f,-120);assert.equal(viewPosition(f.stage.children[0]),1004);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[-1]);f.api.reset();
 });
 
 test('subpixel pad momentum is filtered proportionally while another real fractional stroke stays available',async t=>{
@@ -217,7 +217,7 @@ test('wheel reversal reserves the new input before the previous action can rende
 
 test('late compatibility touchcancel cannot cancel a new wheel episode after pointer release',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);pointer(f,'pointerdown');touch(f,'touchstart');pointer(f,'pointermove',340);pointer(f,'pointerup',340);wheel(f,120);const wait=f.api.whenIdle(f.stage);
- f.fire('touchcancel',{touches:[],changedTouches:[{identifier:9,clientX:340,clientY:100}]});assert.equal(viewPosition(f.stage.children[0]),680);assert.equal(f.api.isActive(f.stage),true);t.mock.timers.tick(80);await wait;await flush();assert.deepEqual(directions(f),[1,1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+ f.fire('touchcancel',{touches:[],changedTouches:[{identifier:9,clientX:340,clientY:100}]});assert.equal(viewPosition(f.stage.children[0]),596);assert.equal(f.api.isActive(f.stage),true);t.mock.timers.tick(80);await wait;await flush();assert.deepEqual(directions(f),[1,1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
 });
 
 test('playback controls, vertical wheel and pinch keep their browser actions',async t=>{
@@ -248,7 +248,7 @@ test('stage background and a sibling face-hit outside the strip receive the same
 
 test('remounting a stage uses one live wheel handler and keeps stage-background input usable',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);f.api.reset(f.stage);f.api.mount(f.stage,f.options);f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- assert.equal(strip.style.touchAction,'pinch-zoom');const event=wheel(f,120,{target:f.stage});assert.equal(event.defaultPrevented,true);assert.equal(viewPosition(strip),680,'One physical packet moves once after remount');t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);stroke(f,140);await flush();assert.deepEqual(directions(f),[1,1]);f.api.reset();
+ assert.equal(strip.style.touchAction,'pinch-zoom');const event=wheel(f,120,{target:f.stage});assert.equal(event.defaultPrevented,true);assert.equal(viewPosition(strip),596,'One physical packet moves once after remount');t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);stroke(f,140);await flush();assert.deepEqual(directions(f),[1,1]);f.api.reset();
 });
 
 test('a tiny initially vertical sample stays undecided and allows the real horizontal swipe to emerge',async()=>{
@@ -269,7 +269,7 @@ test('an unclaimed cancelled Windows pointer retains its joined TouchEvent conta
 });
 
 test('diagnostics expose the actual mounted controller and current input owner',()=>{
- const f=fixture();assert.equal(f.api.version,16);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
+ const f=fixture();assert.equal(f.api.version,17);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
 });
 
 test('a tiny fallback TouchMove after pointercancel releases idle without navigation after quiet',async t=>{
