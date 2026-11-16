@@ -1,10 +1,11 @@
 import {familyOptions,familyLabel} from './gallery-family.mjs?v=2';
-import {filterVideos,VIDEO_SORTS} from './video-filter-core.mjs';
+import {filterVideos,sortVideos,VIDEO_SORTS} from './video-filter-core.mjs?v=duration-description-v1';
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
 const state={open:false,people:new Set(),families:new Set(),categories:new Set(),sort:'uploaded-desc',seed:Math.floor(Math.random()*0x100000000)};
-let ready=false,roster=[],catalog=[],catalogSignature='';
+const orderOptions=()=>({locale:I.locale,getDuration:item=>window.FamilyVideoDelivery?.duration?.(item)??item.duration});
+let ready=false,roster=[],catalog=[],catalogSignature='',durationTimer;
 function choices(id,items,selected,kind){
  $(id).innerHTML=items.map(item=>`<label class="gallery-check-option"><input type="checkbox" data-video-filter-${kind}="${safe(item.id)}"${selected.has(item.id)?' checked':''}><span>${safe(item.label)}</span></label>`).join('')||`<p class="gallery-filter-empty">${tr('לא נמצאו התאמות','No matches found')}</p>`;
 }
@@ -40,6 +41,7 @@ function init(){
  window.FamilyPeopleRoster.subscribe(people=>{roster=people.filter(person=>!person.placeholder);if(ready&&state.open)fillPeople();});
  $('videoPersonSearch').addEventListener('input',fillPeople);
  $('videoSort').addEventListener('change',event=>{if(!VIDEO_SORTS.includes(event.target.value))return;state.sort=event.target.value;if(state.sort==='random')state.seed=Math.floor(Math.random()*0x100000000);refresh();});
+ document.addEventListener('loadedmetadata',event=>{if(!state.sort.startsWith('duration-')||!event.target.closest?.('#videosGrid'))return;clearTimeout(durationTimer);durationTimer=setTimeout(()=>window.FamilyPortal?.refreshVideos(),100);},true);
  $('videoFilterPanel').addEventListener('change',event=>{
   const input=event.target,id=input.dataset.videoFilterPerson||input.dataset.videoFilterFamily||input.dataset.videoFilterCategory;if(!id)return;
   const selected=input.dataset.videoFilterPerson?state.people:input.dataset.videoFilterFamily?state.families:state.categories;
@@ -48,5 +50,5 @@ function init(){
  $('clearVideoFilter').addEventListener('click',()=>{state.people.clear();state.families.clear();state.categories.clear();$('videoPersonSearch').value='';fillPeople();refresh();});
  document.addEventListener('click',event=>{if(state.open&&!event.target.closest('#videoFilterPanel .gallery-filter-field'))for(const field of $('videoFilterPanel').querySelectorAll('details[open]'))field.open=false;});
 }
-window.FamilyVideoFilter={filter:items=>filterVideos(items,state,window.FAMILY_DATA),render,setCategories,toggleCategory,categories:()=>[...state.categories]};
+window.FamilyVideoFilter={filter:items=>filterVideos(items,{...state,...orderOptions()},window.FAMILY_DATA),sort:(items,sort)=>sortVideos(items,{sort,...orderOptions()}),render,setCategories,toggleCategory,categories:()=>[...state.categories]};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

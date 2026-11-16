@@ -1,5 +1,13 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "סדר לפי סרטונים":"Sort videos by",
+  "סדר מקורי":"Original order",
+  "אורך הסרטון: קצר לארוך":"Video length: shortest first",
+  "אורך הסרטון: ארוך לקצר":"Video length: longest first",
+  "מספר המתויגים: הרבה למעט":"Tagged people: most first",
+  "מספר המתויגים: מעט להרבה":"Tagged people: fewest first",
+  "תיאור הסרטון: א–ת":"Video description: A–Z",
+  "תיאור הסרטון: ת–א":"Video description: Z–A",
   "בינה משפחתית":"Artificial Family",
   "רגעים של פעם מתעוררים לחיים":"Memories of yesterday come to life",
   "ספריית האירועים עדיין אינה זמינה. נסו לרענן":"The event library is not available yet. Please refresh",

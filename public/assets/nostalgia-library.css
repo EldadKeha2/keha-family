@@ -8,6 +8,12 @@ body[data-active-view=nostalgia]:has(#nostalgiaView.nostalgia-event-grid) .works
 .nostalgia-event-name{margin:0 0 6px;font:500 calc(31px * var(--a11y-text-scale,1))/1.3 var(--serif);color:#626f4d;text-align:start;overflow-wrap:anywhere}
 .nostalgia-event-details{display:flex;flex-wrap:wrap;gap:4px 18px;color:#93856c;font:calc(13px * var(--a11y-text-scale,1))/1.5 var(--sans)}
 .nostalgia-event-details:empty{display:none}
+.nostalgia-sort-toolbar{display:flex;justify-content:flex-start;margin:0 0 18px}
+.nostalgia-sort-field{display:flex;align-items:center;gap:10px;max-width:100%;color:#566b43;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+.nostalgia-sort-field>span{white-space:nowrap;font-weight:600}
+.nostalgia-sort-field select{min-width:0;max-width:100%;min-height:42px;padding:8px 12px;border:1px solid #aab990;border-radius:6px;background:#f7f8ef;color:#4e5d3f;font:inherit;cursor:pointer}
+.nostalgia-sort-field select:focus-visible{outline:2px solid #586d45;outline-offset:2px}
+@media(max-width:700px){.nostalgia-sort-toolbar{margin-bottom:12px}.nostalgia-sort-field{width:100%;gap:8px;font-size:calc(13px * var(--a11y-text-scale,1))}.nostalgia-sort-field select{flex:1}}
 #nostalgiaView.nostalgia-event-grid .no-content-match{grid-column:1/-1}
 .nostalgia-event-grid>.nostalgia-upload-actions,.nostalgia-event-grid>#nostalgiaDropzone{display:none!important}
 #nostalgiaView.nostalgia-event-grid #nostalgiaGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:20px;align-items:start}

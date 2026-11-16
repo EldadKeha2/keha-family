@@ -15,11 +15,11 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-af337d05d9ed781f.css">
+  <link rel="stylesheet" href="assets/site-styles-573276a3f771de56.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
-  <script src="assets/translations.js?v=category-picker-v3-family-ai-v1-video-library-labels-v7-mobile-menu-v1" defer></script>
+  <script src="assets/translations.js?v=category-picker-v3-family-ai-v1-video-library-labels-v8-mobile-menu-v1" defer></script>
   <script src="assets/i18n.js?v=person-aliases-v2" defer></script>
   <script src="assets/people-roster.js?v=search-portraits-v2" defer></script>
   <script src="assets/collection-transport.js?v=internal-pages-v1" defer></script>
@@ -59,7 +59,7 @@
   <script src="assets/family-ai.js?v=video-album-swipes-v4" defer></script>
   <script src="assets/living-family.js?v=video-album-swipes-v4" defer></script>
   <script src="assets/video-categories.js?v=milestone-category-v5" type="module"></script>
-  <script src="assets/video-filter.js?v=selection-reset-v3" type="module"></script>
+  <script src="assets/video-filter.js?v=duration-description-v1" type="module"></script>
   <script src="assets/memories.js?v=storyteller-portraits-v4" defer></script>
   <script src="assets/portal.js?v=phone-camera-shortcuts-v3" defer></script>
   <script src="assets/gallery-filter.js?v=long-press-v3" type="module"></script>
@@ -69,7 +69,7 @@
   <script src="assets/person-gallery.js?v=profile-default-ten-v3" defer></script>
   <script src="assets/people.js?v=phone-camera-shortcuts-v2" defer></script>
   <script src="assets/biography.js" type="module"></script>
-  <script src="assets/nostalgia-library.js?v=life-viewer-sync-v3" defer></script>
+  <script src="assets/nostalgia-library.js?v=video-sort-v1" defer></script>
   <script src="assets/archive.js?v=performance-20261115-v2" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/family-timeline.js?v=annual-portraits-v8" type="module"></script>
@@ -174,7 +174,7 @@
           <span class="visually-hidden" id="videosCount" role="status"></span>
           <div class="video-filter-toolbar">
             <div class="video-categories" id="videoCategories" aria-label="קטגוריות סרטונים"><button type="button" data-video-category="special-birthdays" aria-pressed="false">ימי הולדת עגולים</button></div>
-            <label class="video-sort-field"><span>סדר לפי</span><select id="videoSort" aria-label="סדר לפי"><option value="uploaded-desc">העלאה: חדש לישן</option><option value="uploaded-asc">העלאה: ישן לחדש</option><option value="modified-desc">שינוי אחרון: חדש לישן</option><option value="modified-asc">שינוי אחרון: ישן לחדש</option><option value="taken-desc">צילום: חדש לישן</option><option value="taken-asc">צילום: ישן לחדש</option><option value="tags-desc">מתויגים: הרבה למעט</option><option value="tags-asc">מתויגים: מעט להרבה</option><option value="random">אקראי</option></select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></label>
+            <label class="video-sort-field"><span>סדר לפי</span><select id="videoSort" aria-label="סדר לפי"><option value="uploaded-desc">העלאה: חדש לישן</option><option value="uploaded-asc">העלאה: ישן לחדש</option><option value="modified-desc">שינוי אחרון: חדש לישן</option><option value="modified-asc">שינוי אחרון: ישן לחדש</option><option value="taken-desc">צילום: חדש לישן</option><option value="taken-asc">צילום: ישן לחדש</option><option value="duration-asc">אורך הסרטון: קצר לארוך</option><option value="duration-desc">אורך הסרטון: ארוך לקצר</option><option value="description-asc">תיאור הסרטון: א–ת</option><option value="description-desc">תיאור הסרטון: ת–א</option><option value="tags-desc">מספר המתויגים: הרבה למעט</option><option value="tags-asc">מספר המתויגים: מעט להרבה</option><option value="random">אקראי</option></select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></label>
             <button type="button" class="gallery-refine-toggle" id="videoFilterToggle" aria-label="סינון סרטונים" aria-expanded="false" aria-controls="videoFilterPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8Z"/></svg><span>סינון</span></button>
           </div>
           <section class="gallery-filter-panel" id="videoFilterPanel" aria-label="סינון סרטונים" hidden>
@@ -236,6 +236,7 @@
           <header id="nostalgiaFeedIntro" class="nostalgia-feed-intro" data-i18n-skip></header>
           <div class="nostalgia-upload-actions" aria-label="הוספת זיכרונות"><button type="button" class="primary-button" data-archive-upload="nostalgia" data-archive-kind="photo">＋ העלאת תמונות</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="video">＋ העלאת סרטונים</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="document">＋ העלאת מסמכים</button></div><p class="archive-status" id="nostalgiaStatus" role="status"></p>
           <div class="archive-toolbar"><span id="nostalgiaCount" role="status"></span><div class="archive-filters" id="nostalgiaFilters" aria-label="סינון זיכרונות"><button data-archive-filter="all" aria-pressed="true">כל הזיכרונות</button><button data-archive-filter="photo" aria-pressed="false">תמונות</button><button data-archive-filter="video" aria-pressed="false">סרטונים</button><button data-archive-filter="document" aria-pressed="false">מסמכים</button></div></div>
+          <div class="nostalgia-sort-toolbar"><label class="nostalgia-sort-field" for="nostalgiaSort"><span>סדר לפי</span><select id="nostalgiaSort" aria-label="סדר לפי סרטונים"><option value="sequence">סדר מקורי</option><option value="duration-asc">אורך הסרטון: קצר לארוך</option><option value="duration-desc">אורך הסרטון: ארוך לקצר</option><option value="tags-desc">מספר המתויגים: הרבה למעט</option><option value="tags-asc">מספר המתויגים: מעט להרבה</option><option value="description-asc">תיאור הסרטון: א–ת</option><option value="description-desc">תיאור הסרטון: ת–א</option></select></label></div>
           <div class="shared-media-grid mixed-media-grid" id="nostalgiaGrid"></div><div class="archive-empty" id="nostalgiaEmpty"><span aria-hidden="true">▧</span><h4>לכל זיכרון יש מקום כאן</h4><p>יש לכם צילום ישן, סרט מהילדות או מסמך משפחתי?<br>העלו אותו והוסיפו כמה מילים על מי, מתי ואיפה.</p></div>
           <div class="collection-upload archive-dropzone" id="nostalgiaDropzone"><div><span class="small-eyebrow">מוסיפים לאלבום המשפחתי</span><h3>מה נשמר אצלכם?</h3><p>תמונות עד 50MB · סרטונים עד 500MB · מסמכים עד 10MB<br>מסמכים: PDF, Word, TXT או Markdown · אפשר לגרור קבצים לכאן.</p></div><div class="upload-buttons"><button type="button" class="primary-button" data-archive-upload="nostalgia" data-archive-kind="photo">＋ העלאת תמונות</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="video">＋ העלאת סרטונים</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="document">＋ העלאת מסמכים</button></div><div class="collection-upload-state" id="nostalgiaUploadState" role="status"></div><progress id="nostalgiaProgress" max="100" value="0" hidden aria-label="התקדמות העלאת הזיכרונות"></progress></div>
         </section>

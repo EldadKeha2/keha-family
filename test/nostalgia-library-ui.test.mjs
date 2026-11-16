@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {sortVideos} from '../public/assets/video-filter-core.mjs';
 
 const source=await readFile(new URL('../public/assets/nostalgia-library.js',import.meta.url),'utf8');
 function model(){const window={FamilyI18n:{isEnglish:false}},document={addEventListener(){}};vm.runInNewContext(source,{window,document});return window.FamilyNostalgia;}
@@ -38,19 +39,31 @@ function galleryModel(source,run){
     focus(){this.focused=true;}
     reset(){}
   }
-  for(const id of ['nostalgiaView','nostalgiaLibraryHome','nostalgiaEventHeader','nostalgiaFeedIntro','nostalgiaDropzone','nostalgiaUploadState']){const node=new Element();node.id=id;nodes.set(id,node);}
+  for(const id of ['nostalgiaView','nostalgiaLibraryHome','nostalgiaEventHeader','nostalgiaFeedIntro','nostalgiaDropzone','nostalgiaUploadState','nostalgiaSort']){const node=new Element();node.id=id;nodes.set(id,node);}
   const listen=(map,name,fn)=>{const listeners=map.get(name)||[];listeners.push(fn);map.set(name,listeners);};
   const emit=(map,name,event={})=>{for(const fn of map.get(name)||[])fn(event);};
   const document={getElementById:id=>nodes.get(id),createElement:tag=>new Element(tag),body:new Element('body'),addEventListener:(name,fn)=>listen(documentListeners,name,fn),querySelector:selector=>selector==='dialog[open]'?[...nodes.values()].find(node=>node.open):null,querySelectorAll:()=>[]};
   const location={hash:'#nostalgia'};
-  const window={FamilyI18n:{isEnglish:false,error:message=>message},FamilyMedia:{open:(...args)=>openedVideos.push(args)},addEventListener:(name,fn)=>listen(windowListeners,name,fn),requestAnimationFrame:fn=>fn(),FamilyArchive:{renderNostalgia(){}}};
+  const window={FamilyI18n:{isEnglish:false,error:message=>message},FamilyVideoFilter:{sort:(items,sort)=>sortVideos(items,{sort})},FamilyMedia:{open:(...args)=>openedVideos.push(args)},addEventListener:(name,fn)=>listen(windowListeners,name,fn),requestAnimationFrame:fn=>fn(),FamilyArchive:{renderNostalgia(){}}};
   const context={window,document,location,matchMedia:query=>({matches:query.includes('hover:hover')}),setTimeout:fn=>{const id=++timerId;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id)};
   run(source,context);emit(documentListeners,'DOMContentLoaded');
   const collection={items:[],library:{categories:[{id:'military',name:'מסיבות גיוס ושחרור',icon:'olive',color:'olive'},{id:'holidays',name:'חגים ומועדים',icon:'lantern',color:'honey'}],events:[{id:'ora',categoryId:'military',name:'מסיבת השחרור של אורה',count:19,videoCount:19,revision:'1'},{id:'independence',categoryId:'holidays',name:'יום העצמאות 1996',count:1,videoCount:1,revision:'1'}]}};
   const render=()=>window.FamilyNostalgia.select(collection);render();
+  const changeSort=value=>{const target=nodes.get('nostalgiaSort');target.value=value;emit(documentListeners,'change',{target});};
   const button=data=>({dataset:data,hasAttribute:name=>Object.hasOwn(data,name.replace(/^data-/,'').replace(/-([a-z])/g,(_,c)=>c.toUpperCase())),closest(selector){return selector==='button'||selector==='[data-nostalgia-category]'&&Object.hasOwn(data,'nostalgiaCategory')?this:null;}});
-  return {api:window.FamilyNostalgia,window,location,openedVideos,node:id=>nodes.get(id),collection,render,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>{const target=button(data);emit(documentListeners,'click',{target});return target;},activate:(id,type='click',event={})=>emit(nodes.get(id).listeners,type,{preventDefault(){},stopPropagation(){},...event}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
+  return {api:window.FamilyNostalgia,window,location,openedVideos,node:id=>nodes.get(id),collection,render,changeSort,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>{const target=button(data);emit(documentListeners,'click',{target});return target;},activate:(id,type='click',event={})=>emit(nodes.get(id).listeners,type,{preventDefault(){},stopPropagation(){},...event}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
 }
+
+test('event folder sorting updates the displayed sequence for all six options and survives refreshes',()=>{
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
+ gallery.collection.items=[{id:'one',name:'קטע 1',kind:'video',nostalgiaEventIds:['ora'],duration:165,caption:'בנימין',tags:[{id:'a'}]},{id:'two',name:'קטע 2',kind:'video',nostalgiaEventIds:['ora'],duration:4,caption:'אורה',tags:[]},{id:'three',name:'קטע 3',kind:'video',nostalgiaEventIds:['ora'],duration:63,caption:'גבי',tags:[{id:'a'},{id:'b'}]},{id:'other',kind:'video',nostalgiaEventIds:['independence'],duration:1}];
+ gallery.goEvent('ora');let displayed,refreshes=0;
+ gallery.window.FamilyArchive.renderNostalgia=()=>{refreshes++;displayed=Array.from(gallery.render(),item=>item.id);};
+ for(const [sort,expected]of [['duration-asc',['two','three','one']],['duration-desc',['one','three','two']],['tags-desc',['three','one','two']],['tags-asc',['two','one','three']],['description-asc',['two','one','three']],['description-desc',['three','one','two']],['sequence',['one','two','three']]]){
+  gallery.changeSort(sort);assert.deepEqual(displayed,expected);assert.deepEqual(Array.from(gallery.render(),item=>item.id),expected);assert.equal(gallery.node('nostalgiaSort').value,sort);
+ }
+ assert.equal(refreshes,7);
+});
 
 test('folder deletion uses its own confirmation with the folder name and sends no deletion when cancelled',async()=>{
  const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));gallery.goEvent('ora');

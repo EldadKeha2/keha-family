@@ -4,7 +4,9 @@
   const tr=(he,en)=>english?en:he,safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
   const DIRECT_CATEGORY='everyday-life',DIRECT_DESTINATION='everyday-life-clips';
-  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',uploadChoice:'',assignId:null,newEventAssignId:null,hoverTimer:null,closeTimer:null,closing:false,deletingEvent:null,activeFolders:{},homeActive:false,stackSuppressUntil:0};
+  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',sort:'sequence',uploadChoice:'',assignId:null,newEventAssignId:null,hoverTimer:null,closeTimer:null,closing:false,deletingEvent:null,activeFolders:{},homeActive:false,stackSuppressUntil:0};
+  const SORTS=['sequence','duration-asc','duration-desc','tags-desc','tags-asc','description-asc','description-desc'];
+  let durationTimer;
   const eventName=event=>english?(event.nameEn||event.name):event.name;
   const categoryName=category=>english?(category.nameEn||category.name):category.name;
   const eventsText=n=>english?`${n} ${n===1?'event':'events'}`:n===1?'אירוע אחד':`${n} אירועים`;
@@ -98,7 +100,8 @@
     // Folder pages have no search or kind controls. Home filters must not hide their contents.
     let items=viewItems(collection,eventId);if(!event&&filter!=='all')items=items.filter(item=>item.kind===filter);
     if(!event&&state.query)items=items.filter(item=>mediaSearch(item).includes(state.query));
-    return items;
+    const sort=$('nostalgiaSort');if(sort)sort.value=state.sort;
+    return state.sort==='sequence'?items:window.FamilyVideoFilter?.sort?.(items,state.sort)||items;
   }
   function decorateCard(card,item){
     let box=card.querySelector('.nostalgia-item-events');if(!box){box=document.createElement('div');box.className='nostalgia-item-events';box.setAttribute('data-i18n-skip','');card.appendChild(box);}
@@ -235,7 +238,11 @@
     document.addEventListener('pointerup',event=>{const start=stackDrag;stackDrag=null;if(!start||start.id!==event.pointerId)return;const dx=event.clientX-start.x,dy=event.clientY-start.y;if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.25){state.stackSuppressUntil=Date.now()+450;moveShelf(start.category,dx>0?-1:1);}});
     document.addEventListener('pointercancel',()=>{stackDrag=null;});
     document.addEventListener('keydown',event=>{const folder=event.target.closest?.('[data-nostalgia-folder]');if(folder&&['ArrowRight','ArrowLeft'].includes(event.key)){event.preventDefault();moveShelf(folder.dataset.shelf,event.key==='ArrowRight'?1:-1);}});
-    document.addEventListener('change',event=>{if(event.target.id==='nostalgiaUploadEvent')state.uploadChoice=event.target.value;});
+    document.addEventListener('change',event=>{
+      if(event.target.id==='nostalgiaUploadEvent')state.uploadChoice=event.target.value;
+      if(event.target.id==='nostalgiaSort'&&SORTS.includes(event.target.value)){state.sort=event.target.value;window.FamilyMediaSelection?.clearScope('nostalgia');window.FamilyArchive?.renderNostalgia?.();}
+    });
+    document.addEventListener('loadedmetadata',event=>{if(!state.sort.startsWith('duration-')||!event.target.closest?.('#nostalgiaGrid'))return;clearTimeout(durationTimer);durationTimer=setTimeout(()=>window.FamilyArchive?.renderNostalgia?.(),100);},true);
     document.addEventListener('dragstart',event=>{const handle=event.target.closest?.('[data-nostalgia-drag]');if(handle){event.dataTransfer.setData('application/x-keha-memory',handle.dataset.nostalgiaDrag);event.dataTransfer.effectAllowed='copy';}});
     document.addEventListener('dragover',event=>{const card=event.target.closest?.('[data-nostalgia-event],[data-nostalgia-direct-category]'),category=event.target.closest?.('[data-nostalgia-category]');if(card){event.preventDefault();card.classList.add('drop-ready');}else if(category){event.preventDefault();if(state.dragCategory!==category.dataset.nostalgiaCategory){state.dragCategory=category.dataset.nostalgiaCategory;clearTimeout(state.hoverTimer);state.hoverTimer=setTimeout(()=>openCategory(state.dragCategory),450);}}});
     document.addEventListener('dragleave',event=>event.target.closest?.('[data-nostalgia-event],[data-nostalgia-direct-category]')?.classList.remove('drop-ready'));
