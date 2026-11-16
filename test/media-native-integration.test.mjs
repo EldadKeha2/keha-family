@@ -38,7 +38,7 @@ async function finishWheel(f,viewport){
 // production index, DOM tree, native scroller, gesture binding and media state
 // machine are real, so missing script wiring or reparenting cannot be hidden
 // by the lightweight object fixtures used in the individual unit suites.
-function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,realPresentation=false,hiddenDialogGeometry=false,query='',route='photos',linkedItem=null,storage=new Map([[directionKey,'1']])}={}){
+function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,realPresentation=false,hiddenDialogGeometry=false,query='',route='photos',linkedItem=null,loadView=null,storage=new Map([[directionKey,'1']])}={}){
  const {window,document}=parseHTML(html),requests=[],captures=[],observers=[],faceReady=[],faceMounts=[],animations=[],frames=new Map();let failSave=false,layoutReady=!hiddenDialogGeometry,frameId=0;
  const get=id=>document.getElementById(id);
  Object.defineProperty(document,'scripts',{configurable:true,get:()=>document.querySelectorAll('script[src]')});
@@ -74,7 +74,7 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,real
   FamilyPhotoKeyboard:{desktop:()=>!mobile,bindNavigation(){}},
   FamilyTags:{taggable:()=>true,mountInline(){},clearInline(){},controls:()=>'',labels:()=>''},
   FamilyI18n:{isEnglish:false,language:'he',t:String,error:String,mediaName:item=>item.name||item.id,html:(parts,...values)=>parts.reduce((out,part,i)=>out+part+(values[i]??''),''),fetch:async(path,options)=>{
-   requests.push({path,options});if(path.endsWith('/view')&&linkedItem)return Response.json({item:linkedItem});const caption=JSON.parse(options.body).caption;
+   requests.push({path,options});if(path.endsWith('/view')&&loadView)return loadView(path,options);if(path.endsWith('/view')&&linkedItem)return Response.json({item:linkedItem});const caption=JSON.parse(options.body).caption;
    return Response.json(failSave?{error:'Caption was not saved'}:{operation:'caption',scope:'photos',item:{...window.FamilyMedia.current(),caption}},{status:failSave?409:200});
   }},
   FamilyFaces:{
@@ -101,7 +101,8 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,real
  function Image(){
   const image=document.createElement('img');Object.defineProperty(image,'src',{configurable:true,get(){return this.getAttribute('src')||'';},set(value){this.setAttribute('src',value);queueMicrotask(()=>{image.onload?.();image.dispatchEvent(new window.Event('load'));});}});return image;
  }
- const context=vm.createContext({window,document,navigator,...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location:{origin:'https://family.test',href:'https://family.test/'+query+'#'+route},matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
+ const location={origin:'https://family.test',href:'https://family.test/'+query+'#'+route};
+ const context=vm.createContext({window,document,navigator,...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location,matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
  // Follow production ordering when loading the scripts under test.
  const loaded=[];
  for(const script of document.querySelectorAll('script[src]')){
@@ -113,7 +114,7 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,real
  const photo=id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,previewSrc:'/media/'+id+'?preview=1',name:id,tags:[]});
  const video=id=>({...photo(id),kind:'video',mime:'video/mp4',poster:'/posters/'+id+'.jpg'});
  const strip=()=>get('mediaStage').querySelector('.native-photo-strip');
- return {window,document,get,emit,requests,captures,loaded,photo,video,strip,faceReady,faceMounts,animations,
+ return {window,document,location,get,emit,requests,captures,loaded,photo,video,strip,faceReady,faceMounts,animations,
   finishAnimations(){for(const animation of animations)animation.finish();},
   open:async(kind='photo',scope=kind==='photo'?'photos':'videos',index=0)=>{window.FamilyMedia.open(['a','b','c'].map(kind==='photo'?photo:video),index,scope);await flush();},
   async snap(page){nativeStroke({strip,emit},page===0?140:-140);await flush();},
@@ -148,6 +149,26 @@ test('a cold gallery link adopts a retained random page even when that page omit
  assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),'gallery');assert.equal(media.current(),selected);assert.equal(f.strip().children[1].querySelector('img'),image);
  const shared=new URL(f.get('shareMediaEmail').getAttribute('href'));assert.match(decodeURIComponent(shared.searchParams.get('body')),/#gallery/);assert.ok(shared.searchParams.get('body').includes('media='+id));
  await f.snap(0);assert.equal(media.current().id,'after','A later page containing the retained photo uses its real successor without a duplicate');assert.equal(f.requests.filter(request=>request.path.endsWith('/view')).length,1);f.close();
+});
+
+test('a gallery page registered before the direct-photo fetch finishes still supplies navigation and its total',async()=>{
+ const id='f'.repeat(32),item={id,kind:'photo',scope:'gallery',mime:'image/jpeg',src:'/media/'+id,previewSrc:'/media/'+id+'?preview=1',tags:[]};let finish;
+ const f=fixture({query:'?media='+id,route:'gallery',loadView:()=>new Promise(resolve=>{finish=resolve;})}),media=f.window.FamilyMedia,pagination={page:1,size:100,pages:12,total:1120,sort:'random',seed:321},page=[f.photo('before'),f.photo('after')];
+ assert.equal(Boolean(f.get('mediaViewer').open),false);media.register('gallery',page,{retainCurrent:true,pagination});
+ finish(Response.json({item}));await flush();
+ assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),'gallery');assert.equal(media.current().id,id);assert.equal(f.get('mediaViewerCounter').textContent,'1 / 1120');assert.equal(media.photoState().total,1120);assert.equal(f.get('mediaNext').hidden,false);assert.equal(f.get('mediaPrevious').hidden,false);assert.ok(f.strip());
+ assert.equal(f.strip().children[1].querySelector('img').getAttribute('src'),item.previewSrc);assert.equal(f.strip().children[0].querySelector('img').getAttribute('src'),'/media/before?preview=1');assert.equal(media.items('gallery').filter(photo=>photo.id===id).length,1);
+ const selected=media.current();media.register('gallery',[page[0],selected,page[1]],{retainCurrent:true,pagination});await flush();assert.equal(f.get('mediaViewerCounter').textContent,'2 / 1120');assert.equal(media.items('gallery').filter(photo=>photo.id===id).length,1);
+ await f.snap(0);assert.equal(media.current().id,'after');assert.equal(f.requests.filter(request=>request.path.endsWith('/view')).length,1);f.close();
+});
+
+test('a stale direct-photo response cannot use a registered gallery to replace a newer active URL or profile route',async()=>{
+ for(const nextRoute of ['gallery','person/ora']){
+  const id='a'.repeat(32),item={id,kind:'photo',scope:'gallery',mime:'image/jpeg',src:'/media/'+id,tags:[]};let finish;
+  const f=fixture({query:'?media='+id,route:'gallery',loadView:()=>new Promise(resolve=>{finish=resolve;})});f.window.FamilyMedia.register('gallery',[f.photo('other')],{retainCurrent:true,pagination:{page:1,size:100,pages:12,total:1120}});
+  f.location.href='https://family.test/?media=newer#'+nextRoute;f.window.FamilyMedia.open([f.photo('newer'),f.photo('next')],0,nextRoute==='gallery'?'gallery':'personal:ora');await flush();
+  finish(Response.json({item}));await flush();assert.equal(f.window.FamilyMedia.current().id,'newer');assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),nextRoute==='gallery'?'gallery':'personal:ora');assert.equal(f.get('mediaViewer').open,true);f.close();
+ }
 });
 
 test('retaining a shared gallery page cannot claim a direct photo belonging to a profile route',async()=>{

@@ -408,7 +408,15 @@
     const known=registeredLink(id);if(known){open(known.items,known.index,known.scope);return;}
     if(!/^[a-f0-9]{32}$/.test(id))return;
     restoringLink=href;
-    try{const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));const loaded=registeredLink(id);if(loaded)open(loaded.items,loaded.index,loaded.scope);else open([result.item],0,'link:'+result.item.id);}catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
+    try{
+      const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));
+      const loaded=registeredLink(id),gallery=routeAlbum()==='gallery'?albums.get('gallery'):null;
+      if(loaded)open(loaded.items,loaded.index,loaded.scope);
+      // The gallery can finish first with a random page missing this photo.
+      // Retain the requested item beside that page, using its existing total.
+      else if(gallery?.length)open([result.item,...gallery.filter(item=>identity(item)!==id)],0,'gallery');
+      else open([result.item],0,'link:'+result.item.id);
+    }catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
   function fitVideoCaption(expand=false){
     if(current()?.kind!=='video')return;
