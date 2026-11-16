@@ -310,6 +310,18 @@ test('two rapid native strokes and mixed arrow actions retain every requested st
  });
 });
 
+test('separate same-direction trackpad bursts count twice even when the browser coalesces their scrollend',async t=>{
+ for(const [label,direction,second,expected]of [['new right gesture',1,[90,45],'e'],['new left gesture',-1,[-90,-45],'a'],['small right momentum tail',1,[1,.5],'d'],['small left momentum tail',-1,[-1,-.5],'b']])await t.test(label,async()=>{
+  const f=fixture({realPresentation:true});f.window.FamilyMedia.open(['a','b','c','d','e'].map(f.photo),2,'photos');await flush();
+  const viewport=f.strip(),image=viewport.children[1].querySelector('img');
+  const burst=deltas=>{for(const deltaX of deltas)f.emit(image,'wheel',{deltaX,deltaY:0,deltaMode:0,clientX:400,clientY:250});viewport.scrollLeft=direction>0?viewport.clientWidth*2:0;f.emit(viewport,'scroll');};
+  burst([direction*90,direction*45]);await new Promise(resolve=>setTimeout(resolve,110));
+  burst(second);await flush();assert.equal(viewport.isConnected,true,'A second burst keeps its original scroll target until native completion');
+  f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,expected,'Distinct strong gestures remain two actions while a tiny momentum tail remains one');
+  f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,expected,'A late duplicate scrollend cannot count another action');f.close();
+ });
+});
+
 test('opening with zero-width dialog geometry anchors the center photo before revealing the native strip',async()=>{
  for(const kind of ['photo','video']){
   const f=fixture({hiddenDialogGeometry:true});await f.open(kind);const viewport=f.strip();assert.ok(viewport);assert.equal(viewport.clientWidth,0);

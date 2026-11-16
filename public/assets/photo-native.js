@@ -90,7 +90,7 @@
     const left=document.createElement('div'),center=document.createElement('div'),right=document.createElement('div');
     for(const pane of [left,center,right]){pane.className='native-photo-pane';viewport.append(pane);}
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
-    const b=active={stage,node,viewport,center,enabled,step,busy,previous,next,mode:'touch',width:0,anchored:false,armed:false,locked:false,pending:0,timer:null,idle:new Set(),pointerId:null,touchId:null,wheelActive:false,wheelSum:0,scrolling:false};
+    const b=active={stage,node,viewport,center,enabled,step,busy,previous,next,mode:'touch',width:0,anchored:false,armed:false,locked:false,pending:0,timer:null,idle:new Set(),pointerId:null,touchId:null,wheelActive:false,wheelSum:0,wheelRestart:null,lastWheelAt:null,scrolling:false};
     arrange(b);anchor(b);
     const finish=b.finish=(force=false,reserveWheel=false)=>{
       if(active!==b||!anchor(b))return;force=force===true;
@@ -100,10 +100,10 @@
       if(!b.armed){viewport.scrollLeft=b.width;return;}
       const intent=b.mode==='wheel'?(Math.abs(b.wheelSum)>=Math.max(32,Math.min(56,b.width*.06))?Math.sign(b.wheelSum):0):b.touchIntent?b.touchIntent.direction:0;
       if(!force&&Math.abs(viewport.scrollLeft-page*b.width)>2)return;
-      if(!b.enabled()||page===1&&!intent){b.touchIntent=null;b.wheelSum=0;viewport.scrollLeft=b.width;resolveIdle(b);return;}
+      if(!b.enabled()||b.mode==='wheel'&&!intent||page===1&&!intent){b.touchIntent=null;b.wheelSum=0;b.wheelRestart=null;viewport.scrollLeft=b.width;resolveIdle(b);return;}
 
       const target=intent?(intent>0)===(b.mode!=='wheel')?0:2:b.releasedPage!=null&&Date.now()-b.releasedAt<750?b.releasedPage:page;
-      clearTimeout(b.releaseTimer);b.releasedPage=null;b.touchIntent=null;b.wheelSum=0;resolveIdle(b);
+      clearTimeout(b.releaseTimer);b.releasedPage=null;b.touchIntent=null;b.wheelSum=0;b.wheelRestart=null;resolveIdle(b);
       const direction=intent||(target<1?1:-1)*(b.mode==='wheel'?-1:1);
       holdPreview(b,viewport.children[target]);
       // Keep the browser scroller available while the media request runs. A
@@ -135,10 +135,26 @@
     viewport.addEventListener('touchstart',event=>{if(event.touches.length===1)beginTouch(event.touches[0],true);else cancelInput();},{capture:true,passive:true});
     viewport.addEventListener('wheel',event=>{
       if(event.ctrlKey||event.metaKey||nativeControl(event))return;
-      const dx=event.deltaX||event.shiftKey&&event.deltaY||0,dy=event.shiftKey&&!event.deltaX?0:event.deltaY||0;
+      const unit=event.deltaMode===1?16:event.deltaMode===2?b.width:1;
+      const dx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=(event.shiftKey&&!event.deltaX?0:event.deltaY||0)*unit;
       if(dx&&Math.abs(dx)>=Math.abs(dy)*1.15){
-        if(b.wheelSum&&Math.sign(dx)!==Math.sign(b.wheelSum)&&Math.abs(dx)>=8&&Math.abs(b.wheelSum)>=40)b.finish(true,true);
-        if(active!==b||!input('wheel'))return;b.wheelSum+=dx;b.wheelActive=true;
+        const now=Date.now(),distance=Math.max(32,Math.min(56,b.width*.06));
+        // Browser snap animation can merge two separate trackpad bursts into
+        // one scrollend. A pause between meaningful sample groups marks the
+        // next action; continuous precision-pad momentum stays in one group.
+        const nextPhase=b.lastWheelAt!==null&&now-b.lastWheelAt>=70&&Math.abs(b.wheelSum)>=distance;
+        const reversal=b.wheelSum&&Math.sign(dx)!==Math.sign(b.wheelSum)&&Math.abs(dx)>=8&&Math.abs(b.wheelSum)>=40;
+        if(!b.wheelRestart&&(nextPhase||reversal))b.wheelRestart={sum:0};
+        if(b.wheelRestart){
+          b.wheelRestart.sum+=dx;
+          // A tiny late momentum tail is not another action. Fractional input
+          // can still build a real restarted phase over several samples.
+          if(Math.abs(b.wheelRestart.sum)>=32){
+            const restarted=b.wheelRestart.sum;b.finish(true,true);
+            if(active!==b)return;b.wheelSum=restarted;
+          }
+        }else b.wheelSum+=dx;
+        if(active!==b||!input('wheel'))return;b.lastWheelAt=now;b.wheelActive=true;
         clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active!==b)return;b.wheelActive=false;resolveIdle(b);},180);
       }
     },{capture:true,passive:true});

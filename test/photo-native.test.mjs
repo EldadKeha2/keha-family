@@ -16,7 +16,7 @@ function fixture({mobile=false,english=false,supported=true,scrollEnd=false,widt
   querySelector(selector){if(selector==='.face-photo-scroll')return this.children.flatMap(n=>[n,...n.children.flatMap(c=>[c,...c.children])]).find(n=>n.className==='face-photo-scroll')||null;return null;}
  }
  const events=new Map(),stage=new Node(),scroll=new Node(),window={addEventListener(){}},document={createElement:()=>new Node(),addEventListener:(type,handler)=>{const previous=events.get(type);events.set(type,event=>{previous?.(event);handler(event);});}},calls=[];scroll.className='face-photo-scroll';stage.append(scroll);let enabled=true;
- const context=vm.createContext({window,document,navigator:{userAgent:mobile?'Android':'Windows NT'},CSS:{supports:()=>supported},matchMedia:()=>({matches:mobile}),setTimeout,clearTimeout});vm.runInContext(source,context);vm.runInContext(swipeSource,context);
+ const context=vm.createContext({window,document,navigator:{userAgent:mobile?'Android':'Windows NT'},CSS:{supports:()=>supported},matchMedia:()=>({matches:mobile}),Date,setTimeout,clearTimeout});vm.runInContext(source,context);vm.runInContext(swipeSource,context);
  const options={previous:{kind:'photo',previewSrc:'/prev-small'},next:{kind:'photo',previewSrc:'/next-small'},isEnglish:english,enabled:()=>enabled,step(direction,opts){calls.push({direction,native:opts.native});window.FamilyPhotoNative.reset(stage);}};
  return {api:window.FamilyPhotoNative,swipe:window.FamilyPhotoSwipe,events,stage,scroll,calls,options,disable(){enabled=false;}};
 }
@@ -155,4 +155,22 @@ test('native playback seeking never leaves a deferred gallery swipe for the next
  strip.handlers.get('pointerdown')(event);f.events.get('pointerup')({...event,clientX:350});assert.equal(f.api.whenIdle(f.stage),null);
  strip.handlers.get('wheel')({target:video,clientY:480,deltaX:120,deltaY:0});assert.equal(f.api.whenIdle(f.stage),null);
  strip.handlers.get('pointerdown')({...event,clientY:200});assert.deepEqual(f.calls,[],'Seeking cannot be replayed as a photo navigation at the next body touch');f.api.reset();
+});
+
+
+test('separate same-direction wheel bursts count twice before one coalesced scrollend, while tiny momentum counts once',async t=>{
+ t.mock.timers.enable({apis:['Date']});
+ for(const second of [[90,45],[1,.5]]){
+  const f=fixture({scrollEnd:true});f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(()=>{});};
+  f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+  for(const dx of [90,45]){strip.handlers.get('wheel')({deltaX:dx,deltaY:0});t.mock.timers.tick(8);}strip.scrollLeft=1600;
+  t.mock.timers.tick(110);
+  for(const dx of second){strip.handlers.get('wheel')({deltaX:dx,deltaY:0});t.mock.timers.tick(8);}strip.scrollLeft=1600;
+  strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(f.calls.map(call=>call.direction),second[0]>8?[1,1]:[1]);assert.equal(strip.scrollLeft,800);f.api.reset();
+ }
+ const continuous=fixture({scrollEnd:true});continuous.options.step=(direction,options)=>{continuous.calls.push({direction,native:options.native});return new Promise(()=>{});};
+ continuous.api.mount(continuous.stage,continuous.options);const strip=continuous.stage.children[0];
+ for(let i=0;i<80;i++){strip.handlers.get('wheel')({deltaX:2,deltaY:.1});t.mock.timers.tick(8);}strip.scrollLeft=1600;strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();
+ assert.deepEqual(continuous.calls.map(call=>call.direction),[1]);continuous.api.reset();
 });
