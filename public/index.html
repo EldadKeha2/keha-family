@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-fbc8271fa5f28679.css">
+  <link rel="stylesheet" href="assets/site-styles-781439c556765c71.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
@@ -61,13 +61,13 @@
   <script src="assets/video-categories.js?v=milestone-category-v5" type="module"></script>
   <script src="assets/video-filter.js?v=selection-reset-v3" type="module"></script>
   <script src="assets/memories.js?v=storyteller-portraits-v4" defer></script>
-  <script src="assets/portal.js?v=gallery-toolbar-v2" defer></script>
+  <script src="assets/portal.js?v=phone-camera-shortcuts-v3" defer></script>
   <script src="assets/gallery-filter.js?v=long-press-v3" type="module"></script>
   <script src="assets/media-selection.js?v=person-gallery-v1" type="module"></script>
   <script src="assets/updates.js" defer></script>
   <script src="assets/relations.js?v=20261105.faces1" defer></script>
   <script src="assets/person-gallery.js?v=profile-default-ten-v3" defer></script>
-  <script src="assets/people.js?v=person-gallery-v1" defer></script>
+  <script src="assets/people.js?v=phone-camera-shortcuts-v2" defer></script>
   <script src="assets/biography.js" type="module"></script>
   <script src="assets/nostalgia-library.js?v=life-viewer-sync-v3" defer></script>
   <script src="assets/archive.js?v=performance-20261115-v2" defer></script>
@@ -103,7 +103,7 @@
       <section class="family-workspace" aria-label="עץ המשפחה">
         <div class="workspace-header">
           <div class="workspace-title"><span class="section-diamond" aria-hidden="true">◇</span><div><h2 id="workspaceTitle">האילן המשפחתי</h2><p id="workspaceSubtitle">משורש משותף, שישה ענפים של אהבה</p><p id="workspaceDetail" class="workspace-detail" hidden></p></div></div>
-          <button type="button" id="galleryHeaderUpload" class="primary-button gallery-header-upload" data-upload-collection="gallery" aria-label="הוספת תמונות לגלריה"><span>+ הוספת</span><span>תמונות</span></button>
+          <div class="gallery-header-upload-actions"><button type="button" id="galleryHeaderUpload" class="primary-button gallery-header-upload" data-upload-collection="gallery" aria-label="הוספת תמונות לגלריה"><span>+ הוספת</span><span>תמונות</span></button><button type="button" class="photo-camera-shortcut" data-camera-collection="gallery" aria-label="צילום תמונה" title="צילום תמונה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 1-2h6l1 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="12" r="4"/></svg></button></div>
           <button type="button" id="videoHeaderUpload" class="primary-button video-header-upload" data-upload-collection="videos" aria-label="העלאת סרטונים"><span>+ העלאת</span><span>סרטונים</span></button>
           <div class="workspace-actions">
             <div class="search-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg><input id="searchInput" type="search" placeholder="חיפוש בן או בת משפחה" aria-label="חיפוש בני משפחה" autocomplete="off"><div class="search-results" id="searchResults" hidden></div></div>
@@ -246,6 +246,7 @@
   </div>
 
   <input type="file" id="personPageUpload" multiple hidden>
+  <input type="file" id="personPageCamera" accept="image/*" capture="environment" hidden>
   <input type="file" id="photoUploadInput" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple hidden>
   <input type="file" id="personCameraInput" accept="image/*" capture="environment" hidden>
   <input type="file" id="sharedPhotosInput" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" multiple hidden>
@@ -264,6 +265,14 @@
     <div class="gallery-upload-source-options">
       <button type="button" data-gallery-upload-source="gallery" autofocus><span class="gallery-upload-source-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v1M3 7h16a2 2 0 0 1 2 2l-2 10H4L2 9a2 2 0 0 1 1-2Z"/></svg></span><span>הוספת תמונות מהגלריה בנייד</span></button>
       <button type="button" data-gallery-upload-source="camera"><span class="gallery-upload-source-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8 5 1-2h6l1 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="12" r="4"/><path d="M18 8h.01"/></svg></span><span>הוספת תמונות ישירות ממצלמה</span></button>
+    </div>
+  </dialog>
+  <dialog class="portal-dialog gallery-upload-source" id="personPhotoUploadSource" aria-labelledby="personPhotoUploadSourceTitle">
+    <button type="button" class="dialog-close" data-close-dialog="personPhotoUploadSource" aria-label="סגירה">×</button>
+    <h2 id="personPhotoUploadSourceTitle">הוספת תמונות</h2>
+    <div class="gallery-upload-source-options">
+      <button type="button" data-person-photo-source="gallery" autofocus><span class="gallery-upload-source-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v1M3 7h16a2 2 0 0 1 2 2l-2 10H4L2 9a2 2 0 0 1 1-2Z"/></svg></span><span>הוספת תמונות מהגלריה בנייד</span></button>
+      <button type="button" data-person-photo-source="camera"><span class="gallery-upload-source-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m8 5 1-2h6l1 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="12" r="4"/><path d="M18 8h.01"/></svg></span><span>הוספת תמונות ישירות ממצלמה</span></button>
     </div>
   </dialog>
   <input type="file" id="weddingUploadInput" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.mov,.webm,.pdf,.doc,.docx,.txt,.md" multiple hidden>

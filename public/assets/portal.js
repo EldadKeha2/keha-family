@@ -314,7 +314,7 @@
         if(kind==='gallery'&&matchMedia('(max-width:700px)').matches){if(!$('galleryUploadSource').open)$('galleryUploadSource').showModal();return;}
         const input=$({videos:'sharedVideosInput',photos:'sharedPhotosInput',gallery:'sharedGalleryInput'}[kind]);input.value='';input.click();return;
       }
-      const camera=event.target.closest('[data-camera-collection]');if(camera){if(!canSave())return;const input=$(camera.dataset.cameraCollection==='videos'?'sharedVideosCamera':'sharedPhotosCamera');input.value='';input.click();return;}
+      const camera=event.target.closest('[data-camera-collection]');if(camera){if(!canSave())return;const id={gallery:'sharedGalleryCamera',videos:'sharedVideosCamera',photos:'sharedPhotosCamera'}[camera.dataset.cameraCollection];if(!id)return;const input=$(id);input.value='';input.click();return;}
       const save=event.target.closest('[data-save-shared]');if(save){saveCaption(captionKey(save.dataset.sharedKind,save.dataset.saveShared));return;}
       const editCaption=event.target.closest('[data-edit-shared-caption]');if(editCaption){openPhotoCaption(editCaption);return;}
       const cancelCaption=event.target.closest('[data-cancel-shared-caption]');if(cancelCaption){cancelPhotoCaption(cancelCaption);return;}

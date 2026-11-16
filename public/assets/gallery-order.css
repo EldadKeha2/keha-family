@@ -2,6 +2,15 @@
 #sharedGalleryGrid{direction:ltr;grid-auto-flow:row}
 html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
 .gallery-header-upload,.gallery-page-size-mobile{display:none}
+.gallery-header-upload-actions,.photo-camera-shortcut{display:none}
+.person-photo-upload-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+@media(max-width:700px){
+ body[data-active-view=gallery] .gallery-header-upload-actions{display:flex;align-items:stretch;gap:7px;flex-shrink:0}
+ .photo-camera-shortcut{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;flex:0 0 44px;width:44px;min-width:44px;min-height:44px;padding:9px;border:1px solid #a9b79b;border-radius:9px;background:#f0f4e9;color:#536b44;cursor:pointer;-webkit-tap-highlight-color:transparent}
+ .photo-camera-shortcut svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+ .photo-camera-shortcut:active{background:#dfe9d4}
+ .photo-camera-shortcut:focus-visible{outline:3px solid #718a61;outline-offset:2px}
+}
 .gallery-pager-wrap{position:relative;display:flow-root}
 .gallery-mobile-filter-dock{display:none}
 .gallery-pager:is([data-gallery-pager],[data-person-pager]){display:grid;grid-template-columns:auto minmax(145px,220px) minmax(0,1fr) auto;align-items:center;gap:12px}

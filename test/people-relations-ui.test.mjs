@@ -7,10 +7,10 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const relationsSource=await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8');
 const peopleSource=await readFile(new URL('../public/assets/people.js',import.meta.url),'utf8');
-async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={},pageAlbums={},photoPages=null,pagedAlbums={},mediaView=null,pageView=null}={}){
+async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={},pageAlbums={},photoPages=null,pagedAlbums={},mediaView=null,pageView=null,phone=false,photoPrepare=async()=>[]}={}){
   const browser=navigation?browserHistory(entryUrl||'https://family.test/#person/'+id):null;let view=browser?browser.location.hash.slice(1).split('/')[0]:'person';
-  const nodes=new Map(),listeners=new Map(),requests=[],registered=[],toasts=[],location=browser?.location||{hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
-  function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,scrollIntoView(){},addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
+  const nodes=new Map(),listeners=new Map(),requests=[],registered=[],toasts=[],prepared=[],location=browser?.location||{hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
+  function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,value:'',files:[],clicks:0,click(){this.clicks++;},showModal(){this.open=true;},close(){this.open=false;},scrollIntoView(){},addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
   const summary=id=>({...family.people[id],...overrides[id]});
   const window={FAMILY_DATA:family,FamilyMedia:{register:(...args)=>registered.push(args)},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',error:String,mediaName:item=>item.caption||item.name||'',fetch:async url=>{
     requests.push(String(url));if(String(url).startsWith('api/media/'))return mediaView?mediaView(String(url)):{ok:true,json:async()=>({item:{id:String(url).split('/')[2],kind:'photo',src:'/media/current'}})};
@@ -24,18 +24,39 @@ async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overr
     }))})};
   }},scrollTo(){},addEventListener(event,callback){callbacks.set(event,callback);browser?.addEventListener(event,callback);}};
   window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},toast:message=>toasts.push(message),getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
+  window.FamilyPhotoEditor={prepare:(files,options)=>{prepared.push({files,options});return photoPrepare(files,options);}};
   const document={getElementById:node,addEventListener:(event,callback)=>callbacks.set(event,callback),querySelector:()=>null,visibilityState:'visible'};
-  const context=vm.createContext({window,document,location,history:browser?.history||{pushState(_a,_b,hash){location.hash=hash;}},matchMedia:()=>({matches:false}),URLSearchParams,URL,console,setInterval:()=>0,setTimeout,clearTimeout});
+  const context=vm.createContext({window,document,location,history:browser?.history||{pushState(_a,_b,hash){location.hash=hash;}},matchMedia:query=>({matches:phone&&query==='(max-width:700px)'}),URLSearchParams,URL,console,setInterval:()=>0,setTimeout,clearTimeout});
   if(browser){vm.runInContext(navigationSource,context);browser.addEventListener('popstate',()=>{const next=location.hash.slice(1).split('/')[0];if(next!==view)window.FamilyApp.setView(next,false);});}
   vm.runInContext(relationsSource,context);vm.runInContext(peopleSource,context);callbacks.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
-  return {window,browser,registered,toasts,get view(){return view;},clickPage(step){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-page]'?{dataset:{personPage:'photos',step:String(step)}}:null}});},clickPortrait(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-portrait]'?{}:null}});},clickItem(id,kind='photos'){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-item]'?{dataset:{personItem:id,personKind:kind}}:null}});},openMedia(){node('mediaViewer').open=true;},closeMedia(){node('mediaViewer').open=false;listeners.get('mediaViewer:close')?.();},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
+  return {window,browser,registered,toasts,prepared,node,clickUpload(kind='photos'){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-upload]'?{dataset:{personUpload:kind}}:null}});},clickCamera(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-camera]'?{}:null}});},chooseSource(source){callbacks.get('click')({target:{closest:selector=>selector==='[data-person-photo-source]'?{dataset:{personPhotoSource:source}}:null}});},selectCapture(files){node('personPageCamera').files=files;listeners.get('personPageCamera:change')();},get view(){return view;},clickPage(step){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-page]'?{dataset:{personPage:'photos',step:String(step)}}:null}});},clickPortrait(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-portrait]'?{}:null}});},clickItem(id,kind='photos'){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-item]'?{dataset:{personItem:id,personKind:kind}}:null}});},openMedia(){node('mediaViewer').open=true;},closeMedia(){node('mediaViewer').open=false;listeners.get('mediaViewer:close')?.();},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
     let prevented=false,stopped=false;
     await listeners.get('personPageContent:click')({button:0,ctrlKey:modifier,preventDefault(){prevented=true;},stopPropagation(){stopped=true;},target:{closest:selector=>selector==='[data-person-relative]'?{dataset:{personRelative:id}}:null}});
     await flush();return {prevented,stopped};
   }};
 }
 const group=(html,key)=>html.match(new RegExp('<section class="person-family-group" data-relative-kind="'+key+'"[\\s\\S]*?<\\/section>'))[0];
+
+test('phone profile photo uploads offer camera or gallery, while other media and desktop keep their picker',async()=>{
+ const f=await fixture('eldad',{phone:true});f.window.FamilyApp.apiEnabled=true;
+ assert.equal((f.html.match(/data-person-camera/g)||[]).length,1);
+ await f.clickUpload();assert.equal(f.node('personPhotoUploadSource').open,true);assert.equal(f.node('personPageUpload').clicks,0);
+ f.chooseSource('gallery');assert.equal(f.node('personPhotoUploadSource').open,false);assert.equal(f.node('personPageUpload').clicks,1);assert.equal(f.node('personPageCamera').clicks,0);
+ await f.clickUpload();f.chooseSource('camera');assert.equal(f.node('personPhotoUploadSource').open,false);assert.equal(f.node('personPageCamera').clicks,1);
+ for(const kind of ['videos','documents']){await f.clickUpload(kind);assert.equal(f.node('personPhotoUploadSource').open,false);}
+ assert.equal(f.node('personPageUpload').clicks,3);
+ const desktop=await fixture();desktop.window.FamilyApp.apiEnabled=true;await desktop.clickUpload();assert.equal(desktop.node('personPageUpload').clicks,1);assert.equal(desktop.node('personPhotoUploadSource').open,false);
+});
+test('profile camera captures enter the upload wizard for the selected person, with cancellation and retakes supported',async()=>{
+ let finish;const f=await fixture('shosh',{phone:true,photoPrepare:()=>new Promise(resolve=>{finish=resolve;})});f.window.FamilyApp.apiEnabled=true;
+ const image={name:'camera.jpg',type:'image/jpeg',size:100};
+ await f.clickCamera();assert.equal(f.node('personPageCamera').clicks,1);assert.equal(f.node('personPhotoUploadSource').open,false);
+ f.selectCapture([]);await f.flush();assert.equal(f.prepared.length,0);
+ await f.clickCamera();f.selectCapture([image]);await f.flush();assert.equal(f.prepared.length,1);assert.equal(f.prepared[0].options.scope,'personal:shosh');assert.equal(f.prepared[0].files[0],image);assert.equal(f.node('personPageCamera').value,'');
+ finish([]);await f.flush();await f.clickUpload();f.chooseSource('camera');f.selectCapture([image]);await f.flush();assert.equal(f.prepared.length,2);assert.equal(f.prepared[1].options.scope,'personal:shosh');finish([]);await f.flush();
+ f.window.FamilyApp.apiEnabled=false;const before=f.node('personPageCamera').clicks;await f.clickCamera();assert.equal(f.node('personPageCamera').clicks,before);
+});
 
 test('personal photo grid pages loop without changing the video and document pages',async()=>{
  const photoPages=['a','b','c'].map(id=>[{id,kind:'photo',mime:'image/jpeg',src:'/media/'+id}]),f=await fixture('eldad',{photoPages});

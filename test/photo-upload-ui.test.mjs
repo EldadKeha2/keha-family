@@ -68,6 +68,14 @@ test('phone camera uses the gallery editor and destination, waits for approval a
   approve([edited]);await f.flush();assert.equal(f.sent.length,1);assert.match(f.sent[0].url,/collections\/gallery\/upload/);assert.equal(f.sent[0].file,edited);f.sent[0].complete();await f.flush();
   f.tap('[data-upload-collection]',{uploadCollection:'gallery'});f.tap('[data-gallery-upload-source]',{galleryUploadSource:'camera'});assert.equal(f.node('sharedGalleryCamera').clicks,2);
 });
+test('the gallery camera shortcut opens capture directly and preserves the gallery wizard destination',async()=>{
+  const calls=[],f=fixture(async(files,options)=>{calls.push({files,scope:options.scope});return [];},undefined,undefined,{phone:true});
+  f.tap('[data-camera-collection]',{cameraCollection:'gallery'});
+  assert.equal(f.node('sharedGalleryCamera').clicks,1);assert.equal(f.node('sharedPhotosCamera').clicks,undefined);assert.equal(Boolean(f.node('galleryUploadSource').open),false);
+  f.select('camera',[original]);await f.flush();assert.equal(calls.length,1);assert.equal(calls[0].scope,'gallery');assert.equal(calls[0].files[0],original);assert.equal(f.sent.length,0);
+  f.tap('[data-camera-collection]',{cameraCollection:'gallery'});f.select('camera',[]);await f.flush();assert.equal(calls.length,1);assert.equal(f.node('sharedGalleryCamera').clicks,2);
+  const offline=fixture(async()=>[],undefined,undefined,{phone:true,apiEnabled:false});offline.tap('[data-camera-collection]',{cameraCollection:'gallery'});assert.equal(offline.node('sharedGalleryCamera').clicks,undefined);
+});
 test('desktop gallery and other mobile albums open their existing picker directly; offline cannot start either flow',()=>{
   for(const phone of [false,true])for(const kind of ['gallery','photos','videos']){
     if(phone&&kind==='gallery')continue;
