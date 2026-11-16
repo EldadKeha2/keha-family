@@ -10,12 +10,25 @@ const sources=new Map(await Promise.all(names.map(async name=>[name,await readFi
 const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
 const flush=async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>setImmediate(resolve));};
 
-function nativeStroke(f,dx,{wheel=false,page=wheel?(dx>0?2:0):(dx>0?0:2)}={}){
+function browserWheel(f,target,deltaX,extra={}){
+ const viewport=target.closest('.native-photo-strip'),before=viewport.scrollLeft;
+ const event=f.emit(target,'wheel',{deltaX,deltaY:0,deltaMode:0,clientX:400,clientY:250,...extra});
+ // Model the browser's normal wheel action only when script did not own it.
+ if(!event.defaultPrevented&&!event.ctrlKey&&!event.metaKey)viewport.scrollLeft+=deltaX;
+ f.emit(viewport,'scroll');return {event,viewport,before,after:viewport.scrollLeft};
+}
+
+function nativeStroke(f,dx,{wheel=false,page=dx>0?0:2}={}){
  const viewport=f.strip();assert.ok(viewport,'A rapid gesture still needs an active native input surface');
  const target=viewport.children[1].querySelector('img,video,iframe')||viewport;
- if(wheel)f.emit(target,'wheel',{deltaX:dx,deltaY:0,deltaMode:0,clientX:400,clientY:250});
+ if(wheel){browserWheel(f,target,dx);return viewport;}
  else for(const [type,x]of [['pointerdown',200],['pointermove',200+dx],['pointerup',200+dx]])f.emit(target,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY:250});
  viewport.scrollLeft=page*viewport.clientWidth;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');return viewport;
+}
+
+async function finishWheel(f,viewport){
+ await new Promise(resolve=>setTimeout(resolve,100));
+ f.emit(viewport,'scrollend');await flush();
 }
 
 // Browser geometry and image readiness are the boundaries modeled here. The
@@ -127,8 +140,8 @@ test('desktop photo viewers use browser scrolling for both touch and trackpad in
   assert.equal(f.emit(surface,'touchend',{touches:[],changedTouches:[{...point,clientX:350}]}).defaultPrevented,false);
   assert.equal(f.captures.length,0,'Native touch does not capture the pointer away from browser scrolling');assert.equal(f.window.FamilyMedia.current().id,'a');
   viewport.scrollLeft=0;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'b',scope+' Next');
-  const wheelViewport=f.strip();assert.equal(f.emit(wheelViewport.children[1].querySelector('img'),'wheel',{deltaX:140,deltaY:0,deltaMode:0,clientX:400,clientY:250}).defaultPrevented,false,'The browser receives the full trackpad gesture');
-  wheelViewport.scrollLeft=wheelViewport.clientWidth*2;f.emit(wheelViewport,'scroll');f.emit(wheelViewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
+  const wheelViewport=f.strip(),wheel=browserWheel(f,wheelViewport.children[1].querySelector('img'),140);assert.equal(wheel.event.defaultPrevented,true,'Horizontal trackpad pixels are owned so they move in the requested physical direction');
+  await finishWheel(f,wheelViewport);assert.equal(f.window.FamilyMedia.current().id,'c');
   await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'b',scope+' Previous');f.close();
  }
 });
@@ -281,13 +294,57 @@ test('native photo scrolling saves descriptions before moving and retains failed
 });
 
 test('physical rightward touch and trackpad gestures select the same item as the Next arrow',async()=>{
- for(const kind of ['photo','video'])for(const wheel of [false,true])for(const oppositeSnap of [false,true]){
+ for(const kind of ['photo','video'])for(const wheel of [false,true])for(const oppositeSnap of wheel?[false]:[false,true]){
   const f=fixture();await f.open(kind,kind==='photo'?'photos':'videos',1);
   f.emit(f.get('mediaNext'),'click');await flush();const next=f.window.FamilyMedia.current().id;assert.equal(next,'c');
-  const forwardPage=wheel?2:0,backwardPage=wheel?0:2;
-  await f.open(kind,kind==='photo'?'photos':'videos',1);nativeStroke(f,140,{wheel,page:oppositeSnap?2-forwardPage:forwardPage});await flush();
+  const forwardPage=0,backwardPage=2;
+  await f.open(kind,kind==='photo'?'photos':'videos',1);const forward=nativeStroke(f,140,{wheel,page:oppositeSnap?2-forwardPage:forwardPage});if(wheel)await finishWheel(f,forward);else await flush();
   assert.equal(f.window.FamilyMedia.current().id,next,(wheel?'Trackpad':'Touch')+' rightward movement must follow Next');
-  nativeStroke(f,-140,{wheel,page:oppositeSnap?2-backwardPage:backwardPage});await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A native snap to the opposite pane cannot reverse the completed physical stroke');f.close();
+  const backward=nativeStroke(f,-140,{wheel,page:oppositeSnap?2-backwardPage:backwardPage});if(wheel)await finishWheel(f,backward);else await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A native snap to the opposite pane cannot reverse the completed physical stroke');f.close();
+ }
+});
+
+test('rightward trackpad input moves the actual current pixels right before choosing the Next image',async()=>{
+ for(const kind of ['photo','video']){
+  const f=fixture();await f.open(kind,kind==='photo'?'photos':'videos',1);const viewport=f.strip(),target=viewport.children[1].querySelector(kind==='photo'?'img':'video');
+  const next=kind==='photo'?'/media/c?preview=1':'/posters/c.jpg',previous=kind==='photo'?'/media/a?preview=1':'/posters/a.jpg';
+  assert.equal(viewport.children[0].querySelector('img')?.getAttribute('src'),next);
+  const sample=browserWheel(f,target,140);
+  assert.equal(sample.event.defaultPrevented,true,'The default browser wheel movement would send the pixels left');
+  assert.ok(sample.after<sample.before,'Positive rightward input must decrease the actual scrollLeft');
+  assert.equal(viewport.clientWidth-sample.after,140,'The center pane moves 140 pixels right, before any completed navigation');
+  assert.equal(f.window.FamilyMedia.current().id,'b','Spatial movement is verified before committing a new item');
+  assert.equal(viewport.children[0].querySelector('img')?.getAttribute('src'),next,'Trackpad input does not swap neighbor panes to hide reversed pixel movement');
+  assert.equal(viewport.children[2].querySelector('img')?.getAttribute('src'),previous);
+  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+ }
+});
+
+test('released touch and wheel movement complete without a native scrollend and cannot leave queued arrows waiting',async()=>{
+ for(const kind of ['photo','video'])for(const wheel of [false,true]){
+  const f=fixture();await f.open(kind);const viewport=f.strip(),target=viewport.children[1].querySelector(kind==='photo'?'img':'video');
+  if(wheel)browserWheel(f,target,140);
+  else {
+   const finger={pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientY:250};
+   f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});viewport.scrollLeft-=140;f.emit(viewport,'scroll');f.emit(target,'pointerup',{...finger,clientX:340});
+  }
+  // No animation, scrollend or manually forced snap follows the release.
+  await new Promise(resolve=>setTimeout(resolve,320));await flush();
+  assert.equal(f.window.FamilyMedia.current().id,'b',(wheel?'Wheel':'Touch')+' quiet completion must retain the requested next action');
+  assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);assert.equal(f.window.FamilyPhotoNative.whenIdle(f.get('mediaStage')),null);
+  assert.equal(f.window.FamilyMedia.photoState().busy,false);assert.equal(f.get('mediaViewer').querySelectorAll('.native-pending-cover').length,0);
+  f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,'c','The following arrow cannot wait on a completed gesture forever');f.close();
+ }
+});
+
+test('fractional wheel input moves the pixels and completes without requiring a forced edge or native end event',async()=>{
+ for(const settle of [false,true]){
+  const f=fixture();await f.open();const viewport=f.strip(),target=viewport.children[1].querySelector('img'),sample=browserWheel(f,target,.75);assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,.75,'Fractional input moves the pixels in the requested physical direction');
+  if(settle){viewport.scrollLeft=0;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');}
+  await new Promise(resolve=>setTimeout(resolve,320));await flush();
+  assert.equal(f.window.FamilyMedia.current().id,'b','Owned fractional horizontal input still completes one requested action');
+  assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);assert.equal(f.window.FamilyPhotoNative.whenIdle(f.get('mediaStage')),null);
+  f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
  }
 });
 
@@ -296,7 +353,7 @@ test('two rapid native strokes and mixed arrow actions retain every requested st
   const f=fixture(),loads=[];f.window.FamilyMedia.open(['a','b','c','d','e'].map(f.photo),0,'photos');await flush();
   f.window.FamilyPhotoPresentation.ready=()=>null;f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.push({item,resolve}));
   for(const action of actions){
-   if(action==='swipe'||action==='back')nativeStroke(f,action==='back'?-140:140,{wheel});
+   if(action==='swipe'||action==='back'){const viewport=nativeStroke(f,action==='back'?-140:140,{wheel});if(wheel)await finishWheel(f,viewport);}
    else {const button=f.get(action==='next'?'mediaNext':'mediaPrevious');assert.equal(button.disabled,false);f.emit(button,'click');}
   }
   assert.equal(f.window.FamilyMedia.current().id,'a','The first unresolved image remains visible');
@@ -306,20 +363,30 @@ test('two rapid native strokes and mixed arrow actions retain every requested st
   }
   const expected=actions.includes('back')?'a':'c',following=expected==='a'?'b':'d';
   assert.equal(f.window.FamilyMedia.current().id,expected,actions.join(' → ')+' must retain every step and reversal without dropping a rapid gesture');
-  assert.ok(f.strip());nativeStroke(f,140,{wheel});for(const {item,resolve}of loads.splice(0)){const image=f.document.createElement('img');image.src=item.previewSrc;resolve(image);}await flush();assert.equal(f.window.FamilyMedia.current().id,following,'The queue remains usable after draining');f.close();
+  assert.ok(f.strip());const followingViewport=nativeStroke(f,140,{wheel});if(wheel)await finishWheel(f,followingViewport);for(const {item,resolve}of loads.splice(0)){const image=f.document.createElement('img');image.src=item.previewSrc;resolve(image);}await flush();assert.equal(f.window.FamilyMedia.current().id,following,'The queue remains usable after draining');f.close();
  });
 });
 
 test('separate same-direction trackpad bursts count twice even when the browser coalesces their scrollend',async t=>{
- for(const [label,direction,second,expected]of [['new right gesture',1,[90,45],'e'],['new left gesture',-1,[-90,-45],'a'],['small right momentum tail',1,[1,.5],'d'],['small left momentum tail',-1,[-1,-.5],'b']])await t.test(label,async()=>{
+ for(const [label,direction,second,expected]of [['new right gesture',1,[90,45],'e'],['new left gesture',-1,[-90,-45],'a'],['separate fractional right episode',1,[1,.5],'e'],['separate fractional left episode',-1,[-1,-.5],'a']])await t.test(label,async()=>{
   const f=fixture({realPresentation:true});f.window.FamilyMedia.open(['a','b','c','d','e'].map(f.photo),2,'photos');await flush();
   const viewport=f.strip(),image=viewport.children[1].querySelector('img');
-  const burst=deltas=>{for(const deltaX of deltas)f.emit(image,'wheel',{deltaX,deltaY:0,deltaMode:0,clientX:400,clientY:250});viewport.scrollLeft=direction>0?viewport.clientWidth*2:0;f.emit(viewport,'scroll');};
+  const burst=deltas=>{for(const deltaX of deltas)browserWheel(f,image,deltaX);};
   burst([direction*90,direction*45]);await new Promise(resolve=>setTimeout(resolve,110));
   burst(second);await flush();assert.equal(viewport.isConnected,true,'A second burst keeps its original scroll target until native completion');
-  f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,expected,'Distinct strong gestures remain two actions while a tiny momentum tail remains one');
+  await finishWheel(f,viewport);assert.equal(f.window.FamilyMedia.current().id,expected,'A quiet boundary makes the next owned horizontal episode a second action, including fractional input');
   f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,expected,'A late duplicate scrollend cannot count another action');f.close();
  });
+});
+
+test('a continuous trackpad episode including its fractional tail commits exactly one action',async()=>{
+ for(const direction of [1,-1]){
+  const f=fixture({realPresentation:true});f.window.FamilyMedia.open(['a','b','c','d','e'].map(f.photo),2,'photos');await flush();
+  const viewport=f.strip(),target=viewport.children[1].querySelector('img');
+  for(const delta of [90,45,1,.5,.25]){browserWheel(f,target,delta*direction);await new Promise(resolve=>setTimeout(resolve,12));}
+  await finishWheel(f,viewport);assert.equal(f.window.FamilyMedia.current().id,direction>0?'d':'b','Samples within the same quiet-boundary window remain one continuous action');
+  f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,direction>0?'d':'b');f.close();
+ }
 });
 
 test('opening with zero-width dialog geometry anchors the center photo before revealing the native strip',async()=>{
