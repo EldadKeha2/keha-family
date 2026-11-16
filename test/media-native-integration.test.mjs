@@ -14,12 +14,17 @@ const directionKey='keha-gallery-pad-direction-v2';
 const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
 const flush=async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>setImmediate(resolve));};
 
+
+// The DOM fixture does not lay out CSS transforms. Positive translate3d x
+// moves actual pixels right while the scroll origin remains fixed.
+const paintedPosition=viewport=>viewport.scrollLeft-(Number(viewport.children[1]?.style.transform?.match(/translate3d\(([-.\d]+)px/)?.[1])||0);
+
 function browserWheel(f,target,deltaX,extra={}){
- const ancestor=target.closest('.native-photo-strip'),viewport=ancestor||f.strip(),before=viewport.scrollLeft;
+ const ancestor=target.closest('.native-photo-strip'),viewport=ancestor||f.strip(),before=paintedPosition(viewport);
  const event=f.emit(target,'wheel',{deltaX,deltaY:0,deltaMode:0,clientX:400,clientY:250,...extra});
  // Model the browser's normal wheel action only when script did not own it.
  if(ancestor&&!event.defaultPrevented&&!event.ctrlKey&&!event.metaKey&&!['hidden','clip'].includes(viewport.style.overflowX||nativeStyle('overflow-x')))viewport.scrollLeft+=deltaX;
- f.emit(viewport,'scroll');return {event,viewport,before,after:viewport.scrollLeft};
+ f.emit(viewport,'scroll');return {event,viewport,before,after:paintedPosition(viewport)};
 }
 
 function nativeStroke(f,dx,{wheel=false}={}){
@@ -151,7 +156,7 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,real
 
 test('production loads the native controller before the gallery binds gesture input',()=>{
  const f=fixture();for(const name of names)assert.ok(f.loaded.includes(name),name+' must be loaded by the production page');
- assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,11,'The loaded implementation, not only its script URL, must be version eleven');
+ assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,12,'The loaded implementation, not only its script URL, must be version twelve');
 });
 
 test('a cold gallery link adopts a retained random page even when that page omits the opened photo',async()=>{
@@ -205,11 +210,11 @@ test('retaining a shared gallery page cannot claim a direct photo belonging to a
 test('desktop photo viewers drag the actual pixels right and commit Next directly on release',async()=>{
  for(const scope of ['photos','gallery','personal:ruti','wedding:parents','nursery:ruti']){
   const f=fixture();await f.open('photo',scope);const stage=f.get('mediaStage'),viewport=f.strip();assert.ok(viewport,scope);
-  assert.equal(viewport.children.length,3);assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.equal(stage.classList.contains('photo-manual-swipes'),false);
+  assert.equal(viewport.children.length,3);assert.equal(paintedPosition(viewport),viewport.clientWidth);assert.equal(stage.classList.contains('photo-manual-swipes'),false);
   const image=viewport.children[1].querySelector('img');assert.ok(image,'The actual photo stays in the center pane');
   const finger={pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientY:250};
   f.emit(image,'pointerdown',{...finger,clientX:200});f.emit(image,'pointermove',{...finger,clientX:350});
-  assert.equal(viewport.clientWidth-viewport.scrollLeft,150,'The first physical-right move must move the current pixels right without synthetic browser scrolling');
+  assert.equal(viewport.clientWidth-paintedPosition(viewport),150,'The first physical-right move must move the current pixels right without synthetic browser scrolling');
   assert.equal(f.window.FamilyMedia.current().id,'a','The current item is retained while the finger is down');
   f.emit(image,'pointerup',{...finger,clientX:350});await flush();
   assert.equal(f.window.FamilyMedia.current().id,'b',scope+' commits Next without any scroll or scrollend event');
@@ -292,7 +297,7 @@ test('native photo scrolling survives fullscreen reparenting, resize and return 
  assert.equal(f.strip().children[1].querySelector('img'),image,'Fullscreen preserves the decoded photo while changing its container');
  const fullscreenStrip=f.strip();for(let i=0;i<3;i++)f.window.FamilyMedia.refreshPhotoPresentation();
  assert.equal(f.strip(),fullscreenStrip);assert.equal(f.strip().children[1].querySelector('img'),image,'Repeated refreshes cannot mistake a neighbour preview for the fullscreen photo');
- const mountsBefore=f.faceMounts.length;f.resize(900);assert.equal(f.strip().scrollLeft,900);
+ const mountsBefore=f.faceMounts.length;f.resize(900);assert.equal(paintedPosition(f.strip()),900);
  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.faceMounts.length,mountsBefore,'Browsing fullscreen does not mount editable face controls');
  anchor.replaceWith(stage);root.remove();assert.equal(f.window.FamilyMedia.setFullscreen(false),true);await flush();
  assert.equal(stage.parentNode,originalParent);assert.equal(f.window.FamilyMedia.photoState().active,false);
@@ -357,7 +362,7 @@ test('native photo scrolling saves descriptions before moving and retains failed
   const f=fixture();await f.open('photo');f.failSaving(fail);
   const input=f.get('openedCaptionText');input.value='A description worth keeping';f.emit(input,'input');
   await f.snap(0);assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/a/caption');
-  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');assert.ok(f.strip());assert.equal(f.strip().scrollLeft,f.strip().clientWidth);
+  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'b');assert.ok(f.strip());assert.equal(paintedPosition(f.strip()),f.strip().clientWidth);
   if(fail){assert.equal(input.value,'A description worth keeping');assert.equal(f.get('openedCaptionError').textContent,'Caption was not saved');f.failSaving(false);await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b','A failed save does not permanently lock the native strip');}
   else assert.equal(f.window.FamilyMedia.lookup('photos','a').caption,'A description worth keeping');
   f.close();
@@ -374,6 +379,18 @@ test('physical rightward touch and trackpad gestures select the same item as the
  }
 });
 
+test('a saved rightward pad gesture paints right without altering photo or video order or the pad preference',async()=>{
+ for(const kind of ['photo','video']){
+  const storage=new Map([[directionKey,'-1']]),f=fixture({storage});await f.open(kind,kind==='photo'?'photos':'nostalgia',1);
+  f.emit(f.get('mediaNext'),'click');await flush();const arrowNext=f.window.FamilyMedia.current().id;
+  await f.open(kind,kind==='photo'?'photos':'nostalgia',1);const rail=f.strip(),origin=rail.scrollLeft;
+  Object.defineProperty(rail,'scrollLeft',{get:()=>origin,set:value=>assert.equal(value,origin,'The paint path cannot reverse or move the browser scroll origin')});
+  browserWheel(f,rail.children[1].querySelector('img,video'),-140);
+  assert.equal(rail.children[1].style.transform,'translate3d(140px,0,0)');assert.equal(f.window.FamilyMedia.current().id,'b');
+  await finishWheel(f,rail);assert.equal(f.window.FamilyMedia.current().id,arrowNext);assert.equal(storage.get(directionKey),'-1','Changing the animation must not change saved navigation direction');f.close();
+ }
+});
+
 test('rightward trackpad input moves the actual current pixels right before choosing the Next image',async()=>{
  for(const kind of ['photo','video']){
   const f=fixture();await f.open(kind,kind==='photo'?'photos':'videos',1);const viewport=f.strip(),target=viewport.children[1].querySelector(kind==='photo'?'img':'video');
@@ -381,7 +398,7 @@ test('rightward trackpad input moves the actual current pixels right before choo
   assert.equal(viewport.children[0].querySelector('img')?.getAttribute('src'),next);
   const sample=browserWheel(f,target,140);
   assert.equal(sample.event.defaultPrevented,true,'The default browser wheel movement would send the pixels left');
-  assert.ok(sample.after<sample.before,'Positive rightward input must decrease the actual scrollLeft');
+  assert.ok(sample.after<sample.before,'Positive rightward input must move the viewed pixels right');
   assert.equal(viewport.clientWidth-sample.after,140,'The center pane moves 140 pixels right, before any completed navigation');
   assert.equal(f.window.FamilyMedia.current().id,'b','Spatial movement is verified before committing a new item');
   assert.equal(viewport.children[0].querySelector('img')?.getAttribute('src'),next,'Trackpad input does not swap neighbor panes to hide reversed pixel movement');
@@ -402,7 +419,7 @@ test('stage backgrounds and face overlays outside the strip share the actual hor
   if(overlay){const layer=f.document.createElement('div');layer.className='face-layer';const area=f.document.createElement('div');area.className='face-image-area';target=f.document.createElement('button');target.className='face-hit';area.append(target);layer.append(area);stage.append(layer);assert.equal(target.closest('.native-photo-strip'),null,'The input target is a stage sibling, just as a face overlay before wrapping can be');}
   if(wheel){const sample=browserWheel(f,target,140);assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,140);await finishWheel(f,viewport);}
   else {
-   const finger={pointerType:'touch',pointerId:4,isPrimary:true,button:0,clientY:250};f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-viewport.scrollLeft,140,'The actual viewed pixels follow a drag even when it starts outside the inner strip');f.emit(target,'pointerup',{...finger,clientX:340});await flush();
+   const finger={pointerType:'touch',pointerId:4,isPrimary:true,button:0,clientY:250};f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-paintedPosition(viewport),140,'The actual viewed pixels follow a drag even when it starts outside the inner strip');f.emit(target,'pointerup',{...finger,clientX:340});await flush();
   }
   assert.equal(f.window.FamilyMedia.current().id,'b',(wheel?'Wheel':'Touch')+' at the '+(overlay?'face overlay':'stage background')+' advances exactly once');f.close();
  }
@@ -416,7 +433,7 @@ test('noneditable host and scroller attributes never classify ordinary gallery i
   else {const host=f.document.createElement(mode==='outer-link'?'a':'div');if(mode==='outer-link')host.setAttribute('href','#gallery');else host.setAttribute('role','textbox');stage.before(host);host.append(stage);}
   if(wheel){const sample=browserWheel(f,target,140);assert.equal(sample.event.defaultPrevented,true,mode+' must not protect a control outside the stage or a noneditable surface');assert.equal(viewport.clientWidth-sample.after,140);await finishWheel(f,viewport);}
   else {
-   touchEvent(f,target,'touchstart',[[11,200,250]]);const move=touchEvent(f,target,'touchmove',[[11,340,250]]);assert.equal(move.defaultPrevented,true);assert.equal(viewport.clientWidth-viewport.scrollLeft,140,'The recorded div.face-photo-scroll target must actually move');touchEvent(f,target,'touchend',[],[[11,340,250]]);await flush();
+   touchEvent(f,target,'touchstart',[[11,200,250]]);const move=touchEvent(f,target,'touchmove',[[11,340,250]]);assert.equal(move.defaultPrevented,true);assert.equal(viewport.clientWidth-paintedPosition(viewport),140,'The recorded div.face-photo-scroll target must actually move');touchEvent(f,target,'touchend',[],[[11,340,250]]);await flush();
   }
   assert.equal(f.window.FamilyMedia.current().id,'b',kind+' '+mode+' '+(wheel?'wheel':'single touch')+' advances once');f.close();
  }
@@ -427,7 +444,7 @@ test('real editable and playback controls inside the gallery remain protected fr
   const f=fixture();await f.open();const stage=f.get('mediaStage'),viewport=f.strip(),control=f.document.createElement(mode.startsWith('editable')||mode==='textbox'?'div':mode),target=['input','textarea','select'].includes(mode)?control:f.document.createElement('span');
   if(mode==='a')control.setAttribute('href','#gallery');if(mode==='textbox')control.setAttribute('role','textbox');if(mode.startsWith('editable'))control.setAttribute('contenteditable',mode==='editable-true'?'true':'');if(target!==control)control.append(target);stage.append(control);
   touchEvent(f,target,'touchstart',[[11,200,250]]);const move=touchEvent(f,target,'touchmove',[[11,340,250]]);touchEvent(f,target,'touchend',[],[[11,340,250]]);const wheel=browserWheel(f,target,140);await finishWheel(f,viewport);
-  assert.equal(move.defaultPrevented,false,mode+' keeps its own touch input');assert.equal(wheel.event.defaultPrevented,false,mode+' keeps its own wheel input');assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.window.FamilyPhotoNative.isActive(stage),false);f.close();
+  assert.equal(move.defaultPrevented,false,mode+' keeps its own touch input');assert.equal(wheel.event.defaultPrevented,false,mode+' keeps its own wheel input');assert.equal(paintedPosition(viewport),viewport.clientWidth);assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.window.FamilyPhotoNative.isActive(stage),false);f.close();
  }
 });
 
@@ -443,7 +460,7 @@ test('the manual fallback ignores noneditable outside wrappers and still protect
 test('two parallel fingers move the actual pixels right or left and their staggered lifts commit exactly one action',async()=>{
  for(const kind of ['photo','video'])for(const dx of [140,-140])for(const paired of [false,true]){
   const f=fixture();await f.open(kind,kind==='photo'?'photos':'videos',1);const expected=dx>0?'c':'a';
-  await parallelGroup(f,dx,{paired,tailMove:true,afterMove:(viewport,event)=>{assert.equal(event.defaultPrevented,true,'Parallel translation is owned by the gallery');assert.equal(viewport.clientWidth-viewport.scrollLeft,dx,'The two-finger centroid moves real pixels in its physical direction');assert.equal(f.window.FamilyMedia.current().id,'b');},afterFirstLift:()=>assert.equal(f.window.FamilyMedia.current().id,expected,'The first contact lift finishes the group once')});
+  await parallelGroup(f,dx,{paired,tailMove:true,afterMove:(viewport,event)=>{assert.equal(event.defaultPrevented,true,'Parallel translation is owned by the gallery');assert.equal(viewport.clientWidth-paintedPosition(viewport),dx,'The two-finger centroid moves real pixels in its physical direction');assert.equal(f.window.FamilyMedia.current().id,'b');},afterFirstLift:()=>assert.equal(f.window.FamilyMedia.current().id,expected,'The first contact lift finishes the group once')});
   assert.equal(f.window.FamilyMedia.current().id,expected,'The remaining finger and paired PointerEvents cannot add or reverse a step');assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);
   f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,dx>0?'a':'b','The group tail cannot block following arrow navigation');f.close();
  }
@@ -456,10 +473,10 @@ test('distance-changing pinches and a third finger cancel translation while pres
   if(reason==='pinch'){
    const pinch=touchEvent(f,target,'touchmove',[[11,280,190],[22,400,390]]);assert.equal(pinch.defaultPrevented,false,'A changing two-finger span keeps browser pinch zoom even when its centroid translates right');
   }else {
-   touchEvent(f,target,'touchmove',[[11,280,240],[22,280,340]]);assert.equal(viewport.clientWidth-viewport.scrollLeft,80);touchEvent(f,target,'touchstart',[[11,280,240],[22,280,340],[33,280,440]],[[33,280,440]]);touchEvent(f,target,'touchmove',[[11,340,240],[22,340,340],[33,340,440]]);
+   touchEvent(f,target,'touchmove',[[11,280,240],[22,280,340]]);assert.equal(viewport.clientWidth-paintedPosition(viewport),80);touchEvent(f,target,'touchstart',[[11,280,240],[22,280,340],[33,280,440]],[[33,280,440]]);touchEvent(f,target,'touchmove',[[11,340,240],[22,340,340],[33,340,440]]);
   }
   touchEvent(f,target,'touchend',[[22,340,340]],[[11,340,240],[33,340,440]]);touchEvent(f,f.get('mediaStage'),'touchend',[],[[22,340,340]]);await flush();
-  assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.strip().scrollLeft,f.strip().clientWidth);assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);
+  assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(paintedPosition(f.strip()),f.strip().clientWidth);assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);
   await parallelGroup(f,140);assert.equal(f.window.FamilyMedia.current().id,'b',reason+' cancellation must release the next legitimate group');f.close();
  }
 });
@@ -467,7 +484,7 @@ test('distance-changing pinches and a third finger cancel translation while pres
 test('two-finger vertical translation scrolls the viewer without selecting a photo or film',async()=>{
  for(const kind of ['photo','video']){
   const f=fixture();await f.open(kind);const viewer=f.get('mediaViewer');viewer.scrollTop=200;
-  await parallelGroup(f,0,{dy:100,afterMove:(viewport,event)=>{assert.equal(event.defaultPrevented,true);assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.equal(viewer.scrollTop,100);},afterFirstLift:()=>assert.equal(f.window.FamilyMedia.current().id,'a')});
+  await parallelGroup(f,0,{dy:100,afterMove:(viewport,event)=>{assert.equal(event.defaultPrevented,true);assert.equal(paintedPosition(viewport),viewport.clientWidth);assert.equal(viewer.scrollTop,100);},afterFirstLift:()=>assert.equal(f.window.FamilyMedia.current().id,'a')});
   assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(viewer.scrollTop,100);assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);f.close();
  }
 });
@@ -486,9 +503,9 @@ test('a small diagonal start can become a rightward laptop drag on pointer and t
   const touch=(type,x,y)=>{const point={identifier:9,clientX:x,clientY:y,target};return f.emit(target,type,{touches:type==='touchend'?[]:[point],changedTouches:[point]});};
   if(pointer)f.emit(target,'pointerdown',{...finger,clientX:200,clientY:250});touch('touchstart',200,250);
   if(pointer)f.emit(target,'pointermove',{...finger,clientX:202,clientY:258});else touch('touchmove',202,258);
-  assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.equal(f.window.FamilyMedia.current().id,'a');
+  assert.equal(paintedPosition(viewport),viewport.clientWidth);assert.equal(f.window.FamilyMedia.current().id,'a');
   const move=pointer?f.emit(target,'pointermove',{...finger,clientX:340,clientY:250}):touch('touchmove',340,250);
-  assert.equal(move.defaultPrevented,true);assert.equal(viewport.clientWidth-viewport.scrollLeft,140,'The early two-by-eight-pixel packet cannot permanently turn a rightward gesture into vertical input');
+  assert.equal(move.defaultPrevented,true);assert.equal(viewport.clientWidth-paintedPosition(viewport),140,'The early two-by-eight-pixel packet cannot permanently turn a rightward gesture into vertical input');
   if(pointer)f.emit(target,'pointerup',{...finger,clientX:340,clientY:250});touch('touchend',340,250);await flush();
   assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.window.FamilyPhotoNative.isActive(stage),false);f.close();
  }
@@ -500,7 +517,7 @@ test('controlled vertical finger movement scrolls the viewer without navigating 
   const finger={pointerType:'touch',pointerId:3,isPrimary:true,button:0,clientX:200};f.emit(target,'pointerdown',{...finger,clientY:250});
   for(const clientY of [290,350])assert.equal(f.emit(target,'pointermove',{...finger,clientY}).defaultPrevented,true,'The controller owns vertical finger movement while retaining pinch zoom');
   f.emit(target,'pointerup',{...finger,clientY:350});await flush();
-  assert.equal(viewer.scrollTop,100,'A hundred-pixel downward finger move scrolls the dialog upward by the same amount');assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.equal(f.window.FamilyPhotoNative.isActive(stage),false);
+  assert.equal(viewer.scrollTop,100,'A hundred-pixel downward finger move scrolls the dialog upward by the same amount');assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(paintedPosition(viewport),viewport.clientWidth);assert.equal(f.window.FamilyPhotoNative.isActive(stage),false);
   const wheel=browserWheel(f,stage,0,{deltaY:140});assert.equal(wheel.event.defaultPrevented,false,'A vertical trackpad wheel remains native');assert.equal(wheel.after,wheel.before);f.close();
  }
 });
@@ -550,7 +567,7 @@ test('two immediate Next presses leave the following rightward drag working',asy
  const f=fixture({realPresentation:true});f.window.FamilyMedia.open(['a','b','c','d','e'].map(f.photo),0,'photos');await flush();
  f.emit(f.get('mediaNext'),'click');f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
  const viewport=f.strip(),target=viewport.children[1].querySelector('img'),finger={pointerType:'touch',pointerId:5,isPrimary:true,button:0,clientY:250};
- f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-viewport.scrollLeft,140);
+ f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-paintedPosition(viewport),140);
  f.emit(target,'pointerup',{...finger,clientX:340});await flush();assert.equal(f.window.FamilyMedia.current().id,'d');f.close();
 });
 
@@ -560,7 +577,7 @@ test('released touch and wheel movement complete without a native scrollend and 
   if(wheel)browserWheel(f,target,140);
   else {
    const finger={pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientY:250};
-   f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-viewport.scrollLeft,140);f.emit(target,'pointerup',{...finger,clientX:340});
+   f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-paintedPosition(viewport),140);f.emit(target,'pointerup',{...finger,clientX:340});
   }
   // No animation, scrollend or manually forced snap follows the release.
   await new Promise(resolve=>setTimeout(resolve,320));await flush();
@@ -586,7 +603,7 @@ test('pointer cancellation follows claimed horizontal movement while vertical mo
    f.emit(target,'pointerup',{...finger,clientX:340});f.emit(target,'pointerup',{...finger,pointerId:8,isPrimary:false,clientX:400});f.emit(target,'touchend',{touches:[],changedTouches:[{...one,clientX:280},{...two,clientX:460}]});
   }else f.emit(target,'pointerup',{...finger,clientX:208,clientY:390});
   await new Promise(resolve=>setTimeout(resolve,350));await flush();
-  assert.equal(f.window.FamilyMedia.current().id,reason==='horizontal-cancel'?'b':'a',reason+' uses only the last script-controlled horizontal movement');assert.equal(f.strip().scrollLeft,f.strip().clientWidth);
+  assert.equal(f.window.FamilyMedia.current().id,reason==='horizontal-cancel'?'b':'a',reason+' uses only the last script-controlled horizontal movement');assert.equal(paintedPosition(f.strip()),f.strip().clientWidth);
   assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);assert.equal(f.window.FamilyPhotoNative.whenIdle(f.get('mediaStage')),null);
   await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,reason==='horizontal-cancel'?'c':'b','A cancelled '+reason+' never disables the next real drag');f.close();
  }
@@ -595,7 +612,7 @@ test('pointer cancellation follows claimed horizontal movement while vertical mo
 test('compatibility touch events preserve the pointer origin and never duplicate a completed drag',async()=>{
  const f=fixture();await f.open();const viewport=f.strip(),target=viewport.children[1].querySelector('img'),finger={pointerType:'touch',pointerId:7,isPrimary:true,button:0,clientY:250},point={identifier:9,clientX:210,clientY:250,target};
  f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'touchstart',{touches:[point],changedTouches:[point]});
- f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-viewport.scrollLeft,140,'Companion touchstart must not shift an existing pointer origin by ten pixels');
+ f.emit(target,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-paintedPosition(viewport),140,'Companion touchstart must not shift an existing pointer origin by ten pixels');
  f.emit(target,'pointerup',{...finger,clientX:340});f.emit(target,'touchend',{touches:[],changedTouches:[{...point,clientX:340}]});await flush();
  assert.equal(f.window.FamilyMedia.current().id,'b','Pointer release and its compatibility touchend are one action');assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);f.close();
 });
@@ -603,9 +620,9 @@ test('compatibility touch events preserve the pointer origin and never duplicate
 test('an intentional drag back to its starting position cancels without a browser snap or scrollend',async()=>{
  const f=fixture();await f.open();const viewport=f.strip(),target=viewport.children[1].querySelector('img');
  const finger={pointerType:'touch',pointerId:7,isPrimary:true,button:0,clientY:250};
- f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:380});assert.equal(viewport.clientWidth-viewport.scrollLeft,180);
+ f.emit(target,'pointerdown',{...finger,clientX:200});f.emit(target,'pointermove',{...finger,clientX:380});assert.equal(viewport.clientWidth-paintedPosition(viewport),180);
  f.emit(target,'pointermove',{...finger,clientX:200});f.emit(target,'pointerup',{...finger,clientX:200});await flush();
- assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);
+ assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(paintedPosition(viewport),viewport.clientWidth);assert.equal(f.window.FamilyPhotoNative.isActive(f.get('mediaStage')),false);
  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
 });
 
@@ -617,7 +634,7 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,140,'A calibrated negative device packet moves the current pixels right');
  assert.equal(settings.wheelFactor(),-1);assert.equal(settings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
- const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 11/);assert.match(trace,/native implementation 11/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
+ const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 11/);assert.match(trace,/native implementation 12/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
  const restored=fixture({storage});assert.equal(restored.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(restored.window.FamilyGalleryInput.isCalibrating(),false);assert.equal(restored.get('galleryGestureCheck'),null,'Ordinary browsing shows no diagnostic or calibration interface');
  await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,140);
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(restored.window.FamilyMedia.current().id,'c');restored.close();
@@ -725,7 +742,7 @@ test('sparse pad momentum cannot skip images after a photo or video is rebuilt, 
 test('guided right setup with an opposite first packet keeps rightward pixels and advances exactly once',async()=>{
  const storage=new Map([[directionKey,'1']]),f=fixture({query:'?gesture-check=11',storage,realPresentation:true});await f.open();
  const rail=f.strip(),target=rail.children[1].querySelector('img');browserWheel(f,target,.4);browserWheel(f,target,-120);browserWheel(f,target,-40);
- assert.ok(Math.abs(rail.clientWidth-rail.scrollLeft-160.4)<.001,'Every setup packet moves right despite the initial sign jitter');
+ assert.ok(Math.abs(rail.clientWidth-paintedPosition(rail)-160.4)<.001,'Every setup packet moves right despite the initial sign jitter');
  await finishWheel(f,rail);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(f.window.FamilyGalleryInput.isCalibrating(),false);
  const current=f.strip(),tail=browserWheel(f,current.children[1].querySelector('img'),-8);assert.equal(tail.after,current.clientWidth);await finishWheel(f,current);assert.equal(f.window.FamilyMedia.current().id,'b');
  f.close();const reload=fixture({query:'?gesture-check=11',storage});await reload.open();assert.equal(reload.window.FamilyGalleryInput.isCalibrating(),false);
@@ -738,7 +755,7 @@ test('opening with zero-width dialog geometry anchors the center photo before re
   const media=viewport.children[1].querySelector(kind==='photo'?'img':'video');assert.ok(media);
   assert.equal(viewport.style.visibility,'hidden','The unmeasured strip must not flash a neighboring pane');
   f.emit(viewport,'scroll');f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'a','Layout-induced scroll events are not a navigation intent');
-  f.layout();await flush();assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.notEqual(viewport.style.visibility,'hidden');
+  f.layout();await flush();assert.equal(paintedPosition(viewport),viewport.clientWidth);assert.notEqual(viewport.style.visibility,'hidden');
   assert.ok(viewport.children[1].querySelector(kind==='photo'?'img':'video')===media,'The original pixels remain in the centered pane');
   f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'a');nativeStroke(f,140);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
  }
@@ -748,7 +765,7 @@ test('a prepared photo cannot replace the original touch target underneath the n
  const f=fixture(),loads=[];await f.open();f.window.FamilyPhotoPresentation.ready=()=>null;f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.push({item,resolve}));
  nativeStroke(f,140);const viewport=f.strip(),image=viewport.children[1].querySelector('img');assert.ok(loads.some(load=>load.item.id==='b'));
  const finger={pointerType:'touch',pointerId:2,isPrimary:true,button:0,clientY:250};
- f.emit(image,'pointerdown',{...finger,clientX:200});f.emit(image,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-viewport.scrollLeft,140);
+ f.emit(image,'pointerdown',{...finger,clientX:200});f.emit(image,'pointermove',{...finger,clientX:340});assert.equal(viewport.clientWidth-paintedPosition(viewport),140);
  for(const {item,resolve}of loads.splice(0)){const prepared=f.document.createElement('img');prepared.src=item.previewSrc;resolve(prepared);}await flush();
  assert.equal(f.window.FamilyMedia.current().id,'a','The first image load must wait while a second physical stroke still owns the old target');assert.equal(image.isConnected,true);
  f.emit(image,'pointerup',{...finger,clientX:340});
@@ -817,7 +834,7 @@ test('profile page loaders retain native swiping on the final single-item photo 
 });
 
 test('native scrolling recenters on resize and yields cleanly to photo zoom and unsupported browsers',async()=>{
- const f=fixture();await f.open();f.resize(640);assert.equal(f.strip().scrollLeft,640);await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');
+ const f=fixture();await f.open();f.resize(640);assert.equal(paintedPosition(f.strip()),640);await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');
  f.zoom(2);assert.equal(f.strip(),null);assert.ok(f.get('mediaStage').querySelector('.face-photo-scroll img'));
  f.zoom(1);assert.ok(f.strip());await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
  for(const options of [{supported:false},{mobile:true}]){

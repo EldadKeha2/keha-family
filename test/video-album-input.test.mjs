@@ -33,7 +33,7 @@ test('generated video input owns horizontal movement and release while retaining
  assert.equal(strip.children[0].querySelector('img').src,'/poster-b');assert.equal(strip.children[2].querySelector('img').src,'/poster-b');
  assert.equal(f.emit(player.video,'wheel',{deltaX:120,deltaY:0,clientX:200,clientY:470}).defaultPrevented,false,'The seeking strip still gets native wheel input');
  const pointer=(type,x,id=1)=>f.emit(player.video,type,{pointerType:'touch',pointerId:id,isPrimary:true,button:0,clientX:x,clientY:200});
- assert.equal(pointer('pointerdown',200).defaultPrevented,false);assert.equal(pointer('pointermove',350).defaultPrevented,true);assert.equal(strip.scrollLeft,650,'The first rightward motion moves actual pixels right');
+ assert.equal(pointer('pointerdown',200).defaultPrevented,false);assert.equal(pointer('pointermove',350).defaultPrevented,true);assert.equal(strip.scrollLeft,800,'The browser scroll origin stays fixed');assert.equal(strip.children[1].style.transform,'translate3d(150px,0,0)','The first rightward motion translates the actual player pixels right');
  assert.deepEqual(f.captures,[1]);assert.equal(pointer('pointerup',350).defaultPrevented,true);
  await tick();assert.deepEqual(f.selected,['b']);assert.equal(player.video.src,'/b.mp4');assert.equal(player.strip(),strip);assert.equal(strip.scrollLeft,800);
  for(const [type,x]of [['pointerdown',350],['pointermove',200],['pointerup',200]])f.emit(player.video,type,{pointerType:'touch',pointerId:2,isPrimary:true,button:0,clientX:x,clientY:200});

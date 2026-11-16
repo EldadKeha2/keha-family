@@ -113,8 +113,14 @@
   function anchor(b){
     const width=b.viewport.clientWidth;
     if(!(width>0))return false;
-    if(!b.anchored||Math.abs(width-b.width)>1){b.width=width;b.viewport.scrollLeft=width;b.anchored=true;b.viewport.style.visibility='';}
+    if(!b.anchored||Math.abs(width-b.width)>1){b.width=width;b.viewport.scrollLeft=width;paintMotion(b);b.anchored=true;b.viewport.style.visibility='';}
     return true;
+  }
+  function paintMotion(b,dx=0){
+    // Paint in physical screen coordinates. The pad's already calibrated
+    // navigation sign remains separate from browser/RTL scroll coordinates.
+    const x=Math.max(-b.width,Math.min(b.width,dx));
+    for(const pane of b.viewport.children)pane.style.transform='translate3d('+x+'px,0,0)';
   }
   function arrange(b){side(b.viewport.children[0],b.next);side(b.viewport.children[2],b.previous);}
   function releaseCapture(b,g){if(g?.pointerId!=null)try{b.stage.releasePointerCapture?.(g.pointerId);}catch{}}
@@ -135,13 +141,13 @@
     if(!node)return false;
     if(active?.stage===stage&&active.node===node){Object.assign(active,{enabled,step,busy,vertical,previous,next});if(!pending)clearCover(active);arrange(active);anchor(active);return true;}
     reset();const viewport=document.createElement('div');viewport.className='native-photo-strip';viewport.dir='ltr';
-    Object.assign(viewport.style,{scrollBehavior:'auto',scrollSnapType:'none',touchAction:'pinch-zoom',visibility:'hidden',overflowX:'hidden'});
+    Object.assign(viewport.style,{scrollBehavior:'auto',scrollSnapType:'none',touchAction:'pinch-zoom',visibility:'hidden',overflowX:'hidden',direction:'ltr',flexDirection:'row'});
     const left=document.createElement('div'),center=document.createElement('div'),right=document.createElement('div');
-    for(const pane of [left,center,right]){pane.className='native-photo-pane';viewport.append(pane);}
+    for(const pane of [left,center,right]){pane.className='native-photo-pane';pane.style.willChange='transform';viewport.append(pane);}
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
     const b=active={stage,node,viewport,center,enabled,step,busy,vertical,previous,next,width:0,anchored:false,pending:0,idle:new Set(),contact:null,wheel:null,lastDecision:'mounted',lastEvent:'mount',protectedMatch:null};
     arrange(b);anchor(b);
-    const recenter=()=>{if(b.anchored)viewport.scrollLeft=b.width;};
+    const recenter=()=>{if(b.anchored)paintMotion(b);};
     const navigate=b.navigate=direction=>{
       if(active!==b||!anchor(b))return;
       if(!direction||!b.enabled()){recenter();resolveIdle(b);return;}
@@ -180,7 +186,7 @@
       navigate(Math.sign(wheel.dx));
     };
     b.cancel=()=>{endContact();b.wheel=null;clearTimeout(b.wheelTimer);recenter();resolveIdle(b);};
-    const draw=g=>{viewport.scrollLeft=Math.max(0,Math.min(b.width*2,b.width-g.dx));};
+    const draw=g=>paintMotion(b,g.dx);
     b.move=event=>{
       const g=b.contact;if(!g||!coordinate(event)||active!==b)return;
       record(b,'move',event,'contact-moving');
@@ -312,7 +318,7 @@
       }
       if(active!==b)return;b.wheel||={dx:0,episode:sample.episode};b.wheel.dx+=dx;
       b.lastDecision='wheel-owned';
-      viewport.scrollLeft=Math.max(0,Math.min(b.width*2,b.width-b.wheel.dx));
+      paintMotion(b,b.wheel.dx);
       clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);
     };
     bindStage(stage);
@@ -322,5 +328,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0};}
-  window.FamilyPhotoNative={version:11,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:12,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();
