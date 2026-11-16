@@ -30,15 +30,18 @@ body[data-active-view=screensaver] .workspace-actions{display:none}
 .screensaver-label-size input[type=range]:focus-visible{outline:2px solid #ad8135;outline-offset:2px;border-radius:5px}
 .screensaver-label-size output{min-width:4ch;text-align:center;font-variant-numeric:tabular-nums}
 #photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options){flex-wrap:wrap}
-#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close{order:2}
-#photoFullscreenRoot .screensaver-fullscreen-options{order:-2;flex:0 0 100%;display:flex;align-items:center;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;min-width:0}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-counter{order:3;flex:0 0 100%;margin:0}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close{order:2;width:72px;height:72px;min-width:72px;min-height:72px;padding:18px;border:2px solid #d8c39d;background:#f4ead5;color:#5d503e;box-shadow:0 3px 16px #0005}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close svg{width:34px;height:34px;stroke-width:2.6}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close:hover{background:#fff7e8;border-color:#fff1d3;color:#403625}
+#photoFullscreenRoot .screensaver-fullscreen-options{order:1;flex:0 1 auto;display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;min-width:0;margin-left:auto}
 #photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{order:0;flex:0 1 auto;flex-wrap:wrap;gap:12px;margin:0;min-width:0;max-width:100%;font-size:calc(20px * var(--a11y-text-scale,1));font-weight:600}
 #photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family>span{margin-left:0}
 #photoFullscreenRoot .screensaver-fullscreen-options .screensaver-family-select{width:360px;height:64px;min-height:64px;padding:10px 18px;border:2px solid #c9b68f;border-radius:12px;background:#263322;color:#fffdf2;font:600 calc(22px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 #photoFullscreenRoot .screensaver-family-select:focus-visible{outline:3px solid #edce8e;outline-offset:3px}
 #mediaViewer[data-media-scope=screensaver] #mediaStage>.photo-magic-wand{display:none}
-#photoFullscreenRoot .photo-fullscreen-label-size{order:1;flex:0 1 auto;margin-left:auto;color:#fffdf2;font-size:calc(20px * var(--a11y-text-scale,1))}
+#photoFullscreenRoot .photo-fullscreen-label-size{order:0;flex:0 1 auto;margin:0;color:#fffdf2;font-size:calc(20px * var(--a11y-text-scale,1))}
 #photoFullscreenRoot .photo-fullscreen-label-size input[type=range]{accent-color:#c3d6a9}
 #photoFullscreenRoot .photo-fullscreen-label-size input[type=range]:focus-visible{outline-color:#edce8e}
-@media(max-width:1000px){#photoFullscreenRoot .photo-fullscreen-label-size{order:-1;flex:1 1 100%;margin-left:0}}
+@media(max-width:1280px){#photoFullscreenRoot .screensaver-fullscreen-options{order:-1;flex:1 1 calc(100% - 90px);margin-left:0}#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close{order:-1}}
 @media(max-width:700px){.screensaver-label-size,#photoFullscreenRoot .photo-fullscreen-label-size{font-size:calc(18px * var(--a11y-text-scale,1))}.screensaver-label-size input[type=range]{width:130px}#photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{flex:1 1 100%;align-items:stretch;flex-direction:column;gap:6px;font-size:calc(18px * var(--a11y-text-scale,1))}#photoFullscreenRoot .screensaver-fullscreen-options .screensaver-family-select{width:100%;height:60px;min-height:60px;font-size:calc(20px * var(--a11y-text-scale,1))}}
