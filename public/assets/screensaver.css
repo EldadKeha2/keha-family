@@ -28,7 +28,7 @@ body[data-active-view=screensaver] .workspace-actions{display:none}
 .screensaver-label-size input[type=range]:focus-visible{outline:2px solid #ad8135;outline-offset:2px;border-radius:5px}
 .screensaver-label-size output{min-width:4ch;text-align:center;font-variant-numeric:tabular-nums}
 #photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options){flex-wrap:wrap}
-#photoFullscreenRoot .screensaver-fullscreen-options{order:-1;flex:0 0 100%;display:flex;align-items:center;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;min-width:0}
+#photoFullscreenRoot .screensaver-fullscreen-options{order:-1;flex:0 0 100%;display:flex;align-items:center;justify-content:flex-start;gap:8px 20px;flex-wrap:wrap;min-width:0}
 #photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{order:0;flex:0 1 auto;margin:0;max-width:100%}
 #photoFullscreenRoot .photo-fullscreen-label-size{color:#fffdf2;font-size:13px;max-width:100%}
 #photoFullscreenRoot .photo-fullscreen-label-size input[type=range]{accent-color:#c3d6a9}
