@@ -15,6 +15,10 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
 .gallery-pager [data-gallery-page-label]{min-width:0;font-size:13px;text-align:center;overflow-wrap:anywhere}
 .gallery-pager .gallery-page-buttons{display:flex;align-items:center;gap:7px;min-width:0}
 .gallery-page-buttons svg{display:none;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
+@media(min-width:701px){
+  .gallery-pager .gallery-page-buttons button{display:inline-flex;align-items:center;justify-content:center;gap:8px;direction:ltr;white-space:nowrap}
+  .gallery-page-buttons svg{display:block;flex:none}
+}
 @media(max-width:700px){
   .gallery-pager[data-gallery-pager]{grid-template-columns:66px minmax(0,1fr) 84px;gap:8px 6px;padding:12px 0;margin:10px 0 14px}
   .gallery-pager .gallery-sort-field{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;border:1px solid #cfc2a2;border-radius:6px;background:#fffdf6;color:#6e7059}
