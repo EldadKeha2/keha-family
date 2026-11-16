@@ -86,6 +86,30 @@ test('deleting an interior video segment saves both retained sections in place a
   const second=await f.call('/api/media/'+item.id+'/video-remove',{method:'POST',body:{...body,operationId:uid(),expectedVideoRevision:saved.videoRevision,range:{start:1,end:3,remove:true}}});assert.equal(second.status,200,await second.clone().text());assert.equal((await second.json()).item.duration,2.25);
  }finally{await f.close();}
 });
+test('segment deletion streams measured progress and acknowledges 100 only after the saved result is durable',async()=>{
+ const f=fixture();try{
+  await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url)),item=await taggedUpload(f,'/api/collections/videos',bytes,'film.mp4');
+  const source=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;
+  const body={operationId:uid(),name:source.name,caption:source.caption,range:{start:2.125,end:5.875,remove:true},expectedVideoRevision:source.videoRevision};
+  const response=await f.call('/api/media/'+item.id+'/video-remove',{method:'POST',body,headers:{Accept:'application/x-ndjson'}});
+  assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/application\/x-ndjson/);
+  const events=(await response.text()).trim().split('\n').map(line=>JSON.parse(line)),progress=events.filter(event=>event.type==='progress');
+  assert.equal(progress[0].percent,1);assert.ok(progress.some(event=>event.stage==='processing'&&event.percent>5));assert.equal(progress.at(-1).stage,'saving');
+  assert.ok(progress.every((event,index)=>event.percent<100&&(!index||event.percent>progress[index-1].percent)));
+  const complete=events.at(-1);assert.equal(complete.type,'complete');assert.equal(complete.percent,100);assert.equal(complete.result.item.duration,4.25);
+  assert.equal((await(await f.call('/api/media/'+item.id+'/view')).json()).item.videoRevision,complete.result.item.videoRevision);
+  const retry=await f.call('/api/media/'+item.id+'/video-remove',{method:'POST',body,headers:{Accept:'application/x-ndjson'}});assert.equal((await retry.json()).alreadySaved,true);
+ }finally{await f.close();}
+});
+test('a failed streamed deletion reports an error without 100 percent or changing the video',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f,'/api/collections/videos',video,'invalid-clip.mp4'),source=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;
+  const response=await f.call('/api/media/'+item.id+'/video-remove',{method:'POST',headers:{Accept:'application/x-ndjson'},body:{operationId:uid(),name:source.name,range:{start:1,end:2,remove:true},expectedVideoRevision:source.videoRevision}});
+  const events=(await response.text()).trim().split('\n').map(line=>JSON.parse(line));
+  assert.equal(events[0].type,'progress');assert.equal(events.at(-1).type,'error');assert.ok(events.every(event=>event.percent!==100));
+  const unchanged=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;assert.equal(unchanged.videoRevision,source.videoRevision);assert.equal(unchanged.src,source.src);
+ }finally{await f.close();}
+});
 test('video viewing copies publish behind the existing media access route while original bytes stay unchanged',async()=>{
  const f=fixture();try{
   await f.connect();const uploaded=await(await f.call('/api/collections/videos/upload?filename=source.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json(),item=uploaded.collection.items[0];

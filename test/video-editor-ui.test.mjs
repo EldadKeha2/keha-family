@@ -29,7 +29,7 @@ function editorFixture(){
  }
  const document={body:new Node('body'),activeElement:null,getElementById:id=>nodes.get(id),createElement(tag){const node=new Node(tag);if(tag==='video')videos.push(node);return node;},querySelectorAll:selector=>selector==='video'?videos:[],addEventListener:(type,fn)=>listeners.set(type,fn)};
  const window={FamilyI18n:{isEnglish:false,mediaName:item=>item.name,error:String,fetch:async(path,options)=>{requests.push({path,body:JSON.parse(options.body)});return Response.json({item:{id:'saved-clip',kind:'video'}});}},dispatchEvent(){},FamilyApp:{toast(){}}};
- vm.runInNewContext(source,{window,document,URL,Response,CustomEvent,crypto:{randomUUID:()=>String(++sequence).padStart(32,'0')}});listeners.get('DOMContentLoaded')();
+ vm.runInNewContext(source,{window,document,URL,Response,CustomEvent,TextDecoder,setInterval,clearInterval,setTimeout,crypto:{randomUUID:()=>String(++sequence).padStart(32,'0')}});listeners.get('DOMContentLoaded')();
  const api=window.FamilyVideoEditor,get=id=>nodes.get(id);
  const open=async(id='film')=>{api.open({id,kind:'video',name:'Family movie',src:'/media/'+id,duration:120},'nostalgia');const media=videos.at(-1);await media.emit('loadedmetadata');await media.finishSeek();media.seeks=[];return media;};
  return {api,window,document,get,requests,open,input(id,value){get(id).value=String(value);return get(id).emit('input');}};
@@ -121,4 +121,22 @@ test('exit remains available after an invalid range, and Escape exits deletion m
  assert.equal(f.get('videoClipDeleteRange').disabled,true);assert.equal(f.get('videoClipExitDelete').hidden,false);assert.equal(f.get('videoClipExitDelete').disabled,false);
  await f.document.body.children[0].emit('cancel');assert.equal(f.get('videoClipDeleteRange')['aria-pressed'],'false');assert.equal(f.document.body.children[0].open,true);assert.equal(f.get('videoClipEnd').value,'invalid');assert.equal(f.requests.length,0);
  await f.document.body.children[0].emit('cancel');assert.equal(f.document.body.children[0].open,false);
+});
+test('deletion displays streamed percentages, ignores regressions and waits for the saved completion',async()=>{
+ const f=editorFixture();let stream,request;const encoder=new TextEncoder(),flush=()=>new Promise(resolve=>setImmediate(resolve));
+ f.window.FamilyI18n.fetch=async(path,options)=>{request=options;return new Response(new ReadableStream({start(controller){stream=controller;}}),{headers:{'Content-Type':'application/x-ndjson'}});};
+ await f.open();await f.input('videoClipStart',10);await f.input('videoClipEnd',40);await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteConfirm').emit('click');await flush();
+ assert.equal(request.headers.Accept,'application/x-ndjson');assert.equal(f.get('videoClipProgress').hidden,false);assert.equal(f.get('videoClipPercent').textContent,'0%');assert.equal(f.get('videoClipStart').disabled,true);
+ const first=encoder.encode(JSON.stringify({type:'progress',percent:48,stage:'processing'})+'\n');stream.enqueue(first.slice(0,9));stream.enqueue(first.slice(9));await flush();assert.equal(f.get('videoClipPercent').textContent,'48%');
+ stream.enqueue(encoder.encode(JSON.stringify({type:'progress',percent:20})+'\n'));await flush();assert.equal(f.get('videoClipPercent').textContent,'48%');
+ stream.enqueue(encoder.encode(JSON.stringify({type:'progress',percent:97,stage:'saving'})+'\n'));await flush();assert.equal(f.get('videoClipPercent').textContent,'97%');assert.equal(f.document.body.children[0].open,true);
+ stream.enqueue(encoder.encode(JSON.stringify({type:'complete',percent:100,result:{item:{id:'film'}}})+'\n'));stream.close();await flush();assert.equal(f.get('videoClipPercent').textContent,'100%');
+ await new Promise(resolve=>setTimeout(resolve,470));assert.equal(f.document.body.children[0].open,false);
+});
+test('an interrupted progress stream keeps the editor open for retry and never claims completion',async()=>{
+ const f=editorFixture(),encoder=new TextEncoder(),flush=()=>new Promise(resolve=>setImmediate(resolve));
+ f.window.FamilyI18n.fetch=async()=>new Response(new ReadableStream({start(controller){controller.enqueue(encoder.encode('{"type":"progress","percent":61,"stage":"processing"}\n'));controller.close();}}),{headers:{'Content-Type':'application/x-ndjson'}});
+ await f.open();await f.input('videoClipStart',10);await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteConfirm').emit('click');await flush();
+ assert.equal(f.get('videoClipPercent').textContent,'61%');assert.equal(f.document.body.children[0].open,true);assert.equal(f.get('videoClipClose').disabled,false);assert.equal(f.get('videoClipDeleteRange').disabled,false);assert.match(f.get('videoClipStatus').textContent,/לא התקבל אישור שמירה/);
+ await f.get('videoClipClose').emit('click');assert.equal(f.get('videoClipProgress').hidden,true);
 });

@@ -3,7 +3,17 @@
  const $=id=>document.getElementById(id),tr=(he,en)=>window.FamilyI18n.isEnglish?en:he;
  const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fullscreenIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3H3v6M3 3l7 7M15 3h6v6M21 3l-7 7M3 15v6h6M3 21l7-7M15 21h6v-6M21 21l-7-7"/></svg>';
- let root,anchor,active=false,hadNative=false;
+ let root,anchor,active=false,hadNative=false,downloadAnchor=null,shareLabel='';
+ function syncSharing(video){
+  const download=$('mediaOriginal'),sharing=$('mediaShareActions'),heading=sharing?.querySelector('.media-share-heading span');
+  if(!download||!heading)return;
+  const desktop=video&&window.matchMedia?.('(min-width:701px)').matches===true;
+  if(desktop){
+   if(!downloadAnchor){downloadAnchor=document.createComment('video-download-position');download.before(downloadAnchor);shareLabel=heading.textContent;}
+   if(download.parentNode!==sharing)sharing.insertBefore(download,$('shareMediaWhatsApp'));
+   heading.textContent=tr('הורדה ושיתוף','Download & share');
+  }else if(downloadAnchor){downloadAnchor.before(download);downloadAnchor.remove();downloadAnchor=null;heading.textContent=shareLabel;}
+ }
  function controls(item,scope){
   const id=safe(item.id||item.file),context=safe(scope||item.scope||'videos'),fullscreenLabel=tr('מסך מלא','Full screen');
   return `<div class="video-overlay-tools"><div class="video-overlay-editing">${window.FamilyVideoEditor?.controls(item,scope)||''}</div><button type="button" class="video-fullscreen-launch" data-video-fullscreen="${id}" data-video-scope="${context}" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">${fullscreenIcon}</button></div>`;
@@ -24,7 +34,8 @@
   root.querySelector('.video-fullscreen-previous').addEventListener('click',()=>window.FamilyMedia.step(-1));
   root.querySelector('.video-fullscreen-next').addEventListener('click',()=>window.FamilyMedia.step(1));
   $('mediaViewer').addEventListener('cancel',event=>{if(active){event.preventDefault();exit();}});
-  $('mediaViewer').addEventListener('close',()=>exit({focus:false}));
+  $('mediaViewer').addEventListener('close',()=>{exit({focus:false});syncSharing(false);});
+  window.addEventListener?.('resize',()=>syncSharing($('mediaViewer').open&&window.FamilyMedia?.current()?.kind==='video'));
  }
  function exit({focus=true}={}){
   if(!active)return false;active=false;hadNative=false;
@@ -43,6 +54,7 @@
  }
  function present(item,scope){
   mount();const video=item?.kind==='video';$('mediaViewer')?.classList.toggle('video-gallery-viewer',video);
+  syncSharing(video);
   if(!video){exit({focus:false});return;}
   window.FamilyPhotoDate?.syncInline?.();
   const stage=$('mediaStage');stage.querySelector('.video-overlay-tools')?.remove();stage.insertAdjacentHTML('beforeend',controls(item,scope));

@@ -6,12 +6,46 @@
  const pencilIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1 12-12a2.8 2.8 0 0 0-4-4L4 15v5Z"/></svg>';
  const trashIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/></svg>';
 
- let active=null,dialog=null,player=null,saving=false,queuedSeek=null,deleteDialog=null,pendingDelete=null;
+ let active=null,dialog=null,player=null,saving=false,queuedSeek=null,deleteDialog=null,pendingDelete=null,progressState=null;
  const clock=value=>{value=Math.max(0,Number(value)||0);const hours=Math.floor(value/3600),minutes=Math.floor(value/60)%60,seconds=(value%60).toFixed(2).padStart(5,'0');return (hours?String(hours)+':':'')+String(minutes).padStart(2,'0')+':'+seconds;};
  function seconds(value){const parts=String(value).trim().replace(',','.').split(':');if(!parts.length||parts.length>3||parts.some(p=>!/^\d+(?:\.\d+)?$/.test(p)))return NaN;if(parts.length>1&&parts.slice(1).some(p=>Number(p)>=60))return NaN;return parts.reduce((n,p)=>n*60+Number(p),0);}
  function controls(item,scope){return item.id&&item.kind==='video'?`<button type="button" class="video-edit-button" data-video-edit="${safe(item.id)}" data-video-scope="${safe(scope)}" aria-label="${tr('עריכת הסרטון','Edit video')}">${editIcon}<span>${tr('עריכה','Edit')}</span></button>`:'';}
  function youtubeFrame(start,end){return 'https://www.youtube-nocookie.com/embed/'+active.item.youtubeId+'?rel=0&start='+Math.floor((active.item.youtubeStart||0)+start)+(end?'&end='+Math.ceil((active.item.youtubeStart||0)+end):'');}
  function feedback(message='',failed=false){$('videoClipStatus').textContent=message;$('videoClipStatus').classList.toggle('is-error',failed);}
+ function progressTime(){
+  if(!progressState)return;
+  const elapsed=Math.floor((Date.now()-progressState.started)/1000);
+  $('videoClipElapsed').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');
+ }
+ function resetProgress(){if(progressState)clearInterval(progressState.timer);progressState=null;$('videoClipProgress').hidden=true;}
+ function updateProgress(percent,stage='processing'){
+  if(!progressState||!Number.isFinite(percent))return;
+  progressState.percent=Math.max(progressState.percent,Math.min(100,Math.floor(percent)));
+  $('videoClipProgressBar').value=progressState.percent;$('videoClipPercent').textContent=progressState.percent+'%';
+  $('videoClipProgressLabel').textContent=stage==='complete'?tr('הקטע נמחק והסרטון נשמר ✓','Segment deleted and video saved ✓'):stage==='saving'?tr('שומר את הסרטון…','Saving the video…'):stage==='preparing'?tr('מכין את הסרטון למחיקת הקטע…','Preparing to delete the segment…'):tr('מוחק את הקטע ומחבר את הסרטון…','Deleting the segment and joining the video…');
+ }
+ function startProgress(){
+  resetProgress();progressState={started:Date.now(),percent:0};$('videoClipProgress').hidden=false;updateProgress(0,'preparing');progressTime();progressState.timer=setInterval(progressTime,1000);
+ }
+ async function saveResult(response){
+  const missing=()=>Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Try again.'));
+  if(!response.headers.get('Content-Type')?.includes('application/x-ndjson')){
+   let result;try{result=await response.json();}catch{throw missing();}
+   if(!response.ok)throw Error(I.error(result.error)||tr('לא ניתן לשמור את הקטע.','The clip could not be saved.'));return result;
+  }
+  if(!response.ok||!response.body)throw missing();
+  const reader=response.body.getReader(),decoder=new TextDecoder();let pending='',result;
+  const consume=line=>{
+   if(!line.trim())return;const event=JSON.parse(line);
+   if(event.type==='error')throw Error(I.error(event.error)||tr('לא ניתן לשמור את הקטע.','The clip could not be saved.'));
+   if(event.type==='progress')updateProgress(Math.min(99,event.percent),event.stage);
+   if(event.type==='complete'&&event.result){result=event.result;}
+  };
+  try{
+   while(true){const next=await reader.read();pending+=decoder.decode(next.value||new Uint8Array(),{stream:!next.done});let boundary;while((boundary=pending.indexOf('\n'))>=0){consume(pending.slice(0,boundary));pending=pending.slice(boundary+1);}if(next.done)break;}
+   if(pending.trim())consume(pending);if(!result)throw missing();return result;
+  }finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+ }
  function fitName(){
   if(!active||!dialog?.open)return;
   const field=$('videoClipName'),style=typeof getComputedStyle==='function'?getComputedStyle(field):null;
@@ -44,6 +78,7 @@
   const name=$('videoClipName').value.trim();$('videoClipSubtitle').textContent=name;$('videoClipSubtitle').hidden=active.nameExpanded||!name;
   $('videoClipSave').disabled=saving||!valid||!name;$('videoClipSaveNew').disabled=saving||!valid||!name;
   $('videoClipSaveName').disabled=saving||!name;$('videoClipEditName').disabled=saving;$('videoClipName').readOnly=saving;
+  for(const id of ['videoClipStart','videoClipEnd','videoClipStartRange','videoClipEndRange','videoClipCategory'])$(id).disabled=saving;
   const removing=Boolean(active.removeMode);
   dialog.classList.toggle('is-removing-segment',removing);
   $('videoClipDeleteRange').hidden=active.item.provider==='youtube';
@@ -60,7 +95,7 @@
   $('videoClipLength').setAttribute('aria-label',valid?tr('אורך הסרטון: ','Video length: ')+clock(length):tr('בחרו זמן התחלה וסיום תקינים','Choose a valid start and end'));
   if(boundary&&valid)showFrame(boundary==='end'?end:start);
  }
- function close(){if(saving)return;const previous=active;pendingDelete=null;deleteDialog?.close();queuedSeek=null;pausePlayer();window.FamilyTags?.clearInline($('videoClipTags'));dialog.close();if(player?.tagName==='VIDEO'){player.removeAttribute('src');player.load();}else if(player)player.removeAttribute('src');active=null;if(previous?.objectURL)URL.revokeObjectURL(previous.objectURL);previous?.onCancel?.();}
+ function close(){if(saving)return;resetProgress();const previous=active;pendingDelete=null;deleteDialog?.close();queuedSeek=null;pausePlayer();window.FamilyTags?.clearInline($('videoClipTags'));dialog.close();if(player?.tagName==='VIDEO'){player.removeAttribute('src');player.load();}else if(player)player.removeAttribute('src');active=null;if(previous?.objectURL)URL.revokeObjectURL(previous.objectURL);previous?.onCancel?.();}
  function viewer(item,scope){const button=$('editOpenedVideo');if(button){button.hidden=item.kind!=='video'||!item.id;const photo=$('editOpenedPhoto');if(photo){button.innerHTML=photo.innerHTML;button.className=photo.className;}button.setAttribute('aria-label',tr('עריכת הסרטון','Edit video'));button.dataset.videoEdit=item.id||'';button.dataset.videoScope=scope||item.scope||'';}}
  function categoryPicker(item,scope){const source=['videos','nostalgia'].includes(scope)?scope:item.scope;return source==='videos'?window.FamilyVideoCategories:source==='nostalgia'?window.FamilyNostalgia:null;}
  function editCategory(){
@@ -70,7 +105,7 @@
  }
  function open(item,scope,options={}){
   if(!item?.id||item.kind!=='video'||saving)return;for(const video of document.querySelectorAll('video'))if(!video.paused)video.pause();
-  queuedSeek=null;active={item,scope,start:options.range?.start||0,end:options.range?.end||item.duration||60,duration:item.duration||60,knownDuration:Boolean(item.duration),valid:false,removeMode:Boolean(options.range?.remove),clipId:crypto.randomUUID().replaceAll('-',''),payload:null,...options};
+  resetProgress();queuedSeek=null;active={item,scope,start:options.range?.start||0,end:options.range?.end||item.duration||60,duration:item.duration||60,knownDuration:Boolean(item.duration),valid:false,removeMode:Boolean(options.range?.remove),clipId:crypto.randomUUID().replaceAll('-',''),payload:null,...options};
   $('videoClipCategory').hidden=Boolean(options.selectionOnly)||!categoryPicker(item,scope)?.openAssign;
   $('videoClipName').maxLength=options.selectionOnly?140:5000;$('videoClipName').value=(options.name||item.caption||I.mediaName(item)||tr('סרטון','Video')).slice(0,$('videoClipName').maxLength);$('videoClipStart').value=clock(active.start);$('videoClipEnd').value=clock(active.end);
   editName(false);dialog.classList.toggle('is-selection',Boolean(options.selectionOnly));
@@ -109,17 +144,18 @@
   if(active.selectionOnly){const confirm=active.onConfirm,selection={start:active.start,end:active.end,...(event.deleteRange?{remove:true}:{}),duration:active.duration,name:$('videoClipName').value.trim()};active.onCancel=null;close();confirm?.(selection);return;}
   const saveAsNew=event.submitter?.id==='videoClipSaveNew';
   saving=true;queuedSeek=null;pausePlayer();$('videoClipSave').disabled=$('videoClipSaveNew').disabled=$('videoClipClose').disabled=true;$('videoClipTags').inert=true;dialog.setAttribute('aria-busy','true');feedback(tr('שומר את השינויים…','Saving changes…'));sync();
+  if(event.deleteRange)startProgress();else resetProgress();
   try{
    const tags=await window.FamilyTags?.draftSelection($('videoClipTags'))||{},caption=$('videoClipName').value.trim(),name=caption.slice(0,140),changedRange=Math.abs(active.start-active.initialStart)>.0001||Math.abs(active.end-active.initialEnd)>.0001;
    const payload={name,caption,...tags,expectedName:active.item.name,expectedCaption:active.item.caption||'',expectedVideoRevision:active.item.videoRevision||'original',...(saveAsNew?{clipId:active.clipId,start:active.start,end:active.end}:{operationId:active.clipId,range:changedRange||event.deleteRange?{start:active.start,end:active.end,...(event.deleteRange?{remove:true}:{})}:null})};
    const signature=JSON.stringify({...payload,clipId:'',operationId:''});if(active.payload&&active.payload!==signature){active.clipId=crypto.randomUUID().replaceAll('-','');if(saveAsNew)payload.clipId=active.clipId;else payload.operationId=active.clipId;}active.payload=signature;
-   const response=await I.fetch('api/media/'+encodeURIComponent(active.item.id)+(event.deleteRange?'/video-remove':saveAsNew?'/clip':'/video-edit'),{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify(payload)});
-   let result;try{result=await response.json();}catch{throw Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Try again.'));}
-   if(!response.ok)throw Error(I.error(result.error)||tr('לא ניתן לשמור את הקטע.','The clip could not be saved.'));
+   const response=await I.fetch('api/media/'+encodeURIComponent(active.item.id)+(event.deleteRange?'/video-remove':saveAsNew?'/clip':'/video-edit'),{method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN,...(event.deleteRange?{Accept:'application/x-ndjson'}:{})},body:JSON.stringify(payload)});
+   const result=await saveResult(response);
+   if(event.deleteRange){updateProgress(100,'complete');clearInterval(progressState.timer);progressTime();await new Promise(resolve=>setTimeout(resolve,450));}
    window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
    window.FamilyApp?.toast(event.deleteRange?tr('הקטע נמחק ושאר הסרטון חובר ונשמר ✓','The segment was deleted and the remaining video was joined and saved ✓'):saveAsNew?tr('הקטע נשמר כסרטון נוסף באותה תיקייה ✓','The clip was saved as another video in this folder ✓'):tr('השינויים בסרטון נשמרו ✓','Video changes saved ✓'));
    saving=false;close();
-  }catch(error){feedback(error.message,true);}finally{saving=false;$('videoClipClose').disabled=false;$('videoClipTags').inert=false;dialog.removeAttribute('aria-busy');if(active)sync();}
+  }catch(error){feedback(error.message,true);if(progressState){clearInterval(progressState.timer);$('videoClipProgressLabel').textContent=tr('המחיקה לא הושלמה. אפשר לנסות שוב.','Deletion did not finish. You can try again.');}}finally{saving=false;$('videoClipClose').disabled=false;$('videoClipTags').inert=false;dialog.removeAttribute('aria-busy');if(active)sync();}
  }
  function exitDeleteMode(){
   if(!active||saving)return;
@@ -146,6 +182,7 @@
     <div class="video-clip-title-row"><span class="section-diamond" aria-hidden="true">◇</span><h2 id="videoClipTitle">${tr('עריכת הסרטון','Edit video')}</h2></div>
     <div class="video-clip-subtitle-row"><button type="button" id="videoClipEditName" aria-label="${tr('עריכת שם הסרטון','Edit video name')}" aria-controls="videoClipName" aria-expanded="false">${pencilIcon}</button><button type="button" id="videoClipSaveName" hidden>${tr('שמירת הכיתוב','Save caption')}</button><p id="videoClipSubtitle" dir="auto"></p><textarea id="videoClipName" rows="1" maxlength="5000" dir="auto" required hidden aria-label="${tr('שם הסרטון','Video name')}"></textarea></div>
    </div><button type="button" id="videoClipClose" aria-label="${tr('סגירת עורך הסרטונים','Close video editor')}">×</button></header>
+   <section id="videoClipProgress" class="video-clip-progress" hidden aria-label="${tr('התקדמות מחיקת הקטע','Segment deletion progress')}"><div class="video-clip-progress-heading"><span id="videoClipProgressLabel" role="status" aria-live="polite"></span><strong id="videoClipPercent" dir="ltr">0%</strong></div><progress id="videoClipProgressBar" max="100" value="0" aria-label="${tr('התקדמות מחיקת הקטע','Segment deletion progress')}"></progress><div class="video-clip-elapsed"><span>${tr('זמן שחלף','Elapsed time')}</span><output id="videoClipElapsed" dir="ltr">00:00</output></div></section>
    <div id="videoClipPlayer"></div>
    <div class="video-clip-timeline" id="videoClipTimeline"><div class="video-clip-track"><span id="videoClipSelection"></span></div><label>${tr('תחילת הקטע','Clip start')}<input type="range" min="0" max="60" step=".01" value="0" id="videoClipStartRange" aria-label="${tr('תחילת הקטע בציר הזמן','Clip start on timeline')}"></label><label>${tr('סיום הקטע','Clip end')}<input type="range" min="0" max="60" step=".01" value="60" id="videoClipEndRange" aria-label="${tr('סיום הקטע בציר הזמן','Clip end on timeline')}"></label></div>
    <div class="video-clip-timing"><div class="video-clip-times">
