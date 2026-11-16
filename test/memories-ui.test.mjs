@@ -73,6 +73,14 @@ test('existing memories retain attachments and tags during editing and filter by
   f.window.FamilyMemories.search('Yona');assert.equal(f.get('storyTimeline').children.length,1);
   f.window.FamilyMemories.search('no-match');assert.equal(f.get('storyTimeline').children.length,0);assert.equal(f.get('storiesEmpty').hidden,false);
 });
+test('Enter in an empty or still-loading people picker never submits a story',async()=>{
+  const f=fixture();await f.activate('stories');f.click('#newStory');f.get('storyTitle').value='A complete memory';f.get('storyBody').value='Content';
+  assert.equal(f.emit('storyPeoplePickerSearch','keydown',{key:'Enter'}).defaultPrevented,true);
+  f.get('storyPeoplePickerSearch').value='יונה';f.emit('storyPeoplePickerSearch','input');
+  assert.equal(f.emit('storyPeoplePickerSearch','keydown',{key:'Enter'}).defaultPrevented,true);
+  assert.equal(f.requests.some(r=>r.options.method==='POST'),false);await f.flush();
+  f.emit('storyPeoplePickerSearch','keydown',{key:'Enter'});assert.match(f.get('storyPeoplePicker').textContent,/יונה נקאש קהא/);
+});
 test('voices use native seekable players, allow metadata editing and expose download links',async()=>{
   const f=fixture();await f.activate('voices');assert.equal(f.get('voicesView').hidden,false);assert.equal(f.get('storiesView').hidden,true);
   const player=f.document.querySelector('#voiceList audio');assert.ok(player.hasAttribute('controls'));assert.equal(player.getAttribute('preload'),'none');assert.equal(player.getAttribute('src'),recording.src);

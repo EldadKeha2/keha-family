@@ -44,8 +44,11 @@
       this.input.addEventListener('input',()=>this.search());this.input.addEventListener('focus',()=>this.search());
       this.input.addEventListener('keydown',event=>{
         if(event.key==='Escape'&&!this.list.hidden){event.preventDefault();event.stopPropagation();this.hide();return;}
-        if(!['ArrowDown','ArrowUp','Enter'].includes(event.key)||this.list.hidden||!this.results.length)return;
-        event.preventDefault();if(event.key==='Enter'){this.pick(this.results[Math.max(0,this.active)]);return;}
+        // Enter belongs to the name picker even while its network search is pending.
+        // Never let a missing/hidden suggestion submit the surrounding story form.
+        if(event.key==='Enter'){event.preventDefault();if(!this.list.hidden&&this.results.length)this.pick(this.results[Math.max(0,this.active)]);return;}
+        if(!['ArrowDown','ArrowUp'].includes(event.key)||this.list.hidden||!this.results.length)return;
+        event.preventDefault();
         this.active=(this.active+(event.key==='ArrowDown'?1:-1)+this.results.length)%this.results.length;this.highlight();
       });
       this.list.addEventListener('mousedown',event=>event.preventDefault());
@@ -66,7 +69,7 @@
     }
     highlight(){for(const [i,button]of [...this.list.querySelectorAll('[role=option]')].entries())button.setAttribute('aria-selected',String(i===this.active));if(this.active>=0){this.input.setAttribute('aria-activedescendant',this.host.id+'Option'+this.active);this.list.children[this.active]?.scrollIntoView?.({block:'nearest'});}}
     pick(person){if(!person)return;if(this.selected.size>=150){this.status.textContent=t('אפשר לתייג עד 150 אנשים.','You can tag up to 150 people.');return;}this.selected.set(person.id,person);this.input.value='';this.renderChips();this.hide();this.input.focus();this.hide();}
-    hide(){this.serial++;this.list.hidden=true;this.input.setAttribute('aria-expanded','false');this.input.removeAttribute('aria-activedescendant');}
+    hide(){this.serial++;this.list.hidden=true;this.input.setAttribute('aria-expanded','false');this.input.removeAttribute('aria-activedescendant');if(this.status.textContent===t('טוען שמות…','Loading names…'))this.status.textContent='';}
     ids(){return [...this.selected.keys()];}
   }
   let storyPicker,voicePicker;
