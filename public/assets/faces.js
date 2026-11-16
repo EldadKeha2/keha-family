@@ -464,7 +464,7 @@
       changed(c,result);
       if(live(c)){c.saving=false;c.pendingDismiss=null;c.ignored=result.ignoredFaces||[];apply(c,result.faces);announce(c,tr('הסימון והתיוג הוסרו.','Face marker and label removed.'));advanceUnlabelledFace(c,face);}
     }catch(error){if(live(c)){c.pendingDismiss=null;paint(c);announce(c,error.message);window.FamilyApp?.toast?.(error.message);}}
-    finally{c.saving=false;}
+    finally{c.saving=false;if(live(c)&&!c.adapter)window.FamilyMedia?.refreshPhotoPresentation?.();}
   }
   async function resized(c,face){
     if(!live(c))return;c.resizeDrag=null;c.stage.classList.remove('face-resizing');c.skipClick=true;setTimeout(()=>{if(live(c))c.skipClick=false;},0);
@@ -487,7 +487,7 @@
       if(!c.adapter)remember(c.item.id,result.faces,result.item,c.detected,result.ignoredFaces,c.retained);
       if(live(c)){c.saving=false;if(result.ignoredFaces)c.ignored=result.ignoredFaces;apply(c,result.faces);closePopup(c);announce(c,result.face?tr('תיוג הפנים נשמר ונוסף גם לתיוגי התמונה.','Face label saved and added to the photo’s tags.'):tr('התיוג הוסר מהפנים. אם אין לאדם תיוג פנים נוסף בתמונה, הוא הוסר גם מרשימת השמות.','Face tag removed. If this person has no other labelled face in the photo, their name was also removed.'));if(result.face&&!(advance&&advanceUnlabelledFace(c,result.face))){showLabel(c,result.face,touchMode(),true);if(c.tabFace){rememberTabFace(c,result.face);focusTabFace(c,result.face);}}}
     }catch(error){if(live(c)&&removing){c.pendingUnassign=null;c.reviewed=Boolean(c.item.faceSummary?.reviewed);paint(c);announce(c,error.message);window.FamilyApp?.toast?.(error.message);}else if(live(c)&&c.popup===panel&&panel){panel.querySelector('[data-face-status]').textContent=error.message;for(const control of panel.querySelectorAll('button,input'))control.disabled=false;}}
-    finally{c.saving=false;}
+    finally{c.saving=false;if(live(c)&&!c.adapter)window.FamilyMedia?.refreshPhotoPresentation?.();}
   }
   function point(c,event,clamp=false){if(!imageWidth(c.image))return null;const r=imageArea(c);if(!clamp&&(event.clientX<r.x||event.clientX>r.x+r.width||event.clientY<r.y||event.clientY>r.y+r.height))return null;return {x:Math.max(0,Math.min(1,(event.clientX-r.x)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.y)/r.height))};}
   function faceAt(c,event){

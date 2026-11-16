@@ -18,7 +18,7 @@ function fixture({mobile=false,english=false,supported=true,scrollEnd=false,widt
  const events=new Map(),stage=new Node(),scroll=new Node(),window={addEventListener(){}},document={createElement:()=>new Node(),addEventListener:(type,handler)=>{const previous=events.get(type);events.set(type,event=>{previous?.(event);handler(event);});}},calls=[];scroll.className='face-photo-scroll';stage.append(scroll);let enabled=true;
  const context=vm.createContext({window,document,navigator:{userAgent:mobile?'Android':'Windows NT'},CSS:{supports:()=>supported},matchMedia:()=>({matches:mobile}),Date,setTimeout,clearTimeout});vm.runInContext(source,context);vm.runInContext(swipeSource,context);
  const options={previous:{kind:'photo',previewSrc:'/prev-small'},next:{kind:'photo',previewSrc:'/next-small'},isEnglish:english,enabled:()=>enabled,step(direction,opts){calls.push({direction,native:opts.native});window.FamilyPhotoNative.reset(stage);}};
- return {api:window.FamilyPhotoNative,swipe:window.FamilyPhotoSwipe,events,stage,scroll,calls,options,disable(){enabled=false;}};
+ return {window,api:window.FamilyPhotoNative,swipe:window.FamilyPhotoSwipe,events,stage,scroll,calls,options,disable(){enabled=false;}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const pointer=(f,type,x=200,y=100,id=7,target)=>{
@@ -145,4 +145,40 @@ test('a normal Windows pointer release completes a compatibility touch even when
   if(lateTouchEnd){f.events.get('touchend')({changedTouches:[{identifier:9,clientX:340,clientY:100}]});t.mock.timers.tick(300);await flush();assert.equal(f.calls.length,1,'A late companion touchend cannot count the same gesture twice');}
   f.api.reset();
  }
+});
+
+test('Windows browser-owned native pan survives early pointer cancellation and continuous real scroll samples',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const compatibility of [false,true]){
+  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+  pointer(f,'pointerdown');if(compatibility)strip.handlers.get('touchstart')({touches:[{identifier:7,clientX:200,clientY:100}]});pointer(f,'pointermove',208);f.events.get('pointercancel')({pointerId:7});
+  for(let i=1;i<=6;i++){t.mock.timers.tick(60);strip.scrollLeft=800-i*30;strip.handlers.get('scroll')();assert.deepEqual(f.calls,[]);assert.equal(strip.scrollLeft,800-i*30,'A fixed cancellation timer cannot recenter a still-moving native pan');}
+  const wait=f.api.whenIdle(f.stage);t.mock.timers.tick(249);assert.deepEqual(f.calls,[]);t.mock.timers.tick(1);await wait;await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);
+ }
+});
+
+test('native automatic snapback retains inferred physical direction while an explicit actual release can reverse or cancel it',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const release of ['missing','cancel','reverse']){
+  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+  pointer(f,'pointerdown');strip.handlers.get('touchstart')({touches:[{identifier:7,clientX:200,clientY:100}]});pointer(f,'pointermove',208);f.events.get('pointercancel')({pointerId:7});
+  strip.scrollLeft=620;strip.handlers.get('scroll')();
+  if(release!=='missing')f.events.get('touchend')({changedTouches:[{identifier:7,clientX:release==='cancel'?205:60,clientY:100}]});
+  strip.scrollLeft=800;strip.handlers.get('scroll')();strip.handlers.get('scrollend')();t.mock.timers.tick(350);await flush();
+  assert.deepEqual(f.calls.map(call=>call.direction),release==='missing'?[1]:release==='reverse'?[-1]:[]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+ }
+});
+
+test('an orphan touchstart releases idle without discarding ownership of a later actual native pan',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ strip.handlers.get('touchstart')({touches:[{identifier:7,clientX:200,clientY:100}]});const wait=f.api.whenIdle(f.stage);t.mock.timers.tick(350);await wait;assert.equal(f.api.whenIdle(f.stage),null);assert.deepEqual(f.calls,[]);
+ strip.scrollLeft=650;strip.handlers.get('scroll')();assert.equal(f.api.isActive(f.stage),true);t.mock.timers.tick(250);await flush();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(f.api.whenIdle(f.stage),null);
+});
+
+
+test('trackpad mapping applies only after horizontal ownership and never changes actual screen-touch direction',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({scrollEnd:true}),mapped=[];f.window.FamilyGalleryInput={wheelDelta:dx=>{mapped.push(dx);return -dx;}};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ wheel(strip,0,{deltaY:140});wheel(strip,120,{ctrlKey:true});assert.deepEqual(mapped,[]);
+ wheel(strip,120,{deltaMode:1});assert.deepEqual(mapped,[1920]);assert.equal(strip.scrollLeft,1600);t.mock.timers.tick(80);strip.handlers.get('scrollend')();await flush();assert.deepEqual(f.calls,[{direction:-1,native:true}]);
+ const touch=fixture({scrollEnd:true});touch.window.FamilyGalleryInput={wheelDelta:()=>{throw Error('Screen touch must never be calibrated');}};touch.api.mount(touch.stage,touch.options);const rail=touch.stage.children[0];pointer(touch,'pointerdown');pointer(touch,'pointerup',340);rail.scrollLeft=0;rail.handlers.get('scrollend')();await flush();assert.deepEqual(touch.calls,[{direction:1,native:true}]);
 });

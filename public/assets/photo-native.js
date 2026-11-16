@@ -19,19 +19,27 @@
   function released(b,event,force=false){
     if(event)position(b,event);
     if(b.pointerId!=null||b.touchId!=null)return;
-    const stroke=b.stroke;
+    const stroke=b.stroke;b.explicitRelease=Boolean(event);
     b.touchIntent=stroke&&Math.abs(stroke.dx)>=Math.max(32,Math.min(56,b.width*.06))&&Math.abs(stroke.dx)>=Math.abs(stroke.dy)*1.2?Math.sign(stroke.dx):0;
     b.settling=true;clearTimeout(b.settleTimer);
     b.settleTimer=setTimeout(()=>{if(active===b)b.finish(true);},250);
     if(force||b.nativeEnded)b.finish(force);
   }
-  function cancelledContact(b){
-    clearTimeout(b.contactTimer);b.pointerCancelled=true;
-    b.contactTimer=setTimeout(()=>{if(active!==b)return;b.touchId=null;b.pointerId=null;released(b,null,true);},250);
+  function cancelledContact(b,delay=250){
+    clearTimeout(b.contactTimer);b.pointerCancelled=true;b.settling=true;
+    b.contactTimer=setTimeout(()=>{
+      if(active!==b)return;b.touchId=null;b.pointerId=null;b.pointerCancelled=false;
+      if(b.nativePanSeen||b.explicitRelease||Math.abs(b.stroke?.dx||0)>=32){if(b.explicitRelease)b.finish(true);else released(b,null,true);}
+      else{
+        // An orphan compatibility start must release idle, but a later real
+        // native pan on this same rail still belongs to its original contact.
+        b.settling=false;clearTimeout(b.settleTimer);resolveIdle(b);
+      }
+    },delay);
   }
   document.addEventListener('pointermove',event=>{const b=active;if(b?.pointerId===event.pointerId)position(b,event);},{capture:true,passive:true});
   document.addEventListener('pointerup',event=>{const b=active;if(b?.pointerId!==event.pointerId)return;clearTimeout(b.contactTimer);b.pointerCancelled=false;b.pointerId=null;b.touchId=null;released(b,event);},{capture:true,passive:true});
-  document.addEventListener('pointercancel',event=>{const b=active;if(b?.pointerId!==event.pointerId)return;b.pointerId=null;if(b.touchId==null)released(b);else cancelledContact(b);},{capture:true,passive:true});
+  document.addEventListener('pointercancel',event=>{const b=active;if(b?.pointerId!==event.pointerId)return;b.pointerId=null;cancelledContact(b);},{capture:true,passive:true});
   document.addEventListener('touchmove',event=>{const b=active;if(b?.touchId==null)return;const touch=[...event.touches].find(touch=>touch.identifier===b.touchId);if(touch){position(b,touch);if(b.pointerCancelled)cancelledContact(b);}},{capture:true,passive:true});
   document.addEventListener('touchend',event=>{const b=active;if(b?.touchId==null)return;const touch=[...event.changedTouches].find(touch=>touch.identifier===b.touchId);if(touch){clearTimeout(b.contactTimer);b.pointerCancelled=false;b.touchId=null;b.pointerId=null;released(b,touch);}},{capture:true,passive:true});
   document.addEventListener('touchcancel',()=>{const b=active;if(!b)return;b.touchId=null;b.pointerId=null;released(b);},{capture:true,passive:true});
@@ -86,14 +94,14 @@
     const b=active={stage,node,viewport,center,enabled,step,busy,previous,next,width:0,anchored:false,pending:0,idle:new Set(),pointerId:null,touchId:null,touchOwned:false,touchIntent:0,wheelActive:false,wheelOwned:false,wheelSum:0,settling:false,nativeEnded:false};
     arrange(b);anchor(b);
     const clearEpisode=()=>{
-      clearTimeout(b.wheelTimer);clearTimeout(b.settleTimer);clearTimeout(b.contactTimer);b.pointerCancelled=false;b.settling=false;b.touchOwned=false;b.touchIntent=0;b.wheelOwned=false;b.wheelSum=0;b.nativeEnded=false;b.settleTarget=null;viewport.style.scrollSnapType='';
+      clearTimeout(b.wheelTimer);clearTimeout(b.settleTimer);clearTimeout(b.contactTimer);b.pointerCancelled=false;b.settling=false;b.touchOwned=false;b.touchIntent=0;b.explicitRelease=false;b.nativePanSeen=false;b.panDirection=0;b.wheelOwned=false;b.wheelSum=0;b.nativeEnded=false;b.settleTarget=null;viewport.style.scrollSnapType='';
     };
     const finish=b.finish=(fallback=false,reserveWheel=false)=>{
       if(active!==b||!anchor(b))return;fallback=fallback===true;
       if(!fallback&&(b.pointerId!=null||b.touchId!=null)){if(Math.abs(viewport.scrollLeft-b.width)>2)b.nativeEnded=true;return;}
       const edge=viewport.scrollLeft<=2?1:viewport.scrollLeft>=b.width*2-2?-1:0;
       const owned=b.touchOwned||b.wheelOwned;
-      const direction=b.wheelOwned?(b.wheelSum?Math.sign(b.wheelSum):edge):(b.touchIntent||edge);
+      const direction=b.wheelOwned?(b.wheelSum?Math.sign(b.wheelSum):edge):(b.explicitRelease?b.touchIntent:b.touchIntent||b.panDirection||edge);
       // Navigation is no longer part of input ownership. Clear the completed
       // episode before step(), while retaining a newer contact or wheel burst.
       clearEpisode();b.wheelActive=reserveWheel===true;resolveIdle(b);
@@ -114,7 +122,8 @@
       const preceding=b.settling||b.wheelOwned;
       if(touch)b.touchId=event.identifier;else b.pointerId=event.pointerId;
       if(preceding)b.finish(true);
-      if(active!==b)return;b.touchOwned=true;b.nativeEnded=false;b.stroke={x:event.clientX,y:event.clientY,dx:0,dy:0};
+      if(active!==b)return;b.touchOwned=true;b.explicitRelease=false;b.nativeEnded=false;b.nativePanSeen=false;b.panDirection=0;b.stroke={x:event.clientX,y:event.clientY,dx:0,dy:0};
+      if(touch&&b.pointerId==null)cancelledContact(b,350);
     };
     viewport.addEventListener('pointerdown',event=>{if(['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents)beginTouch(event);},{capture:true,passive:true});
     viewport.addEventListener('touchstart',event=>{if(event.touches.length===1)beginTouch(event.touches[0],true);else cancel();},{capture:true,passive:true});
@@ -127,8 +136,9 @@
     };
     viewport.addEventListener('wheel',event=>{
       if(event.ctrlKey||event.metaKey||nativeControl(event)||active!==b||!b.enabled()||!anchor(b))return;
-      const unit=event.deltaMode===1?16:event.deltaMode===2?b.width:1,dx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=(event.shiftKey&&!event.deltaX?0:event.deltaY||0)*unit;
-      if(!dx||Math.abs(dx)<Math.abs(dy)*1.15)return;
+      const unit=event.deltaMode===1?16:event.deltaMode===2?b.width:1,rawDX=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=(event.shiftKey&&!event.deltaX?0:event.deltaY||0)*unit;
+      if(!rawDX||Math.abs(rawDX)<Math.abs(dy)*1.15)return;
+      const dx=window.FamilyGalleryInput?.wheelDelta?.(rawDX)??rawDX;
       if(event.cancelable!==false)event.preventDefault?.();
       const oldContact=b.pointerId!=null||b.touchId!=null;
       const preceding=oldContact||b.settling||b.wheelOwned&&Math.sign(dx)!==Math.sign(b.wheelSum)&&Math.abs(dx)>=8;
@@ -144,6 +154,16 @@
       viewport.scrollLeft=Math.max(0,Math.min(b.width*2,viewport.scrollLeft-dx));
       clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(settleWheel,80);
     },{capture:true,passive:false});
+    viewport.addEventListener('scroll',()=>{
+      if(active!==b||!b.touchOwned||b.wheelOwned||!anchor(b))return;
+      const offset=b.width-viewport.scrollLeft;
+      if(Math.abs(offset)<=2)return;
+      b.nativePanSeen=true;
+      if(Math.abs(offset)>=Math.max(12,Math.min(32,b.width*.025)))b.panDirection=Math.sign(offset);
+      // pointercancel means the browser took the pan. Its actual moving rail,
+      // rather than a stopped pointer stream, keeps this contact alive.
+      clearTimeout(b.settleTimer);cancelledContact(b);
+    },{passive:true});
     viewport.addEventListener('scrollend',()=>{
       if(!b.wheelOwned||b.settling&&Math.abs(viewport.scrollLeft-b.settleTarget)<=2)b.finish();
     },{passive:true});

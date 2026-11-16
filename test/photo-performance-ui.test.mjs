@@ -11,6 +11,22 @@ test('preview preparation uses the small browsing URL and requests the original 
  const preview=window.FamilyPhotoPresentation.prepare(item);await images[0].onload();await preview;assert.equal(images[0].src,'/small-preview');
  const original=window.FamilyPhotoPresentation.prepare(item,'high',true);await images[1].onload();await original;assert.equal(images[1].src,'/large-original');
 });
+test('a loaded photo whose decode never finishes times out, releases its cache entry and can be retried',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const images=[],window={};let finishStaleDecode;
+ class Image{constructor(){images.push(this);this.naturalWidth=1200;this.naturalHeight=800;}decode(){return images[0]===this?new Promise(resolve=>finishStaleDecode=resolve):Promise.resolve();}}
+ vm.runInNewContext(presentation,{window,Image,navigator:{},setTimeout,clearTimeout});const api=window.FamilyPhotoPresentation,item={kind:'photo',src:'/original/stalled',previewSrc:'/preview/stalled'};
+ const pending=api.prepare(item),rejected=assert.rejects(pending,/Photo decoding timed out/),loading=images[0].onload();await Promise.resolve();
+ t.mock.timers.tick(4999);assert.equal(api.ready(item),null);t.mock.timers.tick(1);await rejected;await loading;assert.equal(api.ready(item),null);
+ const retry=api.prepare(item);assert.equal(images.length,2);assert.notEqual(retry,pending);await images[1].onload();assert.equal(await retry,images[1]);
+ finishStaleDecode();await Promise.resolve();assert.equal(api.ready(item),images[1],'Late decoding of the timed-out image cannot replace the successful retry');
+});
+test('the overall preparation deadline remains active while decoding and late decode cannot revive a timed-out entry',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const images=[],window={};let finishDecode;
+ class Image{constructor(){images.push(this);this.naturalWidth=1200;this.naturalHeight=800;}decode(){return new Promise(resolve=>finishDecode=resolve);}}
+ vm.runInNewContext(presentation,{window,Image,navigator:{},setTimeout,clearTimeout});const api=window.FamilyPhotoPresentation,item={kind:'photo',src:'/slow-photo'};
+ const pending=api.prepare(item),rejected=assert.rejects(pending,/Photo preparation timed out/);t.mock.timers.tick(9000);const loading=images[0].onload();await Promise.resolve();t.mock.timers.tick(1000);await rejected;
+ finishDecode();await loading;assert.equal(api.ready(item),null);const retry=api.prepare(item);assert.equal(images.length,2);const retried=images[1].onload();await Promise.resolve();finishDecode();await retried;await retry;
+});
 test('new uploads schedule copies from the local file without blocking the album or downloading the original again',async()=>{
  const calls=[],window={FamilyApp:{apiEnabled:true},FAMILY_API_TOKEN:'test',dispatchEvent(){}},item={id:'a',file:'a.png',kind:'photo',src:'/media/a',mime:'image/png',size:3000000};let decoded=0,closed=false;
  const document={hidden:false,querySelectorAll:()=>[],addEventListener(){},createElement(){return{getContext:()=>({drawImage(){}}),toBlob:fn=>fn(new Blob(['copy'],{type:'image/webp'}))};}};

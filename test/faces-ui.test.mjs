@@ -569,6 +569,19 @@ test('completion, undo and failed saves restore swiping after metadata pauses it
   f.faces.clear();
  }
 });
+test('face removal and ignored detections restore swiping after successful and failed saves',async()=>{
+ for(const installed of [false,true])for(const operation of ['save','ignore'])for(const fail of [false,true]){
+  const f=fixture(operation==='ignore'?[first]:[],{desktop:true,windows:true,hoverNone:installed,installed}),person={id:'yona',name:'יונה'},face={...first,id:'saved-face',personId:person.id,person,revision:'face-1'};let nativeReady=false;
+  f.window.FamilyMedia={refreshPhotoPresentation(){nativeReady=f.faces.canNavigate(f.stage);}};
+  f.window.addEventListener('family-media-changed',()=>f.window.FamilyMedia.refreshPhotoPresentation());
+  f.window.FamilyI18n.fetch=async path=>path.endsWith('/'+operation)?fail?Response.json({error:'Connection lost'},{status:503}):Response.json({operation:'faces',item:{id:'swipe-face',kind:'photo',scope:'gallery'},faces:[],ignoredFaces:operation==='ignore'?[first.rect]:[]}):Response.json({faces:operation==='save'?[face]:[]});
+  await f.mount('swipe-face',{}, {scope:'gallery'});assert.equal(nativeReady,true);
+  f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});
+  f.emit(f.find('face-popover face-picker').querySelector(operation==='save'?'[data-face-remove]':'[data-face-ignore]'),'click');
+  f.window.FamilyMedia.refreshPhotoPresentation();assert.equal(nativeReady,false,'Navigation pauses while a face save is outstanding');
+  await f.faces.flush();assert.equal(f.faces.canNavigate(f.stage),true);assert.equal(nativeReady,true,`${operation} ${fail?'failure':'success'} restores the swipe strip after saving ends`);f.faces.clear();
+ }
+});
 
 test('desktop frame handles save new geometry with the same person, face identity and concurrency revision',async()=>{
  const original={id:'a'.repeat(32),rect:{x:.3,y:.2,width:.1,height:.15},personId:'yona',person:{id:'yona',name:'יונה'},revision:'face-r1'},requests=[];

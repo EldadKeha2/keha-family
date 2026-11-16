@@ -123,12 +123,13 @@
       const control=event.target.closest(controls);
       if(!mouse()||!enabled()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;
-      const dx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=event.shiftKey&&!event.deltaX?0:(event.deltaY||0)*unit;
+      const rawDx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=event.shiftKey&&!event.deltaX?0:(event.deltaY||0)*unit;
       // Windows Precision Touchpads can report a whole gesture in subpixel
       // deltas. Accumulate them, including the small momentum tail.
       // Once a horizontal burst owns the axis, diagonal samples and momentum
       // remain part of that same swipe instead of being discarded individually.
-      if(!Number.isFinite(dx)||!dx||!wheelGesture&&Math.abs(dx)<Math.abs(dy)*1.15)return;
+      if(!Number.isFinite(rawDx)||!rawDx||!wheelGesture&&Math.abs(rawDx)<Math.abs(dy)*1.15)return;
+      const dx=window.FamilyGalleryInput?.wheelDelta?.(rawDx)??rawDx;
       if(event.cancelable)event.preventDefault();blockClick();
       wheelGesture||={dx:0};wheelGesture.dx+=dx;preview(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
       wheelTimer=setTimeout(()=>{wheelTimer=null;const dx=wheelGesture?.dx||0;wheelGesture=null;finished();if(enabled()&&Math.abs(dx)>=distance()){flushPreview();navigate(dx,{dragX:dx,queued:true,native:true});}else {clearPreview();cancel?.();}},120);

@@ -19,10 +19,23 @@
     const image=new Image(),entry={image,promise:null,ready:false,pixels:0};
     const promise=entry.promise=new Promise((resolve,reject)=>{
       image.decoding='async';image.fetchPriority=priority;
-      let timeout=setTimeout(()=>reject(Error('Photo preparation timed out')),original?30000:10000);
-      const fallback=()=>{if(src===item.src)return false;window.FamilyPhotoThumbnails?.rejectPreview?.(item);if(cache.get(src)===entry)cache.delete(src);src=item.src;cache.set(src,entry);clearTimeout(timeout);timeout=setTimeout(()=>reject(Error('Photo preparation timed out')),30000);image.src=src;return true;};
-      image.onload=async()=>{if(image.naturalWidth&&window.FamilyPhotoThumbnails?.visiblePixels?.(image)===false&&fallback())return;clearTimeout(timeout);try{await image.decode?.();}catch{}if(image.naturalWidth){entry.ready=true;entry.pixels=image.naturalWidth*(image.naturalHeight||1);trim(cache,src);resolve(image);}else reject(Error('Photo unavailable'));};
-      image.onerror=()=>{if(fallback())return;clearTimeout(timeout);reject(Error('Photo unavailable'));};image.src=src;
+      let settled=false,timeout;
+      const fail=error=>{if(settled)return;settled=true;clearTimeout(timeout);reject(error);};
+      timeout=setTimeout(()=>fail(Error('Photo preparation timed out')),original?30000:10000);
+      const fallback=()=>{if(src===item.src)return false;window.FamilyPhotoThumbnails?.rejectPreview?.(item);if(cache.get(src)===entry)cache.delete(src);src=item.src;cache.set(src,entry);clearTimeout(timeout);timeout=setTimeout(()=>fail(Error('Photo preparation timed out')),30000);image.src=src;return true;};
+      image.onload=async()=>{
+        if(settled)return;
+        if(image.naturalWidth&&window.FamilyPhotoThumbnails?.visiblePixels?.(image)===false&&fallback())return;
+        // Some browsers load the bytes but never settle decode(). Keep the
+        // request deadline alive and bound decoding so navigation can recover.
+        let decodeTimer;
+        try{await Promise.race([Promise.resolve().then(()=>image.decode?.()).catch(()=>{}),new Promise((_,rejectDecode)=>{decodeTimer=setTimeout(()=>rejectDecode(Error('Photo decoding timed out')),5000);})]);}
+        catch(error){fail(error);return;}
+        finally{clearTimeout(decodeTimer);}
+        if(settled)return;clearTimeout(timeout);
+        if(image.naturalWidth){settled=true;entry.ready=true;entry.pixels=image.naturalWidth*(image.naturalHeight||1);trim(cache,src);resolve(image);}else fail(Error('Photo unavailable'));
+      };
+      image.onerror=()=>{if(settled)return;if(fallback())return;fail(Error('Photo unavailable'));};image.src=src;
     });
     cache.set(src,entry);
     promise.catch(()=>{if(cache.get(src)===entry)cache.delete(src);});
