@@ -58,7 +58,7 @@
   function clearHandoff(token=handoff){if(token&&handoff===token){handoff=null;token.node.remove();}}
   function holdNative(stage,fallback){
     const strip=stage.querySelector('.native-photo-strip'),host=stage.closest?.('#photoFullscreenRoot')||stage.closest?.('dialog');if(!strip||!host)return null;
-    const page=Math.round(strip.scrollLeft/strip.clientWidth),shown=strip.children[page]?.querySelector('img'),queued=queuedDrag?.stage===stage?prepared.get(source(queuedDrag.next||{})):null,image=queued?.ready?queued.image:queuedDrag?.stage===stage&&fallback?.naturalWidth?fallback:shown?.naturalWidth?shown:fallback;
+    const page=Math.round(strip.scrollLeft/strip.clientWidth),shown=window.FamilyPhotoNative?.preview?.(stage)||strip.children[page]?.querySelector('img'),queued=queuedDrag?.stage===stage?prepared.get(source(queuedDrag.next||{})):null,image=queued?.ready?queued.image:fallback?.naturalWidth?fallback:shown?.naturalWidth?shown:fallback;
     if(!image?.naturalWidth||!image.naturalHeight)return null;
     const r=strip.getBoundingClientRect();if(!r.width||!r.height)return null;
     const node=document.createElement('div'),canvas=document.createElement('canvas'),ratio=Math.min(2,window.devicePixelRatio||1);

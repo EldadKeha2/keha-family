@@ -197,12 +197,12 @@ test('the phone touch owner preserves vertical scroll, pinch zoom and cancellati
  finger(f,'touchstart',180);finger(f,'touchmove',300);f.events.get('touchcancel')();finger(f,'touchend',300);assert.equal(f.window.FamilyMedia.current().id,'a');
  finger(f,'touchstart',180);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.get('mediaNext').clicks,1);f.close();
 });
-test('a phone swipe during a disabled page-change button cannot queue a second photo beyond the Next button target',async()=>{
- const f=fixture({touchscreen:true}),pagination={page:1,pages:2,size:2,total:4};f.navigator.userAgent='Android';f.get('mediaStage').clientWidth=360;let finish,settled=0;
- f.window.FamilyPhotoPresentation.settle=()=>{settled++;};f.window.FamilyMedia.register('gallery',['a','b'].map(f.photo),{pagination});f.window.FamilyMedia.openFrom('gallery','b');settled=0;
+test('a second phone swipe during a page change queues another photo without disabling the arrows',async()=>{
+ const f=fixture({touchscreen:true}),pagination={page:1,pages:2,size:2,total:4};f.navigator.userAgent='Android';f.get('mediaStage').clientWidth=360;let finish;
+ f.window.FamilyMedia.register('gallery',['a','b'].map(f.photo),{pagination});f.window.FamilyMedia.openFrom('gallery','b');
  f.window.FamilyPortal={pageGallery:page=>new Promise(resolve=>{finish=()=>{f.window.FamilyMedia.register('gallery',['c','d'].map(f.photo),{pagination:{...pagination,page}});resolve();};})};
- const first=f.get('mediaNext').click();assert.equal(f.get('mediaNext').disabled,true);finger(f,'touchstart',180);finger(f,'touchmove',60);finger(f,'touchend',60);assert.equal(f.get('mediaNext').clicks,1);assert.equal(settled,1);
- finish();await first;assert.equal(f.window.FamilyMedia.current().id,'c');finger(f,'touchstart',180);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.get('mediaNext').clicks,2);f.close();
+ const first=f.get('mediaNext').click();assert.equal(f.get('mediaNext').disabled,false);finger(f,'touchstart',180);finger(f,'touchmove',60);finger(f,'touchend',60);assert.equal(f.get('mediaNext').clicks,2);
+ finish();await first;await new Promise(resolve=>setImmediate(resolve));assert.equal(f.window.FamilyMedia.current().id,'d');assert.equal(f.get('mediaViewerCounter').textContent,'4 / 4');f.close();
 });
 test('touch gestures and buttons loop both ways in every photo viewer, including fullscreen',async()=>{
  for(const english of [false,true])for(const fullscreen of [false,true])for(const scope of ['photos','gallery','personal:ora','wedding:parents','nursery:ora','nostalgia','home:photos']){

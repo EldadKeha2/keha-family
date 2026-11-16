@@ -15,7 +15,7 @@ function fixture({mobile=false,english=false,supported=true,scrollEnd=false,widt
   remove(){if(this.parent){this.parent.children=this.parent.children.filter(x=>x!==this);this.parent=null;}}
   querySelector(selector){if(selector==='.face-photo-scroll')return this.children.flatMap(n=>[n,...n.children.flatMap(c=>[c,...c.children])]).find(n=>n.className==='face-photo-scroll')||null;return null;}
  }
- const events=new Map(),stage=new Node(),scroll=new Node(),window={addEventListener(){}},document={createElement:()=>new Node(),addEventListener:(type,handler)=>events.set(type,handler)},calls=[];scroll.className='face-photo-scroll';stage.append(scroll);let enabled=true;
+ const events=new Map(),stage=new Node(),scroll=new Node(),window={addEventListener(){}},document={createElement:()=>new Node(),addEventListener:(type,handler)=>{const previous=events.get(type);events.set(type,event=>{previous?.(event);handler(event);});}},calls=[];scroll.className='face-photo-scroll';stage.append(scroll);let enabled=true;
  const context=vm.createContext({window,document,navigator:{userAgent:mobile?'Android':'Windows NT'},CSS:{supports:()=>supported},matchMedia:()=>({matches:mobile}),setTimeout,clearTimeout});vm.runInContext(source,context);vm.runInContext(swipeSource,context);
  const options={previous:{kind:'photo',previewSrc:'/prev-small'},next:{kind:'photo',previewSrc:'/next-small'},isEnglish:english,enabled:()=>enabled,step(direction,opts){calls.push({direction,native:opts.native});window.FamilyPhotoNative.reset(stage);}};
  return {api:window.FamilyPhotoNative,swipe:window.FamilyPhotoSwipe,events,stage,scroll,calls,options,disable(){enabled=false;}};
@@ -25,7 +25,7 @@ test('phone and desktop native scrolling selects the adjacent photo once in eith
   const f=fixture({mobile,english}),width=mobile?360:800;assert.equal(f.api.mount(f.stage,f.options),true);const strip=f.stage.children[0];assert.equal(strip.className,'native-photo-strip');assert.equal(strip.scrollLeft,width);
   assert.equal(strip.children[1].children[0],f.scroll);assert.equal(f.api.mount(f.stage,f.options),true);assert.equal(f.stage.children.length,1);
   assert.equal(strip.children[0].children[0].src,'/next-small','A rightward finger movement reveals the higher-numbered photo on the left');assert.equal(strip.children[2].children[0].src,'/prev-small');
-  strip.scrollLeft=page*width;strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();await new Promise(resolve=>setImmediate(resolve));
+  f.api.claim(f.stage);strip.scrollLeft=page*width;strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(f.calls,[{direction:page===0?1:-1,native:true}]);assert.equal(f.scroll.parent,f.stage);assert.equal(f.api.has(f.stage),false);
  }
 });
@@ -33,12 +33,12 @@ test('native swiping disables itself for zoom, editing and browsers needing the 
  const old=fixture({supported:false});assert.equal(old.api.mount(old.stage,old.options),false);assert.equal(old.stage.children[0],old.scroll);
  for(const mobile of [false,true]){const f=fixture({mobile});f.api.mount(f.stage,f.options);f.disable();assert.equal(f.api.mount(f.stage,f.options),false);assert.equal(f.stage.children[0],f.scroll);}
 });
-test('native scrolling waits for a completed snap and freezes the target while its photo is prepared',async t=>{
+test('native scrolling waits for a completed snap and remains centered and available while its photo is prepared',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture({mobile:true,scrollEnd:true});let finish;
  f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(resolve=>{finish=resolve;});};f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
- strip.scrollLeft=100;strip.handlers.get('scrollend')();assert.equal(f.calls.length,0,'A partially finished snap must not replace the photo');
+ f.api.claim(f.stage);strip.scrollLeft=100;strip.handlers.get('scrollend')();assert.equal(f.calls.length,0,'A partially finished snap must not replace the photo');
  strip.scrollLeft=0;strip.handlers.get('scroll')();t.mock.timers.tick(500);assert.equal(f.calls.length,0,'Supporting browsers wait for the actual gesture end, not a pause under the finger');
- strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(strip.style.overflowX,'hidden');
+ strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(strip.style.overflowX,'');assert.equal(strip.scrollLeft,360);
  finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(strip.style.overflowX,'');assert.equal(strip.scrollLeft,360);f.api.reset();
 });
 test('a new stroke claims a completed native snap before scrollend and queues further strokes while loading',async()=>{
@@ -47,7 +47,7 @@ test('a new stroke claims a completed native snap before scrollend and queues fu
   f.options.busy=()=>busy;f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(resolve=>finish=resolve);};
   f.api.mount(f.stage,f.options);const strip=f.stage.children[0];assert.equal(f.api.claim(f.stage),'native');strip.scrollLeft=0;
   assert.equal(f.api.claim(f.stage),'queued');assert.deepEqual(f.calls,[{direction:1,native:true}]);strip.handlers.get('scrollend')();assert.equal(f.calls.length,1);
-  finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.api.claim(f.stage),'queued','An older load ending cannot unlock a strip used by a newer queued target');assert.equal(strip.scrollLeft,0);
+  finish();await new Promise(resolve=>setImmediate(resolve));assert.equal(f.api.claim(f.stage),'queued','An older load ending cannot unlock a strip used by a newer queued target');assert.equal(strip.scrollLeft,360,'The next physical stroke starts from the reusable center');
   busy=false;f.api.reset();assert.equal(f.api.claim(f.stage),'manual');
  }
 });
@@ -72,7 +72,7 @@ test('phone pointer and touch swipes follow the finger even when the browser sna
   if(stream==='touch')touch('touchend',180+dx);else pointer('pointerup',180+dx);
   strip.handlers.get('scrollend')();pointer('pointerup',180+dx);strip.handlers.get('scrollend')();
   await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.calls,[{direction:expected,native:true}],`${english?'English':'Hebrew'} ${stream}: right is Next, left is Previous, once`);
-  assert.equal(strip.scrollLeft,(expected>0?0:2)*360,'The visible pane agrees with the selected photo');
+  assert.equal(strip.scrollLeft,360,'The reusable strip recenters after recording the selected neighbour');
  }
 });
 test('released touch swipes still select a neighbour when native scrolling is cancelled or reports no completion',async t=>{
@@ -83,4 +83,76 @@ test('released touch swipes still select a neighbour when native scrolling is ca
  }
  const hidden=fixture({mobile:true,scrollEnd:true,width:0});hidden.api.mount(hidden.stage,hidden.options);hidden.stage.children[0].clientWidth=360;hidden.api.note(hidden.stage,120);t.mock.timers.tick(180);assert.equal(hidden.calls.length,1,'Opening while hidden must not permanently retain a zero-width strip');
  const closed=fixture({mobile:true,scrollEnd:true});closed.api.mount(closed.stage,closed.options);closed.api.note(closed.stage,120);closed.api.reset();t.mock.timers.tick(500);assert.equal(closed.calls.length,0);
+});
+
+
+test('native touch direction follows the completed finger and wheel direction follows Next deltas',async()=>{
+ for(const mode of ['touch','wheel'])for(const direction of [-1,1])for(const page of [0,2]){
+  const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+  if(mode==='wheel')strip.handlers.get('wheel')({deltaX:direction*120,deltaY:0});
+  else{
+   strip.handlers.get('pointerdown')({pointerType:'touch',pointerId:7,clientX:200,clientY:100});
+   f.events.get('pointermove')({pointerId:7,clientX:200+direction*120,clientY:100});
+   f.events.get('pointerup')({pointerId:7,clientX:200+direction*120,clientY:100});
+  }
+  strip.scrollLeft=page*800;strip.handlers.get('scrollend')();await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(f.calls,[{direction,native:true}],mode+' must retain physical intent even if a browser snap finishes on the opposite pane');
+ }
+});
+
+test('each completed native stroke is accepted while earlier media preparation is still pending',async()=>{
+ const f=fixture({scrollEnd:true}),finishes=[];f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});return new Promise(resolve=>finishes.push(resolve));};
+ f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ for(const direction of [1,1,-1]){
+  strip.handlers.get('pointerdown')({pointerType:'touch',pointerId:7,clientX:200,clientY:100});
+  f.events.get('pointerup')({pointerId:7,clientX:200+direction*120,clientY:100});
+  strip.scrollLeft=direction>0?0:1600;strip.handlers.get('scrollend')();strip.handlers.get('scrollend')();
+  assert.equal(strip.scrollLeft,800);assert.equal(strip.style.overflowX,'');
+ }
+ assert.deepEqual(f.calls.map(call=>call.direction),[1,1,-1]);
+ for(const finish of finishes)finish();await new Promise(resolve=>setImmediate(resolve));f.api.reset();
+});
+
+test('native contact keeps pending pixels stable until release and reset resolves outstanding waiters',async()=>{
+ const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ strip.handlers.get('pointerdown')({pointerType:'touch',pointerId:7,clientX:200,clientY:100});
+ let idle=false;const wait=f.api.whenIdle(f.stage).then(()=>idle=true);assert.equal(f.api.isActive(f.stage),true);await Promise.resolve();assert.equal(idle,false);
+ f.events.get('pointerup')({pointerId:7,clientX:200,clientY:100});await wait;assert.equal(f.api.isActive(f.stage),false);
+ strip.handlers.get('pointerdown')({pointerType:'touch',pointerId:8,clientX:200,clientY:100});const closed=f.api.whenIdle(f.stage);f.api.reset();await closed;assert.equal(f.api.whenIdle(f.stage),null);
+});
+
+test('a zero-width opening stays hidden until a reused mount can anchor the actual center',()=>{
+ const f=fixture({width:0,scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ assert.equal(strip.style.visibility,'hidden');strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[]);
+ strip.clientWidth=800;f.api.mount(f.stage,f.options);assert.equal(strip.scrollLeft,800);assert.equal(strip.style.visibility,'');assert.equal(strip.children[1].children[0],f.scroll);strip.handlers.get('scrollend')();assert.deepEqual(f.calls,[]);strip.scrollLeft=0;strip.handlers.get('scrollend')({type:'scrollend'});assert.equal(strip.scrollLeft,800);assert.deepEqual(f.calls,[],'An unarmed layout snap cannot navigate');f.api.reset();
+});
+
+
+test('a reversing wheel phase reserves new input before committing an earlier unsnapped burst',async()=>{
+ const f=fixture({scrollEnd:true}),waits=[];f.options.step=(direction,options)=>{
+  f.calls.push({direction,native:options.native});const wait=f.api.whenIdle(f.stage);if(wait)waits.push(wait);return wait;
+ };
+ f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ strip.handlers.get('wheel')({deltaX:120,deltaY:0});strip.scrollLeft=950;
+ strip.handlers.get('wheel')({deltaX:-140,deltaY:0});
+ assert.deepEqual(f.calls,[{direction:1,native:true}]);assert.equal(waits.length,1,'The first cached image must wait for the reversing physical input');
+ strip.scrollLeft=0;strip.handlers.get('scrollend')();await Promise.all(waits);await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(f.calls.map(call=>call.direction),[1,-1]);assert.equal(strip.scrollLeft,800);f.api.reset();
+});
+
+
+test('a completed second stroke remains active until native snap completion consumes its intent',async()=>{
+ const f=fixture({scrollEnd:true});f.options.step=()=>new Promise(()=>{});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ strip.handlers.get('pointerdown')({pointerType:'touch',pointerId:7,clientX:200,clientY:100});
+ f.events.get('pointerup')({pointerId:7,clientX:340,clientY:100});
+ let idle=false;const waiting=f.api.whenIdle(f.stage).then(()=>idle=true);await Promise.resolve();assert.equal(idle,false,'A released but unconsumed action must not be replaced by an earlier decoded photo');
+ strip.scrollLeft=0;strip.handlers.get('scrollend')();await waiting;assert.equal(idle,true);f.api.reset();
+});
+
+test('native playback seeking never leaves a deferred gallery swipe for the next contact',async()=>{
+ const f=fixture({scrollEnd:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0],video={getBoundingClientRect:()=>({bottom:500}),closest:selector=>selector==='video'?video:null};
+ const event={target:video,pointerType:'touch',pointerId:7,clientX:200,clientY:480};
+ strip.handlers.get('pointerdown')(event);f.events.get('pointerup')({...event,clientX:350});assert.equal(f.api.whenIdle(f.stage),null);
+ strip.handlers.get('wheel')({target:video,clientY:480,deltaX:120,deltaY:0});assert.equal(f.api.whenIdle(f.stage),null);
+ strip.handlers.get('pointerdown')({...event,clientY:200});assert.deepEqual(f.calls,[],'Seeking cannot be replayed as a photo navigation at the next body touch');f.api.reset();
 });

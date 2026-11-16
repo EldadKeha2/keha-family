@@ -201,7 +201,7 @@ test('an empty people or family filter explains how to change the criteria and r
 });
 
 test('page navigation waits for an older response, wraps across the last page and cannot reopen a closed viewer',async()=>{
- const f=fixture(Array.from({length:205},(_,i)=>photo(String(i))));await f.flush();f.open('99');f.defer();f.poll();assert.equal(f.pending.length,1);f.get('mediaNext').click();assert.equal(f.get('mediaNext').disabled,true);f.pending.shift()();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/100');assert.equal(f.get('mediaViewerCounter').textContent,'101 / 205');
+ const f=fixture(Array.from({length:205},(_,i)=>photo(String(i))));await f.flush();f.open('99');f.defer();f.poll();assert.equal(f.pending.length,1);f.get('mediaNext').click();assert.equal(f.get('mediaNext').disabled,false,'Further user actions remain available during page loading');f.pending.shift()();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/100');assert.equal(f.get('mediaViewerCounter').textContent,'101 / 205');
  await f.window.FamilyPortal.pageGallery(3);f.close();f.open('204');f.get('mediaNext').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/0');assert.equal(f.get('mediaViewerCounter').textContent,'1 / 205');f.get('mediaPrevious').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/204');assert.equal(f.get('mediaViewerCounter').textContent,'205 / 205');
  f.defer();f.get('mediaNext').click();f.close();f.pending.shift()();await f.flush();assert.equal(f.get('mediaViewer').open,false);
 });

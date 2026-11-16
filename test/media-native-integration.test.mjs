@@ -10,18 +10,26 @@ const sources=new Map(await Promise.all(names.map(async name=>[name,await readFi
 const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
 const flush=async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>setImmediate(resolve));};
 
+function nativeStroke(f,dx,{wheel=false,page=wheel?(dx>0?2:0):(dx>0?0:2)}={}){
+ const viewport=f.strip();assert.ok(viewport,'A rapid gesture still needs an active native input surface');
+ const target=viewport.children[1].querySelector('img,video,iframe')||viewport;
+ if(wheel)f.emit(target,'wheel',{deltaX:dx,deltaY:0,deltaMode:0,clientX:400,clientY:250});
+ else for(const [type,x]of [['pointerdown',200],['pointermove',200+dx],['pointerup',200+dx]])f.emit(target,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY:250});
+ viewport.scrollLeft=page*viewport.clientWidth;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');return viewport;
+}
+
 // Browser geometry and image readiness are the boundaries modeled here. The
 // production index, DOM tree, native scroller, gesture binding and media state
 // machine are real, so missing script wiring or reparenting cannot be hidden
 // by the lightweight object fixtures used in the individual unit suites.
-function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,realPresentation=false}={}){
- const {window,document}=parseHTML(html),requests=[],captures=[],observers=[],faceReady=[],faceMounts=[],animations=[];let failSave=false;
+function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,realPresentation=false,hiddenDialogGeometry=false}={}){
+ const {window,document}=parseHTML(html),requests=[],captures=[],observers=[],faceReady=[],faceMounts=[],animations=[],frames=new Map();let failSave=false,layoutReady=!hiddenDialogGeometry,frameId=0;
  const get=id=>document.getElementById(id);
  for(const dialog of document.querySelectorAll('dialog')){
   dialog.showModal=()=>{dialog.open=true;dialog.setAttribute('open','');};
   dialog.close=()=>{dialog.open=false;dialog.removeAttribute('open');dialog.dispatchEvent(new window.Event('close'));};
  }
- Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{configurable:true,get(){return this._testWidth??width;}});
+ Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{configurable:true,get(){if(hiddenDialogGeometry&&(!layoutReady||this.closest('dialog')&&!this.closest('dialog').open))return 0;return this._testWidth??width;}});
  Object.defineProperty(window.HTMLElement.prototype,'onscrollend',{configurable:true,value:null,writable:true});
  window.HTMLElement.prototype.getBoundingClientRect=function(){return {x:0,y:100,left:0,right:this.clientWidth,top:100,bottom:700,width:this.clientWidth,height:600};};
  window.HTMLElement.prototype.setPointerCapture=function(id){captures.push({node:this,id});};
@@ -75,7 +83,7 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,real
  function Image(){
   const image=document.createElement('img');Object.defineProperty(image,'src',{configurable:true,get(){return this.getAttribute('src')||'';},set(value){this.setAttribute('src',value);queueMicrotask(()=>{image.onload?.();image.dispatchEvent(new window.Event('load'));});}});return image;
  }
- const context=vm.createContext({window,document,navigator,...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location:{origin:'https://family.test',href:'https://family.test/#photos'},matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{queueMicrotask(fn);return 1;},cancelAnimationFrame(){},setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
+ const context=vm.createContext({window,document,navigator,...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location:{origin:'https://family.test',href:'https://family.test/#photos'},matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
  // Follow production ordering when loading the scripts under test.
  const loaded=[];
  for(const script of document.querySelectorAll('script[src]')){
@@ -90,8 +98,9 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,real
  return {window,document,get,emit,requests,captures,loaded,photo,video,strip,faceReady,faceMounts,animations,
   finishAnimations(){for(const animation of animations)animation.finish();},
   open:async(kind='photo',scope=kind==='photo'?'photos':'videos',index=0)=>{window.FamilyMedia.open(['a','b','c'].map(kind==='photo'?photo:video),index,scope);await flush();},
-  async snap(page){const viewport=strip();assert.ok(viewport,'The active media must be inside a browser scroll-snap strip');viewport.scrollLeft=page*viewport.clientWidth;emit(viewport,'scroll');emit(viewport,'scrollend');await flush();},
+  async snap(page){const viewport=strip();assert.ok(viewport,'The active media must be inside a browser scroll-snap strip');const target=viewport.children[1].querySelector('img,video,iframe')||viewport,dx=page===0?140:-140;for(const [type,x]of [['pointerdown',200],['pointermove',200+dx],['pointerup',200+dx]])emit(target,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY:250});viewport.scrollLeft=page*viewport.clientWidth;emit(viewport,'scroll');emit(viewport,'scrollend');await flush();},
   resize(value){const viewport=strip();viewport._testWidth=value;for(const observer of observers)if(observer.nodes.has(viewport))observer.callback([{target:viewport}]);},
+  layout(){layoutReady=true;for(const observer of observers)for(const node of observer.nodes)if(node.isConnected)observer.callback([{target:node}]);const pending=[...frames.values()];frames.clear();for(const callback of pending)callback();},
   zoom(value){const stage=get('mediaStage');stage._familyFaceContext.zoom=value;stage.classList.toggle('face-photo-enlarged',value>1);window.FamilyMedia.refreshPhotoPresentation();},
   failSaving(value=true){failSave=value;},
   close(){get('mediaViewer').close();}
@@ -108,17 +117,19 @@ test('desktop photo viewers use browser scrolling for both touch and trackpad in
   const f=fixture();await f.open('photo',scope);const stage=f.get('mediaStage'),viewport=f.strip();assert.ok(viewport,scope);
   assert.equal(viewport.children.length,3);assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.equal(stage.classList.contains('photo-manual-swipes'),false);
   const surface=viewport.children[1].querySelector('img');assert.ok(surface,'The actual photo stays in the center pane');
-  for(const [type,x]of [['pointerdown',200],['pointermove',350],['pointerup',350]]){
-   assert.equal(f.emit(surface,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY:250}).defaultPrevented,false);
-  }
+  const pointer=(type,x)=>assert.equal(f.emit(surface,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY:250}).defaultPrevented,false);
   const point={identifier:1,clientX:200,clientY:250,target:surface};
+  pointer('pointerdown',200);
   assert.equal(f.emit(surface,'touchstart',{touches:[point],changedTouches:[point]}).defaultPrevented,false);
+  pointer('pointermove',350);
   assert.equal(f.emit(surface,'touchmove',{touches:[{...point,clientX:350}],changedTouches:[]}).defaultPrevented,false);
+  pointer('pointerup',350);
   assert.equal(f.emit(surface,'touchend',{touches:[],changedTouches:[{...point,clientX:350}]}).defaultPrevented,false);
-  assert.equal(f.emit(surface,'wheel',{deltaX:140,deltaY:0,deltaMode:0,clientX:400,clientY:250}).defaultPrevented,false,'The browser receives the full trackpad gesture');
   assert.equal(f.captures.length,0,'Native touch does not capture the pointer away from browser scrolling');assert.equal(f.window.FamilyMedia.current().id,'a');
-  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b',scope+' Next');
-  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'a',scope+' Previous');f.close();
+  viewport.scrollLeft=0;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'b',scope+' Next');
+  const wheelViewport=f.strip();assert.equal(f.emit(wheelViewport.children[1].querySelector('img'),'wheel',{deltaX:140,deltaY:0,deltaMode:0,clientX:400,clientY:250}).defaultPrevented,false,'The browser receives the full trackpad gesture');
+  wheelViewport.scrollLeft=wheelViewport.clientWidth*2;f.emit(wheelViewport,'scroll');f.emit(wheelViewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
+  await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'b',scope+' Previous');f.close();
  }
 });
 
@@ -128,12 +139,12 @@ test('desktop local video galleries use native scrolling and preserve playback c
   const player=viewport.children[1].querySelector('video');assert.ok(player);assert.equal(player.controls,true);player.currentTime=42;
   assert.equal(stage.querySelectorAll('video').length,1,'Neighbor panes use still posters, never extra video players');
   assert.equal(viewport.children[0].querySelector('img')?.getAttribute('src'),'/posters/b.jpg');assert.equal(viewport.children[2].querySelector('img')?.getAttribute('src'),'/posters/c.jpg');
-  for(const clientY of [250,680]){
+  for(const clientY of [680,250]){
    for(const [type,x]of [['pointerdown',200],['pointermove',350],['pointerup',350]])assert.equal(f.emit(player,type,{pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientX:x,clientY}).defaultPrevented,false,'The browser owns video body gestures and the native seeking strip');
-   assert.equal(f.emit(player,'wheel',{deltaX:140,deltaY:0,deltaMode:0,clientX:400,clientY}).defaultPrevented,false);
+   if(clientY===680)assert.equal(f.emit(player,'wheel',{deltaX:140,deltaY:0,deltaMode:0,clientX:400,clientY}).defaultPrevented,false);
   }
   assert.equal(player.currentTime,42);assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.captures.length,0);
-  await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(stage.querySelectorAll('video').length,1);
+  viewport.scrollLeft=0;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(stage.querySelectorAll('video').length,1);
   f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A late native completion never skips a second film');
   await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
  }
@@ -266,6 +277,96 @@ test('native photo scrolling saves descriptions before moving and retains failed
   if(fail){assert.equal(input.value,'A description worth keeping');assert.equal(f.get('openedCaptionError').textContent,'Caption was not saved');f.failSaving(false);await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b','A failed save does not permanently lock the native strip');}
   else assert.equal(f.window.FamilyMedia.lookup('photos','a').caption,'A description worth keeping');
   f.close();
+ }
+});
+
+test('physical rightward touch and trackpad gestures select the same item as the Next arrow',async()=>{
+ for(const kind of ['photo','video'])for(const wheel of [false,true])for(const oppositeSnap of [false,true]){
+  const f=fixture();await f.open(kind,kind==='photo'?'photos':'videos',1);
+  f.emit(f.get('mediaNext'),'click');await flush();const next=f.window.FamilyMedia.current().id;assert.equal(next,'c');
+  const forwardPage=wheel?2:0,backwardPage=wheel?0:2;
+  await f.open(kind,kind==='photo'?'photos':'videos',1);nativeStroke(f,140,{wheel,page:oppositeSnap?2-forwardPage:forwardPage});await flush();
+  assert.equal(f.window.FamilyMedia.current().id,next,(wheel?'Trackpad':'Touch')+' rightward movement must follow Next');
+  nativeStroke(f,-140,{wheel,page:oppositeSnap?2-backwardPage:backwardPage});await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A native snap to the opposite pane cannot reverse the completed physical stroke');f.close();
+ }
+});
+
+test('two rapid native strokes and mixed arrow actions retain every requested step while a photo loads',async t=>{
+ for(const wheel of [false,true])for(const actions of [['swipe','swipe'],['swipe','next','previous','swipe'],['swipe','back']])await t.test((wheel?'trackpad: ':'touch: ')+actions.join(' → '),async()=>{
+  const f=fixture(),loads=[];f.window.FamilyMedia.open(['a','b','c','d','e'].map(f.photo),0,'photos');await flush();
+  f.window.FamilyPhotoPresentation.ready=()=>null;f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.push({item,resolve}));
+  for(const action of actions){
+   if(action==='swipe'||action==='back')nativeStroke(f,action==='back'?-140:140,{wheel});
+   else {const button=f.get(action==='next'?'mediaNext':'mediaPrevious');assert.equal(button.disabled,false);f.emit(button,'click');}
+  }
+  assert.equal(f.window.FamilyMedia.current().id,'a','The first unresolved image remains visible');
+  for(let round=0;round<5;round++){
+   for(const {item,resolve}of loads.splice(0)){const image=f.document.createElement('img');image.src=item.previewSrc;resolve(image);}
+   await flush();
+  }
+  const expected=actions.includes('back')?'a':'c',following=expected==='a'?'b':'d';
+  assert.equal(f.window.FamilyMedia.current().id,expected,actions.join(' → ')+' must retain every step and reversal without dropping a rapid gesture');
+  assert.ok(f.strip());nativeStroke(f,140,{wheel});for(const {item,resolve}of loads.splice(0)){const image=f.document.createElement('img');image.src=item.previewSrc;resolve(image);}await flush();assert.equal(f.window.FamilyMedia.current().id,following,'The queue remains usable after draining');f.close();
+ });
+});
+
+test('opening with zero-width dialog geometry anchors the center photo before revealing the native strip',async()=>{
+ for(const kind of ['photo','video']){
+  const f=fixture({hiddenDialogGeometry:true});await f.open(kind);const viewport=f.strip();assert.ok(viewport);assert.equal(viewport.clientWidth,0);
+  const media=viewport.children[1].querySelector(kind==='photo'?'img':'video');assert.ok(media);
+  assert.equal(viewport.style.visibility,'hidden','The unmeasured strip must not flash a neighboring pane');
+  f.emit(viewport,'scroll');f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'a','Layout-induced scroll events are not a navigation intent');
+  f.layout();await flush();assert.equal(viewport.scrollLeft,viewport.clientWidth);assert.notEqual(viewport.style.visibility,'hidden');
+  assert.ok(viewport.children[1].querySelector(kind==='photo'?'img':'video')===media,'The original pixels remain in the centered pane');
+  f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,'a');nativeStroke(f,140);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+ }
+});
+
+test('a prepared photo cannot replace the original touch target underneath the next unfinished stroke',async()=>{
+ const f=fixture(),loads=[];await f.open();f.window.FamilyPhotoPresentation.ready=()=>null;f.window.FamilyPhotoPresentation.prepare=item=>new Promise(resolve=>loads.push({item,resolve}));
+ nativeStroke(f,140);const viewport=f.strip(),image=viewport.children[1].querySelector('img');assert.ok(loads.some(load=>load.item.id==='b'));
+ const finger={pointerType:'touch',pointerId:2,isPrimary:true,button:0,clientY:250};
+ f.emit(image,'pointerdown',{...finger,clientX:200});f.emit(image,'pointermove',{...finger,clientX:340});viewport.scrollLeft=viewport.clientWidth*.5;
+ for(const {item,resolve}of loads.splice(0)){const prepared=f.document.createElement('img');prepared.src=item.previewSrc;resolve(prepared);}await flush();
+ assert.equal(f.window.FamilyMedia.current().id,'a','The first image load must wait while a second physical stroke still owns the old target');assert.equal(image.isConnected,true);
+ f.emit(image,'pointerup',{...finger,clientX:340});viewport.scrollLeft=0;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');
+ for(let round=0;round<5;round++){for(const {item,resolve}of loads.splice(0)){const prepared=f.document.createElement('img');prepared.src=item.previewSrc;resolve(prepared);}await flush();}
+ assert.equal(f.window.FamilyMedia.current().id,'c','Releasing the second stroke keeps both requested advances');assert.ok(f.strip());f.close();
+});
+
+test('a second rapid finger contact cannot detach the target when the previous prepared photo has not snapped yet',async()=>{
+ const f=fixture({realPresentation:true});await f.open();const viewport=f.strip(),image=viewport.children[1].querySelector('img');
+ const first={pointerType:'touch',pointerId:1,isPrimary:true,button:0,clientY:250};
+ for(const [type,x]of [['pointerdown',200],['pointermove',340],['pointerup',340]])f.emit(image,type,{...first,clientX:x});
+ viewport.scrollLeft=viewport.clientWidth*.4;f.emit(viewport,'scroll');
+ const second={...first,pointerId:2};f.emit(image,'pointerdown',{...second,clientX:200});await flush();
+ assert.equal(f.window.FamilyMedia.current().id,'a','A warm cached first target must still wait for the newly started second finger');assert.equal(viewport.isConnected,true,'The second stroke keeps the same native scroll target');assert.equal(image.isConnected,true);
+ f.emit(image,'pointermove',{...second,clientX:340});f.emit(image,'pointerup',{...second,clientX:340});await flush();
+ assert.equal(f.window.FamilyMedia.current().id,'a','The second release still owns its browser coast until native scrollend');assert.equal(viewport.isConnected,true);
+ viewport.scrollLeft=0;f.emit(viewport,'scroll');f.emit(viewport,'scrollend');await flush();
+ assert.equal(f.window.FamilyMedia.current().id,'c','Two quick contacts and releases advance exactly two prepared images');assert.ok(f.strip());f.close();
+});
+
+test('rapid queued arrows share one caption save and retain both steps or preserve a failed draft',async()=>{
+ for(const kind of ['photo','video'])for(const fail of [false,true]){
+  const f=fixture();await f.open(kind);let finish;const requests=[];
+  f.window.FamilyI18n.fetch=(path,options)=>{requests.push({path,options});return new Promise(resolve=>{finish=()=>resolve(Response.json(fail?{error:'Caption was not saved'}:{operation:'caption',scope:'photos',item:{...f.window.FamilyMedia.current(),caption:'Keep this draft'}},{status:fail?409:200}));});};
+  const input=f.get('openedCaptionText');input.value='Keep this draft';f.emit(input,'input');
+  f.emit(f.get('mediaNext'),'click');f.emit(f.get('mediaNext'),'click');assert.equal(requests.length,1,'Rapid arrows share the in-flight save');finish();await flush();
+  assert.equal(f.window.FamilyMedia.current().id,fail?'a':'c','Both queued steps must survive a successful asynchronous caption save');
+  if(fail){assert.equal(input.value,'Keep this draft');assert.equal(f.get('openedCaptionError').textContent,'Caption was not saved');}
+  assert.ok(f.strip());f.close();
+ }
+});
+
+test('a second arrow press during a native page load continues beyond the first item of the next page',async()=>{
+ for(const kind of ['photo','video']){
+  const f=fixture(),scope='personal:ruti',make=kind==='photo'?f.photo:f.video,pages=[['a','b'].map(make),['c','d'].map(make)];let finishPage;
+  const loadPage=page=>new Promise(resolve=>{finishPage=()=>{register(page);resolve();};});
+  const register=page=>f.window.FamilyMedia.register(scope,pages[page-1],{pagination:{page,pages:2,size:2,total:4},loadPage});
+  register(1);f.window.FamilyMedia.openFrom(scope,'b');await flush();nativeStroke(f,140);
+  const next=f.get('mediaNext');assert.equal(next.disabled,false,'Page transport must not discard a second arrow press');if(!next.disabled)f.emit(next,'click');
+  finishPage();await flush();assert.equal(f.window.FamilyMedia.current().id,'d','Native Next plus arrow Next must advance across the page boundary twice');assert.ok(f.strip());f.close();
  }
 });
 
