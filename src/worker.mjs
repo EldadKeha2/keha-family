@@ -300,6 +300,7 @@ export default {
       }
       if(path==='/api/setup'&&request.method==='GET')return json({database:true,mediaConfigured:Boolean(configured(env)),limits:LIMITS});
       if(path==='/api/health'&&request.method==='GET')return json(await db('health'));
+      if(path==='/api/search'&&request.method==='GET')return json(await db('site.search',Object.fromEntries(['q','person','type','branch','year','label','sort','page','size'].map(key=>[key,url.searchParams.get(key)||'']))));
       if(path==='/api/media'&&request.method==='GET'){
         if(request.headers.has('If-None-Match')){const {revision}=await db('people.revision');if(request.headers.get('If-None-Match')==='"'+revision+'"')return new Response(null,{status:304,headers:{ETag:'"'+revision+'"','Cache-Control':'no-store'}});}
         return snapshot(request,await db('people'));

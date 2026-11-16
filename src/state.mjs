@@ -1,5 +1,6 @@
 import {photoFrame,validatePhotoFrame} from './photo-framing.mjs';
 import family from './family.mjs';
+import {searchSite} from './site-search.mjs';
 import {RecordingLibrary,memoryCategory,memoryYear,memoryPeople,publicStory} from './memories.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {NostalgiaLibrary} from './nostalgia-library.mjs';
@@ -539,6 +540,7 @@ export class FamilyState {
   }
   run(action,p){
     switch(action){
+      case 'site.search':return searchSite(this,p);
       case 'family-ai.list':return this.familyAi.list(p);
       case 'family-ai.living.list':return this.familyAi.living.featured();
       case 'family-ai.living.source.prepare':return this.familyAi.living.prepareSource(p);
@@ -786,7 +788,7 @@ export class FamilyState {
         item.caption=caption;item.updatedAt=new Date().toISOString();this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.touchMedia(item);return this.mediaChanged(item,'caption');
       }
       case 'tag.people.revision':return {revision:this.peopleRevision};
-      case 'tag.people':return {revision:this.peopleRevision,people:this.rows('SELECT data FROM people').map(row=>{const item=JSON.parse(row.data);return {id:item.id,name:item.name,nameEn:item.nameEn||null,extra:Boolean(item.extra),branch:family.people[item.id]?.branch||null};})};
+      case 'tag.people':return {revision:this.peopleRevision,people:Object.values(this.run('people').people).map(item=>{const canonical=family.people[item.id];return {id:item.id,name:item.name,nameEn:item.nameEn||null,aliases:canonical?.aliases||item.aliases||[],extra:Boolean(item.extra),extended:Boolean(item.extended),placeholder:Boolean(canonical?.placeholder),branch:canonical?.branch||item.branch||null,generation:canonical?.generation||null,profile:item.profile||null,profileMediaId:item.profileMediaId||null,profileFraming:item.profileFraming||null};})};
       case 'birthday':{
         const person=this.person(p.id);if(person.birthday!==p.expectedBirthday)throw new HttpError(409,'התאריך עודכן בינתיים. סגרו את העריכה ופתחו אותה מחדש לפני שמירה.');
         const value=birthday(p.birthday),deathDate=person.deathDate;

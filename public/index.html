@@ -15,13 +15,13 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-05ed4e94a95f84e6.css">
+  <link rel="stylesheet" href="assets/site-styles-6fb0c2f704277f51.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
   <script src="assets/translations.js?v=category-picker-v3-family-ai-v1-video-library-labels-v7" defer></script>
   <script src="assets/i18n.js?v=person-aliases-v2" defer></script>
-  <script src="assets/people-roster.js?v=shared-roster-v1" defer></script>
+  <script src="assets/people-roster.js?v=search-portraits-v2" defer></script>
   <script src="assets/collection-transport.js?v=internal-pages-v1" defer></script>
   <script src="assets/video-delivery.js?v=grid-durations-v2" defer></script>
   <script src="assets/photo-framing.js?v=2" type="module"></script>
@@ -29,7 +29,7 @@
   <script src="assets/photo-effects.js?v=photo-framing-preview-v1" type="module"></script>
   <script src="assets/photo-editor.js?v=upload-swipes-v21" type="module"></script>
   <script src="assets/photo-drop.js?v=1" type="module"></script>
-  <script src="assets/navigation.js?v=storybook-v1-family-ai-v1-nostalgia-library-v4" defer></script>
+  <script src="assets/navigation.js?v=storybook-v1-family-ai-v1-nostalgia-library-v4-mobile-search-v1" defer></script>
   <script src="assets/desktop-app.js?v=fit-window-v1" defer></script>
   <script src="assets/home-install.js?v=ios-device-steps-v12" defer></script>
   <script src="assets/accessibility.js?v=1" defer></script>
@@ -75,7 +75,8 @@
   <script src="assets/nursery.js?v=photo-framing-preview-v1" defer></script>
   <script src="assets/tree-guide.js" defer></script>
   <script src="assets/games.js?v=performance-20261115-v1" type="module"></script>
-  <script src="assets/app.js?v=storybook-v1" defer></script>
+  <script src="assets/app.js?v=storybook-v1-mobile-search-v1" defer></script>
+  <script src="assets/site-search.js?v=mobile-search-v1" type="module"></script>
   <script src="assets/cloud.js" defer></script>
   <script src="assets/recycle-bin.js?v=private-bin-v1" defer></script>
 </head>
@@ -119,6 +120,7 @@
         </div>
         <section id="timelineView" class="family-timeline" aria-label="ציר זמן משפחתי" data-i18n-skip hidden><div id="timelineContent"></div></section>
         <div id="directoryView" hidden><div class="directory-tabs" role="tablist" aria-label="קבוצות בני משפחה"><button role="tab" type="button" data-directory-group="main" aria-selected="true">המשפחה שלנו</button><button role="tab" type="button" data-directory-group="extended" aria-selected="false">בני משפחה נוספים</button><button role="tab" type="button" data-directory-group="friends" aria-selected="false">מכרים וחברי משפחה</button></div><div class="directory-heading"><p id="directoryCount"></p><span id="directoryHelp">לחיצה על כרטיס פותחת את העמוד האישי</span></div><div class="directory-grid" id="directoryGrid"></div><div class="empty-search" id="emptySearch" hidden>לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.</div></div>
+        <section id="siteSearchView" class="site-search-view" aria-label="חיפוש בתוכן המשפחתי" data-i18n-skip hidden></section>
         <section id="homeView" class="phone-home-view" aria-label="הבית המשפחתי" hidden>
           <header class="phone-home-intro"><img src="assets/fez.svg" alt="" width="55" height="55"><div><h2>הבית שלנו מתחיל כאן</h2><p>כל המשפחה, הסיפורים והרגעים שלנו.</p></div></header>
           <section class="family-slideshow" aria-label="רגעים מהאלבום המשפחתי"><div id="homeSlideStage" class="home-slide-stage" data-carousel="false"><div id="homeCarouselRail" class="home-carousel-rail" hidden></div><button id="homeSlideOpen" class="home-slide-open" aria-label="פתיחת התמונה המשפחתית"><img id="homeSlideImage" alt="" hidden><span class="home-slide-placeholder" id="homeSlidePlaceholder"><span aria-hidden="true">❖</span><strong>הרגעים שלנו, ביחד</strong><small>תמונות מהאלבום המשפחתי יתחלפו כאן.</small></span></button></div><div class="home-slide-caption" id="homeSlideCaption" hidden></div><div class="home-slide-controls"><button id="homeSlidePrevious" aria-label="התמונה המשפחתית הקודמת">→</button><span id="homeSlideCounter"></span><button id="homeSlideNext" aria-label="התמונה המשפחתית הבאה">←</button><button id="homeSlidePause" aria-label="השהיית התמונות המתחלפות">Ⅱ</button></div></section>
