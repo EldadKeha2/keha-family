@@ -7,24 +7,29 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const relationsSource=await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8');
 const peopleSource=await readFile(new URL('../public/assets/people.js',import.meta.url),'utf8');
-async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={},pageAlbums={},photoPages=null}={}){
+async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={},pageAlbums={},photoPages=null,pagedAlbums={},mediaView=null,pageView=null}={}){
   const browser=navigation?browserHistory(entryUrl||'https://family.test/#person/'+id):null;let view=browser?browser.location.hash.slice(1).split('/')[0]:'person';
-  const nodes=new Map(),listeners=new Map(),requests=[],registered=[],location=browser?.location||{hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
+  const nodes=new Map(),listeners=new Map(),requests=[],registered=[],toasts=[],location=browser?.location||{hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
   function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,scrollIntoView(){},addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
   const summary=id=>({...family.people[id],...overrides[id]});
   const window={FAMILY_DATA:family,FamilyMedia:{register:(...args)=>registered.push(args)},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',error:String,mediaName:item=>item.caption||item.name||'',fetch:async url=>{
-    requests.push(String(url));if(String(url).startsWith('api/media/'))return {ok:true,json:async()=>({item:{id:String(url).split('/')[2],kind:'photo',src:'/media/current'}})};
+    requests.push(String(url));if(String(url).startsWith('api/media/'))return mediaView?mediaView(String(url)):{ok:true,json:async()=>({item:{id:String(url).split('/')[2],kind:'photo',src:'/media/current'}})};
+    if(pageView){const custom=pageView(String(url));if(custom)return custom;}
     const id=decodeURIComponent(String(url).match(/api\/people\/([^/]+)\/page/)[1]);
-    const page=Number(new URL(url,'https://family.test').searchParams.get('photos')||1);
-    return {ok:true,status:200,json:async()=>({person:summary(id),revision:id,albums:Object.fromEntries(['photos','videos','documents'].map(key=>[key,key==='photos'&&photoPages?{items:photoPages[page-1],page,pages:photoPages.length,total:photoPages.flat().length}:{items:pageAlbums[key]||[],page:1,pages:1,total:pageAlbums[key]?.length||0}]))})};
+    const params=new URL(url,'https://family.test').searchParams;
+    return {ok:true,status:200,json:async()=>({person:summary(id),revision:id,albums:Object.fromEntries(['photos','videos','documents'].map(key=>{
+      const pages=key==='photos'&&photoPages?photoPages:pagedAlbums[key];if(!pages)return [key,{items:pageAlbums[key]||[],page:1,pages:1,total:pageAlbums[key]?.length||0,size:25}];
+      const focus=pages.findIndex(items=>items.some(item=>item.id===params.get('focus'))),page=focus>=0?focus+1:Number(params.get(key)||1);
+      return [key,{items:pages[page-1],page,pages:pages.length,total:pages.flat().length,size:pages[0].length}];
+    }))})};
   }},scrollTo(){},addEventListener(event,callback){callbacks.set(event,callback);browser?.addEventListener(event,callback);}};
-  window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
+  window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},toast:message=>toasts.push(message),getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
   const document={getElementById:node,addEventListener:(event,callback)=>callbacks.set(event,callback),querySelector:()=>null,visibilityState:'visible'};
   const context=vm.createContext({window,document,location,history:browser?.history||{pushState(_a,_b,hash){location.hash=hash;}},matchMedia:()=>({matches:false}),URLSearchParams,URL,console,setInterval:()=>0,setTimeout,clearTimeout});
   if(browser){vm.runInContext(navigationSource,context);browser.addEventListener('popstate',()=>{const next=location.hash.slice(1).split('/')[0];if(next!==view)window.FamilyApp.setView(next,false);});}
   vm.runInContext(relationsSource,context);vm.runInContext(peopleSource,context);callbacks.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));await flush();
-  return {window,browser,registered,get view(){return view;},clickPage(step){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-page]'?{dataset:{personPage:'photos',step:String(step)}}:null}});},clickPortrait(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-portrait]'?{}:null}});},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
+  return {window,browser,registered,toasts,get view(){return view;},clickPage(step){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-page]'?{dataset:{personPage:'photos',step:String(step)}}:null}});},clickPortrait(){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-portrait]'?{}:null}});},clickItem(id,kind='photos'){return listeners.get('personPageContent:click')({target:{closest:selector=>selector==='[data-person-item]'?{dataset:{personItem:id,personKind:kind}}:null}});},openMedia(){node('mediaViewer').open=true;},closeMedia(){node('mediaViewer').open=false;listeners.get('mediaViewer:close')?.();},back(){return listeners.get('personPageContent:click')({preventDefault(){},target:{closest:selector=>selector==='[data-person-back]'?{}:null}});},location,requests,flush,get html(){return node('personPageContent').innerHTML;},async clickRelative(id,modifier=false){
     let prevented=false,stopped=false;
     await listeners.get('personPageContent:click')({button:0,ctrlKey:modifier,preventDefault(){prevented=true;},stopPropagation(){stopped=true;},target:{closest:selector=>selector==='[data-person-relative]'?{dataset:{personRelative:id}}:null}});
     await flush();return {prevented,stopped};
@@ -51,8 +56,95 @@ test('personal pages register the loaded album of a directly linked item without
 
 test('an edited profile photo opens the same original media ID despite its display revision',async()=>{
  const id='a'.repeat(32),f=await fixture('eldad',{overrides:{eldad:{profile:'/media/'+id+'?v='+'b'.repeat(32)}}}),opened=[];
- f.window.FamilyMedia={open:(...args)=>opened.push(args)};await f.clickPortrait();
- assert.equal(f.requests.at(-1),'api/media/'+id+'/view');assert.equal(opened.length,1);assert.equal(opened[0][0][0].id,id);assert.equal(opened[0][2],'personal:eldad');
+ f.window.FamilyMedia.open=(...args)=>opened.push(args);await f.clickPortrait();
+ assert.ok(f.requests.includes('api/media/'+id+'/view'));assert.match(f.requests.at(-1),new RegExp('api/people/eldad/page\\?photos=1&videos=1&documents=1&focus='+id));assert.equal(opened.length,1);assert.equal(opened[0][0][0].id,id);assert.equal(opened[0][2],'personal:eldad');
+});
+
+test('a profile picture opens among the loaded personal photos at its real position, without duplicates',async()=>{
+ const photo=id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id});
+ for(const extra of [false,true]){
+  const pageAlbums={photos:['a','profile','b'].map(photo),videos:[{id:'film',kind:'video',mime:'video/mp4',src:'/media/film'}]},f=await fixture('eldad',{overrides:{eldad:{extra,profile:'/media/profile?v=revision'}},pageAlbums}),opened=[];
+  f.window.FamilyMedia.open=(...args)=>opened.push(args);await f.clickPortrait();
+  assert.equal(opened.length,1);assert.deepEqual(Array.from(opened[0][0],item=>item.id),['a','profile','b']);assert.equal(opened[0][1],1);assert.equal(opened[0][2],'personal:eldad');
+  assert.equal(opened[0][0][1].src,'/media/current','The selected photo uses the fresh original metadata');assert.equal(pageAlbums.photos[1].src,'/media/profile','Opening never mutates the rendered album array');
+ }
+});
+
+test('a profile outside the loaded photo page opens on its real containing page with paging available',async()=>{
+ const photos=['a','b'].map(id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id})),f=await fixture('eldad',{overrides:{eldad:{profile:'/media/profile'}},photoPages:[photos,[{id:'profile',kind:'photo',mime:'image/jpeg',src:'/media/profile'}]]}),opened=[];
+ f.window.FamilyMedia.open=(...args)=>opened.push(args);await f.clickPortrait();
+ assert.deepEqual(Array.from(opened[0][0],item=>item.id),['profile']);assert.equal(opened[0][1],0);assert.equal(opened[0][2],'personal:eldad');assert.equal(photos.length,2);
+ assert.match(f.requests.at(-1),/focus=profile/);assert.equal(f.registered.at(-1)[2].pagination.page,2);assert.equal(f.registered.at(-1)[2].pagination.pages,2);assert.equal(typeof f.registered.at(-1)[2].loadPage,'function');
+});
+
+test('off-page personal links load the matching page and register a real page loader',async()=>{
+ const id='f'.repeat(32),photo=id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id}),pages=[[photo('a'.repeat(32))],[photo(id)]];
+ const f=await fixture('eldad',{navigation:true,entryUrl:'https://family.test/?media='+id+'#person/eldad',photoPages:pages});
+ assert.match(f.requests[0],new RegExp('focus='+id));assert.equal(f.registered.length,1);assert.equal(f.registered[0][1][0].id,id);assert.equal(f.registered[0][2].pagination.page,2);assert.equal(typeof f.registered[0][2].loadPage,'function');
+ await f.registered[0][2].loadPage(1);assert.equal(f.registered.at(-1)[2].pagination.page,1);assert.equal(f.registered.at(-1)[1][0].id,'a'.repeat(32));assert.match(f.requests.at(-1),/photos=1&videos=1&documents=1$/,'Subsequent paging does not keep forcing the original shared item');
+});
+
+test('personal gallery loaders page one media kind while retaining the other album positions',async()=>{
+ const make=(id,kind)=>({id,kind,mime:kind==='photo'?'image/jpeg':kind==='video'?'video/mp4':'application/pdf',src:'/media/'+id});
+ const f=await fixture('eldad',{overrides:{eldad:{profile:'/media/profile'}},photoPages:[[make('p1','photo')],[make('profile','photo')]],pagedAlbums:{videos:[[make('v1','video')],[make('v2','video')]],documents:[[make('d1','document')],[make('d2','document')],[make('d3','document')]]}}),opened=[];
+ f.window.FamilyMedia.open=(...args)=>opened.push(args);
+ await f.clickItem('v1','videos');assert.equal(f.registered.at(-1)[2].pagination.page,1);await f.registered.at(-1)[2].loadPage(2);
+ assert.match(f.requests.at(-1),/photos=1&videos=2&documents=1/);assert.deepEqual(Array.from(f.registered.at(-1)[1],item=>item.id),['v2']);
+ await f.clickItem('d1','documents');await f.registered.at(-1)[2].loadPage(3);assert.match(f.requests.at(-1),/photos=1&videos=2&documents=3/);
+ await f.clickPortrait();assert.match(f.requests.at(-1),/photos=1&videos=2&documents=3&focus=profile/);assert.equal(opened.at(-1)[0][0].id,'profile');assert.equal(f.registered.at(-1)[2].pagination.page,2);
+ const photoLoader=f.registered.at(-1)[2].loadPage;await photoLoader(1);assert.match(f.requests.at(-1),/photos=1&videos=2&documents=3/);assert.deepEqual(Array.from(f.registered.at(-1)[1],item=>item.kind),['photo']);
+ f.closeMedia();await f.registered.at(-1)[2].loadPage(2);assert.equal(f.registered.at(-1)[2].pagination.page,2,'Closing can restore the grid page through the same loader');
+ await f.clickItem('v2','videos');const count=f.requests.length;await assert.rejects(photoLoader(1),/album changed|האלבום השתנה/);assert.equal(f.requests.length,count,'A previous media kind cannot change the newly opened gallery');assert.equal(f.registered.at(-1)[1][0].kind,'video');
+ await f.registered.at(-1)[2].loadPage(1);assert.match(f.requests.at(-1),/photos=2&videos=1&documents=3/);assert.deepEqual(Array.from(f.registered.at(-1)[1],item=>item.id),['v1']);
+});
+
+test('a page response cannot replace a newer page request or another person',async()=>{
+ const make=id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id}),photoPages=[['a'],['b'],['c']].map(ids=>ids.map(make)),pending=new Map();let deferred=false;
+ const response=page=>({ok:true,json:async()=>({person:family.people.eldad,revision:'page-'+page,albums:{photos:{items:photoPages[page-1],page,pages:3,total:3,size:1},videos:{items:[],page:1,pages:1,total:0,size:10},documents:{items:[],page:1,pages:1,total:0,size:10}}})});
+ const f=await fixture('eldad',{photoPages,pageView:url=>deferred?new Promise(resolve=>pending.set(Number(new URL(url,'https://family.test').searchParams.get('photos')),resolve)):null});f.window.FamilyMedia.open=()=>{};await f.clickItem('a');const load=f.registered.at(-1)[2].loadPage;deferred=true;
+ const older=load(2),olderResult=assert.rejects(older,/album changed|האלבום השתנה/),newer=load(3);pending.get(3)(response(3));await newer;pending.get(2)(response(2));await olderResult;assert.match(f.html,/data-person-item="c"/);assert.equal(f.registered.at(-1)[2].pagination.page,3);
+ const stale=f.registered.at(-1)[2].loadPage(2),staleResult=assert.rejects(stale,/album changed|האלבום השתנה/);deferred=false;await f.clickRelative('yona');pending.get(2)(response(2));await staleResult;assert.match(f.html,/יונה/);assert.doesNotMatch(f.html,/data-person-item="b"/);
+});
+
+test('closing a viewer rejects its pending page without a grid jump and permits a new closed-page restoration',async()=>{
+ const make=id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id}),photoPages=[[make('a')],[make('b')]];
+ const response=page=>({ok:true,json:async()=>({person:family.people.eldad,revision:'page-'+page,albums:{photos:{items:photoPages[page-1],page,pages:2,total:2,size:1},videos:{items:[],page:1,pages:1,total:0,size:10},documents:{items:[],page:1,pages:1,total:0,size:10}}})});
+ for(const reopen of [false,true]){
+  let deferredPage=null,finish;
+  const f=await fixture('eldad',{photoPages,pageView:url=>Number(new URL(url,'https://family.test').searchParams.get('photos'))===deferredPage?new Promise(resolve=>finish=resolve):null});
+  f.window.FamilyMedia.open=()=>f.openMedia();await f.clickItem('a');const loadPage=f.registered.at(-1)[2].loadPage,registrations=f.registered.length;
+  deferredPage=2;const pending=loadPage(2),rejected=assert.rejects(pending,/album changed|האלבום השתנה/);f.closeMedia();if(reopen)f.openMedia();
+  finish(response(2));await rejected;assert.match(f.html,/data-person-item="a"/);assert.doesNotMatch(f.html,/data-person-item="b"/);assert.equal(f.registered.length,registrations,'The late response cannot register a different page after closing');
+  if(reopen)f.closeMedia();deferredPage=null;await loadPage(2);assert.match(f.html,/data-person-item="b"/);assert.equal(f.registered.at(-1)[2].pagination.page,2,'An explicit load started while closed remains usable for grid restoration');
+  deferredPage=1;const restoring=loadPage(1),restorationRejected=assert.rejects(restoring,/album changed|האלבום השתנה/);f.openMedia();finish(response(1));await restorationRejected;
+  assert.match(f.html,/data-person-item="b"/,'Reopening a viewer also invalidates an unfinished closed-page restoration');
+  f.closeMedia();deferredPage=null;await loadPage(1);assert.match(f.html,/data-person-item="a"/);assert.equal(f.registered.at(-1)[2].pagination.page,1);
+ }
+});
+
+test('a late profile response cannot open over another person, page, gallery or closed viewer',async()=>{
+ for(const change of ['person','view','album','close','same-person']){
+  let finish;const photos=['a','b'].map(id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id}));
+  const f=await fixture('eldad',{overrides:{eldad:{profile:'/media/profile'}},photoPages:[photos,photos],mediaView:()=>new Promise(resolve=>finish=resolve)}),opened=[];
+  f.window.FamilyMedia.open=(...args)=>opened.push(args);const pending=f.clickPortrait();
+  if(change==='person')await f.clickRelative('yona');
+  else if(change==='view')f.window.FamilyApp.setView('directory',false);
+  else if(change==='album')await f.clickPage(1);
+  else if(change==='close')f.closeMedia();
+  else f.window.FamilyPeople.open('eldad');
+  finish({ok:true,json:async()=>({item:{id:'profile',kind:'photo',src:'/media/profile'}})});await pending;assert.equal(opened.length,0,change);assert.deepEqual(f.toasts,[]);
+ }
+ let finish;const f=await fixture('eldad',{overrides:{eldad:{profile:'/media/profile'}},pageAlbums:{photos:[{id:'a',kind:'photo',mime:'image/jpeg',src:'/media/a'}]},mediaView:()=>new Promise(resolve=>finish=resolve)}),opened=[];
+ f.window.FamilyMedia.open=(...args)=>opened.push(args);const pending=f.clickPortrait();await f.clickItem('a');f.closeMedia();finish({ok:true,json:async()=>({item:{id:'profile',kind:'photo',src:'/media/profile'}})});await pending;assert.equal(opened.length,1);assert.equal(opened[0][0][0].id,'a');
+});
+
+test('only the latest profile request can open and unavailable profiles report an error without opening',async()=>{
+ const pending=[],f=await fixture('eldad',{overrides:{eldad:{profile:'/media/profile'}},mediaView:()=>new Promise(resolve=>pending.push(resolve))}),opened=[];
+ f.window.FamilyMedia.open=(...args)=>opened.push(args);const first=f.clickPortrait(),second=f.clickPortrait();
+ pending[1]({ok:true,json:async()=>({item:{id:'profile',kind:'photo',src:'/media/new'}})});await second;
+ pending[0]({ok:true,json:async()=>({item:{id:'profile',kind:'photo',src:'/media/old'}})});await first;assert.equal(opened.length,1);assert.equal(opened[0][0][0].src,'/media/new');
+ const missing=await fixture('eldad',{overrides:{eldad:{profile:'/media/missing'}},mediaView:async()=>({ok:false,json:async()=>({error:'The photo was removed'})})}),missingOpened=[];
+ missing.window.FamilyMedia.open=(...args)=>missingOpened.push(args);await missing.clickPortrait();assert.equal(missingOpened.length,0);assert.deepEqual(missing.toasts,['The photo was removed']);
 });
 
 test('Back restores each relative page and then the actual source section; Forward renders the correct person',async()=>{

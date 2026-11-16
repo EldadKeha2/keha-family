@@ -4,13 +4,15 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value).normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase().trim();
   const scope=id=>'nursery:'+id,icon='<svg viewBox="0 0 48 48" aria-hidden="true"><use href="assets/home-icons.svg#nursery"></use></svg>';
-  const albums=new Map(),albumVersions=new Map(),errors=new Map(),messages=new Map(),loading=new Set(),queue=[];
+  const albums=new Map(),albumVersions=new Map(),errors=new Map(),messages=new Map(),loading=new Map(),pendingViewerPages=new Set(),queue=[];
+  let viewerCloseEpoch=0,viewerPageIntent=0;
   const state={ready:false,view:'tree',id:null,page:1,query:'',summaries:{},summaryLoading:false,summaryError:'',summaryLoaded:false,running:false,uploading:null};
   // Use the live family roster, never a manually maintained list of nursery cards.
   const members=()=>app().getPeople().filter(person=>!person.extended&&!person.extra);
   const member=id=>members().find(person=>person.id===id);
   const name=id=>app().nameOf(id),photoCount=n=>I.isEnglish?`${n} ${n===1?'photo':'photos'}`:n===1?'תמונה אחת':`${n} תמונות`;
   const routeId=()=>{try{return /^#nursery\/([^/]+)$/.exec(location.hash)?.[1]?decodeURIComponent(location.hash.slice(9)):null;}catch{return null;}};
+  const routeFocus=id=>{const focus=routeId()===id?new URLSearchParams(location.search||'').get('media'):null;return /^[a-f0-9]{32}$/.test(focus||'')?focus:null;};
   function indexCard(person){
     const summary=state.summaries[person.id],label=name(person.id);
     return `<a class="nursery-card${summary?.count?' has-baby-photos':''}" href="#nursery/${encodeURIComponent(person.id)}" data-nursery-person="${safe(person.id)}" aria-label="${safe(tr('אלבום התינוקייה של ','Baby album for ')+label)}"><span class="nursery-frame">${summary?.cover?`<img ${window.FamilyPhotoFraming?.attributes({id:summary.coverMediaId,src:summary.cover,framing:summary.coverFraming})||''} src="${safe(summary.cover)}" alt="${safe(tr('תמונת תינוקות של ','Baby photo of ')+label)}" loading="lazy" decoding="async">`:`<span class="nursery-placeholder">${icon}<span>${tr('כאן מתחיל הסיפור','The story starts here')}</span></span>`}<span class="nursery-frame-corner" aria-hidden="true">❖</span></span><strong>${safe(label)}</strong><span class="nursery-card-action">${summary?.count?`${photoCount(summary.count)} <span aria-hidden="true">${I.isEnglish?'→':'←'}</span>`:`<span aria-hidden="true">＋</span> ${tr('הוספת תמונות','Add baby photos')}`}</span></a>`;
@@ -25,7 +27,7 @@
   }
   function renderAlbum(){
     const id=state.id,album=albums.get(id),items=album?.items||[],p=album?.pagination||{page:1,pages:1,total:0},busy=Boolean(state.uploading),status=messages.get(id)||'',error=errors.get(id)||'';
-    window.FamilyMedia.register(scope(id),items,{cover:album?.cover});
+    window.FamilyMedia.register(scope(id),items,{cover:album?.cover,pagination:album?.pagination,loadPage:page=>loadViewerPage(id,page)});
     $('nurseryContent').innerHTML=`<nav class="person-page-breadcrumb nursery-breadcrumb"><a href="#nursery" data-nursery-back>${I.isEnglish?'←':'→'} ${tr('חזרה לתינוקייה','Back to the nursery')}</a><span aria-hidden="true">›</span><span>${safe(name(id))}</span></nav><header class="nursery-album-hero"><span class="nursery-album-emblem" aria-hidden="true">${icon}</span><div><span class="small-eyebrow">${tr('האלבום של ההתחלה','The very first chapter')}</span><h2>${safe(name(id))}</h2><p>${tr('תמונות התינוקות שלי','My baby photos')}</p></div><span class="nursery-hero-diamond" aria-hidden="true">❖</span></header><div class="collection-heading nursery-album-heading"><div><h3>${tr('אלבום התינוקייה','Baby album')}</h3><span class="collection-count">${album?photoCount(album.count):tr('טוען את האלבום…','Loading the album…')}</span></div><button class="primary-button" type="button" data-nursery-upload ${busy?'disabled':''}>＋ ${tr('הוספת תמונות','Add photos')}</button></div><p class="nursery-album-help">${tr('לחצו על תמונה לצפייה, תיאור, תיוג ושיתוף, בדיוק כמו בגלריה המשפחתית.','Open a photo to view it, add a description, tag or share, just like in the Family Gallery.')}</p><p class="nursery-status${error?' is-error':''}" role="status">${safe(error||status)}${error?` <button type="button" data-nursery-retry>${tr('ניסיון נוסף','Try again')}</button>`:''}</p><div class="compact-gallery-grid nursery-photo-grid">${items.map(item=>photoCard(item,id)).join('')}</div>${album&&!album.count?`<div class="nursery-empty-album"><span aria-hidden="true">${icon}</span><h3>${tr('לתמונה הראשונה יש מקום מיוחד','A special place for the first photo')}</h3><p>${tr('מצאו תמונת תינוקות מהאלבום המשפחתי והוסיפו אותה לכאן.','Find a baby photo in the family album and add it here.')}</p><button type="button" class="primary-button" data-nursery-upload ${busy?'disabled':''}>＋ ${tr('בחירת תמונות','Choose photos')}</button></div>`:''}${p.total?`<nav class="person-album-pager nursery-pager" aria-label="${tr('דפדוף באלבום התינוקייה','Baby album pages')}"><button class="secondary-button" type="button" data-nursery-page="-1" ${p.pages<2?'disabled':''}>${tr('הקודם','Previous')}</button><span>${I.isEnglish?`Page ${p.page} of ${p.pages}`:`עמוד ${p.page} מתוך ${p.pages}`} · ${photoCount(p.total)}</span><button class="secondary-button" type="button" data-nursery-page="1" ${p.pages<2?'disabled':''}>${tr('הבא','Next')}</button></nav>`:''}<section class="collection-upload nursery-dropzone" data-nursery-drop><div><span class="small-eyebrow">${tr('עוד רגע קטן לשמור','Another little moment to keep')}</span><h3>${tr('מוסיפים תמונות לתינוקייה','Add photos to the baby album')}</h3><p>${tr('אפשר לבחור כמה תמונות יחד, לגרור לכאן או להדביק תמונה. עד 50MB לתמונה.','Choose several photos, drag them here or paste a photo. Up to 50MB per photo.')}</p></div><button class="primary-button" type="button" data-nursery-upload ${busy?'disabled':''}>＋ ${tr('בחירת תמונות','Choose photos')}</button><button class="secondary-button mobile-camera" type="button" data-nursery-camera ${busy?'disabled':''}>${tr('צילום תמונה','Take a photo')}</button><p class="nursery-upload-status" id="nurseryUploadStatus" role="status" aria-live="polite">${safe(status)}</p><progress id="nurseryProgress" max="100" value="${state.uploading?.id===id?state.uploading.percent:0}" ${state.uploading?.id===id?'':'hidden'} aria-label="${tr('התקדמות העלאת התמונות','Photo upload progress')}"></progress></section>`;
   }
   function render(){
@@ -44,18 +46,37 @@
     if(mutation)albumVersions.set(id,(albumVersions.get(id)||0)+1);
     albums.set(id,album);state.summaries[id]={...state.summaries[id],...(album.coverFraming?{coverFraming:album.coverFraming,coverMediaId:album.coverMediaId}:{}),count:album.count,cover:'cover' in album?album.cover:album.pagination?.page>1?(state.summaries[id]?.cover||album.items[0]?.src||null):(album.items[0]?.src||null)};
   }
-  async function loadAlbum(id,page=state.page){
-    const key=id+':'+page;if(loading.has(key)||!app().apiEnabled)return;loading.add(key);errors.delete(id);
+  async function loadAlbum(id,page=state.page,{focus=null,valid=()=>true,requestKey=''}={}){
+    const key=id+':'+page+':'+(focus||'')+':'+requestKey;if(loading.has(key))return loading.get(key);if(!app().apiEnabled)return;errors.delete(id);
     const version=albumVersions.get(id);
-    try{const response=await I.fetch('api/nursery/'+encodeURIComponent(id)+'?page='+page,{cache:'no-store'}),result=await response.json();if(!response.ok)throw Error(I.error(result.error));if(state.id===id&&state.page===page&&albumVersions.get(id)===version){applyAlbum(id,result);state.page=result.pagination.page;}}
-    catch(error){if(state.id===id&&state.page===page)errors.set(id,error.message||tr('לא ניתן לטעון את האלבום כרגע.','The album is currently unavailable.'));}
-    finally{loading.delete(key);render();}
+    const request=(async()=>{
+      try{const response=await I.fetch('api/nursery/'+encodeURIComponent(id)+'?page='+page+(focus?'&focus='+focus:''),{cache:'no-store'}),result=await response.json();if(!response.ok)throw Error(I.error(result.error));if(valid()&&state.id===id&&state.page===page&&albumVersions.get(id)===version){state.page=result.pagination.page;applyAlbum(id,result);}}
+      catch(error){if(valid()&&state.id===id&&state.page===page)errors.set(id,error.message||tr('לא ניתן לטעון את האלבום כרגע.','The album is currently unavailable.'));}
+      finally{loading.delete(key);render();}
+    })();loading.set(key,request);return request;
+  }
+  async function loadViewerPage(id,page){
+    // The viewer retains the owner it opened. An old page callback must not
+    // move the grid after the visitor has switched to another baby album.
+    if(state.view!=='nursery'||state.id!==id)return;
+    const opened=$('mediaViewer')?.open===true,epoch=viewerCloseEpoch,intent=++viewerPageIntent;
+    if(opened&&window.FamilyMedia.isOpen?.(scope(id))!==true)return;
+    const valid=()=>viewerCloseEpoch===epoch&&($('mediaViewer')?.open===true)===opened&&(!opened||window.FamilyMedia.isOpen?.(scope(id))===true);
+    const sharedGridRequest=opened&&loading.has(id+':'+page+'::'),previousPage=sharedGridRequest?state.page:(albums.get(id)?.pagination?.page||state.page);
+    const owner={id,page,previousPage,intent};if(opened)pendingViewerPages.add(owner);
+    state.page=page;
+    // A grid request already in flight keeps its own intent. A request that
+    // starts in the viewer belongs only to that viewer lifetime.
+    try{
+      await loadAlbum(id,page,!sharedGridRequest?{valid,requestKey:'viewer:'+epoch+':'+(opened?'open':'closed')}:{});
+      if(valid()&&state.view==='nursery'&&state.id===id&&state.page===page&&errors.has(id))throw Error(errors.get(id));
+    }finally{pendingViewerPages.delete(owner);if(!valid()&&intent===viewerPageIntent&&state.id===id&&state.page===page){state.page=albums.get(id)?.pagination?.page||previousPage;render();}}
   }
   function activate(next){
     state.view=next;$('nurseryView').hidden=next!=='nursery';if(!state.ready||next!=='nursery')return;
     const requested=routeId(),id=requested&&member(requested)?requested:null;
     if(state.id!==id){state.id=id;state.page=1;state.query='';}
-    render();if(id)loadAlbum(id,state.page);else loadIndex();
+    render();if(id)loadAlbum(id,state.page,{focus:routeFocus(id)});else loadIndex();
   }
   function navigate(id){
     if(id&&!member(id))return;
@@ -105,13 +126,18 @@
   function canDrop(){return state.view==='nursery'&&Boolean(state.id)&&!document.querySelector('dialog[open]');}
   function init(){
     state.ready=true;activate(app().getView());
+    $('mediaViewer')?.addEventListener('close',()=>{
+      viewerCloseEpoch++;let changed=false;
+      for(const owner of pendingViewerPages)if(owner.intent===viewerPageIntent&&state.id===owner.id&&state.page===owner.page){state.page=owner.previousPage;changed=true;}
+      if(changed)render();
+    },{capture:true});
     $('nurseryContent').addEventListener('click',event=>{
       const person=event.target.closest('[data-nursery-person]');if(person){event.preventDefault();navigate(person.dataset.nurseryPerson);return;}
       if(event.target.closest('[data-nursery-back]')){event.preventDefault();if(!window.FamilyNavigation?.returnTo('#nursery'))navigate(null);return;}
       if(event.target.closest('[data-nursery-upload]')){pick();return;}
       if(event.target.closest('[data-nursery-camera]')){pick(true);return;}
       if(event.target.closest('[data-nursery-retry]')){if(state.id)loadAlbum(state.id);else loadIndex();return;}
-      const page=event.target.closest('[data-nursery-page]');if(page&&!page.disabled){const pages=albums.get(state.id)?.pagination?.pages||1;state.page=(state.page-1+Number(page.dataset.nurseryPage)+pages)%pages+1;loadAlbum(state.id);}
+      const page=event.target.closest('[data-nursery-page]');if(page&&!page.disabled){viewerPageIntent++;const pages=albums.get(state.id)?.pagination?.pages||1;state.page=(state.page-1+Number(page.dataset.nurseryPage)+pages)%pages+1;loadAlbum(state.id);}
     });
     for(const id of ['nurseryUploadInput','nurseryCameraInput'])$(id).addEventListener('change',event=>{addFiles(event.target.dataset.personId,event.target.files);event.target.value='';});
     $('nurseryContent').addEventListener('dragover',event=>{if(canDrop()&&event.dataTransfer?.types.includes('Files')){event.preventDefault();event.dataTransfer.dropEffect='copy';event.currentTarget.classList.add('nursery-drag-over');}});

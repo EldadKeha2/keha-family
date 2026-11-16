@@ -6,8 +6,8 @@ import vm from 'node:vm';
 const source=await readFile(new URL('../public/assets/living-family.js',import.meta.url),'utf8');
 const photo={id:'a'.repeat(32),title:'יונה ושלמה',titleEn:'Yona and Shlomo',generation:1,src:'/media/source',thumbnailSrc:'/media/thumb',tags:[],animations:[{id:'smile',label:'מבט וחיוך',labelEn:'A look and a smile',status:'ready',duration:5.0625,videoSrc:'/api/family-ai/video/source/smile?v=one'},{id:'wave',label:'נפנוף לשלום',labelEn:'A little wave',status:'ready',duration:5.0625,videoSrc:'/api/family-ai/video/source/wave?v=two'},{id:'dance',label:'ריקוד קטן',labelEn:'A little dance',status:'pending',duration:5}]};
 const tick=async()=>{for(let i=0;i<6;i++)await new Promise(resolve=>setImmediate(resolve));};
-function fixture(){
-  const nodes=new Map(),listeners=new Map(),requests=[],opened=[],registered=[],removed=[];let fail=false;
+function fixture({items=[photo]}={}){
+  const nodes=new Map(),listeners=new Map(),requests=[],opened=[],registered=[],removed=[],bindings=[];let fail=false;
   class Element{
     constructor(){this.children=[];this.listeners=new Map();this.attrs={};this.hidden=false;this.open=false;this.disabled=false;this.dataset={};this.paused=true;this.classList={add(){}};}
     get firstChild(){return this.children[0]||null;}
@@ -28,10 +28,10 @@ function fixture(){
   }
   const host=new Element();host.id='familyAiView';host.append(new Element());nodes.set(host.id,host);
   const document={readyState:'loading',visibilityState:'visible',getElementById:id=>nodes.get(id),createElement:()=>new Element(),body:new Element(),addEventListener:(name,callback)=>listeners.set(name,callback)};
-  const window={FamilyI18n:{isEnglish:true,fetch:async(path,options)=>{requests.push({path,options});if(fail)throw Error('Offline');return {ok:true,json:async()=>({items:[photo],total:1,totalClips:3,readyClips:2})};}},FamilyAI:{activate(){},search(){},refresh(){},remove:item=>removed.push(item)},FamilyApp:{getView:()=> 'tree'},FamilyMedia:{register:(...args)=>registered.push(args),open:(...args)=>opened.push(args)},addEventListener(){}};
+  const window={FamilyI18n:{isEnglish:true,fetch:async(path,options)=>{requests.push({path,options});if(fail)throw Error('Offline');return {ok:true,json:async()=>({items,total:items.length,totalClips:3,readyClips:2})};}},FamilyAI:{activate(){},search(){},refresh(){},remove:item=>removed.push(item)},FamilyApp:{getView:()=> 'tree'},FamilyMedia:{register:(...args)=>registered.push(args),open:(...args)=>opened.push(args)},FamilyVideoAlbumInput:{bind(video,options){const binding={video,options,items:[],sync(items,selected){this.items=items;this.selected=selected;},close(){this.closed=true;}};bindings.push(binding);return binding;}},addEventListener(){}};
   vm.runInNewContext(source,{window,document,location:{hash:'#tree'},setTimeout:()=>1,clearTimeout(){}});listeners.get('DOMContentLoaded')();
   const click=async(data,{inDialog=false,disabled=false}={})=>{const button={dataset:data,disabled,hasAttribute:name=>name==='data-living-refresh'&&'livingRefresh'in data};await nodes.get(inDialog?'livingFamilyPlayer':'livingFamilySection').emit('click',{target:{closest:selector=>selector==='[data-living-close]'?null:button}});await tick();};
-  return {nodes,requests,opened,registered,removed,api:window.FamilyAI,click,set fail(value){fail=value;},activate:async()=>{window.FamilyAI.activate('family-ai');await tick();}};
+  return {nodes,requests,opened,registered,removed,bindings,api:window.FamilyAI,click,set fail(value){fail=value;},activate:async()=>{window.FamilyAI.activate('family-ai');await tick();}};
 }
 
 test('visitors see three actions with accurate readiness and only GET requests',async()=>{
@@ -50,6 +50,16 @@ test('action selection switches the actual saved clip and a pending action canno
 test('the original-photo button stops the movie and opens the normal shared gallery',async()=>{
   const f=fixture();await f.activate();await f.click({livingPhoto:photo.id,livingAction:'smile'});await f.nodes.get('livingFamilyOriginal').emit('click');
   assert.equal(f.nodes.get('livingFamilyVideo').paused,true);assert.equal(f.nodes.get('livingFamilyVideo').src,undefined);assert.equal(f.nodes.get('livingFamilyPlayer').open,false);assert.equal(f.opened[0][0][0].id,photo.id);assert.equal(f.opened[0][2],'living-family');
+});
+
+test('generated-video swipes update animation choices, download and original-photo links together',async()=>{
+ const other={...photo,id:'b'.repeat(32),titleEn:'Another family photo',animations:[{...photo.animations[0],videoSrc:'/other-smile.mp4'},photo.animations[2]]};
+ const f=fixture({items:[photo,other]});await f.activate();await f.click({livingPhoto:photo.id,livingAction:'smile'});
+ const binding=f.bindings[0];assert.equal(binding.items.length,3,'Only ready saved variants participate');
+ binding.options.select(binding.items[1]);assert.equal(f.nodes.get('livingFamilyVideo').src,photo.animations[1].videoSrc);assert.equal(binding.selected,photo.id+':wave');
+ assert.match(f.nodes.get('livingFamilyPlayerActions').innerHTML,/data-living-action="wave"[^>]*aria-pressed="true"/);
+ binding.options.select(binding.items[2]);assert.equal(f.nodes.get('livingFamilyPlayerTitle').textContent,'Another family photo');assert.equal(f.nodes.get('livingFamilyVideo').src,'/other-smile.mp4');assert.match(f.nodes.get('livingFamilyDownload').download,new RegExp(other.id+'-smile'));
+ await f.nodes.get('livingFamilyOriginal').emit('click');assert.equal(binding.closed,true);assert.equal(f.opened[0][0][f.opened[0][1]].id,other.id);
 });
 
 test('a failed refresh retains the album and a later success clears its error',async()=>{

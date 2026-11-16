@@ -4,13 +4,13 @@
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const swipeHintsSeen=new Set();let swipeHintNode=null;
-  const albums=new Map(),albumPages=new Map(),albumCovers=new Map(),albumEdges=new Map();
+  const albums=new Map(),albumPages=new Map(),albumCovers=new Map(),albumEdges=new Map(),albumLoaders=new Map();
   const state={scope:null,items:[],index:0,activeId:null,pending:null,deleting:false,opener:null,paging:false,pageTarget:null,pageDirection:1,pageRequest:null,pageRender:null,pageQueued:false,navigation:0,session:0,photoActivity:0,photoLoading:false,photoTarget:null,fullscreen:false};
   const identity=item=>item.id||item.file;
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
-  const paginatedAlbum=scope=>scope==='gallery'||scope==='family-ai';
-  const pagingApi=()=>state.scope==='family-ai'?window.FamilyAI:window.FamilyPortal;
+  const paginatedAlbum=scope=>scope==='gallery'||scope==='family-ai'||albumLoaders.has(scope);
+  const pagingApi=()=>albumLoaders.get(state.scope)||(state.scope==='family-ai'?window.FamilyAI:window.FamilyPortal);
   const desktopPhotoInput=()=>window.FamilyPhotoPresentation?.desktop?.()===true||navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||'');
   const phonePhotoInput=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
   const swipeDirection=direction=>phonePhotoInput()?-direction:direction;
@@ -32,7 +32,7 @@
     // The first and last pages are neighbours in the same album. Keep their
     // already loaded previews under the finger while the page changes.
     const edge=albumEdges.get(state.scope);
-    return (direction>0&&page.page===page.pages?edge?.first:direction<0&&page.page===1?edge?.last:null)||null;
+    return (direction>0&&page.page===page.pages?(state.fullscreen?edge?.firstPhoto:edge?.first):direction<0&&page.page===1?(state.fullscreen?edge?.lastPhoto:edge?.last):null)||null;
   }
   function photoState(){
     const photos=state.items.filter(item=>item.kind==='photo'),page=paginatedAlbum(state.scope)?albumPages.get(state.scope):null;
@@ -61,7 +61,12 @@
     hint.innerHTML='<svg viewBox="0 0 76 92" fill="none"><path class="swipe-hint-arrow" d="M12 14h47m-9-8 9 8-9 8"/><g class="swipe-hint-hand"><path d="M30 68 20 52c-4-7 2-11 7-6l5 6V26c0-7 9-7 9 0v17-5c0-6 9-6 9 0v8-4c0-6 8-6 8 0v8-2c0-6 8-5 8 1v17c0 10-7 15-8 19H37c0-7-3-10-7-17Z"/><path d="M38 85h20"/></g></svg>';
     swipeHintNode=hint;$('mediaStage').append(hint);
   }
-  function shareURL(item){const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);url.hash='gallery';return url.href;}
+  function shareURL(item){
+    const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);
+    const scope=state.scope||item.scope||'gallery';
+    url.hash=scope.startsWith('personal:')?'person/'+encodeURIComponent(scope.slice(9)):scope.startsWith('wedding:')?'weddings/'+encodeURIComponent(scope.slice(8)):scope.startsWith('nursery:')?'nursery/'+encodeURIComponent(scope.slice(8)):scope.startsWith('nostalgia')?'nostalgia':['photos','videos','family-ai','living-family'].includes(scope)?(scope==='living-family'?'family-ai':scope):'gallery';
+    return url.href;
+  }
 
   function controls(item,scope){
     return I18n.html`<div class="media-controls"><button data-media-open="${safe(identity(item))}" data-media-scope="${safe(scope)}">⛶ פתיחה בגלריה</button>${window.FamilyVideoEditor?.controls(item,scope)||''}${window.FamilyTags.controls(item)}${item.id?`<button class="media-delete" data-media-delete="${safe(item.id)}" data-media-scope="${safe(scope)}" aria-label="${linked(item,scope)?I18n.t('הסרת'):I18n.t('מחיקת')} ${safe(I18n.mediaName(item))}${linked(item,scope)?I18n.t(' מהאלבום'):''}">${I18n.isEnglish&&item.kind==='photo'?'Delete Photo':linked(item,scope)?I18n.t('הסרה מהאלבום'):I18n.t('מחיקת הפריט')}</button>`:''}</div>${window.FamilyTags.labels(item)}`;
@@ -79,16 +84,17 @@
     for(const scope of scopes){const items=albums.get(scope)||[],index=items.findIndex(item=>identity(item)===id);if(index>=0)return {scope,items,index};}
     return null;
   }
-  function register(scope,items,{retainCurrent=false,advanceRemoved=false,pagination,cover}={}){
+  function register(scope,items,{retainCurrent=false,advanceRemoved=false,pagination,cover,loadPage}={}){
     const previousPage=albumPages.get(scope);
     albums.set(scope,items);
+    if(typeof loadPage==='function')albumLoaders.set(scope,{pageGallery:loadPage});else if(loadPage===null)albumLoaders.delete(scope);
     if(cover!==undefined)albumCovers.set(scope,cover);
     if(pagination){
       albumPages.set(scope,{...pagination});
       const {page,...context}=pagination,key=JSON.stringify(context);
       const edge=albumEdges.get(scope)?.key===key?albumEdges.get(scope):{key};
-      if(page===1)edge.first=items.find(item=>item.kind==='photo');
-      if(page===pagination.pages)edge.last=items.findLast(item=>item.kind==='photo');
+      if(page===1){edge.first=items[0];edge.firstPhoto=items.find(item=>item.kind==='photo');}
+      if(page===pagination.pages){edge.last=items.at(-1);edge.lastPhoto=items.findLast(item=>item.kind==='photo');}
       albumEdges.set(scope,edge);
     }
     // A direct photo can arrive before its album. Adopt the matching route's
@@ -214,6 +220,7 @@
   function clearStage({preserveHandoff=false,nextItem=null}={}){
     clearTimeout(faceTimer);faceTimer=null;
     photoSwipe?.reset();
+    window.FamilyPhotoNative?.reset($('mediaStage'));
     window.FamilyPhotoPresentation?.cancel({preserveHandoff});
     renderedVersion=null;
     window.FamilyFaces?.clear({preserveControls:Boolean(nextItem?.id&&nextItem.kind==='photo'&&!state.fullscreen),item:nextItem});
@@ -222,7 +229,8 @@
   }
   function show(index,{direction=0,image=null,native=false,instant=false,effect=null}={}){
     if(!state.items.length)return;
-    const handoff=native?window.FamilyPhotoPresentation?.holdNative?.($('mediaStage'),image):null;
+    const target=state.items[(index+state.items.length)%state.items.length];
+    const handoff=native&&target?.kind==='photo'?window.FamilyPhotoPresentation?.holdNative?.($('mediaStage'),image):null;
     const ghost=!instant&&!native&&direction&&current()?.kind==='photo'?window.FamilyPhotoPresentation?.snapshot($('mediaStage')):null;
     state.index=(index+state.items.length)%state.items.length;
     $('openedCaptionForm').classList.remove('caption-expanded');$('openedCaptionText').style.height='';
@@ -261,6 +269,7 @@
       const note=document.createElement('p');note.className='media-document-preview';note.textContent='▤ '+item.filename+I18n.t(' · לפתיחת המסמך בחרו ״הורדת המקור״.');stage.append(note);$('mediaPlaybackNote').hidden=true;
     }
     window.FamilyVideoPresentation?.present(item,state.scope);
+    refreshPhotoPresentation();
     fitVideoCaption();
     renderSwipeHint();
   }
@@ -324,7 +333,7 @@
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(window.FamilyFaces?.canNavigate?.(stage)??true);
   }
   function canNavigateVideo(){
-    return $('mediaViewer').open&&current()?.kind==='video'&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&!state.paging&&state.items.length>1&&
+    return $('mediaViewer').open&&current()?.kind==='video'&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&!state.paging&&(albumPages.get(state.scope)?.total??state.items.length)>1&&
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#videoClipEditor[open],#photoDateDialog[open]');
   }
   function refreshPhotoPresentation(){
@@ -332,11 +341,11 @@
     const native=window.FamilyPhotoNative,desktop=desktopPhotoInput();
     // Use the same browser-owned scrolling as the working CSS-mode demo on
     // laptops. Faces call this again after their image wrapper is ready.
-    const browserScroll=desktop&&current()?.kind==='photo'&&native?.supported?.()===true;
+    const browserScroll=desktop&&['photo','video'].includes(current()?.kind)&&native?.supported?.()===true;
     stage.classList.toggle('photo-manual-swipes',desktop&&!browserScroll);
-    if(browserScroll){
+    if(browserScroll&&faceTimer===null){
       native.mount(stage,{previous:photoNeighbour(-1),next:photoNeighbour(1),
-        enabled:()=>canNavigatePhoto(),step,
+        enabled:()=>canNavigatePhoto()||canNavigateVideo(),step,
         busy:()=>state.paging||state.photoLoading});
     }else native?.reset(stage);
   }

@@ -181,6 +181,18 @@ test('only Life itself keeps the same home carousel while its arrows select indi
  assert.equal(gallery.node('nostalgiaLibraryHome').hidden,false);assert.match(gallery.node('nostalgiaCategories').innerHTML,/data-nostalgia-event="ora"/);
  gallery.goEvent('old-life');assert.equal(gallery.api.isEvent(),false);assert.equal(gallery.node('nostalgiaEventHeader').hidden,true);
 });
+test('the Life viewer sequence refreshes independently of unassigned-grid filters and changed memberships',()=>{
+ const gallery=lifeGallery(),registered=[];
+ gallery.window.FamilyMedia.register=(scope,items)=>registered.push({scope,ids:Array.from(items,item=>item.id)});
+ gallery.api.select(gallery.collection,{query:'nothing matches',filter:'photo'});
+ assert.deepEqual(registered.at(-1),{scope:'nostalgia-everyday-life',ids:['life-1','life-2']},'Grid filters cannot narrow the direct-video album');
+ gallery.collection.items[0].nostalgiaEventIds=[];
+ gallery.collection.items.push({id:'life-3',name:'סרטון שלישי',kind:'video',src:'/media/three',nostalgiaEventIds:['everyday-life-clips']});
+ gallery.render();
+ assert.deepEqual(registered.at(-1),{scope:'nostalgia-everyday-life',ids:['life-2','life-3']},'Assignment changes replace the viewer sequence, preserving its category order');
+ gallery.click({nostalgiaSingleVideo:'life-3'});
+ assert.deepEqual(Array.from(gallery.openedVideos.at(-1)[0],item=>item.id),['life-2','life-3']);assert.equal(gallery.openedVideos.at(-1)[1],1);
+});
 test('Life itself has one assignment choice and saving it preserves historical memberships',()=>{
  const gallery=lifeGallery();gallery.click({nostalgiaAssign:'life-1'});
  const choices=gallery.node('nostalgiaAssignChoices').innerHTML;

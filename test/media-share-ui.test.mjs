@@ -9,6 +9,13 @@ const source=await readFile(new URL('../public/assets/media.js',import.meta.url)
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 const presentationSource=await readFile(new URL('../public/assets/photo-presentation.js',import.meta.url),'utf8');
 const keyboardSource=await readFile(new URL('../public/assets/photo-keyboard.js',import.meta.url),'utf8');
+
+test('sharing preserves the gallery that supplied the opened item',async()=>{
+ for(const [scope,hash]of [['gallery','#gallery'],['photos','#photos'],['videos','#videos'],['personal:ruti','#person/ruti'],['wedding:parents','#weddings/parents'],['nursery:ruti','#nursery/ruti'],['nostalgia-everyday-life','#nostalgia'],['family-ai','#family-ai']]){
+  const f=fixture();f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,scope);
+  await f.get('copyMediaLink').handlers.get('click')();const url=new URL(f.copied[0]);assert.equal(url.hash,hash,scope);assert.equal(url.searchParams.get('media'),'a');f.close();
+ }
+});
 function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null,touchscreen=false}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{

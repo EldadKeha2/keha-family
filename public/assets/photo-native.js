@@ -4,16 +4,22 @@
   const supported=()=>typeof CSS!=='undefined'&&CSS.supports('scroll-snap-type','x mandatory');
   function side(pane,item){
     const constrained=navigator.connection?.saveData||/^(slow-)?2g$/.test(navigator.connection?.effectiveType||'');
-    const source=item?.kind==='photo'?((constrained?item.thumbnailSrc:null)||(window.FamilyPhotoPresentation?.source?.(item)||item.previewSrc||item.thumbnailSrc||item.src)):null;
-    if(pane._photoSource===source)return;pane._photoSource=source;
+    const source=item?.kind==='photo'?((constrained?item.thumbnailSrc:null)||(window.FamilyPhotoPresentation?.source?.(item)||item.previewSrc||item.thumbnailSrc||item.src)):item?.kind==='video'?item.poster||null:null;
+    const key=JSON.stringify([source,item?.kind,item?.kind==='video'?(item.caption||item.name||item.filename):'']);
+    if(pane._photoSource===key)return;pane._photoSource=key;
     for(const child of [...pane.children])child.remove();
-    pane.setAttribute('aria-hidden','true');if(!source)return;
-    const image=document.createElement('img');image.alt='';image.decoding='async';image.fetchPriority='low';image.draggable=false;image.src=source;pane.append(image);
+    pane.setAttribute('aria-hidden','true');
+    if(source){const image=document.createElement('img');image.alt='';image.decoding='async';image.fetchPriority='low';image.draggable=false;image.src=source;pane.append(image);}
+    if(item?.kind==='video'){const title=document.createElement('span');title.className='native-video-preview';title.textContent='▶ '+(item.caption||item.name||item.filename||'');pane.append(title);}
   }
   function reset(stage){
     if(!active||stage&&active.stage!==stage)return;
     const b=active;active=null;clearTimeout(b.timer);clearTimeout(b.releaseTimer);b.resize?.disconnect();
-    b.viewport.before(b.node);b.viewport.remove();b.stage.classList.remove('has-native-photo-strip');
+    // Face setup can adopt the raw image while an arrow transition finishes.
+    // Only unwrap pixels still owned by this strip, never steal the image out
+    // of the newer face surface that now owns it.
+    if(b.node.parentNode===b.center)b.viewport.before(b.node);
+    b.viewport.remove();b.stage.classList.remove('has-native-photo-strip');
   }
   function has(stage){return active?.stage===stage;}
   function note(stage,dx){
@@ -35,7 +41,7 @@
     if(stage?.nodeType!==1||!supported()||!enabled()){reset(stage);return false;}
     // In fullscreen the first <img> is a neighbour preview after mounting.
     // Keep the actual center image when metadata or layout refreshes again.
-    const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?(active?.stage===stage?active.node:stage.querySelector('img')):null);
+    const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?(active?.stage===stage?active.node:stage.querySelector('video,iframe,img')):null);
     if(!node)return false;
     if(active?.stage===stage&&active.node===node){
       Object.assign(active,{enabled,step,busy});side(active.viewport.children[0],next);side(active.viewport.children[2],previous);return true;
