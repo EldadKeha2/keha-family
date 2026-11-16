@@ -10,12 +10,13 @@
     const enabled=()=>isOpen()&&items.length>1;
     const navigate=direction=>{if(!enabled())return;const next=(index+direction+items.length)%items.length;return select(items[next]);};
     const native=()=>window.FamilyPhotoNative;
+    const vertical=dy=>{const dialog=stage.closest('dialog');if(dialog)dialog.scrollTop=(dialog.scrollTop||0)+dy;};
     const refresh=()=>{
-      if(!mobile()&&native()?.supported?.()===true&&enabled())native().mount(stage,{previous:items[(index-1+items.length)%items.length],next:items[(index+1)%items.length],enabled,step:navigate});
+      if(!mobile()&&native()?.supported?.()===true&&enabled())native().mount(stage,{previous:items[(index-1+items.length)%items.length],next:items[(index+1)%items.length],enabled,step:navigate,vertical});
       else native()?.reset(stage);
     };
     const manual=window.FamilyPhotoSwipe?.bind(stage,{enabled,mouse:()=>!mobile(),preferPointer:()=>!mobile(),touchOnly:()=>mobile()&&'ontouchstart' in window,
-      nativeScroll:()=>native()?.has?.(stage)===true,strictStart:true,videoSurface:()=>video,
+      nativeScroll:()=>native()?.has?.(stage)===true,strictStart:true,videoSurface:()=>video,vertical,
       right:()=>navigate(mobile()?-1:1),left:()=>navigate(mobile()?1:-1)});
     window.addEventListener?.('resize',refresh);
     return {

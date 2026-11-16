@@ -98,9 +98,11 @@
       if(page===pagination.pages){edge.last=items.at(-1);edge.lastPhoto=items.findLast(item=>item.kind==='photo');}
       albumEdges.set(scope,edge);
     }
-    // A direct photo can arrive before its album. Adopt the matching route's
-    // album in place so the image, face editor, zoom and focus survive loading.
-    if($('mediaViewer')?.open&&state.scope?.startsWith('link:')&&scope===routeAlbum()&&new URL(location.href).searchParams.get('media')===state.activeId&&items.some(item=>identity(item)===state.activeId))state.scope=scope;
+    // A direct photo can arrive before its album. A newly randomized gallery
+    // page can omit it; retainCurrent below keeps those pixels while adopting
+    // the matching gallery's navigation and total.
+    const retainLinkedGallery=scope==='gallery'&&retainCurrent;
+    if($('mediaViewer')?.open&&state.scope?.startsWith('link:')&&scope===routeAlbum()&&new URL(location.href).searchParams.get('media')===state.activeId&&(retainLinkedGallery||items.some(item=>identity(item)===state.activeId)))state.scope=scope;
     if(!$('mediaViewer')?.open||state.scope!==scope)return;
     if(state.paging&&pagination?.page===state.pageTarget){
       const session=state.session,render=()=>{if(session!==state.session||!$('mediaViewer').open)return;state.items=items;if(items.length)show(state.pageDirection>0?0:items.length-1,{direction:state.pageDirection,native:state.pageNative,instant:state.pageInstant,effect:state.pageEffect});else $('mediaViewer').close();};
@@ -349,6 +351,7 @@
       const waiting=state.photoLoading?state.items.findIndex(item=>identity(item)===state.photoTarget):-1,from=waiting>=0?waiting:state.index;
       native.mount(stage,{previous:photoNeighbour(-1,from),next:photoNeighbour(1,from),pending:state.photoLoading||state.paging,
         enabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),step,
+        vertical:dy=>{$('mediaViewer').scrollTop+=dy;},
         busy:()=>state.paging||state.photoLoading});
     }else native?.reset(stage);
   }

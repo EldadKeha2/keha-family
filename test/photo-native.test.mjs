@@ -161,3 +161,55 @@ test('zero-width startup waits for geometry and unowned scrollend never selects 
 test('reset resolves pending input waiters and cannot steal an image reparented by a newer face context',async()=>{
  const f=fixture();f.api.mount(f.stage,f.options);pointer(f,'pointerdown');const wait=f.api.whenIdle(f.stage);const newer=f.stage.children[0].children[2];newer.append(f.scroll);f.api.reset();await wait;assert.equal(f.scroll.parent,newer);assert.equal(f.api.whenIdle(f.stage),null);
 });
+
+test('stage background and a sibling face-hit outside the strip receive the same physical swipe controller',async()=>{
+ for(const targetKind of ['background','face']){
+  const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0],target=targetKind==='background'?f.stage:new f.scroll.constructor();
+  if(targetKind==='face'){target.className='face-hit';f.stage.append(target);}
+  pointer(f,'pointerdown',200,100,7,target);pointer(f,'pointermove',340,100,7,target);assert.equal(strip.scrollLeft,660);pointer(f,'pointerup',340,100,7,target);await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);
+ }
+});
+
+test('remounting a stage uses one live wheel handler and keeps stage-background input usable',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);f.api.reset(f.stage);f.api.mount(f.stage,f.options);f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ assert.equal(strip.style.touchAction,'pinch-zoom');const event=wheel(f,120,{target:f.stage});assert.equal(event.defaultPrevented,true);assert.equal(strip.scrollLeft,680,'One physical packet moves once after remount');t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);stroke(f,140);await flush();assert.deepEqual(directions(f),[1,1]);f.api.reset();
+});
+
+test('a tiny initially vertical sample stays undecided and allows the real horizontal swipe to emerge',async()=>{
+ const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];pointer(f,'pointerdown');pointer(f,'pointermove',202,108);assert.equal(strip.scrollLeft,800);pointer(f,'pointermove',340,100);assert.equal(strip.scrollLeft,660);pointer(f,'pointerup',340,100);await flush();assert.deepEqual(directions(f),[1]);
+});
+
+test('deliberate vertical movement scrolls by incremental deltas and can yield to a later clear horizontal swipe',async()=>{
+ const f=fixture(),vertical=[];f.options.vertical=dy=>vertical.push(dy);f.api.mount(f.stage,f.options);const strip=f.stage.children[0];pointer(f,'pointerdown');pointer(f,'pointermove',200,130);pointer(f,'pointermove',200,160);assert.deepEqual(vertical,[-30,-30]);assert.equal(strip.scrollLeft,800);pointer(f,'pointermove',340,160);assert.equal(strip.scrollLeft,660);pointer(f,'pointerup',340,160);await flush();assert.deepEqual(directions(f),[1]);
+});
+
+test('an unclaimed cancelled Windows pointer retains its joined TouchEvent contact for a bounded fallback',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const continuing of [false,true]){
+  const f=fixture();f.api.mount(f.stage,f.options);pointer(f,'pointerdown');touch(f,'touchstart');pointer(f,'pointermove',202,108);pointer(f,'pointercancel',0,0);const wait=f.api.whenIdle(f.stage);assert.ok(wait);t.mock.timers.tick(349);assert.equal(f.api.isActive(f.stage),true);
+  if(continuing){touch(f,'touchmove',340);assert.equal(f.stage.children[0].scrollLeft,660);touch(f,'touchend',340);}else t.mock.timers.tick(1);
+  await wait;await flush();assert.deepEqual(directions(f),continuing?[1]:[]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+ }
+});
+
+test('v8 diagnostics expose the actual mounted controller and current input owner',()=>{
+ const f=fixture();assert.equal(f.api.version,8);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
+});
+
+test('a tiny fallback TouchMove after pointercancel releases idle without navigation after quiet',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);pointer(f,'pointerdown');touch(f,'touchstart');pointer(f,'pointermove',202,108);pointer(f,'pointercancel',0,0);touch(f,'touchmove',203,109);const wait=f.api.whenIdle(f.stage);assert.ok(wait);t.mock.timers.tick(349);assert.equal(f.api.isActive(f.stage),true);t.mock.timers.tick(1);await wait;await flush();assert.deepEqual(directions(f),[]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+});
+
+test('a meaningful fallback TouchMove completes once from its last position when touchend is missing',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);pointer(f,'pointerdown');touch(f,'touchstart');pointer(f,'pointermove',202,108);pointer(f,'pointercancel',0,0);touch(f,'touchmove',340);const wait=f.api.whenIdle(f.stage);assert.ok(wait);t.mock.timers.tick(349);assert.deepEqual(directions(f),[]);t.mock.timers.tick(1);await wait;await flush();assert.deepEqual(directions(f),[1]);touch(f,'touchend',340);t.mock.timers.tick(350);assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
+});
+
+test('continued fallback TouchMove samples keep ownership until 350ms after the last sample',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);pointer(f,'pointerdown');touch(f,'touchstart');pointer(f,'pointermove',202,108);pointer(f,'pointercancel',0,0);
+ for(const x of [240,260,280,300,340]){t.mock.timers.tick(100);touch(f,'touchmove',x);assert.deepEqual(directions(f),[]);assert.equal(f.api.isActive(f.stage),true);}
+ const wait=f.api.whenIdle(f.stage);t.mock.timers.tick(349);assert.deepEqual(directions(f),[]);t.mock.timers.tick(1);await wait;await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);
+});
+
+test('a healthy pointer can remain held for a second without a fallback watchdog completing it',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.mount(f.stage,f.options);pointer(f,'pointerdown');pointer(f,'pointermove',340);t.mock.timers.tick(1000);assert.deepEqual(directions(f),[]);assert.equal(f.api.isActive(f.stage),true);pointer(f,'pointerup',340);await flush();assert.deepEqual(directions(f),[1]);assert.equal(f.api.whenIdle(f.stage),null);
+});

@@ -1475,15 +1475,15 @@ body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-
 #mediaStage.photo-dragging>.face-photo-scroll,#mediaStage.photo-dragging>img{will-change:transform}
 #mediaStage.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) img{user-select:none;-webkit-user-drag:none}
 @media(any-hover:hover){#mediaStage.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(img,.face-photo-surface){cursor:grab}#mediaStage.photo-pointer-dragging :is(img,.face-photo-surface){cursor:grabbing}}
-.native-photo-strip{display:flex;flex:1 1 auto;width:100%;min-width:0;overflow-x:hidden;overflow-y:hidden;scroll-snap-type:none;overscroll-behavior-x:contain;scrollbar-width:none;direction:ltr;touch-action:pan-y pinch-zoom}
+.native-photo-strip{display:flex;flex:1 1 auto;width:100%;min-width:0;overflow-x:hidden;overflow-y:hidden;scroll-snap-type:none;overscroll-behavior-x:contain;scrollbar-width:none;direction:ltr;touch-action:pinch-zoom}
 .native-photo-strip::-webkit-scrollbar{display:none}
 .native-photo-pane{position:relative;flex:0 0 100%;width:100%;min-width:0;scroll-snap-align:center;display:flex;align-items:center;justify-content:center}
 .native-photo-pane[aria-hidden=true]>img{position:absolute;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
 #mediaStage.has-native-photo-strip.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
-#mediaStage.has-native-photo-strip.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pan-y pinch-zoom}
+#mediaStage.has-native-photo-strip.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pinch-zoom}
 #mediaStage.has-native-photo-strip:not(.face-photo-enlarged) .face-photo-scroll{overflow:visible;overscroll-behavior:auto;flex:0 0 100%}
 #mediaStage.has-native-photo-strip.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
-#mediaStage.has-native-photo-strip.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pan-y pinch-zoom}
+#mediaStage.has-native-photo-strip.photo-manual-swipes.photo-swipe-enabled:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,.face-hit){touch-action:pinch-zoom}
 /* Desktop touch owns its axis from first contact. Otherwise Windows may cancel
    the pointer stream on the diagonal start of a horizontal stroke. Vertical
    finger movement scrolls the dialog in photo-swipe.js; pinch stays native. */
@@ -1497,15 +1497,16 @@ body[data-active-view=weddings]:has(#weddingsOverview:not([hidden])) .workspace-
 #mediaViewer.video-gallery-viewer #mediaStage.photo-manual-swipes,
 #mediaViewer.video-gallery-viewer #mediaStage.photo-manual-swipes>video{touch-action:pinch-zoom}
 /* One horizontal controller owns both the preview and the selected item.
-   The browser keeps vertical scrolling and pinch, but cannot reveal a neighbour
+   The controller also scrolls vertically; the browser keeps pinch, and cannot reveal a neighbour
    when a horizontal packet is declined or a pointer stream is interrupted. */
 #mediaViewer #mediaStage.has-native-photo-strip:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing),
-#mediaViewer #mediaStage.has-native-photo-strip:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,img,video,iframe){touch-action:pan-y pinch-zoom}
+#mediaViewer #mediaStage.has-native-photo-strip:not(.face-photo-enlarged):not(.face-adjusting):not(.face-resizing) :is(.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,img,video,iframe){touch-action:pinch-zoom}
 #mediaStage.has-native-photo-strip>.native-photo-strip{height:100%;min-height:0}
 #mediaStage.has-native-photo-strip .native-photo-pane{min-height:0}
 .native-video-preview{position:absolute;inset:auto 16px 16px;padding:8px 12px;border-radius:8px;background:#302b23bb;color:#fffaf0;text-align:center;font:calc(16px * var(--a11y-text-scale,1))/1.5 var(--sans)}
 .video-album-stage{position:relative;min-width:0;max-width:100%;overflow:hidden;touch-action:pan-y pinch-zoom}
 .video-album-stage :is(.native-photo-strip,.native-photo-pane,video){touch-action:pan-y pinch-zoom}
+.video-album-stage.has-native-photo-strip,.video-album-stage.has-native-photo-strip :is(.native-photo-strip,.native-photo-pane,video){touch-action:pinch-zoom}
 .media-stage.is-video{aspect-ratio:16/9;max-height:64vh;max-height:64dvh;min-height:200px;width:100%;margin:auto}
 .media-stage video,.media-stage iframe{display:block;width:100%;height:100%;min-height:200px;border:0;object-fit:contain}
 .media-viewer-footer{padding:14px 22px 18px}
