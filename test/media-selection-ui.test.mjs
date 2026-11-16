@@ -97,9 +97,9 @@ test('phones retain long-press selection without desktop entry buttons',()=>{
  const f=fixture({desktop:false});assert.equal(f.document.querySelector('.gallery-category-row [data-selection-start]').hidden,true);
  f.hold(f.a);assert.equal(f.bar.hidden,false);assert.deepEqual(Array.from(f.api.ids()),['a'.repeat(32)]);
 });
-test('a mouse hold selects at two seconds before release and its release never opens or deselects the photo',()=>{
+test('a mouse hold selects at one second before release and its release never opens or deselects the photo',()=>{
  const f=fixture(),target=f.button(f.a);
- f.emit('pointerdown',target,{pointerType:'mouse'});f.advance(1999);
+ f.emit('pointerdown',target,{pointerType:'mouse'});f.advance(999);
  assert.equal(f.bar.hidden,true);assert.equal(f.api.ids().length,0);f.advance(1);
  assert.equal(f.bar.hidden,false);assert.deepEqual(Array.from(f.api.ids()),['a'.repeat(32)]);assert.equal(f.opens,0);
  f.advance(4000);f.emit('pointerup',target,{pointerType:'mouse'});f.emit('click',target,{pointerType:'mouse'});
@@ -108,7 +108,7 @@ test('a mouse hold selects at two seconds before release and its release never o
 });
 test('a shorter mouse hold opens normally and movement or cancellation cannot start selection later',()=>{
  const f=fixture(),target=f.button(f.a);
- f.emit('pointerdown',target,{pointerType:'mouse'});f.advance(1999);f.emit('pointerup',target,{pointerType:'mouse'});f.emit('click',target,{pointerType:'mouse'});
+ f.emit('pointerdown',target,{pointerType:'mouse'});f.advance(999);f.emit('pointerup',target,{pointerType:'mouse'});f.emit('click',target,{pointerType:'mouse'});
  assert.equal(f.opens,1);assert.equal(f.bar.hidden,true);f.advance(2000);assert.equal(f.api.ids().length,0);
  for(const action of ['pointermove','pointercancel','scroll']){
   f.emit('pointerdown',target,{pointerType:'mouse'});f.emit(action,target,{pointerType:'mouse',clientX:40});f.advance(2500);

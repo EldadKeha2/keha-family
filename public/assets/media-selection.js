@@ -123,7 +123,7 @@ function pointerDown(event){
     pending.fired=true;enter(card);suppress={card,until:Date.now()+1600};
     try{card.setPointerCapture?.(pending.id);}catch{}
     card.querySelector('video')?.pause();
-  },event.pointerType==='mouse'?2000:600);
+  },event.pointerType==='mouse'?1000:600);
 }
 function pointerMove(event){if(press?.id===event.pointerId&&!press.fired&&Math.hypot(event.clientX-press.x,event.clientY-press.y)>10)cancelPress();}
 function pointerEnd(event){pendingPointers.delete(event.pointerId);if(press?.id===event.pointerId){if(press.fired)suppress={card:press.card,until:Date.now()+900};cancelPress();}}
