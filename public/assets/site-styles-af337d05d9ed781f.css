@@ -4827,9 +4827,9 @@ img.photo-framing-active{cursor:grabbing!important;outline:2px dashed #657950;ou
 .site-search-header-slot{display:none}
 .site-search-desktop{display:none}
 @media(min-width:1200px) and (max-width:1530px){
-  html:not([data-a11y-text]) .site-header{grid-template-columns:max-content minmax(0,1fr) max-content;column-gap:16px}
-  html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%}
-  html:not([data-a11y-text]) .site-header .home-install-actions{flex-wrap:wrap;justify-content:center;gap:5px}
+  html:not([data-a11y-text]) .site-header{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);column-gap:24px}
+  html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%;justify-content:center}
+  html:not([data-a11y-text]) .site-header .home-install-actions{width:100%;flex-wrap:wrap;justify-content:center;gap:5px}
   .site-header .home-install-actions button{padding-inline:8px;font-size:calc(13px * var(--a11y-text-scale,1))}
   .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh]){width:42px;min-width:42px;padding:8px}
   .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh])>span{display:none}
