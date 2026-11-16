@@ -4,15 +4,17 @@
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const ui={},chevron='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
   let helpers;
-  const keyState=key=>ui[key]||=( {open:false,expanded:new Set(),search:''} );
+  const keyState=key=>ui[key]||=( {open:false,expanded:new Set(),search:'',columns:3} );
   const options=key=>window.FamilyPeople.galleryOptions(key);
-  function defaults(){return Object.fromEntries(['photos','videos'].flatMap(key=>[[key+'Size',100],[key+'Sort','random'],[key+'Seed',Math.floor(Math.random()*0x100000000)]]));}
+  function defaults(){const size=matchMedia('(max-width:700px)').matches?10:100;return Object.fromEntries(['photos','videos'].flatMap(key=>[[key+'Size',size],[key+'Sort','random'],[key+'Seed',Math.floor(Math.random()*0x100000000)]]));}
   function pager(key,album){
     // Reuse the gallery's actual controls, including its sort and page-size options.
     const nav=document.querySelector('#galleryView [data-gallery-pager]').cloneNode(true);
     nav.hidden=false;nav.removeAttribute('data-gallery-pager');nav.dataset.personPager=key;
     nav.setAttribute('aria-label',tr('דפדוף באלבום','Album pages'));
-    const size=nav.querySelector('[data-gallery-size]');size.removeAttribute('data-gallery-size');size.dataset.personSize=key;for(const option of size.querySelectorAll('option'))option.toggleAttribute('selected',option.value===String(options(key).size));
+    const size=nav.querySelector('[data-gallery-size]');size.removeAttribute('data-gallery-size');size.dataset.personSize=key;
+    for(const value of [50,20,10]){const option=document.createElement('option');option.value=String(value);option.textContent=value;size.prepend(option);}
+    for(const option of size.querySelectorAll('option'))option.toggleAttribute('selected',option.value===String(options(key).size));
     size.setAttribute('aria-label',key==='photos'?tr('תמונות בעמוד','Photos per page'):tr('סרטונים בעמוד','Videos per page'));
     nav.querySelector('.gallery-page-size>span>span').textContent=key==='photos'?tr('תמונות','Photos'):tr('סרטונים','Videos');
     const sort=nav.querySelector('[data-gallery-sort]');sort.removeAttribute('data-gallery-sort');sort.dataset.personSort=key;for(const option of sort.querySelectorAll('option'))option.toggleAttribute('selected',option.value===options(key).sort);
@@ -37,7 +39,8 @@
   }
   function controls(key,album){
     const open=keyState(key).open;
-    return `<div class="person-gallery-toolbar"><div class="media-grid-header-actions"><button type="button" class="gallery-refine-toggle" data-person-filter-toggle="${key}" aria-controls="personGallery-${key}-panel" aria-expanded="${open}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8Z"/></svg><span>${tr('סינון','Filter')}</span></button></div></div>${pager(key,album)}${panel(key)}`;
+    const columns=key==='photos'?`<label class="person-photo-columns"><span>${tr('תמונות בשורה','Photos per row')}</span><select data-person-photo-columns aria-label="${tr('תמונות בשורה','Photos per row')}">${[1,2,3,4,5,6].map(value=>`<option value="${value}"${value===keyState(key).columns?' selected':''}>${value}</option>`).join('')}</select></label>`:'';
+    return `<div class="person-gallery-toolbar"><div class="media-grid-header-actions"><button type="button" class="gallery-refine-toggle" data-person-filter-toggle="${key}" aria-controls="personGallery-${key}-panel" aria-expanded="${open}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8Z"/></svg><span>${tr('סינון','Filter')}</span></button></div>${columns}</div>${pager(key,album)}${panel(key)}`;
   }
   function checkboxes(host,items,selected,field){
     if(!host)return;
@@ -62,6 +65,7 @@
     await Promise.allSettled([window.FamilyPeopleRoster.load(),helpers[1].loadPhotoLabelCatalog()]);
     for(const key of ['photos','videos'])if(keyState(key).open)fill(key);
   }
+  function applyColumns(root){root.querySelector('[data-person-grid="photos"]')?.style.setProperty('--person-photo-columns',String(keyState('photos').columns));}
   function preserve(root,html){
     const grids=new Map([...root.querySelectorAll('[data-person-grid]')].map(grid=>[grid.dataset.personOwner+':'+grid.dataset.personGrid,grid]));
     const active=document.activeElement,focus=active?.dataset.personSearch,selection=focus?[active.selectionStart,active.selectionEnd]:null;
@@ -72,6 +76,7 @@
       const cards=[...next.children].map(card=>{const previous=old.get(card.dataset.personCard);return previous?.dataset.personVersion===card.dataset.personVersion?previous:card;});
       grid.replaceChildren(...cards);next.replaceWith(grid);
     }
+    applyColumns(root);
     for(const key of ['photos','videos'])if(keyState(key).open)fill(key);
     if(focus){const input=root.querySelector('[data-person-search="'+focus+'"]');if(input){input.focus({preventScroll:true});if(selection)input.setSelectionRange?.(...selection);}}
     window.FamilyVideoPreviews?.watch(root);window.FamilyMediaSelection?.refresh();
@@ -86,6 +91,7 @@
     root.addEventListener('toggle',event=>{const details=event.target;if(!details.dataset.personDetails)return;const key=details.closest('[data-person-filter-panel]').dataset.personFilterPanel;keyState(key).expanded[details.open?'add':'delete'](details.id);},true);
     root.addEventListener('change',event=>{
       const node=event.target,key=node.dataset.personSize||node.dataset.personSort;
+      if(node.hasAttribute('data-person-photo-columns')){const columns=Number(node.value);if([1,2,3,4,5,6].includes(columns)){keyState('photos').columns=columns;applyColumns(root);}return;}
       if(key){const change=node.dataset.personSize?{size:node.value}:{sort:node.value,...(node.value==='random'?{seed:Math.floor(Math.random()*0x100000000)}:{})};window.FamilyPeople.refineAlbum(key,change);return;}
       const field=node.dataset.personRefine;if(!field)return;
       const album=node.closest('[data-person-filter-panel]').dataset.personFilterPanel,selected=new Set((options(album)[field]||'').split(',').filter(Boolean));selected[node.checked?'add':'delete'](node.value);window.FamilyPeople.refineAlbum(album,{[field]:[...selected].sort().join(',')});
