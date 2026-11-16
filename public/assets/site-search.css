@@ -1,6 +1,14 @@
 .site-header .home-install-actions [data-site-search-open]{display:none}
 .site-search-header-slot{display:none}
 .site-search-desktop{display:none}
+@media(min-width:1200px) and (max-width:1530px){
+  html:not([data-a11y-text]) .site-header{grid-template-columns:max-content minmax(0,1fr) max-content;column-gap:16px}
+  html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%}
+  html:not([data-a11y-text]) .site-header .home-install-actions{flex-wrap:wrap;justify-content:center;gap:5px}
+  .site-header .home-install-actions button{padding-inline:8px;font-size:calc(13px * var(--a11y-text-scale,1))}
+  .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh]){width:42px;min-width:42px;padding:8px}
+  .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh])>span{display:none}
+}
 @media(min-width:701px){
   .site-header .home-install-actions .site-search-desktop{display:block;position:relative;flex:0 0 clamp(132px,12vw,190px);width:clamp(132px,12vw,190px);min-width:0;margin:0;order:-1}
   .site-search-desktop-field{display:flex;align-items:center;gap:9px;box-sizing:border-box;width:100%;min-height:44px;padding:7px 12px;border:1px solid #ccc5b4;border-radius:9px;background:#fff;box-shadow:0 1px 5px #6053390b;cursor:text}
