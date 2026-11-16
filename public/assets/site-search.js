@@ -24,6 +24,10 @@ function search(query,person){const next=new URLSearchParams();if(query?.trim())
 function closeDesktop(){if(desktopMenu)desktopMenu.hidden=true;desktopInput?.setAttribute('aria-expanded','false');}
 function closeDialog(){if(dialog?.open)dialog.close();closeDesktop();}
 function openProfile(id){closeDialog();window.FamilyApp?.openPerson(id);}
+function submitSuggestedSearch(query){
+  query=query.trim();if(!query)return;
+  const first=suggestPeople(roster(),query)[0];if(first)openProfile(first.id);else search(query);
+}
 function peopleSuggestions(people){
   return people.map(person=>'<li class="site-search-suggestion"><a class="site-search-person" href="#person/'+encodeURIComponent(person.id)+'" data-site-search-person="'+safe(person.id)+'">'+portrait(person)+'<span><strong>'+safe(personName(person))+'</strong><small>'+tr('לפתיחת הפרופיל','Open profile')+'</small></span><span class="site-search-chevron" aria-hidden="true">'+(I.isEnglish?'→':'←')+'</span></a></li><li class="site-search-suggestion site-search-content-suggestion"><button class="site-search-person site-search-content-action" type="button" data-site-search-related="'+safe(person.id)+'"><span class="site-search-content-icon">'+contentSearchIcon+'</span><span><strong>'+tr('כל התכנים של ','All content for ')+safe(personName(person))+'</strong><small>'+tr('תמונות, סרטונים, זיכרונות ועוד','Photos, videos, memories and more')+'</small></span><span class="site-search-chevron" aria-hidden="true">'+(I.isEnglish?'→':'←')+'</span></button></li>').join('');
 }
@@ -59,7 +63,7 @@ function mountDesktopSearch(actions){
   desktopInput.addEventListener('focus',()=>{
     desktopSuggestions();window.FamilyPeopleRoster?.load().then(()=>{if(!desktopMenu.hidden&&desktopForm.contains(document.activeElement))desktopSuggestions();}).catch(()=>{});
   });
-  desktopForm.addEventListener('submit',event=>{event.preventDefault();if(desktopInput.value.trim())search(desktopInput.value);});
+  desktopForm.addEventListener('submit',event=>{event.preventDefault();submitSuggestedSearch(desktopInput.value);});
   desktopForm.addEventListener('click',selectSuggestion);
   $('siteSearchDesktopFree').addEventListener('click',()=>search(desktopInput.value));
   desktopForm.addEventListener('keydown',event=>{
@@ -151,13 +155,13 @@ function init(){
   const brand=document.querySelector('#homeLink>span');if(brand)brand.innerHTML='<span class="brand-title-line">'+tr('בית משפחת','Keha Family')+'</span> <span class="brand-title-line">'+tr('קהא','Home')+'</span>';
   const actions=document.querySelector('[data-home-install-actions]');actions?.append(button);button.addEventListener('click',openQuick);mountDesktopSearch(actions);
   dialog=document.createElement('dialog');dialog.id='siteSearchDialog';dialog.className='site-search-dialog';dialog.setAttribute('aria-labelledby','siteSearchQuickTitle');dialog.setAttribute('data-i18n-skip','');
-  dialog.innerHTML='<header class="site-search-dialog-heading"><h2 id="siteSearchQuickTitle">'+tr('מה מחפשים במשפחה?','What are you looking for?')+'</h2><button type="button" class="site-search-close" data-site-search-close aria-label="'+tr('סגירה','Close')+'">×</button></header><form id="siteSearchQuickForm" role="search"><label for="siteSearchQuickInput" class="site-search-sr">'+tr('שם או מילות חיפוש','Name or search words')+'</label><div class="site-search-field">'+magnifier+'<input id="siteSearchQuickInput" type="search" inputmode="search" maxlength="200" autocomplete="off" aria-controls="siteSearchSuggestions" aria-expanded="false" placeholder="'+tr('למשל: רועי','For example: Roei')+'"><button type="submit" aria-label="'+tr('חיפוש חופשי','Search all content')+'">'+tr('חיפוש','Search')+'</button></div></form><p class="site-search-hint" id="siteSearchQuickHint" role="status"></p><ul id="siteSearchSuggestions" class="site-search-suggestions"></ul><button type="button" class="site-search-free" id="siteSearchFree" hidden>'+magnifier+'<span></span></button>';
+  dialog.innerHTML='<header class="site-search-dialog-heading"><h2 id="siteSearchQuickTitle">'+tr('מה מחפשים במשפחה?','What are you looking for?')+'</h2><button type="button" class="site-search-close" data-site-search-close aria-label="'+tr('סגירה','Close')+'">×</button></header><form id="siteSearchQuickForm" role="search"><label for="siteSearchQuickInput" class="site-search-sr">'+tr('שם או מילות חיפוש','Name or search words')+'</label><div class="site-search-field">'+magnifier+'<input id="siteSearchQuickInput" type="search" inputmode="search" maxlength="200" autocomplete="off" aria-controls="siteSearchSuggestions" aria-expanded="false" placeholder="'+tr('למשל: רועי','For example: Roei')+'"><button type="submit">'+tr('חיפוש','Search')+'</button></div></form><p class="site-search-hint" id="siteSearchQuickHint" role="status"></p><ul id="siteSearchSuggestions" class="site-search-suggestions"></ul><button type="button" class="site-search-free" id="siteSearchFree" hidden>'+magnifier+'<span></span></button>';
   document.body.append(dialog);
   for(const element of [dialog,view])element.addEventListener('error',event=>{if(event.target.tagName==='IMG')event.target.remove();},true);
   dialog.querySelector('[data-site-search-close]').addEventListener('click',closeDialog);
   $('siteSearchQuickInput').addEventListener('input',suggestions);
   $('siteSearchQuickInput').addEventListener('keydown',event=>{if(event.key==='ArrowDown'){const first=dialog.querySelector('[data-site-search-person]');if(first){event.preventDefault();first.focus();}}});
-  $('siteSearchQuickForm').addEventListener('submit',event=>{event.preventDefault();const query=$('siteSearchQuickInput').value.trim();if(query)search(query);});
+  $('siteSearchQuickForm').addEventListener('submit',event=>{event.preventDefault();submitSuggestedSearch($('siteSearchQuickInput').value);});
   $('siteSearchFree').addEventListener('click',()=>search($('siteSearchQuickInput').value));
   dialog.addEventListener('click',selectSuggestion);
   dialog.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp'].includes(event.key)||event.target===$('siteSearchQuickInput'))return;const choices=[...$('siteSearchSuggestions').querySelectorAll('a,button')],at=choices.indexOf(document.activeElement);if(at<0)return;event.preventDefault();if(at===0&&event.key==='ArrowUp')$('siteSearchQuickInput').focus();else choices[(at+(event.key==='ArrowDown'?1:-1)+choices.length)%choices.length]?.focus();});
