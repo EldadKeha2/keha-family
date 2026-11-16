@@ -60,6 +60,32 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('selected photos and videos from different albums download together as original bytes and accept additive labels',async()=>{
+ const f=fixture();try{
+  const bootstrap=await f.connect(),token=JSON.parse(/window.FAMILY_API_TOKEN=("[^"]+")/.exec(bootstrap)[1]);
+  const picture=await taggedUpload(f,'/api/collections/gallery',photo,'picture.jpg'),movie=await taggedUpload(f,'/api/collections/videos',video,'movie.mp4');
+  for(const item of [picture,movie]){
+   for(const label of ['holidays','birthdays']){const response=await f.call('/api/media/'+item.id+'/labels',{method:'POST',body:{label,tagged:true}});assert.equal(response.status,200,await response.clone().text());}
+   const saved=(await(await f.call('/api/media/'+item.id+'/view')).json()).item;assert.deepEqual(saved.labels,['birthdays','holidays']);assert.equal(saved.name,item.name);assert.equal(saved.src,item.src);
+  }
+  const form=new URLSearchParams({token,ids:JSON.stringify([picture.id,movie.id])}).toString();
+  const response=await f.call('/api/media/download',{method:'POST',body:form,headers:{'Content-Type':'application/x-www-form-urlencoded'}});assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/application\/zip/);
+  const zip=Buffer.from(await response.arrayBuffer());assert.ok(zip.includes(photo));assert.ok(zip.includes(video));assert.match(zip.toString('utf8'),/picture.jpg/);assert.match(zip.toString('utf8'),/movie.mp4/);
+  assert.equal((await f.call('/api/media/download',{method:'POST',body:new URLSearchParams({token:'wrong',ids:JSON.stringify([picture.id])}).toString()})).status,403);
+ }finally{await f.close();}
+});
+test('deleting an interior video segment saves both retained sections in place and retries never delete twice',async()=>{
+ const f=fixture();try{
+  await f.connect();const bytes=await readFile(new URL('./fixtures/video-clip-source.mp4',import.meta.url)),item=await taggedUpload(f,'/api/collections/videos',bytes,'film.mp4');
+  const source=(await(await f.call('/api/media/'+item.id+'/view')).json()).item,objectCount=f.objects.size;
+  const body={operationId:uid(),name:source.name,caption:source.caption,range:{start:2.125,end:5.875,remove:true},expectedVideoRevision:source.videoRevision};
+  const response=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(response.status,200,await response.clone().text());const saved=(await response.json()).item;
+  assert.equal(saved.id,item.id);assert.equal(saved.duration,4.25);assert.equal(f.objects.size,objectCount+1);
+  const original=JSON.parse(f.database.prepare('SELECT data FROM media WHERE id=?').get(item.id).data).videoOriginal;assert.ok(original.key);
+  const retry=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body});assert.equal(retry.status,200);assert.equal((await retry.json()).alreadySaved,true);assert.equal(f.objects.size,objectCount+1);
+  const second=await f.call('/api/media/'+item.id+'/video-edit',{method:'POST',body:{...body,operationId:uid(),expectedVideoRevision:saved.videoRevision,range:{start:1,end:3,remove:true}}});assert.equal(second.status,200,await second.clone().text());assert.equal((await second.json()).item.duration,2.25);
+ }finally{await f.close();}
+});
 test('video viewing copies publish behind the existing media access route while original bytes stay unchanged',async()=>{
  const f=fixture();try{
   await f.connect();const uploaded=await(await f.call('/api/collections/videos/upload?filename=source.mp4',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json(),item=uploaded.collection.items[0];

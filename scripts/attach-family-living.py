@@ -9,7 +9,7 @@ import json
 import pathlib
 import urllib.parse
 import urllib.request
-from family_living_source import verified_source
+from family_living_source import verified_source, output_tones_reviewed
 
 
 def main():
@@ -26,10 +26,10 @@ def main():
     with urllib.request.urlopen(urllib.request.Request(origin+'/api/family-ai/featured',headers={'User-Agent':'Mozilla/5.0'}),timeout=30)as response:album=json.load(response)
     items={item['id']:item for item in album['items']}
     for key,job in state['jobs'].items():
-        if job['photoId'] not in approved or job.get('status')!='complete' or not job.get('reviewed') or not job.get('monochromeReviewed'):
+        if job['photoId'] not in approved or job.get('status')!='complete' or not job.get('reviewed') or not output_tones_reviewed(approved[job['photoId']], job):
             continue
         if job.get('sourceRevision','original')!=approved[job['photoId']].get('revision','original'):
-            raise RuntimeError('Clip does not match the reviewed black-and-white source revision: '+key)
+            raise RuntimeError('Clip does not match the reviewed source revision: '+key)
         item=items.get(job['photoId'])
         if not item:raise RuntimeError('The photo is absent from the curated album: '+job['photoId'])
         action=next(a for a in item['animations']if a['id']==job['actionId'])

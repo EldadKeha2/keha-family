@@ -34,7 +34,7 @@ function fixture(){
 
 test('the curated album has ten photos, three honest pending actions, and leaves gallery metadata intact',()=>{
   const f=fixture();try{
-    assert.equal(livingPhotos.length,10);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.every(p=>[1,2].includes(p.generation)&&p.originalBlackAndWhite===true));
+    assert.equal(livingPhotos.length,10);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.filter(p=>p.id!=='89b5dd6a048342ecb9cd4b29b73ca197').every(p=>p.originalBlackAndWhite===true));assert.deepEqual(livingPhotos.filter(p=>p.requestedColorException).map(p=>p.id),['89b5dd6a048342ecb9cd4b29b73ca197']);assert.ok(!livingPhotos.some(p=>p.id==='a1e9162209384402b481b7a487ca5cf9'));
     const before=f.database.prepare('SELECT data FROM media ORDER BY id').all();const album=f.run('family-ai.living.list');
     assert.equal(album.total,10);assert.equal(album.totalClips,30);assert.equal(album.readyClips,0);assert.ok(album.items.every(item=>item.animations.length===3&&item.animations.every(a=>a.status==='pending'&&!a.videoSrc)));
     assert.equal('key'in album.items[0],false);assert.deepEqual(f.database.prepare('SELECT data FROM media ORDER BY id').all(),before);

@@ -559,6 +559,6 @@
       if(event.key==='ArrowRight'){event.preventDefault();step(1);}
     });
   }
-  window.FamilyMedia={register,controls,open,openFrom,requestDelete,notify,current,refreshPhotoPresentation,photoState,setFullscreen,step,isPhotoBrowsing:()=>Boolean($('mediaViewer')?.open&&current()?.kind==='photo'&&(state.photoLoading||state.paging||photoSwipe?.isActive?.()||Date.now()-state.photoActivity<800)),lookup:(scope,id)=>(albums.get(scope)||[]).find(item=>identity(item)===id||item.file===id),isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
+  window.FamilyMedia={items:scope=>[...(albums.get(scope)||[])],register,controls,open,openFrom,requestDelete,notify,current,refreshPhotoPresentation,photoState,setFullscreen,step,isPhotoBrowsing:()=>Boolean($('mediaViewer')?.open&&current()?.kind==='photo'&&(state.photoLoading||state.paging||photoSwipe?.isActive?.()||Date.now()-state.photoActivity<800)),lookup:(scope,id)=>(albums.get(scope)||[]).find(item=>identity(item)===id||item.file===id),isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
   document.addEventListener('DOMContentLoaded',init);
 })();

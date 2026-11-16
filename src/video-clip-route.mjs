@@ -2,19 +2,25 @@ import {HttpError,json,readJSON,uid} from './http.mjs';
 import {getObject,putObject,deleteObject} from './hf.mjs';
 import {planMp4Clip} from './mp4-clip.mjs';
 
-function prefixedStream(prefix,body,expected){
- const reader=body.getReader();let first=true,total=0;
- return new ReadableStream({async pull(controller){try{if(first){first=false;controller.enqueue(prefix);return;}const next=await reader.read();if(next.done){if(total!==expected)throw new Error('Incomplete source range');controller.close();return;}total+=next.value.byteLength;if(total>expected)throw new Error('Oversized source range');controller.enqueue(next.value);}catch(error){await reader.cancel().catch(()=>{});controller.error(error);}},cancel:reason=>reader.cancel(reason)});
+function plannedStream(plan,ranged,sourceSize){
+ let first=true,index=0,reader=null,total=0,expected=0;
+ return new ReadableStream({async pull(controller){try{
+  if(first){first=false;controller.enqueue(plan.prefix);return;}
+  while(true){
+   if(!reader){if(index===plan.ranges.length){controller.close();return;}const range=plan.ranges[index++],response=await ranged(range.start,range.end);expected=range.end-range.start+1;total=0;
+    if(response.status!==206||response.headers.get('Content-Range')!==`bytes ${range.start}-${range.end}/${sourceSize}`||Number(response.headers.get('Content-Length'))!==expected){await response.body?.cancel();throw new HttpError(502,'הקטע המסומן לא התקבל במלואו. נסו שוב.');}reader=response.body.getReader();}
+   const next=await reader.read();if(next.done){reader.releaseLock();reader=null;if(total!==expected)throw Error('Incomplete source range');continue;}
+   total+=next.value.byteLength;if(total>expected)throw Error('Oversized source range');controller.enqueue(next.value);return;
+  }
+ }catch(error){await reader?.cancel().catch(()=>{});controller.error(error);}},async cancel(reason){await reader?.cancel(reason);}});
 }
 export async function renderVideoRange(request,env,ctx,source,range,ownerId){
  let plan,key;
   if(!['video/mp4','video/quicktime'].includes(source.mime))throw new HttpError(415,'לעריכת קטעים העלו סרטון בפורמט MP4 או MOV.','VIDEO_CLIP_FORMAT');
   const ranged=(start,end)=>getObject(env,source,new Request(request.url,{headers:{Range:`bytes=${start}-${end}`}}));
   const read=async(start,end)=>{const response=await ranged(start,end);if(response.status!==206||response.headers.get('Content-Range')!==`bytes ${start}-${end}/${source.size}`){await response.body?.cancel();throw new HttpError(502,'לא ניתן לקרוא את הקטע המסומן כרגע. נסו שוב.');}const bytes=new Uint8Array(await response.arrayBuffer());if(bytes.length!==end-start+1)throw new HttpError(502,'נתוני הסרטון לא התקבלו במלואם.');return bytes;};
-  plan=await planMp4Clip(read,source.size,{start:range.start,end:range.end});
-  const response=await ranged(plan.rangeStart,plan.rangeEnd);
-  if(response.status!==206||Number(response.headers.get('Content-Length'))!==plan.rangeEnd-plan.rangeStart+1){await response.body?.cancel();throw new HttpError(502,'הקטע המסומן לא התקבל במלואו. נסו שוב.');}
-  key='video-clips/'+ownerId+'/'+uid()+'.mp4';let stream=prefixedStream(plan.prefix,response.body,plan.rangeEnd-plan.rangeStart+1),transfer=Promise.resolve();
+  plan=await planMp4Clip(read,source.size,range);
+  key='video-clips/'+ownerId+'/'+uid()+'.mp4';let stream=plannedStream(plan,ranged,source.size),transfer=Promise.resolve();
   if(typeof FixedLengthStream!=='undefined'){const fixed=new FixedLengthStream(plan.size);transfer=stream.pipeTo(fixed.writable);stream=fixed.readable;transfer.catch(()=>{});}
   try{await Promise.all([putObject(env,key,stream,plan.size,'video/mp4'),transfer]);}catch(error){ctx.waitUntil(deleteObject(env,key).catch(()=>{}));throw error;}
  return {key,size:plan.size,mime:'video/mp4',duration:plan.duration};

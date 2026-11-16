@@ -8,7 +8,7 @@ test('production rejects unreviewed or changed sources and preserves quota block
   const output=execFileSync('python3',['-c',`
 import hashlib, pathlib, sys, tempfile, time
 sys.path.insert(0,sys.argv[1])
-from family_living_source import verified_source, free_quota_reset
+from family_living_source import verified_source, free_quota_reset, output_tones_reviewed
 with tempfile.TemporaryDirectory() as directory:
     source=pathlib.Path(directory)/'source.jpg'
     source.write_bytes(b'reviewed original fixture')
@@ -26,6 +26,15 @@ with tempfile.TemporaryDirectory() as directory:
     source.write_bytes(b'replaced by a color source')
     rejected()
     photo['blackAndWhiteReview']['kind']='color'
+    rejected()
+    photo['requestedColorException']=True
+    photo['sourceReview']={'kind':'owner-requested-color','reviewed':True,'revision':'original','sha256':hashlib.sha256(source.read_bytes()).hexdigest()}
+    rejected()
+    photo['id']='89b5dd6a048342ecb9cd4b29b73ca197'
+    assert verified_source(photo)==source
+    assert not output_tones_reviewed(photo,{'monochromeReviewed':True})
+    assert output_tones_reviewed(photo,{'colorPreservationReviewed':True})
+    photo['revision']='edited'
     rejected()
     reset=time.time()+86400
     blocked={'error':'You have exceeded your ZeroGPU quota','retryAfter':reset}

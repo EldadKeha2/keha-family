@@ -65,3 +65,5 @@ html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
   body[data-active-view=gallery] .gallery-tag-filters button{font-size:calc(11.5px * var(--a11y-text-scale,1));padding-inline:4px}
   body[data-active-view=gallery] .gallery-tag-filters button::before{width:14px;height:14px;flex-basis:14px}
 }
+
+.gallery-pager .gallery-page-buttons{direction:ltr}

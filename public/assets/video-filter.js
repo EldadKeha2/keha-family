@@ -14,7 +14,7 @@ function fillPeople(){
 }
 function fillFamilies(){for(const generation of [2,3,4])choices('videoFamily'+generation,familyOptions(window.FAMILY_DATA,generation).map(unit=>({id:unit.id,label:familyLabel(window.FAMILY_DATA,unit,person=>I.personName(person),I.isEnglish)})).sort((a,b)=>a.label.localeCompare(b.label,I.locale)),state.families,'family');}
 function fillCategories(){choices('videoCategoryFilter',catalog.map(category=>({id:category.id,label:category.id==='special-birthdays'?tr('ימי הולדת עגולים','Milestone birthdays'):I.isEnglish?category.nameEn||category.name:category.name})),state.categories,'category');}
-function refresh(){render();window.FamilyPortal?.refreshVideos();}
+function refresh(){window.FamilyMediaSelection?.clearScope('videos');render();window.FamilyPortal?.refreshVideos();}
 function render(categories){
  if(Array.isArray(categories))catalog=categories;
  if(!ready)return;

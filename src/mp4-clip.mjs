@@ -1,5 +1,6 @@
 // Lossless ISO-BMFF clips: keep the decode keyframe, hide preroll with an edit
-// list, rebuild the sample tables, and stream one bounded source byte range.
+// list, rebuild sample tables, and stream bounded source ranges. Multiple
+// edits join the retained parts after deletion without recompressing the movie.
 import {HttpError} from './http.mjs';
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 const MAX_METADATA=12*1024*1024,MAX_SAMPLES=1000000;
@@ -34,22 +35,49 @@ function parseTrack(trak,movieTimescale){
  const co=tables.find(b=>['stco','co64'].includes(b.type));if(!co)throw error();const cov=view(co.data),chunkCount=cov.getUint32(4),width=co.type==='co64'?8:4;if(co.data.length!==8+width*chunkCount)throw error();
  const offsets=new Float64Array(count);let sample=0,entry=0;for(let i=0;i<chunkCount;i++){while(entry+1<sc.length&&sc[entry+1].first<=i+1)entry++;let offset=width===8?uint64(cov,8+8*i):cov.getUint32(8+4*i);for(let j=0;j<sc[entry].count;j++){if(sample>=count)throw error();offsets[sample]=offset;offset+=sizes[sample++];}}if(sample!==count)throw error();
  const stss=tables.find(b=>b.type==='stss');let sync=null;if(stss){const ssv=view(stss.data),n=ssv.getUint32(4);if(stss.data.length!==8+4*n)throw error();sync=new Set(Array.from({length:n},(_,i)=>ssv.getUint32(8+4*i)-1));}
- let mediaStart=0,movieOffset=0;const edts=children.find(b=>b.type==='edts');if(edts){const elst=boxes(edts.data).find(b=>b.type==='elst');if(elst){const ev=view(elst.data),version=elst.data[0],n=ev.getUint32(4),width=version?20:12;if(version>1||elst.data.length!==8+n*width)throw error();let edits=0;for(let i=0;i<n;i++){const offset=8+i*width,duration=version?uint64(ev,offset):ev.getUint32(offset),media=version?int64(ev,offset+8):ev.getInt32(offset+4),rate=ev.getInt32(offset+(version?16:8));if(rate!==65536)throw error();if(media===-1&&!edits)movieOffset+=duration/movieTimescale;else if(media>=0&&edits++===0)mediaStart=media;else throw error();}}}
- return {trak,children,mdia,mdias,mdhd,minf,minfs,tables,kind,count,sizes,durations,compositions,dts,offsets,sync,ctts,description:sc[0].description,mediaStart,movieOffset,...headerInfo(mdhd)};
+ const edits=[];const edts=children.find(b=>b.type==='edts');
+ if(edts){const elst=boxes(edts.data).find(b=>b.type==='elst');if(elst){
+  const ev=view(elst.data),version=elst.data[0],n=ev.getUint32(4),width=version?20:12;if(version>1||n>128||elst.data.length!==8+n*width)throw error();let position=0;
+  for(let i=0;i<n;i++){const offset=8+i*width,duration=version?uint64(ev,offset):ev.getUint32(offset),media=version?int64(ev,offset+8):ev.getInt32(offset+4),rate=ev.getInt32(offset+(version?16:8));if(rate!==65536||media < -1)throw error();edits.push({start:position,end:position+duration/movieTimescale,media});position+=duration/movieTimescale;}
+ }}
+ if(!edits.length)edits.push({start:0,end:time/headerInfo(mdhd).timescale,media:0});
+ return {trak,children,mdia,mdias,mdhd,minf,minfs,tables,kind,count,sizes,durations,compositions,dts,offsets,sync,ctts,description:sc[0].description,edits,...headerInfo(mdhd)};
 }
-function rebuildTrack(track,selection,movieDuration,baseOffset,rangeStart){
- const {first,last,t0}=selection,count=last-first+1,indices=Array.from({length:count},(_,i)=>first+i),durations=track.durations.subarray(first,last+1),decodeDuration=durations.reduce((n,d)=>n+d,0),mediaTime=Math.max(0,Math.round(t0-track.dts[first]));
- const elst=new Uint8Array(28),ev=view(elst);ev.setUint32(4,1);ev.setBigUint64(8,BigInt(movieDuration));ev.setBigInt64(16,BigInt(mediaTime));ev.setInt32(24,65536);elst[0]=1;
- const offsets=indices.map(i=>baseOffset+track.offsets[i]-rangeStart);if(offsets.some(n=>n<0||n>0xffffffff))throw error();
+function trackSelections(track,ranges){
+ const selections=[];
+ for(const range of ranges)for(const edit of track.edits){
+  const start=Math.max(range.start,edit.start),end=Math.min(range.end,edit.end);if(end-start<.000001)continue;
+  if(edit.media===-1){selections.push({empty:true,duration:end-start});continue;}
+  const t0=(start-edit.start)*track.timescale+edit.media,t1=(end-edit.start)*track.timescale+edit.media;let first=0,last=-1;
+  if(t0<0)throw error();
+  if(track.kind==='vide'){for(let i=0;i<track.count;i++)if((!track.sync||track.sync.has(i))&&track.dts[i]+track.compositions[i]<=t0)first=i;if(track.sync&&!track.sync.has(first))throw error();}
+  else{first=track.count;for(let i=0;i<track.count;i++)if(track.dts[i]+track.compositions[i]+track.durations[i]>t0){first=i;break;}}
+  for(let i=first;i<track.count;i++)if(track.dts[i]+track.compositions[i]<t1)last=i;
+  if(last<first)throw error();selections.push({first,last,t0,duration:end-start});
+ }
+ if(!selections.some(s=>!s.empty))throw error();return selections;
+}
+function rebuildTrack(track,selections,movieDuration,movieTimescale,baseOffset,ranges){
+ const indices=[],edits=[];let decodeDuration=0,moviePosition=0;
+ for(const selection of selections){
+  moviePosition+=selection.duration;const duration=Math.round(moviePosition*movieTimescale)-edits.reduce((n,e)=>n+e.duration,0);
+  if(selection.empty){edits.push({duration,media:-1});continue;}
+  const {first,last,t0}=selection;edits.push({duration,media:decodeDuration+Math.max(0,Math.round(t0-track.dts[first]))});
+  for(let i=first;i<=last;i++){indices.push(i);decodeDuration+=track.durations[i];}
+ }
+ const count=indices.length;if(count>MAX_SAMPLES)throw error();const durations=indices.map(i=>track.durations[i]);
+ const elst=new Uint8Array(8+20*edits.length),ev=view(elst);ev.setUint32(4,edits.length);elst[0]=1;
+ for(const [i,edit]of edits.entries()){ev.setBigUint64(8+20*i,BigInt(edit.duration));ev.setBigInt64(16+20*i,BigInt(edit.media));ev.setInt32(24+20*i,65536);}
+ const offsets=indices.map(i=>{const range=ranges.find(r=>track.offsets[i]>=r.start&&track.offsets[i]+track.sizes[i]-1<=r.end);if(!range)throw error();return baseOffset+range.offset+track.offsets[i]-range.start;});if(offsets.some(n=>n<0||n>0xffffffff))throw error();
  const tableBoxes=[child(track.tables,'stsd').raw,runBox('stts',durations)];
- if(track.ctts)tableBoxes.push(runBox('ctts',track.compositions.subarray(first,last+1),track.ctts.data[0]));
- if(track.sync)tableBoxes.push(full('stss',[u32(indices.filter(i=>track.sync.has(i)).length),uints(indices.filter(i=>track.sync.has(i)).map(i=>i-first+1))]));
- tableBoxes.push(full('stsc',[u32(1,1,1,track.description)]),full('stsz',[u32(0,count),uints(track.sizes.subarray(first,last+1))]),full('stco',[u32(count),uints(offsets)]));
- const dependency=track.tables.find(b=>b.type==='sdtp');if(dependency&&dependency.data.length===4+track.count)tableBoxes.push(full('sdtp',[dependency.data.subarray(4+first,5+last)]));
+ if(track.ctts)tableBoxes.push(runBox('ctts',indices.map(i=>track.compositions[i]),track.ctts.data[0]));
+ if(track.sync){const sync=indices.flatMap((original,i)=>track.sync.has(original)?[i+1]:[]);tableBoxes.push(full('stss',[u32(sync.length),uints(sync)]));}
+ tableBoxes.push(full('stsc',[u32(1,1,1,track.description)]),full('stsz',[u32(0,count),uints(indices.map(i=>track.sizes[i]))]),full('stco',[u32(count),uints(offsets)]));
+ const dependency=track.tables.find(b=>b.type==='sdtp');if(dependency&&dependency.data.length===4+track.count)tableBoxes.push(full('sdtp',[Uint8Array.from(indices.map(i=>dependency.data[4+i]))]));
  const stbl=mp4Box('stbl',...tableBoxes),minf=mp4Box('minf',...track.minfs.map(b=>b.type==='stbl'?stbl:b.raw)),mdia=mp4Box('mdia',...track.mdias.map(b=>b.type==='minf'?minf:b.type==='mdhd'?setDuration(b,decodeDuration):b.raw));
- const output=track.children.filter(b=>b.type!=='edts').map(b=>b.type==='mdia'?mdia:b.type==='tkhd'?setDuration(b,movieDuration,true):b.raw);output.splice(1,0,mp4Box('edts',elst.length?mp4Box('elst',elst):new Uint8Array()));return mp4Box('trak',...output);
+ const output=track.children.filter(b=>b.type!=='edts').map(b=>b.type==='mdia'?mdia:b.type==='tkhd'?setDuration(b,movieDuration,true):b.raw);output.splice(1,0,mp4Box('edts',mp4Box('elst',elst)));return mp4Box('trak',...output);
 }
-export async function planMp4Clip(readRange,size,{start,end}){
+export async function planMp4Clip(readRange,size,{start,end,remove=false}){
  if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end-start<.1)throw new HttpError(400,'סמנו התחלה וסיום תקינים לקטע, באורך עשירית שנייה לפחות.');
  let position=0,moov=null,ftyp=null;for(let i=0;i<64&&position<size;i++){
   const head=await readRange(position,Math.min(position+15,size-1));if(head.length<8)throw error();const v=view(head),small=v.getUint32(0),length=small===1?uint64(v,8):small||size-position,type=decoder.decode(head.subarray(4,8));if(length<8||position+length>size)throw error();
@@ -59,16 +87,21 @@ export async function planMp4Clip(readRange,size,{start,end}){
  if(!moov)throw error();const movie=boxes(moov.data);if(movie.some(b=>b.type==='mvex'))throw error();const mvhd=child(movie,'mvhd'),info=headerInfo(mvhd),duration=info.duration/info.timescale;
  if(!info.timescale||!Number.isFinite(duration)||end>duration+.05||start>=duration)throw new HttpError(400,'הקטע המסומן חורג ממשך הסרטון.');end=Math.min(end,duration);
  const tracks=movie.filter(b=>b.type==='trak').map(t=>parseTrack(t,info.timescale)).filter(Boolean);if(!tracks.some(t=>t.kind==='vide'))throw error();
- const selections=tracks.map(track=>{const t0=(start-track.movieOffset)*track.timescale+track.mediaStart,t1=(end-track.movieOffset)*track.timescale+track.mediaStart;let first=0,last=-1;
-  if(t0<0)throw error();if(track.kind==='vide'){for(let i=0;i<track.count;i++)if((!track.sync||track.sync.has(i))&&track.dts[i]+track.compositions[i]<=t0)first=i;if(track.sync&&!track.sync.has(first))throw error();}
-  else{first=track.count;for(let i=0;i<track.count;i++)if(track.dts[i]+track.compositions[i]+track.durations[i]>t0){first=i;break;}}
-  for(let i=first;i<track.count;i++)if(track.dts[i]+track.compositions[i]<t1)last=i;
-  if(last<first)throw error();return {first,last,t0};
- });
- let rangeStart=Infinity,rangeEnd=0;for(let t=0;t<tracks.length;t++)for(let i=selections[t].first;i<=selections[t].last;i++){rangeStart=Math.min(rangeStart,tracks[t].offsets[i]);rangeEnd=Math.max(rangeEnd,tracks[t].offsets[i]+tracks[t].sizes[i]-1);}
- if(!Number.isSafeInteger(rangeStart)||rangeStart<0||rangeEnd>=size)throw error();const payloadSize=rangeEnd-rangeStart+1,movieDuration=Math.round((end-start)*info.timescale);
+ const retained=remove?[...(start>0?[{start:0,end:start}]:[]),...(end<duration?[{start:end,end:duration}]:[])]:[{start,end}];
+ const outputDuration=retained.reduce((n,r)=>n+r.end-r.start,0);if(outputDuration<.099)throw new HttpError(400,'יש להשאיר לפחות עשירית שנייה בסרטון.');
+ const selections=tracks.map(track=>trackSelections(track,retained)),spans=[];
+ // One envelope per retained section and track bounds source fetches while
+ // permitting keyframe preroll. Merge overlaps before assigning new offsets.
+ for(let t=0;t<tracks.length;t++)for(const selection of selections[t]){
+  if(selection.empty)continue;let first=Infinity,last=0;
+  for(let i=selection.first;i<=selection.last;i++){first=Math.min(first,tracks[t].offsets[i]);last=Math.max(last,tracks[t].offsets[i]+tracks[t].sizes[i]-1);}
+  if(!Number.isSafeInteger(first)||first<0||last>=size)throw error();spans.push({start:first,end:last});
+ }
+ const ranges=[];for(const span of spans.sort((a,b)=>a.start-b.start)){const last=ranges.at(-1);if(last&&span.start<=last.end+1)last.end=Math.max(last.end,span.end);else ranges.push({...span});}
+ let payloadSize=0;for(const range of ranges){range.offset=payloadSize;payloadSize+=range.end-range.start+1;}
+ const movieDuration=Math.round(outputDuration*info.timescale);
  ftyp ||= mp4Box('ftyp',encoder.encode('isom'),u32(512),encoder.encode('isomiso2mp41'));
- const makeMoov=base=>mp4Box('moov',setDuration(mvhd,movieDuration),...tracks.map((track,i)=>rebuildTrack(track,selections[i],movieDuration,base,rangeStart)));
+ const makeMoov=base=>mp4Box('moov',setDuration(mvhd,movieDuration),...tracks.map((track,i)=>rebuildTrack(track,selections[i],movieDuration,info.timescale,base,ranges)));
  const placeholder=makeMoov(0),base=ftyp.length+placeholder.length+8,prefix=join([ftyp,makeMoov(base),u32(payloadSize+8),encoder.encode('mdat')]);
- return {prefix,rangeStart,rangeEnd,size:prefix.length+payloadSize,duration:end-start,sourceDuration:duration,start,end};
+ return {prefix,ranges,rangeStart:ranges[0].start,rangeEnd:ranges.at(-1).end,size:prefix.length+payloadSize,duration:outputDuration,sourceDuration:duration,start,end};
 }

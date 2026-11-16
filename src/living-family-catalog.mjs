@@ -1,5 +1,5 @@
-// Visually reviewed original black-and-white sources from generations one and two.
-// Media originals stay in the existing gallery; color selections are not eligible.
+// Reviewed original photographs. Tedhar in the red toy car is the owner-requested
+// color exception; every other featured source remains original black-and-white.
 export const livingActions = [
   {
     "id": "smile",
@@ -82,10 +82,9 @@ export const livingPhotos = [
     "originalBlackAndWhite": true
   },
   {
-    "id": "a1e9162209384402b481b7a487ca5cf9",
-    "title": "אורה ואדי ביום חתונתם",
-    "titleEn": "Ora and Eddie on their wedding day",
-    "generation": 2,
-    "originalBlackAndWhite": true
+    "id": "89b5dd6a048342ecb9cd4b29b73ca197",
+    "title": "תדהר במכונית האדומה",
+    "titleEn": "Tedhar in the red toy car",
+    "requestedColorException": true
   }
 ];

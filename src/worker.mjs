@@ -236,14 +236,14 @@ export default {
       if(!env.FAMILY_STATE)throw new HttpError(503,'צריך להשלים את הגדרת השמירה באתר.');
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
-      if(path==='/api/gallery/download'&&request.method==='POST'){
+      if(['/api/gallery/download','/api/media/download'].includes(path)&&request.method==='POST'){
         checkOrigin(request);
         const form=new URLSearchParams(new TextDecoder().decode(await boundedBody(request,4_000_000)));
         if(!equal(form.get('token'),PUBLIC_WRITE_TOKEN))throw new HttpError(403,'יש לרענן את הדף לפני ההורדה.');
         let ids;try{ids=JSON.parse(form.get('ids'));}catch{throw new HttpError(400,'בחרו תמונות להורדה.');}
-        const {items}=await db('gallery.download',{ids});
-        const entries=items.map(item=>({name:item.filename||item.name||item.file,open:signal=>getObject(env,item,new Request(url.origin+'/media/'+item.id),r=>fetch(r,{signal}))}));
-        return new Response(zipStream(entries),{headers:{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="Keha-Family-Photos-'+new Date().toISOString().slice(0,10)+'.zip"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+        const {items}=await db(path==='/api/gallery/download'?'gallery.download':'media.download',{ids});
+        const entries=items.map(item=>item.provider==='youtube'?{name:(item.name||'video')+'.url',open:async()=>new Response('[InternetShortcut]\r\nURL=https://www.youtube.com/watch?v='+item.youtubeId+'&t='+Math.floor(item.youtubeStart||0)+'\r\n')}:{name:item.filename||item.name||item.file,open:signal=>getObject(env,item,new Request(url.origin+'/media/'+item.id),r=>fetch(r,{signal}))});
+        return new Response(zipStream(entries),{headers:{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="Keha-Family-'+(path==='/api/gallery/download'?'Photos':'Media')+'-'+new Date().toISOString().slice(0,10)+'.zip"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
       }
       if(request.method==='POST'&&path!=='/api/updates/one-click'){
         checkOrigin(request);
@@ -317,7 +317,7 @@ export default {
       if(path==='/api/photo-assets'&&request.method==='GET')return json(await db('photo.assets.queue',{after:url.searchParams.get('after'),limit:url.searchParams.get('limit')}));
       if(path==='/api/video-assets'&&request.method==='GET')return json(await db('video.assets.queue',{after:url.searchParams.get('after'),limit:url.searchParams.get('limit')}));
       if(path==='/api/gallery/face-scan'&&request.method==='GET')return json(await db('gallery.face.scan',{after:url.searchParams.get('after')}));
-      if(path==='/api/gallery/selection'&&request.method==='GET')return json(await db('gallery.selection',{person:url.searchParams.get('person'),unit:url.searchParams.get('unit'),labels:url.searchParams.get('labels'),query:url.searchParams.get('q')}));
+      if(path==='/api/gallery/selection'&&request.method==='GET')return json(await db('gallery.selection',{person:url.searchParams.get('person'),unit:url.searchParams.get('unit'),labels:url.searchParams.get('labels'),query:url.searchParams.get('q'),filter:url.searchParams.get('filter')||'all'}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/versions$/.exec(path))&&request.method==='GET')return json(await db('photo.versions',{id:match[1]}));
       if((match=/^\/api\/media\/([a-f0-9]{32})\/faces$/.exec(path))&&request.method==='GET')return json(await db('media.faces',{id:match[1]}));
       if((match=/^\/api\/nursery\/([^/]+)$/.exec(path))&&request.method==='GET')return snapshot(request,await db('collection',{kind:nurseryCollection(decodeURIComponent(match[1])),page:url.searchParams.get('page')}));

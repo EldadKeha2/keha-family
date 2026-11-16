@@ -119,6 +119,7 @@
     $('workspaceSubtitle').textContent = subtitle;
     const workspaceDetail=$('workspaceDetail');workspaceDetail.hidden=state.view!=='calendar';workspaceDetail.textContent=state.view==='calendar'?I18n.t('ימי הולדת, חגים ומועדים בלוח עברי ולועזי'):'';
     $('searchInput').placeholder = state.view==='videos' ? (I18n.isEnglish?'Search':'חיפוש') : state.view==='timeline' ? I18n.t('חיפוש בשם או בשנת לידה') : state.view==='nursery' ? I18n.t('חיפוש בן או בת משפחה') : global ? state.view==='stories'?I18n.t('חיפוש בסיפורים ובשנים'):I18n.t('חיפוש לפי כיתוב, שם קובץ או אדם') : I18n.t('חיפוש בן או בת משפחה');
+    const searchWrap=$('searchInput').closest?.('.search-wrap');if(searchWrap)searchWrap.hidden=state.view==='family-ai';
     $('searchInput').setAttribute('aria-label', state.view==='nursery'?I18n.t('חיפוש בני משפחה'):global?I18n.t('חיפוש בתוכן המשפחתי'):I18n.t('חיפוש בני משפחה'));
     window.FamilyPortal?.activate(state.view,{preserveGalleryState});
     window.FamilyArchive?.activate(state.view);

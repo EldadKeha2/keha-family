@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import time
 import uuid
-from family_living_source import verified_source, free_quota_reset
+from family_living_source import verified_source, free_quota_reset, owner_color_exception
 
 SPACE = 'https://zerogpu-aoti-wan2-2-fp8da-aoti-faster.hf.space'
 NEGATIVE = 'colorization, exaggerated expressions, facial distortion, changed identity, deformed hands, extra fingers, extra people, camera movement, abrupt motion, morphing, flicker, text, watermark'
@@ -95,7 +95,8 @@ def main():
                                     analytics_enabled=False, max_workers=1,
                                     download_files=str(args.work_dir / 'sdk-output'),
                                     httpx_kwargs={'timeout': 60.0})
-                prompt = MONOCHROME + action['prompt']
+                tones = 'Preserve the original faded colors of this exact family photograph, including the red toy car. No recoloring or monochrome conversion. ' if owner_color_exception(photo) else MONOCHROME
+                prompt = tones + action['prompt']
                 job = {'photoId': photo['id'], 'actionId': action['id'], 'sourceRevision': photo.get('revision', 'original'), 'prompt': prompt, 'createdAt': time.time(), 'status': 'submitting', 'operationId': uuid.uuid4().hex, 'protocol': 'official-gradio-sdk', 'sessionHash': client.session_hash}
                 state['jobs'][key] = job
                 save(journal_path, state)

@@ -3,12 +3,10 @@ import {photoLabelOptions,photoLabelName,loadPhotoLabelCatalog} from './photo-la
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
-const state={open:false,people:new Set(),families:new Set(),labels:new Set(),selected:new Set(),version:0,busy:false,resultsReady:false};
-const downloadIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>';
-const previewIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="14" height="14" rx="2"/><path d="M17 21H5a2 2 0 0 1-2-2V7m4 6 4-4 4 4 2-2 4 4"/><circle cx="16.5" cy="7.5" r="1"/></svg>';
+const state={open:false,people:new Set(),families:new Set(),labels:new Set(),resultsReady:false};
 let roster=[],ready=false;
 function status(message='',error=false){const host=$('gallerySelectionStatus');if(!host)return;host.textContent=message;host.hidden=!message;host.classList.toggle('is-error',error);}
-function clearSelection(){state.selected.clear();state.version++;state.busy=false;status();render();}
+function clearSelection(){window.FamilyMediaSelection?.clearScope('gallery');status();render();}
 function criteria(){return {person:[...state.people].sort().join(','),unit:[...state.families].sort().join(','),labels:[...state.labels].sort().join(',')};}
 function checkboxes(host,items,selected,kind){
   host.innerHTML=items.map(item=>'<label class="gallery-check-option"><input type="checkbox" data-gallery-'+kind+'="'+safe(item.id)+'"'+(selected.has(item.id)?' checked':'')+'><span>'+safe(item.label)+'</span></label>').join('')||'<p class="gallery-filter-empty">'+tr('לא נמצאו התאמות','No matches found')+'</p>';
@@ -43,51 +41,17 @@ function render(){
     const count=[...state.families].filter(id=>window.FAMILY_DATA.units[id]?.generation===generation).length;
     $('galleryFamily'+generation+'ChoiceCount').textContent=count?'('+count+')':'';
   }
-  for(const id of ['gallerySelectionTop','gallerySelectionBottom']){
-    const bar=$(id);bar.hidden=!open;
-    bar.querySelector('[data-gallery-selected-count]').textContent=tr('נבחרו ','Selected: ')+state.selected.size;
-    bar.querySelector('[data-gallery-download]').disabled=!state.selected.size||state.busy;
-    bar.querySelector('[data-gallery-select-all]').disabled=state.busy||!state.resultsReady||!collection.count;
-    bar.querySelector('[data-gallery-clear-selection]').disabled=!state.selected.size||state.busy;
-  }
-  const items=new Map(collection.items.map(item=>[item.id,item]));
-  for(const button of $('sharedGalleryGrid').querySelectorAll('[data-media-open][data-media-scope="gallery"]')){
-    const id=button.dataset.mediaOpen,item=items.get(id);if(!item)continue;
-    button.classList.toggle('gallery-selectable',open);
-    if(open){button.setAttribute('aria-pressed',String(state.selected.has(id)));button.setAttribute('aria-disabled',String(!state.resultsReady||state.busy));button.setAttribute('aria-label',tr('בחירת תמונה: ','Select photo: ')+(item.caption||item.name));}
-    else{button.removeAttribute('aria-pressed');button.removeAttribute('aria-disabled');button.setAttribute('aria-label',tr('פתיחת התמונה ','Open photo ')+(item.caption||item.name));}
-    const card=button.closest('.compact-gallery-card');let preview=card.querySelector('[data-gallery-preview]');
-    if(!open){preview?.remove();continue;}
-    if(!preview){preview=document.createElement('button');preview.type='button';preview.className='gallery-selection-preview';preview.dataset.galleryPreview=id;preview.innerHTML=previewIcon;preview.setAttribute('aria-label',tr('פתיחת הגלריה המסוננת','Open filtered gallery'));preview.title=preview.getAttribute('aria-label');card.append(preview);}
-    preview.disabled=!state.resultsReady||state.busy;
-  }
+  for(const id of ['gallerySelectionTop','gallerySelectionBottom'])$(id).hidden=true;
+  window.FamilyMediaSelection?.refresh();
 }
 function previewFiltered(id){
-  if(!state.open||state.busy||!state.resultsReady)return;
+  if(!state.open||!state.resultsReady)return;
   const collection=window.FamilyPortal.getCollection('gallery');
   if(!collection.items.some(item=>item.id===id))return;
   // Register the matching page and its filter context before opening. Paging
   // continues through the same server-side filters instead of a stale album.
   window.FamilyMedia.register('gallery',collection.items,{pagination:collection.pagination});
   window.FamilyMedia.openFrom('gallery',id);
-}
-async function selectAll(){
-  if(state.busy)return;state.busy=true;const version=++state.version;status(tr('בוחרים את כל תוצאות הסינון…','Selecting all matching photos…'));render();
-  try{
-    const q=window.FamilyPortal.galleryQuery(),response=await I.fetch('api/gallery/selection?'+new URLSearchParams({q:q.query,person:q.person,unit:q.unit,labels:q.labels||''}),{cache:'no-store'}),result=await response.json();
-    if(!response.ok)throw Error(I.error(result.error));if(version!==state.version)return;
-    state.selected=new Set(result.ids);status();
-  }catch(error){if(version===state.version)status(error.message,true);}
-  finally{if(version===state.version){state.busy=false;render();}}
-}
-function download(){
-  if(!state.selected.size||state.busy)return;
-  let frame=$('galleryZipFrame');if(!frame){frame=document.createElement('iframe');frame.id='galleryZipFrame';frame.name='galleryZipFrame';frame.hidden=true;frame.title=tr('הורדת התמונות שנבחרו','Selected photo download');document.body.append(frame);
-    frame.addEventListener('load',()=>{try{const message=JSON.parse(frame.contentDocument.body.textContent);if(message.error)status(I.error(message.error),true);}catch{}});
-  }
-  const form=document.createElement('form');form.method='POST';form.action='api/gallery/download';form.target=frame.name;form.hidden=true;
-  for(const [name,value]of Object.entries({ids:JSON.stringify([...state.selected]),token:window.FAMILY_API_TOKEN})){const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);}
-  document.body.append(form);form.submit();form.remove();const message=tr('הורדת קובץ ה־ZIP החלה.','Your ZIP download has started.');status(message);window.FamilyApp?.toast(message);
 }
 function init(){
   if(!$('galleryFilterToggle'))return;
@@ -97,9 +61,6 @@ function init(){
     const placeFilter=()=>{(mobile.matches?mobileDock:filterHome).append(filterButton);};
     placeFilter();mobile.addEventListener('change',placeFilter);
   }
-  const barHTML='<button type="button" data-gallery-select-all>'+tr('בחר הכל','Select all')+'</button><button type="button" data-gallery-clear-selection>'+tr('ביטול הבחירה','Clear selection')+'</button><span class="gallery-selection-count" data-gallery-selected-count></span><button type="button" class="gallery-download-selected" data-gallery-download>'+downloadIcon+'<span>'+tr('הורדת הנבחרות','Download selected')+'</span></button>';
-  for(const id of ['gallerySelectionTop','gallerySelectionBottom'])$(id).innerHTML=barHTML;
-  $('gallerySelectionTop').querySelector('[data-gallery-selected-count]').setAttribute('aria-live','polite');
   roster=window.FamilyPeopleRoster.snapshot().filter(p=>!p.placeholder);ready=true;fillFamilies();fillPeople();fillLabels();$('galleryLabelSummary').textContent=tr('תגיות','Labels');render();
   $('galleryFilterToggle').addEventListener('click',async()=>{
     if(state.open){reset();window.FamilyPortal.refineGallery({person:'',unit:'',labels:''});return;}
@@ -123,18 +84,9 @@ function init(){
     if(state.open&&!event.target.closest('#galleryFilterPanel .gallery-filter-field')){
       for(const field of $('galleryFilterPanel').querySelectorAll('details[open]'))field.open=false;
     }
-    if(event.target.closest('[data-gallery-select-all]'))selectAll();
-    else if(event.target.closest('[data-gallery-clear-selection]'))clearSelection();
-    else if(event.target.closest('[data-gallery-download]'))download();
-    else{const preview=event.target.closest('[data-gallery-preview]');if(preview)previewFiltered(preview.dataset.galleryPreview);}
+    const preview=event.target.closest('[data-gallery-preview]');if(preview)previewFiltered(preview.dataset.galleryPreview);
   });
-  document.addEventListener('click',event=>{
-    if(!state.open||window.FamilyPortal.galleryQuery().filter!=='all')return;
-    const photo=event.target.closest('#sharedGalleryGrid [data-media-open][data-media-scope="gallery"]');if(!photo)return;
-    event.preventDefault();event.stopImmediatePropagation();if(state.busy||!state.resultsReady)return;
-    const id=photo.dataset.mediaOpen;if(state.selected.has(id))state.selected.delete(id);else state.selected.add(id);status();render();
-  },true);
-  window.addEventListener('family-media-changed',event=>{if(event.detail?.operation==='delete'&&event.detail.scope==='gallery'){state.selected.delete(event.detail.item.id);render();}});
+  window.addEventListener('family-media-changed',event=>{if(event.detail?.operation==='delete'&&event.detail.scope==='gallery'){render();}});
 }
 window.FamilyGalleryFilter={render,reset,category,clearSelection};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

@@ -96,3 +96,15 @@ test('late seek and metadata events from a closed video cannot change the next e
  const current=await f.open('new');old.duration=999;await old.emit('loadedmetadata');await old.finishSeek();
  assert.equal(f.get('videoClipEnd').value,'02:00.00');assert.equal(current.currentTime,0);assert.deepEqual(current.seeks,[]);
 });
+test('segment deletion arms red selection first, then requires a separate confirmation before saving',async()=>{
+ const f=editorFixture();await f.open();await f.input('videoClipStart',10);await f.input('videoClipEnd',40);
+ await f.get('videoClipDeleteRange').emit('click');assert.equal(f.requests.length,0);assert.equal(f.get('videoClipDeleteRange')['aria-pressed'],'true');assert.equal(f.get('videoClipDeleteLabel').textContent,'אשר מחיקה');assert.equal(f.get('videoClipLength').textContent,'01:30.00');assert.equal(f.get('videoClipSave').disabled,true);
+ await f.get('videoClipDeleteRange').emit('click');assert.equal(f.requests.length,0);assert.equal(f.document.body.children.at(-1).open,true);
+ await f.get('videoClipDeleteConfirm').emit('click');await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.requests.length,1);assert.deepEqual(f.requests[0].body.range,{start:10,end:40,remove:true});assert.equal(f.requests[0].path,'api/media/film/video-edit');
+});
+test('canceling segment deletion restores green selection, and the entire video cannot be deleted as a segment',async()=>{
+ const f=editorFixture();await f.open();assert.equal(f.get('videoClipDeleteRange').disabled,true);
+ await f.input('videoClipStart',10);await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteCancel').emit('click');
+ assert.equal(f.get('videoClipDeleteRange')['aria-pressed'],'false');assert.equal(f.document.body.children.at(-1).open,false);assert.equal(f.requests.length,0);assert.equal(f.get('videoClipSave').disabled,false);
+});

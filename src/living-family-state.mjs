@@ -8,7 +8,7 @@ export class LivingFamilyState {
     this.owner.sql.exec('CREATE TABLE IF NOT EXISTS living_family_receipts(operation_id TEXT PRIMARY KEY,media_id TEXT NOT NULL,action_id TEXT NOT NULL,data TEXT NOT NULL)');
   }
   photo(id){
-    if(!livingPhotos.some(photo=>photo.id===id&&photo.originalBlackAndWhite===true))throw new HttpError(404,'התמונה אינה חלק מהאוסף הזה.','LIVING_PHOTO');
+    if(!livingPhotos.some(photo=>photo.id===id&&(photo.originalBlackAndWhite===true||photo.requestedColorException===true)))throw new HttpError(404,'התמונה אינה חלק מהאוסף הזה.','LIVING_PHOTO');
     const item=this.owner.photo(id);
     if(this.owner.familyAi.isExcluded(id))throw new HttpError(404,'התמונה הוסרה מבינה משפחתית.','LIVING_PHOTO');
     return item;

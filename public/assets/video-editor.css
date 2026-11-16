@@ -122,3 +122,20 @@ html[dir=ltr] #videoClipEditor .video-clip-heading,html[dir=ltr] #videoClipEdito
  #videoClipEditor.tag-search-active #videoClipForm{max-height:none}
 }
 html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
+
+/* Start, end, duration and segment deletion share one compact row. */
+#videoClipEditor .video-clip-timing{grid-template-columns:minmax(0,1.8fr) minmax(58px,.9fr) minmax(72px,1.1fr);width:100%;gap:6px;align-items:stretch}
+#videoClipEditor .video-clip-times{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;min-width:0}
+#videoClipEditor .video-clip-time-row{min-width:0}
+#videoClipEditor .video-clip-time-row input{box-sizing:border-box;width:100%;min-width:0;padding:5px 3px;font-size:12px}
+#videoClipEditor .video-clip-duration{min-width:0;padding:4px 3px;justify-content:center}
+#videoClipEditor .video-clip-duration>span{font-size:11px;white-space:normal;text-align:center}
+#videoClipEditor #videoClipLength{font-size:12px}
+#videoClipEditor .video-clip-delete-range{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-sizing:border-box;min-width:0;min-height:48px;padding:5px;border:1px solid #d2aea2;border-radius:6px;background:#fbf0e8;color:#9e513e;font:11px/1.25 var(--sans);cursor:pointer}
+#videoClipEditor .video-clip-delete-range svg{flex:none;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#videoClipEditor.is-removing-segment #videoClipSelection{background:#d35242}
+#videoClipEditor.is-removing-segment .video-clip-timeline input{accent-color:#bd382a}
+#videoClipEditor.is-removing-segment .video-clip-delete-range{background:#bd382a;border-color:#a62b20;color:#fff;box-shadow:0 2px 7px #9f302b33;font-weight:700}
+#videoClipEditor .video-clip-delete-range:focus-visible{outline:2px solid #a62b20;outline-offset:2px}
+#videoClipEditor .video-clip-timing:has(#videoClipDeleteRange[hidden]){grid-template-columns:minmax(0,2fr) minmax(70px,1fr)}
+@media(max-width:380px){#videoClipEditor .video-clip-timing{gap:4px;grid-template-columns:minmax(0,1.8fr) minmax(54px,.85fr) minmax(68px,1fr)}#videoClipEditor .video-clip-time-row input,#videoClipEditor #videoClipLength{font-size:11px}#videoClipEditor .video-clip-delete-range,#videoClipEditor .video-clip-duration>span{font-size:10px}}

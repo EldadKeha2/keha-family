@@ -1,8 +1,12 @@
 # Ten family photographs, three prepared actions
 
-The main `#family-ai` view now presents a curated set of ten visually verified,
-original black-and-white photographs from the first and second generations.
-Color photographs are ineligible even if vintage, old, or converted to grayscale.
+The main `#family-ai` view presents ten reviewed photographs. Nine are original
+black-and-white photographs. On 16 November 2026 the owner explicitly replaced
+the Ora/Eddie wedding selection with Tedhar in his red toy car, photo
+`89b5dd6a048342ecb9cd4b29b73ca197`. This is the only color exception; preserve
+its original faded colors. All other color photographs remain ineligible even
+if vintage, old, or converted to grayscale. Generation labels and the duplicate
+introductory card are omitted from the public view.
 `src/living-family-catalog.mjs` identifies
 the photographs and the three actions: smile, wave, and a little dance.
 The existing larger archival collection remains available below the curated
@@ -44,6 +48,11 @@ visually inspecting the image. Both scripts reject missing reviews, changed
 source revisions, or changed bytes. Replacement color jobs remain archived in
 `excludedJobs`, and their provider quota reset still blocks all new submissions.
 The generator adds a monochrome-only instruction to every new movement prompt.
+The named Tedhar exception instead requires `requestedColorException: true`
+and `sourceReview` with `kind: "owner-requested-color"`, its unchanged revision
+and SHA-256. Its output requires `colorPreservationReviewed: true` in place of
+`monochromeReviewed`. The shared helper accepts this exception only for that
+exact photo ID; it cannot relax the rule for another selection.
 
 Inspect generated frames for identity, natural motion, monochrome preservation,
 extra people, and hand artifacts. Set `reviewed: true` and

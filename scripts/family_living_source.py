@@ -2,12 +2,19 @@
 import hashlib
 import pathlib
 
+OWNER_COLOR_PHOTO = '89b5dd6a048342ecb9cd4b29b73ca197'
+
+
+def owner_color_exception(photo):
+    return photo.get('id') == OWNER_COLOR_PHOTO and photo.get('requestedColorException') is True
+
 
 def verified_source(photo):
-    """Bind an actual visual black-and-white review to unchanged original bytes."""
-    review = photo.get('blackAndWhiteReview', {})
+    """Bind a visual source review to unchanged bytes, with one named exception."""
+    color = owner_color_exception(photo)
+    review = photo.get('sourceReview' if color else 'blackAndWhiteReview', {})
     revision = photo.get('revision', 'original')
-    if (review.get('kind') != 'original-black-and-white'
+    if (review.get('kind') != ('owner-requested-color' if color else 'original-black-and-white')
             or review.get('reviewed') is not True
             or review.get('revision') != revision):
         raise ValueError('A visually reviewed original black-and-white source is required: ' + photo['id'])
@@ -16,6 +23,10 @@ def verified_source(photo):
     if review.get('sha256') != digest:
         raise ValueError('Source bytes changed after black-and-white review: ' + photo['id'])
     return source
+
+
+def output_tones_reviewed(photo, job):
+    return bool(job.get('colorPreservationReviewed') if owner_color_exception(photo) else job.get('monochromeReviewed'))
 
 
 def free_quota_reset(state):

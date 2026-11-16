@@ -375,8 +375,8 @@ export class FamilyState {
     ...(item.thumbnail?.revision===(item.photoRevision||'original')?{thumbnailSrc:'/media/'+item.id+'?thumbnail=1&v='+item.thumbnail.revision+(item.thumbnail.cacheRevision?'&copy='+item.thumbnail.cacheRevision:''),thumbnailSize:item.thumbnail.size}:{}),
     ...(item.preview?.revision===(item.photoRevision||'original')?{previewSrc:'/media/'+item.id+'?preview=1&v='+item.preview.revision+(item.preview.cacheRevision?'&copy='+item.preview.cacheRevision:''),previewSize:item.preview.size}:{}),
     collections:cached?[...new Set([...(item.category==='personal'?[]:[item.category]),...cached.collections])]:this.mediaCollections(item),modifiedAt:item.modifiedAt||item.updatedAt||item.photoEditedAt||item.createdAt,
-    ...(mediaKind(item)==='photo'?{framing:photoFrame(item.framing),faceSummary:this.faceSummary(item,cached?.face),labels:photoLabels(item.labels)}:{}),
-    ...(['photo','video'].includes(mediaKind(item))?{takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
+    ...(mediaKind(item)==='photo'?{framing:photoFrame(item.framing),faceSummary:this.faceSummary(item,cached?.face)}:{}),
+    ...(['photo','video'].includes(mediaKind(item))?{labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
     ...(item.videoClip?{videoClip:item.videoClip}:{}),...(item.duration?{duration:item.duration}:{}),...(mediaKind(item)==='video'?{videoRevision:item.videoRevision||'original'}:{}),
     ...(item.youtubeStart!==undefined?{youtubeStart:item.youtubeStart,youtubeEnd:item.youtubeEnd}:{}),
@@ -767,7 +767,8 @@ export class FamilyState {
         return {version:2,labels:photoLabelOptions(ids)};
       }
       case 'media.labels.patch':{
-        const item=this.photo(p.id);
+        const item=this.media(p.id);
+        if(!['photo','video'].includes(mediaKind(item)))throw new HttpError(400,'בחרו תמונה או סרטון להוספת תגית.');
         let label=normalizePhotoLabel(p.label);if(typeof p.tagged!=='boolean'||!label)throw new HttpError(400,'הזינו תגית באורך של עד 60 תווים.');
         const key=photoLabelKey(label),current=photoLabels(item.labels),known=label.startsWith('custom:')?this.run('photo.labels.catalog').labels.find(option=>photoLabelKey(option.id)===key):null;label=known?.id||label;
         const labels=new Set(current.filter(id=>photoLabelKey(id)!==key));
@@ -997,7 +998,14 @@ export class FamilyState {
         person.profileHistory=history.slice(-50);this.savePerson(person);
         return {saved:true,operation:p.restorePrevious?'profile-restore':'profile',person:this.snapshot(person,this.personMedia(p.id))};
       }
-      case 'gallery.selection':return this.collection('gallery',{...p,filter:'all',selection:true});
+      case 'gallery.selection':return this.collection('gallery',{...p,filter:p.filter||'all',selection:true});
+      case 'media.download':{
+        if(!Array.isArray(p.ids)||!p.ids.length||p.ids.length>50000||p.ids.some(id=>typeof id!=='string'||!/^([a-f0-9]{32})$/.test(id)))throw new HttpError(400,'בחרו תמונות או סרטונים להורדה.');
+        const ids=[...new Set(p.ids)],found=new Map();
+        for(let i=0;i<ids.length;i+=80){const batch=ids.slice(i,i+80);for(const row of this.rows('SELECT id,data FROM media WHERE id IN ('+batch.map(()=>'?').join(',')+')',...batch)){const item=JSON.parse(row.data);if(['photo','video'].includes(mediaKind(item)))found.set(row.id,item);}}
+        if(found.size!==ids.length)throw new HttpError(409,'חלק מהפריטים אינם זמינים. רעננו את הבחירה ונסו שוב.');
+        return {items:ids.map(id=>found.get(id))};
+      }
       case 'gallery.download':{
         if(!Array.isArray(p.ids)||!p.ids.length||p.ids.length>50000||p.ids.some(id=>typeof id!=='string'||!/^([a-f0-9]{32})$/.test(id)))throw new HttpError(400,'בחרו תמונות להורדה.');
         const ids=[...new Set(p.ids)],found=new Map();
