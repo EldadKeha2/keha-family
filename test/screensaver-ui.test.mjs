@@ -53,7 +53,7 @@ test('label size changes immediately and stays synchronized between the page and
   for(const english of [false,true]){
     const f=fixture({english});await flush();
     const page=f.nodes.get('screensaverLabelSize').querySelector('input'),output=f.nodes.get('screensaverLabelSize').querySelector('output');
-    assert.equal(page.value,'100');assert.equal(page.getAttribute('aria-label'),english?'Label size':'גודל התוויות');
+    assert.equal(page.value,'100');assert.equal(page.getAttribute('aria-label'),english?'Label size':'גודל תוויות');
     page.value='150';page.dispatchEvent(new Event('input'));assert.equal(output.textContent,'150%');assert.equal(f.window.FamilyPhotoFullscreen.options().labelScale,1.5);
     f.start();const live=f.bar.querySelector('input');assert.equal(live.value,'150');
     live.value='200';live.dispatchEvent(new Event('input'));assert.equal(page.value,'200');assert.equal(output.textContent,'200%');assert.equal(f.playing(),true);
