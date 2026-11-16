@@ -36,6 +36,8 @@ test('the dedicated page offers exactly all plus the six branches in both langua
   for(const english of [false,true]){
     const f=fixture({english});await flush();
     assert.deepEqual(f.select().children.map(node=>node.value),['all',...family.branches.map(branch=>branch.id)]);
+    assert.equal(f.select().value,'all');assert.equal(f.select().children[0].textContent,english?'The whole family':'כל המשפחה');
+    assert.equal(f.select().getAttribute('aria-label'),english?'Choose the family branch to display':'בחר את הענף המשפחתי המוצג');
     assert.equal(f.requests[0].query.get('unit'),'');assert.equal(f.requests[0].query.get('size'),'500');
     for(const branch of family.branches){f.choose(branch.id);await flush();assert.equal(f.requests.at(-1).query.get('unit'),branch.unit);}
     f.start();assert.equal(f.opens.at(-1).scope,'screensaver');assert.equal(f.playing(),true);assert.equal(f.fullSelect().value,family.branches.at(-1).id);

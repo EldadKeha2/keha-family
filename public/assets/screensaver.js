@@ -8,16 +8,17 @@
   const branches=()=>window.FAMILY_DATA?.branches||[];
   function fill(select){
     select.replaceChildren();
-    for(const branch of [{id:'all',title:tr('הכל — כל המשפחה','All — the whole family')},...branches()]){
+    for(const branch of [{id:'all',title:tr('כל המשפחה','The whole family')},...branches()]){
       const option=document.createElement('option');option.value=branch.id;option.textContent=branch.id==='all'?branch.title:I.branchName(branch);select.append(option);
     }
     select.value=state.branch;
   }
   function familyControl(className){
-    const label=document.createElement('label');label.className=className;label.dir=I.isEnglish?'ltr':'rtl';
-    const text=document.createElement('span');text.textContent=tr('ענף במשפחה','Family branch');
+    const label=document.createElement('label');label.className=className+' screensaver-branch-control';label.dir=I.isEnglish?'ltr':'rtl';
+    const icon=document.createElement('span');icon.className='screensaver-branch-icon';icon.setAttribute('aria-hidden','true');icon.innerHTML='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 27c2-9 6-15 13-22M13 20C5 21 4 15 5 11c6 0 10 3 8 9ZM18 14c-1-6 3-10 9-10 1 6-3 10-9 10ZM16 17c5-4 10-3 12 0-4 5-9 6-12 0Z"/></svg>';
+    const text=document.createElement('span');text.className='screensaver-branch-prompt';text.textContent=tr('בחר את הענף המשפחתי המוצג','Choose the family branch to display');
     const select=document.createElement('select');select.className='screensaver-family-select';select.setAttribute('aria-label',text.textContent);fill(select);
-    select.addEventListener('change',()=>{state.branch=branches().some(branch=>branch.id===select.value)?select.value:'all';void load();});label.append(text,select);return {label,select};
+    select.addEventListener('change',()=>{state.branch=branches().some(branch=>branch.id===select.value)?select.value:'all';void load();});label.append(icon,text,select);return {label,select};
   }
   function labelSizeControl(className){
     const label=document.createElement('label');label.className='screensaver-label-size '+className;label.dir=I.isEnglish?'ltr':'rtl';
