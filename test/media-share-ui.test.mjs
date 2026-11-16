@@ -947,3 +947,22 @@ test('closing a paginated viewer restores the grid page where that viewer was op
  f.window.FamilyMedia.openFrom('gallery','return-b');await f.window.FamilyMedia.step(-1);await f.window.FamilyMedia.step(-1);assert.equal(page,3);f.close();assert.equal(page,2);assert.deepEqual(visits,[1,3,2]);
  f.window.FamilyMedia.openFrom('gallery','return-b');f.close();assert.deepEqual(visits,[1,3,2],'Closing without crossing a page does not reload the grid');
 });
+
+
+test('an obsolete closed-viewer page restoration cannot show an error in another view or reopened gallery',async()=>{
+ for(const action of ['same-owner','route-change','view-change','reopen']){
+  const f=fixture({navigation:true,url:'https://family.test/#person/ruti'}),messages=[],pages=[[f.photo('owner-a')],[f.photo('owner-b')]];let view='person',rejectRestore;
+  f.window.FamilyApp.getView=()=>view;f.window.FamilyApp.toast=message=>messages.push(message);
+  const loadPage=page=>page===1?new Promise((_resolve,reject)=>{rejectRestore=reject;}):Promise.resolve(register(page));
+  const register=page=>f.window.FamilyMedia.register('personal:ruti',pages[page-1],{pagination:{page,pages:2,size:1,total:2},loadPage});
+  register(1);f.window.FamilyMedia.openFrom('personal:ruti','owner-a');await f.window.FamilyMedia.step(1);f.close();await f.browser.flush();
+  assert.equal(typeof rejectRestore,'function','Closing after paging attempts to restore the opening page');
+  if(action==='route-change')f.window.FamilyNavigation.go('#nostalgia');
+  if(action==='view-change')view='nostalgia';
+  if(action==='reopen')f.window.FamilyMedia.openFrom('personal:ruti','owner-b');
+  rejectRestore(Error('The source album changed'));await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(messages.length,action==='same-owner'?1:0,action);
+  if(action==='same-owner')assert.equal(messages[0],'לא ניתן לחזור לעמוד התמונות כרגע.');
+  if(f.get('mediaViewer').open)f.close();
+ }
+});

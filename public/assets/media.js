@@ -476,6 +476,17 @@
       if(active())await step(direction,{instant:true,queued:true});
     }catch(error){if(active())notify(error.message||tr('לא ניתן להשלים את התיוג כרגע.','The tag could not be completed.'));}
   }
+  function restoreGridPage(page){
+    const scope=state.scope,api=pagingApi();
+    if(!page||!paginatedAlbum(scope)||(api?.galleryQuery?.().page??albumPages.get(scope)?.page)===page)return;
+    const owner={session:state.session,hash:new URL(location.href).hash,view:app()?.getView?.()};
+    const failed=()=>{
+      // Leaving the source album or reopening a viewer cancels its restoration.
+      // An obsolete rejection must not report a failure in the newly opened view.
+      if(!$('mediaViewer').open&&state.session===owner.session&&state.scope===scope&&new URL(location.href).hash===owner.hash&&app()?.getView?.()===owner.view)notify(tr('לא ניתן לחזור לעמוד התמונות כרגע.','The original photo page could not be restored.'));
+    };
+    try{api?.pageGallery?.(page)?.catch?.(failed);}catch{failed();}
+  }
   function init(){
     const stage=$('mediaStage');
     const previousPhoto=()=>step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true}),nextPhoto=()=>step(1,{instant:window.FamilyPhotoPresentation?.desktop?.(),queued:true});
@@ -579,7 +590,7 @@
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
     $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
-    $('mediaViewer').addEventListener('close',()=>{hideSwipeHint();const returnPage=state.returnPage;state.returnPage=null;state.session++;state.navigation++;state.paging=false;state.pageTarget=null;state.pageRequest=null;state.photoLoading=false;state.photoTarget=null;state.fullscreen=false;$('mediaViewer').classList.toggle('photo-fullscreen',false);window.FamilyPhotoFullscreen?.closed();instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));if(returnPage&&paginatedAlbum(state.scope)&&(pagingApi()?.galleryQuery?.().page??albumPages.get(state.scope)?.page)!==returnPage)pagingApi()?.pageGallery?.(returnPage)?.catch?.(()=>notify(tr('לא ניתן לחזור לעמוד התמונות כרגע.','The original photo page could not be restored.')));if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
+    $('mediaViewer').addEventListener('close',()=>{hideSwipeHint();const returnPage=state.returnPage;state.returnPage=null;state.session++;state.navigation++;state.paging=false;state.pageTarget=null;state.pageRequest=null;state.photoLoading=false;state.photoTarget=null;state.fullscreen=false;$('mediaViewer').classList.toggle('photo-fullscreen',false);window.FamilyPhotoFullscreen?.closed();instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));restoreGridPage(returnPage);if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')||event.target.closest('input,textarea,select'))return;
       if(event.key==='ArrowLeft'){event.preventDefault();step(-1);}
