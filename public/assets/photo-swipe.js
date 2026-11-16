@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,photoButtons=false,videoSurface=null,strictStart=false}){
+  function bind(stage,{enabled,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,photoButtons=false,videoSurface=null,strictStart=false}){
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
     const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
     const clearPreview=()=>{if(previewFrame!==null)cancelAnimationFrame(previewFrame);previewFrame=null;pendingPreview=null;};
@@ -46,8 +46,9 @@
       if(!isMouse&&!video&&typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       gesture.mode=mode;gesture.mouse=isMouse;return mode;
     };
-    // Phone browsers report both PointerEvents and TouchEvents for one finger.
-    // Let the real touch stream own the complete stroke, including its release.
+    // Phones use the real touch stream. Windows hybrid browsers can emit a
+    // touchstart without subsequent touchmove events; keep their pointer stream
+    // active, retaining TouchEvents as a fallback if the browser cancels it.
     stage.addEventListener('pointerdown',event=>{freshVideoTouch(event);if(!touchOnly())begin(event);},{capture:true,passive:true});
     const moved=event=>{
       const g=gesture;if(!g||event.pointerId!==g.id)return;
@@ -72,7 +73,7 @@
       blockClick();if(event.cancelable)event.preventDefault();
       preview(dx,{queued:g.mode==='queued'});
     };
-    document.addEventListener('pointermove',event=>{if(!touchOnly()&&!touchStart)moved(event);},{capture:true,passive:false});
+    document.addEventListener('pointermove',event=>{if(!touchOnly()&&(!touchStart||preferPointer()))moved(event);},{capture:true,passive:false});
     const released=event=>{
       const g=gesture;if(!g){if(nativePointer?.id===event.pointerId){nativeEnded(nativePointer,event);nativePointer=null;}return;}if(event.pointerId!==g.id)return;
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
@@ -85,7 +86,7 @@
       // Use the gallery's actual Next/Previous actions for physical gestures.
       navigate(dx,{dragX:dx,queued:true,...(g.mode==='queued'?{native:true}:{})});
     };
-    document.addEventListener('pointerup',event=>{if(!touchOnly()&&!touchStart)released(event);},{capture:true,passive:false});
+    document.addEventListener('pointerup',event=>{if(!touchOnly()&&(!touchStart||preferPointer()))released(event);},{capture:true,passive:false});
     document.addEventListener('pointercancel',event=>{if(!touchOnly()&&gesture?.id===event.pointerId){blockClick();reset(true);}},{capture:true,passive:true});
     // Some Windows touch browsers interrupt the pointer stream when their
     // native photo scroller claims a gesture. Keep a single-touch fallback;

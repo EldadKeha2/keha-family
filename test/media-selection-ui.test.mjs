@@ -7,8 +7,8 @@ import * as labels from '../public/assets/photo-labels-catalog.mjs';
 
 const source=(await readFile(new URL('../public/assets/media-selection.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 const tick=async()=>{for(let i=0;i<5;i++)await new Promise(resolve=>setImmediate(resolve));};
-function fixture(){
- const {document,window:dom}=parseHTML('<html><body><section><div id="photos"></div></section><section><div id="videos"></div></section></body></html>');
+function fixture({desktop=true,english=false}={}){
+ const {document,window:dom}=parseHTML('<html><body><section><div class="gallery-category-row"><div class="gallery-tag-filters"></div><button class="gallery-refine-toggle">Filter</button></div><div id="photos"></div></section><section><div class="video-filter-toolbar"></div><div id="videos"></div></section></body></html>');
  const handlers=new Map(),timers=new Map(),frames=new Map(),items=new Map(),requests=[],changes=[],downloads=[];let now=10000,sequence=0,opens=0,failId=null;
  const add=(scope,id,kind='photo')=>{
   const item={id,kind,scope,name:'Memory '+id,src:'/media/'+id};items.set(scope+':'+id,item);
@@ -19,7 +19,7 @@ function fixture(){
  document.addEventListener=(name,fn,options)=>{if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(fn);};
  dom.HTMLElement.prototype.showModal=function(){this.setAttribute('open','');};dom.HTMLElement.prototype.close=function(){this.removeAttribute('open');};dom.HTMLElement.prototype.focus=function(){};
  dom.HTMLElement.prototype.submit=function(){downloads.push({action:this.action,ids:JSON.parse(this.querySelector('[name=ids]').value)});};
- const window={FamilyI18n:{isEnglish:false,mediaName:item=>item.name,error:String,fetch:async(path,options)=>{
+ const window={FamilyPhotoKeyboard:{desktop:()=>desktop},FamilyI18n:{isEnglish:english,mediaName:item=>item.name,error:String,fetch:async(path,options)=>{
   const body=options?.body&&JSON.parse(options.body);requests.push({path,body});
   if(path.startsWith('api/gallery/selection?'))return Response.json({ids:['a'.repeat(32),'b'.repeat(32),'d'.repeat(32)]});
   const [,id,action]=/^api\/media\/([^/]+)\/(.+)$/.exec(path)||[];
@@ -74,4 +74,32 @@ test('a single chosen label is added to every selected video without replacing e
  const f=fixture();f.hold(f.video);f.action('label');await tick();const dialog=f.document.querySelector('dialog');
  dialog.querySelector('input[name=label]').value='זיכרון משפחתי';dialog.querySelector('form').dispatchEvent(new f.document.defaultView.Event('submit',{bubbles:true,cancelable:true}));await tick();
  assert.equal(f.requests.length,1);assert.match(f.requests[0].path,/\/labels$/);assert.equal(f.requests[0].body.tagged,true);assert.match(f.requests[0].body.label,/^custom:/);assert.equal(f.changes[0].operation,'labels');
+});
+
+test('desktop header Select opens the existing actions with no implicit selection and ordinary clicks then toggle cards',()=>{
+ for(const english of [false,true]){
+  const f=fixture({english}),button=f.document.querySelector('.gallery-category-row [data-selection-start]');
+  assert.equal(button.hidden,false);assert.equal(button.getAttribute('aria-pressed'),'false');assert.equal(f.bar.hidden,true);
+  button.click();assert.equal(f.bar.hidden,false);assert.equal(button.getAttribute('aria-pressed'),'true');assert.deepEqual(Array.from(f.api.ids()),[]);
+  assert.equal(f.bar.querySelector('[data-selection-download]').disabled,true);assert.equal(f.bar.querySelector('[data-selection-all]').disabled,false);
+  f.tap(f.a);f.tap(f.b);assert.equal(f.opens,0);assert.equal(f.api.ids().length,2);assert.equal(f.bar.querySelector('[data-selection-download]').disabled,false);
+  button.click();assert.equal(f.bar.hidden,true);assert.equal(button.getAttribute('aria-pressed'),'false');f.tap(f.a);assert.equal(f.opens,1);
+ }
+});
+test('desktop selection buttons keep grids separate, use existing filtered Select all and do not duplicate after rendering',async()=>{
+ const f=fixture(),gallery=f.document.querySelector('.gallery-category-row [data-selection-start]'),video=f.document.querySelector('.video-filter-toolbar [data-selection-start]');
+ gallery.click();f.action('all');await tick();assert.equal(f.api.ids().length,3);assert.match(f.requests[0].path,/filter=partial/);
+ video.click();assert.deepEqual(Array.from(f.api.ids()),[]);assert.equal(gallery.getAttribute('aria-pressed'),'false');f.tap(f.video);assert.deepEqual(Array.from(f.api.ids()),['c'.repeat(32)]);
+ f.api.refresh();f.flush();f.api.refresh();f.flush();assert.equal(f.document.querySelectorAll('[data-selection-start]').length,2);
+ assert.equal(f.document.querySelectorAll('.media-grid-header-actions').length,1);
+});
+test('phones retain long-press selection without desktop entry buttons',()=>{
+ const f=fixture({desktop:false});assert.equal(f.document.querySelector('.gallery-category-row [data-selection-start]').hidden,true);
+ f.hold(f.a);assert.equal(f.bar.hidden,false);assert.deepEqual(Array.from(f.api.ids()),['a'.repeat(32)]);
+});
+test('dynamic grids get their own top menu and an emptied grid removes its stale entry point',()=>{
+ const f=fixture(),section=f.document.createElement('section'),grid=f.document.createElement('div'),card=f.video.cloneNode(true);grid.id='dynamic-video-grid';
+ grid.append(card);section.append(grid);f.document.body.append(section);f.api.refresh();f.flush();
+ const menu=section.querySelector('.media-grid-selection-menu');assert.ok(menu);menu.querySelector('[data-selection-start]').click();f.tap(card);assert.deepEqual(Array.from(f.api.ids()),['c'.repeat(32)]);
+ card.remove();f.api.refresh();f.flush();assert.equal(section.querySelector('[data-selection-start]'),null);
 });

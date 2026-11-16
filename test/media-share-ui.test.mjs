@@ -259,6 +259,36 @@ test('photo preparation keeps the current photo visible and cannot reopen a clos
   else{assert.equal(f.get('mediaOriginal').href,action==='finish'?'/media/b':'/media/b?v=edited');assert.equal(f.get('mediaStage').content[0].src,f.get('mediaOriginal').href);assert.equal(f.get('mediaNext').disabled,false);}
  }
 });
+test('Windows hybrid input keeps pointer navigation when only touchstart arrives, without a second advance from touchend',()=>{
+ for(const dx of [-140,140])for(const scope of ['gallery','photos','personal:ruti','nostalgia']){
+  const f=fixture({touchscreen:true});f.navigator.userAgent='Windows NT 10.0';f.get('mediaStage').clientWidth=1200;
+  f.window.FamilyMedia.open(['a','b','c'].map(f.photo),1,scope);
+  pointer(f,'pointerdown',300);finger(f,'touchstart',300);
+  pointer(f,'pointermove',300+dx);pointer(f,'pointerup',300+dx);
+  assert.equal(f.window.FamilyMedia.current().id,dx>0?'c':'a');
+  finger(f,'touchend',300);assert.equal(f.window.FamilyMedia.current().id,dx>0?'c':'a','A stale compatibility touch release must not navigate again');f.close();
+ }
+});
+test('Windows pointer cancellation hands the same stroke to touch input and accepts the next pointer stroke',()=>{
+ const f=fixture({touchscreen:true});f.navigator.userAgent='Windows NT 10.0';f.get('mediaStage').clientWidth=1200;
+ f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'gallery');
+ pointer(f,'pointerdown',300);finger(f,'touchstart',300);pointer(f,'pointercancel',300);finger(f,'touchmove',440);finger(f,'touchend',440);
+ assert.equal(f.window.FamilyMedia.current().id,'b');
+ pointer(f,'pointerdown',300);finger(f,'touchstart',300);pointer(f,'pointermove',440);pointer(f,'pointerup',440);finger(f,'touchend',440);
+ assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+});
+test('desktop video body swipes browse the album while native playback controls retain taps and seeking',()=>{
+ for(const dx of [-140,140]){
+  const f=fixture({touchscreen:true});f.navigator.userAgent='Windows NT 10.0';const stage=f.get('mediaStage');stage.clientWidth=1200;
+  f.window.FamilyMedia.open(['a','b','c'].map(id=>({...f.photo(id),kind:'video',mime:'video/mp4'})),1,'videos');
+  const player=stage.content[0];player.tagName='VIDEO';player.getBoundingClientRect=()=>({top:0,bottom:600});player.closest=selector=>selector.includes('video')?player:null;stage.children.set('video',player);
+  const input=(type,x,y)=>pointer(f,type,x,y,{target:player});
+  input('pointerdown',300,570);input('pointermove',300+dx,570);input('pointerup',300+dx,570);
+  assert.equal(f.window.FamilyMedia.current().id,'b','Seeking in the native controls never changes the video');
+  input('pointerdown',300,200);input('pointermove',300+dx,200);input('pointerup',300+dx,200);
+  assert.equal(f.window.FamilyMedia.current().id,dx>0?'c':'a');f.close();
+ }
+});
 test('desktop button presses switch prepared photos and rebind their controls synchronously',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture(),mounts=[],tags=[];let preparations=0;
  f.window.FamilyPhotoPresentation.ready=item=>Object.assign(f.document.createElement('img'),{src:item.src});f.window.FamilyPhotoPresentation.prepare=()=>{preparations++;return null;};f.window.FamilyPhotoPresentation.preload=()=>{};
@@ -419,13 +449,12 @@ test('pinch, cancelled and stale gestures never navigate and swipes cannot activ
  f.get('mediaStage').handlers.get('click')(click);assert.equal(click.prevented,true);assert.equal(click.stopped,true);
  const keyboard={...click,detail:0,prevented:false,stopped:false};f.get('mediaStage').handlers.get('click')(keyboard);assert.equal(keyboard.prevented,false);
 });
-test('zoom, active tag edits, caption edits, other dialogs, videos and single-photo albums block swipes',()=>{
+test('zoom, active tag edits, caption edits, other dialogs and single-photo albums block swipes',()=>{
  const f=fixture();f.get('mediaStage').clientWidth=360;
  const open=()=>f.window.FamilyMedia.open([f.photo('a'),f.photo('b')],0,'gallery');open();
  f.window.FamilyFaces={canNavigate:()=>false,clear(){},update(){},mount(){}};swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
  f.window.FamilyFaces.canNavigate=()=>true;f.get('editOpenedCaption').handlers.get('click')();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
  f.get('cancelOpenedCaption').handlers.get('click')();f.document.querySelector=()=>({open:true});swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');f.document.querySelector=()=>null;
- f.window.FamilyMedia.open([{...f.photo('a'),kind:'video'},f.photo('b')],0,'videos');swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
  f.open();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/a');
  open();swipe(f,120);assert.equal(f.get('mediaOriginal').href,'/media/b');
 });

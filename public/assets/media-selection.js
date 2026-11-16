@@ -4,10 +4,12 @@ const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state={scope:null,grid:null,ids:new Set(),items:new Map(),busy:false,epoch:0,context:''};
 const cardSelector='.shared-media-card,.compact-gallery-card,.gallery-photo,.living-card,.family-ai-card';
-const icons={download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',trash:'<path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/>',label:'<path d="M3 3h8l10 10-8 8L3 11Z"/><circle cx="7.5" cy="7.5" r="1.3"/>'};
+const icons={select:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m7 12 3 3 7-7"/>',download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',trash:'<path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/>',label:'<path d="M3 3h8l10 10-8 8L3 11Z"/><circle cx="7.5" cy="7.5" r="1.3"/>'};
 const icon=name=>`<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;
 let bar,confirmation,labelDialog,press=null,suppress=null,frame=null,resizeObserver;
 const pendingPointers=new Set();
+const menus=new Map();
+const desktop=()=>window.FamilyPhotoKeyboard?.desktop?.()??matchMedia('(min-width:701px)').matches;
 const lookup=(scope,id)=>window.FamilyMedia?.lookup(scope,id);
 const context=scope=>{if(scope!=='gallery')return '';const q=window.FamilyPortal.galleryQuery();return JSON.stringify([q.query,q.person,q.unit,q.labels||'',q.filter||'all']);};
 const cards=()=>[...document.querySelectorAll('[data-select-id]')];
@@ -25,6 +27,25 @@ function clear(){
   if(state.busy)return;
   state.epoch++;state.ids.clear();state.items.clear();state.scope=null;state.grid=null;
   status();render();
+}
+function startSelection(grid){
+  if(state.busy)return;
+  cancelPress();suppress=null;
+  if(state.grid===grid){clear();return;}
+  const card=cards().find(card=>card.parentElement===grid),data=card&&candidate(card);if(!data)return;
+  clear();state.scope=data.scope;state.grid=grid;state.context=context(data.scope);status();render();
+}
+function mountMenu(grid){
+  const existing=menus.get(grid);if(existing?.button.isConnected)return;
+  const siblings=[...grid.parentElement.children],preceding=siblings.slice(0,siblings.indexOf(grid));
+  let host=preceding.find(node=>node.matches('.gallery-category-row')),fallback=false;
+  if(host){
+    const row=host;host=row.querySelector('.media-grid-header-actions');
+    if(!host){host=document.createElement('div');host.className='media-grid-header-actions';const filter=row.querySelector('.gallery-refine-toggle');row.append(host);if(filter)host.append(filter);}
+  }else host=[...preceding].reverse().find(node=>node.matches('.video-filter-toolbar,.collection-heading,.archive-toolbar,.archive-filters,.family-ai-toolbar,.living-family-meta'));
+  if(!host){host=document.createElement('div');host.className='media-grid-selection-menu';grid.before(host);fallback=true;}
+  const button=document.createElement('button');button.type='button';button.className='media-grid-selection-toggle';button.dataset.selectionStart='';button.setAttribute('data-i18n-skip','');button.setAttribute('aria-controls','mediaSelectionActions');button.innerHTML=icon('select')+'<span></span>';
+  button.addEventListener('click',()=>startSelection(grid));host.append(button);menus.set(grid,{host,button,fallback});
 }
 function enter(card){
   if(state.busy)return;
@@ -56,6 +77,12 @@ function render(){
     const check=card.querySelector('[data-selection-check]');
     if(check){check.hidden=!selectable;check.setAttribute('aria-pressed',String(selected));check.disabled=state.busy;}
   }
+  const show=desktop();
+  for(const [grid,{host,button,fallback}]of menus){
+    const selecting=active&&state.grid===grid,label=selecting?tr('סיום בחירה','Done selecting'):tr('בחירה','Select');
+    button.hidden=!show;button.disabled=state.busy;button.setAttribute('aria-pressed',String(selecting));button.setAttribute('aria-label',label);button.title=label;button.querySelector('span').textContent=label;
+    if(fallback)host.hidden=!show;
+  }
 }
 function placeCheck(card){
   const check=card.querySelector('[data-selection-check]'),media=card.querySelector('.gallery-image,.living-photo,.family-ai-photo,.video-tile-preview,.personal-video-cover,video');
@@ -63,9 +90,9 @@ function placeCheck(card){
   const rect=media.getBoundingClientRect();if(rect.height){check.style.top=Math.max(4,Math.round(rect.bottom-card.getBoundingClientRect().top-35))+'px';check.style.bottom='auto';}
 }
 function scan(){
-  frame=null;
+  frame=null;const grids=new Set();
   for(const card of document.querySelectorAll(cardSelector)){
-    const data=candidate(card);if(!data)continue;
+    const data=candidate(card);if(!data)continue;grids.add(data.grid);
     card.dataset.selectId=data.id;card.dataset.selectScope=data.scope;
     card.classList.add('media-select-card');
     if(!card.querySelector('[data-selection-check]')){
@@ -75,6 +102,8 @@ function scan(){
     }
     placeCheck(card);
   }
+  for(const [grid,{host,button,fallback}]of menus)if(!grids.has(grid)||!button.isConnected){button.remove();if(fallback)host.remove();menus.delete(grid);}
+  for(const grid of grids)mountMenu(grid);
   render();
 }
 function refresh(){if(frame===null)frame=requestAnimationFrame(scan);}
@@ -171,7 +200,7 @@ async function chooseLabel(){
   labelDialog.querySelector('input[name=label]').value='';labelDialog.querySelector('[data-selection-label-error]').textContent='';labelDialog.showModal();
 }
 function init(){
-  bar=document.createElement('div');bar.className='media-selection-bar';bar.hidden=true;bar.setAttribute('data-i18n-skip','');bar.setAttribute('role','region');bar.setAttribute('aria-label',tr('פעולות על הפריטים שנבחרו','Selected media actions'));
+  bar=document.createElement('div');bar.id='mediaSelectionActions';bar.className='media-selection-bar';bar.hidden=true;bar.setAttribute('data-i18n-skip','');bar.setAttribute('role','region');bar.setAttribute('aria-label',tr('פעולות על הפריטים שנבחרו','Selected media actions'));
   bar.innerHTML=`<strong data-selection-count aria-live="polite"></strong><button type="button" data-selection-all>${tr('בחר הכל','Select all')}</button><button type="button" data-selection-done>${tr('סיום בחירה','Done selecting')}</button><button type="button" data-selection-download>${icon('download')}${tr('הורדה','Download')}</button><button type="button" data-selection-label>${icon('label')}${tr('הוספת תגית','Add label')}</button><button type="button" data-selection-delete>${icon('trash')}${tr('מחיקה','Delete')}</button><p data-selection-status role="status"></p>`;
   document.body.append(bar);
   bar.addEventListener('click',event=>{if(event.target.closest('[data-selection-done]'))clear();else if(event.target.closest('[data-selection-all]'))void selectAll();else if(event.target.closest('[data-selection-download]'))download();else if(event.target.closest('[data-selection-delete]'))confirmDelete();else if(event.target.closest('[data-selection-label]'))void chooseLabel();});
@@ -181,6 +210,7 @@ function init(){
   document.addEventListener('dragstart',event=>{if(cardFor(event.target)){event.preventDefault();cancelPress();}},true);
   document.addEventListener('click',captureClick,true);
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.grid&&!document.querySelector('dialog[open]'))clear();if(event.key===' '&&event.shiftKey){const card=cardFor(event.target);if(card){event.preventDefault();state.grid===card.parentElement?toggle(card):enter(card);}}});
+  window.addEventListener('resize',refresh);
   window.addEventListener('blur',()=>{cancelPress();pendingPointers.clear();});window.addEventListener('hashchange',()=>{cancelPress();clear();});
   window.addEventListener('family-media-changed',event=>{const item=event.detail?.item;if(item){if(event.detail.operation==='delete'){state.ids.delete(item.id);state.items.delete(item.id);}else if(state.ids.has(item.id))state.items.set(item.id,item);}refresh();});
   if(typeof ResizeObserver!=='undefined')resizeObserver=new ResizeObserver(entries=>{for(const entry of entries)if(entry.target.isConnected)placeCheck(entry.target);else resizeObserver.unobserve(entry.target);});
