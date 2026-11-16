@@ -22,7 +22,7 @@ function scan(root=document){
     image.dataset.photoFrame=id;image.draggable=false;paint(image,id);
     const owner=image.closest('button,a')||image;if(owner.closest('[aria-hidden=true]'))continue;
     owner.setAttribute('aria-keyshortcuts','Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight');
-    if(owner.dataset.frameHint!=='true'){owner.dataset.frameHint='true';owner.title=(owner.title?owner.title+' · ':'')+tr('למיקום התמונה: גררו בעכבר. בטלפון החזיקו שנייה וחצי ואז גררו.','Position photo: drag with the mouse. On a phone, hold for 1.5 seconds, then drag.');}
+    if(owner.dataset.frameHint!=='true'){owner.dataset.frameHint='true';owner.title=(owner.title?owner.title+' · ':'')+tr('למיקום התמונה: לחצו בלי לשחרר וגררו בעכבר. בטלפון החזיקו שנייה וחצי ואז גררו.','Position photo: press and hold the mouse button, then drag. On a phone, hold for 1.5 seconds, then drag.');}
   }
 }
 function rememberProfiles(){
@@ -59,12 +59,12 @@ async function save(id,value){
 function activate(g){
   if(gesture!==g||!g.image.isConnected)return;g.active=true;g.image.classList.add('photo-framing-active');try{g.image.setPointerCapture(g.pointer);}catch{}controls(g.image);
 }
-function cancel(){const g=gesture;if(!g)return;clearTimeout(g.timer);gesture=null;g.image.classList.remove('photo-framing-active');if(g.active){drafts.delete(g.id);repaint(g.id);}try{g.image.releasePointerCapture(g.pointer);}catch{}}
+function cancel(){const g=gesture;if(!g)return;clearTimeout(g.timer);gesture=null;g.image.classList.remove('photo-framing-ready','photo-framing-active');if(g.active){drafts.delete(g.id);repaint(g.id);}try{g.image.releasePointerCapture(g.pointer);}catch{}}
 function down(event){
   if(event.button>0||event.isPrimary===false||event.ctrlKey||event.metaKey||event.target.closest?.('.photo-framing-toolbar'))return;
   const image=targetImage(event.target);if(!image)return;cancel();
   const r=image.getBoundingClientRect(),g=gesture={image,id:image.dataset.photoFrame,pointer:event.pointerId,touch:event.pointerType!=='mouse',x:event.clientX,y:event.clientY,frame:effective(image.dataset.photoFrame),box:{width:r.width,height:r.height},imageSize:{width:image.naturalWidth,height:image.naturalHeight},active:false};
-  if(g.touch)g.timer=setTimeout(()=>activate(g),HOLD_MS);
+  if(g.touch)g.timer=setTimeout(()=>activate(g),HOLD_MS);else image.classList.add('photo-framing-ready');
 }
 function move(event){
   const g=gesture;if(!g||g.pointer!==event.pointerId)return;const dx=event.clientX-g.x,dy=event.clientY-g.y;
@@ -72,7 +72,7 @@ function move(event){
   event.preventDefault();event.stopPropagation();drafts.set(g.id,dragFrame(g.frame,dx,dy,g.box,g.imageSize));repaint(g.id);
 }
 function up(event){
-  const g=gesture;if(!g||g.pointer!==event.pointerId)return;clearTimeout(g.timer);gesture=null;g.image.classList.remove('photo-framing-active');try{g.image.releasePointerCapture(g.pointer);}catch{}
+  const g=gesture;if(!g||g.pointer!==event.pointerId)return;clearTimeout(g.timer);gesture=null;g.image.classList.remove('photo-framing-ready','photo-framing-active');try{g.image.releasePointerCapture(g.pointer);}catch{}
   if(!g.active)return;event.preventDefault();event.stopPropagation();blocked={id:g.id,until:Date.now()+800};const frame=effective(g.id);if(JSON.stringify(frame)!==JSON.stringify(g.frame))void save(g.id,frame);else hideTimer=setTimeout(hide,5000);
 }
 function init(){

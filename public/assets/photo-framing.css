@@ -1,5 +1,5 @@
 img[data-photo-frame]{-webkit-user-drag:none;user-select:none;-webkit-touch-callout:none}
-@media(any-hover:hover){:is(.person-page-portrait,.person-media-photos,.nursery-frame,.nursery-photo-card .gallery-image) img[data-photo-frame]{cursor:grab}}
+@media(any-hover:hover){img[data-photo-frame]{cursor:pointer}img.photo-framing-ready{cursor:grab}}
 img.photo-framing-active{cursor:grabbing!important;outline:2px dashed #657950;outline-offset:-4px;touch-action:none}
 .photo-framing-toolbar{position:fixed;z-index:1000;box-sizing:border-box;max-width:calc(100vw - 16px);padding:9px 11px;border:1px solid #ccb88e;border-radius:10px;background:#fffaf0;box-shadow:0 5px 20px #4b3b2330;color:#6a5d43;font:13px/1.5 var(--sans);text-align:start}
 .photo-framing-toolbar[hidden]{display:none}.photo-framing-toolbar>span{display:block;margin-bottom:6px}.photo-framing-toolbar>div{display:flex;gap:6px}.photo-framing-toolbar button{min-height:34px;padding:5px 9px;border:1px solid #d5c5a4;border-radius:6px;background:#f5eedf;color:#6b5b3e;font:inherit}.photo-framing-toolbar [data-frame-close]{margin-inline-start:auto;background:#6b7d55;color:#fffdf5;border-color:#6b7d55}
