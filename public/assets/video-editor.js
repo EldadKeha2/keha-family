@@ -50,6 +50,7 @@
   $('videoClipDeleteRange').disabled=saving||!valid||!active.knownDuration||active.duration-(end-start)<.099;
   $('videoClipDeleteRange').setAttribute('aria-pressed',String(removing));
   $('videoClipDeleteLabel').textContent=removing?tr('אשר מחיקה','Confirm deletion'):tr('מחיקת הקטע הנבחר','Delete selected segment');
+  $('videoClipExitDelete').hidden=!removing;$('videoClipExitDelete').disabled=saving;
   $('videoClipSave').disabled=$('videoClipSave').disabled||removing;
   $('videoClipSaveNew').disabled=$('videoClipSaveNew').disabled||removing;
   if(valid){$('videoClipStartRange').value=start;$('videoClipEndRange').value=end;}
@@ -120,6 +121,10 @@
    saving=false;close();
   }catch(error){feedback(error.message,true);}finally{saving=false;$('videoClipClose').disabled=false;$('videoClipTags').inert=false;dialog.removeAttribute('aria-busy');if(active)sync();}
  }
+ function exitDeleteMode(){
+  if(!active||saving)return;
+  pendingDelete=null;deleteDialog?.close();active.removeMode=false;feedback();sync();$('videoClipDeleteRange').focus({preventScroll:true});
+ }
  function deleteRange(){
   if(!active||saving)return;sync();if($('videoClipDeleteRange').disabled)return;
   if(!active.removeMode){active.removeMode=true;pausePlayer();feedback();sync();return;}
@@ -127,8 +132,7 @@
    deleteDialog=document.createElement('dialog');deleteDialog.id='videoClipDeleteDialog';deleteDialog.className='media-selection-dialog';deleteDialog.setAttribute('data-i18n-skip','');deleteDialog.setAttribute('aria-labelledby','videoClipDeleteTitle');
    deleteDialog.innerHTML=`<h2 id="videoClipDeleteTitle">${tr('למחוק את הקטע הנבחר?','Delete the selected segment?')}</h2><p id="videoClipDeleteSummary"></p><div class="media-selection-dialog-actions"><button type="button" id="videoClipDeleteCancel" class="secondary-button">${tr('ביטול','Cancel')}</button><button type="button" id="videoClipDeleteConfirm" class="media-selection-danger">${tr('כן, מחק את הקטע','Yes, delete segment')}</button></div>`;
    document.body.appendChild(deleteDialog);
-   const cancel=()=>{pendingDelete=null;deleteDialog.close();if(active){active.removeMode=false;sync();$('videoClipDeleteRange').focus();}};
-   $('videoClipDeleteCancel').addEventListener('click',cancel);deleteDialog.addEventListener('cancel',event=>{event.preventDefault();cancel();});
+   $('videoClipDeleteCancel').addEventListener('click',exitDeleteMode);deleteDialog.addEventListener('cancel',event=>{event.preventDefault();exitDeleteMode();});
    $('videoClipDeleteConfirm').addEventListener('click',()=>{const pending=pendingDelete;pendingDelete=null;deleteDialog.close();if(!pending||pending.editor!==active||pending.start!==active.start||pending.end!==active.end)return;void save({preventDefault(){},deleteRange:true});});
   }
   pendingDelete={editor:active,start:active.start,end:active.end};
@@ -148,11 +152,12 @@
     <div class="video-clip-time-row"><label id="videoClipStartLabel" for="videoClipStart">${tr('התחלה','Start')}</label><input type="text" id="videoClipStart" value="00:00.00" dir="ltr" inputmode="decimal" aria-label="${tr('זמן תחילת הקטע','Clip start time')}"></div>
     <div class="video-clip-time-row"><label id="videoClipEndLabel" for="videoClipEnd">${tr('סיום','End')}</label><input type="text" id="videoClipEnd" value="01:00.00" dir="ltr" inputmode="decimal" aria-label="${tr('זמן סיום הקטע','Clip end time')}"></div>
    </div><div class="video-clip-duration"><span>${tr('אורך הסרטון','Video length')}</span><output id="videoClipLength" for="videoClipStart videoClipEnd" dir="ltr" role="status" aria-live="polite"></output></div><button type="button" id="videoClipDeleteRange" class="video-clip-delete-range" aria-pressed="false">${trashIcon}<span id="videoClipDeleteLabel">${tr('מחיקת הקטע הנבחר','Delete selected segment')}</span></button></div>
+   <button type="button" id="videoClipExitDelete" class="video-clip-exit-delete" hidden>${tr('יציאה ממצב מחיקה','Exit deletion mode')}</button>
    <div class="video-clip-completion"><div id="videoClipTags" class="video-clip-tags"></div>
     <footer><button type="submit" class="primary-button" id="videoClipSave">${tr('שמור','Save')}</button><button type="submit" class="secondary-button" id="videoClipSaveNew">${tr('שמור כקובץ חדש','Save as new clip')}</button><button type="button" class="secondary-button video-clip-category" id="videoClipCategory" hidden>${tr('שיוך לקטגוריה אחרת','Change video category')}</button></footer>
     <p id="videoClipStatus" role="status" aria-live="polite"></p>
    </div></form>`;
-  document.body.appendChild(dialog);$('videoClipClose').addEventListener('click',close);$('videoClipDeleteRange').addEventListener('click',deleteRange);$('videoClipCategory').addEventListener('click',editCategory);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});$('videoClipForm').addEventListener('submit',save);
+  document.body.appendChild(dialog);$('videoClipClose').addEventListener('click',close);$('videoClipDeleteRange').addEventListener('click',deleteRange);$('videoClipExitDelete').addEventListener('click',exitDeleteMode);$('videoClipCategory').addEventListener('click',editCategory);dialog.addEventListener('cancel',event=>{event.preventDefault();if(active?.removeMode)exitDeleteMode();else close();});$('videoClipForm').addEventListener('submit',save);
   dialog.addEventListener('keydown',event=>event.stopPropagation());
   for(const [id,boundary]of [['videoClipStart','start'],['videoClipEnd','end']])$(id).addEventListener('input',()=>sync('fields',boundary));
   $('videoClipName').addEventListener('input',()=>{fitName();sync();});

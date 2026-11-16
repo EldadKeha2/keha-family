@@ -108,3 +108,17 @@ test('canceling segment deletion restores green selection, and the entire video 
  await f.input('videoClipStart',10);await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteRange').emit('click');await f.get('videoClipDeleteCancel').emit('click');
  assert.equal(f.get('videoClipDeleteRange')['aria-pressed'],'false');assert.equal(f.document.body.children.at(-1).open,false);assert.equal(f.requests.length,0);assert.equal(f.get('videoClipSave').disabled,false);
 });
+test('a direct exit leaves deletion mode in one click and preserves the marked times without a request',async()=>{
+ const f=editorFixture();await f.open();assert.equal(f.get('videoClipExitDelete').hidden,true);
+ await f.input('videoClipStart','00:14.70');await f.input('videoClipEnd','00:14.80');await f.get('videoClipDeleteRange').emit('click');
+ assert.equal(f.get('videoClipExitDelete').hidden,false);assert.equal(f.get('videoClipSave').disabled,true);
+ await f.get('videoClipExitDelete').emit('click');
+ assert.equal(f.get('videoClipDeleteRange')['aria-pressed'],'false');assert.equal(f.get('videoClipExitDelete').hidden,true);assert.equal(f.get('videoClipSave').disabled,false);assert.equal(f.get('videoClipSaveNew').disabled,false);
+ assert.equal(f.get('videoClipStart').value,'00:14.70');assert.equal(f.get('videoClipEnd').value,'00:14.80');assert.equal(f.document.body.children[0].open,true);assert.equal(f.requests.length,0);
+});
+test('exit remains available after an invalid range, and Escape exits deletion mode before closing the editor',async()=>{
+ const f=editorFixture();await f.open();await f.input('videoClipStart',10);await f.get('videoClipDeleteRange').emit('click');await f.input('videoClipEnd','invalid');
+ assert.equal(f.get('videoClipDeleteRange').disabled,true);assert.equal(f.get('videoClipExitDelete').hidden,false);assert.equal(f.get('videoClipExitDelete').disabled,false);
+ await f.document.body.children[0].emit('cancel');assert.equal(f.get('videoClipDeleteRange')['aria-pressed'],'false');assert.equal(f.document.body.children[0].open,true);assert.equal(f.get('videoClipEnd').value,'invalid');assert.equal(f.requests.length,0);
+ await f.document.body.children[0].emit('cancel');assert.equal(f.document.body.children[0].open,false);
+});
