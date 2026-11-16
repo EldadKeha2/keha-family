@@ -139,8 +139,14 @@
       if(!Number.isFinite(rawDx)||!rawDx||!wheelGesture&&Math.abs(rawDx)<Math.abs(dy)*1.15)return;
       const dx=window.FamilyGalleryInput?.wheelDelta?.(rawDx)??rawDx;
       if(event.cancelable)event.preventDefault();blockClick();
-      wheelGesture||={dx:0};wheelGesture.dx+=dx;preview(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
-      wheelTimer=setTimeout(()=>{wheelTimer=null;const dx=wheelGesture?.dx||0;wheelGesture=null;finished();if(enabled()&&Math.abs(dx)>=distance()){flushPreview();navigate(dx,{dragX:dx,queued:true,native:true});}else {clearPreview();cancel?.();}},120);
+      const sample=window.FamilyPhotoNative?.wheelSample?.(stage,dx);
+      const complete=done=>{if(!done)return;window.FamilyPhotoNative?.finishWheelEpisode?.(stage,done.episode);window.FamilyGalleryInput?.finishWheelDirection?.();if(!wheelGesture)finished();if(enabled()&&Math.abs(done.dx)>=distance()){flushPreview();navigate(done.dx,{dragX:done.dx,queued:true,native:true});}else {clearPreview();cancel?.();}};
+      const finish=()=>{wheelTimer=null;const done=wheelGesture;wheelGesture=null;complete(done);};
+      if(sample?.ignore){if(wheelGesture){clearTimeout(wheelTimer);wheelTimer=setTimeout(finish,120);}return;}
+      if(sample?.replace&&wheelGesture)wheelGesture.dx=0;
+      if(sample?.split&&wheelGesture){clearTimeout(wheelTimer);const done=wheelGesture;wheelGesture={dx:0,episode:sample.episode};complete(done);}
+      wheelGesture||={dx:0,episode:sample?.episode};wheelGesture.dx+=dx;preview(wheelGesture.dx,{queued:true});clearTimeout(wheelTimer);
+      wheelTimer=setTimeout(finish,120);
     },{capture:true,passive:false});
     // A swipe starting over a face must not also open or remove its tag.
     stage.addEventListener('click',event=>{

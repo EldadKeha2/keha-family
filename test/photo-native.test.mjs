@@ -138,6 +138,35 @@ test('separate quiet wheel bursts each commit without any browser completion eve
  for(const dx of [120,120,-120]){wheel(f,dx);t.mock.timers.tick(80);}await flush();assert.deepEqual(directions(f),[1,1,-1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
 });
 
+test('one pad stroke with sparse decaying momentum cannot advance three photographs across remounts',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);
+ wheel(f,160);wheel(f,80);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
+ for(const tail of [24,8,2]){
+  f.api.reset(f.stage);f.api.mount(f.stage,f.options);t.mock.timers.tick(70);const strip=f.stage.children[0],sample=wheel(f,tail);
+  assert.equal(sample.defaultPrevented,true);assert.equal(strip.scrollLeft,strip.clientWidth,'A momentum tail cannot drag the next photograph');
+  t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1],'Momentum after a quiet gap belongs to the original stroke');
+ }
+ wheel(f,160);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1,1],'A renewed deliberate stroke works immediately');f.api.reset();
+});
+
+test('small reverse-sign pad tremors neither flip the preview nor create extra navigation',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
+ wheel(f,120);const position=strip.scrollLeft;wheel(f,-1);assert.equal(strip.scrollLeft,position);wheel(f,8);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
+ wheel(f,-140);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1,-1],'A deliberate reversal is a new stroke');f.api.reset();
+});
+
+test('a subpixel start in the opposite sign is replaced by the deliberate stroke instead of counting another image',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);
+ wheel(f,.4);wheel(f,-120);assert.equal(f.stage.children[0].scrollLeft,920);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[-1]);f.api.reset();
+});
+
+test('subpixel pad momentum is filtered proportionally while another real fractional stroke stays available',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});const f=fixture({keep:true});f.api.mount(f.stage,f.options);
+ wheel(f,.75);wheel(f,.4);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);
+ for(const tail of [.1,.03]){t.mock.timers.tick(70);wheel(f,tail);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1]);}
+ wheel(f,.75);t.mock.timers.tick(80);await flush();assert.deepEqual(directions(f),[1,1]);f.api.reset();
+});
+
 test('wheel reversal reserves the new input before the previous action can render a cached target',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture({keep:true}),waits=[];f.options.step=(direction,options)=>{f.calls.push({direction,native:options.native});const wait=f.api.whenIdle(f.stage);if(wait)waits.push(wait);return wait;};f.api.mount(f.stage,f.options);
  wheel(f,120);wheel(f,-140);assert.deepEqual(directions(f),[1]);assert.equal(waits.length,1);t.mock.timers.tick(80);await Promise.all(waits);await flush();assert.deepEqual(directions(f),[1,-1]);assert.equal(f.api.whenIdle(f.stage),null);f.api.reset();
@@ -196,8 +225,8 @@ test('an unclaimed cancelled Windows pointer retains its joined TouchEvent conta
  }
 });
 
-test('v9 diagnostics expose the actual mounted controller and current input owner',()=>{
- const f=fixture();assert.equal(f.api.version,9);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
+test('diagnostics expose the actual mounted controller and current input owner',()=>{
+ const f=fixture();assert.equal(f.api.version,11);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
 });
 
 test('a tiny fallback TouchMove after pointercancel releases idle without navigation after quiet',async t=>{

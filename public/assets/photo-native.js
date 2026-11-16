@@ -3,6 +3,24 @@
   let active=null,ignoredTouchStage=null,ignoredTouchIds=new Set();
   const boundStages=new WeakSet();
   const completedPointerStarts=new WeakSet();
+  // A pad keeps emitting momentum after the finger lifts, including packets
+  // separated by more than the paint/commit deadline. Keep its episode on the
+  // stable stage so rebuilding a photograph cannot turn that tail into Next.
+  const wheelEpisodes=new WeakMap();
+  function wheelSample(stage,dx){
+    const now=Date.now(),magnitude=Math.abs(dx),sign=Math.sign(dx),old=wheelEpisodes.get(stage),recent=old&&now-old.at<=360;
+    if(recent){
+      const same=sign===old.sign,rebound=!same&&magnitude<=old.peak*.1;
+      const tail=old.ended&&same&&magnitude<old.peak*.3&&(magnitude<=old.last*1.4+Math.max(.001,old.peak*.005)||old.tail&&magnitude<old.peak*.12);
+      if(rebound||tail){old.at=now;old.ignored++;if(tail){old.last=magnitude;old.tail=true;}return {episode:old,ignore:true};}
+      if(!old.ended&&same){old.at=now;old.last=magnitude;old.peak=Math.max(old.peak,magnitude);old.samples++;return {episode:old};}
+    }
+    const replace=Boolean(recent&&!old.ended&&old.samples<=2&&old.peak<8&&magnitude>=Math.max(.5,old.peak*4)&&sign!==old.sign);
+    const episode={sign,at:now,peak:magnitude,last:magnitude,samples:1,ignored:0,ended:false,tail:false};wheelEpisodes.set(stage,episode);
+    return {episode,replace,split:Boolean(old&&!old.ended&&!replace)};
+  }
+  function finishWheelEpisode(stage,episode){if(episode&&wheelEpisodes.get(stage)===episode)episode.ended=true;}
+  function clearWheelEpisode(stage){if(stage)wheelEpisodes.delete(stage);}
   const supported=()=>typeof CSS!=='undefined'&&CSS.supports('scroll-snap-type','x mandatory');
   const previewSource=item=>item?.kind==='photo'?((navigator.connection?.saveData||/^(slow-)?2g$/.test(navigator.connection?.effectiveType||'')?item.thumbnailSrc:null)||(window.FamilyPhotoPresentation?.source?.(item)||item.previewSrc||item.thumbnailSrc||item.src)):item?.kind==='video'?item.poster||null:null;
   function side(pane,item){
@@ -53,8 +71,8 @@
     if(event.detail===0)return;
     for(let node=event.target;node;node=node.parentNode){if(Date.now()<(blockedClicks.get(node)||0)){event.preventDefault();event.stopImmediatePropagation();return;}}
   },{capture:true});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTouchTail();active?.cancel();}});
-  window.addEventListener?.('blur',()=>{clearTouchTail();active?.cancel();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){clearWheelEpisode(active?.stage);clearTouchTail();active?.cancel();}});
+  window.addEventListener?.('blur',()=>{clearWheelEpisode(active?.stage);clearTouchTail();active?.cancel();});
   function bindStage(stage){
     if(boundStages.has(stage))return;boundStages.add(stage);
     stage.addEventListener('pointerdown',event=>{
@@ -158,6 +176,7 @@
     };
     const finishWheel=()=>{
       const wheel=b.wheel;if(!wheel)return;b.wheel=null;clearTimeout(b.wheelTimer);
+      finishWheelEpisode(stage,wheel.episode);window.FamilyGalleryInput?.finishWheelDirection?.();
       navigate(Math.sign(wheel.dx));
     };
     b.cancel=()=>{endContact();b.wheel=null;clearTimeout(b.wheelTimer);recenter();resolveIdle(b);};
@@ -279,16 +298,19 @@
       const dx=window.FamilyGalleryInput?.wheelDelta?.(rawDX)??rawDX;
       if(!Number.isFinite(dx)||!dx){b.lastDecision='invalid-mapped-delta';return;}
       prevent(event);blockClick(b);
+      const sample=wheelSample(stage,dx);
+      if(sample.ignore){b.lastDecision='wheel-momentum-ignored';if(b.wheel){clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);}return;}
+      if(sample.replace&&b.wheel)b.wheel.dx=0;
       if(b.contact){
         // Wheel input proves a new owner. Finish a real horizontal finger
         // stroke, while making the newly reserved wheel visible to whenIdle.
-        b.wheel={dx:0};const g=endContact(),threshold=Math.max(32,Math.min(56,b.width*.06));
+        b.wheel={dx:0,episode:sample.episode};const g=endContact(),threshold=Math.max(32,Math.min(56,b.width*.06));
         navigate(g?.axis==='x'&&Math.abs(g.dx)>=threshold?Math.sign(g.dx):0);
       }
-      if(b.wheel?.dx&&Math.sign(dx)!==Math.sign(b.wheel.dx)){
-        const previous=b.wheel;b.wheel={dx:0};clearTimeout(b.wheelTimer);navigate(Math.sign(previous.dx));
+      if(b.wheel?.dx&&sample.split){
+        const previous=b.wheel;b.wheel={dx:0,episode:sample.episode};clearTimeout(b.wheelTimer);finishWheelEpisode(stage,previous.episode);navigate(Math.sign(previous.dx));
       }
-      if(active!==b)return;b.wheel||={dx:0};b.wheel.dx+=dx;
+      if(active!==b)return;b.wheel||={dx:0,episode:sample.episode};b.wheel.dx+=dx;
       b.lastDecision='wheel-owned';
       viewport.scrollLeft=Math.max(0,Math.min(b.width*2,b.width-b.wheel.dx));
       clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);
@@ -300,5 +322,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0};}
-  window.FamilyPhotoNative={version:9,mount,reset,has,claim,note,supported,diagnostics,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:11,mount,reset,has,claim,note,supported,diagnostics,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();

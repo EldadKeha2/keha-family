@@ -50,3 +50,14 @@ test('the direct reverse action switches the pad immediately, saves it and cance
  const reload=fixture({checking:'10',stored});assert.equal(reload.api.wheelFactor(),-1);assert.equal(reload.api.isCalibrating(),false);
  reload.api.reverseWheelDirection();assert.equal(reload.api.wheelDelta(120),120);
 });
+
+test('whole-stroke setup learns the deliberate sign rather than its first opposite subpixel packet',()=>{
+ for(const sign of [-1,1]){
+  const stored=new Map([['keha-gallery-pad-direction-v2',String(-sign)]]),f=fixture({checking:'11',stored});
+  assert.equal(f.api.wheelDelta(-sign*.4),.4);assert.equal(f.api.isCalibrating(),true);
+  assert.equal(f.api.wheelDelta(sign*120),120);assert.equal(f.api.wheelDelta(sign*40),40);
+  assert.equal(stored.get('keha-gallery-pad-direction-v2'),String(-sign),'The first jitter packet must not save the wrong direction');
+  f.api.finishWheelDirection();assert.equal(f.api.isCalibrating(),false);assert.equal(f.api.wheelFactor(),sign);
+  const reload=fixture({checking:'11',stored});assert.equal(reload.api.isCalibrating(),false);assert.equal(reload.api.wheelDelta(sign*120),120);assert.equal(reload.api.wheelDelta(-sign*120),-120);
+ }
+});

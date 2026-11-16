@@ -151,7 +151,7 @@ function fixture({supported=true,mobile=false,width=1200,delayedFaces=false,real
 
 test('production loads the native controller before the gallery binds gesture input',()=>{
  const f=fixture();for(const name of names)assert.ok(f.loaded.includes(name),name+' must be loaded by the production page');
- assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,9,'The loaded implementation, not only its script URL, must be version nine');
+ assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,11,'The loaded implementation, not only its script URL, must be version eleven');
 });
 
 test('a cold gallery link adopts a retained random page even when that page omits the opened photo',async()=>{
@@ -617,7 +617,7 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,140,'A calibrated negative device packet moves the current pixels right');
  assert.equal(settings.wheelFactor(),-1);assert.equal(settings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
- const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 10/);assert.match(trace,/native implementation 9/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
+ const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 11/);assert.match(trace,/native implementation 11/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
  const restored=fixture({storage});assert.equal(restored.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(restored.window.FamilyGalleryInput.isCalibrating(),false);assert.equal(restored.get('galleryGestureCheck'),null,'Ordinary browsing shows no diagnostic or calibration interface');
  await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,140);
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(restored.window.FamilyMedia.current().id,'c');restored.close();
@@ -693,7 +693,7 @@ test('separate same-direction trackpad bursts count twice even when the browser 
   const f=fixture({realPresentation:true});f.window.FamilyMedia.open(['a','b','c','d','e'].map(f.photo),2,'photos');await flush();
   const viewport=f.strip();
   const burst=deltas=>{const target=f.strip().children[1].querySelector('img');for(const deltaX of deltas)browserWheel(f,target,deltaX);};
-  burst([direction*90,direction*45]);await new Promise(resolve=>setTimeout(resolve,110));await flush();
+  burst(label.includes('fractional')?[direction,direction*.5]:[direction*90,direction*45]);await new Promise(resolve=>setTimeout(resolve,110));await flush();
   burst(second);await flush();
   await finishWheel(f,f.strip());assert.equal(f.window.FamilyMedia.current().id,expected,'A quiet boundary makes the next owned horizontal episode a second action, including fractional input');
   f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,expected,'A late duplicate scrollend cannot count another action');f.close();
@@ -708,6 +708,28 @@ test('a continuous trackpad episode including its fractional tail commits exactl
   await finishWheel(f,viewport);assert.equal(f.window.FamilyMedia.current().id,direction>0?'d':'b','Samples within the same quiet-boundary window remain one continuous action');
   f.emit(viewport,'scrollend');await flush();assert.equal(f.window.FamilyMedia.current().id,direction>0?'d':'b');f.close();
  }
+});
+
+test('sparse pad momentum cannot skip images after a photo or video is rebuilt, including the manual fallback',async()=>{
+ for(const supported of [true,false])for(const kind of ['photo','video']){
+  const f=fixture({supported,realPresentation:supported});await f.open(kind,kind==='photo'?'photos':'nostalgia');
+  const packet=dx=>{const target=f.get('mediaStage').querySelector(kind==='photo'?'.face-photo-scroll img':'video');return f.emit(target,'wheel',{deltaX:dx,deltaY:0,deltaMode:0,clientX:400,clientY:250});};
+  const settle=async()=>{await new Promise(resolve=>setTimeout(resolve,140));await flush();};
+  packet(320);packet(160);await settle();assert.equal(f.window.FamilyMedia.current().id,'b');
+  for(const tail of [80,40,8]){assert.equal(packet(tail).defaultPrevented,true);await settle();assert.equal(f.window.FamilyMedia.current().id,'b',kind+' momentum must not advance again after repaint');}
+  f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
+  packet(320);await settle();assert.equal(f.window.FamilyMedia.current().id,'a','A renewed strong pad stroke still works immediately after arrows');f.close();
+ }
+});
+
+test('guided right setup with an opposite first packet keeps rightward pixels and advances exactly once',async()=>{
+ const storage=new Map([[directionKey,'1']]),f=fixture({query:'?gesture-check=11',storage,realPresentation:true});await f.open();
+ const rail=f.strip(),target=rail.children[1].querySelector('img');browserWheel(f,target,.4);browserWheel(f,target,-120);browserWheel(f,target,-40);
+ assert.ok(Math.abs(rail.clientWidth-rail.scrollLeft-160.4)<.001,'Every setup packet moves right despite the initial sign jitter');
+ await finishWheel(f,rail);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(f.window.FamilyGalleryInput.isCalibrating(),false);
+ const current=f.strip(),tail=browserWheel(f,current.children[1].querySelector('img'),-8);assert.equal(tail.after,current.clientWidth);await finishWheel(f,current);assert.equal(f.window.FamilyMedia.current().id,'b');
+ f.close();const reload=fixture({query:'?gesture-check=11',storage});await reload.open();assert.equal(reload.window.FamilyGalleryInput.isCalibrating(),false);
+ browserWheel(reload,reload.strip().children[1].querySelector('img'),-120);await finishWheel(reload,reload.strip());assert.equal(reload.window.FamilyMedia.current().id,'b');reload.close();
 });
 
 test('opening with zero-width dialog geometry anchors the center photo before revealing the native strip',async()=>{
