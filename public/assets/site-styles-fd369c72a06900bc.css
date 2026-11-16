@@ -908,6 +908,27 @@ progress{width:100%;height:9px;accent-color:#6f8655}
 @media(prefers-reduced-motion:reduce){.memory-spark,.memory-world.is-turning .memory-spark,.memory-world.is-turning .memory-turn-sheet,.memory-world.is-turning .memory-book-stage{animation:none!important}.memory-category,.memory-book-stage{transition:none}.memory-spark:nth-child(4n){opacity:.35}}
 html[data-a11y-motion] .memory-spark,html[data-a11y-motion] .memory-world.is-turning .memory-turn-sheet,html[data-a11y-motion] .memory-world.is-turning .memory-book-stage{animation:none!important}
 
+/* Keep the story title and its own search together above all five chapters. */
+@media(max-width:700px){
+  body[data-active-view=stories] #mobileViewTitle{display:none}
+  body[data-active-view=stories] .site-header .phone-navigation{margin-top:4px;padding-top:4px}
+  body[data-active-view=stories] .phone-navigation button{min-height:36px}
+  body[data-active-view=stories] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) clamp(110px,32vw,140px);align-items:center;gap:12px;padding:12px 12px 10px}
+  body[data-active-view=stories] .workspace-title{min-width:0;gap:5px}
+  body[data-active-view=stories] .workspace-title>div{min-width:0}
+  body[data-active-view=stories] .workspace-title .section-diamond{font-size:calc(20px * var(--a11y-text-scale,1));flex-shrink:0}
+  body[data-active-view=stories] .workspace-title h2{font-size:calc(clamp(18px,5vw,21px) * var(--a11y-text-scale,1));line-height:1.3}
+  body[data-active-view=stories] #workspaceSubtitle{display:none}
+  body[data-active-view=stories] .workspace-actions{width:100%;min-width:0;margin:0;display:block}
+  body[data-active-view=stories] .workspace-actions .search-wrap{width:100%;min-width:0}
+  body[data-active-view=stories] .workspace-actions .search-wrap input{width:100%;min-width:0;height:36px;padding:0 24px 0 8px;font-size:16px;border-radius:8px;background:#fffdf8}
+  body[data-active-view=stories] .workspace-actions .search-wrap input::placeholder{font-size:12px}
+  body[data-active-view=stories] .workspace-actions .search-wrap>svg{width:14px;height:14px;right:7px}
+  html[dir=ltr] body[data-active-view=stories] .workspace-actions .search-wrap input{padding:0 8px 0 24px}
+  html[dir=ltr] body[data-active-view=stories] .workspace-actions .search-wrap>svg{left:7px;right:auto}
+  body[data-active-view=stories] #memoryWorld{height:clamp(410px,calc(100svh - 210px),550px);margin-top:0;margin-bottom:14px}
+}
+
 /* Warm paper, copper jewellery and the diamond stitches of family embroidery. */
 body[data-active-view=nostalgia]:has(#nostalgiaView.nostalgia-event-grid) .workspace-header{display:none!important}
 #nostalgiaView.nostalgia-event-grid>.archive-toolbar,#nostalgiaView.nostalgia-event-grid>#nostalgiaFeedIntro{display:none!important}
@@ -4692,6 +4713,8 @@ body[data-active-view=search] .workspace-actions{display:none}
   .site-search-header-slot [data-site-search-open]:hover{background:#e9e5d75e;color:#566a43}
   .site-header .home-install-actions{gap:1px}
   .site-header .home-install-actions button{min-width:32px;padding-inline:0}
+  body[data-active-view=home] .site-header .home-install-actions{width:max-content;max-width:100%;gap:0}
+  body[data-active-view=home] .site-header .home-install-actions button{flex:0 0 auto}
   .site-header .home-install-actions [data-site-search-open]{display:flex}
   .site-search-dialog{padding:16px;margin-top:max(12px,env(safe-area-inset-top))}
   .site-search-dialog h2{font-size:21px}

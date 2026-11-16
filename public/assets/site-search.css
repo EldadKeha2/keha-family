@@ -88,6 +88,8 @@ body[data-active-view=search] .workspace-actions{display:none}
   .site-search-header-slot [data-site-search-open]:hover{background:#e9e5d75e;color:#566a43}
   .site-header .home-install-actions{gap:1px}
   .site-header .home-install-actions button{min-width:32px;padding-inline:0}
+  body[data-active-view=home] .site-header .home-install-actions{width:max-content;max-width:100%;gap:0}
+  body[data-active-view=home] .site-header .home-install-actions button{flex:0 0 auto}
   .site-header .home-install-actions [data-site-search-open]{display:flex}
   .site-search-dialog{padding:16px;margin-top:max(12px,env(safe-area-inset-top))}
   .site-search-dialog h2{font-size:21px}

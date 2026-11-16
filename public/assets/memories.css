@@ -136,3 +136,24 @@
 @media(max-width:350px){.memory-world{height:550px}.memory-category{width:112px}.memory-category strong{font-size:12px}.memory-category small{font-size:8px}.memory-book{width:136px}.memory-book-stage{width:136px;height:108px}.memory-book-title{font-size:16px}.memory-world-kicker{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.memory-spark,.memory-world.is-turning .memory-spark,.memory-world.is-turning .memory-turn-sheet,.memory-world.is-turning .memory-book-stage{animation:none!important}.memory-category,.memory-book-stage{transition:none}.memory-spark:nth-child(4n){opacity:.35}}
 html[data-a11y-motion] .memory-spark,html[data-a11y-motion] .memory-world.is-turning .memory-turn-sheet,html[data-a11y-motion] .memory-world.is-turning .memory-book-stage{animation:none!important}
+
+/* Keep the story title and its own search together above all five chapters. */
+@media(max-width:700px){
+  body[data-active-view=stories] #mobileViewTitle{display:none}
+  body[data-active-view=stories] .site-header .phone-navigation{margin-top:4px;padding-top:4px}
+  body[data-active-view=stories] .phone-navigation button{min-height:36px}
+  body[data-active-view=stories] .workspace-header{display:grid;grid-template-columns:minmax(0,1fr) clamp(110px,32vw,140px);align-items:center;gap:12px;padding:12px 12px 10px}
+  body[data-active-view=stories] .workspace-title{min-width:0;gap:5px}
+  body[data-active-view=stories] .workspace-title>div{min-width:0}
+  body[data-active-view=stories] .workspace-title .section-diamond{font-size:calc(20px * var(--a11y-text-scale,1));flex-shrink:0}
+  body[data-active-view=stories] .workspace-title h2{font-size:calc(clamp(18px,5vw,21px) * var(--a11y-text-scale,1));line-height:1.3}
+  body[data-active-view=stories] #workspaceSubtitle{display:none}
+  body[data-active-view=stories] .workspace-actions{width:100%;min-width:0;margin:0;display:block}
+  body[data-active-view=stories] .workspace-actions .search-wrap{width:100%;min-width:0}
+  body[data-active-view=stories] .workspace-actions .search-wrap input{width:100%;min-width:0;height:36px;padding:0 24px 0 8px;font-size:16px;border-radius:8px;background:#fffdf8}
+  body[data-active-view=stories] .workspace-actions .search-wrap input::placeholder{font-size:12px}
+  body[data-active-view=stories] .workspace-actions .search-wrap>svg{width:14px;height:14px;right:7px}
+  html[dir=ltr] body[data-active-view=stories] .workspace-actions .search-wrap input{padding:0 8px 0 24px}
+  html[dir=ltr] body[data-active-view=stories] .workspace-actions .search-wrap>svg{left:7px;right:auto}
+  body[data-active-view=stories] #memoryWorld{height:clamp(410px,calc(100svh - 210px),550px);margin-top:0;margin-bottom:14px}
+}
