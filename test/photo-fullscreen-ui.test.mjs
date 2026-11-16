@@ -12,7 +12,7 @@ function fixture({english=false,native=false,rejected=false,viewerOpen=true,load
   get classList(){const set=new Set(this.className.split(' ').filter(Boolean));return{contains:name=>set.has(name),add:(...names)=>{names.forEach(name=>set.add(name));this.className=[...set].join(' ');},remove:(...names)=>{names.forEach(name=>set.delete(name));this.className=[...set].join(' ');},toggle:(name,on)=>{on=on??!set.has(name);set[on?'add':'delete'](name);this.className=[...set].join(' ');}};}
   setAttribute(key,value){this.attributes.set(key,String(value));}
   getAttribute(key){if(key.startsWith('data-'))return this.dataset[camel(key.slice(5))]??null;return this.attributes.get(key)??(key==='id'?this.id:key==='class'?this.className:null);}
-  matches(selector){return selector.split(',').some(selector=>{selector=selector.trim();if(selector.startsWith('#'))return this.id===selector.slice(1);if(selector.startsWith('.'))return this.classList.contains(selector.slice(1));if(selector.startsWith('['))return[...selector.matchAll(/\[([^=\]]+)(?:="([^"]*)")?\]/g)].every(([,key,value])=>{const actual=this.getAttribute(key);return value===undefined?actual!==null:actual===value;});return this.tagName===selector;});}
+  matches(selector){return selector.split(',').some(selector=>{selector=selector.trim();if(/:focus(?:-visible)?$/.test(selector))return document.activeElement===this&&this.matches(selector.replace(/:focus(?:-visible)?$/,''));if(selector.startsWith('#'))return this.id===selector.slice(1);if(selector.startsWith('.'))return this.classList.contains(selector.slice(1));if(selector.startsWith('['))return[...selector.matchAll(/\[([^=\]]+)(?:="([^"]*)")?\]/g)].every(([,key,value])=>{const actual=this.getAttribute(key);return value===undefined?actual!==null:actual===value;});return this.tagName===selector;});}
   querySelectorAll(selector){return this.children.flatMap(child=>[...(child.matches(selector)?[child]:[]),...child.querySelectorAll(selector)]);}
   querySelector(selector){return this.querySelectorAll(selector)[0]||null;}
   closest(selector){return this.matches(selector)?this:this.parentNode?.closest(selector)||null;}
@@ -96,6 +96,24 @@ test('album and home photos offer direct fullscreen while profile portraits offe
 test('the home fullscreen button opens the nearest moving center instead of the older logical slide',async()=>{
  const f=fixture({viewerOpen:false}),home=f.document.createElement('div'),opener=f.document.createElement('button');home.id='homeSlideStage';opener.id='homeSlideOpen';opener.dataset.photoAlbum='home:photos';opener.dataset.photoId='a';opener.disabled=true;opener.append(f.document.createElement('img'));home.append(opener);f.document.body.append(home);
  f.window.FamilyHome={centeredPhoto:()=>f.photo('c')};f.redecorate();home.querySelector('[data-photo-fullscreen]').click();await f.flush();assert.equal(f.media.current().id,'c');assert.equal(f.api.isActive(),true);f.api.exit();
+});
+test('screensaver controls hide after two idle seconds even with a focused selector and wake only for activity',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.state.scope='screensaver';f.api.enter();await f.flush();
+ const root=f.stage.parentNode,speed=f.find('photo-fullscreen-speed'),visible=()=>root.classList.contains('controls-visible'),idle=()=>root.classList.contains('screensaver-controls-idle');
+ speed.focus();f.emit(speed,'focusin');t.mock.timers.tick(1999);assert.equal(visible(),true);t.mock.timers.tick(1);assert.equal(visible(),false);assert.equal(idle(),true);
+ f.emit(root,'pointermove');assert.equal(visible(),true);assert.equal(idle(),false);
+ t.mock.timers.tick(1500);f.api.setAlbumStatus(true,'Loading family');t.mock.timers.tick(500);assert.equal(idle(),true,'A background album update does not delay hiding');
+ f.api.setAlbumStatus(false);assert.equal(idle(),true,'Completing the load does not reveal idle menus');
+ for(const type of ['keydown','input','change','pointerdown','pointerup','wheel']){
+  f.emit(speed,type,{key:'ArrowUp'});assert.equal(visible(),true,type+' restores the controls');assert.equal(idle(),false);
+  t.mock.timers.tick(1999);assert.equal(visible(),true);t.mock.timers.tick(1);assert.equal(idle(),true);
+ }
+ f.api.play();t.mock.timers.tick(4000);await f.flush();assert.equal(f.steps.length,1);assert.equal(idle(),true,'Automatic photo changes do not reveal the controls');
+ f.api.exit();f.api.enter();assert.equal(visible(),true);assert.equal(idle(),false,'Starting again resets idle state');f.api.exit();
+});
+test('other fullscreen albums retain focused keyboard controls instead of inheriting screensaver idle behavior',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.enter();await f.flush();const root=f.stage.parentNode,speed=f.find('photo-fullscreen-speed');
+ speed.focus();f.emit(speed,'focusin');t.mock.timers.tick(2400);assert.equal(root.classList.contains('controls-visible'),true);assert.equal(root.classList.contains('screensaver-controls-idle'),false);f.api.exit();
 });
 test('slideshow loops, pauses, waits four seconds per loaded image and never advances while hidden or closed',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.enter();await f.flush();f.find('photo-fullscreen-play').click();

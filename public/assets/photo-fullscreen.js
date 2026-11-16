@@ -25,8 +25,13 @@
     timer=setTimeout(()=>{timer=null;if(active&&playing&&!document.hidden)media().step(1,{effect:effects?nextEffect():null});},4000/speed);
   }
   function showControls(){
-    if(!active)return;root.classList.add('controls-visible');clearTimeout(hideTimer);
-    hideTimer=setTimeout(()=>{if(active&&!root.querySelector('button:focus-visible,select:focus'))root.classList.remove('controls-visible');},2400);
+    if(!active)return;root.classList.remove('screensaver-controls-idle');root.classList.add('controls-visible');clearTimeout(hideTimer);
+    const screensaver=media()?.photoState().scope==='screensaver';
+    hideTimer=setTimeout(()=>{
+      hideTimer=null;if(!active)return;
+      if(media()?.photoState().scope==='screensaver'){root.classList.add('screensaver-controls-idle');root.classList.remove('controls-visible');}
+      else if(!root.querySelector('button:focus-visible,select:focus'))root.classList.remove('controls-visible');
+    },screensaver?2000:2400);
   }
   function sync(){
     if(!viewer||!media())return;const state=media().photoState(),photo=state.item?.kind==='photo';
@@ -101,7 +106,7 @@
     window.FamilyFullscreenFaces?.configure({showNames,showAges,labelScale});sync();showControls();
   }
   function setAlbumStatus(blocked,message=''){
-    albumBlocked=blocked;root.classList.toggle('photo-album-blocked',blocked);status.textContent=message;sync();schedule();showControls();
+    albumBlocked=blocked;root.classList.toggle('photo-album-blocked',blocked);status.textContent=message;sync();schedule();if(media()?.photoState().scope!=='screensaver')showControls();
   }
   function launch(opener){
     const wasOpen=viewer.open;
@@ -149,6 +154,7 @@
     namesControl.addEventListener('click',()=>configure({showNames:!showNames}));
     agesControl.addEventListener('click',()=>configure({showAges:!showAges}));
     root.addEventListener('pointermove',showControls,{passive:true});root.addEventListener('pointerdown',showControls,{passive:true});root.addEventListener('focusin',showControls);
+    for(const type of ['pointerup','keydown','input','change','wheel'])root.addEventListener(type,showControls,{passive:true});
     viewer.addEventListener('cancel',event=>{if(active){event.preventDefault();exit();}});
     document.addEventListener('keydown',event=>{if(active&&event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();exit();}},{capture:true});
     document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement===root)hadNative=true;else if(active&&hadNative)exit();});
