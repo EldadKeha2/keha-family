@@ -1,5 +1,5 @@
-// Reviewed original photographs. Tedhar in the red toy car is the owner-requested
-// color exception; every other featured source remains original black-and-white.
+// Reviewed photographs. Only the exact owner-selected car and picnic photographs
+// are color exceptions; independent additions remain originally black-and-white.
 export const livingActions = [
   {
     "id": "smile",
@@ -40,11 +40,12 @@ export const livingPhotos = [
     "originalBlackAndWhite": true
   },
   {
-    "id": "7f80a774ddd94d2c8ae629264f284b27",
-    "title": "שלמה בצעירותו",
-    "titleEn": "Young Shlomo",
+    "id": "d76e78dc736a404fac0f36d68d2a760f",
+    "title": "מפגש משפחתי ביער",
+    "titleEn": "Family picnic in the forest",
     "generation": 1,
-    "originalBlackAndWhite": true
+    "requestedColorException": true,
+    "ownerRestoredSource": true
   },
   {
     "id": "aee7645f62674c94b3adb5d773ae11f7",

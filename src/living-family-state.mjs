@@ -14,6 +14,22 @@ export class LivingFamilyState {
     return item;
   }
   action(id){if(!livingActions.some(action=>action.id===id))throw new HttpError(400,'בחרו אחת משלוש האפשרויות.','LIVING_ACTION');return id;}
+  prepareSource(p){
+    if(!livingPhotos.some(photo=>photo.id===p.id&&photo.ownerRestoredSource===true))throw new HttpError(404,'התמונה אינה מיועדת להחלפה הזאת.','LIVING_SOURCE');
+    if(!/^[a-f0-9]{64}$/.test(p.digest||'')||p.mime!=='image/png'||!Number.isSafeInteger(p.size)||p.size<57||p.size>16*1024*1024)throw new HttpError(400,'פרטי התמונה אינם תקינים.','LIVING_SOURCE');
+    let item;try{item=this.owner.media(p.id);}catch(error){if(error.status!==404)throw error;}
+    if(item&&(item.category!=='family-ai'||item.sourceDigest!==p.digest||item.size!==p.size))throw new HttpError(409,'התמונה כבר נשמרה בגרסה אחרת.','LIVING_SOURCE_CHANGED');
+    return {alreadySaved:Boolean(item),item:item?this.owner.mediaPublic(item):null};
+  }
+  saveSource(p){
+    const prepared=this.prepareSource(p);if(prepared.alreadySaved)return prepared;
+    if(p.key!=='family-ai/'+p.id+'/source/'+p.digest+'.png')throw new HttpError(400,'פרטי התמונה אינם תקינים.','LIVING_SOURCE');
+    const entry=livingPhotos.find(photo=>photo.id===p.id),item={id:p.id,category:'family-ai',personId:null,filename:'Restored_Family_Picnic.png',name:entry.title,nameEn:entry.titleEn,file:p.id+'.png',key:p.key,kind:'photo',mime:p.mime,size:p.size,sourceDigest:p.digest,caption:entry.title,createdAt:new Date().toISOString()};
+    // Dedicated AI-page source: no gallery/category membership, personal album,
+    // profile selection, source-photo replacement, or unrelated album mutation.
+    this.owner.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,'family-ai',null,JSON.stringify(item));
+    return {saved:true,alreadySaved:false,item:this.owner.mediaPublic(item)};
+  }
   clip(id,action){this.action(action);const row=this.owner.rows('SELECT data FROM living_family_clips WHERE media_id=? AND action_id=?',id,action)[0];return row?JSON.parse(row.data):null;}
   publicClip(clip,item){
     if(!clip)return null;

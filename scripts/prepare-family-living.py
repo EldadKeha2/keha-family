@@ -95,7 +95,7 @@ def main():
                                     analytics_enabled=False, max_workers=1,
                                     download_files=str(args.work_dir / 'sdk-output'),
                                     httpx_kwargs={'timeout': 60.0})
-                tones = 'Preserve the original faded colors of this exact family photograph, including the red toy car. No recoloring or monochrome conversion. ' if owner_color_exception(photo) else MONOCHROME
+                tones = 'Preserve the existing vintage colors of this exact owner-selected family photograph. No recoloring or monochrome conversion. ' if owner_color_exception(photo) else MONOCHROME
                 prompt = tones + action['prompt']
                 job = {'photoId': photo['id'], 'actionId': action['id'], 'sourceRevision': photo.get('revision', 'original'), 'prompt': prompt, 'createdAt': time.time(), 'status': 'submitting', 'operationId': uuid.uuid4().hex, 'protocol': 'official-gradio-sdk', 'sessionHash': client.session_hash}
                 state['jobs'][key] = job

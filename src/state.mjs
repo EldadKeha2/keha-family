@@ -541,6 +541,8 @@ export class FamilyState {
     switch(action){
       case 'family-ai.list':return this.familyAi.list(p);
       case 'family-ai.living.list':return this.familyAi.living.featured();
+      case 'family-ai.living.source.prepare':return this.familyAi.living.prepareSource(p);
+      case 'family-ai.living.source.save':return this.familyAi.living.saveSource(p);
       case 'family-ai.living.get':return this.familyAi.living.get(p);
       case 'family-ai.living.prepare':return this.familyAi.living.prepare(p);
       case 'family-ai.living.save':return this.familyAi.living.save(p);

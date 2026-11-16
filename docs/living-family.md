@@ -1,12 +1,14 @@
 # Ten family photographs, three prepared actions
 
-The main `#family-ai` view presents ten reviewed photographs. Nine are original
-black-and-white photographs. On 16 November 2026 the owner explicitly replaced
-the Ora/Eddie wedding selection with Tedhar in his red toy car, photo
-`89b5dd6a048342ecb9cd4b29b73ca197`. This is the only color exception; preserve
-its original faded colors. All other color photographs remain ineligible even
-if vintage, old, or converted to grayscale. Generation labels and the duplicate
-introductory card are omitted from the public view.
+The main `#family-ai` view presents ten reviewed photographs: eight original
+black-and-white sources and two explicitly owner-selected color exceptions.
+Tedhar in the red toy car (`89b5dd6a048342ecb9cd4b29b73ca197`) replaced the
+Ora/Eddie wedding selection. The restored family picnic
+(`d76e78dc736a404fac0f36d68d2a760f`) replaces the young-Shlomo card while the
+portrait stays intact in its original personal album. Preserve each selected
+source's existing colors. Every independent future addition must still be
+originally black-and-white. Generation labels and the duplicate introductory
+card are omitted from the public view.
 `src/living-family-catalog.mjs` identifies
 the photographs and the three actions: smile, wave, and a little dance.
 The existing larger archival collection remains available below the curated
@@ -41,18 +43,18 @@ may throttle, exhaust its free
 allowance, or fail; a submitted job is not a completed video. Do not purchase
 credits, switch to paid APIs, or rotate accounts/Spaces to bypass a limit.
 
-Every production-plan photo requires a `blackAndWhiteReview` recording
+Every originally black-and-white production-plan photo requires a `blackAndWhiteReview` recording
 `kind: "original-black-and-white"`, `reviewed: true`, its reviewed `revision`,
 and the SHA-256 of the actual original source bytes. Record this only after
 visually inspecting the image. Both scripts reject missing reviews, changed
 source revisions, or changed bytes. Replacement color jobs remain archived in
 `excludedJobs`, and their provider quota reset still blocks all new submissions.
 The generator adds a monochrome-only instruction to every new movement prompt.
-The named Tedhar exception instead requires `requestedColorException: true`
+Each named owner-selected color exception instead requires `requestedColorException: true`
 and `sourceReview` with `kind: "owner-requested-color"`, its unchanged revision
 and SHA-256. Its output requires `colorPreservationReviewed: true` in place of
-`monochromeReviewed`. The shared helper accepts this exception only for that
-exact photo ID; it cannot relax the rule for another selection.
+`monochromeReviewed`. The shared helper accepts exceptions only for these two exact photo IDs;
+it cannot relax the rule for another selection.
 
 Inspect generated frames for identity, natural motion, monochrome preservation,
 extra people, and hand artifacts. Set `reviewed: true` and
@@ -94,3 +96,14 @@ Media stays in the site's existing private bucket and plays through
 and downloads, and uses no expiring generation-provider URL. Deleted or
 excluded source photographs are not exposed by the curated album. Later
 source edits mark an older animation as based on a previous image version.
+
+## AI-page-only restored source
+
+`POST /api/family-ai/photos/PHOTO_ID/source` accepts a bounded, structurally
+validated PNG only for the catalog entry explicitly marked `ownerRestoredSource`.
+The existing same-origin public contribution guard still applies. The saved
+record uses the separate `family-ai` media category and has no gallery, personal
+album, profile, or collection membership. The original portrait is never edited
+or deleted. The prepared source and its three pending actions appear only on
+the selected AI card. Repeating the same bytes is idempotent; changing an
+existing source or importing into another photo ID is rejected.

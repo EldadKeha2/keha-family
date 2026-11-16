@@ -34,10 +34,29 @@ function fixture(){
 
 test('the curated album has ten photos, three honest pending actions, and leaves gallery metadata intact',()=>{
   const f=fixture();try{
-    assert.equal(livingPhotos.length,10);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.filter(p=>p.id!=='89b5dd6a048342ecb9cd4b29b73ca197').every(p=>p.originalBlackAndWhite===true));assert.deepEqual(livingPhotos.filter(p=>p.requestedColorException).map(p=>p.id),['89b5dd6a048342ecb9cd4b29b73ca197']);assert.ok(!livingPhotos.some(p=>p.id==='a1e9162209384402b481b7a487ca5cf9'));
+    assert.equal(livingPhotos.length,10);assert.deepEqual(livingActions.map(a=>a.id),['smile','wave','dance']);assert.ok(livingPhotos.filter(p=>!p.requestedColorException).every(p=>p.originalBlackAndWhite===true));assert.deepEqual(livingPhotos.filter(p=>p.requestedColorException).map(p=>p.id),['d76e78dc736a404fac0f36d68d2a760f','89b5dd6a048342ecb9cd4b29b73ca197']);assert.ok(!livingPhotos.some(p=>['a1e9162209384402b481b7a487ca5cf9','7f80a774ddd94d2c8ae629264f284b27'].includes(p.id)));
     const before=f.database.prepare('SELECT data FROM media ORDER BY id').all();const album=f.run('family-ai.living.list');
     assert.equal(album.total,10);assert.equal(album.totalClips,30);assert.equal(album.readyClips,0);assert.ok(album.items.every(item=>item.animations.length===3&&item.animations.every(a=>a.status==='pending'&&!a.videoSrc)));
     assert.equal('key'in album.items[0],false);assert.deepEqual(f.database.prepare('SELECT data FROM media ORDER BY id').all(),before);
+  }finally{f.close();}
+});
+
+test('the owner-restored source replaces only its AI card and never adds a gallery or personal-album duplicate',async()=>{
+  const f=fixture(),id='d76e78dc736a404fac0f36d68d2a760f',oldId='7f80a774ddd94d2c8ae629264f284b27';try{
+    f.database.prepare('DELETE FROM media WHERE id=?').run(id);
+    const portrait=JSON.stringify({id:oldId,category:'personal',personId:'shlomo',filename:'original.png',file:oldId+'.png',kind:'photo',mime:'image/png',size:100,key:'portrait.png'});
+    f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(oldId,'personal','shlomo',portrait);
+    const galleryCount=f.database.prepare("SELECT count(*) AS n FROM media WHERE category='gallery'").get().n;
+    const png=Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0GQAAAAASUVORK5CYII=','base64'));
+    const path='/api/family-ai/photos/'+id+'/source';let response=await f.call(path,{method:'POST',bytes:png});assert.equal(response.status,201);const result=await response.json();assert.equal(result.item.scope,'family-ai');
+    assert.equal(f.database.prepare("SELECT count(*) AS n FROM media WHERE category='gallery'").get().n,galleryCount);
+    assert.equal(f.database.prepare('SELECT data FROM media WHERE id=?').get(oldId).data,portrait);
+    assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections WHERE media_id=?').get(id).n,0);
+    const featured=f.run('family-ai.living.list');assert.ok(featured.items.some(p=>p.id===id&&p.animations.every(a=>a.status==='pending')));assert.ok(!featured.items.some(p=>p.id===oldId));
+    response=await f.call(path,{method:'POST',bytes:png});assert.equal((await response.json()).alreadySaved,true);assert.equal(f.calls.filter(c=>c.method==='PUT').length,1);
+    await assert.rejects(f.call('/api/family-ai/photos/'+oldId+'/source',{method:'POST',bytes:png}),e=>e.code==='LIVING_SOURCE');
+    const changed=png.slice();changed[changed.length-1]^=1;await assert.rejects(f.call(path,{method:'POST',bytes:changed}),e=>e.code==='LIVING_SOURCE_CHANGED');
+    await assert.rejects(f.call(path,{method:'POST',bytes:new TextEncoder().encode('not a PNG')}),e=>e.code==='LIVING_SOURCE_FORMAT');
   }finally{f.close();}
 });
 

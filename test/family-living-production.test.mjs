@@ -34,6 +34,12 @@ with tempfile.TemporaryDirectory() as directory:
     assert verified_source(photo)==source
     assert not output_tones_reviewed(photo,{'monochromeReviewed':True})
     assert output_tones_reviewed(photo,{'colorPreservationReviewed':True})
+    photo['id']='d76e78dc736a404fac0f36d68d2a760f'
+    assert verified_source(photo)==source
+    assert output_tones_reviewed(photo,{'colorPreservationReviewed':True})
+    photo['requestedColorException']=False
+    rejected()
+    photo['requestedColorException']=True
     photo['revision']='edited'
     rejected()
     reset=time.time()+86400

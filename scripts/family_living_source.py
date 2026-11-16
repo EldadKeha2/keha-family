@@ -2,15 +2,18 @@
 import hashlib
 import pathlib
 
-OWNER_COLOR_PHOTO = '89b5dd6a048342ecb9cd4b29b73ca197'
+OWNER_COLOR_PHOTOS = frozenset({
+    '89b5dd6a048342ecb9cd4b29b73ca197',
+    'd76e78dc736a404fac0f36d68d2a760f',
+})
 
 
 def owner_color_exception(photo):
-    return photo.get('id') == OWNER_COLOR_PHOTO and photo.get('requestedColorException') is True
+    return photo.get('id') in OWNER_COLOR_PHOTOS and photo.get('requestedColorException') is True
 
 
 def verified_source(photo):
-    """Bind a visual source review to unchanged bytes, with one named exception."""
+    """Bind a visual source review to unchanged bytes, with named exceptions."""
     color = owner_color_exception(photo)
     review = photo.get('sourceReview' if color else 'blackAndWhiteReview', {})
     revision = photo.get('revision', 'original')

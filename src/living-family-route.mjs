@@ -1,11 +1,22 @@
 import {HttpError,json,boundedBody,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {livingVideoInfo,LIVING_VIDEO_MAX_BYTES} from './living-family-video.mjs';
+import {livingSourceInfo,LIVING_SOURCE_MAX_BYTES} from './living-family-source.mjs';
 
 const cleanName=value=>String(value||'family-memory.mp4').split(/[\\/]/).pop().replace(/[\x00-\x1f<>:"|?*]/g,'_').slice(0,180)||'family-memory.mp4';
 export async function livingFamilyRoute(request,env,db,ctx,fetcher=fetch){
   const url=new URL(request.url),path=url.pathname;let match;
   if(path==='/api/family-ai/featured'&&request.method==='GET')return json(await db('family-ai.living.list'));
+  if((match=/^\/api\/family-ai\/photos\/([a-f0-9]{32})\/source$/.exec(path))&&request.method==='POST'){
+    if(!configured(env))throw new HttpError(503,'שמירת התמונה אינה זמינה כרגע.','LIVING_STORAGE');
+    const bytes=await boundedBody(request,LIVING_SOURCE_MAX_BYTES),input={id:match[1],...livingSourceInfo(bytes),digest:await sha256(bytes)};
+    const prepared=await db('family-ai.living.source.prepare',input);
+    if(prepared.alreadySaved)return json({saved:true,...prepared});
+    const key='family-ai/'+input.id+'/source/'+input.digest+'.png';
+    await putObject(env,key,bytes,bytes.byteLength,'image/png',fetcher);
+    const result=await db('family-ai.living.source.save',{...input,key});
+    return json({saved:true,...result},result.alreadySaved?200:201);
+  }
   if((match=/^\/api\/family-ai\/photos\/([a-f0-9]{32})\/clips\/(smile|wave|dance)$/.exec(path))&&request.method==='POST'){
     if(!configured(env))throw new HttpError(503,'שמירת הסרטונים אינה זמינה כרגע.','LIVING_STORAGE');
     const id=match[1],action=match[2],revision=url.searchParams.get('revision'),operation=url.searchParams.get('operation'),expected=url.searchParams.get('expected');
