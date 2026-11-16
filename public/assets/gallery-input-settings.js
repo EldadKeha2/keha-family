@@ -2,7 +2,10 @@
   'use strict';
   const key='keha-gallery-pad-direction',checking=new URL(location.href).searchParams.get('gesture-check')==='6';
   let factor=1,calibrating=checking,last='waiting',panel=null,scheduled=false;
-  try{factor=window.localStorage?.getItem(key)==='-1'?-1:1;}catch{}
+  try{
+    const saved=window.localStorage?.getItem(key);
+    if(saved==='-1'||saved==='1'){factor=Number(saved);calibrating=false;}
+  }catch{}
   function wheelDelta(raw){
     if(!Number.isFinite(raw)||!raw)return raw;
     // The first gesture in the explicit setup page is a physical rightward

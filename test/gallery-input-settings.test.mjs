@@ -19,6 +19,7 @@ test('one explicitly requested rightward pad gesture calibrates either OS sign a
   const f=fixture({checking:true});assert.equal(f.api.isCalibrating(),true);assert.equal(f.api.wheelDelta(raw),Math.abs(raw));assert.equal(f.api.isCalibrating(),false);
   assert.equal(f.api.wheelDelta(-raw),-Math.abs(raw));assert.equal(f.stored.get('keha-gallery-pad-direction'),String(Math.sign(raw)));
   const reopened=fixture({stored:f.stored});assert.equal(reopened.api.wheelDelta(raw),Math.abs(raw));assert.equal(reopened.api.isCalibrating(),false);
+  const sameSetupURL=fixture({checking:true,stored:f.stored});assert.equal(sameSetupURL.api.isCalibrating(),false);assert.equal(sameSetupURL.api.wheelDelta(-raw),-Math.abs(raw));assert.equal(sameSetupURL.stored.get('keha-gallery-pad-direction'),String(Math.sign(raw)),'Reloading the setup link cannot silently recalibrate a later leftward swipe');
  }
 });
 test('setup ignores empty input and waits until a media viewer is open',()=>{

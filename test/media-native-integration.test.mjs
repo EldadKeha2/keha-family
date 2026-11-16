@@ -394,6 +394,17 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  const restored=fixture({storage});assert.equal(restored.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(restored.window.FamilyGalleryInput.isCalibrating(),false);assert.equal(restored.get('galleryGestureCheck'),null,'Ordinary browsing shows no diagnostic or calibration interface');
  await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,140);
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(restored.window.FamilyMedia.current().id,'c');restored.close();
+ const setupReload=fixture({query:'?gesture-check=6',storage}),reloadedSettings=setupReload.window.FamilyGalleryInput;
+ assert.equal(reloadedSettings.wheelFactor(),-1);assert.equal(reloadedSettings.isCalibrating(),false,'Reloading the setup URL must preserve an already calibrated device');
+ await setupReload.open('photo','photos',1);const reloadedRail=setupReload.strip(),left=browserWheel(setupReload,reloadedRail.children[1].querySelector('img'),140);
+ assert.equal(reloadedRail.clientWidth-left.after,-140,'A physical-left packet remains left after reloading the setup page');assert.equal(storage.get('keha-gallery-pad-direction'),'-1');
+ await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(setupReload.window.FamilyMedia.current().id,'a','A left gesture on reload must select Previous, not recalibrate the device');
+ assert.equal(reloadedSettings.wheelFactor(),-1);assert.equal(reloadedSettings.isCalibrating(),false);
+ const recalibrate=setupReload.get('galleryGestureCheck').querySelector('[data-gesture-recalibrate]');assert.equal(recalibrate.hidden,false);setupReload.emit(recalibrate,'click');await flush();assert.equal(reloadedSettings.isCalibrating(),true);
+ assert.equal(storage.get('keha-gallery-pad-direction'),'-1','Pressing recalibrate waits for a new physical-right sample');
+ await setupReload.open('photo','photos',1);const recalibratedRail=setupReload.strip(),right=browserWheel(setupReload,recalibratedRail.children[1].querySelector('img'),140);
+ assert.equal(recalibratedRail.clientWidth-right.after,140);assert.equal(reloadedSettings.wheelFactor(),1);assert.equal(reloadedSettings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction'),'1');
+ await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(setupReload.window.FamilyMedia.current().id,'c');setupReload.close();
 });
 
 test('an orphan compatibility touchstart without a pointer stream or end cannot block later wheel input',async()=>{
