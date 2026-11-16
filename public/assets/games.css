@@ -144,6 +144,14 @@
 .family-game-choice.game-choice-baby b{flex:0 0 auto;margin-top:auto;padding:5px 14px;border:1px solid #d3c3a2;border-radius:20px;background:#fff9ee;color:#8b734a}
 @media(max-width:980px){.game-group-knowledge>.family-game-choices{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.family-game-groups{gap:24px}.game-group-title{font-size:calc(25px * var(--a11y-text-scale,1));gap:9px;margin-bottom:10px;padding-bottom:10px}}
+/* The phone lobby starts with a compact ornamental divider, then the games. */
+@media(max-width:700px){
+ .family-game-intro:has(+.game-lobby-desktop-stage){display:flex;align-items:center;gap:12px;margin:8px 0 16px;padding:0}
+ .family-game-intro:has(+.game-lobby-desktop-stage)>:not(.game-medallion){display:none}
+ .family-game-intro:has(+.game-lobby-desktop-stage)>.game-medallion{flex:0 0 auto;margin:0;font-size:calc(18px * var(--a11y-text-scale,1));line-height:1}
+ .family-game-intro:has(+.game-lobby-desktop-stage)::before,.family-game-intro:has(+.game-lobby-desktop-stage)::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,#b39a6030,#b39a60)}
+ .family-game-intro:has(+.game-lobby-desktop-stage)::after{transform:scaleX(-1)}
+}
 /* Decorative side borders belong to the desktop games tab only. */
 @media(min-width:981px){
  body[data-active-view=games] .family-workspace::before,body[data-active-view=games] .family-workspace::after{content:"";position:absolute;top:18px;bottom:18px;width:24px;background:url('ornament.svg') repeat-y center top / 24px auto;opacity:.75;pointer-events:none;z-index:1}
