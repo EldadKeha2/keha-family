@@ -4143,11 +4143,11 @@ html:has(#mediaViewer.photo-fullscreen[open]){overflow:hidden}
 #photoFullscreenRoot :is(.photo-fullscreen-caption,.photo-fullscreen-status){position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;margin:0;padding:20px 76px calc(18px + env(safe-area-inset-bottom,0px));max-height:28%;overflow:auto;background:linear-gradient(transparent,#000c);color:#fff;text-align:center;white-space:pre-wrap;font:clamp(15px,2vw,20px)/1.6 var(--sans);text-shadow:0 1px 5px #000}
 #photoFullscreenRoot .photo-fullscreen-status:empty,#photoFullscreenRoot [hidden]{display:none!important}
 #photoFullscreenRoot .photo-fullscreen-status{z-index:20}
-.photo-fullscreen-face-label{position:absolute;z-index:18;box-sizing:border-box;max-width:min(260px,calc(100% - 16px));padding:6px 10px;border:1px solid #c2d0a8;border-radius:8px;background:#202819ed;color:#fffdf5;font:calc(15px * var(--a11y-text-scale,1))/1.4 var(--sans);text-align:center;overflow-wrap:anywhere;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 2px 8px #0005}
+.photo-fullscreen-face-label{position:absolute;z-index:18;box-sizing:border-box;max-width:min(calc(260px * var(--photo-fullscreen-label-scale,1)),calc(100% - 16px));padding:calc(6px * var(--photo-fullscreen-label-scale,1)) calc(10px * var(--photo-fullscreen-label-scale,1));border:1px solid #c2d0a8;border-radius:8px;background:#202819ed;color:#fffdf5;font:calc(15px * var(--a11y-text-scale,1) * var(--photo-fullscreen-label-scale,1))/1.4 var(--sans);text-align:center;overflow-wrap:anywhere;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 2px 8px #0005}
 .photo-fullscreen-face-label[data-below=true]{transform:translate(-50%,0)}
 .photo-fullscreen-face-outline{position:absolute;z-index:17;box-sizing:border-box;border:1px solid #d0e4a7c4;border-radius:5px;box-shadow:0 0 0 1px #17220b66;pointer-events:none}
 .photo-fullscreen-face-label[hidden],.photo-fullscreen-face-outline[hidden]{display:none!important}
-.photo-fullscreen-person-label{z-index:16;transform:none;max-width:min(220px,calc(100% - 16px));font-size:clamp(11px,1.2vw,15px);padding:4px 8px}
+.photo-fullscreen-person-label{z-index:16;transform:none;max-width:min(calc(220px * var(--photo-fullscreen-label-scale,1)),calc(100% - 16px));font-size:calc(clamp(11px,1.2vw,15px) * var(--a11y-text-scale,1) * var(--photo-fullscreen-label-scale,1));padding:calc(4px * var(--photo-fullscreen-label-scale,1)) calc(8px * var(--photo-fullscreen-label-scale,1))}
 .photo-fullscreen-name-link{position:absolute;z-index:15;height:1px;background:#e1ecca;transform-origin:0 50%;box-shadow:0 0 2px #000;pointer-events:none}
 #mediaStage.photo-slide-running :is(.photo-fullscreen-person-label,.photo-fullscreen-name-link),#mediaStage:has(.photo-queued-drag) :is(.photo-fullscreen-person-label,.photo-fullscreen-name-link){visibility:hidden}
 @media(hover:none),(pointer:coarse){#photoFullscreenRoot :is(.photo-fullscreen-bar,.photo-fullscreen-previous,.photo-fullscreen-next,.photo-fullscreen-caption){opacity:1;pointer-events:auto}}
@@ -4384,6 +4384,19 @@ html[dir=ltr] #mediaViewer.video-gallery-viewer .tag-search-label input{directio
 body[data-active-view=screensaver] .workspace-actions{display:none}
 @media(max-width:700px){.screensaver-toolbar{gap:6px}.screensaver-family{gap:8px;font-size:14px}.screensaver-family select{max-width:225px}.screensaver-label-options{gap:16px;font-size:13px}.screensaver-frame{height:55dvh;min-height:340px;border-radius:10px}.screensaver-invitation h3{font-size:26px}.screensaver-footer p{margin-inline-start:0;width:100%}}
 
+.screensaver-label-size{display:flex;align-items:center;gap:10px;min-height:44px;color:#7b6c51;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+.screensaver-label-size>span{white-space:nowrap}
+.screensaver-label-size input[type=range]{box-sizing:border-box;width:140px;min-width:70px;height:44px;margin:0;padding:0;accent-color:#647c4e;cursor:pointer;touch-action:pan-y}
+.screensaver-label-size input[type=range]:focus-visible{outline:2px solid #ad8135;outline-offset:2px;border-radius:5px}
+.screensaver-label-size output{min-width:4ch;text-align:center;font-variant-numeric:tabular-nums}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options){flex-wrap:wrap}
+#photoFullscreenRoot .screensaver-fullscreen-options{order:-1;flex:0 0 100%;display:flex;align-items:center;justify-content:space-between;gap:8px 20px;flex-wrap:wrap;min-width:0}
+#photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{order:0;flex:0 1 auto;margin:0;max-width:100%}
+#photoFullscreenRoot .photo-fullscreen-label-size{color:#fffdf2;font-size:13px;max-width:100%}
+#photoFullscreenRoot .photo-fullscreen-label-size input[type=range]{accent-color:#c3d6a9}
+#photoFullscreenRoot .photo-fullscreen-label-size input[type=range]:focus-visible{outline-color:#edce8e}
+@media(max-width:700px){.screensaver-label-size{font-size:13px}.screensaver-label-size input[type=range]{width:130px}#photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{flex:1 1 100%}}
+
 /* Fixed physical positions: Previous left, Next right, in both languages. */
 #mediaViewer.photo-controls-below .media-viewer-header{direction:ltr}
 html[dir=rtl] #mediaViewer.photo-controls-below .media-viewer-paging #mediaPrevious{grid-area:1 / 2}
@@ -4549,10 +4562,10 @@ img.photo-framing-active{cursor:grabbing!important;outline:2px dashed #657950;ou
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-title{font-size:calc(16px * var(--a11y-text-scale,1));gap:8px;color:#6a6f48}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-title svg{width:23px;height:23px}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr);gap:18px}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields label{position:relative;gap:4px;font-size:calc(13px * var(--a11y-text-scale,1))}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields label:not(:last-child)::after{content:'/';position:absolute;right:-13px;bottom:10px;color:#a49b7e;font:22px/1 var(--sans)}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields input{min-height:44px;padding:6px 2px;font:calc(20px * var(--a11y-text-scale,1))/1.3 var(--sans);font-variant-numeric:tabular-nums;direction:ltr;appearance:textfield;-moz-appearance:textfield}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields input::-webkit-inner-spin-button{appearance:none;margin:0}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields label{position:relative;gap:4px;font-size:calc(13px * var(--a11y-text-scale,1));text-align:center;font-weight:700}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input{min-height:44px;padding:6px 2px;font:400 calc(20px * var(--a11y-text-scale,1))/1.3 var(--sans);font-variant-numeric:tabular-nums;direction:ltr;text-align:center!important;text-indent:0;appearance:textfield;-moz-appearance:textfield}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input::placeholder{text-align:center!important;font-weight:400}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input::-webkit-inner-spin-button,#mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input::-webkit-outer-spin-button{appearance:none;margin:0}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form button{min-height:36px;padding:6px 12px;border-radius:7px;font-size:calc(14px * var(--a11y-text-scale,1))}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-title{grid-column:1;grid-row:1;font-size:calc(14px * var(--a11y-text-scale,1))}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:10px 14px}

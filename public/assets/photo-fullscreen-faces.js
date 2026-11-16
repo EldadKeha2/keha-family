@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  let current=null,options={showNames:false,showAges:false};
+  let current=null,options={showNames:false,showAges:false,labelScale:1};
   const tr=(he,en)=>window.FamilyI18n.isEnglish?en:he;
   const live=c=>current===c&&!c.abort.signal.aborted;
   function hide(c){clearTimeout(c.timer);c.timer=null;c.bubble.hidden=c.outline.hidden=true;c.point=null;}
@@ -10,6 +10,7 @@
     return [!persistent||options.showNames?face.name:'',age?tr('גיל ','Age ')+age.text:''].filter(Boolean).join(' · ');
   }
   function render(c){
+    c.stage.style.setProperty('--photo-fullscreen-label-scale',String(options.labelScale));
     for(const node of c.overlays)node.remove();c.overlays=[];
     if(!live(c)||(!options.showNames&&!options.showAges))return;
     const image=imageRect(c.image),stage=c.stage.getBoundingClientRect();if(!image)return;

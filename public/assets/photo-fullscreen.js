@@ -8,7 +8,8 @@
   const agesIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r="3"/><path d="M2 20v-3a6 6 0 0 1 9-5"/><circle cx="16.5" cy="16.5" r="5.5"/><path d="M16.5 13v3.5l2 1"/></svg>';
   const transitions=['dissolve','zoom-in','zoom-out','drift','rise','curtain','iris'];let transitionBag=[],lastEffect=null,speed=1,effects=false;
   let viewer,stage,root,anchor,bar,play,speedControl,effectsControl,namesControl,agesControl,close,previous,next,counter,caption,status,active=false,playing=false,returnToViewer=true,hadNative=false;
-  let showNames=false,showAges=false,albumBlocked=false;
+  let showNames=false,showAges=false,albumBlocked=false,labelScale=1;
+  try{const saved=Number(localStorage.getItem('family-screensaver-label-scale'));if(Number.isFinite(saved)&&saved>=.75&&saved<=2)labelScale=saved;}catch{}
   let timer=null,hideTimer=null,frame=null,paint=0,ready=false,wasBusy=false;
   const media=()=>window.FamilyMedia;
   const mobileGrid=()=>typeof navigator!=='undefined'&&(navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
@@ -93,7 +94,11 @@
   function configure(options={}){
     if(typeof options.showNames==='boolean')showNames=options.showNames;
     if(typeof options.showAges==='boolean')showAges=options.showAges;
-    window.FamilyFullscreenFaces?.configure({showNames,showAges});sync();showControls();
+    if(typeof options.labelScale==='number'&&Number.isFinite(options.labelScale)){
+      labelScale=Math.max(.75,Math.min(2,options.labelScale));
+      try{localStorage.setItem('family-screensaver-label-scale',String(labelScale));}catch{}
+    }
+    window.FamilyFullscreenFaces?.configure({showNames,showAges,labelScale});sync();showControls();
   }
   function setAlbumStatus(blocked,message=''){
     albumBlocked=blocked;root.classList.toggle('photo-album-blocked',blocked);status.textContent=message;sync();schedule();showControls();
@@ -153,8 +158,8 @@
       if(control.dataset.photoFullscreen==='viewer')launch(stage);else launch(control._photoOpener);
     },{capture:true});
     if(typeof MutationObserver!=='undefined')new MutationObserver(records=>{if(records.some(record=>!viewer.contains(record.target)&&[...record.addedNodes].some(node=>node.nodeType===1)))scheduleDecoration();}).observe(document.body,{childList:true,subtree:true});
-    window.addEventListener('family-media-changed',scheduleDecoration);window.addEventListener('resize',sync);decorate();sync();
+    window.addEventListener('family-media-changed',scheduleDecoration);window.addEventListener('resize',sync);decorate();configure();
   }
-  window.FamilyPhotoFullscreen={enter,exit,closed,sync,present,configure,setAlbumStatus,options:()=>({showNames,showAges}),play(){if(!active)return;playing=true;sync();schedule();showControls();},isBlocked:()=>active&&albumBlocked,isActive:()=>active};
+  window.FamilyPhotoFullscreen={enter,exit,closed,sync,present,configure,setAlbumStatus,options:()=>({showNames,showAges,labelScale}),play(){if(!active)return;playing=true;sync();schedule();showControls();},isBlocked:()=>active&&albumBlocked,isActive:()=>active};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

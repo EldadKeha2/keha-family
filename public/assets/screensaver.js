@@ -3,7 +3,7 @@
   const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
   const scope='screensaver',seed=Math.floor(Math.random()*2147483647);
   const state={branch:'all',items:[],total:0,pending:false,loaded:false,error:'',preview:0,request:0,abort:null};
-  let pageSelect,fullscreenSelect,fullscreenFamily;
+  let pageSelect,fullscreenSelect,fullscreenFamily,pageLabelSize,fullscreenLabelSize,fullscreenOptions;
   const isFullscreen=()=>window.FamilyPhotoFullscreen?.isActive()&&window.FamilyMedia?.photoState().scope===scope;
   const branches=()=>window.FAMILY_DATA?.branches||[];
   function fill(select){
@@ -19,6 +19,14 @@
     const select=document.createElement('select');select.className='screensaver-family-select';select.setAttribute('aria-label',text.textContent);fill(select);
     select.addEventListener('change',()=>{state.branch=branches().some(branch=>branch.id===select.value)?select.value:'all';void load();});label.append(text,select);return {label,select};
   }
+  function labelSizeControl(className){
+    const label=document.createElement('label');label.className='screensaver-label-size '+className;label.dir=I.isEnglish?'ltr':'rtl';
+    const text=document.createElement('span');text.textContent=tr('גודל התוויות','Label size');
+    const input=document.createElement('input');input.type='range';input.min='75';input.max='200';input.step='25';input.dir='ltr';input.setAttribute('aria-label',text.textContent);
+    const output=document.createElement('output');output.dir='ltr';
+    input.addEventListener('input',()=>{window.FamilyPhotoFullscreen.configure({labelScale:Number(input.value)/100});render();});
+    label.append(text,input,output);return {label,input,output};
+  }
   function render(){
     if(!$('screensaverStart'))return;
     pageSelect.value=state.branch;if(fullscreenSelect)fullscreenSelect.value=state.branch;
@@ -32,6 +40,7 @@
     $('screensaverRetry').hidden=!state.error;
     if(fullscreenFamily)fullscreenFamily.querySelector('button').hidden=!state.error;
     const options=window.FamilyPhotoFullscreen.options();$('screensaverNames').checked=options.showNames;$('screensaverAges').checked=options.showAges;
+    for(const control of [pageLabelSize,fullscreenLabelSize])if(control){const size=Math.round((options.labelScale||1)*100);control.input.value=String(size);control.output.textContent=size+'%';control.input.setAttribute('aria-valuetext',size+'%');}
     const text=item&&!state.pending?[item.caption,options.showNames||options.showAges?(item.tags||[]).map(person=>{
       const name=options.showNames?I.personName(person):'',age=options.showAges?window.FamilyPhotoDate?.ageFor(person,item):null;
       return [name,age?tr('גיל ','Age ')+age.text:''].filter(Boolean).join(' · ');
@@ -73,13 +82,14 @@
     if(window.FamilyMedia.open([...state.items],state.preview,scope)&&window.FamilyPhotoFullscreen.enter(false))window.FamilyPhotoFullscreen.play();
   }
   function mountFullscreen(bar){
-    fullscreenFamily?.remove();fullscreenSelect=null;fullscreenFamily=null;
+    fullscreenOptions?.remove();fullscreenSelect=null;fullscreenFamily=null;fullscreenLabelSize=null;fullscreenOptions=null;
     if(window.FamilyMedia.photoState().scope!==scope)return;
     const control=familyControl('photo-fullscreen-family');fullscreenFamily=control.label;fullscreenSelect=control.select;
-    const retry=document.createElement('button');retry.type='button';retry.textContent=tr('ניסיון נוסף','Retry');retry.hidden=!state.error;retry.addEventListener('click',()=>void load());fullscreenFamily.append(retry);bar.append(fullscreenFamily);
+    const retry=document.createElement('button');retry.type='button';retry.textContent=tr('ניסיון נוסף','Retry');retry.hidden=!state.error;retry.addEventListener('click',()=>void load());fullscreenFamily.append(retry);
+    fullscreenLabelSize=labelSizeControl('photo-fullscreen-label-size');fullscreenOptions=document.createElement('div');fullscreenOptions.className='screensaver-fullscreen-options';fullscreenOptions.dir=I.isEnglish?'ltr':'rtl';fullscreenOptions.append(fullscreenFamily,fullscreenLabelSize.label);bar.append(fullscreenOptions);render();
   }
   function fullscreenClosed(){
-    fullscreenFamily?.remove();fullscreenFamily=null;fullscreenSelect=null;
+    fullscreenOptions?.remove();fullscreenOptions=null;fullscreenFamily=null;fullscreenSelect=null;fullscreenLabelSize=null;
     const id=window.FamilyMedia?.current()?.id,index=state.items.findIndex(item=>item.id===id);if(index>=0)state.preview=index;render();
   }
   function activate(view){
@@ -88,8 +98,9 @@
   }
   function init(){
     const host=$('screensaverView');if(!host)return;
-    host.innerHTML='<div class="screensaver-toolbar"><div id="screensaverFamily"></div><div class="screensaver-label-options"><label><input id="screensaverNames" type="checkbox">'+tr('תוויות שמות','Name labels')+'</label><label><input id="screensaverAges" type="checkbox">'+tr('גילים בזמן הצילום','Ages in the photo')+'</label></div></div><div class="screensaver-frame"><img id="screensaverPreview" alt="" hidden><div id="screensaverPlaceholder" class="screensaver-placeholder"><img src="assets/medallion.svg" alt="" width="76" height="76"><p id="screensaverPlaceholderText"></p></div><div class="screensaver-invitation"><span aria-hidden="true">✧ · ❖ · ✧</span><h3>'+tr('הרגעים שלנו, על כל המסך','Our moments, filling the screen')+'</h3><button id="screensaverStart" class="primary-button" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>'+tr('הפעלת שומר המסך','Start screensaver')+'</button></div></div><p id="screensaverPreviewCaption" class="screensaver-preview-caption" hidden></p><div class="screensaver-footer"><span id="screensaverStatus" role="status" aria-live="polite"></span><button id="screensaverRetry" class="secondary-button" type="button" hidden>'+tr('ניסיון נוסף','Try again')+'</button><p>'+tr('בחרו את כל המשפחה או אחד מששת הענפים, והזיכרונות יתחלפו מעצמם.','Choose the whole family or one of six branches, and let the memories unfold.')+'</p></div>';
+    host.innerHTML='<div class="screensaver-toolbar"><div id="screensaverFamily"></div><div class="screensaver-label-options"><label><input id="screensaverNames" type="checkbox">'+tr('תוויות שמות','Name labels')+'</label><label><input id="screensaverAges" type="checkbox">'+tr('גילים בזמן הצילום','Ages in the photo')+'</label></div><div id="screensaverLabelSize"></div></div><div class="screensaver-frame"><img id="screensaverPreview" alt="" hidden><div id="screensaverPlaceholder" class="screensaver-placeholder"><img src="assets/medallion.svg" alt="" width="76" height="76"><p id="screensaverPlaceholderText"></p></div><div class="screensaver-invitation"><span aria-hidden="true">✧ · ❖ · ✧</span><h3>'+tr('הרגעים שלנו, על כל המסך','Our moments, filling the screen')+'</h3><button id="screensaverStart" class="primary-button" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>'+tr('הפעלת שומר המסך','Start screensaver')+'</button></div></div><p id="screensaverPreviewCaption" class="screensaver-preview-caption" hidden></p><div class="screensaver-footer"><span id="screensaverStatus" role="status" aria-live="polite"></span><button id="screensaverRetry" class="secondary-button" type="button" hidden>'+tr('ניסיון נוסף','Try again')+'</button><p>'+tr('בחרו את כל המשפחה או אחד מששת הענפים, והזיכרונות יתחלפו מעצמם.','Choose the whole family or one of six branches, and let the memories unfold.')+'</p></div>';
     const control=familyControl('screensaver-family');pageSelect=control.select;$('screensaverFamily').append(control.label);
+    pageLabelSize=labelSizeControl('screensaver-page-label-size');$('screensaverLabelSize').append(pageLabelSize.label);
     $('screensaverStart').addEventListener('click',start);$('screensaverRetry').addEventListener('click',()=>void load());
     for(const [id,option]of [['screensaverNames','showNames'],['screensaverAges','showAges']])$(id).addEventListener('change',()=>{window.FamilyPhotoFullscreen.configure({[option]:$(id).checked});render();});
     render();if(window.FamilyApp?.getView()==='screensaver'||location.hash==='#screensaver')activate('screensaver');

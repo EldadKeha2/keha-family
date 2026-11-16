@@ -36,10 +36,10 @@
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-title{font-size:calc(16px * var(--a11y-text-scale,1));gap:8px;color:#6a6f48}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-title svg{width:23px;height:23px}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr);gap:18px}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields label{position:relative;gap:4px;font-size:calc(13px * var(--a11y-text-scale,1))}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields label:not(:last-child)::after{content:'/';position:absolute;right:-13px;bottom:10px;color:#a49b7e;font:22px/1 var(--sans)}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields input{min-height:44px;padding:6px 2px;font:calc(20px * var(--a11y-text-scale,1))/1.3 var(--sans);font-variant-numeric:tabular-nums;direction:ltr;appearance:textfield;-moz-appearance:textfield}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form .photo-date-fields input::-webkit-inner-spin-button{appearance:none;margin:0}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields label{position:relative;gap:4px;font-size:calc(13px * var(--a11y-text-scale,1));text-align:center;font-weight:700}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input{min-height:44px;padding:6px 2px;font:400 calc(20px * var(--a11y-text-scale,1))/1.3 var(--sans);font-variant-numeric:tabular-nums;direction:ltr;text-align:center!important;text-indent:0;appearance:textfield;-moz-appearance:textfield}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input::placeholder{text-align:center!important;font-weight:400}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input::-webkit-inner-spin-button,#mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields input::-webkit-outer-spin-button{appearance:none;margin:0}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form button{min-height:36px;padding:6px 12px;border-radius:7px;font-size:calc(14px * var(--a11y-text-scale,1))}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-title{grid-column:1;grid-row:1;font-size:calc(14px * var(--a11y-text-scale,1))}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:10px 14px}

@@ -23,7 +23,7 @@ function fixture({read=async()=>result(['one','two']),english=false}={}){
     click(){if(!this.disabled)this.dispatchEvent(new Event('click'));}
   }
   const host=new Node();host.id='screensaverView';nodes.set(host.id,host);
-  const bar=new Node(),mediaState={scope:null,items:[],index:0},options={showNames:false,showAges:false};let active=false,playing=false;
+  const bar=new Node(),mediaState={scope:null,items:[],index:0},options={showNames:false,showAges:false,labelScale:1};let active=false,playing=false;
   const window={FAMILY_DATA:family,FamilyI18n:{isEnglish:english,locale:english?'en-US':'he-IL',branchName:b=>english?b.titleEn:b.title,personName:p=>p.name,async fetch(url,options){const query=new URL(url,'https://family.test').searchParams;requests.push({query,options});return read(query,options);}},FamilyApp:{getView:()=> 'screensaver'}};
   window.FamilyMedia={photoState:()=>mediaState,current:()=>mediaState.items[mediaState.index],register(scope,items){registrations.push({scope,items});if(mediaState.scope===scope)mediaState.items=items;},open(items,index,scope){opens.push({items,index,scope});Object.assign(mediaState,{items,index,scope});return true;}};
   window.FamilyPhotoFullscreen={isActive:()=>active,options:()=>options,configure:value=>Object.assign(options,value),enter(){active=true;window.FamilyScreensaver.mountFullscreen(bar);return true;},play(){playing=true;},setAlbumStatus(blocked,message){statuses.push({blocked,message});},exit(){active=false;window.FamilyScreensaver.fullscreenClosed();}};
@@ -48,6 +48,17 @@ test('every matching gallery page is loaded, with a stable random seed and no re
   const f=fixture({read:async query=>query.get('page')==='1'?result(['one','two'],2,1):result(['two','three'],2,2)});await flush();
   assert.deepEqual(f.requests.map(r=>r.query.get('page')),['1','2']);assert.equal(f.requests[0].query.get('seed'),f.requests[1].query.get('seed'));
   f.start();assert.deepEqual(Array.from(f.opens.at(-1).items,item=>item.id),['one','two','three']);
+});
+test('label size changes immediately and stays synchronized between the page and running screensaver in both languages',async()=>{
+  for(const english of [false,true]){
+    const f=fixture({english});await flush();
+    const page=f.nodes.get('screensaverLabelSize').querySelector('input'),output=f.nodes.get('screensaverLabelSize').querySelector('output');
+    assert.equal(page.value,'100');assert.equal(page.getAttribute('aria-label'),english?'Label size':'גודל התוויות');
+    page.value='150';page.dispatchEvent(new Event('input'));assert.equal(output.textContent,'150%');assert.equal(f.window.FamilyPhotoFullscreen.options().labelScale,1.5);
+    f.start();const live=f.bar.querySelector('input');assert.equal(live.value,'150');
+    live.value='200';live.dispatchEvent(new Event('input'));assert.equal(page.value,'200');assert.equal(output.textContent,'200%');assert.equal(f.playing(),true);
+    f.window.FamilyPhotoFullscreen.exit();assert.equal(f.bar.querySelector('input'),null);f.start();assert.equal(f.bar.querySelector('input').value,'200');
+  }
 });
 test('a fast branch change discards late photos from previous branches, even if their requests ignore cancellation',async()=>{
   const pending=[],f=fixture({read:()=>new Promise(resolve=>pending.push(resolve))});

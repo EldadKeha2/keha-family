@@ -7,7 +7,7 @@ const faces=[{rect:{x:.4,y:.3,width:.2,height:.2},person:{id:'yona',name:'יונ
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture({read=async()=>faces,naturalWidth=1000,naturalHeight=600}={}){
  class Node extends EventTarget{
-  constructor(){super();this.children=[];this.style={};this.dataset={};this.hidden=false;this.textContent='';this.isConnected=true;this.classes=new Set();this.classList={contains:name=>this.classes.has(name)};}
+  constructor(){super();this.children=[];this.style={setProperty(name,value){this[name]=value;}};this.dataset={};this.hidden=false;this.textContent='';this.isConnected=true;this.classes=new Set();this.classList={contains:name=>this.classes.has(name)};}
   setAttribute(name,value){this[name]=value;}
   append(...nodes){for(const node of nodes){node.parent=this;this.children.push(node);}}
   remove(){this.isConnected=false;if(this.parent)this.parent.children=this.parent.children.filter(node=>node!==this);}
@@ -57,4 +57,13 @@ test('persistent names and photo ages are independent, follow each image and res
  const old=labels()[0];f.window.dispatchEvent(new Event('resize'));assert.equal(old.isConnected,false);assert.equal(labels().length,1);
  f.mount('undated');assert.equal(labels().length,0);await flush();assert.equal(labels().length,0,'Unknown photo dates have no age label');
  f.api.configure({showNames:true});assert.deepEqual(labels().map(node=>node.textContent),['יונה','שלמה']);f.api.clear();assert.equal(f.stage.children.length,0);
+});
+test('resizing labels repaints both names and ages on the active photo and follows later photos',async()=>{
+ const f=fixture();f.window.FamilyPhotoDate={ageFor:()=>({text:'58'})};
+ f.api.configure({showNames:true,showAges:true,labelScale:1.5});f.mount();await flush();
+ assert.equal(f.stage.style['--photo-fullscreen-label-scale'],'1.5');
+ const before=f.stage.children.find(node=>node.className?.includes('photo-fullscreen-person-label'));
+ assert.equal(before.textContent,'יונה · גיל 58');
+ f.api.configure({labelScale:2});assert.equal(before.isConnected,false);assert.equal(f.stage.style['--photo-fullscreen-label-scale'],'2');
+ f.mount('next');await flush();assert.equal(f.stage.style['--photo-fullscreen-label-scale'],'2');f.api.clear();
 });
