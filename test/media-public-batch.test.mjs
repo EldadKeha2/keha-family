@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {FamilyState} from '../src/state.mjs';
 import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
 import {collectionPageRevision} from '../src/collection-pages.mjs';
+import {galleryRevision} from '../src/gallery.mjs';
 
 function fixture(){
   const database=new DatabaseSync(':memory:'),queries=[];
@@ -86,4 +87,23 @@ test('supplemental names invalidate the shared roster validator without per-chec
     const after=f.state.run('tag.people');assert.notEqual(after.revision,before);assert.ok(after.people.some(person=>person.name==='New guest'));
     f.queries.length=0;assert.equal(f.state.run('tag.people.revision').revision,after.revision);assert.equal(f.queries.length,0);
   }finally{f.close();}
+});
+
+test('all gallery photos exceed 500 while respecting search, person filters, ordering and cache validators',()=>{
+ const f=fixture();try{
+  const items=Array.from({length:605},(_,i)=>f.insert(i+1,{category:'gallery',caption:i%2?'other':'match',createdAt:new Date(Date.UTC(2000,0,i+1)).toISOString()}));
+  for(const item of items.slice(0,5))f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(item.id,'yona');
+  const first=f.state.collection('gallery',{size:500}),last=f.state.collection('gallery',{size:500,page:2});
+  const all=f.state.collection('gallery',{size:'all',page:8});
+  assert.deepEqual(all.items,[...first.items,...last.items]);
+  assert.equal(all.items.length,605);assert.equal(all.pagination.size,605);assert.equal(all.pagination.all,true);assert.equal(all.pagination.pages,1);assert.equal(all.pagination.page,1);
+  const base=f.state.run('collection.revision',{kind:'gallery'}).revision;
+  assert.equal(all.revision,galleryRevision(base,{size:'all',page:1}));assert.notEqual(all.revision,first.revision);assert.doesNotMatch(all.revision,/NaN/);
+  const options={size:'all',person:'yona',query:'match',filter:'partial',sort:'uploaded-asc'},filtered=f.state.collection('gallery',options);
+  assert.deepEqual(filtered.items.map(item=>item.id),[items[0].id,items[2].id,items[4].id]);
+  assert.equal(filtered.pagination.size,3);assert.equal(filtered.pagination.all,true);assert.equal(filtered.revision,galleryRevision(base,{...options,page:1}));
+  const empty=f.state.collection('gallery',{size:'all',query:'no such photo'});assert.equal(empty.items.length,0);assert.equal(empty.pagination.pages,1);assert.equal(empty.pagination.size,1);
+  assert.equal(f.state.collection('gallery',{size:100}).items.length,100);
+  for(const size of ['invalid',-1,501,Infinity])assert.throws(()=>f.state.collection('gallery',{size}),error=>error.status===400);
+ }finally{f.close();}
 });

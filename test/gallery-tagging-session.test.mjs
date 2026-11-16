@@ -32,8 +32,8 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
  const document={activeElement:null,visibilityState:'visible',body:new Node(),documentElement:new Node(),getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:s==='[data-gallery-pager]'?pagers:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
  const collection=path=>{
   const params=new URL(path,'https://test/').searchParams,filter=params.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length&&!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:filter==='complete'?item.faceSummary.reviewed:true);
-  const size=Math.min(Number(params.get('size'))||100,filter==='all'?allPageSize:Infinity),pages=Math.max(1,Math.ceil(selected.length/size)),page=Math.max(1,Math.min(pages,Number(params.get('page'))||1));
-  return{items:structuredClone(selected.slice((page-1)*size,page*size)),count:selected.length,revision:'gallery-'+revision+'-'+page,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length,complete:server.filter(i=>i.faceSummary.reviewed).length},pagination:{page,size,pages,total:selected.length,filter}};
+  const showAll=params.get('size')==='all',size=showAll?Math.max(1,selected.length):Math.min(Number(params.get('size'))||100,filter==='all'?allPageSize:Infinity),pages=Math.max(1,Math.ceil(selected.length/size)),page=Math.max(1,Math.min(pages,Number(params.get('page'))||1));
+  return{items:structuredClone(selected.slice((page-1)*size,page*size)),count:selected.length,revision:'gallery-'+revision+'-'+page,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length,complete:server.filter(i=>i.faceSummary.reviewed).length},pagination:{page,size,pages,total:selected.length,filter,...(showAll?{all:true}:{})}};
  };
  const browser=routing?browserHistory('https://test/?lang=he#gallery'):null;
  const window={FamilyApp:{apiEnabled:true,getView:()=>initialView,toast(){}},FAMILY_DATA:{people:{},branches:[],units:{}},scrollTo(){},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>{listen(windowHandlers,name,fn);browser?.addEventListener(name,fn);},dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
@@ -47,6 +47,7 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
  for(const fn of documentHandlers.get('DOMContentLoaded'))fn();window.FamilyPortal.activate(initialView);
  const flush=async()=>{await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
  return{window,get,requests,pending,mounted,filters,pagers,flush,server,browser,
+  size(value){for(const fn of documentHandlers.get('change')||[])fn({target:{value,matches:selector=>selector==='[data-gallery-size]'}});},
   page(direction){const button=pagers[0].querySelector(direction>0?'[data-gallery-next]':'[data-gallery-prev]');button.hasAttribute=s=>s==='data-gallery-next'&&direction>0;button.closest=()=>null;for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-next],[data-gallery-prev]'?button:null}});},
   filter(name){for(const fn of documentHandlers.get('click')||[])fn({target:{closest:s=>s==='[data-gallery-filter]'?{dataset:{galleryFilter:name}}:null}});},
   open:id=>window.FamilyMedia.openFrom('gallery',id),close:()=>get('closeMediaViewer').click(),poll:()=>intervals.forEach(fn=>fn()),defer(){nextDeferred=true;},
@@ -215,4 +216,14 @@ test('Artificial Family reuses gallery paging, preserves its opening page and re
  f.get('mediaNext').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/ai-0');assert.equal(page,1);
  f.get('mediaPrevious').click();await f.flush();assert.equal(f.get('mediaOriginal').href,'/media/ai-2');assert.equal(page,2);
  f.close();await f.flush();assert.equal(page,1);assert.equal(f.get('mediaViewer').open,false);
+});
+
+test('All remains selected in both gallery pagers across filtering and can switch back to 100 on desktop and phone',async()=>{
+ for(const phone of [false,true]){
+  const items=Array.from({length:205},(_,i)=>photo(String(i),i<5?[{id:'yona'}]:[])),f=fixture(items,{phone});await f.flush();
+  f.size('all');await f.flush();assert.equal(f.cards.length,205);assert.match(f.requests.at(-1),/size=all/);assert.equal(f.window.FamilyPortal.galleryQuery().size,'all');
+  for(const pager of f.pagers){assert.equal(pager.querySelector('[data-gallery-size]').value,'all');assert.equal(pager.querySelector('[data-gallery-next]').disabled,true);}
+  f.filter('partial');await f.flush();assert.equal(f.cards.length,5);for(const pager of f.pagers)assert.equal(pager.querySelector('[data-gallery-size]').value,'all');
+  f.filter('all');await f.flush();assert.equal(f.cards.length,205);f.size('100');await f.flush();assert.equal(f.cards.length,100);assert.equal(f.window.FamilyPortal.galleryQuery().size,100);for(const pager of f.pagers)assert.equal(pager.querySelector('[data-gallery-size]').value,'100');
+ }
 });

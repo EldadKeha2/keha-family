@@ -486,9 +486,9 @@ export class FamilyState {
         ...(pagination?{collectionRevision:revision,pagination}:{}),...(kind==='videos'?{categories:this.videoCategories.snapshot()}:{}),...(library?{library}:{}),
         ...(kind.startsWith('wedding:')?{cover:pagination?this.albumCover(kind):this.albumCover(kind,items.find(item=>item.kind==='photo')?.src||null)}:{})};
     }
-    const size=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120),filter=options.filter||'all',order=galleryOrdering(options);
+    const allPhotos=options.size==='all',requestedSize=Number(options.size||100),requestedPage=Number(options.page||1),query=text(options.query||'','חיפוש',120),filter=options.filter||'all',order=galleryOrdering(options);
     if(!['all','untagged','partial','complete'].includes(filter))throw new HttpError(400,'בחרו סינון תמונות תקין.');
-    if(![100,200,300,400,500].includes(size)||!Number.isSafeInteger(requestedPage)||requestedPage<1)throw new HttpError(400,'בחרו עמוד תקין ועד 500 תמונות בעמוד.');
+    if((!allPhotos&&![100,200,300,400,500].includes(requestedSize))||!Number.isSafeInteger(requestedPage)||requestedPage<1)throw new HttpError(400,'בחרו עמוד תקין ועד 500 תמונות בעמוד.');
     const like='%'+query.replace(/[\\%_]/g,'\\$&')+'%',args=[kind];
     let where='m.category=?';
     const refinement=galleryRefinement(options);
@@ -512,10 +512,10 @@ export class FamilyState {
     const counts=this.rows('SELECT count(*) AS all_count,coalesce(sum(CASE WHEN '+untagged+' THEN 1 ELSE 0 END),0) AS untagged_count FROM media m WHERE m.category=?',kind)[0];
     const filterCounts={all:counts.all_count,untagged:counts.untagged_count,complete:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND NOT ('+unfinished+')',kind)[0].n,partial:this.rows('SELECT count(*) AS n FROM media m WHERE m.category=? AND '+partial,kind)[0].n};
     const total=query||refinement.person||refinement.unit||labels.length?this.rows('SELECT count(*) AS n FROM media m WHERE '+where,...args)[0].n:filterCounts[filter];
-    const pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
+    const size=allPhotos?Math.max(1,total):requestedSize,pages=Math.max(1,Math.ceil(total/size)),page=Math.min(requestedPage,pages);
     const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY '+order.sql+' LIMIT ? OFFSET ?',...args,...order.args,size,(page-1)*size).map(row=>JSON.parse(row.data)));
-    const criteria={page,size,query,filter,...refinement,labels:labels.join(','),sort:order.sort,seed:order.seed};
-    return {kind,items,count:total,filterCounts,revision:galleryRevision(revision,criteria),pagination:{page,size,total,pages,query,filter,person:refinement.person,unit:refinement.unit,labels:criteria.labels,sort:order.sort,seed:order.seed}};
+    const criteria={page,size:allPhotos?'all':size,query,filter,...refinement,labels:labels.join(','),sort:order.sort,seed:order.seed};
+    return {kind,items,count:total,filterCounts,revision:galleryRevision(revision,criteria),pagination:{page,size,total,pages,...(allPhotos?{all:true}:{}),query,filter,person:refinement.person,unit:refinement.unit,labels:criteria.labels,sort:order.sort,seed:order.seed}};
   }
   touch(kind){this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value','collection:'+kind,uid());}
   albumCover(kind,fallback){
