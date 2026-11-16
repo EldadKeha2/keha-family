@@ -3385,6 +3385,10 @@ body[data-active-view=nursery][data-nursery-mode=album] .workspace-actions{displ
   .gallery-category-row .gallery-upload-heading{margin:0;padding:0;border:0}
   .gallery-category-row .gallery-tag-filters{justify-content:flex-end}
   .gallery-category-row .media-grid-header-actions{align-self:center}
+  html[dir=rtl] .gallery-category-row{grid-template-columns:minmax(0,auto) minmax(max-content,1fr) auto}
+  html[dir=rtl] .gallery-category-row .gallery-upload-heading{grid-column:3;grid-row:1}
+  html[dir=rtl] .gallery-category-row .gallery-tag-filters{grid-column:1;grid-row:1;justify-content:flex-start}
+  html[dir=rtl] .gallery-category-row .media-grid-header-actions{grid-column:2;grid-row:1;justify-self:start}
 }
 @media(max-width:700px){
   .gallery-category-row>.gallery-upload-heading,.gallery-category-row>.media-grid-header-actions{display:none}
