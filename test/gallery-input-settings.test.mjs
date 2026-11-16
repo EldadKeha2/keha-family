@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../public/assets/gallery-input-settings.js',import.meta.url),'utf8');
 function fixture({checking=false,stored=new Map(),open=true}={}){
- const events=new Map(),viewer={open},window={localStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value)}};
+ const events=new Map(),viewer={open},window={localStorage:{getItem:key=>stored.get(key),setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)}};
  const document={getElementById:id=>id==='mediaViewer'?viewer:null,addEventListener:(name,fn)=>events.set(name,fn)};
  vm.runInNewContext(source,{window,document,location:{href:'https://family.test/'+(checking?'?gesture-check='+(checking===true?'6':checking):'')},URL,requestAnimationFrame(){}});
  return{api:window.FamilyGalleryInput,events,stored,viewer};
@@ -59,5 +59,33 @@ test('whole-stroke setup learns the deliberate sign rather than its first opposi
   assert.equal(stored.get('keha-gallery-pad-direction-v2'),String(-sign),'The first jitter packet must not save the wrong direction');
   f.api.finishWheelDirection();assert.equal(f.api.isCalibrating(),false);assert.equal(f.api.wheelFactor(),sign);
   const reload=fixture({checking:'11',stored});assert.equal(reload.api.isCalibrating(),false);assert.equal(reload.api.wheelDelta(sign*120),120);assert.equal(reload.api.wheelDelta(-sign*120),-120);
+ }
+});
+
+test('desktop reference setup combines the existing pad action and the existing screen motion without changing the pad setting',()=>{
+ const bridgeKey='keha-desktop-gesture-bridge-v14',directionKey='keha-gallery-pad-direction-v2';
+ for(const factor of [-1,1])for(const pad of [-1,1])for(const touch of [-1,1]){
+  const stored=new Map([[directionKey,String(factor)]]),f=fixture({checking:'14',stored});
+  assert.equal(f.api.isCalibrating(),false);assert.equal(f.api.wheelDelta(pad*factor*120),pad*120,'The reference must preserve the already-working selection');
+  assert.equal(f.api.desktopBridgePhase(),'pad');f.api.commitTouchGesture(touch*120);assert.equal(f.api.desktopBridgePhase(),'pad','The screen cannot become the pad reference');
+  for(const invalid of [0,NaN,Infinity]){f.api.observePadGesture(invalid);f.api.commitPadGesture(invalid);}
+  assert.equal(f.api.desktopBridgePhase(),'pad');f.api.observePadGesture(pad*120);f.api.commitPadGesture(pad*120);
+  assert.equal(f.api.desktopBridgePhase(),'touch');assert.equal(stored.has(bridgeKey),false,'An incomplete pair must not survive a reload');
+  f.api.observeTouchGesture(touch*120);assert.equal(f.api.touchAction(touch),pad);assert.equal(f.api.padMotion(pad*120),touch*120);
+  for(const invalid of [0,NaN,Infinity])f.api.commitTouchGesture(invalid);
+  assert.equal(f.api.desktopBridgePhase(),'touch');f.api.commitTouchGesture(touch*120);assert.equal(f.api.desktopBridgePhase(),'ready');
+  assert.equal(stored.get(directionKey),String(factor));assert.deepEqual(JSON.parse(stored.get(bridgeKey)),{pad,touch});
+  const reopened=fixture({stored});assert.equal(reopened.events.size,0,'Ordinary browsing does not display setup');assert.equal(reopened.api.desktopBridgePhase(),'ready');
+  assert.equal(reopened.api.wheelDelta(-pad*factor*120),-pad*120);assert.equal(reopened.api.touchAction(-touch),-pad);assert.equal(reopened.api.padMotion(-pad*120),-touch*120);
+  const oldLink=fixture({checking:'11',stored});assert.equal(oldLink.api.isCalibrating(),false,'An older setup URL must not overwrite a completed pair');assert.equal(oldLink.api.wheelFactor(),factor);
+  reopened.api.commitTouchGesture(-touch*120);reopened.api.commitPadGesture(-pad*120);assert.deepEqual(JSON.parse(stored.get(bridgeKey)),{pad,touch},'Later left/right browsing cannot relearn the reference');
+  reopened.api.resetBridge();assert.equal(reopened.api.desktopBridgePhase(),'pad');assert.equal(stored.has(bridgeKey),false);assert.equal(stored.get(directionKey),String(factor));
+ }
+});
+
+test('ordinary browsing and invalid saved reference pairs keep the previous device behavior',()=>{
+ for(const value of [undefined,'{}','{"pad":0,"touch":1}','{"pad":1,"touch":-2}','broken']){
+  const f=fixture({stored:new Map(value?[['keha-desktop-gesture-bridge-v14',value]]:[])});
+  assert.equal(f.api.desktopBridgeActive(),false);assert.equal(f.api.touchAction(-1),-1);assert.equal(f.api.padMotion(-120),-120);
  }
 });
