@@ -12,7 +12,7 @@ const story={id:'a'.repeat(24),title:'הדרך הביתה',body:'סיפור מש
 const recording={id:'b'.repeat(32),title:'בקולה של סבתא',body:'זיכרון מוקלט',author:'משפחה',year:1985,personIds:['yona'],tags:[person],filename:'voice.mp3',src:'/api/voices/'+('b'.repeat(32))+'/audio',createdAt:'2026-11-01T00:00:00Z',updatedAt:'2026-11-01T00:00:00Z'};
 const tick=async()=>{for(let n=0;n<5;n++)await new Promise(resolve=>setImmediate(resolve));};
 
-function fixture({english=false,reduced=false,stories=[story],recordings=[recording],fail=false,categoryError=0}={}){
+function fixture({english=false,reduced=false,stories=[story],recordings=[recording],people=[person],fail=false,categoryError=0}={}){
   const {window,document}=parseHTML(html),requests=[],timers=new Map(),scrolls=[],uploads=[],notices=[];let timer=0;
   // Native browser methods, modeled only at the UI boundary.
   for(const dialog of document.querySelectorAll('dialog')){dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;};}
@@ -36,6 +36,8 @@ function fixture({english=false,reduced=false,stories=[story],recordings=[record
     return Response.json(path==='api/stories'?{stories,revision:'s1'}:{recordings,revision:'v1'});
   };
   Object.assign(window,{FAMILY_API_TOKEN:'public-marker',FamilyI18n:{isEnglish:english,locale:english?'en-US':'he-IL',error:String,personName:p=>english?p.nameEn:p.name,searchNames:p=>[p.name,p.nameEn].join(' '),fetch:api},FamilyApp:{apiEnabled:true,getView:()=> 'tree',toast:s=>notices.push(s)},FamilyTags:{findPeople:async q=>[person].filter(p=>!q||p.name.includes(q)||p.nameEn.toLowerCase().includes(q.toLowerCase()))},FamilyAccessibility:{isReducedMotion:()=>reduced}});
+  window.FAMILY_DATA={people:Object.fromEntries(people.map(p=>[p.id,p]))};
+  window.FamilyApp.getPersonSummary=id=>people.find(p=>p.id===id);
   class XHR{
     constructor(){this.headers={};this.events={};this.upload={addEventListener:(name,fn)=>{this.progress=fn;}};}
     open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}addEventListener(name,fn){this.events[name]=fn;}
@@ -58,6 +60,24 @@ test('the five category doors open from an ornamented book and each click turns 
   assert.equal(f.scrolls.includes('memoryCollection'),false);f.finishAnimation();assert.equal(f.get('memoryWorld').classList.contains('is-turning'),false);assert.equal(f.scrolls.at(-1),'memoryCollection');
   f.click('[data-memory-category="funny"]');assert.equal(f.get('storyTimeline').children.length,0);assert.equal(f.get('storiesEmpty').hidden,false);
   f.click('#newStory');assert.equal(f.get('storyEditor').open,true);assert.equal(f.get('storyCategory').value,'funny');
+});
+test('story cards and readers show the storyteller portrait rather than the tagged subject in either language',async()=>{
+  const shosh={id:'shosh',name:'שוש בלום',nameEn:'Shosh Bloom',profile:'/media/'+'1'.repeat(32)},margalit={id:'margalit',name:'מרגלית נקאש',nameEn:'Margalit Nakash',profile:'/media/'+'2'.repeat(32)};
+  for(const english of [false,true]){
+    const f=fixture({english,people:[shosh,margalit],stories:[{...story,title:'נעלי הבית של סבתא מרגלית',author:'שוש בלום',category:'childhood',personIds:['margalit'],tags:[margalit]}]});
+    await f.activate('stories');f.click('[data-memory-category="childhood"]');
+    const card=f.document.querySelector('.memory-card-heading img');assert.equal(card.getAttribute('src'),shosh.profile+'?thumbnail=1');assert.equal(card.alt,english?'Shosh Bloom':'שוש בלום');
+    f.click('[data-open-story]');assert.equal(f.document.querySelector('.story-reader-byline img').getAttribute('src'),shosh.profile+'?thumbnail=1');assert.match(f.get('storyReaderBody').textContent,english?/Margalit Nakash/:/מרגלית נקאש/);
+    shosh.profile='/media/'+'3'.repeat(32);f.window.dispatchEvent(new f.window.Event('family-profile-changed'));
+    assert.equal(f.document.querySelector('.memory-card-heading img').getAttribute('src'),shosh.profile+'?thumbnail=1');assert.equal(f.document.querySelector('.story-reader-byline img').getAttribute('src'),shosh.profile+'?thumbnail=1');
+  }
+});
+test('an existing credited grandmother keeps her own portrait while ambiguous or unknown narrators use initials',async()=>{
+  const yona={...person,profile:'/media/'+'4'.repeat(32)},tami={id:'tammy',name:'תמי לבבי',nameEn:'Tami Levavi',profile:'/media/'+'5'.repeat(32)};
+  const credited=fixture({people:[yona,tami],stories:[{...story,author:'סבתא יונה מתוך עבודת השורשים של תמי'}]});await credited.activate('stories');assert.equal(credited.document.querySelector('.memory-narrator-portrait img').getAttribute('src'),yona.profile+'?thumbnail=1');
+  for(const author of ['יונה','מספרת אחרת','<img src=x onerror=alert(1)>']){
+    const f=fixture({people:[yona,{...yona,id:'another-yona',name:'יונה אחרת'}],stories:[{...story,author}]});await f.activate('stories');assert.equal(f.document.querySelectorAll('.memory-narrator-portrait img').length,0);assert.ok(f.document.querySelector('.memory-narrator-portrait'));assert.equal(f.document.querySelectorAll('[onerror]').length,0);
+  }
 });
 test('new memories save the selected chapter and keyboard-selected people without requiring a year',async()=>{
   const f=fixture();await f.activate('stories');f.click('[data-memory-category="childhood"]');f.click('#newStory');

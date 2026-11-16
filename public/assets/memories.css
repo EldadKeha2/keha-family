@@ -62,6 +62,13 @@
 .memory-card-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font:12px/1.6 var(--sans);color:#a08759}
 .memory-card h4{margin:10px 0;font:600 24px/1.4 var(--display,var(--sans));color:#60674e}
 .memory-card h4 button{font:inherit;color:inherit;text-align:start;background:none;border:0;padding:0;cursor:pointer}
+.memory-card-heading{display:flex;align-items:center;gap:14px;margin:12px 0}
+.memory-card-heading h4{flex:1;min-width:0;margin:0}
+.memory-narrator-portrait{position:relative;display:grid;place-items:center;flex:0 0 56px;width:56px;height:56px;border:1px solid #bca36f;border-radius:50%;overflow:hidden;background:#edf0e3;color:#65744e;box-shadow:0 0 0 3px #fffaf0,0 0 0 4px #dfd2b5;font:calc(19px * var(--a11y-text-scale,1))/1 var(--serif)}
+.memory-narrator-portrait img.profile-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.story-reader-byline{display:flex;align-items:center;gap:15px;margin:12px 0 24px}
+.story-reader-byline .story-reader-author{margin:0;min-width:0}
+@media(max-width:700px){.memory-card-heading{gap:12px}.memory-narrator-portrait{flex-basis:48px;width:48px;height:48px;font-size:calc(17px * var(--a11y-text-scale,1))}}
 .memory-card-excerpt{font:15px/1.9 var(--sans);white-space:pre-line;color:#82765f;margin:0 0 14px}
 .memory-card-footer{display:flex;align-items:center;gap:13px;border-top:1px solid #e6dcc9;margin-top:16px;padding-top:12px;color:#9a8c72;font:12px/1.5 var(--sans)}
 .memory-card-footer>span{margin-inline-end:auto}

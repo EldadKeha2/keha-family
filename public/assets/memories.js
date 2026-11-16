@@ -74,6 +74,28 @@
     ids(){return [...this.selected.keys()];}
   }
   let storyPicker,voicePicker;
+  function narratorPerson(item){
+    // The storyteller is identified by the byline, never by the story's subjects.
+    const author=normalize(item.author).split(/\s+מתוך\s+|\s+from\s+/i)[0].replace(/^(?:סבתא|סבתה|סבא|grandma|grandpa|grandmother|grandfather)\s+/i,'').replace(/\s+/g,' ');
+    if(!author)return null;
+    const roster=new Map();
+    for(const p of [...Object.values(window.FAMILY_DATA?.people||{}),...(window.FamilyPeopleRoster?.snapshot?.()||[]),...(window.FamilyApp?.getPeople?.()||[])])roster.set(p.id,{...roster.get(p.id),...p,...window.FamilyApp?.getPersonSummary?.(p.id)});
+    const people=[...roster.values()];
+    const exact=people.filter(p=>[p.name,p.nameEn,...(p.aliases||[])].some(value=>value&&normalize(value).replace(/\s+/g,' ')===author));
+    if(exact.length)return exact.length===1?exact[0]:null;
+    const first=people.filter(p=>[p.firstName,p.name?.split(/\s+/)[0],p.nameEn?.split(/\s+/)[0]].some(value=>value&&normalize(value)===author));
+    return first.length===1?first[0]:null;
+  }
+  function narratorHTML(item){
+    const person=narratorPerson(item),label=person?I.personName(person):item.author||t('המספר או המספרת','Storyteller');
+    const initials=String(label).trim().split(/\s+/).slice(0,2).map(part=>Array.from(part)[0]).join('');
+    let src=typeof person?.profile==='string'?person.profile:'';
+    if(/^\/media\/[a-f0-9]{32}(?:\?|$)/.test(src)&&!/[?&]thumbnail=/.test(src))src+=(src.includes('?')?'&':'?')+'thumbnail=1';
+    return `<span class="memory-narrator-portrait" data-memory-narrator="${safe(item.id)}" aria-label="${safe(label)}"><span aria-hidden="true">${safe(initials)}</span>${src?`<img class="profile-photo" ${window.FamilyPhotoFraming?.profile(person)||''} src="${safe(src)}" alt="${safe(label)}" loading="lazy" decoding="async">`:''}</span>`;
+  }
+  function refreshNarratorPortraits(){
+    for(const node of document.querySelectorAll('[data-memory-narrator]')){const item=state.stories.find(item=>item.id===node.dataset.memoryNarrator);if(item)node.outerHTML=narratorHTML(item);}
+  }
   const tagsHTML=(item,kind)=>(item.tags||[]).map(p=>`<button type="button" class="memory-person-chip" data-memory-filter-person="${safe(p.id)}" data-memory-kind="${kind}">${safe(I.personName(p))}</button>`).join('');
   const filesHTML=files=>(files||[]).map(file=>`<a href="${safe(file.src)}" target="_blank" rel="noopener" download="${safe(file.name)}">▤ ${safe(file.name)} <span>↓</span></a>`).join('');
   function filterOptions(select,values,allLabel){
@@ -107,7 +129,7 @@
     $('storiesCount').textContent=state.loaded.stories?`${items.length} ${t(items.length===1?'זיכרון':'זיכרונות',items.length===1?'memory':'memories')}`:'';
     $('storiesEmpty').hidden=!state.loaded.stories||items.length>0;
     $('memoryEmptyText').textContent=all.length?t('לא נמצאו זיכרונות בסינון הזה. אפשר לשנות את הסינון או להוסיף זיכרון.','No memories match these filters. Change them or add a memory.'):selected?.intro||t('סיפור קטן, רגע גדול, או משהו שרק אתם זוכרים.','A small story, a big moment, or something only you remember.');
-    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div>${categoryControl(item)}</article>`).join('');
+    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><div class="memory-card-heading">${narratorHTML(item)}<h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4></div><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div>${categoryControl(item)}</article>`).join('');
   }
   function renderVoices({background=false}={}){
     if(background&&[...$('voiceList').querySelectorAll('audio')].some(a=>!a.paused))return;
@@ -129,7 +151,7 @@
   }
   function openStory(id){
     const item=state.stories.find(item=>item.id===id);if(!item)return;
-    $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2>${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}<div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
+    $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2><div class="story-reader-byline">${narratorHTML(item)}${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}</div><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
     $('storyReader').showModal();
   }
   function canWrite(){if(window.FamilyApp?.apiEnabled)return true;window.FamilyApp?.toast(t('השמירה זמינה באתר המחובר.','Saving is available on the connected website.'));return false;}
@@ -184,9 +206,12 @@
     const changed=state.view!==view;state.view=view;$('storiesView').hidden=view!=='stories';$('voicesView').hidden=view!=='voices';
     if(view!=='voices')$('voiceList').querySelectorAll('audio').forEach(audio=>audio.pause());
     if(changed)state.query='';
-    if(view==='stories'){renderStories();refresh('stories');}else if(view==='voices'){renderVoices();refresh('voices');}
+    if(view==='stories'){renderStories();refresh('stories');window.FamilyPeopleRoster?.load?.().then(refreshNarratorPortraits).catch(()=>{});}else if(view==='voices'){renderVoices();refresh('voices');}
   }
   function init(){
+    window.FamilyPeopleRoster?.subscribe?.(refreshNarratorPortraits);
+    window.addEventListener('family-profile-changed',refreshNarratorPortraits);
+    window.addEventListener('family-people-loaded',refreshNarratorPortraits);
     $('memoryWorld').innerHTML=worldHTML();storyPicker=new PeoplePicker($('storyPeoplePicker'),t('מי מופיע בזיכרון?','Who appears in this memory?'));voicePicker=new PeoplePicker($('voicePeoplePicker'),t('את מי שומעים בהקלטה?','Who can we hear in this recording?'));
     document.addEventListener('click',event=>{
       const c=event.target.closest('[data-memory-category]');if(c){chooseCategory(c.dataset.memoryCategory);return;}
