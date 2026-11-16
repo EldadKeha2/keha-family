@@ -31,7 +31,7 @@
   window.addEventListener('storage',event=>{if(event.key!==key&&event.key!==null)return;try{settings=normalize(event.key===null?null:JSON.parse(event.newValue));apply();}catch{}});
   function init(){
     button=document.getElementById('accessibilityButton');
-    button.innerHTML=icon+'<span>'+tr('נגישות','Accessibility')+'</span><span class="a11y-active-dot" aria-hidden="true"></span>';
+    button.innerHTML=icon+'<span>'+tr('נגישות','Accessibility')+'</span><span class="a11y-mobile-header-label">'+tr('נגישות','Access')+'</span><span class="a11y-active-dot" aria-hidden="true"></span>';
     const skip=document.getElementById('skipToContent');skip.textContent=tr('דילוג לתוכן הראשי','Skip to main content');
     skip.addEventListener('click',event=>{event.preventDefault();const main=document.getElementById('mainContent');main.focus();main.scrollIntoView({block:'start',behavior:'instant'});});
     panel=document.createElement('dialog');panel.id='accessibilityPanel';panel.className='a11y-panel';panel.setAttribute('data-i18n-skip','');panel.setAttribute('aria-labelledby','a11yTitle');panel.setAttribute('aria-describedby','a11yIntro');

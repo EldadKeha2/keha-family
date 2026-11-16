@@ -148,7 +148,7 @@ body[data-active-view=search] .workspace-actions{display:none}
 .mobile-language-options button[aria-pressed=true]{border-color:#7c8f68;background:#edf1e4}
 .mobile-language-options img{width:28px;height:20px;object-fit:contain}
 @media(max-width:700px){
- body:not([data-active-view=home]) .site-header,html[data-a11y-text] body:not([data-active-view=home]) .site-header{position:relative;display:grid;grid-template-columns:40px 40px 40px minmax(0,1fr);grid-template-areas:"menu search access brand";align-items:center;column-gap:0;row-gap:0;height:auto;min-height:62px;padding:7px 1px;direction:ltr}
+ body:not([data-active-view=home]) .site-header,html[data-a11y-text] body:not([data-active-view=home]) .site-header{position:relative;display:grid;grid-template-columns:40px 40px 40px minmax(0,1fr);grid-template-areas:"menu search access brand";align-items:center;column-gap:max(0px,calc((50% - 140px)/3));row-gap:0;height:auto;min-height:62px;padding:7px 1px;direction:ltr}
  body:not([data-active-view=home]) .site-header .phone-navigation,body:not([data-active-view=home]) .site-header .header-preferences{display:contents;margin:0;padding:0;border:0}
  body:not([data-active-view=home]) .site-header .phone-home-button,body:not([data-active-view=home]) #mobileViewTitle{display:none}
  body:not([data-active-view=home]) .site-header #mobileMenuToggle,body:not([data-active-view=home]) .site-search-header-slot [data-site-search-open],body:not([data-active-view=home]) .site-header #accessibilityButton{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-sizing:border-box;width:40px;min-width:40px;min-height:48px;height:48px;margin:0;padding:4px 0;border:0;border-radius:5px;background:transparent;color:#746744;font:11px/1.2 var(--sans);white-space:nowrap;box-shadow:none}
@@ -160,11 +160,11 @@ body[data-active-view=search] .workspace-actions{display:none}
  body:not([data-active-view=home]) .site-header #accessibilityButton>svg,body:not([data-active-view=home]) .site-search-header-slot svg{width:22px;height:22px;flex:0 0 22px;stroke-width:1.6}
  body:not([data-active-view=home]) #accessibilityButton>span:not(.a11y-mobile-header-label):not(.a11y-active-dot){display:none}
  body:not([data-active-view=home]) .site-header #accessibilityButton>.a11y-mobile-header-label{position:static;display:block;width:auto;height:auto;overflow:visible;clip-path:none;white-space:nowrap}
- body:not([data-active-view=home]) .site-header .language-selector{position:absolute;left:max(144px,50%);top:50%;transform:translate(-50%,-50%);width:46px;min-width:46px;margin:0;direction:ltr}
+ body:not([data-active-view=home]) .site-header .language-selector{position:absolute;left:max(140px,50%);top:50%;transform:translate(-50%,-50%);width:40px;min-width:40px;margin:0;direction:ltr}
  body:not([data-active-view=home]) .language-selector>.language-switcher-label,body:not([data-active-view=home]) .language-selector>.language-switcher{display:none}
- body:not([data-active-view=home]) .mobile-language-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:46px;min-width:46px;min-height:48px;padding:4px 0;border:0;border-radius:5px;background:transparent;color:#746744;font:11px/1.2 var(--sans);white-space:nowrap}
- body:not([data-active-view=home]) .mobile-language-button img{width:25px;height:18px;object-fit:contain}
- body:not([data-active-view=home]) .site-header .brand,html[data-a11y-text] body:not([data-active-view=home]) .site-header .brand{grid-area:brand;justify-self:end;direction:rtl;gap:4px;width:max-content;min-width:0;max-width:100%;font:500 13px/1.2 var(--sans);white-space:nowrap}
+ body:not([data-active-view=home]) .mobile-language-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;box-sizing:border-box;width:40px;min-width:40px;min-height:48px;height:48px;padding:4px 0;border:0;border-radius:5px;background:transparent;color:#746744;font:11px/1.2 var(--sans);white-space:nowrap}
+ body:not([data-active-view=home]) .mobile-language-button img{width:25px;height:22px;object-fit:contain}
+ body:not([data-active-view=home]) .site-header #homeLink{grid-area:brand;justify-self:end;direction:rtl;gap:4px;width:max-content;min-width:0;max-width:100%;font:600 15px/1.3 var(--sans);white-space:nowrap}
  body:not([data-active-view=home]) .site-header .brand img{width:24px;height:24px;flex:0 0 24px}
  body:not([data-active-view=home]) .site-header .brand>span{max-width:none;white-space:nowrap}
  body:not([data-active-view=home]) .brand-family-label{display:none}

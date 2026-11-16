@@ -206,7 +206,6 @@ function init(){
   button=document.createElement('button');button.type='button';button.dataset.siteSearchOpen='';button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','siteSearchDialog');button.setAttribute('aria-expanded','false');button.setAttribute('aria-label',tr('חיפוש בכל האתר','Search the family website'));button.innerHTML=magnifier+'<span>'+tr('חיפוש','Search')+'</span>';
   headerSlot=document.createElement('div');headerSlot.className='site-search-header-slot';document.querySelector('.site-header')?.append(headerSlot);
   const brand=document.querySelector('#homeLink>span');if(brand)brand.innerHTML='<span class="brand-family-label"><span class="brand-title-line">'+tr('בית משפחת','Keha Family')+'</span> <span class="brand-title-line">'+tr('קהא','Home')+'</span></span><span class="brand-home-label">'+tr('למסך הבית','Home screen')+'</span>';
-  const accessibility=$('accessibilityButton');if(accessibility){const label=document.createElement('span');label.className='a11y-mobile-header-label';label.textContent=tr('נגישות','Access');accessibility.append(label);}
   mountCompactLanguage();
   const actions=document.querySelector('[data-home-install-actions]');actions?.append(button);button.addEventListener('click',openQuick);mountDesktopSearch(actions);
   dialog=document.createElement('dialog');dialog.id='siteSearchDialog';dialog.className='site-search-dialog';dialog.setAttribute('aria-labelledby','siteSearchQuickTitle');dialog.setAttribute('data-i18n-skip','');
