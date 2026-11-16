@@ -3,6 +3,8 @@
   let active=null,ignoredTouchStage=null,ignoredTouchIds=new Set();
   const boundStages=new WeakSet();
   const completedPointerStarts=new WeakSet();
+  const PAD_QUIET=80;
+  const padOffset=(dx,width=Infinity)=>Math.max(-width,Math.min(width,dx*1.7));
   let padFinish=null;
   function clearPadFinish(){const old=padFinish;if(!old)return;padFinish=null;clearTimeout(old.timer);for(const animation of old.animations)animation.cancel();old.node.remove();}
   // Only wheel input is widened to the open viewer. The established screen
@@ -26,7 +28,10 @@
     const now=Date.now(),magnitude=Math.abs(dx),sign=Math.sign(dx),old=wheelEpisodes.get(stage),recent=old&&now-old.at<=360;
     if(recent){
       const same=sign===old.sign,rebound=!same&&magnitude<=old.peak*.1;
-      const tail=old.ended&&same&&magnitude<old.peak*.3&&(magnitude<=old.last*1.4+Math.max(.001,old.peak*.005)||old.tail&&magnitude<old.peak*.12);
+      // A new light stroke can begin before the old momentum expires. Two
+      // rising packets distinguish it from an isolated tail fluctuation.
+      old.rising=old.ended&&old.tail&&same&&magnitude>old.last*1.4+Math.max(.005,old.peak*.0005)?(old.rising||0)+1:0;
+      const tail=old.rising<2&&old.ended&&same&&magnitude<old.peak*.3&&(magnitude<=old.last*1.4+Math.max(.001,old.peak*.005)||old.tail&&magnitude<old.peak*.12);
       if(rebound||tail){old.at=now;old.ignored++;if(tail){old.last=magnitude;old.tail=true;}return {episode:old,ignore:true};}
       if(!old.ended&&same){old.at=now;old.last=magnitude;old.peak=Math.max(old.peak,magnitude);old.samples++;return {episode:old};}
     }
@@ -132,23 +137,35 @@
   }
   function arrange(b){const forward=(window.FamilyGalleryInput?.touchAction?.(1)??1)>0;side(b.viewport.children[0],forward?b.next:b.previous);side(b.viewport.children[2],forward?b.previous:b.next);}
   function arrangePad(b){side(b.viewport.children[0],b.next);side(b.viewport.children[2],b.previous);}
+  function paintPad(b,dx){
+    const direction=Math.sign(dx),host=b.stage.closest?.('#photoFullscreenRoot')||b.stage.closest?.('dialog'),oldImage=b.node.tagName==='IMG'?b.node:b.node.querySelector?.('img'),pane=b.viewport.children[direction>0?0:2],source=previewSource(pane._item);
+    if(!direction||!host||!oldImage?.complete||!oldImage.naturalWidth||!source)return null;
+    const rect=b.viewport.getBoundingClientRect(),width=b.width,offset=padOffset(dx,width),key=[oldImage.currentSrc||oldImage.src,source,direction].join('|');if(!rect.width||!rect.height)return null;
+    let token=padFinish;
+    if(!token||token.stage!==b.stage||token.finishing||token.key!==key){
+      clearPadFinish();const ready=[...pane.children].find(node=>node.tagName==='IMG'&&node.complete&&node.naturalWidth),node=document.createElement('div'),outgoing=oldImage.cloneNode(false),incoming=ready?ready.cloneNode(false):document.createElement('img');node.className='native-pad-drag';node.setAttribute('aria-hidden','true');
+      if(!ready){incoming.decoding='async';incoming.fetchPriority='high';incoming.src=source;}
+      Object.assign(node.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',overflow:'hidden',pointerEvents:'none',zIndex:'9',direction:'ltr',backgroundColor:typeof getComputedStyle==='function'?getComputedStyle(b.stage).backgroundColor:'#ede5d4'});
+      for(const image of [outgoing,incoming]){image.removeAttribute('id');image.className='';image.style.cssText='';Object.assign(image.style,{position:'absolute',inset:'0',width:'100%',height:'100%',maxWidth:'100%',maxHeight:'100%',objectFit:'contain',willChange:'transform'});}
+      node.append(outgoing,incoming);host.append(node);token=padFinish={node,outgoing,incoming,stage:b.stage,key,animations:[],timer:null,finishing:false};
+    }
+    // These are screen coordinates, independent of RTL scrolling, pane
+    // refreshes and the touchscreen's saved action direction.
+    token.offset=offset;token.width=width;token.outgoing.style.transform='translateX('+offset+'px)';token.incoming.style.transform='translateX('+(offset-direction*width)+'px)';return token;
+  }
   function finishPadPaint(b,direction){
-    const host=b.stage.closest?.('dialog'),oldImage=b.node.querySelector?.('img'),pane=b.viewport.children[direction>0?0:2],nextImage=[...pane.children].find(node=>node.tagName==='IMG'&&node.complete&&node.naturalWidth);
-    if(!host||!oldImage?.complete||!oldImage.naturalWidth||!nextImage||typeof oldImage.animate!=='function'||typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-    const rect=b.viewport.getBoundingClientRect(),width=b.width,offset=Math.max(-width,Math.min(width,width-b.viewport.scrollLeft));
-    if(!rect.width||!rect.height)return;
-    clearPadFinish();const node=document.createElement('div'),outgoing=oldImage.cloneNode(false),incoming=nextImage.cloneNode(false);node.className='native-pad-finish';node.setAttribute('aria-hidden','true');
-    Object.assign(node.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',overflow:'hidden',pointerEvents:'none',zIndex:'9',backgroundColor:typeof getComputedStyle==='function'?getComputedStyle(b.stage).backgroundColor:'#ede5d4'});
-    for(const image of [outgoing,incoming]){image.removeAttribute('id');image.className='';image.style.cssText='';Object.assign(image.style,{position:'absolute',inset:'0',width:'100%',height:'100%',maxWidth:'100%',maxHeight:'100%',objectFit:'contain',willChange:'transform'});}
-    node.append(outgoing,incoming);host.append(node);
-    const duration=Math.max(65,140*(1-Math.min(.6,Math.abs(offset)/width))),options={duration,easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};
-    const animations=[outgoing.animate([{transform:'translateX('+offset+'px)'},{transform:'translateX('+(direction*width)+'px)'}],options),incoming.animate([{transform:'translateX('+(offset-direction*width)+'px)'},{transform:'translateX(0)'}],options)];
-    const token=padFinish={node,animations,timer:null},done=()=>{if(padFinish===token)clearPadFinish();};token.timer=setTimeout(done,duration+60);Promise.all(animations.map(animation=>animation.finished.catch(()=>{}))).then(done);
+    const token=padFinish?.stage===b.stage&&!padFinish.finishing?padFinish:paintPad(b,b.width-b.viewport.scrollLeft);
+    if(!token)return;
+    if(typeof token.outgoing.animate!=='function'||typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches){clearPadFinish();return;}
+    token.finishing=true;token.node.className='native-pad-finish';const {outgoing,incoming,offset,width}=token;
+    const duration=Math.max(50,90*(1-Math.min(.6,Math.abs(offset)/width))),options={duration,easing:'cubic-bezier(.22,.61,.36,1)',fill:'both'};
+    token.animations=[outgoing.animate([{transform:'translateX('+offset+'px)'},{transform:'translateX('+(direction*width)+'px)'}],options),incoming.animate([{transform:'translateX('+(offset-direction*width)+'px)'},{transform:'translateX(0)'}],options)];
+    const done=()=>{if(padFinish===token)clearPadFinish();};token.timer=setTimeout(done,duration+48);Promise.all(token.animations.map(animation=>animation.finished.catch(()=>{}))).then(done);
   }
   function releaseCapture(b,g){if(g?.pointerId!=null)try{b.stage.releasePointerCapture?.(g.pointerId);}catch{}}
-  function reset(stage){
+  function reset(stage,preservePad=false){
     if(!active||stage&&active.stage!==stage)return;
-    const b=active;active=null;clearTimeout(b.wheelTimer);clearTimeout(b.contactTimer);releaseCapture(b,b.contact);b.resize?.disconnect();for(const resolve of b.idle)resolve();b.idle.clear();
+    const b=active;if(!preservePad&&padFinish?.stage===b.stage&&!padFinish.finishing)clearPadFinish();active=null;clearTimeout(b.wheelTimer);clearTimeout(b.contactTimer);releaseCapture(b,b.contact);b.resize?.disconnect();for(const resolve of b.idle)resolve();b.idle.clear();
     if(b.node.parentNode===b.center)b.viewport.before(b.node);
     b.viewport.remove();b.stage.classList.remove('has-native-photo-strip');b.stage.classList.remove('photo-pointer-dragging');
   }
@@ -161,8 +178,9 @@
     if(stage?.nodeType!==1||!supported()||!enabled()){reset(stage);return false;}
     const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?(active?.stage===stage?active.node:stage.querySelector('video,iframe,img')):null);
     if(!node)return false;
-    if(active?.stage===stage&&active.node===node){Object.assign(active,{enabled,step,touchStep,busy,vertical,previous,next});if(!pending)clearCover(active);arrange(active);anchor(active);return true;}
-    reset();const viewport=document.createElement('div');viewport.className='native-photo-strip';viewport.dir='ltr';
+    if(active?.stage===stage&&active.node===node){Object.assign(active,{enabled,step,touchStep,busy,vertical,previous,next});if(!pending)clearCover(active);if(active.wheel)arrangePad(active);else arrange(active);anchor(active);return true;}
+    const resumedWheel=active?.stage===stage?active.wheel:null;
+    reset(undefined,Boolean(resumedWheel));const viewport=document.createElement('div');viewport.className='native-photo-strip';viewport.dir='ltr';
     Object.assign(viewport.style,{scrollBehavior:'auto',scrollSnapType:'none',touchAction:'pinch-zoom',visibility:'hidden',overflowX:'hidden'});
     const left=document.createElement('div'),center=document.createElement('div'),right=document.createElement('div');
     for(const pane of [left,center,right]){pane.className='native-photo-pane';viewport.append(pane);}
@@ -173,12 +191,12 @@
     const recenter=()=>{clearWheelPaint();if(b.anchored)viewport.scrollLeft=b.width;};
     const navigate=b.navigate=(direction,input='touch')=>{
       if(active!==b||!anchor(b))return;
-      if(!direction||!b.enabled()){recenter();resolveIdle(b);return;}
+      if(!direction||!b.enabled()){if(input==='wheel')clearPadFinish();recenter();resolveIdle(b);return;}
       const bridge=window.FamilyGalleryInput;
       if(input==='wheel')bridge?.commitPadGesture?.(direction);else bridge?.commitTouchGesture?.(direction);
       const actionDirection=input==='touch'?(bridge?.touchAction?.(direction)??direction):direction;
       const motionDirection=direction;
-      if(input==='wheel'){arrangePad(b);finishPadPaint(b,direction);}else arrange(b);
+      if(input==='wheel'){arrangePad(b);if(b.contact)clearPadFinish();else finishPadPaint(b,direction);}else arrange(b);
       // Copy the selected preview before step() can update logical neighbours.
       // Input ownership is already complete, so image preparation can paint.
       holdPreview(b,viewport.children[motionDirection>0?0:2]);recenter();resolveIdle(b);b.pending++;
@@ -215,7 +233,7 @@
       finishWheelEpisode(stage,wheel.episode);window.FamilyGalleryInput?.finishWheelDirection?.();
       navigate(Math.sign(wheel.dx),'wheel');
     };
-    b.cancel=()=>{endContact();b.wheel=null;clearTimeout(b.wheelTimer);recenter();resolveIdle(b);};
+    b.cancel=()=>{if(b.wheel)clearPadFinish();endContact();b.wheel=null;clearTimeout(b.wheelTimer);recenter();resolveIdle(b);};
     const draw=g=>{viewport.scrollLeft=Math.max(0,Math.min(b.width*2,b.width-g.dx));};
     b.move=event=>{
       const g=b.contact;if(!g||!coordinate(event)||active!==b)return;
@@ -336,7 +354,7 @@
       if(!Number.isFinite(dx)||!dx){b.lastDecision='invalid-mapped-delta';return;}
       prevent(event);blockClick(b);
       const sample=wheelSample(stage,dx);
-      if(sample.ignore){b.lastDecision='wheel-momentum-ignored';if(b.wheel){clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);}return;}
+      if(sample.ignore){b.lastDecision='wheel-momentum-ignored';if(b.wheel){clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},PAD_QUIET);}return;}
       if(sample.replace&&b.wheel)b.wheel.dx=0;
       if(b.contact){
         // Wheel input proves a new owner. Finish a real horizontal finger
@@ -352,15 +370,16 @@
       window.FamilyGalleryInput?.observePadGesture?.(b.wheel.dx);arrangePad(b);
       // The pad keeps its working Next/Previous selection. Paint that action
       // in its own direction, independently of the saved touchscreen mapping.
-      clearPadFinish();clearWheelPaint();draw({dx:b.wheel.dx});
-      clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},80);
+      clearWheelPaint();draw({dx:b.wheel.dx});paintPad(b,b.wheel.dx);
+      clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},PAD_QUIET);
     };
     bindStage(stage);
+    if(resumedWheel){b.wheel=resumedWheel;arrangePad(b);draw(resumedWheel);paintPad(b,resumedWheel.dx);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},Math.max(0,PAD_QUIET-(Date.now()-resumedWheel.episode.at)));}
     // Browser scroll events are deliberately observational only. The rail is
     // not horizontally scrollable by the browser, even for declined inputs.
     if(typeof ResizeObserver!=='undefined'){b.resize=new ResizeObserver(()=>{if(active===b)anchor(b);});b.resize.observe(viewport);}
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:15,mount,reset,has,claim,note,supported,diagnostics,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:16,mount,reset,has,claim,note,supported,diagnostics,padOffset,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();

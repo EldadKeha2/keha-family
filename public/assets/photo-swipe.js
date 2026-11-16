@@ -12,7 +12,7 @@
     const preview=(dx,options)=>{if(!move)return;if(!frames){move(dx,options);return;}pendingPreview={dx,options};if(previewFrame===null)previewFrame=requestAnimationFrame(()=>{previewFrame=null;const pending=pendingPreview;pendingPreview=null;if(pending)move(pending.dx,pending.options);});};
     const desktopBridge=()=>mouse()?window.FamilyGalleryInput:null;
     const touchDirection=dx=>desktopBridge()?.touchAction?.(Math.sign(dx))??Math.sign(dx);
-    const wheelMotion=dx=>dx;
+    const wheelMotion=dx=>window.FamilyPhotoNative?.padOffset?.(dx,stage.clientWidth)??dx*1.7;
     const navigate=(dx,options={})=>{
       const bridge=desktopBridge();
       if(options.input==='wheel')bridge?.commitPadGesture?.(dx);
@@ -154,13 +154,13 @@
       const dx=window.FamilyGalleryInput?.wheelDelta?.(rawDx)??rawDx;
       if(event.cancelable)event.preventDefault();blockClick();
       const sample=window.FamilyPhotoNative?.wheelSample?.(stage,dx);
-      const complete=done=>{if(!done)return;window.FamilyPhotoNative?.finishWheelEpisode?.(stage,done.episode);window.FamilyGalleryInput?.finishWheelDirection?.();if(!wheelGesture)finished();if(enabled()&&Math.abs(done.dx)>=distance()){flushPreview();navigate(done.dx,{dragX:wheelMotion(done.dx),queued:true,native:true,input:'wheel'});}else {clearPreview();cancel?.();}};
+      const complete=done=>{if(!done)return;window.FamilyPhotoNative?.finishWheelEpisode?.(stage,done.episode);window.FamilyGalleryInput?.finishWheelDirection?.();if(!wheelGesture)finished();if(enabled()&&Math.abs(done.dx)>0){flushPreview();navigate(done.dx,{dragX:wheelMotion(done.dx),queued:true,native:true,input:'wheel'});}else {clearPreview();cancel?.();}};
       const finish=()=>{wheelTimer=null;const done=wheelGesture;wheelGesture=null;complete(done);};
-      if(sample?.ignore){if(wheelGesture){clearTimeout(wheelTimer);wheelTimer=setTimeout(finish,120);}return;}
+      if(sample?.ignore){if(wheelGesture){clearTimeout(wheelTimer);wheelTimer=setTimeout(finish,80);}return;}
       if(sample?.replace&&wheelGesture)wheelGesture.dx=0;
       if(sample?.split&&wheelGesture){clearTimeout(wheelTimer);const done=wheelGesture;wheelGesture={dx:0,episode:sample.episode};complete(done);}
       wheelGesture||={dx:0,episode:sample?.episode};wheelGesture.dx+=dx;desktopBridge()?.observePadGesture?.(wheelGesture.dx);preview(wheelMotion(wheelGesture.dx),{queued:true,actionDirection:Math.sign(wheelGesture.dx)});clearTimeout(wheelTimer);
-      wheelTimer=setTimeout(finish,120);
+      wheelTimer=setTimeout(finish,80);
     };
     stage.addEventListener('wheel',onWheel,{capture:true,passive:false});
     document.addEventListener('wheel',event=>{const root=wheelRoot();if(!root||stage.contains(event.target)||!window.FamilyPhotoNative?.wheelScope?.(stage,event,root))return;onWheel(event);},{capture:true,passive:false});
