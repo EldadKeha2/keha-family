@@ -36,7 +36,7 @@ test('personal photos and videos reuse gallery options without tagging-state tab
   const f=await fixture(english),root=f.root;
   assert.equal(root.querySelectorAll('[data-gallery-filter]').length,0);assert.equal(root.querySelectorAll('[data-person-grid]').length,2);
   for(const key of ['photos','videos']){
-   const select=root.querySelector('[data-person-size="'+key+'"]');assert.deepEqual([...select.querySelectorAll('option')].map(o=>o.value),['10','20','50','100','200','300','400','500','all']);assert.equal(select.querySelector('[selected]').value,'100');
+   const select=root.querySelector('[data-person-size="'+key+'"]');assert.deepEqual([...select.querySelectorAll('option')].map(o=>o.value),['10','20','50','100','200','300','400','500','all']);assert.equal(select.querySelector('[selected]').value,'10');
    assert.equal(root.querySelector('[data-person-sort="'+key+'"] [selected]').value,'random');assert.ok(root.querySelector('#personAlbum-'+key+' [data-selection-start]'));
   }
   await f.window.FamilyPeople.refineAlbum('videos',{sort:'taken-asc',size:'all'});f.paint();

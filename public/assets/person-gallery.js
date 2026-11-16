@@ -6,7 +6,7 @@
   let helpers;
   const keyState=key=>ui[key]||=( {open:false,expanded:new Set(),search:'',columns:3} );
   const options=key=>window.FamilyPeople.galleryOptions(key);
-  function defaults(){const size=matchMedia('(max-width:700px)').matches?10:100;return Object.fromEntries(['photos','videos'].flatMap(key=>[[key+'Size',size],[key+'Sort','random'],[key+'Seed',Math.floor(Math.random()*0x100000000)]]));}
+  function defaults(){return Object.fromEntries(['photos','videos'].flatMap(key=>[[key+'Size',10],[key+'Sort','random'],[key+'Seed',Math.floor(Math.random()*0x100000000)]]));}
   function pager(key,album){
     // Reuse the gallery's actual controls, including its sort and page-size options.
     const nav=document.querySelector('#galleryView [data-gallery-pager]').cloneNode(true);
