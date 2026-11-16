@@ -391,7 +391,7 @@ export class FamilyState {
     const scope=this.mediaScope(item);
     const people=Object.fromEntries([...new Set(ids)].map(id=>[id,this.snapshot(this.person(id),this.personMedia(id))]));
     return {saved:true,operation,scope,item:this.mediaPublic(item),people,
-      ...(item.category==='personal'?{person:people[item.personId]}:{collection:this.collection(item.category)}),
+      ...(item.category==='personal'?{person:people[item.personId]}:item.category==='family-ai'?{}:{collection:this.collection(item.category)}),
       ...(item.category.startsWith('wedding:')?{wedding:this.wedding(item.category.slice(8))}:{})};
   }
   patchTags(id,changes){

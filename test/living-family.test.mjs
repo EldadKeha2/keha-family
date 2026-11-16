@@ -60,6 +60,26 @@ test('the owner-restored source replaces only its AI card and never adds a galle
   }finally{f.close();}
 });
 
+test('a versioned replacement updates the existing AI card and preserves its original, queue and other albums',async()=>{
+  const f=fixture(),id='d76e78dc736a404fac0f36d68d2a760f';try{
+    f.database.prepare('DELETE FROM media WHERE id=?').run(id);
+    const png=Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0GQAAAAASUVORK5CYII=','base64'));
+    await f.call('/api/family-ai/photos/'+id+'/source',{method:'POST',bytes:png});
+    const original=f.run('photo.version',{id,versionId:'original'}),before=f.run('family-ai.living.list');
+    const unrelated=f.database.prepare('SELECT data FROM media WHERE id!=? ORDER BY id').all(id);
+    const versionId=uid(),version={id:versionId,key:'photo-versions/'+id+'/'+versionId+'.png',mime:'image/png',size:100,filename:'conservative-restoration.png'};
+    const saved=f.run('photo.save',{id,expectedVersion:'original',baseVersion:'original',rotation:0,crop:{x:0,y:0,width:1,height:1},version});
+    assert.equal(saved.saved,true);assert.equal(saved.item.id,id);assert.equal(saved.item.scope,'family-ai');assert.equal(saved.item.photoRevision,versionId);
+    const after=f.run('family-ai.living.list'),card=after.items.find(item=>item.id===id);
+    assert.deepEqual(after.items.map(item=>item.id),before.items.map(item=>item.id));assert.equal(card.src,'/media/'+id+'?v='+versionId);
+    assert.ok(card.animations.every(action=>action.status==='pending'&&!action.videoSrc));
+    assert.equal(f.run('photo.version',{id,versionId:'original'}).key,original.key);
+    assert.equal(f.run('photo.version',{id,versionId}).key,version.key);
+    assert.deepEqual(f.database.prepare('SELECT data FROM media WHERE id!=? ORDER BY id').all(id),unrelated);
+    assert.equal(f.database.prepare('SELECT count(*) AS n FROM media_collections WHERE media_id=?').get(id).n,0);
+  }finally{f.close();}
+});
+
 test('the replaced color sources cannot be featured, animated, or served as prepared clips',async()=>{
   const f=fixture();try{
     for(const id of ['69af11cd81634789b926acff99dd37b1','593ae5f58cb74de389ab387b0e6c8eff','8002969bd642436089a78b045da2d4fe','38526015914c4738943e7ad543275d2a','0427f8c68f454d50b2f867ce4f24675f','193c0accaa7a41e8bd3c2b0a6f5e71be']){
