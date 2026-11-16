@@ -62,3 +62,15 @@
 @media(max-width:1000px){.gallery-refine-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){body[data-active-view=gallery] .workspace-header .workspace-actions{display:none}.gallery-refine-fields{gap:10px}.gallery-filter-panel{padding:12px}.gallery-filter-field summary{min-height:60px}.gallery-selection-bar{gap:6px}.gallery-selection-bar button{font-size:calc(13px * var(--a11y-text-scale,1));padding:7px 9px}}
 @media(max-width:420px){.gallery-refine-toggle span{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}.gallery-refine-toggle{width:40px;padding:8px}.gallery-selection-count{font-size:calc(13px * var(--a11y-text-scale,1))}}
+
+/* Draw attention to newly opened gallery filters on desktop without moving their contents. */
+@media(min-width:701px){
+  #galleryFilterPanel{position:relative;padding:20px;border-color:#aeb699;border-radius:12px;background:linear-gradient(135deg,#fcfbf4,#f0f2e5);box-shadow:0 4px 14px #48593914,0 0 0 3px #bca46718}
+  #galleryFilterPanel::before{content:'';position:absolute;inset:5px;border:1px solid #d5c7a64d;border-radius:7px;pointer-events:none}
+  #galleryFilterPanel:not([hidden]){animation:gallery-filter-open-glow 1.5s ease-in-out 1}
+  @keyframes gallery-filter-open-glow{
+    0%,50%,100%{border-color:#aeb699;box-shadow:0 4px 14px #48593914,0 0 0 3px #bca46718}
+    25%,75%{border-color:#a8894e;box-shadow:0 4px 14px #48593914,0 0 0 5px #bca4672e,0 0 18px #bca46733}
+  }
+}
+
