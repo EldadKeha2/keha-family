@@ -30,6 +30,14 @@ test('phone suggestions prefer complete names, aliases and core family members',
   assert.equal(suggestPeople(people,'רועי חבר')[0].id,'friend');
   assert.deepEqual(suggestPeople(people,''),[]);
 });
+test('English names and Hebrew typed on an English keyboard find the same Hebrew profiles',()=>{
+  const people=[{id:'shlomo',name:'שלמה קהא',nameEn:'Shlomo Keha'},{id:'roi',name:'רועי אלחריזי',nameEn:'Roei Elharizi'},{id:'latin',name:'חבר משפחה',nameEn:'Aknv',extra:true}];
+  for(const query of ['Shlomo','SHLOMO KEHA','Shlómo','AKNV EVT'])assert.equal(suggestPeople(people,query)[0].id,'shlomo',query);
+  assert.equal(suggestPeople(people,'aknv')[0].id,'latin','A literal name remains ahead of the keyboard fallback');
+  assert.ok(suggestPeople(people,'aknv').some(person=>person.id==='shlomo'));
+  for(const query of ['Roei','Róei Elharizi','rugh tkjrhzh'])assert.equal(suggestPeople(people,query)[0].name,'רועי אלחריזי',query);
+  assert.deepEqual(suggestPeople(people,'unrelated text'),[]);
+});
 test('the shared people endpoint supplies real profile portraits and alias names on a fresh visit',async()=>{
   const f=fixture();try{
     const picture=f.media();
@@ -50,6 +58,18 @@ test('the HTTP search finds tagged and personal content across albums, even with
     assert.doesNotMatch(JSON.stringify(data),/PRIVATE-KEY/);
     const free=(await f.call({q:'רועי'})).data;assert.ok(free.items.some(item=>item.id===photo.id));
     const english=(await f.call({q:'Roei Elharizi'})).data;assert.ok(english.items.some(item=>item.id===photo.id));
+  }finally{f.close();}
+});
+test('full searches support Hebrew keyboard mistakes in names, person filters and free text',async()=>{
+  const f=fixture();try{
+    const tagged=f.media({caption:'רגע משפחתי'}),city=f.media({tag:null,caption:'טיול בירושלים'});
+    for(const options of [{q:'rugh tkjrhzh'},{q:'rugh tkjrhzh',person:'roi'}]){
+      const {status,data}=await f.call(options);assert.equal(status,200);
+      assert.ok(data.items.some(item=>item.id==='roi'&&item.title==='רועי אלחריזי'));
+      assert.ok(data.items.some(item=>item.id===tagged.id));
+    }
+    const {data}=await f.call({q:'hruakho'});assert.ok(data.items.some(item=>item.id===city.id));
+    assert.ok(data.items.every(item=>item.id!==tagged.id));
   }finally{f.close();}
 });
 test('free text, selected people, tags, branch, year and type filters compose before pagination',async()=>{

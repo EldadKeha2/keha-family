@@ -1,6 +1,6 @@
 import family from './family.mjs';
 import {HttpError,text} from './http.mjs';
-import {normalizeSearch,searchNames,personRank,SEARCH_TYPES} from '../public/assets/site-search-core.mjs';
+import {normalizeSearch,searchVariants,searchNames,personRank,SEARCH_TYPES} from '../public/assets/site-search-core.mjs';
 import {photoLabelName,photoLabels,normalizePhotoLabel} from '../public/assets/photo-labels-catalog.mjs';
 
 const yearOf=value=>{const n=Number(value);return Number.isInteger(n)&&n>=1000&&n!==1111&&n<=new Date().getUTCFullYear()?n:null;};
@@ -20,7 +20,7 @@ export function searchSite(state,options={}){
   const people=Object.fromEntries(Object.values(roster).map(p=>[p.id,{...family.people[p.id],...p,aliases:[...(family.people[p.id]?.aliases||[]),...(p.aliases||[])]}]));
   if(person&&!people[person])throw new HttpError(404,'בן או בת המשפחה לא נמצאו.');
   const selected=person?people[person]:null,selectedNames=selected?searchNames(selected).map(normalizeSearch):[];
-  const terms=selected&&(!query||selectedNames.includes(query))?[]:query.split(' ').filter(Boolean);
+  const queries=searchVariants(q),terms=selected&&(!query||queries.some(value=>selectedNames.includes(value)))?[]:queries.map(value=>value.split(' '));
   const queryPeople=!selected&&query?new Set(Object.values(people).filter(p=>personRank(p,q)>0).map(p=>p.id)):new Set();
   const personSummary=p=>({id:p.id,name:p.name,nameEn:p.nameEn||null,profile:p.profile||null,profileFraming:p.profileFraming||null,branch:p.branch||null,extra:Boolean(p.extra),extended:Boolean(p.extended)});
   const tags=new Map(),collections=new Map();
@@ -36,9 +36,9 @@ export function searchSite(state,options={}){
     const ids=[...new Set([...personIds,...inferred])].filter(id=>people[id]),names=ids.flatMap(id=>searchNames(people[id])),haystack=normalizeSearch([...words,...names].join(' '));
     if(selected&&!ids.includes(person)&&!mentions)return;
     const tagged=!selected&&ids.some(id=>queryPeople.has(id));
-    if(terms.length&&!tagged&&!terms.every(term=>haystack.includes(term)))return;
+    if(terms.length&&!tagged&&!terms.some(words=>words.every(term=>haystack.includes(term))))return;
     const title=normalizeSearch([entry.title,entry.titleEn].join(' '));
-    const score=entry.type==='person'?personRank(people[entry.id],q)+50+(selected&&entry.id===person?110:0):(selected&&ids.includes(person)?90:tagged?80:title.includes(query)&&query?70:40);
+    const score=entry.type==='person'?personRank(people[entry.id],q)+50+(selected&&entry.id===person?110:0):(selected&&ids.includes(person)?90:tagged?80:queries.some(value=>title.includes(value))?70:40);
     entries.push({...entry,personIds:ids,branches:[...new Set(ids.map(id=>people[id]?.branch).filter(Boolean))],labels:entry.labels||[],score,excerpt:plain(entry.excerpt).slice(0,230)});
   }
   if(query||person){

@@ -134,6 +134,19 @@ for(const mode of ['Desktop','Quick']){
     }
     f.selected().click();assert.equal(f.url.hash,'#nursery');assert.equal(f.requests.length,0);
   });
+  test(mode+' English words and Hebrew keyboard mistakes keep profile and category results in Hebrew',()=>{
+    const f=open();
+    for(const [query,id]of [['People','directory'],['Movies','videos'],['Screen Saver','screensaver'],['Audio','voices'],['Artificial Intelligence','family-ai'],['Archive','nostalgia'],['Babies','nursery'],['Remembrance','memorial'],['dkrhv','gallery'],['XRYUBHO','videos'],['najeho','games']]){
+      f.type(query);const choice=f.selected(),category=f.document.querySelector('#mainNav [data-view="'+id+'"]');
+      assert.equal(choice.dataset.siteSearchSection,id,query);assert.equal(choice.querySelector('strong').textContent,category.textContent,query);
+    }
+    for(const query of ['Roei','RÓEI ELHARIZI','rugh tkjrhzh']){
+      f.type(query);assert.equal(f.selected().dataset.siteSearchPerson,'roi',query);
+      assert.equal(f.selected().querySelector('strong').textContent,'רועי אלחריזי');
+      assert.ok(f.selected().querySelector('img'));
+    }
+    press(f.window,f.field,'Enter');assert.deepEqual(f.profiles,['roi']);assert.equal(f.requests.length,0);
+  });
   test(mode+' Up and Down visibly select each action and Enter activates that selection',async()=>{
     const f=open();f.type('רועי');
     assert.equal(press(f.window,f.field,'ArrowUp').defaultPrevented,true);
