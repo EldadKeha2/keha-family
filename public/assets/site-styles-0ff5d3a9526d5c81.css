@@ -4449,9 +4449,14 @@ html[dir=ltr] #mediaViewer.video-gallery-viewer .tag-search-label input{directio
 .screensaver-view{padding-block:4px 20px}
 .screensaver-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px}
 #screensaverFamily{flex:1 1 400px;min-width:0;max-width:100%}
-.screensaver-family{display:flex;align-items:center;flex-wrap:wrap;gap:12px;color:#526441;font:600 calc(20px * var(--a11y-text-scale,1))/1.5 var(--sans)}
-.screensaver-family select{box-sizing:border-box;width:clamp(280px,26vw,400px);min-height:64px;max-width:100%;padding:12px 18px;border:2px solid #bda579;border-radius:12px;background:#fffdf6;color:#405334;font:600 calc(22px * var(--a11y-text-scale,1))/1.4 var(--sans);cursor:pointer}
-.screensaver-family select:focus-visible{outline:3px solid #647c4e;outline-offset:3px}
+.screensaver-family{color:#526441;font:600 calc(20px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.screensaver-branch-control{box-sizing:border-box;display:grid;grid-template-columns:42px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:2px 12px;width:420px;max-width:100%;min-height:84px;padding:10px 14px;border:2px solid #bda579;border-radius:14px;background:#fffdf6;cursor:pointer}
+.screensaver-branch-control>.screensaver-branch-icon{grid-column:1;grid-row:1 / span 2;display:grid;place-items:center;width:42px;height:42px;border:1px solid #bda57980;border-radius:50%;background:#647c4e0d;color:#647c4e}
+.screensaver-branch-icon svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.screensaver-branch-control>.screensaver-branch-prompt{grid-column:2;grid-row:1;min-width:0;white-space:normal;font:600 calc(16px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+.screensaver-family select{grid-column:2;grid-row:2;box-sizing:border-box;width:100%;height:34px;min-height:34px;max-width:100%;padding:0;border:0;border-radius:4px;background:transparent;color:#405334;font:600 calc(22px * var(--a11y-text-scale,1))/1.4 var(--sans);cursor:pointer}
+.screensaver-branch-control:focus-within{outline:3px solid #647c4e;outline-offset:3px}
+.screensaver-family select:focus-visible{outline:none}
 .screensaver-label-options{display:flex;align-items:center;gap:18px;flex-wrap:wrap;color:#7b6c51;font-size:calc(14px * var(--a11y-text-scale,1))}
 .screensaver-label-options label{display:flex;align-items:center;gap:7px;min-height:44px;cursor:pointer}
 .screensaver-label-options input{width:18px;height:18px;accent-color:#647c4e}
@@ -4470,7 +4475,7 @@ html[dir=ltr] #mediaViewer.video-gallery-viewer .tag-search-label input{directio
 .screensaver-footer p{margin:0;margin-inline-start:auto;color:#938467;font-size:calc(13px * var(--a11y-text-scale,1))}
 .screensaver-view [hidden]{display:none!important}
 body[data-active-view=screensaver] .workspace-actions{display:none}
-@media(max-width:700px){.screensaver-toolbar{gap:14px}#screensaverFamily{flex-basis:100%}.screensaver-family{align-items:stretch;flex-direction:column;gap:6px;font-size:calc(18px * var(--a11y-text-scale,1))}.screensaver-family select{width:100%;min-height:60px;font-size:calc(20px * var(--a11y-text-scale,1))}.screensaver-label-options{gap:16px;font-size:13px}.screensaver-frame{height:55dvh;min-height:340px;border-radius:10px}.screensaver-invitation h3{font-size:26px}.screensaver-footer p{margin-inline-start:0;width:100%}}
+@media(max-width:700px){.screensaver-toolbar{gap:14px}#screensaverFamily{flex-basis:100%}.screensaver-family{align-items:stretch;flex-direction:column;gap:6px;font-size:calc(18px * var(--a11y-text-scale,1))}.screensaver-family select{width:100%;height:34px;min-height:34px;font-size:calc(20px * var(--a11y-text-scale,1))}.screensaver-label-options{gap:16px;font-size:13px}.screensaver-frame{height:55dvh;min-height:340px;border-radius:10px}.screensaver-invitation h3{font-size:26px}.screensaver-footer p{margin-inline-start:0;width:100%}}
 
 .screensaver-label-size{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%;min-height:44px;color:#6b5d43;font:600 calc(20px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 .screensaver-label-size>span{white-space:nowrap}
@@ -4478,21 +4483,33 @@ body[data-active-view=screensaver] .workspace-actions{display:none}
 .screensaver-label-size input[type=range]:focus-visible{outline:2px solid #ad8135;outline-offset:2px;border-radius:5px}
 .screensaver-label-size output{min-width:4ch;text-align:center;font-variant-numeric:tabular-nums}
 #photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options){flex-wrap:wrap}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) :is(.photo-fullscreen-play,.photo-fullscreen-effects,.photo-fullscreen-names,.photo-fullscreen-ages){height:64px;min-height:64px}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-play{width:64px;min-width:64px;padding:16px}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) :is(.photo-fullscreen-effects,.photo-fullscreen-names,.photo-fullscreen-ages){width:76px;min-width:76px;padding:6px;gap:4px;font-size:calc(12px * var(--a11y-text-scale,1))}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) :is(.photo-fullscreen-play,.photo-fullscreen-effects,.photo-fullscreen-names,.photo-fullscreen-ages) svg{width:28px;height:28px}
+#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-speed{width:88px;height:64px;font-size:calc(18px * var(--a11y-text-scale,1))}
 #photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-counter{order:3;flex:0 0 100%;margin:0}
 #photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close{order:2;width:72px;height:72px;min-width:72px;min-height:72px;padding:18px;border:2px solid #d8c39d;background:#f4ead5;color:#5d503e;box-shadow:0 3px 16px #0005}
 #photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close svg{width:34px;height:34px;stroke-width:2.6}
 #photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close:hover{background:#fff7e8;border-color:#fff1d3;color:#403625}
 #photoFullscreenRoot .screensaver-fullscreen-options{order:1;flex:0 1 auto;display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;min-width:0;margin-left:auto}
-#photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{order:0;flex:0 1 auto;flex-wrap:wrap;gap:12px;margin:0;min-width:0;max-width:100%;font-size:calc(20px * var(--a11y-text-scale,1));font-weight:600}
+#photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{display:grid;order:0;flex:0 1 auto;gap:2px 12px;width:420px;margin:0;min-width:0;max-width:100%;border-color:#c9b68f;background:linear-gradient(135deg,#303e2a,#202b1d);color:#fffdf2;font-size:calc(20px * var(--a11y-text-scale,1));font-weight:600}
 #photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family>span{margin-left:0}
-#photoFullscreenRoot .screensaver-fullscreen-options .screensaver-family-select{width:360px;height:64px;min-height:64px;padding:10px 18px;border:2px solid #c9b68f;border-radius:12px;background:#263322;color:#fffdf2;font:600 calc(22px * var(--a11y-text-scale,1))/1.4 var(--sans)}
-#photoFullscreenRoot .screensaver-family-select:focus-visible{outline:3px solid #edce8e;outline-offset:3px}
+#photoFullscreenRoot .screensaver-fullscreen-options .screensaver-family-select{grid-column:2;grid-row:2;width:100%;height:34px;min-height:34px;padding:0;border:0;border-radius:4px;background:transparent;color:#fffdf2;font:600 calc(22px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+#photoFullscreenRoot .screensaver-family-select option{background:#263322;color:#fffdf2}
+#photoFullscreenRoot .photo-fullscreen-family>.screensaver-branch-icon{background:#fffdf20d;color:#e0d1a9;border-color:#c9b68f80}
+#photoFullscreenRoot .photo-fullscreen-family>.screensaver-branch-prompt{white-space:normal}
+#photoFullscreenRoot .photo-fullscreen-family>button{grid-column:2}
+#photoFullscreenRoot .screensaver-branch-control:focus-within{outline-color:#edce8e}
+#photoFullscreenRoot .screensaver-family-select:focus-visible{outline:none}
 #mediaViewer[data-media-scope=screensaver] #mediaStage>.photo-magic-wand{display:none}
 #photoFullscreenRoot .photo-fullscreen-label-size{order:0;flex:0 1 auto;margin:0;color:#fffdf2;font-size:calc(20px * var(--a11y-text-scale,1))}
 #photoFullscreenRoot .photo-fullscreen-label-size input[type=range]{accent-color:#c3d6a9}
 #photoFullscreenRoot .photo-fullscreen-label-size input[type=range]:focus-visible{outline-color:#edce8e}
 @media(max-width:1280px){#photoFullscreenRoot .screensaver-fullscreen-options{order:-1;flex:1 1 calc(100% - 90px);margin-left:0}#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-close{order:-1}}
-@media(max-width:700px){.screensaver-label-size,#photoFullscreenRoot .photo-fullscreen-label-size{font-size:calc(18px * var(--a11y-text-scale,1))}.screensaver-label-size input[type=range]{width:130px}#photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{flex:1 1 100%;align-items:stretch;flex-direction:column;gap:6px;font-size:calc(18px * var(--a11y-text-scale,1))}#photoFullscreenRoot .screensaver-fullscreen-options .screensaver-family-select{width:100%;height:60px;min-height:60px;font-size:calc(20px * var(--a11y-text-scale,1))}}
+@media(max-width:700px){.screensaver-label-size,#photoFullscreenRoot .photo-fullscreen-label-size{font-size:calc(18px * var(--a11y-text-scale,1))}.screensaver-label-size input[type=range]{width:130px}#photoFullscreenRoot .screensaver-fullscreen-options .photo-fullscreen-family{flex:1 1 100%;align-items:stretch;flex-direction:column;gap:6px;font-size:calc(18px * var(--a11y-text-scale,1))}#photoFullscreenRoot .screensaver-fullscreen-options .screensaver-family-select{width:100%;height:34px;min-height:34px;font-size:calc(20px * var(--a11y-text-scale,1))}}
+
+@media(max-width:480px){#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-play{width:56px;min-width:56px;height:56px;min-height:56px;padding:12px}#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) :is(.photo-fullscreen-effects,.photo-fullscreen-names,.photo-fullscreen-ages){width:64px;min-width:64px;height:56px;min-height:56px;font-size:11px}#photoFullscreenRoot .photo-fullscreen-bar:has(.screensaver-fullscreen-options) .photo-fullscreen-speed{width:74px;height:56px;font-size:16px}}
 
 /* Fixed physical positions: Previous left, Next right, in both languages. */
 #mediaViewer.photo-controls-below .media-viewer-header{direction:ltr}
