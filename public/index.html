@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-3833ea508bca6f21.css">
+  <link rel="stylesheet" href="assets/site-styles-c6db79d3c08e5ace.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
@@ -73,7 +73,7 @@
   <script src="assets/archive.js?v=performance-20261115-v2" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/family-timeline.js?v=fullscreen-v9" type="module"></script>
-  <script src="assets/home.js?v=desktop-menu-v12" defer></script>
+  <script src="assets/home.js?v=desktop-dropdown-v13" defer></script>
   <script src="assets/home-scroll.js?v=1" defer></script>
   <script src="assets/memorial.js?v=memorial-email-link-v2" defer></script>
   <script src="assets/nursery.js?v=viewer-paging-v2" defer></script>
@@ -95,7 +95,7 @@
       <div class="header-preferences">
       <div class="language-selector"><span class="language-switcher-label" data-i18n-skip dir="ltr"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg><bdi>Language/שפה</bdi></span><div class="language-switcher" role="group" aria-label="בחירת שפה" data-i18n-skip><button type="button" data-language="he" aria-label="עברית" title="עברית" aria-pressed="true"><img src="assets/flag-il.svg?v=small-star-v1" alt="" width="28" height="20"><span class="visually-hidden">עברית</span></button><button type="button" data-language="en-US" aria-label="English (United States)" title="English (United States)" aria-pressed="false"><img src="assets/flag-us.svg" alt="" width="28" height="20"><span class="visually-hidden">English (US)</span></button><button type="button" data-language="en-GB" aria-label="English (United Kingdom)" title="English (United Kingdom)" aria-pressed="false"><img src="assets/flag-gb.svg" alt="" width="28" height="20"><span class="visually-hidden">English (UK)</span></button></div></div>
       <button type="button" class="a11y-trigger" id="accessibilityButton" aria-label="נגישות" aria-haspopup="dialog" aria-controls="accessibilityPanel" aria-expanded="false" data-i18n-skip>נגישות</button>
-      <button type="button" class="desktop-menu-toggle" id="desktopMenuToggle" aria-label="פתיחת תפריט העמודים" aria-haspopup="dialog" aria-controls="mobileNavDialog" aria-expanded="false" title="תפריט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="desktop-menu" id="desktopMenu"><button type="button" class="desktop-menu-toggle" id="desktopMenuToggle" aria-label="פתיחת תפריט העמודים" aria-controls="desktopMenuDropdown" aria-expanded="false" title="תפריט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><nav class="desktop-menu-dropdown" id="desktopMenuDropdown" aria-label="תפריט העמודים" hidden><div id="desktopMenuTiles"></div></nav></div>
       </div>
       <div class="phone-navigation"><button class="phone-home-button" data-view="home" aria-label="מסך הבית">⌂ הבית</button><button id="mobileMenuToggle" aria-controls="mobileNavDialog" aria-expanded="false" aria-haspopup="dialog" aria-label="פתיחת תפריט העמודים"><span id="mobileViewTitle">הבית שלנו</span><span class="phone-menu-label">תפריט</span><span aria-hidden="true">☰</span></button></div>
     </header>
