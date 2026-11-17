@@ -26,7 +26,9 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
   append(...children){for(const node of children){node.remove();node.removed=false;node.parent=this;this.children.push(node);if(node.classList.contains('home-slide-incoming'))setTimer(()=>{const event=new Event('animationend');Object.defineProperty(event,'animationName',{value:'homePhotoIn'});node.dispatchEvent(event);},650);}}
   getBoundingClientRect(){return {width,height};}
   get clientWidth(){return width;}
-  closest(){return null;}
+  closest(selector){return selector==='[data-view]'&&this.dataset.view?this:this.parent?.closest(selector)||null;}
+  contains(node){return this===node||this.children.some(child=>child.contains(node));}
+  focus(){document.activeElement=this;}
   remove(){if(this.parent)this.parent.children=this.parent.children.filter(n=>n!==this);this.parent=null;this.removed=true;}
   removeAttribute(name){if(name==='id')this.id='';else delete this.attrs[name];}
   setAttribute(name,value){this.attrs[name]=String(value);}
@@ -41,9 +43,10 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
   resolve(w=1000,h=800){this.naturalWidth=w;this.naturalHeight=h;this.onload?.();}
   fail(){this.onerror?.();}
  }
- const ids=['homeView','homeSlideImage','homeSlidePlaceholder','homeSlideCaption','homeSlideCounter','homeSlideOpen','homeSlidePrevious','homeSlideNext','homeSlidePause','homeTiles','mobileMenuTiles','mobileMenuToggle','desktopMenuToggle','mobileNavDialog','closeMobileMenu','mediaViewer'];
+ const ids=['homeView','homeSlideImage','homeSlidePlaceholder','homeSlideCaption','homeSlideCounter','homeSlideOpen','homeSlidePrevious','homeSlideNext','homeSlidePause','homeTiles','mobileMenuTiles','mobileMenuToggle','desktopMenu','desktopMenuToggle','desktopMenuDropdown','desktopMenuTiles','mobileNavDialog','closeMobileMenu','mediaViewer'];
  for(const id of ids){const n=new Node();n.id=id;}
  const get=id=>nodes.findLast(n=>n.id===id&&!n.removed);get('homeSlideOpen').append(get('homeSlideImage'));get('homeSlideImage').hidden=true;get('homeSlideCaption').hidden=true;
+ get('desktopMenu').append(get('desktopMenuToggle'),get('desktopMenuDropdown'));get('desktopMenuDropdown').append(get('desktopMenuTiles'));get('desktopMenuDropdown').hidden=true;
  if(carousel){for(const id of ['homeSlideStage','homeCarouselRail']){const node=new Node();node.id=id;}get('homeSlideStage').append(get('homeSlideOpen'),get('homeCarouselRail'));}
  const document=new EventTarget();document.getElementById=get;document.createElement=()=>new Node();document.visibilityState='visible';
  const window=new EventTarget(),motion=new EventTarget(),desktopQuery=new EventTarget();motion.matches=reduced;desktopQuery.matches=desktop;
@@ -67,17 +70,29 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
  };
 }
 
-test('desktop and phone menu buttons open the same complete tab menu and reset on close or route selection',async()=>{
+test('the desktop dropdown and phone dialog both retain every tab and keep their own open state',async()=>{
  const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8'),nav=html.match(/<nav class="main-nav"[^>]*>[\s\S]*?<\/nav>/)[0],tabs=[...nav.matchAll(/data-view="([^"]+)"/g)].map(match=>match[1]);
  for(const desktop of [true,false]){
-  const f=fixture({desktop});await f.ready();const dialog=f.get('mobileNavDialog'),buttons=['desktopMenuToggle','mobileMenuToggle'].map(f.get);
-  for(const tab of tabs)assert.ok(f.get('mobileMenuTiles').innerHTML.includes('data-view="'+tab+'"'),tab+' is available from either menu button');
-  for(const button of buttons){
-   button.click();assert.equal(dialog.open,true);assert.ok(buttons.every(node=>node.attrs['aria-expanded']==='true'));
-   f.get('closeMobileMenu').click();assert.equal(dialog.open,false);assert.ok(buttons.every(node=>node.attrs['aria-expanded']==='false'));
-   button.click();dialog.close();assert.ok(buttons.every(node=>node.attrs['aria-expanded']==='false'),'A route change or Escape closes the same shared dialog');
-  }
+  const f=fixture({desktop});await f.ready();const dialog=f.get('mobileNavDialog'),dropdown=f.get('desktopMenuDropdown'),button=f.get('desktopMenuToggle');
+  for(const tab of tabs)for(const id of ['mobileMenuTiles','desktopMenuTiles'])assert.ok(f.get(id).innerHTML.includes('data-view="'+tab+'"'),tab+' is available from '+id);
+  button.click();assert.equal(dropdown.hidden,false);assert.notEqual(dialog.open,true);assert.equal(button.attrs['aria-expanded'],'true');
+  button.click();assert.equal(dropdown.hidden,true);assert.equal(button.attrs['aria-expanded'],'false');
+  f.get('mobileMenuToggle').click();assert.equal(dialog.open,true);assert.equal(dropdown.hidden,true);assert.equal(f.get('mobileMenuToggle').attrs['aria-expanded'],'true');
+  f.get('closeMobileMenu').click();assert.equal(dialog.open,false);assert.equal(f.get('mobileMenuToggle').attrs['aria-expanded'],'false');
  }
+});
+test('the desktop dropdown stays open when crossing into it and closes on pointer exit, outside press and a tab choice',async()=>{
+ const f=fixture();await f.ready();const root=f.get('desktopMenu'),button=f.get('desktopMenuToggle'),dropdown=f.get('desktopMenuDropdown');
+ button.click();root.dispatchEvent(new Event('pointerleave'));await f.advance(100);root.dispatchEvent(new Event('pointerenter'));await f.advance(200);assert.equal(dropdown.hidden,false,'Crossing from the button to the dropdown must not close it');
+ root.dispatchEvent(new Event('pointerleave'));await f.advance(181);assert.equal(dropdown.hidden,true);assert.equal(button.attrs['aria-expanded'],'false');
+ button.click();const outside=new Event('pointerdown');Object.defineProperty(outside,'target',{value:f.get('homeTiles')});f.document.dispatchEvent(outside);assert.equal(dropdown.hidden,true);
+ button.click();const choice=f.document.createElement('button');choice.dataset.view='nostalgia';dropdown.append(choice);const click=new Event('click');Object.defineProperty(click,'target',{value:choice});dropdown.dispatchEvent(click);assert.equal(dropdown.hidden,true);
+});
+test('keyboard focus can use the dropdown without hovering and Escape and a phone resize dismiss it',async()=>{
+ const f=fixture();await f.ready();const root=f.get('desktopMenu'),button=f.get('desktopMenuToggle'),dropdown=f.get('desktopMenuDropdown'),choice=f.document.createElement('button');dropdown.append(choice);
+ button.click();choice.focus();root.dispatchEvent(new Event('pointerleave'));await f.advance(181);assert.equal(dropdown.hidden,false,'Keyboard users keep the focused options');
+ const escape=new Event('keydown',{cancelable:true});Object.defineProperty(escape,'key',{value:'Escape'});root.dispatchEvent(escape);assert.equal(escape.defaultPrevented,true);assert.equal(dropdown.hidden,true);assert.equal(f.document.activeElement,button);
+ button.click();await f.resize(390,700,false);assert.equal(dropdown.hidden,true);assert.equal(button.attrs['aria-expanded'],'false');
 });
 
 test('home photo order is shuffled on desktop and phone without changing the source album or its visible captions',async()=>{
