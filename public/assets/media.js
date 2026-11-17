@@ -331,10 +331,10 @@
     state.pageRender=null;
     try{state.pageRequest=Promise.resolve(pagingApi().pageGallery(state.pageTarget)).then(()=>state.pageRender);await state.pageRequest;}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;state.pageRequest=null;state.pageRender=null;if($('mediaViewer').open)metadata();}}
   }
-  function canNavigatePhoto({pending=false}={}){
+  function canNavigatePhoto({pending=false,wheel=false}={}){
     const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&
       (pending||!stage.classList.contains?.('photo-slide-running'))&&(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1&&
-      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(window.FamilyFaces?.canNavigate?.(stage)??true);
+      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(wheel||(window.FamilyFaces?.canNavigate?.(stage)??true));
   }
   function canNavigateVideo({pending=false}={}){
     return $('mediaViewer').open&&current()?.kind==='video'&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&(pending||!state.paging)&&(albumPages.get(state.scope)?.total??state.items.length)>1&&
@@ -521,6 +521,7 @@
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
       enabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),mouse:desktopPhotoInput,touchOnly:phoneTouchInput,preferPointer:desktopPhotoInput,claim:()=> 'queued',
+      wheelEnabled:()=>canNavigatePhoto({pending:true,wheel:true})||canNavigateVideo({pending:true}),wheelStep:arrowStep,
       nativeScroll:()=>window.FamilyPhotoNative?.has?.(stage)===true,strictStart:true,
       wheelRoot:()=>$('mediaViewer'),
       videoSurface:()=>current()?.kind==='video'?stage.querySelector('video'):null,

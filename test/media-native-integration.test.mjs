@@ -523,7 +523,7 @@ test('controlled vertical finger movement scrolls the viewer without navigating 
   for(const clientY of [290,350])assert.equal(f.emit(target,'pointermove',{...finger,clientY}).defaultPrevented,true,'The controller owns vertical finger movement while retaining pinch zoom');
   f.emit(target,'pointerup',{...finger,clientY:350});await flush();
   assert.equal(viewer.scrollTop,100,'A hundred-pixel downward finger move scrolls the dialog upward by the same amount');assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(viewPosition(viewport),viewport.clientWidth);assert.equal(f.window.FamilyPhotoNative.isActive(stage),false);
-  const wheel=browserWheel(f,stage,0,{deltaY:140});assert.equal(wheel.event.defaultPrevented,false,'A vertical trackpad wheel remains native');assert.equal(wheel.after,wheel.before);f.close();
+  f.close();
  }
 });
 
@@ -831,15 +831,52 @@ test('pad input follows the same episode across the viewer header, details, back
  }
 });
 
-test('viewer-wide pad handling preserves vertical scrolling, editors, other dialogs and closed viewers',async()=>{
+test('viewer-wide horizontal pad handling preserves editors, other dialogs, browser zoom and closed viewers',async()=>{
  for(const supported of [true,false]){
   const f=fixture({supported});await f.open();const footer=f.get('mediaViewer').querySelector('footer'),editor=f.document.createElement('textarea');footer.append(editor);editor.readOnly=false;
   const other=f.document.createElement('dialog');other.open=true;other.setAttribute('open','');const input=f.document.createElement('input');other.append(input);f.document.body.append(other);
-  const cases=[[editor,{}],[input,{}],[other,{}],[f.get('mediaNext'),{deltaX:0,deltaY:160}],[f.get('mediaNext'),{ctrlKey:true}],[f.get('mediaNext'),{metaKey:true}]];
+  const cases=[[editor,{}],[input,{}],[other,{}],[f.get('mediaNext'),{ctrlKey:true}],[f.get('mediaNext'),{metaKey:true}]];
   for(const [target,extra]of cases){const event=f.emit(target,'wheel',{deltaX:140,deltaY:0,clientX:400,clientY:250,...extra});assert.equal(event.defaultPrevented,false,'Native editing, vertical movement and zoom retain their events');}
   await new Promise(resolve=>setTimeout(resolve,150));await flush();assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
   const closed=f.emit(f.document.body,'wheel',{deltaX:140,deltaY:0,clientX:400,clientY:250});assert.equal(closed.defaultPrevented,false);
  }
+});
+
+test('every vertical mouse delta navigates once over the entire open photo or video viewer',async()=>{
+ for(const supported of [true,false])for(const kind of ['photo','video']){
+  const f=fixture({supported});await f.open(kind,kind==='photo'?'gallery':'nostalgia');
+  const points=[()=>f.get('mediaNext'),()=>f.get('mediaViewerCaption'),()=>f.get('openedCaptionText'),()=>f.get('mediaViewer').querySelector('footer'),()=>f.get('shareMediaWhatsApp'),()=>f.get('mediaStage').querySelector('img,video'),()=>f.document.body,()=>f.get('mediaViewer')];
+  const deltas=[-1,-2.75,-40,-53,-94,-140,-160,-100];let index=0;
+  for(const [i,point]of points.entries()){
+   const event=f.emit(point(),'wheel',{deltaX:0,deltaY:deltas[i],clientX:400,clientY:250});
+   assert.equal(event.defaultPrevented,true,`${supported?'native':'fallback'} ${kind} point ${i}`);await flush();index=(index+1)%3;
+   assert.equal(f.window.FamilyMedia.current().id,['a','b','c'][index],'Each event advances exactly once across both document and stage listeners');
+  }
+  const down=f.emit(f.get('openedCaptionText'),'wheel',{deltaX:0,deltaY:.5,clientX:400,clientY:250});assert.equal(down.defaultPrevented,true);await flush();
+  assert.equal(f.window.FamilyMedia.current().id,['a','b','c'][(index+2)%3]);f.close();
+  assert.equal(f.emit(f.document.body,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,false,'Closed galleries restore ordinary page scrolling');
+ }
+});
+
+test('opening Labels restores scrolling everywhere until the dropdown is closed again',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported});await f.open();
+  const toggle=f.document.createElement('button');toggle.setAttribute('data-photo-label-toggle','');toggle.setAttribute('aria-expanded','true');f.get('mediaPhotoLabels').append(toggle);
+  for(const point of [f.get('mediaNext'),f.get('openedCaptionText'),f.get('mediaStage').querySelector('img'),toggle,f.document.body])for(const deltaY of [-94,53]){
+   const event=f.emit(point,'wheel',{deltaX:0,deltaY,clientX:400,clientY:250});assert.equal(event.defaultPrevented,false,'The browser scrolls even when the pointer is outside the open dropdown');
+  }
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'a');
+  toggle.setAttribute('aria-expanded','false');assert.equal(f.emit(f.document.body,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+ }
+});
+
+test('vertical wheel navigation works while a photo is enlarged and leaves other dialogs and pinch alone',async()=>{
+ const f=fixture();await f.open();f.zoom(2);assert.equal(f.strip(),null);
+ assert.equal(f.emit(f.get('openedCaptionText'),'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');
+ const dialog=f.document.createElement('dialog');dialog.id='photoDateDialog';f.document.body.append(dialog);dialog.open=true;dialog.setAttribute('open','');
+ assert.equal(f.emit(dialog,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,false);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');dialog.open=false;dialog.removeAttribute('open');dialog.remove();
+ for(const modifier of ['ctrlKey','metaKey'])assert.equal(f.emit(f.document.body,'wheel',{deltaX:0,deltaY:-94,[modifier]:true}).defaultPrevented,false);
+ await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
 });
 
 test('pad completion continues the last physical offset smoothly while touch retains its exact saved behavior',async()=>{

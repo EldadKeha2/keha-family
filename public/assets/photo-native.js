@@ -16,6 +16,13 @@
   }catch{}
   const padMotion=dx=>dx*animationDirection;
   const padOffset=(dx,width=Infinity)=>Math.max(-width,Math.min(width,padMotion(dx)*1.7));
+  // Vertical gallery browsing must accept every mouse's delta size.
+  // Horizontal pad input and browser zoom retain their existing owners.
+  function verticalWheelDirection(event){
+    const y=event.deltaY;
+    if(event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||event.sourceCapabilities?.firesTouchEvents||event.deltaX||!Number.isFinite(y)||!y)return 0;
+    return -Math.sign(y);
+  }
   // Browsers do not identify wheel hardware. Claim discrete vertical notches
   // only; leave precision-pad packets, horizontal swipes and pinch untouched.
   function mouseWheelDirection(event){
@@ -36,7 +43,7 @@
     const inside=stage.contains(target);if(!inside&&!root)return false;
     if(root&&(root.hidden||root.tagName==='DIALOG'&&!root.open))return false;
     const other=target.closest?.('dialog');if(root&&other&&other!==root)return false;
-    if(!inside){const editor=target.closest?.('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]');if(editor&&!editor.readOnly&&!editor.disabled)return false;}
+    if(!inside&&!verticalWheelDirection(event)){const editor=target.closest?.('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]');if(editor&&!editor.readOnly&&!editor.disabled)return false;}
     return true;
   }
   document.addEventListener('wheel',event=>{const b=active;if(b&&wheelScope(b.stage,event))b.handleWheel(event);},{capture:true,passive:false});
@@ -373,6 +380,9 @@
       if(!pointer){const g=b.contact;b.contactTimer=setTimeout(()=>{if(active===b&&b.contact===g&&!g.axis)b.cancel();},650);}
     };
     b.handleWheel=event=>{
+      // The stable gallery binding also works when zoom or image loading
+      // temporarily unmounts the native strip.
+      if(stage._familyGalleryWheel&&verticalWheelDirection(event))return;
       record(b,'wheel',event,'wheel-start');
       if(event.ctrlKey||event.metaKey){b.lastDecision='pinch-or-modifier';return;}
       if(nativeControl(event)){b.lastDecision='protected-control';return;}
@@ -419,5 +429,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:18,mount,reset,has,claim,note,supported,diagnostics,padOffset,mouseWheelDirection,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:18,mount,reset,has,claim,note,supported,diagnostics,padOffset,mouseWheelDirection,verticalWheelDirection,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();
