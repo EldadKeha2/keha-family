@@ -11,6 +11,7 @@
       frame=0;
       const buttons=selectors.map(selector=>actions.querySelector(selector)).filter(Boolean);
       for(const button of buttons)button.removeAttribute('data-header-icon-only');
+      header.style.removeProperty('--desktop-preferences-offset');
       if(!desktop.matches){
         header.style.removeProperty('--desktop-masthead-width');
         header.style.removeProperty('--desktop-masthead-margin');
@@ -37,6 +38,22 @@
       for(const button of buttons){
         if(fits())break;
         if(button.getBoundingClientRect().width>0)button.setAttribute('data-header-icon-only','');
+      }
+      // Center language and accessibility in the real free space between the
+      // actions and the fixed menu. Extra space disappears naturally on zoom.
+      const menu=header.querySelector('.desktop-menu')?.getBoundingClientRect();
+      const settings=[header.querySelector('.language-selector'),header.querySelector('#accessibilityButton')].filter(Boolean).map(element=>element.getBoundingClientRect()).filter(rect=>rect.width>0);
+      const controls=[...actions.children].map(element=>element.getBoundingClientRect()).filter(rect=>rect.width>0);
+      if(menu?.width&&settings.length&&controls.length){
+        const start=Math.min(...controls.map(rect=>rect.left)),end=Math.max(...controls.map(rect=>rect.right));
+        const menuOnLeft=menu.left<start;
+        const gapStart=menuOnLeft?menu.right:end,gapEnd=menuOnLeft?start:menu.left;
+        const settingsStart=Math.min(...settings.map(rect=>rect.left)),settingsEnd=Math.max(...settings.map(rect=>rect.right));
+        const minOffset=gapStart+8-settingsStart,maxOffset=gapEnd-8-settingsEnd;
+        if(minOffset<=maxOffset){
+          const centered=(gapStart+gapEnd-settingsStart-settingsEnd)/2;
+          header.style.setProperty('--desktop-preferences-offset',Math.max(minOffset,Math.min(maxOffset,centered))+'px');
+        }
       }
     }
     function schedule(){if(!frame)frame=requestAnimationFrame(fit);}
