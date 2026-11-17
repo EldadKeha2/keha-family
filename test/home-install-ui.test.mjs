@@ -43,6 +43,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
     constructor(tag='div'){
       super();this.tagName=tag;this.hidden=false;this.open=false;this.disabled=false;this.dataset={};this.attrs=new Map();this.children=new Map();this.textContent='';this.value='';this.modalCalls=0;
       const classes=new Set();this.classList={add:(...names)=>names.forEach(name=>classes.add(name)),remove:(...names)=>names.forEach(name=>classes.delete(name)),contains:name=>classes.has(name)};
+      const styles=new Map();this.style={setProperty:(name,value)=>styles.set(name,String(value)),getPropertyValue:name=>styles.get(name)||''};
       if(tag==='dialog'&&!nativeDialog){this.showModal=undefined;this.close=undefined;}
     }
     setAttribute(name,value){this.attrs.set(name,String(value));}
@@ -55,7 +56,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
     select(){this.selected=true;}
     showModal(){this.open=true;this.modalCalls++;}
     close(){this.open=false;this.dispatchEvent(new Event('close'));}
-    getBoundingClientRect(){return {left:0,right:320,top:0,bottom:400};}
+    getBoundingClientRect(){return {left:0,right:320,top:0,bottom:400,width:320,height:400};}
     contains(node){return node===this||[...this.children.values()].includes(node);}
     closest(selector){return this.attrs.has(selector.replace(/^\[|\]$/g,''))?this:null;}
     querySelector(selector){return this.children.get(selector)??null;}
@@ -81,7 +82,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   }
   const card=new Element('section'),dialog=new Element('dialog');nodes.set('homeInstall',card);nodes.set('homeInstallDialog',dialog);
   const windowsLink=new Element('a');windowsLink.setAttribute('href','#install-desktop');windowsLink.children.set('span',new Element('span'));nodes.set('desktopShortcutLink',windowsLink);
-  document.documentElement=new Element('html');document.documentElement.lang=english?'en-US':'he';
+  document.documentElement=new Element('html');document.documentElement.lang=english?'en-US':'he';document.documentElement.clientWidth=390;
   document.getElementById=id=>nodes.get(id)||null;
   const window=new EventTarget();window.top=iframe?{}:window;window.FamilyI18n={isEnglish:english,language:english?'en-US':'he'};
   const queries=new Map();
@@ -123,12 +124,18 @@ test('phone toolbar responds to viewport changes and keeps both controls in inst
 
 test('already installed shortcut announces its state for two seconds without reopening installation',async()=>{
   for(const options of [{standalone:true},{iosStandalone:true}]){
-    const f=fixture(options),offer=f.offer();f.click(f.button());
+    const f=fixture(options),offer=f.offer(),status=f.card.querySelector('[data-home-install-status]');
+    let buttonRect={left:140,right:172,top:20,bottom:68,width:32,height:48};
+    f.button().getBoundingClientRect=()=>buttonRect;status.getBoundingClientRect=()=>({height:44});f.click(f.button());
     assert.equal(f.button().hidden,false);assert.equal(offer.calls,0);assert.equal(f.dialog.open,false);
-    const status=f.card.querySelector('[data-home-install-status]');assert.equal(status.hidden,false);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
+    assert.equal(status.hidden,false);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');assert.equal(status.hasAttribute('data-install-feedback'),true);
+    let left=parseFloat(status.style.getPropertyValue('--install-feedback-left')),width=parseFloat(status.style.getPropertyValue('--install-feedback-width'));
+    assert.ok(left>buttonRect.right);assert.ok(left+width<=f.document.documentElement.clientWidth-8);assert.equal(parseFloat(status.style.getPropertyValue('--install-feedback-top'))+22,(buttonRect.top+buttonRect.bottom)/2);
+    buttonRect={left:170,right:202,top:8,bottom:56,width:32,height:48};f.document.documentElement.clientWidth=320;f.window.dispatchEvent(new Event('resize'));
+    left=parseFloat(status.style.getPropertyValue('--install-feedback-left'));width=parseFloat(status.style.getPropertyValue('--install-feedback-width'));assert.ok(left>buttonRect.right);assert.ok(left+width<=312);
     await f.advanceTime(1999);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
     f.click(f.button());await f.advanceTime(1999);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
-    await f.advanceTime(1);assert.equal(status.textContent,'');assert.equal(f.dialog.open,false);assert.equal(offer.calls,0);
+    await f.advanceTime(1);assert.equal(status.textContent,'');assert.equal(status.hasAttribute('data-install-feedback'),false);assert.equal(f.dialog.open,false);assert.equal(offer.calls,0);
   }
   const english=fixture({english:true,standalone:true});english.click(english.button());
   assert.equal(english.card.querySelector('[data-home-install-status]').textContent,'The app is already installed on your device');assert.equal(english.dialog.open,false);
