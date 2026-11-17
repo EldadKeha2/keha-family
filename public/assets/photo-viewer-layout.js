@@ -5,7 +5,7 @@
   // Keep existing phone and tablet app behavior, including landscape, intact.
   const compact=matchMedia('(max-width:700px)'),appMode=matchMedia('(display-mode:standalone), (display-mode:fullscreen)');
   const ua=navigator.userAgent||'',mobileDevice=navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
-  const moved=new Map();let faces=null,viewer,header,strip,icons,feedback,fit,fitLabel,zoomValue,zoomGroup,dateSaved,busy=false,active=false,photoId=null,headingLabel,downloadText,shareHeadingText;
+  const moved=new Map();let faces=null,viewer,header,strip,icons,feedback,fit,fitLabel,zoomValue,zoomGroup,dateSaved,parking,pendingRegions,pendingReview,busy=false,active=false,photoId=null,headingLabel,downloadText,shareHeadingText;
 
   // Move the actual controls so their listeners, pending writes and focus stay
   // attached. Anchors restore the normal desktop and non-photo layouts.
@@ -20,6 +20,7 @@
   }
   function restore(){
     dateSaved?.remove();
+    pendingRegions?.remove();pendingReview?.remove();
     for(const button of icons.querySelectorAll('[data-photo-album-kind="baby"],[data-photo-album-kind="wedding"]'))button.hidden=false;
     for(const [node,anchor]of [...moved].reverse()){
       if(anchor.isConnected&&node.isConnected)anchor.replaceWith(node);else anchor.remove();
@@ -43,25 +44,37 @@
       // New metadata can replace the names/date buttons while a face save is
       // still active. Keep the face control itself and discard obsolete anchors.
       for(const [node,anchor]of moved)if(!anchor.isConnected){anchor.remove();moved.delete(node);}
-      const moment=$('photoMomentTools'),names=$('togglePhotoNames'),ages=$('togglePhotoAges'),date=$('editPhotoDate');
-      dateSaved.hidden=!date?.classList.contains('has-date');
+      // Photo metadata and face controls arrive independently. Keep the current
+      // photo's complete toolbar mounted even between those updates.
+      const moment=$('photoMomentTools'),collections=$('mediaViewerCollections');
+      if(moment?.dataset.photoMomentPhoto!==item.id||!$('editPhotoDate')||!$('togglePhotoNames')||!$('togglePhotoAges'))window.FamilyPhotoDate?.mount(item);
+      const group=collections?.querySelector('.photo-collections');
+      if(collections&&(group?.dataset.collectionPhoto!==item.id||!group?.querySelector('[data-photo-album-kind="family"]')))window.FamilyPhotoCollections?.mountViewer(collections,item,viewer.getAttribute('data-media-scope')||item.scope||'gallery');
+      const names=$('togglePhotoNames'),ages=$('togglePhotoAges'),date=$('editPhotoDate');
+      const dateText=window.FamilyPhotoDate?.text?.(item.takenDate)||'';
+      dateSaved.hidden=!dateText;
       if(!dateSaved.hidden){
-        dateSaved.disabled=date.disabled;
-        const label=tr('תאריך הצילום הוזן · ','Photo date saved · ')+(date.getAttribute('aria-label')||tr('עריכת התאריך','Edit date'));
+        dateSaved.disabled=!date||date.disabled;
+        const label=tr('תאריך הצילום הוזן: ','Photo date saved: ')+dateText+tr(' · עריכת התאריך',' · Edit date');
         dateSaved.setAttribute('aria-label',label);dateSaved.title=label;
         if(dateSaved.parentNode!==$('mediaStage'))$('mediaStage').append(dateSaved);
       }
       const controls=faces?.item.id===item.id?faces:null;
+      const regions=controls?.regionsButton||pendingRegions,review=controls?.reviewButton&&!controls.reviewButton.hidden?controls.reviewButton:pendingReview;
+      if(regions!==pendingRegions)pendingRegions.remove();if(review!==pendingReview)pendingReview.remove();
+      pendingRegions.setAttribute('aria-label',tr('הצגת מסגרות פנים · טוען','Show face regions · Loading'));
+      pendingReview.setAttribute('aria-label',tr('אישור תיוג הפנים אינו זמין כרגע','Face tag confirmation is not available yet'));
+      for(const node of icons.querySelectorAll('.face-regions-toggle,.face-review-button'))if(node!==regions&&node!==review)move(node,parking);
       if(moment&&date){
-        move(ages,moment,date);if(controls?.regionsButton)move(controls.regionsButton,moment,ages||date);
-        move(names,moment,controls?.regionsButton||ages||date);
+        move(ages,moment,date);move(regions,moment,ages||date);
+        move(names,moment,regions);
       }
       if(controls?.toolbar){
         move(controls.toolbar,zoomGroup);
         controls.toolbar.querySelector('[data-face-zoom-out]').dataset.zoomLabel=tr('הקטן','Zoom out');
         controls.toolbar.querySelector('[data-face-zoom-in]').dataset.zoomLabel=tr('הגדל','Zoom in');
       }
-      arrange(icons,[moment,$('mediaViewerCollections'),controls?.reviewButton,$('editOpenedPhoto')]);
+      arrange(icons,[moment,collections,review,$('editOpenedPhoto')]);
       const sharing=$('mediaShareActions'),download=$('mediaOriginal'),copy=$('copyMediaLink'),downloadLabel=download.querySelector('span');
       move(copy,sharing,$('shareMediaWhatsApp'));move(download,sharing,copy);
       if(downloadLabel.textContent!==tr('הורד','Download'))downloadText=downloadLabel.textContent;
@@ -74,6 +87,7 @@
   }
   function faceControls(controller,owner){
     if(controller&&controller.dialog!==viewer)return;
+    if(controller&&controller.item?.id!==window.FamilyMedia?.current?.()?.id)return;
     if(!controller&&owner&&faces!==owner)return;
     faces=controller;sync();
   }
@@ -82,6 +96,10 @@
     dateSaved=document.createElement('button');dateSaved.type='button';dateSaved.id='photoDateSaved';dateSaved.hidden=true;dateSaved.setAttribute('aria-haspopup','dialog');dateSaved.setAttribute('aria-controls','photoDateDialog');
     dateSaved.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
     dateSaved.addEventListener('click',()=>$('editPhotoDate')?.click());
+    pendingRegions=document.createElement('button');pendingRegions.type='button';pendingRegions.disabled=true;pendingRegions.dataset.photoControlPlaceholder='regions';
+    pendingRegions.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" stroke-dasharray="3 3"/><circle cx="12" cy="10" r="3"/><path d="M7 18a5 5 0 0 1 10 0"/></svg>';
+    pendingReview=document.createElement('button');pendingReview.type='button';pendingReview.disabled=true;pendingReview.dataset.photoControlPlaceholder='review';
+    pendingReview.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M7 8h.01M13 8h.01M7 11.5a3.3 3.3 0 0 0 5.5.7"/><circle cx="18" cy="17.5" r="5.5" fill="#fffaf0"/><path d="m15.5 17.5 1.7 1.7 3.3-3.5"/></svg>';
     zoomGroup=document.createElement('div');zoomGroup.id='mediaPhotoZoomGroup';zoomGroup.hidden=true;
     fit=document.createElement('button');fit.type='button';fit.id='mediaPhotoFit';fitLabel=document.createElement('span');zoomValue=document.createElement('span');zoomValue.id='mediaPhotoZoomValue';
     fit.append(fitLabel,zoomValue);zoomGroup.append(fit);header.append(zoomGroup);
@@ -89,7 +107,7 @@
     const panel=document.createElement('div');panel.id='mediaPhotoToolbar';
     strip=document.createElement('div');strip.id='mediaPhotoIconScroll';strip.hidden=true;
     icons=document.createElement('div');icons.id='mediaPhotoIcons';icons.setAttribute('role','group');
-    feedback=document.createElement('div');feedback.id='mediaPhotoToolbarFeedback';strip.append(icons);panel.append(strip,feedback);$('mediaStage').after(panel);
+    feedback=document.createElement('div');feedback.id='mediaPhotoToolbarFeedback';parking=document.createElement('div');parking.id='mediaPhotoControlParking';parking.hidden=true;strip.append(icons);panel.append(strip,feedback,parking);$('mediaStage').after(panel);
     viewer.addEventListener('close',()=>{faces=null;restore();});window.addEventListener('resize',sync);compact.addEventListener('change',sync);appMode.addEventListener('change',sync);sync();
   }
   window.FamilyPhotoViewerLayout={sync,faceControls};

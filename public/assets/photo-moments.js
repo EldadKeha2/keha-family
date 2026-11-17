@@ -96,6 +96,7 @@ function refreshAges(){
 }
 function render(){
   const host=$('photoMomentTools');if(!host)return;
+  host.dataset.photoMomentPhoto=item?.id||'';
   host.hidden=!item?.id||!['photo','video'].includes(item.kind);if(host.hidden){host.replaceChildren();return;}
   const known=Boolean(item.takenDate?.year),date=photoDateText(item.takenDate,I.locale);
   if(item.kind==='video'){
