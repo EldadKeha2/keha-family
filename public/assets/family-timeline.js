@@ -1,6 +1,7 @@
 import {familyTimeline,timelineTracks,nearestTimelineYear,annualBirthYears} from './family-timeline-data.mjs?v=annual-board-v7';
 import {mountTimelineOverview} from './family-timeline-overview.mjs?v=annual-board-v7';
 import {bindTimelinePan} from './family-timeline-pan.mjs?v=touch-drag-v3';
+import {bindTimelineFullscreen} from './family-timeline-fullscreen.mjs?v=1';
 import {enchantedTreeLayout,enchantedCohortLayout,treeBoughPaths} from './family-timeline-tree.mjs?v=enchanted-v4';
 
 const I=window.FamilyI18n,$=id=>document.getElementById(id),app=()=>window.FamilyApp;
@@ -9,7 +10,7 @@ const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 const normalize=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase().trim();
 const STEP=64;
 const state={view:'tree',ready:false,mode:'rails',mobileGeneration:1,query:'',wedding:null,weddingLoaded:false,loading:false,error:false,signature:'',frame:0,model:null,tracks:[],years:new Map(),treeDecade:'all'};
-let unmountOverview=null;const overviewView={zoom:1,offset:0};
+let unmountOverview=null,fullscreenTimeline=null;const overviewView={zoom:1,offset:0};
 const generationNames=[null,['דור ראשון','First generation'],['דור שני','Second generation'],['דור שלישי','Third generation'],['דור רביעי','Fourth generation']];
 const generationSubtitles=[null,['סבא וסבתא · יונה ושלמה','Grandma and Grandpa · Yona and Shlomo'],['הילדים ובני הזוג','Children and their partners'],['הנכדים ובני הזוג','Grandchildren and their partners'],['הנינים ובני הנינים · מ־1988','Great-grandchildren and beyond · from 1988']];
 const generationTitle=g=>tr(...generationNames[g]);
@@ -113,7 +114,8 @@ function render(){
   $('timelineContent').dataset.timelineMode=state.mode;
   $('timelineContent').dataset.reducedMotion=String(Boolean(reduced()));
   unmountOverview?.();unmountOverview=null;
-  $('timelineContent').innerHTML=`<div class="ft-mode-switch" role="group" aria-label="${tr('תצוגת ציר הזמן','Timeline display')}"><button type="button" data-timeline-mode="rails" aria-pressed="${state.mode==='rails'}"><span aria-hidden="true">↔</span>${tr('ציר לפי דורות','Generation timelines')}</button><button type="button" data-timeline-mode="tree" aria-pressed="${state.mode==='tree'}"><span aria-hidden="true">❧</span>${tr('עץ השנים','Tree of years')}</button><button type="button" data-timeline-mode="annual" aria-pressed="${state.mode==='annual'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3ZM3 9h18M9 9v11M3 14h18"/></svg>${tr('לוח משפחתי שנתי','Family year register')}</button></div>${state.mode==='rails'?railsHTML():state.mode==='annual'?annualHTML():treeHTML(chapters)}${query&&!events.length?`<p class="ft-no-match">${tr('לא נמצאו שמות או שנים שמתאימים לחיפוש.','No names or years match your search.')}</p>`:''}<footer class="ft-closing"><span aria-hidden="true">❧</span>${all.unknown.length?`<small>${all.unknown.length} ${tr('בני משפחה יתווספו כשיתועד תאריך הלידה שלהם.','family members will join when their birth dates are recorded.')}</small>`:''}${state.error&&state.mode!=='annual'?`<p role="status">${tr('אלבום החתונה לא נטען כרגע.','The wedding album could not be loaded.')} <button type="button" data-timeline-retry>${tr('ניסיון נוסף','Try again')}</button></p>`:''}</footer>`;
+  $('timelineContent').innerHTML=`<div class="ft-toolbar"><button type="button" class="ft-fullscreen" data-timeline-fullscreen aria-pressed="false" aria-controls="timelineView"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="ft-fullscreen-expand" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path class="ft-fullscreen-collapse" d="M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5"/></svg><span>${tr('מסך מלא','Fullscreen')}</span></button><div class="ft-mode-switch" role="group" aria-label="${tr('תצוגת ציר הזמן','Timeline display')}"><button type="button" data-timeline-mode="rails" aria-pressed="${state.mode==='rails'}"><span aria-hidden="true">↔</span>${tr('ציר לפי דורות','Generation timelines')}</button><button type="button" data-timeline-mode="tree" aria-pressed="${state.mode==='tree'}"><span aria-hidden="true">❧</span>${tr('עץ השנים','Tree of years')}</button><button type="button" data-timeline-mode="annual" aria-pressed="${state.mode==='annual'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3ZM3 9h18M9 9v11M3 14h18"/></svg>${tr('לוח משפחתי שנתי','Family year register')}</button></div></div>${state.mode==='rails'?railsHTML():state.mode==='annual'?annualHTML():treeHTML(chapters)}${query&&!events.length?`<p class="ft-no-match">${tr('לא נמצאו שמות או שנים שמתאימים לחיפוש.','No names or years match your search.')}</p>`:''}<footer class="ft-closing"><span aria-hidden="true">❧</span>${all.unknown.length?`<small>${all.unknown.length} ${tr('בני משפחה יתווספו כשיתועד תאריך הלידה שלהם.','family members will join when their birth dates are recorded.')}</small>`:''}${state.error&&state.mode!=='annual'?`<p role="status">${tr('אלבום החתונה לא נטען כרגע.','The wedding album could not be loaded.')} <button type="button" data-timeline-retry>${tr('ניסיון נוסף','Try again')}</button></p>`:''}</footer>`;
+  fullscreenTimeline?.refresh();
   if(state.mode==='rails')unmountOverview=mountTimelineOverview($('timelineContent').querySelector('[data-timeline-overview]'),{
     model:state.model,view:overviewView,tr,preview:overviewPreview,details:focusHTML,
     labels:[tr('סבא וסבתא','Grandparents'),tr('הילדים','Children'),tr('הנכדים','Grandchildren'),tr('הנינים ובני הנינים','Great-grandchildren & beyond')],
@@ -165,6 +167,7 @@ async function loadWedding(){
   catch{state.error=true;}finally{state.loading=false;render();}
 }
 function activate(view){
+  if(view!=='timeline')fullscreenTimeline?.exit({restoreFocus:false});
   const entering=view==='timeline'&&state.view!==view;state.view=view;
   if(entering)state.query=$('searchInput').value;
   $('timelineView').hidden=view!=='timeline';$('timelineView').setAttribute('aria-label',tr('ציר זמן משפחתי','Family Timeline'));
@@ -173,6 +176,7 @@ function activate(view){
 }
 function init(){
   state.ready=true;const content=$('timelineContent');
+  fullscreenTimeline=bindTimelineFullscreen($('timelineView'),{tr});
   bindTimelinePan(content,{getTrack:g=>state.tracks.find(t=>t.generation===g),getYear:g=>state.years.get(g),moveYear,pixelsPerYear:STEP});
   content.addEventListener('click',event=>{
     const target=event.target.closest('[data-timeline-mode],[data-mobile-generation],[data-rail-step],[data-rail-year],[data-tree-decade],[data-tree-step],[data-timeline-retry],[data-annual-print]');if(!target)return;
