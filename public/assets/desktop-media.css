@@ -153,3 +153,11 @@
  #mediaViewer.personal-photo-desktop #openedCaptionForm>p{grid-row:3}
  #mediaViewer.personal-photo-desktop.media-caption-inline #openedCaptionForm>#editSavedCaption{grid-column:1;grid-row:1}
 }
+
+/* Smaller complete name chips leave more of the desktop photo's people visible. */
+@media(min-width:701px){
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #mediaTagPanel .selected-person-tag{min-height:30px;padding:5px 9px;gap:6px;border-radius:16px;font:calc(var(--desktop-media-font) * .6666667)/1.35 var(--sans);white-space:normal;overflow-wrap:anywhere}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #mediaTagPanel .selected-person-tag>span{font-size:calc(14px * var(--a11y-text-scale,1));line-height:1}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #mediaTagPanel .selected-people:not(:empty){gap:6px;max-height:none;overflow:visible;margin-block:4px 0;padding:2px}
+ #mediaViewer.personal-photo-desktop #mediaTagPanel .inline-tag-widget{margin-top:4px;padding-block:4px}
+}
