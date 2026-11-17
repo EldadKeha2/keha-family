@@ -6,7 +6,7 @@ import {parseHTML} from 'linkedom';
 
 const sources=await Promise.all(['gallery-input-settings.js','photo-native.js','photo-swipe.js','video-album-input.js'].map(name=>readFile(new URL('../public/assets/'+name,import.meta.url),'utf8')));
 const tick=async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>setImmediate(resolve));};
-function fixture({mobile=false,supported=true,bridge=null,threeItems=false}={}){
+function fixture({mobile=false,supported=true,bridge=null,threeItems=false,animation=null}={}){
  const {window,document}=parseHTML('<html><body><dialog id="first"><video controls></video></dialog><dialog id="second"><video controls></video></dialog></body></html>');
  let restored=0;const captures=[],selected=[];
  Object.defineProperty(window.HTMLElement.prototype,'clientWidth',{configurable:true,get:()=>800});
@@ -14,7 +14,7 @@ function fixture({mobile=false,supported=true,bridge=null,threeItems=false}={}){
  window.HTMLElement.prototype.getBoundingClientRect=()=>({top:0,bottom:500,width:800,height:500});
  window.HTMLElement.prototype.setPointerCapture=id=>captures.push(id);
  window.FamilyMedia={refreshPhotoPresentation(){restored++;}};window.ontouchstart=null;
- const storage=new Map(bridge?[['keha-desktop-gesture-bridge-v14',JSON.stringify(bridge)]]:[]);window.localStorage={getItem:key=>storage.get(key)};
+ const storage=new Map(bridge?[['keha-desktop-gesture-bridge-v14',JSON.stringify(bridge)]]:[]);if(animation)storage.set('keha-gallery-pad-animation-v1',String(animation));window.localStorage={getItem:key=>storage.get(key)};
  const context=vm.createContext({window,document,URL,location:{href:'https://family.test/'},CSS:{supports:()=>supported},navigator:{userAgent:mobile?'Android Mobile':'Windows NT 10.0'},setTimeout,clearTimeout});
  for(const source of sources)vm.runInContext(source,context);
  const items=[{key:'a',kind:'video',poster:'/poster-a',caption:'Clip A',src:'/a.mp4'},{key:'b',kind:'video',poster:'/poster-b',caption:'Clip B',src:'/b.mp4'}];
@@ -28,6 +28,15 @@ function fixture({mobile=false,supported=true,bridge=null,threeItems=false}={}){
  };
  return {window,document,items,emit,mount,captures,selected,get restored(){return restored;}};
 }
+
+test('both generated-video dialogs retain the accepted pad animation and two adjacent strokes on normal URLs',async()=>{
+ for(const supported of [true,false])for(const id of ['first','second']){
+  const f=fixture({supported,threeItems:true,bridge:{pad:-1,touch:1},animation:-1}),player=f.mount(id);
+  assert.equal(f.window.FamilyPhotoNative.padOffset(140),-238);
+  for(const deltaX of [90,45,10,2,20,10,2])f.emit(player.dialog,'wheel',{deltaX,deltaY:0,clientX:200,clientY:200});
+  await new Promise(resolve=>setTimeout(resolve,140));await tick();assert.deepEqual(f.selected,['b','c']);assert.equal(player.video.src,'/c.mp4');player.close();
+ }
+});
 
 test('generated video input owns horizontal movement and release while retaining one real player and native controls',async()=>{
  const f=fixture(),player=f.mount('first'),strip=player.strip();

@@ -56,6 +56,29 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
  return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,footer,reboot,find,emit,frames,resizeCallbacks,get imageReads(){return imageReads;},paintFrames(){const batch=[...frames.values()];frames.clear();for(const fn of batch)fn();},get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+test('desktop pad pinch over a photo uses the existing zoom steps, returns to fit and never zooms the browser at the limits',async()=>{
+ for(const windows of [false,true]){
+  const f=fixture([],{desktop:true,windows,hoverNone:windows});await f.mount();
+  const pinch=deltaY=>{const r=f.image.getBoundingClientRect();return f.emit(f.stage,'wheel',{target:f.image,ctrlKey:true,deltaY,deltaMode:0,clientX:Math.max(0,r.left)+10,clientY:Math.max(100,r.top)+10});};
+  const level=()=>f.find('face-zoom-toolbar').querySelector('[data-face-zoom-level]').textContent;
+  assert.equal(f.stage._familyFaceContext.zoom,1);assert.equal(pinch(-20).defaultPrevented,true);assert.equal(f.stage._familyFaceContext.zoom,1);
+  pinch(-20);assert.equal(level(),'150%');assert.equal(f.faces.canNavigate(f.stage),false);
+  pinch(-40);assert.equal(level(),'200%');pinch(-1000);assert.equal(level(),'800%');
+  assert.equal(pinch(-1000).defaultPrevented,true);assert.equal(level(),'800%');
+  pinch(1000);assert.equal(level(),'100%');assert.equal(f.faces.canNavigate(f.stage),true);
+  assert.equal(pinch(1000).defaultPrevented,true);assert.equal(level(),'100%');
+  f.faces.clear();
+ }
+});
+test('pad pinch is confined to the visible image, leaves ordinary wheel and mobile input alone, and disposes on remount',async()=>{
+ const f=fixture([],{desktop:true});await f.mount();
+ const r=f.image.getBoundingClientRect(),inside={target:f.image,ctrlKey:true,deltaY:-40,clientX:r.left+r.width/2,clientY:r.top+r.height/2};
+ for(const changes of [{ctrlKey:false},{target:f.stage},{clientX:r.left-1},{clientY:r.top+r.height+1},{metaKey:true},{altKey:true},{deltaY:0}])assert.equal(f.emit(f.stage,'wheel',{...inside,...changes}).defaultPrevented,false);
+ const picker=f.document.createElement('input');f.image.parentNode.append(picker);assert.equal(f.emit(f.stage,'wheel',{...inside,target:picker}).defaultPrevented,false);
+ f.faces.clear();assert.equal(f.emit(f.stage,'wheel',inside).defaultPrevented,false,'An old photo cannot retain ownership of browser zoom');
+ await f.mount('next-photo');const next=f.image.getBoundingClientRect();f.emit(f.stage,'wheel',{...inside,clientX:next.left+10,clientY:next.top+10});assert.equal(f.stage._familyFaceContext.zoom,1.5,'Remount installs exactly one pinch handler');f.faces.clear();
+ const phone=fixture();await phone.mount();const p=phone.image.getBoundingClientRect();assert.equal(phone.emit(phone.stage,'wheel',{...inside,target:phone.image,clientX:p.left+10,clientY:p.top+10}).defaultPrevented,false);assert.equal(phone.stage._familyFaceContext.zoom,1);phone.faces.clear();
+});
 test('fullscreen reads reuse saved face labels without mounting an editor or detector and reject stale pixels',async()=>{
  const f=fixture(),item={id:'readonly-photo',kind:'photo',tagsRevision:'tags-1',photoRevision:'pixels-1'},saved={...first,person:{id:'yona',name:'יונה'}};let reads=0;
  f.window.FamilyI18n.fetch=async(_path,options)=>{reads++;assert.equal(options.method,undefined);return Response.json({faces:[saved],item});};

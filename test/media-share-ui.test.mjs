@@ -843,6 +843,18 @@ test('desktop caption drafts save before the Next button and remain available if
   f.get('cancelOpenedCaption').handlers.get('click')();assert.equal(f.get('openedCaptionForm').hidden,false);assert.equal(f.get('openedCaptionText').value,f.window.FamilyMedia.current().caption||'');f.close();
  }
 });
+test('compact desktop photo captions save on leaving the field and retain failed drafts without requiring a save button',async()=>{
+ for(const fail of [false,true]){
+  const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f,{fail});f.open();f.get('mediaViewer').classList.add('personal-photo-desktop');
+  const form=f.get('openedCaptionForm'),input=f.get('openedCaptionText');input.value='Description saved on blur';input.handlers.get('input')();
+  form.handlers.get('focusout')({relatedTarget:f.get('mediaNext')});await keyboardFlush();
+  assert.equal(saved.length,1);assert.equal(input.value,'Description saved on blur');assert.equal(input.readOnly,!fail);
+  assert.equal(f.window.FamilyMedia.current().caption||'',fail?'':'Description saved on blur');if(fail)assert.ok(f.get('openedCaptionError').textContent);
+  f.get('cancelOpenedCaption').click();f.close();
+ }
+ const f=fixture();f.navigator.userAgent='Windows NT 10.0';const saved=captionServer(f);f.open();f.get('openedCaptionText').value='Leave other editor layouts unchanged';f.get('openedCaptionText').handlers.get('input')();
+ f.get('openedCaptionForm').handlers.get('focusout')({relatedTarget:f.get('mediaNext')});await keyboardFlush();assert.equal(saved.length,0);f.get('cancelOpenedCaption').click();f.close();
+});
 test('desktop photo and video swipes still navigate after opening an unchanged inline caption',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const kind of ['photo','video'])for(const stream of ['pointer','wheel']){

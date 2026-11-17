@@ -897,6 +897,18 @@ test('two adjacent pad bursts retain both actions across photo and video rebuild
   f.emit(f.get('mediaNext'),'wheel',{deltaX:-20,deltaY:0,clientX:400,clientY:250});await new Promise(resolve=>setTimeout(resolve,140));await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A following quick reversal remains available');f.close();
  }
 });
+test('the accepted pad direction and adjacent strokes apply to every shared photo and video album scope',async()=>{
+ const albums={photo:['gallery','photos','personal:eldad','wedding:parents','nursery:ruti','nostalgia:event','family-ai','living-family','home:photos','site-search','link:direct-photo'],video:['videos','personal:eldad','nostalgia:life','nostalgia:event','nostalgia-everyday-life','wedding:parents','nursery:ruti','home:photos','site-search']};
+ const touchKey='keha-desktop-gesture-bridge-v14',saved=JSON.stringify({pad:-1,touch:1});
+ for(const supported of [true,false])for(const [kind,scopes]of Object.entries(albums))for(const scope of scopes){
+  const storage=new Map([[directionKey,'1'],[touchKey,saved],['keha-gallery-pad-animation-v1','-1']]),f=fixture({supported,storage,realPresentation:supported});await f.open(kind,scope);
+  const target=f.get('mediaNext');f.emit(target,'wheel',{deltaX:90,deltaY:0,clientX:400,clientY:250});
+  if(supported)assert.equal(f.strip().children[1].style.transform,'translateX(-153px)',kind+' '+scope+' retains the approved pad animation');
+  for(const deltaX of [45,10,2,20,10,2])f.emit(target,'wheel',{deltaX,deltaY:0,clientX:400,clientY:250});
+  await new Promise(resolve=>setTimeout(resolve,140));await flush();assert.equal(f.window.FamilyMedia.current().id,'c',kind+' '+scope+' retains both Next actions');
+  assert.equal(storage.get(touchKey),saved);assert.equal(storage.get(directionKey),'1');assert.equal(storage.get('keha-gallery-pad-animation-v1'),'-1');f.close();
+ }
+});
 
 test('a short pad swipe also completes promptly in the manual fallback without touching screen calibration',async()=>{
  for(const kind of ['photo','video']){
