@@ -239,18 +239,18 @@ body[data-active-view=search] .workspace-actions{display:none}
 
 /* Retain Home's flags and accessibility panel, with a small menu slot to their left. */
 @media(max-width:700px){
- body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px 88px minmax(0,1fr) clamp(84px,25vw,113px);grid-template-areas:"menu preferences shortcuts brand";column-gap:2px;padding:10px 1px 11px}
+ body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px 88px minmax(0,1fr) clamp(68px,20vw,88px);grid-template-areas:"menu preferences shortcuts brand";column-gap:2px;padding:10px 1px 11px}
  body[data-active-view=home] .site-header .phone-navigation{display:contents}
  body[data-active-view=home] .site-header .phone-home-button,body[data-active-view=home] #mobileViewTitle,body[data-active-view=home] .phone-menu-label{display:none}
  body[data-active-view=home] .site-header #mobileMenuToggle{grid-area:menu;display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:28px;min-width:0;min-height:44px;margin:0;padding:3px 0;border:0;border-radius:5px;background:transparent;color:#746744;box-shadow:none}
  body[data-active-view=home] #mobileMenuToggle>span:last-child{font-size:22px;line-height:1}
- body[data-active-view=home] .site-header .home-install-actions{width:100%;gap:0}
+ body[data-active-view=home] .site-header .home-install-actions{width:min(100%,102px);gap:0}
  body[data-active-view=home] .site-header .home-install-actions button{flex:1 1 0;min-width:0;padding-inline:0}
- body[data-active-view=home] .site-header .brand{gap:3px;font-size:calc(clamp(12px,3.8vw,15px) * var(--a11y-text-scale,1))}
- body[data-active-view=home] .site-header .brand img{width:clamp(24px,7vw,29px);height:clamp(24px,7vw,29px);flex-basis:clamp(24px,7vw,29px)}
+ body[data-active-view=home] .site-header .brand{flex-direction:column;align-items:center;justify-content:center;width:100%;max-width:100%;gap:2px;font-size:calc(clamp(12px,3.8vw,15px) * var(--a11y-text-scale,1))}
+ body[data-active-view=home] .site-header .brand img{width:22px;height:22px;flex-basis:22px}
  html[data-a11y-text] body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px minmax(88px,1fr) minmax(88px,1fr);grid-template-areas:"menu brand brand" "menu preferences shortcuts";row-gap:6px}
 }
 @media(max-width:360px){
- body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px 78px minmax(0,1fr) clamp(74px,25vw,90px)}
+ body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px 78px minmax(0,1fr) clamp(64px,20vw,76px)}
  html[data-a11y-text] body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px minmax(78px,1fr) minmax(78px,1fr)}
 }
