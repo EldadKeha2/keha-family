@@ -134,10 +134,11 @@
 
 /* Give the photo rail its full height before allocating the details panel. */
 @media(min-width:701px){
- #mediaViewer.personal-photo-desktop:not(.photo-fullscreen){--personal-footer-height:min(clamp(220px,29dvh,310px),max(140px,calc(100dvh - clamp(40px,6dvh,80px) - var(--personal-header-height) - 418px)))}
- #mediaViewer.personal-photo-desktop:not(.photo-fullscreen) .media-viewer-footer{padding-block:10px 12px;scroll-padding-block:10px}
+ #mediaViewer.personal-photo-desktop:not(.photo-fullscreen){--personal-footer-height:min(clamp(240px,33dvh,340px),max(140px,calc(100dvh - clamp(40px,6dvh,80px) - var(--personal-header-height) - 418px)))}
+ #mediaViewer.personal-photo-desktop:not(.video-fullscreen):not(.photo-fullscreen) .media-viewer-footer{padding-block:10px 12px;scroll-padding-block:10px}
  #mediaViewer.personal-photo-desktop #personalPhotoBelow{padding-top:3px}
- #mediaViewer.personal-photo-desktop #personalPhotoActions{row-gap:6px;margin-bottom:5px}
+ #mediaViewer.personal-photo-desktop #personalPhotoDetails{gap:6px;margin-bottom:5px}
+ #mediaViewer.personal-photo-desktop #personalPhotoActions{row-gap:6px}
  #mediaViewer.personal-photo-desktop #photoInlineDateForm{padding:6px 12px;row-gap:4px}
  #mediaViewer.personal-photo-desktop #photoInlineDateSave{min-height:26px;padding:3px 8px}
  #mediaViewer.personal-photo-desktop #photoInlineDateForm .photo-date-fields label{gap:2px;font-size:calc(12px * var(--a11y-text-scale,1))}
