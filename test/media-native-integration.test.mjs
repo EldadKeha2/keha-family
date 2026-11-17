@@ -156,7 +156,7 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
 
 test('production loads the native controller before the gallery binds gesture input',()=>{
  const f=fixture();for(const name of names)assert.ok(f.loaded.includes(name),name+' must be loaded by the production page');
- assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,17,'The loaded implementation, not only its script URL, must be version seventeen');
+ assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,18,'The loaded implementation, not only its script URL, must be version eighteen');
 });
 
 test('a cold gallery link adopts a retained random page even when that page omits the opened photo',async()=>{
@@ -639,7 +639,7 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,238,'A calibrated negative device packet moves the current pixels right');
  assert.equal(settings.wheelFactor(),-1);assert.equal(settings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
- const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 17/);assert.match(trace,/native implementation 17/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
+ const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 18/);assert.match(trace,/native implementation 18/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
  const restored=fixture({storage});assert.equal(restored.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(restored.window.FamilyGalleryInput.isCalibrating(),false);assert.equal(restored.get('galleryGestureCheck'),null,'Ordinary browsing shows no diagnostic or calibration interface');
  await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,238);
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(restored.window.FamilyMedia.current().id,'c');restored.close();
@@ -866,6 +866,35 @@ test('the first pad packet moves independent visible pixels immediately in the r
   assert.equal(layer.children[1].getAttribute('src'),'/media/'+(direction>0?'c':'a')+'?preview=1','The incoming visible photo follows the already-correct item order');
   f.window.FamilyMedia.refreshPhotoPresentation();assert.equal(f.get('mediaViewer').querySelector('.native-pad-drag'),layer,'A face/layout refresh cannot recreate or reverse the visible pad layer');assert.equal(f.strip().children[direction>0?0:2]._item.id,direction>0?'c':'a');
   await finishWheel(f,f.strip());assert.equal(f.window.FamilyMedia.current().id,direction>0?'c':'a');assert.equal(storage.get('keha-desktop-gesture-bridge-v14'),saved);assert.ok(f.animations.filter(animation=>animation.node.parentNode?.className==='native-pad-finish').every(animation=>animation.options.duration<=90));f.close();
+ }
+});
+
+test('animation-only pad reversal preserves the next photo, the saved touchscreen mapping, and persists on normal URLs',async()=>{
+ const touchKey='keha-desktop-gesture-bridge-v14',saved=JSON.stringify({pad:-1,touch:1}),storage=new Map([[directionKey,'1'],[touchKey,saved]]);
+ for(const supported of [true,false]){
+  const f=fixture({supported,storage,query:'?pad-animation=reverse',realPresentation:supported}),moves=[];await f.open('photo','photos',1);
+  if(!supported)f.window.FamilyPhotoPresentation.dragQueued=(_stage,dx,items)=>moves.push({dx,...items});
+  const target=f.get('mediaNext');f.emit(target,'wheel',{deltaX:140,deltaY:0,clientX:400,clientY:250});
+  if(supported){const rail=f.strip(),layer=f.get('mediaViewer').querySelector('.native-pad-drag');assert.equal(rail.children[2]._item.id,'c');assert.equal(rail.children[1].style.transform,'translateX(-238px)');assert.equal(layer.children[0].style.transform,'translateX(-238px)');assert.match(layer.children[1].src,/\/media\/c\?/);}
+  else {await flush();assert.equal(moves.at(-1).dx,-238);assert.equal(moves.at(-1).next.id,'c');}
+  await new Promise(resolve=>setTimeout(resolve,140));await flush();assert.equal(f.window.FamilyMedia.current().id,'c','Animation reversal cannot turn Next into Previous');
+  if(supported){const layer=f.get('mediaViewer').querySelector('.native-pad-finish'),animations=f.animations.filter(a=>a.node.parentNode===layer);assert.equal(animations[0].keyframes[1].transform,'translateX(-1200px)');assert.equal(animations[1].keyframes[0].transform,'translateX(962px)');}
+  f.emit(target,'wheel',{deltaX:-140,deltaY:0,clientX:400,clientY:250});if(supported)assert.equal(f.strip().children[1].style.transform,'translateX(238px)');
+  await new Promise(resolve=>setTimeout(resolve,140));await flush();assert.equal(f.window.FamilyMedia.current().id,'b','Reversing the other animation still selects the existing Previous image');
+  assert.equal(storage.get(touchKey),saved);assert.equal(storage.get(directionKey),'1');assert.equal(storage.get('keha-gallery-pad-animation-v1'),'-1');f.close();
+  const reopened=fixture({supported,storage,realPresentation:supported});await reopened.open('photo','personal:ruti',1);
+  assert.equal(reopened.window.FamilyPhotoNative.padOffset(140),-238,'A normal album URL retains the animation-only preference without another setup');
+  const image=supported?reopened.strip().children[1].querySelector('img'):reopened.get('mediaStage').querySelector('img'),finger={pointerType:'touch',pointerId:22,isPrimary:true,button:0,clientY:250};
+  for(const [type,x]of [['pointerdown',300],['pointermove',440],['pointerup',440]])reopened.emit(image,type,{...finger,clientX:x});await flush();assert.equal(reopened.window.FamilyMedia.current().id,'a','The established touchscreen action stays unchanged after saving a pad-only preference');assert.equal(storage.get(touchKey),saved);reopened.close();
+ }
+});
+
+test('two adjacent pad bursts retain both actions across photo and video rebuilding without an idle gap',async()=>{
+ for(const supported of [true,false])for(const kind of ['photo','video']){
+  const f=fixture({supported,realPresentation:supported});await f.open(kind,kind==='photo'?'photos':'nostalgia');
+  for(const deltaX of [90,45,10,2,20,10,2])f.emit(f.get('mediaNext'),'wheel',{deltaX,deltaY:0,clientX:400,clientY:250});
+  await new Promise(resolve=>setTimeout(resolve,140));await flush();assert.equal(f.window.FamilyMedia.current().id,'c','A weaker immediate second stroke must not disappear inside the first episode');
+  f.emit(f.get('mediaNext'),'wheel',{deltaX:-20,deltaY:0,clientX:400,clientY:250});await new Promise(resolve=>setTimeout(resolve,140));await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A following quick reversal remains available');f.close();
  }
 });
 
