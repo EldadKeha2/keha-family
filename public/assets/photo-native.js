@@ -4,7 +4,18 @@
   const boundStages=new WeakSet();
   const completedPointerStarts=new WeakSet();
   const PAD_QUIET=80;
-  const padOffset=(dx,width=Infinity)=>Math.max(-width,Math.min(width,dx*1.7));
+  // Pad animation is a separate device preference; it must never reverse
+  // album selection or the already saved screen-touch reference.
+  const animationKey='keha-gallery-pad-animation-v1';let animationDirection=1;
+  try{
+    const saved=window.localStorage?.getItem(animationKey);if(saved==='-1'||saved==='1')animationDirection=Number(saved);
+  }catch{}
+  try{
+    const requested=typeof location!=='undefined'?new URL(location.href).searchParams.get('pad-animation'):null;
+    if(requested==='reverse'||requested==='standard'){animationDirection=requested==='reverse'?-1:1;window.localStorage?.setItem(animationKey,String(animationDirection));}
+  }catch{}
+  const padMotion=dx=>dx*animationDirection;
+  const padOffset=(dx,width=Infinity)=>Math.max(-width,Math.min(width,padMotion(dx)*1.7));
   let padFinish=null;
   function clearPadFinish(){const old=padFinish;if(!old)return;padFinish=null;clearTimeout(old.timer);for(const animation of old.animations)animation.cancel();old.node.remove();}
   // Only wheel input is widened to the open viewer. The established screen
@@ -27,16 +38,24 @@
   function wheelSample(stage,dx){
     const now=Date.now(),magnitude=Math.abs(dx),sign=Math.sign(dx),old=wheelEpisodes.get(stage),recent=old&&now-old.at<=360;
     if(recent){
-      const same=sign===old.sign,rebound=!same&&magnitude<=old.peak*.1;
-      // A new light stroke can begin before the old momentum expires. Two
-      // rising packets distinguish it from an isolated tail fluctuation.
-      old.rising=old.ended&&old.tail&&same&&magnitude>old.last*1.4+Math.max(.005,old.peak*.0005)?(old.rising||0)+1:0;
-      const tail=old.rising<2&&old.ended&&same&&magnitude<old.peak*.3&&(magnitude<=old.last*1.4+Math.max(.001,old.peak*.005)||old.tail&&magnitude<old.peak*.12);
-      if(rebound||tail){old.at=now;old.ignored++;if(tail){old.last=magnitude;old.tail=true;}return {episode:old,ignore:true};}
-      if(!old.ended&&same){old.at=now;old.last=magnitude;old.peak=Math.max(old.peak,magnitude);old.samples++;return {episode:old};}
+      const same=sign===old.sign,tolerance=Math.max(.005,old.peak*.0005);
+      // A second finger stroke can accelerate while the first is still
+      // decelerating. Reserve it immediately, even below the first peak or in
+      // the opposite direction, instead of merging it until 80ms of silence.
+      const renewed=old.falling>=2&&old.last<old.peak*.35&&magnitude>old.last*2.2+tolerance;
+      if(!renewed){
+        old.falling=magnitude<old.last?(old.falling||0)+1:old.falling||0;
+        const rebound=!same&&magnitude<=old.peak*.1;
+        // A new light stroke can begin before the old momentum expires. Two
+        // rising packets distinguish it from an isolated tail fluctuation.
+        old.rising=old.ended&&old.tail&&same&&magnitude>old.last*1.4+Math.max(.005,old.peak*.0005)?(old.rising||0)+1:0;
+        const tail=old.rising<2&&old.ended&&same&&magnitude<old.peak*.3&&(magnitude<=old.last*1.4+Math.max(.001,old.peak*.005)||old.tail&&magnitude<old.peak*.12);
+        if(rebound||tail){old.at=now;old.ignored++;if(tail){old.last=magnitude;old.tail=true;}return {episode:old,ignore:true};}
+        if(!old.ended&&same){old.at=now;old.last=magnitude;old.peak=Math.max(old.peak,magnitude);old.samples++;return {episode:old};}
+      }
     }
     const replace=Boolean(recent&&!old.ended&&old.samples<=2&&old.peak<8&&magnitude>=Math.max(.5,old.peak*4)&&sign!==old.sign);
-    const episode={sign,at:now,peak:magnitude,last:magnitude,samples:1,ignored:0,ended:false,tail:false};wheelEpisodes.set(stage,episode);
+    const episode={sign,at:now,peak:magnitude,last:magnitude,samples:1,falling:0,ignored:0,ended:false,tail:false};wheelEpisodes.set(stage,episode);
     return {episode,replace,split:Boolean(old&&!old.ended&&!replace)};
   }
   function finishWheelEpisode(stage,episode){if(episode&&wheelEpisodes.get(stage)===episode)episode.ended=true;}
@@ -136,9 +155,9 @@
     return true;
   }
   function arrange(b){const forward=(window.FamilyGalleryInput?.touchAction?.(1)??1)>0;side(b.viewport.children[0],forward?b.next:b.previous);side(b.viewport.children[2],forward?b.previous:b.next);}
-  function arrangePad(b){side(b.viewport.children[0],b.next);side(b.viewport.children[2],b.previous);}
+  function arrangePad(b){side(b.viewport.children[0],animationDirection>0?b.next:b.previous);side(b.viewport.children[2],animationDirection>0?b.previous:b.next);}
   function paintPad(b,dx){
-    const direction=Math.sign(dx),host=b.stage.closest?.('#photoFullscreenRoot')||b.stage.closest?.('dialog'),oldImage=b.previewImage?.complete&&b.previewImage.naturalWidth?b.previewImage:b.node.tagName==='IMG'?b.node:b.node.querySelector?.('img'),pane=b.viewport.children[direction>0?0:2],source=previewSource(pane._item);
+    const direction=Math.sign(padMotion(dx)),host=b.stage.closest?.('#photoFullscreenRoot')||b.stage.closest?.('dialog'),oldImage=b.previewImage?.complete&&b.previewImage.naturalWidth?b.previewImage:b.node.tagName==='IMG'?b.node:b.node.querySelector?.('img'),pane=b.viewport.children[direction>0?0:2],source=previewSource(pane._item);
     if(!direction||!host||!oldImage?.complete||!oldImage.naturalWidth||!source)return null;
     const rect=b.viewport.getBoundingClientRect(),width=b.width,offset=padOffset(dx,width),key=[oldImage.currentSrc||oldImage.src,source,direction].join('|');if(!rect.width||!rect.height)return null;
     let token=padFinish;
@@ -154,6 +173,7 @@
     token.offset=offset;token.width=width;token.outgoing.style.transform='translateX('+offset+'px)';token.incoming.style.transform='translateX('+(offset-direction*width)+'px)';return token;
   }
   function finishPadPaint(b,direction){
+    direction=Math.sign(padMotion(direction));
     const token=padFinish?.stage===b.stage&&!padFinish.finishing?padFinish:paintPad(b,b.padDx??b.width-b.viewport.scrollLeft);
     if(!token)return;
     if(typeof token.outgoing.animate!=='function'||typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches){clearPadFinish();return;}
@@ -196,7 +216,7 @@
       const bridge=window.FamilyGalleryInput;
       if(input==='wheel')bridge?.commitPadGesture?.(direction);else bridge?.commitTouchGesture?.(direction);
       const actionDirection=input==='touch'?(bridge?.touchAction?.(direction)??direction):direction;
-      const motionDirection=direction;
+      const motionDirection=input==='wheel'?Math.sign(padMotion(direction)):direction;
       if(input==='wheel'){arrangePad(b);if(b.contact)clearPadFinish();else finishPadPaint(b,direction);}else arrange(b);
       // Copy the selected preview before step() can update logical neighbours.
       // Input ownership is already complete, so image preparation can paint.
@@ -383,5 +403,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:17,mount,reset,has,claim,note,supported,diagnostics,padOffset,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:18,mount,reset,has,claim,note,supported,diagnostics,padOffset,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();
