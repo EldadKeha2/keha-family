@@ -121,14 +121,18 @@ test('phone toolbar responds to viewport changes and keeps both controls in inst
   for(const options of [{standalone:true},{iosStandalone:true}]){const installed=fixture(options);assert.equal(installed.card.hidden,false);assert.equal(installed.button().hidden,false);assert.equal(installed.card.querySelector('[data-home-install-share]').hidden,false);}
 });
 
-test('already installed shortcut announces its state instead of reopening installation',()=>{
+test('already installed shortcut announces its state for two seconds without reopening installation',async()=>{
   for(const options of [{standalone:true},{iosStandalone:true}]){
     const f=fixture(options),offer=f.offer();f.click(f.button());
     assert.equal(f.button().hidden,false);assert.equal(offer.calls,0);assert.equal(f.dialog.open,false);
-    const status=f.card.querySelector('[data-home-install-status]');assert.equal(status.hidden,false);assert.equal(status.textContent,'קיצור הדרך כבר מותקן');
+    const status=f.card.querySelector('[data-home-install-status]');assert.equal(status.hidden,false);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
+    await f.advanceTime(1999);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
+    f.click(f.button());await f.advanceTime(1999);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
+    await f.advanceTime(1);assert.equal(status.textContent,'');assert.equal(f.dialog.open,false);assert.equal(offer.calls,0);
   }
   const english=fixture({english:true,standalone:true});english.click(english.button());
-  assert.equal(english.card.querySelector('[data-home-install-status]').textContent,'The shortcut is already installed');assert.equal(english.dialog.open,false);
+  assert.equal(english.card.querySelector('[data-home-install-status]').textContent,'The app is already installed on your device');assert.equal(english.dialog.open,false);
+  await english.advanceTime(2000);assert.equal(english.card.querySelector('[data-home-install-status]').textContent,'');
 });
 
 test('normal browser detects only this installed web app by its manifest or identity',async()=>{
@@ -138,14 +142,15 @@ test('normal browser detects only this installed web app by its manifest or iden
   ]){
     const f=fixture({installedRelated:[app]});await tick();f.click(f.button());await tick();
     assert.ok(f.relatedCalls.length>0);assert.equal(f.button().hidden,false);assert.equal(f.dialog.open,false);
-    assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+    assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
+    await f.advanceTime(2000);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'');
   }
 });
 
 test('unknown installed state, unrelated apps and detection failure retain installation help',async()=>{
   for(const installedRelated of ['missing',[],[{platform:'webapp',url:'https://other.example/manifest.webmanifest',id:'https://other.example/'}],'throw']){
     const f=fixture({installedRelated});await tick();f.click(f.button());await tick();
-    assert.equal(f.dialog.open,true);assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+    assert.equal(f.dialog.open,true);assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
   }
 });
 
@@ -168,7 +173,7 @@ test('header installation shows indeterminate requesting and accepted progress w
   assert.equal(f.button().disabled,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
   offer.choose();await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
   f.window.dispatchEvent(new Event('appinstalled'));await tick();assertProgress(f,true);
-  assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+  assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
   assert.ok(f.dialog.querySelector('[data-home-install-check-icon]'));
 });
 
@@ -310,12 +315,12 @@ test('accepted and appinstalled invitation notifications await actual icon confi
   const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
   assert.equal(offer.calls,1);assert.equal(f.dialog.querySelector('[data-home-install-invite-installed]'),null);
   assert.equal(f.dialog.open,true);assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
-  assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+  assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
   f.window.dispatchEvent(new Event('appinstalled'));await tick();
   assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
   f.click(f.dialog.querySelector('[data-home-install-check-icon]'));assertSuccess(f);assert.match(f.dialog.innerHTML,/האייקון מוכן/);
   f.click(f.dialog.querySelector('[data-home-install-success-browse]'));assert.equal(f.dialog.open,false);
-  f.click(f.button());assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'קיצור הדרך כבר מותקן');
+  f.click(f.button());assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
 });
 
 test('installed invitation recipients see their local installed state and browse without prompting',async()=>{

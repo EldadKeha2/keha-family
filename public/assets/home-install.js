@@ -36,10 +36,10 @@
   const desktopShortcutLink=document.getElementById('desktopShortcutLink');
   const desktopView=()=>!mobileDevice&&!phoneQuery.matches;
   const modernDesktopInstall=()=>!modernDesktopInstallFailed&&typeof navigator.install==='function';
-  function announce(target,message){
+  function announce(target,message,duration=5000){
     clearTimeout(feedbackTimer);status.textContent='';shareStatus.textContent='';target.textContent=message;
     const inline=dialog.open?dialog.querySelector('[data-home-install-invite-status]')||dialog.querySelector('[data-home-install-help-status]'):null;if(target===status&&inline)inline.textContent=message;
-    feedbackTimer=setTimeout(()=>{target.textContent='';if(inline)inline.textContent='';},5000);
+    feedbackTimer=setTimeout(()=>{target.textContent='';if(inline)inline.textContent='';},duration);
   }
   function closeDialog(){
     if(typeof dialog.close==='function')dialog.close();
@@ -257,14 +257,14 @@
   async function requestInstallation(fromInvitation=false){
     if(busy||(!fromInvitation&&button.hidden))return;
     if(hasInstalledShortcut()){
-      announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));
+      announce(status,tr('היישום כבר מותקן במכשירך','The app is already installed on your device'),2000);
       return;
     }
     if(ios){openInvitation(button);return;}
     if(attemptActive&&(installState==='pending'||installState==='requesting')){if(!dialog.open)openInvitation(button);return;}
     if(!installPrompt){
       if(window.top===window&&typeof navigator.getInstalledRelatedApps==='function')await checkInstalledShortcut();
-      if(hasInstalledShortcut())announce(status,tr('קיצור הדרך כבר מותקן','The shortcut is already installed'));
+      if(hasInstalledShortcut())announce(status,tr('היישום כבר מותקן במכשירך','The app is already installed on your device'),2000);
       else openHelp();
       return;
     }
