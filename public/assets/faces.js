@@ -315,6 +315,23 @@
     c.toolbar.querySelector('[data-face-zoom-in]').addEventListener('click',()=>setZoom(c,levels[Math.min(levels.length-1,levels.indexOf(c.zoom)+1)]),options);
     c.toolbar.querySelector('[data-face-zoom-out]').addEventListener('click',()=>setZoom(c,levels[Math.max(0,levels.indexOf(c.zoom)-1)]),options);
     c.toolbar.querySelector('[data-face-zoom-reset]').addEventListener('click',()=>setZoom(c,1),options);
+    let padZoomDelta=0,padZoomAt=0;
+    c.stage.addEventListener('wheel',event=>{
+      if(!live(c)||!desktopResize()||!event.ctrlKey||event.metaKey||event.altKey||!Number.isFinite(event.deltaY)||!event.deltaY)return;
+      if(!c.scroller.contains(event.target)||event.target.closest?.('input,textarea,select,[contenteditable="true"],.face-picker,[data-face-handle]'))return;
+      const photo=imageArea(c),frame=c.scroller.getBoundingClientRect(),x=event.clientX,y=event.clientY;
+      // Only the visible photo owns a pad pinch. Letterboxing and the rest of
+      // the gallery retain browser zoom, while screen-touch input is unchanged.
+      if(!Number.isFinite(x)||!Number.isFinite(y)||x<Math.max(photo.x,frame.left)||x>Math.min(photo.x+photo.width,frame.left+frame.width)||y<Math.max(photo.y,frame.top)||y>Math.min(photo.y+photo.height,frame.top+frame.height))return;
+      if(event.cancelable)event.preventDefault();
+      if(c.saving||c.reviewSaving||c.adjust||c.resizeDrag)return;
+      const unit=event.deltaMode===1?16:event.deltaMode===2?c.scroller.clientHeight:1,delta=event.deltaY*unit,now=Date.now();
+      if(now-padZoomAt>180||Math.sign(delta)!==Math.sign(padZoomDelta))padZoomDelta=0;
+      padZoomAt=now;padZoomDelta+=delta;
+      const steps=Math.trunc(padZoomDelta/40);if(!steps)return;padZoomDelta-=steps*40;
+      const index=Math.max(0,Math.min(levels.length-1,levels.indexOf(c.zoom)-steps));
+      if(levels[index]!==c.zoom)setZoom(c,levels[index]);
+    },{capture:true,passive:false,signal:c.events.signal});
     c.scroller.addEventListener('scroll',()=>queuePlace(c),{passive:true,signal:c.events.signal});
     c.scroller.addEventListener('pointerdown',event=>{c.scrollStart={x:c.scroller.scrollLeft,y:c.scroller.scrollTop};},{passive:true,signal:c.events.signal});
     fitZoom(c);

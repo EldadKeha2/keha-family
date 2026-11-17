@@ -27,8 +27,11 @@
     const albumCount=[...albums.querySelectorAll('[data-photo-album-kind]')].filter(button=>!button.hidden).length;
     const leftHeight=rail*4+gap*3,zoomHeight=rail*3+gap*2;
     const controlsTop=Math.max(0,(height-leftHeight)/2);
-    const zoomTop=Math.max(rail+gap,controlsTop);
-    const trashTop=Math.max(height-rail,zoomTop+zoomHeight+gap+rail+gap),editTop=trashTop-gap-rail;
+    // Reclaim vertical gaps before a whole-size tool can be clipped. The
+    // compact footer reserves space for this rail at ordinary browser zoom.
+    const railGap=Math.min(gap,Math.max(0,(height-rail*3-zoomHeight)/3));
+    const zoomTop=Math.max(rail+railGap,Math.min(controlsTop,height-zoomHeight-rail*2-railGap*2));
+    const trashTop=Math.max(height-rail,zoomTop+zoomHeight+railGap+rail+railGap),editTop=trashTop-railGap-rail;
     frame.style.setProperty('--personal-review-top',controlsTop+'px');
     frame.style.setProperty('--personal-albums-top',(controlsTop+rail+gap)+'px');
     frame.style.setProperty('--personal-albums-height',Math.max(0,albumCount*rail+gap*(albumCount-1))+'px');

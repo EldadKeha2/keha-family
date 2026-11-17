@@ -558,6 +558,11 @@
       $('openedCaptionForm').classList.toggle('caption-expanded',expanded);$('editSavedCaption')?.setAttribute('aria-expanded',String(expanded));
     }).observe($('openedCaptionText'));
     $('openedCaptionForm').addEventListener('submit',saveOpenedCaption);
+    $('openedCaptionForm').addEventListener('focusout',event=>{
+      if(current()?.kind!=='photo'||!desktopPhotoInput()||!$('mediaViewer').classList.contains('personal-photo-desktop')||!inlineCaption()||!captionEditing)return;
+      if(event.relatedTarget&&$('openedCaptionForm').contains?.(event.relatedTarget))return;
+      void saveOpenedCaption();
+    });
     $('openedCaptionText').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,saveOpenedCaption));
     window.FamilyPhotoKeyboard?.bindNavigation({available:canControlNavigate,capture:()=>({session:state.session,navigation:state.navigation,id:identity(current())}),navigate:controlNavigate});
     $('shareMediaInstagram').addEventListener('click',shareInstagram);
