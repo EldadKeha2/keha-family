@@ -11,6 +11,14 @@
     if(!event.repeat)save();
     return true;
   }
+  function zoomPhoto(event,toolbar){
+    if(!desktop()||event.defaultPrevented||event.isComposing||event.keyCode===229||event.ctrlKey||event.metaKey||event.altKey||!['+','=','-'].includes(event.key))return false;
+    const target=event.target;
+    if(target?.isContentEditable||target?.closest?.('input,textarea,select,[role="textbox"],[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"]'))return false;
+    const button=toolbar?.querySelector(event.key==='-'?'[data-face-zoom-out]':'[data-face-zoom-in]');
+    if(!button||button.disabled)return false;
+    event.preventDefault();event.stopPropagation();button.click();return true;
+  }
   function bindNavigation({available,capture,navigate}){
     let tap=null;
     const eligible=event=>desktop()&&!event.defaultPrevented&&!event.isComposing&&!event.altKey&&!event.metaKey&&available();
@@ -29,5 +37,5 @@
     },{capture:true});
     for(const type of ['blur','pointerdown','wheel'])window.addEventListener(type,()=>{tap=null;},{capture:true,passive:true});
   }
-  window.FamilyPhotoKeyboard={desktop,saveDescription,bindNavigation};
+  window.FamilyPhotoKeyboard={desktop,saveDescription,zoomPhoto,bindNavigation};
 })();

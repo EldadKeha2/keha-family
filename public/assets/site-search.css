@@ -1,8 +1,19 @@
 .site-header .home-install-actions [data-site-search-open]{display:none}
 .site-search-header-slot{display:none}
 .site-search-desktop{display:none}
+/* The shared desktop masthead must leave room for the page on Full HD and
+   scaled laptop displays. Let its actual controls size the outside columns. */
+@media(min-width:701px){
+ .site-header{height:auto;min-height:0;padding-block:14px 12px;row-gap:12px}
+ .site-header .main-nav{gap:7px;padding:12px 0 0;align-self:auto}
+ .site-header .main-nav .nav-link{min-height:40px;padding:6px 10px;font-size:calc(clamp(14px,.9vw,16px) * var(--a11y-text-scale,1))}
+}
+@media(min-width:1200px){
+ html:not([data-a11y-text]) .site-header{grid-template-columns:max-content minmax(0,1fr) max-content;column-gap:16px}
+ html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%;justify-content:center}
+ html:not([data-a11y-text]) .site-header .home-install-actions{width:100%;flex-wrap:wrap;justify-content:center}
+}
 @media(min-width:1200px) and (max-width:1530px){
-  html:not([data-a11y-text]) .site-header{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);column-gap:24px}
   html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%;justify-content:center}
   html:not([data-a11y-text]) .site-header .home-install-actions{width:100%;flex-wrap:wrap;justify-content:center;gap:5px}
   .site-header .home-install-actions button{padding-inline:8px;font-size:calc(13px * var(--a11y-text-scale,1))}

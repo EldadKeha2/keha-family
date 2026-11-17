@@ -6,6 +6,14 @@ import {parseHTML} from 'linkedom';
 
 const sources=await Promise.all(['gallery-input-settings.js','photo-native.js','photo-swipe.js','video-album-input.js'].map(name=>readFile(new URL('../public/assets/'+name,import.meta.url),'utf8')));
 const tick=async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>setImmediate(resolve));};
+
+test('mouse wheel advances and reverses one item in both native and fallback generated-video galleries',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported,threeItems:true}),player=f.mount('first');
+  for(const deltaY of [-100,-100,100]){const event=f.emit(player.video,'wheel',{deltaX:0,deltaY,clientY:200});assert.equal(event.defaultPrevented,true);await tick();}
+  assert.deepEqual(f.selected,['b','c','b']);player.close();
+ }
+});
 function fixture({mobile=false,supported=true,bridge=null,threeItems=false,animation=null}={}){
  const {window,document}=parseHTML('<html><body><dialog id="first"><video controls></video></dialog><dialog id="second"><video controls></video></dialog></body></html>');
  let restored=0;const captures=[],selected=[];

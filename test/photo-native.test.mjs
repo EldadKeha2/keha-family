@@ -48,6 +48,28 @@ const wheel=(f,dx,extra={})=>f.fire('wheel',{deltaX:dx,deltaY:0,...extra});
 const stroke=(f,dx,dy=0)=>{pointer(f,'pointerdown');pointer(f,'pointermove',200+dx,100+dy);return pointer(f,'pointerup',200+dx,100+dy);};
 const directions=f=>f.calls.map(call=>call.direction);
 
+test('one discrete mouse wheel notch selects one photo immediately, independently of saved pad direction',async()=>{
+ const f=fixture({keep:true}),pad=[],touch=[];
+ f.window.FamilyGalleryInput={wheelDelta:()=>{throw Error('Mouse wheel must not calibrate the pad');},touchAction:()=>-1,commitPadGesture:d=>pad.push(d),commitTouchGesture:d=>touch.push(d)};
+ f.api.mount(f.stage,f.options);
+ for(const [y,mode]of [[-100,0],[-100,0],[100,0],[-3,1],[3,1],[-1,2]]){
+  assert.equal(wheel(f,0,{deltaY:y,deltaMode:mode}).defaultPrevented,true);
+ }
+ await flush();assert.deepEqual(directions(f),[1,1,-1,1,-1,1]);assert.deepEqual(pad,[]);assert.deepEqual(touch,[]);
+ assert.equal(f.api.diagnostics(f.stage).lastInput,'mouse-wheel');f.api.reset();
+});
+
+test('precision-pad vertical packets and modifier keys retain their normal behavior',()=>{
+ const f=fixture({keep:true});f.api.mount(f.stage,f.options);
+ for(const values of [{deltaY:2.5},{deltaY:140},{deltaY:12,wheelDeltaY:-36},{deltaY:100,ctrlKey:true},{deltaY:100,metaKey:true},{deltaX:1,deltaY:100}]){
+  if(values.deltaX)assert.equal(f.api.mouseWheelDirection(values),0);
+  else assert.equal(wheel(f,0,values).defaultPrevented,undefined);
+ }
+ assert.equal(f.api.mouseWheelDirection({deltaY:-53,wheelDeltaY:120}),1);
+ assert.equal(f.api.mouseWheelDirection({deltaY:53,wheelDeltaY:-120}),-1);
+ assert.deepEqual(f.calls,[]);f.api.reset();
+});
+
 test('the controlled strip keeps fixed Next-left panes and the actual face scroller in the center',()=>{
  const f=fixture();f.api.mount(f.stage,f.options);const strip=f.stage.children[0];
  assert.equal(strip.children[0].children[0].src,'/next-small');assert.equal(strip.children[2].children[0].src,'/prev-small');assert.equal(strip.children[1].children[0],f.scroll);assert.equal(viewPosition(strip),800);f.api.reset();assert.equal(f.scroll.parent,f.stage);

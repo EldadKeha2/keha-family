@@ -141,9 +141,14 @@
     document.addEventListener('touchcancel',()=>{touchStart=null;blockClick();reset();},{capture:true,passive:true});
     stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!controlAt(event))event.preventDefault();});
     const onWheel=event=>{
-      if(nativeScroll())return;
+      if(event.defaultPrevented||nativeScroll())return;
       const outside=typeof stage.contains==='function'&&!stage.contains(event.target),candidate=outside?event.target.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]'):controlAt(event),control=outside&&(candidate?.readOnly||candidate?.disabled)?null:candidate;
       if(!mouse()||!enabled()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
+      const mouseDirection=window.FamilyPhotoNative?.mouseWheelDirection?.(event);
+      if(mouseDirection){
+        reset();if(event.cancelable)event.preventDefault();blockClick();
+        navigate(mouseDirection,{queued:true,input:'mouse-wheel'});return;
+      }
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;
       const rawDx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=event.shiftKey&&!event.deltaX?0:(event.deltaY||0)*unit;
       // Windows Precision Touchpads can report a whole gesture in subpixel

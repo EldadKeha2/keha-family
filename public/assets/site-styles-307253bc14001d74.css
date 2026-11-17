@@ -2144,10 +2144,25 @@ body[data-active-view=home] .workspace-header{display:none}
  to{opacity:1;transform:translate3d(0,0,0)}
 }
 @media(min-width:701px){
- .phone-home-view{max-width:1160px}
- /* Reserve the rest of the first screen for the header, controls and tiles. */
- .home-slide-open{height:clamp(140px,calc(100dvh - 550px),440px);--home-slide-edge-shift:0px;--home-slide-in-scale:1;--home-slide-out-scale:1}
+ .phone-home-view{max-width:1600px;padding:0 clamp(16px,2vw,32px) 25px}
+ /* Give the stage its own size: captions, hidden images and the carousel's
+    absolutely positioned cards must never determine its height. */
+ .home-slide-stage{height:clamp(260px,42dvh,620px);min-height:260px;flex:0 0 auto}
+ .home-slide-stage>.home-slide-open{height:100%;min-height:100%;--home-slide-edge-shift:0px;--home-slide-in-scale:1;--home-slide-out-scale:1}
  .home-slide-open img{object-fit:contain}
+ .phone-home-intro{padding:14px 0 16px}
+ .phone-home-intro h2{font-size:calc(clamp(28px,2.1vw,36px) * var(--a11y-text-scale,1))}
+ #homeTiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+ #homeTiles .home-tile{grid-column:auto;min-height:90px;padding:12px}
+ #homeTiles .home-tile strong{font-size:calc(clamp(20px,1.5vw,26px) * var(--a11y-text-scale,1))}
+ #homeTiles .home-tile-tree .home-tile-arrow{display:none}
+}
+@media(min-width:1500px){
+ body[data-active-view=home] .page-shell{max-width:1920px;padding-inline:clamp(32px,3.4vw,66px)}
+ #homeTiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(min-width:701px) and (max-width:1000px){
+ #homeTiles{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(prefers-reduced-motion:reduce){
  .home-slide-incoming,.home-slide-outgoing,.home-slide-caption.is-visible{animation:none;transform:none}
@@ -4858,8 +4873,19 @@ img.photo-framing-active{cursor:grabbing!important;outline:2px dashed #657950;ou
 .site-header .home-install-actions [data-site-search-open]{display:none}
 .site-search-header-slot{display:none}
 .site-search-desktop{display:none}
+/* The shared desktop masthead must leave room for the page on Full HD and
+   scaled laptop displays. Let its actual controls size the outside columns. */
+@media(min-width:701px){
+ .site-header{height:auto;min-height:0;padding-block:14px 12px;row-gap:12px}
+ .site-header .main-nav{gap:7px;padding:12px 0 0;align-self:auto}
+ .site-header .main-nav .nav-link{min-height:40px;padding:6px 10px;font-size:calc(clamp(14px,.9vw,16px) * var(--a11y-text-scale,1))}
+}
+@media(min-width:1200px){
+ html:not([data-a11y-text]) .site-header{grid-template-columns:max-content minmax(0,1fr) max-content;column-gap:16px}
+ html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%;justify-content:center}
+ html:not([data-a11y-text]) .site-header .home-install-actions{width:100%;flex-wrap:wrap;justify-content:center}
+}
 @media(min-width:1200px) and (max-width:1530px){
-  html:not([data-a11y-text]) .site-header{grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);column-gap:24px}
   html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%;justify-content:center}
   html:not([data-a11y-text]) .site-header .home-install-actions{width:100%;flex-wrap:wrap;justify-content:center;gap:5px}
   .site-header .home-install-actions button{padding-inline:8px;font-size:calc(13px * var(--a11y-text-scale,1))}

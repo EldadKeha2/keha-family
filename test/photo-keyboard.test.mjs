@@ -38,3 +38,17 @@ test('Enter saves once, while Shift+Enter, IME, modifier combinations and mobile
  for(const flags of [{shiftKey:true},{ctrlKey:true},{altKey:true},{metaKey:true},{isComposing:true},{keyCode:229}])assert.equal(enter(flags).defaultPrevented,false);
  f.navigator.userAgent='Android';assert.equal(enter({}).defaultPrevented,false);assert.equal(saves,1);
 });
+
+test('plus, equals, minus and numpad keys activate the existing image zoom buttons',()=>{
+ const f=fixture(),clicked=[],buttons={
+  '[data-face-zoom-in]':{click:()=>clicked.push('in')},
+  '[data-face-zoom-out]':{click:()=>clicked.push('out')}
+ },toolbar={querySelector:selector=>buttons[selector]};
+ const zoom=(key,flags={})=>{const event=new Event('keydown',{cancelable:true});Object.assign(event,{key,...flags});f.api.zoomPhoto(event,toolbar);return event;};
+ for(const [key,flags]of [['+',{}],['=',{}],['+',{shiftKey:true}],['-',{code:'NumpadSubtract'}],['+',{code:'NumpadAdd'}]])assert.equal(zoom(key,flags).defaultPrevented,true);
+ assert.deepEqual(clicked,['in','in','in','out','in']);
+ for(const flags of [{ctrlKey:true},{metaKey:true},{altKey:true},{isComposing:true},{keyCode:229}])assert.equal(zoom('=',flags).defaultPrevented,false);
+ const editable=new Event('keydown',{cancelable:true});Object.assign(editable,{key:'='});Object.defineProperty(editable,'target',{value:{closest:()=>({})}});assert.equal(f.api.zoomPhoto(editable,toolbar),false);
+ buttons['[data-face-zoom-out]'].disabled=true;assert.equal(zoom('-').defaultPrevented,false);
+ f.navigator.userAgent='Android';assert.equal(zoom('+').defaultPrevented,false);assert.equal(clicked.length,5);
+});

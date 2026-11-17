@@ -16,6 +16,17 @@
   }catch{}
   const padMotion=dx=>dx*animationDirection;
   const padOffset=(dx,width=Infinity)=>Math.max(-width,Math.min(width,padMotion(dx)*1.7));
+  // Browsers do not identify wheel hardware. Claim discrete vertical notches
+  // only; leave precision-pad packets, horizontal swipes and pinch untouched.
+  function mouseWheelDirection(event){
+    const y=event.deltaY,x=event.deltaX||0;
+    if(event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||event.sourceCapabilities?.firesTouchEvents||!Number.isFinite(y)||!y||x)return 0;
+    if(event.deltaMode===1||event.deltaMode===2)return -Math.sign(y);
+    const legacy=event.wheelDeltaY||event.wheelDelta||0,magnitude=Math.abs(y);
+    const notch=Number.isInteger(legacy/120)&&legacy!==0&&Number.isInteger(y);
+    const pixelNotch=!legacy&&(magnitude%100===0||magnitude%120===0);
+    return notch||pixelNotch?-Math.sign(y):0;
+  }
   let padFinish=null;
   function clearPadFinish(){const old=padFinish;if(!old)return;padFinish=null;clearTimeout(old.timer);for(const animation of old.animations)animation.cancel();old.node.remove();}
   // Only wheel input is widened to the open viewer. The established screen
@@ -214,7 +225,7 @@
       if(active!==b||!anchor(b))return;
       if(!direction||!b.enabled()){if(input==='wheel')clearPadFinish();recenter();resolveIdle(b);return;}
       const bridge=window.FamilyGalleryInput;
-      if(input==='wheel')bridge?.commitPadGesture?.(direction);else bridge?.commitTouchGesture?.(direction);
+      if(input==='wheel')bridge?.commitPadGesture?.(direction);else if(input==='touch')bridge?.commitTouchGesture?.(direction);
       const actionDirection=input==='touch'?(bridge?.touchAction?.(direction)??direction):direction;
       const motionDirection=input==='wheel'?Math.sign(padMotion(direction)):direction;
       if(input==='wheel'){arrangePad(b);if(b.contact)clearPadFinish();else finishPadPaint(b,direction);}else arrange(b);
@@ -368,6 +379,11 @@
       if(active!==b)return;
       if(!b.enabled()){b.lastDecision='disabled';return;}
       if(!anchor(b)){b.lastDecision='zero-width';return;}
+      const mouseDirection=mouseWheelDirection(event);
+      if(mouseDirection){
+        prevent(event);blockClick(b);b.cancel();clearPadFinish();b.lastDecision='mouse-wheel';
+        navigate(mouseDirection,'mouse-wheel');return;
+      }
       const unit=event.deltaMode===1?16:event.deltaMode===2?b.width:1,rawDX=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=(event.shiftKey&&!event.deltaX?0:event.deltaY||0)*unit;
       if(!Number.isFinite(rawDX)||!rawDX){b.lastDecision='no-horizontal-delta';return;}
       if(!b.wheel&&Math.abs(rawDX)<Math.abs(dy)*.8){b.lastDecision='vertical-wheel';return;}
@@ -403,5 +419,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:18,mount,reset,has,claim,note,supported,diagnostics,padOffset,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:18,mount,reset,has,claim,note,supported,diagnostics,padOffset,mouseWheelDirection,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();

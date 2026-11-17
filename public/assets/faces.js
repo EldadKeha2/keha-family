@@ -596,6 +596,10 @@
     on(document,'pointermove',event=>{if(!c.active||!c.popup?.classList.contains('face-name')||touchMode(event))return;const r=screenFace(c,c.active);if(c.popup.contains(event.target)||(event.clientX>=r.x&&event.clientX<=r.x+r.width&&event.clientY>=r.y&&event.clientY<=r.y+r.height))keepLabel(c);else dismissLabelSoon(c);},{passive:true});
     on(document,'pointermove',event=>{if(!c.hoverPopup||!c.hoverFace||touchMode(event))return;const r=screenFace(c,c.hoverFace);if(c.hoverPopup.contains(event.target)||(event.clientX>=r.x&&event.clientX<=r.x+r.width&&event.clientY>=r.y&&event.clientY<=r.y+r.height))keepHoverLabel(c);else dismissHoverLabelSoon(c);},{passive:true});
     on(document,'keydown',event=>{
+      if(c.zoomEnabled&&live(c)&&c.dialog.open&&!c.adjust&&!c.resizeDrag){
+        const activeDialog=event.target?.closest?.('dialog[open]')||document.activeElement?.closest?.('dialog[open]')||[...document.querySelectorAll('dialog[open]')].at(-1);
+        if((!activeDialog||activeDialog===c.dialog)&&window.FamilyPhotoKeyboard?.zoomPhoto?.(event,c.toolbar))return;
+      }
       if(event.key==='Shift'){
         if(!event.repeat)c.shiftTap=!event.defaultPrevented&&!event.isComposing&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&canStartFaceSequence(c,event.target);
       }else c.shiftTap=false;
