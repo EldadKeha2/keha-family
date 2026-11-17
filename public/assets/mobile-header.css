@@ -28,7 +28,7 @@
   .site-header .a11y-trigger svg{width:17px;height:17px;flex:0 0 17px}
   .site-header .phone-navigation{grid-area:navigation;order:initial;flex-basis:auto;direction:rtl;margin-top:9px;width:100%}
   html[dir=ltr] .site-header .phone-navigation{direction:ltr}
-  .site-header .main-nav{display:none}
+  .main-nav{display:none}
   body[data-active-view=home] .site-header{padding-bottom:10px}
   body[data-active-view=home] .site-header .phone-navigation{display:none}
   body[data-active-view=home] .site-header .home-install:not([hidden]){display:flex}
@@ -89,5 +89,5 @@
   html:not([data-a11y-text]) .site-header .home-install-actions{flex-wrap:nowrap}
   html:not([data-a11y-text]) .site-header .header-preferences{grid-column:3;grid-row:1;display:flex;align-items:center;justify-self:end;gap:16px}
   html:not([data-a11y-text]) .site-header .language-selector{margin:0}
-  html:not([data-a11y-text]) .site-header .main-nav{grid-column:1/-1;grid-row:2;width:100%;min-width:0;margin:0}
+  .main-nav{width:100%;min-width:0;margin:0}
 }

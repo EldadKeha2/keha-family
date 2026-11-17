@@ -21,15 +21,15 @@
 :is(#homeTiles,#mobileMenuTiles) .home-tile .home-tile-icon{display:grid;place-items:center;width:48px;height:52px;flex:0 0 48px;border:1px solid #e5dfcf80;border-radius:13px;background:linear-gradient(145deg,#ffffff80,#ffffff0d);box-shadow:inset 0 1px 0 #ffffff9c}
 :is(#homeTiles,#mobileMenuTiles) .home-tile .home-tile-icon svg{width:37px;height:37px}
 @media(min-width:701px){
-  .site-header .main-nav{gap:10px;align-items:stretch;padding:15px 0 5px;position:relative}
-  .site-header .main-nav:before{content:'';position:absolute;top:0;inset-inline:0;height:1px;background:linear-gradient(90deg,transparent,#d0bb91 15%,#d0bb91 85%,transparent)}
-  .site-header .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid #cdb78e;border-radius:7px;background:#f8f3e7;color:#716145;box-shadow:inset 0 0 0 2px #fffaf0,0 2px 4px #7053260a;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.4;transition:background .18s,border-color .18s,box-shadow .18s}
-  .site-header .main-nav .nav-link:before{content:'';width:6px;height:6px;border:1px solid #ad8c50;transform:rotate(45deg);flex-shrink:0}
-  .site-header .main-nav .nav-link:hover{border-color:#9c7c43;background:#eee4ce;box-shadow:inset 0 0 0 2px #fffaf0,0 3px 9px #70532615}
-  .site-header .main-nav .nav-link.active{color:#fffaf0;border-color:#596c48;background:#596c48;box-shadow:inset 0 0 0 2px #ffffff1c,0 3px 8px #40532f20}
-  .site-header .main-nav .nav-link.active:before{border-color:#ecd4a0}
-  .site-header .main-nav .nav-link.active:after{display:none}
-  .site-header .main-nav .nav-link:focus-visible{outline:3px solid #aa884b;outline-offset:3px}
+  .main-nav{gap:10px;align-items:stretch;padding:15px 0 5px;position:relative}
+  .main-nav:before{content:'';position:absolute;top:0;inset-inline:0;height:1px;background:linear-gradient(90deg,transparent,#d0bb91 15%,#d0bb91 85%,transparent)}
+  .main-nav .nav-link{display:flex;align-items:center;justify-content:center;gap:7px;position:relative;min-height:46px;padding:9px 15px;border:1px solid #cdb78e;border-radius:7px;background:#f8f3e7;color:#716145;box-shadow:inset 0 0 0 2px #fffaf0,0 2px 4px #7053260a;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.4;transition:background .18s,border-color .18s,box-shadow .18s}
+  .main-nav .nav-link:before{content:'';width:6px;height:6px;border:1px solid #ad8c50;transform:rotate(45deg);flex-shrink:0}
+  .main-nav .nav-link:hover{border-color:#9c7c43;background:#eee4ce;box-shadow:inset 0 0 0 2px #fffaf0,0 3px 9px #70532615}
+  .main-nav .nav-link.active{color:#fffaf0;border-color:#596c48;background:#596c48;box-shadow:inset 0 0 0 2px #ffffff1c,0 3px 8px #40532f20}
+  .main-nav .nav-link.active:before{border-color:#ecd4a0}
+  .main-nav .nav-link.active:after{display:none}
+  .main-nav .nav-link:focus-visible{outline:3px solid #aa884b;outline-offset:3px}
 }
 .home-tile-nursery{--tile-surface:#f4e0d5;--tile-line:#d3ae96;--tile-ink:#895c42}
 /* Nursery pairs with memorial, leaving both the same size as the other small tiles. */
@@ -40,6 +40,19 @@
 #homeTiles .home-tile-memorial .home-tile-icon svg,#mobileMenuTiles .home-tile-memorial .home-tile-icon svg{width:35px;height:35px}
 #homeTiles .home-tile-memorial .home-tile-arrow,#mobileMenuTiles .home-tile-memorial .home-tile-arrow{display:none}
 @media(max-width:430px){#mobileMenuTiles .home-tile-memorial{min-height:81px}}
-@media(prefers-reduced-motion:reduce){.site-header .main-nav .nav-link,:is(#homeTiles,#mobileMenuTiles) .home-tile{transition:none}}
+@media(prefers-reduced-motion:reduce){.main-nav .nav-link,:is(#homeTiles,#mobileMenuTiles) .home-tile{transition:none}}
 
 #mainNav .nav-link[data-view="family-ai"],:is(#homeTiles,#mobileMenuTiles) .home-tile-family-ai{--tab-top:#f2edf8;--tab-mid:#d7cbe7;--tab-low:#baaccd;--tab-line:#b5a1cb;--tab-ink:#625373}
+
+/* Keep just the masthead in view; the separate tab row scrolls normally. */
+.desktop-menu-toggle{display:none}
+@media(min-width:701px){
+ .site-header{position:sticky;top:0;z-index:60;background:var(--paper);box-shadow:0 3px 10px #57451e12}
+ .site-header .header-preferences{display:flex;align-items:center;gap:12px}
+ .site-header .desktop-menu-toggle{display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;min-height:44px;margin:0;padding:9px;border:1px solid #c7b894;border-radius:8px;background:#faf7ed;color:#61734d}
+ .site-header .desktop-menu-toggle svg{width:26px;height:26px;stroke-width:1.8}
+ .site-header .desktop-menu-toggle:hover{background:#edf0e3;border-color:#9da985}
+ .main-nav{align-self:auto;flex-wrap:wrap;justify-content:center}
+ #mobileNavDialog{width:min(760px,calc(100vw - 48px));max-height:calc(100dvh - 48px);overflow:auto;overscroll-behavior:contain}
+ #mobileMenuTiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+}

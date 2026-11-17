@@ -236,7 +236,10 @@
   function motionChanged(){updatePauseControl();syncCarousel();if(reducedMotion()){cleanTransition();stopAdvance();if(state.current&&$('homeSlideCaption').hidden)showCaptionLater(state.current,state.serial);}else scheduleAdvance();}
   function init(){
     state.ready=true;updatePauseControl();$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
-    $('mobileMenuToggle').addEventListener('click',()=>$('mobileNavDialog').showModal());$('closeMobileMenu').addEventListener('click',()=>$('mobileNavDialog').close());
+    const menu=$('mobileNavDialog'),menuButtons=['mobileMenuToggle','desktopMenuToggle'].map($).filter(Boolean);
+    for(const button of menuButtons)button.addEventListener('click',()=>{if(!menu.open)menu.showModal();for(const trigger of menuButtons)trigger.setAttribute('aria-expanded','true');});
+    menu.addEventListener('close',()=>{for(const button of menuButtons)button.setAttribute('aria-expanded','false');});
+    $('closeMobileMenu').addEventListener('click',()=>menu.close());
     $('homeSlidePrevious').addEventListener('click',()=>slide(state.target-1,-1));$('homeSlideNext').addEventListener('click',()=>slide(state.target+1,1));$('homeSlidePause').addEventListener('click',togglePause);
     const stage=$('homeSlideStage');if(stage)window.FamilyPhotoSwipe?.bind(stage,{enabled:()=>state.view==='home'&&state.items.length>1&&!$('mediaViewer')?.open,mouse:desktopDevice,photoButtons:true,claim:()=>{stopAdvance();return 'manual';},move:stopAdvance,cancel:scheduleAdvance,step:direction=>slide(state.target+direction,direction)});
     $('homeSlideOpen').addEventListener('click',()=>{const index=state.items.findIndex(item=>item.id===state.current?.id);if(index<0)return;stopAdvance();window.FamilyMedia.open(state.items,index,viewerScope);});

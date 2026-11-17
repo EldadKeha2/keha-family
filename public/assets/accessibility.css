@@ -45,8 +45,8 @@ html[data-a11y-contrast] :is(.family-workspace,.site-header,.workspace-header,.w
 html[data-a11y-contrast] :is(button:not(.face-hit),input,select,textarea){background:#fff!important;border:1px solid #555!important;opacity:1}
 html[data-a11y-contrast] :is(button:disabled,input:disabled,select:disabled){border-style:dashed!important;opacity:.7}
 html[data-a11y-contrast] :is(button[aria-pressed=true],button[aria-selected=true],button.active,.a11y-option[aria-pressed=true]){background:#e2e2e2!important;border:2px solid #111!important;text-decoration:underline}
-html[data-a11y-contrast] .site-header .main-nav .nav-link{background:#fff!important;border-color:#111!important;box-shadow:none!important}
-html[data-a11y-contrast] .site-header .main-nav .nav-link.active{background:#e2e2e2!important}
+html[data-a11y-contrast] .main-nav .nav-link{background:#fff!important;border-color:#111!important;box-shadow:none!important}
+html[data-a11y-contrast] .main-nav .nav-link.active{background:#e2e2e2!important}
 html[data-a11y-contrast] input::placeholder,html[data-a11y-contrast] textarea::placeholder{color:#444!important;opacity:1}
 html[data-a11y-contrast] :is(.portrait,.remembrance-portrait){background:#f1f1f1!important}
 html[data-a11y-contrast] .tree-connectors{stroke:#333}
