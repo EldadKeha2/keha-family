@@ -3,7 +3,7 @@
 .photo-collections .photo-collection-button svg{display:block;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
 .photo-collections .photo-collection-button.is-linked{background:#e8efdc;border-color:#91a570;color:#4f6839}
 #mediaViewer .photo-collections .photo-collection-button.is-linked{background:#5d743e;border-color:#435a2e;color:#fffdf5}
-.photo-collection-button.is-linked::after{content:'✓';position:absolute;inset-inline-end:-3px;bottom:-2px;display:grid;place-items:center;width:12px;height:12px;border-radius:50%;background:#607b46;color:#fff;font:10px/1 Arial,sans-serif}
+.photo-collection-button.is-linked::after{content:'✓';position:absolute;right:0;bottom:0;display:grid;place-items:center;width:12px;height:12px;border-radius:50%;background:#607b46;color:#fff;font:10px/1 Arial,sans-serif;pointer-events:none}
 .photo-collection-button:focus-visible{outline:2px solid #7b905e;outline-offset:2px}
 .photo-collection-button:disabled{opacity:.35;cursor:default}.photo-collection-button[aria-busy=true]{opacity:.55;cursor:progress}
 .photo-collection-button[data-photo-album-kind=wedding]:disabled{color:#aaa69c;border-color:#dedbd4;background:#eeede9;cursor:default}

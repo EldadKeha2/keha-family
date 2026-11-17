@@ -42,16 +42,17 @@ function fixture(english=false,scope='gallery'){
   return {window,document,$,viewer,api,controls,select,ready,get current(){return current;}};
 }
 
-test('year-only and year/month dates have an editable check and retain the calendar control in both languages',()=>{
+test('partial and full dates mark the calendar itself and never add a check over the photograph',()=>{
   for(const english of [false,true]){
     const f=fixture(english);
     for(const takenDate of [{year:1980},{year:1980,month:6},{year:1980,month:6,day:16},{}]){
       f.select('date-'+JSON.stringify(takenDate),takenDate);
       assert.deepEqual(f.controls(),expected);
-      const check=f.$('photoDateSaved');
-      assert.equal(Boolean(check&&!check.hidden),Boolean(takenDate.year));
+      const calendar=f.$('editPhotoDate');
+      assert.equal(calendar.classList.contains('has-date'),Boolean(takenDate.year));
+      assert.equal(f.$('photoDateSaved'),null);
       if(!takenDate.year)continue;
-      assert.match(check.getAttribute('aria-label'),/1980/);check.click();
+      assert.match(calendar.getAttribute('aria-label'),/1980/);calendar.click();
       assert.equal(f.$('photoDateDialog').open,true);
       for(const field of ['day','month','year'])assert.equal(String(f.$('photoDate'+field).value),String(takenDate[field]??''));
       f.$('photoDateDialog').close();
