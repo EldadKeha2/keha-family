@@ -153,6 +153,11 @@ function sync(){
   // The desktop wand belongs to the stationary left controls, so navigation
   // and face-wrapper changes never measure or reposition it against a photo.
   if(rail){button.hidden=false;if(button.style.left)button.style.left='';if(button.style.top)button.style.top='';return;}
+  // Match the fullscreen launcher's fixed corner on phones, independently of
+  // the current image's letterboxing, zoom, scroll or loading state.
+  if(viewer.classList?.contains('photo-controls-below')){
+    button.hidden=false;if(button.style.left!=='6px')button.style.left='6px';if(button.style.top!=='6px')button.style.top='6px';return;
+  }
   const image=stage._familyFaceContext?.image||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
   button.hidden=!image?.complete||!image.naturalWidth||window.FamilyPhotoThumbnails?.visiblePixels?.(image)===false;
   if(!button.hidden){const bounds=stage.getBoundingClientRect(),photo=image.getBoundingClientRect();if(photo.width&&photo.height){const left=Math.min(Math.max(8,photo.left-bounds.left+8),Math.max(8,bounds.width-50))+'px',top=Math.min(Math.max(8,photo.top-bounds.top+8),Math.max(8,bounds.height-50))+'px';if(button.style.left!==left)button.style.left=left;if(button.style.top!==top)button.style.top=top;}}

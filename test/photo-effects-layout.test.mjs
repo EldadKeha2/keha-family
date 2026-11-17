@@ -5,14 +5,14 @@ import {readFile} from 'node:fs/promises';
 
 const source=(await readFile(new URL('../public/assets/photo-effects.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 
-function fixture({desktop=false}={}){
+function fixture({desktop=false,phone=false}={}){
  const frames=new Map(),events=new Map();let serial=0,notify,reads=0,writes=0;
  const style=()=>new Proxy({},{set(target,key,value){writes++;target[key]=value;return true;}});
  const node=()=>({dataset:{},style:style(),attrs:{},addEventListener(type,fn){events.set(type,fn);},getAttribute(key){return this.attrs[key];},setAttribute(key,value){this.attrs[key]=value;},remove(){if(this.parentNode)this.parentNode.button=null;this.parentNode=null;}});
  const image={complete:true,naturalWidth:200,rect:{left:20,top:30,width:200,height:120},getBoundingClientRect(){reads++;return this.rect;}};
  const stage={button:null,querySelector(selector){return selector==='[data-photo-magic]'?this.button:image;},append(button){button.remove();this.button=button;button.parentNode=this;},getBoundingClientRect(){reads++;return {left:0,top:0,width:400,height:300};}};
  const rail={button:null,firstChild:{id:'personalPhotoReview'},insertBefore(button,before){assert.equal(before,this.firstChild);button.remove();this.button=button;button.parentNode=this;}};
- const viewer={open:true,classList:{contains:()=>desktop},querySelector:()=>rail.button||stage.button,addEventListener(type,fn){events.set(type,fn);}};
+ const viewer={open:true,classList:{contains:name=>name==='personal-photo-desktop'?desktop:name==='photo-controls-below'?phone:false},querySelector:()=>rail.button||stage.button,addEventListener(type,fn){events.set(type,fn);}};
  let item={id:'a',kind:'photo'};
  const window={FamilyI18n:{isEnglish:false},FamilyMedia:{current:()=>item,photoState:()=>({busy:false})},addEventListener(type,fn){events.set(type,fn);}};
  const document={readyState:'complete',getElementById:id=>id==='mediaViewer'?viewer:id==='mediaStage'?stage:id==='personalPhotoLeft'&&desktop?rail:null,createElement:node};
@@ -43,4 +43,17 @@ test('desktop wand stays above the left review controls without reading photo ge
  f.desktop(false);f.image.complete=true;f.image.naturalWidth=200;f.api.sync();assert.equal(f.stage.button,button);assert.equal(button.style.left,'28px');assert.equal(button.style.top,'38px');
  const reads=f.reads;f.desktop(true);f.api.sync();assert.equal(f.rail.button,button);assert.equal(f.stage.button,null);assert.equal(button.style.left,'');assert.equal(button.style.top,'');assert.equal(f.reads,reads);
  f.setItem({id:'film',kind:'video'});f.api.sync();assert.equal(f.rail.button,null);f.setItem({id:'photo',kind:'photo'});f.api.sync();f.viewer.open=false;f.api.sync();assert.equal(f.rail.button,null);
+});
+
+test('the phone wand stays opposite the fullscreen corner during loading, zoom, scrolling and photo changes',()=>{
+ const f=fixture({phone:true}),button=f.stage.button;
+ assert.ok(button);assert.equal(button.style.left,'6px');assert.equal(button.style.top,'6px');assert.equal(f.reads,0);
+ const writes=f.writes;
+ for(const rect of [{left:120,top:30,width:160,height:260},{left:-300,top:-200,width:1000,height:800},{left:0,top:130,width:400,height:80}]){
+  f.image.rect=rect;f.setItem({id:JSON.stringify(rect),kind:'photo'});
+  for(let i=0;i<20;i++){f.notify();f.events.get('load')();f.events.get('resize')();}f.paint();
+  assert.equal(f.stage.button,button);assert.equal(button.style.left,'6px');assert.equal(button.style.top,'6px');assert.equal(button.hidden,false);
+ }
+ f.image.complete=false;f.image.naturalWidth=0;f.api.sync();assert.equal(button.hidden,false);assert.equal(f.reads,0);assert.equal(f.writes,writes);
+ f.setItem({id:'video',kind:'video'});f.api.sync();assert.equal(f.stage.button,null);
 });
