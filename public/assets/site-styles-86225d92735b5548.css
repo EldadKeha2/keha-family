@@ -4925,6 +4925,23 @@ img.photo-framing-active{cursor:grabbing!important;outline:2px dashed #657950;ou
  #mediaViewer.personal-photo-desktop #mediaTagPanel .inline-tag-widget{margin-top:4px;padding-block:4px}
 }
 
+/* Fit desktop tool captions to their own available space, including browser
+   zoom and enlarged text, without letting fixed icon cells clip the words. */
+@media(min-width:701px){
+ #mediaViewer.personal-photo-desktop #personalPhotoInformation .photo-moment-tools{container-type:inline-size;container-name:photo-detail-toggles}
+ #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-button,.face-regions-toggle){min-height:68px;gap:4px;padding:6px;font-size:clamp(11px,min(calc(15px * var(--a11y-text-scale,1)),4.1cqi),20px);line-height:1.25;white-space:normal;text-align:center}
+ #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-label,.face-regions-text){display:block;width:100%;max-width:100%;min-width:0;font:inherit;line-height:inherit;white-space:normal;overflow-wrap:anywhere;text-wrap:balance}
+ #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-button,.face-regions-toggle) svg{flex:none;width:clamp(18px,6cqi,22px);height:clamp(18px,6cqi,22px)}
+ #mediaViewer.personal-photo-desktop #personalPhotoZoom{container-type:inline-size;grid-template-rows:minmax(62px,1.6fr) minmax(30px,1fr) 20px minmax(30px,1fr);padding:7px 5px}
+ #mediaViewer.personal-photo-desktop #personalPhotoFit{gap:3px;font-size:clamp(10px,min(calc(13px * var(--a11y-text-scale,1)),30cqi),16px);line-height:1.2}
+ #mediaViewer.personal-photo-desktop #personalPhotoFit svg{flex:none;width:22px;height:22px}
+ #mediaViewer.personal-photo-desktop #personalPhotoFitLabel{display:block;width:100%;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-wrap:balance}
+ #mediaViewer.personal-photo-desktop #personalPhotoZoom [data-face-zoom-level]{max-width:100%;font-size:clamp(10px,30cqi,14px);white-space:nowrap}
+ #mediaViewer.personal-photo-desktop #personalPhotoRight>button.photo-fullscreen-viewer{container-type:inline-size;gap:1px;padding:3px 2px}
+ #mediaViewer.personal-photo-desktop #personalPhotoRight>button.photo-fullscreen-viewer svg{flex:none;width:24px;height:24px}
+ #mediaViewer.personal-photo-desktop #personalPhotoRight>button.photo-fullscreen-viewer .photo-fullscreen-label{max-width:100%;font-size:clamp(9px,min(calc(10px * var(--a11y-text-scale,1)),20cqi),12px);line-height:1.15;white-space:normal;overflow-wrap:anywhere;text-wrap:balance}
+}
+
 .site-header .home-install-actions [data-site-search-open]{display:none}
 .site-search-header-slot{display:none}
 .site-search-desktop{display:none}
