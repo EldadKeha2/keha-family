@@ -32,6 +32,7 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
   setAttribute(name,value){this.attrs[name]=String(value);}
   querySelectorAll(selector){return this.children.filter(n=>n.classList.contains(selector.slice(1)));}
   click(){this.dispatchEvent(new Event('click'));}
+  showModal(){assert.notEqual(this.open,true);this.open=true;}
   close(){this.open=false;this.dispatchEvent(new Event('close'));}
  }
  class Photo extends Node{
@@ -40,7 +41,7 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
   resolve(w=1000,h=800){this.naturalWidth=w;this.naturalHeight=h;this.onload?.();}
   fail(){this.onerror?.();}
  }
- const ids=['homeView','homeSlideImage','homeSlidePlaceholder','homeSlideCaption','homeSlideCounter','homeSlideOpen','homeSlidePrevious','homeSlideNext','homeSlidePause','homeTiles','mobileMenuTiles','mobileMenuToggle','mobileNavDialog','closeMobileMenu','mediaViewer'];
+ const ids=['homeView','homeSlideImage','homeSlidePlaceholder','homeSlideCaption','homeSlideCounter','homeSlideOpen','homeSlidePrevious','homeSlideNext','homeSlidePause','homeTiles','mobileMenuTiles','mobileMenuToggle','desktopMenuToggle','mobileNavDialog','closeMobileMenu','mediaViewer'];
  for(const id of ids){const n=new Node();n.id=id;}
  const get=id=>nodes.findLast(n=>n.id===id&&!n.removed);get('homeSlideOpen').append(get('homeSlideImage'));get('homeSlideImage').hidden=true;get('homeSlideCaption').hidden=true;
  if(carousel){for(const id of ['homeSlideStage','homeCarouselRail']){const node=new Node();node.id=id;}get('homeSlideStage').append(get('homeSlideOpen'),get('homeCarouselRail'));}
@@ -65,6 +66,19 @@ function fixture({items=photos,reduced=false,carousel=false,width=1120,height=19
   async reduced(value){motion.matches=value;motion.dispatchEvent(new Event('change'));await tick();}
  };
 }
+
+test('desktop and phone menu buttons open the same complete tab menu and reset on close or route selection',async()=>{
+ const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8'),nav=html.match(/<nav class="main-nav"[^>]*>[\s\S]*?<\/nav>/)[0],tabs=[...nav.matchAll(/data-view="([^"]+)"/g)].map(match=>match[1]);
+ for(const desktop of [true,false]){
+  const f=fixture({desktop});await f.ready();const dialog=f.get('mobileNavDialog'),buttons=['desktopMenuToggle','mobileMenuToggle'].map(f.get);
+  for(const tab of tabs)assert.ok(f.get('mobileMenuTiles').innerHTML.includes('data-view="'+tab+'"'),tab+' is available from either menu button');
+  for(const button of buttons){
+   button.click();assert.equal(dialog.open,true);assert.ok(buttons.every(node=>node.attrs['aria-expanded']==='true'));
+   f.get('closeMobileMenu').click();assert.equal(dialog.open,false);assert.ok(buttons.every(node=>node.attrs['aria-expanded']==='false'));
+   button.click();dialog.close();assert.ok(buttons.every(node=>node.attrs['aria-expanded']==='false'),'A route change or Escape closes the same shared dialog');
+  }
+ }
+});
 
 test('home photo order is shuffled on desktop and phone without changing the source album or its visible captions',async()=>{
  for(const desktop of [false,true]){
