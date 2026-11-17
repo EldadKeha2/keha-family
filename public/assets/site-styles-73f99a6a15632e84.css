@@ -4944,8 +4944,6 @@ img.photo-framing-active{cursor:grabbing!important;outline:2px dashed #657950;ou
   html:not([data-a11y-text]) .site-header .home-install{min-width:0;width:100%;justify-content:center}
   html:not([data-a11y-text]) .site-header .home-install-actions{width:100%;flex-wrap:wrap;justify-content:center;gap:5px}
   .site-header .home-install-actions button{padding-inline:8px;font-size:calc(13px * var(--a11y-text-scale,1))}
-  .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh]){width:42px;min-width:42px;padding:8px}
-  .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh])>span{display:none}
 }
 @media(min-width:701px){
   .site-header .home-install-actions .site-search-desktop{display:block;position:relative;flex:0 0 clamp(132px,12vw,190px);width:clamp(132px,12vw,190px);min-width:0;margin:0;order:-1}
@@ -5110,10 +5108,10 @@ body[data-active-view=search] .workspace-actions{display:none}
  body[data-active-view=gallery] #workspaceSubtitle{display:none}
 }
 
-/* One desktop masthead row, including enlarged accessibility text. Compact
-   actions according to the row's real available width, not monitor pixels. */
+/* Only the desktop masthead reaches the inner ornament edges. The controller
+   measures its controls before hiding labels, including enlarged text. */
 @media(min-width:701px){
- html .page-shell>.site-header{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;grid-template-rows:auto;grid-template-areas:none;align-items:center;column-gap:clamp(8px,1vw,16px);row-gap:0;flex-wrap:nowrap;min-height:76px;height:auto;padding-block:12px;container-name:desktop-masthead;container-type:inline-size}
+ html .page-shell>.site-header{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;grid-template-rows:auto;grid-template-areas:none;align-items:center;column-gap:clamp(8px,1vw,16px);row-gap:0;flex-wrap:nowrap;width:var(--desktop-masthead-width,100%);max-width:none;margin-inline:var(--desktop-masthead-margin,0px);min-height:76px;height:auto;padding:12px 10px;container-name:desktop-masthead;container-type:inline-size}
  html .page-shell>.site-header>.brand{grid-column:1;grid-row:1;justify-self:start;min-width:0;width:max-content;max-width:none;flex:none;gap:8px;white-space:nowrap;font-size:calc(clamp(18px,1.6vw,24px) * var(--a11y-text-scale,1))}
  html .page-shell>.site-header>.brand>span{white-space:nowrap}
  html .page-shell>.site-header>.home-install{grid-column:2;grid-row:1;justify-self:stretch;justify-content:center;min-width:0;width:100%;max-width:100%;margin:0}
@@ -5125,26 +5123,13 @@ body[data-active-view=search] .workspace-actions{display:none}
  html .page-shell>.site-header .language-switcher img{width:24px;height:18px}
  html .page-shell>.site-header .a11y-trigger{flex:0 0 auto;gap:5px;padding:8px 10px;white-space:nowrap}
  html .page-shell>.site-header .home-install-actions{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;min-width:0;width:100%;gap:6px}
- html .page-shell>.site-header .home-install-actions button{flex:0 0 auto;min-width:44px;padding-inline:10px;white-space:nowrap}
+ html .page-shell>.site-header .home-install-actions button{flex:0 0 auto;width:auto;min-width:44px;padding:8px 10px;white-space:nowrap}
+ html .page-shell>.site-header .home-install-actions button>span{display:inline}
+ html .page-shell>.site-header .home-install-actions button[data-header-icon-only]{width:44px;padding:8px}
+ html .page-shell>.site-header .home-install-actions button[data-header-icon-only]>span{display:none}
  html .page-shell>.site-header .home-install-actions .site-search-desktop{flex:1 1 150px;width:clamp(110px,12vw,190px);min-width:110px;max-width:190px}
- html[data-a11y-text] .page-shell>.site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh]){width:44px;padding:8px}
- html[data-a11y-text] .page-shell>.site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh])>span{display:none}
-}
-@container desktop-masthead (max-width:1550px){
- .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh]){width:44px;padding:8px}
- .site-header .home-install-actions :is([data-desktop-bookmark-action],[data-desktop-refresh])>span{display:none}
-}
-@container desktop-masthead (max-width:1600px){
- html[data-a11y-text] .site-header .home-install-actions button{width:44px;padding:8px}
- html[data-a11y-text] .site-header .home-install-actions button>span{display:none}
-}
-@container desktop-masthead (max-width:1250px){
- .site-header .home-install-actions [data-desktop-install-action]{width:44px;padding:8px}
- .site-header .home-install-actions [data-desktop-install-action]>span{display:none}
 }
 @container desktop-masthead (max-width:1100px){
- .site-header .home-install-actions [data-home-install-share]{width:44px;padding:8px}
- .site-header .home-install-actions [data-home-install-share]>span{display:none}
  .site-header .a11y-trigger{width:44px;min-width:44px;padding:8px}
  .site-header .a11y-trigger>span{display:none}
 }

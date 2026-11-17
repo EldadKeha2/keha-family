@@ -543,7 +543,7 @@ test('an unresponsive desktop prompt keeps visible instructions and releases the
 test('desktop shortcut and refresh controls use desktop labels and remain absent from phone and tablet layouts',()=>{
   for(const english of [false,true]){
     const f=desktopFixture({english}),install=f.card.querySelector('[data-desktop-install-action]'),refresh=f.card.querySelector('[data-desktop-refresh]');
-    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Install on desktop/:/התקנה לשולחן העבודה במחשב/);
+    assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);assert.match(install.textContent,english?/Install on desktop/:/התקנה במחשב/);
     f.resize(true);assert.equal(install.hidden,true);assert.equal(refresh.hidden,true);
     f.resize(false);assert.equal(install.hidden,false);assert.equal(refresh.hidden,false);
   }
