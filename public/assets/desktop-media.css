@@ -147,5 +147,9 @@
  #mediaViewer.personal-photo-desktop #personalPhotoInformation .photo-moment-tools{align-self:stretch}
  #mediaViewer.personal-photo-desktop #personalPhotoInformation :is(.photo-moment-button,.face-regions-toggle){min-height:0;padding:6px 4px}
  #mediaViewer.personal-photo-desktop #openedCaptionText{height:66px;min-height:66px}
- #mediaViewer.personal-photo-desktop #openedCaptionForm>:is([type=submit],#cancelOpenedCaption){display:none}
+ #mediaViewer.personal-photo-desktop.media-caption-inline #openedCaptionForm>label{grid-column:1;grid-row:1}
+ #mediaViewer.personal-photo-desktop #openedCaptionForm>:is([type=submit],#cancelOpenedCaption){display:inline-flex;align-items:center;justify-content:center;grid-row:1;min-height:26px;padding:3px 8px}
+ #mediaViewer.personal-photo-desktop #openedCaptionText{grid-row:2}
+ #mediaViewer.personal-photo-desktop #openedCaptionForm>p{grid-row:3}
+ #mediaViewer.personal-photo-desktop.media-caption-inline #openedCaptionForm>#editSavedCaption{grid-column:1;grid-row:1}
 }
