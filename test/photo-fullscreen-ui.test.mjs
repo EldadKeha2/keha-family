@@ -155,6 +155,11 @@ test('screensaver watchdog recovers from consecutive stuck next-photo preparatio
  t.mock.timers.tick(4000);assert.equal(f.steps.length,1);f.api.sync();t.mock.timers.tick(9999);assert.equal(f.steps.length,1);t.mock.timers.tick(1);assert.equal(f.steps.length,2);assert.equal(f.stepOptions.at(-1).instant,true);
  t.mock.timers.tick(10000);assert.equal(f.steps.length,3,'A second stuck preparation gets a new deadline');f.api.exit();
 });
+test('skipping a failed photo still allows the next photo its full preparation deadline',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture({loading:true});f.state.scope='screensaver';f.api.enter();f.api.play();f.emit(f.stage.querySelector('img'),'error');await f.flush();
+ f.media.step=(direction,options)=>{f.steps.push(direction);f.stepOptions.push(options);f.state.busy=true;f.api.sync();};
+ t.mock.timers.tick(500);assert.equal(f.steps.length,1);t.mock.timers.tick(9999);assert.equal(f.steps.length,1,'The previous failure does not rush a new photo');t.mock.timers.tick(1);assert.equal(f.steps.length,2);f.api.exit();
+});
 test('screensaver recovery respects pause, background tabs, branch loading, manual navigation and exit',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const action of ['pause','hidden','branch','manual','exit','close']){

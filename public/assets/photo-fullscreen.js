@@ -30,7 +30,7 @@
       timer=null;if(!active||!playing||albumBlocked||document.hidden||token!==paint||media().current()!==item)return;
       media().step(1,recovering?{instant:true}:{effect:effects?nextEffect():null});
       schedule();
-    },recovering?(failed?500:10000):4000/speed);
+    },recovering?(failed&&!state.busy?500:10000):4000/speed);
   }
   function showControls(){
     if(!active)return;root.classList.remove('screensaver-controls-idle');root.classList.add('controls-visible');clearTimeout(hideTimer);
