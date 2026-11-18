@@ -96,6 +96,15 @@ test('screensaver recovery skips the pending target and late preparation cannot 
  await f.window.FamilyMedia.step(1,{instant:true});assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.window.FamilyMedia.photoState().busy,false);
  finish(f.document.createElement('img'));await pending;assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
 });
+test('fullscreen tagging freezes every navigation input and face saves update all registered albums without replacing the pixels',async()=>{
+ const f=fixture(),item=f.photo('canonical'),next=f.photo('next'),scopes=['gallery','personal:yona','wedding:parents','nursery:yona','screensaver'];let tagging=false;
+ for(const scope of scopes)f.window.FamilyMedia.register(scope,[item,next]);f.window.FamilyMedia.openFrom('screensaver',item.id);f.window.FamilyMedia.setFullscreen(true);
+ f.window.FamilyPhotoFullscreen={isBlocked:()=>tagging,isTagging:()=>tagging,sync(){},present(){},closed(){}};tagging=true;f.window.FamilyMedia.refreshPhotoPresentation();const image=f.get('mediaStage').content[0];
+ await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,item.id);f.events.get('keydown')({key:'ArrowRight',target:{closest:()=>null},preventDefault(){},stopPropagation(){}});assert.equal(f.window.FamilyMedia.current().id,item.id);
+ const updated={...item,tags:[{id:'yona',name:'יונה'}],tagsRevision:'new-faces'};f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'faces',item:updated,faces:[]}}));
+ for(const scope of scopes)assert.equal(f.window.FamilyMedia.items(scope)[0].tagsRevision,'new-faces',scope);assert.equal(f.get('mediaStage').content[0],image);assert.equal(f.window.FamilyMedia.current().tags[0].id,'yona');
+ tagging=false;await f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.current().id,'next');f.close();
+});
 test('direct photos adopt their route album after loading without resetting the image or active editing',async()=>{
  const id='a'.repeat(32),item={id,kind:'photo',scope:'gallery',mime:'image/jpeg',src:'/media/'+id,tags:[]};
  for(const [route,scope]of [['person/ora','personal:ora'],['weddings/u-fish','wedding:u-fish'],['nursery/ora','nursery:ora'],['gallery','gallery'],['photos','photos']]){

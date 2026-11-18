@@ -6,9 +6,11 @@
   const effectsIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 11-11m-2-6 1.2 3.8L18 8l-3.8 1.2L13 13l-1.2-3.8L8 8l3.8-1.2L13 3ZM20 13l.8 2.2L23 16l-2.2.8L20 19l-.8-2.2L17 16l2.2-.8L20 13Z"/></svg>';
   const namesIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8l10 10-8 8L3 11Z"/><circle cx="7.5" cy="7.5" r="1"/></svg>';
   const agesIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r="3"/><path d="M2 20v-3a6 6 0 0 1 9-5"/><circle cx="16.5" cy="16.5" r="5.5"/><path d="M16.5 13v3.5l2 1"/></svg>';
+  const tagIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/><circle cx="12" cy="10" r="3"/><path d="M7 19a5 5 0 0 1 10 0"/></svg>';
   const transitions=['dissolve','zoom-in','zoom-out','drift','rise','curtain','iris'];let transitionBag=[],lastEffect=null,speed=1,effects=false;
   let viewer,stage,root,anchor,bar,play,speedControl,effectsControl,namesControl,agesControl,close,previous,next,counter,caption,status,active=false,playing=false,returnToViewer=true,hadNative=false;
   let showNames=false,showAges=false,albumBlocked=false,labelScale=1;
+  let tagControl,tagTools,tagging=false,tagItem=null,tagSession=0,resuming=false;
   try{const saved=Number(localStorage.getItem('family-screensaver-label-scale'));if(Number.isFinite(saved)&&saved>=.75&&saved<=2)labelScale=saved;}catch{}
   let timer=null,hideTimer=null,frame=null,paint=0,ready=false,failed=false,wasBusy=false;
   const media=()=>window.FamilyMedia;
@@ -22,18 +24,19 @@
   function schedule(){
     cancelAdvance();const state=media()?.photoState();
     const recovering=state?.scope==='screensaver'&&(!ready||state.busy);
-    if(!active||!playing||albumBlocked||document.hidden||!(state?.total>1)||!recovering&&(!ready||state.busy))return;
+    if(!active||!playing||tagging||albumBlocked||document.hidden||!(state?.total>1)||!recovering&&(!ready||state.busy))return;
     const token=paint,item=state.item;
     // Bound both visible-image loading/decoding and next-photo preparation.
     // A busy step already targets the next photo; another step skips that target.
     timer=setTimeout(()=>{
-      timer=null;if(!active||!playing||albumBlocked||document.hidden||token!==paint||media().current()!==item)return;
+      timer=null;if(!active||!playing||tagging||albumBlocked||document.hidden||token!==paint||media().current()!==item)return;
       media().step(1,recovering?{instant:true}:{effect:effects?nextEffect():null});
       schedule();
     },recovering?(failed&&!state.busy?500:10000):4000/speed);
   }
   function showControls(){
     if(!active)return;root.classList.remove('screensaver-controls-idle');root.classList.add('controls-visible');clearTimeout(hideTimer);
+    if(tagging)return;
     const screensaver=media()?.photoState().scope==='screensaver';
     hideTimer=setTimeout(()=>{
       hideTimer=null;if(!active)return;
@@ -58,7 +61,7 @@
     const label=tr('תמונה '+(state.index+1)+' מתוך '+state.total,'Photo '+(state.index+1)+' of '+state.total);
     if(counter.textContent!==(albumBlocked?'':label))counter.textContent=albumBlocked?'':label;
     if(caption.textContent!==(state.item.caption||''))caption.textContent=state.item.caption||'';caption.hidden=!state.item.caption;
-    previous.hidden=next.hidden=state.total<2;previous.disabled=next.disabled=albumBlocked||(state.pageLoading??state.busy);
+    previous.hidden=next.hidden=tagging||state.total<2;previous.disabled=next.disabled=tagging||albumBlocked||(state.pageLoading??state.busy);
     if(state.total<2&&!albumBlocked){playing=false;cancelAdvance();}play.disabled=albumBlocked||state.total<2;
     speedControl.disabled=effectsControl.disabled=state.total<2;
     speedControl.setAttribute('aria-label',tr('מהירות המצגת','Slideshow speed'));speedControl.title=tr('מהירות המצגת · שניות לתמונה: ','Slideshow speed · seconds per photo: ')+Number((4/speed).toFixed(1));
@@ -67,9 +70,44 @@
     agesControl.title=tr('הצגת גילים בזמן הצילום, כשיש נתונים מתאימים','Show ages at the time of the photo, where dates are known');
     const playLabel=playing?tr('השהיית המצגת','Pause slideshow'):tr('הפעלת מצגת בלולאה','Play looping slideshow');
     if(play.getAttribute('aria-label')!==playLabel){play.setAttribute('aria-label',playLabel);play.title=playLabel;play.innerHTML=playing?pauseIcon:playIcon;}play.setAttribute('aria-pressed',String(playing));
+    tagControl.hidden=!state.item.id||!window.FamilyApp?.apiEnabled||!window.FamilyFaces?.mount;
+    tagControl.disabled=resuming||!tagging&&(albumBlocked||state.busy||!ready||failed);
+    const tagLabel=tagging?tr('המשך','Continue'):tr('תייג','Tag');
+    if(tagControl.getAttribute('aria-label')!==tagLabel){tagControl.setAttribute('aria-label',tagLabel);tagControl.title=tagging?tr('חזרה לשומר המסך','Resume slideshow'):tr('עצירת המצגת ותיוג פנים במסך מלא','Pause slideshow and tag faces fullscreen');tagControl.innerHTML=(tagging?playIcon:tagIcon)+'<span>'+tagLabel+'</span>';}
+    tagControl.setAttribute('aria-pressed',String(tagging));tagControl.setAttribute('aria-busy',String(resuming));
     if(busyChanged)schedule();
   }
+  const currentImage=()=>stage._familyFaceContext?.image||stage.querySelector('.native-photo-pane:nth-child(2) img')||stage.querySelector('img');
+  function clearTagging(){
+    if(!tagging)return;tagging=false;tagItem=null;tagSession++;resuming=false;
+    window.FamilyFaces?.clear();root.classList.remove('photo-fullscreen-tagging');tagTools.hidden=true;
+  }
+  function startTagging(){
+    const state=media()?.photoState();
+    if(!active||tagging||albumBlocked||state?.busy||!ready||failed||!state?.item?.id||!window.FamilyApp?.apiEnabled||!window.FamilyFaces?.mount)return;
+    tagging=true;tagItem=state.item.id;const session=++tagSession;playing=false;cancelAdvance();
+    window.FamilyPhotoPresentation?.cancel();window.FamilyFullscreenFaces?.clear();
+    root.classList.add('photo-fullscreen-tagging');tagTools.hidden=false;status.textContent='';
+    media().refreshPhotoPresentation?.();const image=currentImage();
+    sync();showControls();
+    Promise.resolve(window.FamilyFaces.mount(stage,image,state.item,{popupHost:root,reviewHost:tagTools})).catch(error=>{
+      if(active&&tagging&&session===tagSession)status.textContent=error.message||tr('לא ניתן לפתוח כרגע את תיוג הפנים.','Face tagging is temporarily unavailable.');
+    });
+  }
+  async function resumeTagging(){
+    if(!active||!tagging||resuming)return;
+    const session=tagSession,id=tagItem;resuming=true;sync();
+    try{
+      const saved=await window.FamilyFaces.finish(stage);
+      if(!active||!tagging||session!==tagSession||media().current()?.id!==id)return;
+      if(!saved){status.textContent=tr('התיוג עדיין לא נשמר. השלימו את השמירה ונסו שוב.','The tag has not been saved yet. Complete the save and try again.');return;}
+      clearTagging();media().refreshPhotoPresentation?.();present(media().current(),currentImage());
+      playing=true;sync();schedule();showControls();
+    }catch(error){if(active&&tagging&&session===tagSession)status.textContent=error.message||tr('לא ניתן להשלים את שמירת התיוג כרגע.','The tag could not be saved.');}
+    finally{if(active&&session===tagSession){resuming=false;sync();}}
+  }
   function present(item,image){
+    if(tagging){if(item.id===tagItem){window.FamilyFaces?.update(item);sync();return;}clearTagging();}
     const token=++paint;ready=false;failed=false;cancelAdvance();if(!active)return;
     window.FamilyFullscreenFaces?.mount(stage,image,item);
     if(!albumBlocked)status.textContent='';
@@ -77,7 +115,7 @@
       image.addEventListener('load',resolve,{once:true});image.addEventListener('error',reject,{once:true});
     });
     loaded.then(()=>image.decode?.().catch(()=>{})).then(()=>{
-      if(!active||token!==paint||media().current()!==item)return;ready=true;schedule();
+      if(!active||token!==paint||media().current()!==item)return;ready=true;sync();schedule();
     }).catch(()=>{
       if(!active||token!==paint||media().current()!==item)return;
       failed=true;ready=false;
@@ -103,12 +141,13 @@
   }
   function exit(){
     if(!active)return;const back=returnToViewer;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;
+    clearTagging();
     window.FamilyFullscreenFaces?.clear();leaveNative();restoreStage();media().setFullscreen(false);
     window.FamilyScreensaver?.fullscreenClosed?.();
     if(!back&&viewer.open)viewer.close();else viewer.querySelector('[data-photo-fullscreen="viewer"]')?.focus({preventScroll:true});
   }
   function closed(){
-    if(!root)return;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;window.FamilyFullscreenFaces?.clear();leaveNative();restoreStage();window.FamilyScreensaver?.fullscreenClosed?.();
+    if(!root)return;active=false;playing=false;ready=false;paint++;cancelAdvance();clearTimeout(hideTimer);hadNative=false;clearTagging();window.FamilyFullscreenFaces?.clear();leaveNative();restoreStage();window.FamilyScreensaver?.fullscreenClosed?.();
   }
   function configure(options={}){
     if(typeof options.showNames==='boolean')showNames=options.showNames;
@@ -155,12 +194,15 @@
     effectsControl=button('photo-fullscreen-effects',tr('מעברים אקראיים','Random transitions'),effectsIcon+'<span>'+tr('מעברים','Effects')+'</span>');effectsControl.setAttribute('aria-pressed',String(effects));
     namesControl=button('photo-fullscreen-names',tr('הצגת תוויות שמות','Show name labels'),namesIcon+'<span>'+tr('שמות','Names')+'</span>');
     agesControl=button('photo-fullscreen-ages',tr('הצגת גילים בזמן הצילום','Show ages at the time of the photo'),agesIcon+'<span>'+tr('גילים','Ages')+'</span>');
+    tagControl=button('photo-fullscreen-tag',tr('תייג','Tag'),tagIcon+'<span>'+tr('תייג','Tag')+'</span>');
+    tagTools=document.createElement('div');tagTools.className='photo-fullscreen-tag-tools';tagTools.hidden=true;
     close=button('photo-fullscreen-close',tr('יציאה ממסך מלא','Exit fullscreen'),'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>');
     previous=button('photo-fullscreen-previous',tr('התמונה הקודמת','Previous photo'),'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"/></svg>');
     next=button('photo-fullscreen-next',tr('התמונה הבאה','Next photo'),'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5 7 7-7 7"/></svg>');
     counter=document.createElement('span');counter.className='photo-fullscreen-counter';counter.setAttribute('role','status');counter.setAttribute('aria-live','polite');counter.dir='auto';
     caption=document.createElement('p');caption.className='photo-fullscreen-caption';caption.dir='auto';status=document.createElement('p');status.className='photo-fullscreen-status';status.setAttribute('role','status');
-    bar.append(play,speedControl,effectsControl,namesControl,agesControl,counter,close);root.append(bar,previous,next,caption,status);viewer.append(root);
+    bar.append(play,speedControl,effectsControl,namesControl,agesControl,tagControl,tagTools,counter,close);root.append(bar,previous,next,caption,status);viewer.append(root);
+    tagControl.addEventListener('click',()=>{if(tagging)void resumeTagging();else startTagging();});
     close.addEventListener('click',exit);previous.addEventListener('click',()=>media().step(-1,{instant:window.FamilyPhotoPresentation?.desktop?.()}));next.addEventListener('click',()=>media().step(1,{instant:window.FamilyPhotoPresentation?.desktop?.()}));
     play.addEventListener('click',()=>{playing=!playing;sync();schedule();showControls();});
     speedControl.addEventListener('change',()=>{const value=Number(speedControl.value);speed=[.25,.5,1,1.5,2].includes(value)?value:1;speedControl.value=String(speed);sync();schedule();showControls();});
@@ -169,8 +211,8 @@
     agesControl.addEventListener('click',()=>configure({showAges:!showAges}));
     root.addEventListener('pointermove',showControls,{passive:true});root.addEventListener('pointerdown',showControls,{passive:true});root.addEventListener('focusin',showControls);
     for(const type of ['pointerup','keydown','input','change','wheel'])root.addEventListener(type,showControls,{passive:true});
-    viewer.addEventListener('cancel',event=>{if(active){event.preventDefault();exit();}});
-    document.addEventListener('keydown',event=>{if(active&&event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();exit();}},{capture:true});
+    viewer.addEventListener('cancel',event=>{if(active){event.preventDefault();if(!tagging)exit();}});
+    document.addEventListener('keydown',event=>{if(active&&!tagging&&event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();exit();}},{capture:true});
     document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement===root)hadNative=true;else if(active&&hadNative)exit();});
     document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelAdvance();else schedule();});
     document.addEventListener('click',event=>{
@@ -180,6 +222,6 @@
     if(typeof MutationObserver!=='undefined')new MutationObserver(records=>{if(records.some(record=>!viewer.contains(record.target)&&[...record.addedNodes].some(node=>node.nodeType===1)))scheduleDecoration();}).observe(document.body,{childList:true,subtree:true});
     window.addEventListener('family-media-changed',scheduleDecoration);window.addEventListener('resize',sync);decorate();configure();
   }
-  window.FamilyPhotoFullscreen={enter,exit,closed,sync,present,configure,setAlbumStatus,options:()=>({showNames,showAges,labelScale}),play(){if(!active)return;playing=true;sync();schedule();showControls();},isBlocked:()=>active&&albumBlocked,isActive:()=>active};
+  window.FamilyPhotoFullscreen={enter,exit,closed,sync,present,configure,setAlbumStatus,options:()=>({showNames,showAges,labelScale}),play(){if(!active)return;if(tagging){void resumeTagging();return;}playing=true;sync();schedule();showControls();},isBlocked:()=>active&&(albumBlocked||tagging),isTagging:()=>active&&tagging,isActive:()=>active};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

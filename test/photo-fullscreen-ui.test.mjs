@@ -188,6 +188,44 @@ test('grid and viewer use the same outward-arrow fullscreen symbol',()=>{
  const f=fixture(),viewerIcon=f.find('photo-fullscreen-viewer').innerHTML.split('</svg>')[0];
  assert.equal(f.opener._photoFullscreenLaunch.innerHTML.split('</svg>')[0],viewerIcon);
 });
+function taggingFixture(options={}){
+ const f=fixture(options),mounts=[],cleared=[],labels=[],presentations=[];
+ f.window.FamilyApp={apiEnabled:true};
+ f.window.FamilyFaces={mount(stage,image,item,options){mounts.push({stage,image,item,options});stage._familyFaceContext={image,item};},clear(){cleared.push(f.media.current()?.id);delete f.stage._familyFaceContext;},update(item){if(f.stage._familyFaceContext)f.stage._familyFaceContext.item=item;},finish:async()=>true};
+ f.window.FamilyFullscreenFaces={mount:(_stage,_image,item)=>labels.push(item),clear(){},configure(){}};
+ f.media.refreshPhotoPresentation=()=>presentations.push(f.api.isTagging());
+ return {...f,mounts,cleared,labels,presentations};
+}
+test('Tag pauses on the same photo, keeps controls visible and resumes fullscreen with the saved labels',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const english of [false,true])for(const native of [false,true]){
+  const f=taggingFixture({english,native});f.state.scope='screensaver';f.api.enter();await f.flush();f.api.play();t.mock.timers.tick(1000);
+  const image=f.stage.querySelector('img'),tag=f.find('photo-fullscreen-tag'),root=f.stage.parentNode;tag.click();
+  assert.equal(f.api.isTagging(),true);assert.equal(f.api.isBlocked(),true);assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'false');assert.equal(tag.getAttribute('aria-label'),english?'Continue':'המשך');
+  assert.equal(f.mounts[0].image,image);assert.equal(f.mounts[0].item.id,'a');assert.equal(f.mounts[0].options.popupHost,root);assert.equal(f.mounts[0].options.reviewHost,f.find('photo-fullscreen-tag-tools'));
+  assert.equal(f.find('photo-fullscreen-next').disabled,true);assert.equal(f.find('photo-fullscreen-previous').hidden,true);t.mock.timers.tick(30000);assert.equal(f.steps.length,0);assert.equal(root.classList.contains('screensaver-controls-idle'),false);
+  const updated={...f.media.current(),tags:[{id:'yona',name:'יונה'}],tagsRevision:'new'};f.state.items[0]=updated;f.api.sync();tag.click();await f.flush();
+  assert.equal(f.api.isTagging(),false);assert.equal(f.api.isBlocked(),false);assert.equal(f.api.isActive(),true);assert.equal(f.media.current().id,'a');assert.equal(f.stage.querySelector('img'),image);assert.equal(f.labels.at(-1),updated);
+  assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'true');assert.equal(f.cleared.length,1);assert.deepEqual(f.presentations,[true,false]);t.mock.timers.tick(3999);assert.equal(f.steps.length,0);t.mock.timers.tick(1);assert.equal(f.media.current().id,'b');f.api.exit();
+ }
+});
+test('Continue waits for face saving, keeps a failed save open and discards completion after fullscreen closes',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const close of [false,true]){
+  const f=taggingFixture();f.api.enter();await f.flush();f.api.play();f.find('photo-fullscreen-tag').click();let finish,calls=0;
+  f.window.FamilyFaces.finish=()=>{calls++;return new Promise(resolve=>finish=resolve);};const tag=f.find('photo-fullscreen-tag');tag.click();f.api.play();assert.equal(calls,1);assert.equal(tag.disabled,true);t.mock.timers.tick(30000);assert.equal(f.steps.length,0);
+  if(close){f.api.exit();finish(true);await f.flush();assert.equal(f.api.isActive(),false);assert.equal(f.api.isTagging(),false);t.mock.timers.tick(30000);assert.equal(f.steps.length,0);continue;}
+  finish(false);await f.flush();assert.equal(f.api.isTagging(),true);assert.equal(tag.disabled,false);assert.ok(f.find('photo-fullscreen-status').textContent);assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'false');
+  tag.click();finish(true);await f.flush();assert.equal(f.api.isTagging(),false);assert.equal(f.find('photo-fullscreen-status').textContent,'');f.api.exit();
+ }
+});
+test('fullscreen tagging supports single-photo and personal albums and ignores stale editors after another photo opens',async()=>{
+ for(const scope of ['gallery','personal:yona','wedding:parents','nursery:yona','screensaver']){
+  const f=taggingFixture({items:[{id:'only',kind:'photo',src:'/only'}]});f.state.scope=scope;f.api.enter();await f.flush();f.find('photo-fullscreen-tag').click();assert.equal(f.api.isTagging(),true);assert.equal(f.mounts[0].item.id,'only');
+  f.api.present(f.media.current(),f.stage.querySelector('img'));assert.equal(f.mounts.length,1,'Metadata updates retain the editor');f.find('photo-fullscreen-tag').click();await f.flush();assert.equal(f.api.isTagging(),false);assert.equal(f.api.isActive(),true);f.api.exit();
+ }
+ const f=taggingFixture();f.api.enter();await f.flush();f.find('photo-fullscreen-tag').click();f.media.step(1);await f.flush();assert.equal(f.api.isTagging(),false);assert.equal(f.cleared.length,1);assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'false');f.api.exit();
+});
 test('all fullscreen views offer independent labels and ages without resetting playback or transition choices',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  const f=fixture(),updates=[];f.window.FamilyFullscreenFaces={mount(){},clear(){},configure:value=>updates.push(value)};f.media.current().takenDate={year:1980};

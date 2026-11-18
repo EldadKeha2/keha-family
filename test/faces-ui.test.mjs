@@ -85,6 +85,28 @@ test('fullscreen reads reuse saved face labels without mounting an editor or det
  assert.equal((await f.faces.saved(item))[0].person.name,'יונה');await f.faces.saved(item);assert.equal(reads,1);assert.equal(f.detectionCalls,0);assert.equal(f.stage._familyFaceContext,undefined);
  assert.equal((await f.faces.saved({...item,photoRevision:'pixels-2'})).length,0);assert.equal(reads,2,'A previous revision cannot supply face positions for newly edited pixels');
 });
+test('fullscreen editor keeps pickers and controls inside native fullscreen and saves canonical face tags before finishing',async()=>{
+ const f=fixture([first],{desktop:true}),root=f.document.createElement('div'),tools=f.document.createElement('div'),person={id:'yona',name:'יונה'},changes=[],writes=[];let respond;
+ root.id='photoFullscreenRoot';f.dialog.append(root);root.append(tools,f.stage);f.view.frameHeight=600;f.window.FamilyTags.findPeople=async()=>[person];
+ f.window.addEventListener('family-media-changed',event=>changes.push(event.detail));
+ const item={id:'fullscreen-original',kind:'photo',scope:'gallery',photoRevision:'original',tagsRevision:'empty',tags:[]};
+ f.window.FamilyI18n.fetch=async(path,options)=>{
+  if(path.endsWith('/save')){writes.push({path,body:JSON.parse(options.body)});return new Promise(resolve=>respond=resolve);}
+  return Response.json({faces:[],item});
+ };
+ await f.mount(item.id,{popupHost:root,reviewHost:tools},item);assert.equal(f.stage._familyFaceContext.base.height,600);assert.equal(f.find('face-review-button').parentNode,tools);assert.equal(f.find('face-zoom-toolbar').parentNode,root);
+ f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});const picker=f.find('face-popover face-picker');assert.equal(picker.parentNode,root);assert.equal(f.dialog.contains(picker),true);
+ const host=picker.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];
+ await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await new Promise(resolve=>setImmediate(resolve));let done=false;const finishing=f.faces.finish(f.stage).then(result=>{done=true;return result;});await new Promise(resolve=>setImmediate(resolve));assert.equal(done,false);
+ const saved={...first,id:'saved-fullscreen',personId:person.id,person,revision:'face-1'},updated={...item,tags:[person],tagsRevision:'saved-tags'};respond(Response.json({operation:'faces',item:updated,faces:[saved],face:saved}));assert.equal(await finishing,true);
+ assert.equal(writes[0].path,'api/media/fullscreen-original/faces/save');assert.equal(writes[0].body.personId,'yona');assert.equal(changes.at(-1).item.tags[0].id,'yona');assert.equal((await f.faces.saved(updated))[0].id,'saved-fullscreen');assert.equal(f.find('face-popover face-picker'),undefined);f.faces.clear();assert.equal(f.stage._familyFaceContext,undefined);
+});
+test('finishing a failed face save retains the editor until a successful retry',async()=>{
+ const f=fixture([first],{desktop:true}),person={id:'yona',name:'יונה'};let fail=true;
+ f.window.FamilyTags.findPeople=async()=>[person];f.window.FamilyI18n.fetch=async path=>path.endsWith('/save')?fail?Response.json({error:'Save failed'},{status:503}):Response.json({operation:'faces',item:{id:'retry-fullscreen',kind:'photo',tags:[person]},faces:[{...first,id:'saved',personId:person.id,person}],face:{...first,id:'saved',personId:person.id,person}}):Response.json({faces:[]});
+ await f.mount('retry-fullscreen');f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});const panel=f.find('face-popover face-picker'),host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];await new Promise(resolve=>setImmediate(resolve));
+ f.emit(option,'click');assert.equal(await f.faces.finish(f.stage),false);assert.equal(f.find('face-popover face-picker'),panel);fail=false;f.emit(option,'click');assert.equal(await f.faces.finish(f.stage),true);f.faces.clear();
+});
 test('desktop Tab starts after selecting a face, wraps both ways and focuses the next face search in every album',async()=>{
  for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
   const person={id:'yona',name:'יונה'},named={...first,id:'named',personId:person.id,person},f=fixture([second],{desktop:true});

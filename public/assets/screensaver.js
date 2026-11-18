@@ -103,6 +103,7 @@
     const control=familyControl('screensaver-family');pageSelect=control.select;$('screensaverFamily').append(control.label);
     pageLabelSize=labelSizeControl('screensaver-page-label-size');$('screensaverLabelSize').append(pageLabelSize.label);
     $('screensaverStart').addEventListener('click',start);$('screensaverRetry').addEventListener('click',()=>void load());
+    window.addEventListener('family-media-changed',event=>{const item=event.detail?.item;if(!item||!state.items.some(photo=>photo.id===item.id))return;state.items=state.items.map(photo=>photo.id===item.id?{...photo,...item}:photo);render();});
     for(const [id,option]of [['screensaverNames','showNames'],['screensaverAges','showAges']])$(id).addEventListener('change',()=>{window.FamilyPhotoFullscreen.configure({[option]:$(id).checked});render();});
     render();if(window.FamilyApp?.getView()==='screensaver'||location.hash==='#screensaver')activate('screensaver');
   }

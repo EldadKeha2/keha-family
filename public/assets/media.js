@@ -332,6 +332,7 @@
     try{state.pageRequest=Promise.resolve(pagingApi().pageGallery(state.pageTarget)).then(()=>state.pageRender);await state.pageRequest;}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;state.pageRequest=null;state.pageRender=null;if($('mediaViewer').open)metadata();}}
   }
   function canNavigatePhoto({pending=false,wheel=false}={}){
+    if(state.fullscreen&&window.FamilyPhotoFullscreen?.isBlocked?.())return false;
     const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&
       (pending||!stage.classList.contains?.('photo-slide-running'))&&(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1&&
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(wheel||(window.FamilyFaces?.canNavigate?.(stage)??true));
@@ -345,7 +346,7 @@
     const native=window.FamilyPhotoNative,desktop=desktopPhotoInput();
     // The shared strip owns horizontal input and navigation together. The
     // browser only keeps vertical panning; face setup refreshes its wrapper.
-    const browserScroll=desktop&&['photo','video'].includes(current()?.kind)&&native?.supported?.()===true;
+    const browserScroll=desktop&&['photo','video'].includes(current()?.kind)&&native?.supported?.()===true&&!(state.fullscreen&&window.FamilyPhotoFullscreen?.isTagging?.());
     stage.classList.toggle('photo-manual-swipes',desktop&&!browserScroll);
     if(browserScroll&&faceTimer===null){
       const waiting=state.photoLoading?state.items.findIndex(item=>identity(item)===state.photoTarget):-1,from=waiting>=0?waiting:state.index;
@@ -479,6 +480,7 @@
     return owner.promise;
   }
   function canControlNavigate(){
+    if(state.fullscreen&&window.FamilyPhotoFullscreen?.isBlocked?.())return false;
     return Boolean($('mediaViewer').open&&current()&&!state.deleting&&(state.items.length>1||(albumPages.get(state.scope)?.total||0)>1)&&!document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]'));
   }
   async function controlNavigate(direction,owner){

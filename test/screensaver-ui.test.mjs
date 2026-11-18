@@ -9,7 +9,7 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const photo=id=>({id,kind:'photo',src:'/photo/'+id,caption:'Photo '+id,tags:[]});
 const result=(ids,pages=1,page=1)=>({ok:true,json:async()=>({items:ids.map(photo),count:ids.length,pagination:{page,pages,total:ids.length}})});
 function fixture({read=async()=>result(['one','two']),english=false}={}){
-  const nodes=new Map(),requests=[],registrations=[],opens=[],statuses=[];
+  const nodes=new Map(),requests=[],registrations=[],opens=[],statuses=[],events=new EventTarget();
   class Node extends EventTarget{
     constructor(tag='div'){super();this.tagName=tag;this.children=[];this.attributes={};this.hidden=false;this.disabled=false;this.value='';this.textContent='';this.className='';}
     set innerHTML(value){for(const match of value.matchAll(/<([a-z]+)[^>]*\bid="([^"]+)"/g)){const node=new Node(match[1]);node.id=match[2];nodes.set(node.id,node);this.append(node);}}
@@ -25,6 +25,7 @@ function fixture({read=async()=>result(['one','two']),english=false}={}){
   const host=new Node();host.id='screensaverView';nodes.set(host.id,host);
   const bar=new Node(),mediaState={scope:null,items:[],index:0},options={showNames:false,showAges:false,labelScale:1};let active=false,playing=false;
   const window={FAMILY_DATA:family,FamilyI18n:{isEnglish:english,locale:english?'en-US':'he-IL',branchName:b=>english?b.titleEn:b.title,personName:p=>p.name,async fetch(url,options){const query=new URL(url,'https://family.test').searchParams;requests.push({query,options});return read(query,options);}},FamilyApp:{getView:()=> 'screensaver'}};
+  window.addEventListener=events.addEventListener.bind(events);window.dispatchEvent=events.dispatchEvent.bind(events);
   window.FamilyMedia={photoState:()=>mediaState,current:()=>mediaState.items[mediaState.index],register(scope,items){registrations.push({scope,items});if(mediaState.scope===scope)mediaState.items=items;},open(items,index,scope){opens.push({items,index,scope});Object.assign(mediaState,{items,index,scope});return true;}};
   window.FamilyPhotoFullscreen={isActive:()=>active,options:()=>options,configure:value=>Object.assign(options,value),enter(){active=true;window.FamilyScreensaver.mountFullscreen(bar);return true;},play(){playing=true;},setAlbumStatus(blocked,message){statuses.push({blocked,message});},exit(){active=false;window.FamilyScreensaver.fullscreenClosed();}};
   const document={readyState:'complete',getElementById:id=>nodes.get(id)||null,createElement:tag=>new Node(tag)};
@@ -61,6 +62,11 @@ test('label size changes immediately and stays synchronized between the page and
     live.value='200';live.dispatchEvent(new Event('input'));assert.equal(page.value,'200');assert.equal(output.textContent,'200%');assert.equal(f.playing(),true);
     f.window.FamilyPhotoFullscreen.exit();assert.equal(f.bar.querySelector('input'),null);f.start();assert.equal(f.bar.querySelector('input').value,'200');
   }
+});
+test('fullscreen face saves update the screensaver preview and the next start uses the canonical updated photo',async()=>{
+ const f=fixture();await flush();f.start();const item={...f.mediaState.items[0],tags:[{id:'yona',name:'יונה'}],tagsRevision:'saved-faces',caption:'Updated memory'};
+ const event=new Event('family-media-changed');Object.defineProperty(event,'detail',{value:{operation:'faces',item}});f.window.dispatchEvent(event);
+ f.window.FamilyPhotoFullscreen.exit();assert.equal(f.nodes.get('screensaverPreviewCaption').textContent,'Updated memory');f.start();assert.equal(f.opens.at(-1).items[0].tagsRevision,'saved-faces');assert.equal(f.opens.at(-1).items[0].tags[0].id,'yona');
 });
 test('a fast branch change discards late photos from previous branches, even if their requests ignore cancellation',async()=>{
   const pending=[],f=fixture({read:()=>new Promise(resolve=>pending.push(resolve))});
