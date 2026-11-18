@@ -127,6 +127,50 @@ test('unloaded, failed and stale images cannot start or revive a slideshow',asyn
  f.emit(f.stage.querySelector('img'),'error');await f.flush();assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'false');assert.ok(f.find('photo-fullscreen-status').textContent);t.mock.timers.tick(20000);assert.equal(f.steps.length,1);
  const stale=fixture({loading:true});stale.api.enter();stale.find('photo-fullscreen-play').click();stale.api.exit();stale.load();await stale.flush();t.mock.timers.tick(20000);assert.equal(stale.steps.length,0);
 });
+test('screensaver skips failed photos without pausing and resumes the selected dwell time after a good photo',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const english of [false,true]){
+  const f=fixture({english,loading:true});f.state.scope='screensaver';f.api.enter();const speed=f.find('photo-fullscreen-speed');speed.value='2';f.emit(speed,'change');f.api.play();
+  for(const id of ['b','c','a']){
+   f.emit(f.stage.querySelector('img'),'error');await f.flush();assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'true');
+   t.mock.timers.tick(499);assert.notEqual(f.media.current().id,id);t.mock.timers.tick(1);assert.equal(f.media.current().id,id);assert.equal(f.stepOptions.at(-1).instant,true);
+  }
+  f.load();await f.flush();assert.equal(f.find('photo-fullscreen-status').textContent,'');t.mock.timers.tick(1999);assert.equal(f.steps.length,3);t.mock.timers.tick(1);assert.equal(f.steps.length,4);f.api.exit();
+ }
+});
+test('screensaver skips images that never load or finish decoding and ignores their late completion',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const decoding of [false,true]){
+  const f=fixture({loading:!decoding});f.state.scope='screensaver';let finish;
+  if(decoding)f.stage.querySelector('img').decode=()=>new Promise(resolve=>finish=resolve);
+  const stale=f.stage.querySelector('img');f.api.enter();f.api.play();await f.flush();t.mock.timers.tick(9999);assert.equal(f.steps.length,0);t.mock.timers.tick(1);assert.equal(f.media.current().id,'b');
+  if(decoding)finish();else{stale.complete=true;stale.naturalWidth=1600;f.emit(stale,'load');}await f.flush();
+  if(!decoding){t.mock.timers.tick(4000);assert.equal(f.steps.length,1,'A late load cannot start a timer for the next image');f.load();await f.flush();}
+  t.mock.timers.tick(3999);assert.equal(f.steps.length,1);t.mock.timers.tick(1);assert.equal(f.steps.length,2);f.api.exit();
+ }
+});
+test('screensaver watchdog recovers from consecutive stuck next-photo preparations',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.state.scope='screensaver';f.api.enter();await f.flush();f.api.play();
+ f.media.step=(direction,options)=>{f.steps.push(direction);f.stepOptions.push(options);f.state.busy=true;f.api.sync();};
+ t.mock.timers.tick(4000);assert.equal(f.steps.length,1);f.api.sync();t.mock.timers.tick(9999);assert.equal(f.steps.length,1);t.mock.timers.tick(1);assert.equal(f.steps.length,2);assert.equal(f.stepOptions.at(-1).instant,true);
+ t.mock.timers.tick(10000);assert.equal(f.steps.length,3,'A second stuck preparation gets a new deadline');f.api.exit();
+});
+test('screensaver recovery respects pause, background tabs, branch loading, manual navigation and exit',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ for(const action of ['pause','hidden','branch','manual','exit','close']){
+  const f=fixture({loading:true});f.state.scope='screensaver';f.api.enter();f.api.play();const stale=f.stage.querySelector('img');f.emit(stale,'error');await f.flush();
+  if(action==='pause')f.find('photo-fullscreen-play').click();
+  if(action==='hidden'){f.document.hidden=true;f.emit(f.document,'visibilitychange');}
+  if(action==='branch')f.api.setAlbumStatus(true,'Loading branch');
+  if(action==='manual'){f.find('photo-fullscreen-next').click();f.load();await f.flush();}
+  if(action==='exit')f.api.exit();if(action==='close')f.viewer.close();
+  t.mock.timers.tick(500);assert.equal(f.steps.length,action==='manual'?1:0,action+' cancels the failed image skip');
+  if(action==='hidden'){f.document.hidden=false;f.emit(f.document,'visibilitychange');}
+  if(action==='pause')f.api.play();if(action==='branch')f.api.setAlbumStatus(false);
+  if(['pause','hidden','branch'].includes(action)){t.mock.timers.tick(500);assert.equal(f.steps.length,1,action+' resumes recovery');}
+  f.api.exit();t.mock.timers.tick(20000);assert.equal(f.steps.length,['pause','hidden','branch','manual'].includes(action)?1:0);
+ }
+});
 test('a loaded next-page image starts its dwell timer only when the page request has finished',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});const f=fixture();f.api.enter();await f.flush();f.find('photo-fullscreen-play').click();f.state.busy=true;f.api.sync();
  f.api.present(f.media.current(),f.stage.querySelector('img'));await f.flush();t.mock.timers.tick(12000);assert.equal(f.steps.length,0);

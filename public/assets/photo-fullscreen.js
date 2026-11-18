@@ -10,7 +10,7 @@
   let viewer,stage,root,anchor,bar,play,speedControl,effectsControl,namesControl,agesControl,close,previous,next,counter,caption,status,active=false,playing=false,returnToViewer=true,hadNative=false;
   let showNames=false,showAges=false,albumBlocked=false,labelScale=1;
   try{const saved=Number(localStorage.getItem('family-screensaver-label-scale'));if(Number.isFinite(saved)&&saved>=.75&&saved<=2)labelScale=saved;}catch{}
-  let timer=null,hideTimer=null,frame=null,paint=0,ready=false,wasBusy=false;
+  let timer=null,hideTimer=null,frame=null,paint=0,ready=false,failed=false,wasBusy=false;
   const media=()=>window.FamilyMedia;
   const mobileGrid=()=>typeof navigator!=='undefined'&&(navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
   function button(className,label,html){const node=document.createElement('button');node.type='button';node.className=className;node.setAttribute('aria-label',label);node.title=label;node.innerHTML=html;return node;}
@@ -21,8 +21,16 @@
   }
   function schedule(){
     cancelAdvance();const state=media()?.photoState();
-    if(!active||!playing||!ready||albumBlocked||document.hidden||state?.busy||!(state?.total>1))return;
-    timer=setTimeout(()=>{timer=null;if(active&&playing&&!document.hidden)media().step(1,{effect:effects?nextEffect():null});},4000/speed);
+    const recovering=state?.scope==='screensaver'&&(!ready||state.busy);
+    if(!active||!playing||albumBlocked||document.hidden||!(state?.total>1)||!recovering&&(!ready||state.busy))return;
+    const token=paint,item=state.item;
+    // Bound both visible-image loading/decoding and next-photo preparation.
+    // A busy step already targets the next photo; another step skips that target.
+    timer=setTimeout(()=>{
+      timer=null;if(!active||!playing||albumBlocked||document.hidden||token!==paint||media().current()!==item)return;
+      media().step(1,recovering?{instant:true}:{effect:effects?nextEffect():null});
+      schedule();
+    },recovering?(failed?500:10000):4000/speed);
   }
   function showControls(){
     if(!active)return;root.classList.remove('screensaver-controls-idle');root.classList.add('controls-visible');clearTimeout(hideTimer);
@@ -46,7 +54,7 @@
       return;
     }
     if(!viewer.open){closed();return;}if(!photo){exit();return;}
-    const resumed=wasBusy&&!state.busy;wasBusy=state.busy;if(state.busy)cancelAdvance();
+    const busyChanged=wasBusy!==state.busy;wasBusy=state.busy;
     const label=tr('תמונה '+(state.index+1)+' מתוך '+state.total,'Photo '+(state.index+1)+' of '+state.total);
     if(counter.textContent!==(albumBlocked?'':label))counter.textContent=albumBlocked?'':label;
     if(caption.textContent!==(state.item.caption||''))caption.textContent=state.item.caption||'';caption.hidden=!state.item.caption;
@@ -59,10 +67,10 @@
     agesControl.title=tr('הצגת גילים בזמן הצילום, כשיש נתונים מתאימים','Show ages at the time of the photo, where dates are known');
     const playLabel=playing?tr('השהיית המצגת','Pause slideshow'):tr('הפעלת מצגת בלולאה','Play looping slideshow');
     if(play.getAttribute('aria-label')!==playLabel){play.setAttribute('aria-label',playLabel);play.title=playLabel;play.innerHTML=playing?pauseIcon:playIcon;}play.setAttribute('aria-pressed',String(playing));
-    if(resumed&&ready)schedule();
+    if(busyChanged)schedule();
   }
   function present(item,image){
-    const token=++paint;ready=false;cancelAdvance();if(!active)return;
+    const token=++paint;ready=false;failed=false;cancelAdvance();if(!active)return;
     window.FamilyFullscreenFaces?.mount(stage,image,item);
     if(!albumBlocked)status.textContent='';
     const loaded=image.complete?(image.naturalWidth?Promise.resolve():Promise.reject(Error('Image unavailable'))):new Promise((resolve,reject)=>{
@@ -70,8 +78,14 @@
     });
     loaded.then(()=>image.decode?.().catch(()=>{})).then(()=>{
       if(!active||token!==paint||media().current()!==item)return;ready=true;schedule();
-    }).catch(()=>{if(active&&token===paint){playing=false;ready=false;cancelAdvance();status.textContent=tr('התמונה לא נטענה. אפשר לעבור לתמונה הבאה.','This photo could not load. You can move to the next photo.');sync();}});
-    sync();
+    }).catch(()=>{
+      if(!active||token!==paint||media().current()!==item)return;
+      failed=true;ready=false;
+      if(media().photoState().scope!=='screensaver')playing=false;
+      status.textContent=playing?tr('מדלגים על תמונה שלא נטענה…','Skipping a photo that could not load…'):tr('התמונה לא נטענה. אפשר לעבור לתמונה הבאה.','This photo could not load. You can move to the next photo.');
+      sync();schedule();
+    });
+    sync();schedule();
   }
   function restoreStage(){if(anchor?.parentNode)anchor.replaceWith(stage);anchor=null;root.hidden=true;}
   function leaveNative(){if(document.fullscreenElement===root)Promise.resolve(document.exitFullscreen?.()).catch(()=>{});}

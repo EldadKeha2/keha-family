@@ -89,6 +89,13 @@ test('exiting fullscreen cancels an outstanding next-photo preparation and a lat
  f.window.FamilyPhotoPresentation.prepare=()=>new Promise(resolve=>finish=resolve);const pending=f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.photoState().busy,true);
  f.window.FamilyMedia.setFullscreen(false);finish(f.document.createElement('img'));await pending;assert.equal(f.window.FamilyMedia.current().id,'a');assert.equal(f.window.FamilyMedia.photoState().active,false);assert.equal(f.window.FamilyMedia.photoState().busy,false);f.close();
 });
+test('screensaver recovery skips the pending target and late preparation cannot replace the next photo',async()=>{
+ const f=fixture();f.window.FamilyMedia.open([f.photo('a'),f.photo('b'),f.photo('c')],0,'screensaver');f.window.FamilyMedia.setFullscreen(true);let finish;
+ f.window.FamilyPhotoPresentation.prepare=item=>item.id==='b'?new Promise(resolve=>finish=resolve):null;
+ const pending=f.window.FamilyMedia.step(1);assert.equal(f.window.FamilyMedia.photoState().busy,true);
+ await f.window.FamilyMedia.step(1,{instant:true});assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.window.FamilyMedia.photoState().busy,false);
+ finish(f.document.createElement('img'));await pending;assert.equal(f.window.FamilyMedia.current().id,'c');f.close();
+});
 test('direct photos adopt their route album after loading without resetting the image or active editing',async()=>{
  const id='a'.repeat(32),item={id,kind:'photo',scope:'gallery',mime:'image/jpeg',src:'/media/'+id,tags:[]};
  for(const [route,scope]of [['person/ora','personal:ora'],['weddings/u-fish','wedding:u-fish'],['nursery/ora','nursery:ora'],['gallery','gallery'],['photos','photos']]){
