@@ -53,6 +53,23 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   return {browser,photo,window,document,events,nodes,get,navigator,shared,copied,requests,pending,open(id='a'){window.FamilyMedia.open([photo(id)],0,'gallery');},close(){get('mediaViewer').close();},click(){return get('shareMediaInstagram').handlers.get('click')({preventDefault(){}});}};
 }
 
+test('opening a family photo from Home uses the Family Photos viewer and share link while retaining the slideshow order',async()=>{
+ const f=fixture(),media=f.window.FamilyMedia;
+ const album=[f.photo('first'),f.photo('second'),f.photo('third')],slideOrder=[album[1],album[0],album[2]];
+ media.register('photos',album);
+ media.register('home:photos',slideOrder);
+ media.openFrom('home:photos','second');
+ assert.equal(f.get('mediaViewer').getAttribute('data-media-scope'),'photos');
+ const shared=new URL(new URL(f.get('shareMediaWhatsApp').href).searchParams.get('text').split('\n').at(-1));
+ assert.equal(shared.hash,'#photos');
+ assert.equal(shared.searchParams.get('media'),'second');
+ media.register('photos',album);
+ await media.step(1);
+ assert.equal(media.current().id,'first');
+ assert.equal(f.get('mediaViewerCounter').textContent,'2 / 3');
+ f.close();
+});
+
 test('fullscreen reuses the decoded image, skips non-photos, wraps and restores tagging on the selected photo in every album',async()=>{
  for(const english of [false,true])for(const scope of ['gallery','photos','personal:ora','wedding:parents','nursery:ora','nostalgia','home:photos']){
   const f=fixture({english}),a=f.photo('a'),b=f.photo('b'),video={...f.photo('v'),kind:'video'},doc={...f.photo('d'),kind:'document'};let mounts=0;
