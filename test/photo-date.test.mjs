@@ -15,20 +15,20 @@ test('photo dates retain every combination of optional components without invent
 
 test('ages use completed years at capture time, with conservative rounding for partial dates',()=>{
   const birthday='16.10.1921';
-  assert.deepEqual(photoAge(birthday,{day:15,month:10,year:1980}),{years:58,approximate:false});
-  assert.deepEqual(photoAge(birthday,{day:16,month:10,year:1980}),{years:59,approximate:false});
-  assert.deepEqual(photoAge(birthday,{year:1980}),{years:58,approximate:true});
-  assert.deepEqual(photoAge('1.1.1921',{year:1980}),{years:59,approximate:true});
-  assert.deepEqual(photoAge(birthday,{year:1980,month:10}),{years:58,approximate:true});
-  assert.deepEqual(photoAge(birthday,{year:1980,month:11}),{years:59,approximate:true});
-  assert.deepEqual(photoAge(birthday,{year:1980,day:20}),{years:58,approximate:true});
-  assert.deepEqual(photoAge('29.2.2000',{day:28,month:2,year:2021}),{years:20,approximate:false});
-  assert.deepEqual(photoAge('29.2.2000',{day:1,month:3,year:2021}),{years:21,approximate:false});
+  assert.deepEqual(photoAge(birthday,{day:15,month:10,year:1980}),{years:58,months:707,approximate:false});
+  assert.deepEqual(photoAge(birthday,{day:16,month:10,year:1980}),{years:59,months:708,approximate:false});
+  assert.deepEqual(photoAge(birthday,{year:1980}),{years:58,months:null,approximate:true});
+  assert.deepEqual(photoAge('1.1.1921',{year:1980}),{years:59,months:null,approximate:true});
+  assert.deepEqual(photoAge(birthday,{year:1980,month:10}),{years:58,months:707,approximate:true});
+  assert.deepEqual(photoAge(birthday,{year:1980,month:11}),{years:59,months:708,approximate:true});
+  assert.deepEqual(photoAge(birthday,{year:1980,day:20}),{years:58,months:null,approximate:true});
+  assert.deepEqual(photoAge('29.2.2000',{day:28,month:2,year:2021}),{years:20,months:251,approximate:false});
+  assert.deepEqual(photoAge('29.2.2000',{day:1,month:3,year:2021}),{years:21,months:252,approximate:false});
 });
 
 test('babies are under one; missing years, unknown birthdays and dates before birth never invent an age',()=>{
-  assert.deepEqual(photoAge('16.10.1921',{year:1921}),{years:0,approximate:true});
-  assert.deepEqual(photoAge('16.10.1921',{day:17,month:10,year:1921}),{years:0,approximate:false});
+  assert.deepEqual(photoAge('16.10.1921',{year:1921}),{years:0,months:null,approximate:true});
+  assert.deepEqual(photoAge('16.10.1921',{day:17,month:10,year:1921}),{years:0,months:0,approximate:false});
   for(const [born,date]of [['16.10.1921',{year:1920}],['16.10.1921',{day:15,month:10,year:1921}],['1.1.1111',{year:1980}],['31.2.1980',{year:2000}],['',{year:2000}],['16.10.1921',{day:16,month:10}]])assert.equal(photoAge(born,date),null);
 });
 
@@ -39,4 +39,12 @@ test('date labels faithfully display only known components in Hebrew and English
   assert.equal(photoDateText({}), '');
   assert.match(photoDateText({month:10,year:1980},'en-US'),/Oct.*1980/);
   assert.match(photoDateText({day:16,month:10,year:1980},'en-GB'),/16 Oct 1980/);
+});
+
+test('completed months cross calendar years and wait for the birth day without inventing missing months',()=>{
+  for(const [date,months]of [[{day:14,month:2,year:2021},7],[{day:15,month:2,year:2021},8],[{day:14,month:6,year:2021},11],[{day:15,month:6,year:2021},12],[{day:15,month:12,year:2021},18]])assert.equal(photoAge('15.6.2020',date).months,months);
+  assert.equal(photoAge('15.6.2020',{month:2,year:2021}).months,7,'An unknown day uses the earliest possible capture day');
+  assert.equal(photoAge('15.6.2020',{year:2021}).months,null);
+  assert.equal(photoAge('31.1.2020',{day:29,month:2,year:2020}).months,0);
+  assert.equal(photoAge('31.1.2020',{day:1,month:3,year:2020}).months,1);
 });

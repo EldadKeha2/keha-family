@@ -44,7 +44,7 @@
     for(const control of [pageLabelSize,fullscreenLabelSize])if(control){const size=Math.round((options.labelScale||1)*100);control.input.value=String(size);control.output.textContent=size+'%';control.input.setAttribute('aria-valuetext',size+'%');}
     const text=item&&!state.pending?[item.caption,options.showNames||options.showAges?(item.tags||[]).map(person=>{
       const name=options.showNames?I.personName(person):'',age=options.showAges?window.FamilyPhotoDate?.ageFor(person,item):null;
-      return [name,age?tr('גיל ','Age ')+age.text:''].filter(Boolean).join(' · ');
+      return [name,age?(age.infant?'':tr('גיל ','Age '))+age.text:''].filter(Boolean).join(' · ');
     }).filter(Boolean).join(' / '):''].filter(Boolean).join(' · '):'';
     $('screensaverPreviewCaption').textContent=text;$('screensaverPreviewCaption').hidden=!text;
   }

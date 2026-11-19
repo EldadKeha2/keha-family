@@ -7,7 +7,7 @@
   function clear(){if(!current)return;const c=current;current=null;c.abort.abort();clearTimeout(c.timer);for(const off of c.off)off();c.bubble.remove();c.outline.remove();for(const node of c.overlays)node.remove();}
   function faceText(c,face,persistent=false){
     const age=options.showAges?window.FamilyPhotoDate?.ageFor(face.person,c.item):null;
-    return [!persistent||options.showNames?face.name:'',age?tr('גיל ','Age ')+age.text:''].filter(Boolean).join(' · ');
+    return [!persistent||options.showNames?face.name:'',age?(age.infant?'':tr('גיל ','Age '))+age.text:''].filter(Boolean).join(' · ');
   }
   function render(c){
     c.stage.style.setProperty('--photo-fullscreen-label-scale',String(options.labelScale));

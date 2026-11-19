@@ -29,8 +29,10 @@ export function photoAge(birthday,value){
   if(order(latest)<order({day,month,year}))return null;
   let years=earliest.year-year;
   if(earliest.month<month||earliest.month===month&&earliest.day<day)years--;
-  // A photograph taken in the birth year can show a baby aged under one.
-  return {years:Math.max(0,years),approximate:!taken.month||!taken.day};
+  // Completed calendar months use the same conservative lower date as years.
+  // Without a capture month, do not invent a baby's number of months.
+  const months=taken.month?Math.max(0,(earliest.year-year)*12+earliest.month-month-(earliest.day<day?1:0)):null;
+  return {years:Math.max(0,years),months,approximate:!taken.month||!taken.day};
 }
 
 export function photoDateText(value,locale='he-IL'){

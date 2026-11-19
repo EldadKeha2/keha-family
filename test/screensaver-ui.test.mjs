@@ -63,6 +63,18 @@ test('label size changes immediately and stays synchronized between the page and
     f.window.FamilyPhotoFullscreen.exit();assert.equal(f.bar.querySelector('input'),null);f.start();assert.equal(f.bar.querySelector('input').value,'200');
   }
 });
+
+test('screensaver preview uses infant month labels without duplicating the age prefix',async()=>{
+ for(const english of [false,true]){
+  const infant=english?'8 months old':'בת 8 חודשים',person={id:'baby',name:'Baby'};
+  const f=fixture({english,read:async()=>({ok:true,json:async()=>({items:[{...photo('one'),tags:[person]}],count:1,pagination:{page:1,pages:1,total:1}})})});
+  f.window.FamilyPhotoDate={ageFor:()=>({text:infant,infant:true})};await flush();
+  const ages=f.nodes.get('screensaverAges');ages.checked=true;ages.dispatchEvent(new Event('change'));
+  assert.equal(f.nodes.get('screensaverPreviewCaption').textContent,'Photo one · '+infant);
+  const names=f.nodes.get('screensaverNames');names.checked=true;names.dispatchEvent(new Event('change'));
+  assert.equal(f.nodes.get('screensaverPreviewCaption').textContent,'Photo one · Baby · '+infant);
+ }
+});
 test('fullscreen face saves update the screensaver preview and the next start uses the canonical updated photo',async()=>{
  const f=fixture();await flush();f.start();const item={...f.mediaState.items[0],tags:[{id:'yona',name:'יונה'}],tagsRevision:'saved-faces',caption:'Updated memory'};
  const event=new Event('family-media-changed');Object.defineProperty(event,'detail',{value:{operation:'faces',item}});f.window.dispatchEvent(event);

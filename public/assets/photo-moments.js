@@ -1,4 +1,4 @@
-import {photoDate,photoAge,photoDateText} from './photo-date.mjs?v=1';
+import {photoDate,photoAge,photoDateText} from './photo-date.mjs?v=infant-months-v2';
 const I=window.FamilyI18n,$=id=>document.getElementById(id),tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const calendar='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18M7 15h2m3 0h2m3 0h.01M7 18h2m3 0h2"/></svg>';
@@ -56,7 +56,7 @@ async function saveInlineDate(event){
   draft.error='';draft.status='';
   draft.pending=(async()=>{
     try{
-      const result=await persistDate(draft,date);draft.values=photoDate(result.item?.takenDate||date);draft.revision=result.item?.takenDateRevision||draft.revision;draft.dirty=false;draft.status=tr('נשמר ✓','Saved ✓');return true;
+      const result=await persistDate(draft,date);draft.values=photoDate(result.item?.takenDate||date);draft.revision=result.item?.takenDateRevision||draft.revision;draft.dirty=false;draft.status=tr('התאריך עודכן','Date updated');return true;
     }catch(error){draft.error=error.message;draft.conflict=Boolean(error.latest);if(item?.id!==draft.id)window.FamilyApp?.toast?.(error.message);return false;}
     finally{draft.pending=null;renderInlineDate();}
   })();renderInlineDate();return draft.pending;
@@ -65,13 +65,20 @@ async function saveInlineDate(event){
 function ageFor(person,photo){
   const birthday=person?.birthday??photo.tags?.find(tag=>tag.id===person?.id)?.birthday??window.FamilyApp?.getPersonSummary?.(person?.id)?.birthday??window.FamilyApp?.getPerson?.(person?.id)?.birthday;
   const age=photoAge(birthday,photo.takenDate);if(!age)return null;
-  const value=age.years===0?tr('פחות משנה','Under 1'):String(age.years);
-  return {text:value,title:tr('גיל בזמן הצילום: ','Age in this photo: ')+value};
+  const infant=age.years===0&&age.months!==null;
+  let value;
+  if(infant){
+    const gender=person?.gender??photo.tags?.find(tag=>tag.id===person?.id)?.gender??window.FamilyApp?.getPersonSummary?.(person?.id)?.gender??window.FamilyApp?.getPerson?.(person?.id)?.gender??window.FAMILY_DATA?.people?.[person?.id]?.gender;
+    const months=age.months===0?tr('פחות מחודש','Under 1 month'):age.months===1?tr('חודש','1 month'):age.months+tr(' חודשים',' months');
+    value=I.isEnglish?months+' old':(gender==='f'?'בת ':gender==='m'?'בן ':'גיל ')+months;
+  }else value=age.years===0?tr('פחות משנה','Under 1'):String(age.years<4&&age.months!==null?Math.floor(age.months/6)/2:age.years);
+  return {text:value,title:tr('גיל בזמן הצילום: ','Age in this photo: ')+value,infant};
 }
 function videoTagAge(person,video){
   const summary=window.FamilyApp?.getPersonSummary?.(person?.id),canonical=window.FAMILY_DATA?.people?.[person?.id],birthday=[person?.birthday,video.tags?.find(tag=>tag.id===person?.id)?.birthday,summary?.birthday,canonical?.birthday].find(value=>value&&!String(value).endsWith('1111'));
-  const age=ageFor({...person,birthday},video);if(!age)return '';
   const gender=person?.gender||summary?.gender||canonical?.gender;
+  const age=ageFor({...person,birthday,gender},video);if(!age)return '';
+  if(age.infant)return '('+age.text+')';
   return '('+(I.isEnglish?'age ':gender==='f'?'בת ':gender==='m'?'בן ':'גיל ')+age.text+')';
 }
 const overlays=id=>item?.id===id?{showNames,showAges:showAges&&Boolean(item.takenDate?.year)}:{showNames:false,showAges:false};
@@ -157,7 +164,7 @@ function init(){
   dialog.innerHTML=`<h2 id="photoDateTitle">${tr('מתי התמונה צולמה?','When was this photo taken?')}</h2><p id="photoDateHint">${tr('מזינים רק מה שידוע. אפשר לשמור יום, חודש או שנה בנפרד.','Enter what you know. Day, month and year are all optional.')}</p><form id="photoDateForm" aria-describedby="photoDateHint"><div class="photo-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoDate${field}">${label}<input id="photoDate${field}" name="${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off"></label>`).join('')}</div><p id="photoDateError" class="form-error" role="alert"></p><div class="photo-date-actions"><button type="submit" class="primary-button">${tr('שמירה','Save')}</button><button id="cancelPhotoDate" type="button" class="secondary-button">${tr('ביטול','Cancel')}</button><button id="clearPhotoDate" type="button">${tr('ניקוי התאריך','Clear date')}</button></div></form>`;
   document.body.append(dialog);
   const inline=document.createElement('form');inline.id='photoInlineDateForm';inline.className='photo-inline-date-form';inline.hidden=true;inline.setAttribute('data-i18n-skip','');
-  inline.innerHTML=`<strong class="photo-inline-date-title">${calendar}<span>${tr('תאריך צילום','Photo date')}</span></strong><div class="photo-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoInlineDate${field}">${label}<input id="photoInlineDate${field}" name="${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off" aria-describedby="photoInlineDateError"></label>`).join('')}</div><p id="photoInlineDateError" class="form-error" role="alert"></p><button id="photoInlineDateSave" type="submit" class="primary-button">${tr('שמירת התאריך','Save date')}</button><span id="photoInlineDateStatus" role="status" aria-live="polite"></span>`;
+  inline.innerHTML=`<strong class="photo-inline-date-title">${calendar}<span>${tr('תאריך צילום','Photo date')}</span></strong><div class="photo-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1000,9999]].map(([field,label,min,max])=>`<label for="photoInlineDate${field}">${label}<input id="photoInlineDate${field}" name="${field}" type="number" inputmode="numeric" min="${min}" max="${max}" step="1" placeholder="—" autocomplete="off" aria-describedby="photoInlineDateError"></label>`).join('')}</div><p id="photoInlineDateError" class="form-error" role="alert"></p><div class="photo-inline-date-actions"><button id="photoInlineDateSave" type="submit" class="primary-button">${tr('שמירת התאריך','Save date')}</button><span id="photoInlineDateStatus" role="status" aria-live="polite"></span></div>`;
   document.body.append(inline);inline.addEventListener('submit',saveInlineDate);
   for(const field of dateFields)$('photoInlineDate'+field).addEventListener('input',event=>{const draft=inlineDraft();if(!draft||draft.pending)return;draft.values[field]=event.target.validity?.badInput?NaN:event.target.value;draft.dirty=true;draft.error='';draft.status='';renderInlineDate();});
   inline.addEventListener('focusout',event=>{if(event.relatedTarget&&!inline.contains(event.relatedTarget))void saveInlineDate();});

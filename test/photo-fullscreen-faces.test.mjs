@@ -67,3 +67,12 @@ test('resizing labels repaints both names and ages on the active photo and follo
  f.api.configure({labelScale:2});assert.equal(before.isConnected,false);assert.equal(f.stage.style['--photo-fullscreen-label-scale'],'2');
  f.mount('next');await flush();assert.equal(f.stage.style['--photo-fullscreen-label-scale'],'2');f.api.clear();
 });
+
+test('fullscreen infant overlays and hover show the gendered month label without an extra age prefix',async()=>{
+ const f=fixture();f.window.FamilyPhotoDate={ageFor:person=>person.id==='yona'?{text:'בת 8 חודשים',infant:true}:null};
+ f.api.configure({showNames:true,showAges:true});f.mount();await flush();
+ const labels=()=>f.stage.children.filter(node=>node.className?.includes('photo-fullscreen-person-label')).map(node=>node.textContent);
+ assert.deepEqual(labels(),['יונה · בת 8 חודשים','שלמה']);
+ f.pointer('pointermove');assert.equal(f.bubble().textContent,'יונה · בת 8 חודשים');
+ f.api.configure({showNames:false});assert.deepEqual(labels(),['בת 8 חודשים']);f.api.clear();
+});

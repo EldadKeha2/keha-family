@@ -46,9 +46,10 @@
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-form button{min-height:36px;padding:6px 12px;border-radius:7px;font-size:calc(14px * var(--a11y-text-scale,1))}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-title{grid-column:1;grid-row:1;font-size:calc(14px * var(--a11y-text-scale,1))}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:10px 14px}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateSave{grid-column:2;grid-row:1;min-height:32px;padding:5px 9px;font-size:calc(13px * var(--a11y-text-scale,1))}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) .photo-inline-date-actions{grid-column:2;grid-row:1;justify-content:flex-end}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateSave{min-height:32px;padding:5px 9px;font-size:calc(13px * var(--a11y-text-scale,1))}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateForm .photo-date-fields{grid-row:2}
- #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateStatus{grid-column:1/-1}
+ #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateStatus{white-space:nowrap}
  #mediaViewer:is(.video-gallery-viewer,.personal-photo-desktop) #photoInlineDateStatus:empty{display:none}
  #mediaViewer.video-gallery-viewer #photoInlineDateForm{padding:7px 12px;row-gap:4px}
  #mediaViewer.video-gallery-viewer #photoInlineDateForm .photo-date-fields label{gap:2px;text-align:center;line-height:1.3}

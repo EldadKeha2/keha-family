@@ -80,6 +80,31 @@ test('overlay ages use the lower whole year for partial dates without symbols an
  f.window.FamilyApp.getPersonSummary=()=>({birthday:'16.10.1921'});assert.equal(f.api.ageFor({id:'yona'},{...photo,tags:[],takenDate:{day:16,month:10,year:1980}}).text,'59');
  assert.equal(f.api.ageFor({id:'unknown',birthday:'1.1.1111'},photo),null);assert.equal(f.api.ageFor({id:'future',birthday:'1.1.2000'},photo),null);
 });
+
+test('infant labels show completed months with the saved gender in photos and recording-date tags',()=>{
+ const f=fixture(),photo={id:'baby',takenDate:{day:15,month:2,year:2021},tags:[]},person={id:'baby',birthday:'15.6.2020',gender:'m'};
+ assert.equal(f.api.ageFor(person,photo).text,'בן 8 חודשים');assert.equal(f.api.ageFor({...person,gender:'f'},photo).text,'בת 8 חודשים');
+ assert.equal(f.api.ageFor(person,{...photo,takenDate:{day:14,month:2,year:2021}}).text,'בן 7 חודשים');
+ assert.equal(f.api.ageFor(person,{...photo,takenDate:{day:15,month:7,year:2020}}).text,'בן חודש');
+ assert.equal(f.api.ageFor(person,{...photo,takenDate:{day:16,month:6,year:2020}}).text,'בן פחות מחודש');
+ assert.equal(f.api.ageFor(person,{...photo,takenDate:{year:2020}}).text,'פחות משנה');
+ assert.equal(fixture(true).api.ageFor(person,photo).text,'8 months old');
+ f.window.FamilyApp.getPersonSummary=()=>({birthday:person.birthday,gender:'f'});assert.equal(f.api.ageFor({id:'baby'},photo).text,'בת 8 חודשים');
+ assert.equal(f.api.videoTagAge({...person,gender:'f'},photo),'(בת 8 חודשים)');assert.equal(fixture(true).api.videoTagAge(person,photo),'(8 months old)');
+ assert.equal(f.api.ageFor({...person,gender:'f'},{...photo,takenDate:{day:14,month:6,year:2020}}),null);
+});
+
+test('young children use only completed half-years until the fourth birthday and whole years after it',()=>{
+ const f=fixture(),person={id:'child',birthday:'15.6.2020',gender:'m'},photo={id:'child',tags:[]};
+ for(const [months,label]of [[12,'1'],[17,'1'],[18,'1.5'],[23,'1.5'],[24,'2'],[29,'2'],[30,'2.5'],[35,'2.5'],[36,'3'],[41,'3'],[42,'3.5'],[47,'3.5'],[48,'4'],[59,'4'],[60,'5']]){
+  const date=new Date(Date.UTC(2020,5+months,15)),takenDate={day:15,month:date.getUTCMonth()+1,year:date.getUTCFullYear()};
+  assert.equal(f.api.ageFor(person,{...photo,takenDate}).text,label,months+' completed months');
+  assert.equal(fixture(true).api.ageFor(person,{...photo,takenDate}).text,label);
+ }
+ assert.equal(f.api.ageFor(person,{...photo,takenDate:{day:14,month:12,year:2021}}).text,'1');
+ assert.equal(f.api.ageFor(person,{...photo,takenDate:{year:2022}}).text,'1','A year-only date retains conservative whole years');
+ assert.equal(f.api.videoTagAge(person,{...photo,takenDate:{day:15,month:12,year:2021}}),'(בן 1.5)');
+});
 test('the date editor stays at the top of the visible viewport and above a shrinking phone keyboard',()=>{
  const f=fixture();f.mount({id:'a',takenDate:{year:1980}});f.click('editPhotoDate');const dialog=f.node('photoDateDialog');
  assert.equal(dialog.open,true);assert.equal(f.node('photoDateyear').value,1980);assert.equal(f.node('photoDateday').value,'');assert.equal(dialog.properties.get('--photo-date-top'),'36px');
@@ -93,7 +118,7 @@ test('desktop date fields are always open, preserve partial dates and save inlin
   const f=fixture(english);f.mount({id:'a',takenDate:{month:6,year:1980},takenDateRevision:'before'});f.api.setDesktopInline(true);
   assert.equal(f.node('photoInlineDateForm').hidden,false);assert.equal(f.node('photoDateDialog').open,false);assert.equal(f.node('editPhotoDate').hidden,true);assert.equal(f.node('photoInlineDateday').value,'');assert.equal(f.node('photoInlineDatemonth').value,6);
   f.enter('day','16');f.enter('year','1990');assert.equal(f.node('photoInlineDateSave').disabled,false);assert.equal(f.submit().defaultPrevented,true);await f.flush();
-  assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/a/photo-date');assert.deepEqual(JSON.parse(f.requests[0].options.body),{date:{day:16,month:6,year:1990},expectedRevision:'before'});assert.equal(f.node('photoInlineDateSave').disabled,true);assert.match(f.node('photoInlineDateStatus').textContent,/✓/);
+  assert.equal(f.requests.length,1);assert.equal(f.requests[0].path,'api/media/a/photo-date');assert.deepEqual(JSON.parse(f.requests[0].options.body),{date:{day:16,month:6,year:1990},expectedRevision:'before'});assert.equal(f.node('photoInlineDateSave').disabled,true);assert.equal(f.node('photoInlineDateStatus').textContent,english?'Date updated':'התאריך עודכן');
   f.api.setDesktopInline(false);assert.equal(f.node('photoInlineDateForm').hidden,true);assert.equal(f.node('editPhotoDate').hidden,false);f.click('editPhotoDate');assert.equal(f.node('photoDateDialog').open,true);assert.equal(f.node('photoDateyear').value,1990);
  }
 });
