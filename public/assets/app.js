@@ -7,7 +7,7 @@
   const media = new Map();
   const phoneQuery=matchMedia('(max-width:700px)'),isPhone=()=>phoneQuery.matches;
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
-  const validViews=new Set(['home','tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
+  const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const requestedView=location.hash.slice(1).split('/')[0];
   const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
@@ -69,11 +69,12 @@
 
   function personCardHTML(p) {
     const unset = birthdayOf(p) === '1.1.1111',rootPerson=data.units[data.root].people.includes(p.id);
+    const founderLink=rootPerson?(window.FamilyFounderTrees?.linkHTML(p.id)||''):'';
     if(rootPerson&&!isPhone()){
       const label=I18n.t('פתיחת העמוד האישי של ')+nameOf(p);
-      return I18n.html`<article class="person-card memorial root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${I18n.t(' <span class="memorial-inline">ז״ל</span>')}</span></button><div class="person-birthday root-person-birth" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only>${birthdayHTML(p,false,true)}</div></div><div class="root-person-details" data-root-history="${p.id}">${rootHistoryHTML(p)}</div></article>`;
+      return I18n.html`<article class="person-card memorial root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${I18n.t(' <span class="memorial-inline">ז״ל</span>')}</span></button><div class="person-birthday root-person-birth" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only>${birthdayHTML(p,false,true)}</div></div><div class="root-person-details" data-root-history="${p.id}">${rootHistoryHTML(p)}</div>${founderLink}</article>`;
     }
-    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}>${birthdayHTML(p,!rootPerson)}</div></article>`;
+    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}>${birthdayHTML(p,!rootPerson)}</div>${founderLink}</article>`;
   }
   function toast(message,action) {
     clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -128,6 +129,7 @@
     window.FamilyCalendar?.activate(state.view);
     window.FamilyTimeline?.activate(state.view);
     window.FamilyHome?.activate(state.view);
+    window.FamilyFounderTrees?.activate(state.view);
     window.FamilyScreensaver?.activate(state.view);
     window.FamilyAI?.activate(state.view);
     window.FamilyUpdates?.activate(state.view);
@@ -576,7 +578,7 @@
     if(event.pointerType==='touch'){
       touches.set(event.pointerId,{x:event.clientX,y:event.clientY});
       if(touches.size===2){const [a,b]=[...touches.values()],rect=viewport.getBoundingClientRect();pinch={distance:Math.hypot(a.x-b.x,a.y-b.y),scale:camera.scale,x:(a.x+b.x)/2-rect.left,y:(a.y+b.y)/2-rect.top,cameraX:camera.x,cameraY:camera.y};drag=null;for(const id of touches.keys())viewport.setPointerCapture(id);suppressClickUntil=performance.now()+500;return;}
-    }else if(event.target.closest('button'))return;
+    }else if(event.target.closest('button,a'))return;
     drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:camera.x,y:camera.y,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,vx:0,vy:0,started:false,touch:event.pointerType==='touch',nativeScroll:event.pointerType==='touch'&&isPhone()&&viewport.dataset.overview==='true'};
   });
   viewport.addEventListener('pointermove',event=>{

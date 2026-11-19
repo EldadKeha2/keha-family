@@ -1,0 +1,49 @@
+/* Two illustrated trees branch out from the founding couple. */
+.tree-viewport .tree-unit[data-unit="u-root"] .person-card .person-open{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;padding-inline:0}
+.tree-viewport .tree-unit[data-unit="u-root"] .person-card .person-name{display:block;width:100%;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.4;text-align:center}
+.tree-viewport .tree-unit[data-unit="u-root"] .root-person-identity{min-width:0}
+.founder-tree-link{position:absolute;top:-8px;width:188px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;color:var(--olive);border-radius:12px;text-align:center;cursor:pointer}
+.tree-unit [data-person-card="yona"]>.founder-tree-link{left:calc(100% + 20px)}
+.tree-unit [data-person-card="shlomo"]>.founder-tree-link{right:calc(100% + 20px)}
+.founder-tree-link>img{display:block;width:154px;height:154px;object-fit:contain;filter:drop-shadow(0 3px 5px #76623a18)}
+.founder-tree-link>span{font:calc(16px * var(--a11y-text-scale,1))/1.4 var(--sans);display:block}
+.founder-tree-link>span>span,.founder-tree-link strong{display:block}
+.founder-tree-link strong{font-weight:700}
+.founder-tree-link:hover{background:#e6ecd544}
+.founder-tree-link:focus-visible{outline:3px solid var(--gold);outline-offset:4px}
+.founder-tree-link .founder-tree-arrow{position:absolute;top:47px;width:44px;height:32px;stroke:var(--gold);stroke-width:1.8;fill:none}
+.tree-unit [data-person-card="yona"] .founder-tree-arrow{left:-38px}
+.tree-unit [data-person-card="shlomo"] .founder-tree-arrow{right:-38px;transform:scaleX(-1)}
+.founder-tree-view{padding:18px 30px 38px;background:radial-gradient(ellipse at 50% 38%,#e9edda70,transparent 65%)}
+body[data-active-view="founder-tree"] :is(.workspace-actions,.workspace-footer,.gallery-header-upload-actions){display:none}
+.founder-tree-navigation{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px 24px;padding-block:0 20px;border-bottom:1px solid var(--line);font-size:calc(16px * var(--a11y-text-scale,1));color:var(--olive)}
+.founder-tree-navigation a{min-height:44px;display:inline-flex;align-items:center;padding:5px 0;text-decoration:underline;text-decoration-color:#b9a273;text-underline-offset:6px}
+.founder-tree-navigation a:hover{color:var(--gold)}
+.founder-tree-figure{margin:22px auto 0;max-width:780px;text-align:center}
+.founder-tree-art{display:block;width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 12px 20px #76623a14)}
+.founder-tree-figure figcaption{position:relative;margin-top:-8px}
+.founder-tree-person{display:inline-flex;flex-direction:column;align-items:center;gap:9px;padding:10px 22px;color:var(--olive);max-width:100%;border-radius:12px}
+.founder-tree-person:hover{background:#e9eddd80}
+.founder-tree-portrait{width:84px;height:96px;display:grid;place-items:center;overflow:hidden;position:relative;border:1px solid #b9a273;border-radius:46px 46px 8px 8px;background:var(--surface);padding:4px;box-shadow:0 0 0 4px var(--surface),0 0 0 5px var(--line);font-size:24px}
+.founder-tree-portrait>img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.founder-tree-person strong{font:600 calc(24px * var(--a11y-text-scale,1))/1.5 var(--serif);overflow-wrap:anywhere}
+.founder-tree-choice{display:flex;align-items:start;justify-content:center;gap:36px;padding-top:32px}
+.founder-tree-choice .founder-tree-link{position:relative;top:auto;width:min(44%,280px)}
+.founder-tree-choice .founder-tree-link>img{width:100%;height:auto}
+.founder-tree-choice .founder-tree-arrow{display:none}
+@media(max-width:700px){
+  .tree-viewport .tree-unit[data-unit="u-root"] .person-card .person-name{font-size:calc(14px * var(--a11y-text-scale,1));min-height:2.8em}
+  .tree-unit .founder-tree-link{top:-12px;width:148px;padding:2px;gap:2px}
+  .tree-unit [data-person-card="yona"]>.founder-tree-link{left:calc(100% + 15px)}
+  .tree-unit [data-person-card="shlomo"]>.founder-tree-link{right:calc(100% + 15px)}
+  .tree-unit .founder-tree-link>img{width:112px;height:112px}
+  .tree-unit .founder-tree-link .founder-tree-arrow{top:28px;width:35px}
+  .tree-unit [data-person-card="yona"] .founder-tree-arrow{left:-28px}
+  .tree-unit [data-person-card="shlomo"] .founder-tree-arrow{right:-28px}
+  .founder-tree-view{padding:10px 14px 28px}
+  .founder-tree-navigation{gap:6px 18px;font-size:calc(14px * var(--a11y-text-scale,1));padding-bottom:10px}
+  .founder-tree-figure{margin-top:24px}
+  .founder-tree-figure figcaption{margin-top:0}
+  .founder-tree-person strong{font-size:calc(23px * var(--a11y-text-scale,1))}
+  .founder-tree-choice{gap:16px}
+}

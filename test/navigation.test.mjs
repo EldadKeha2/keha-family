@@ -18,6 +18,16 @@ test('a shared family screensaver tab has a home parent and returns with the sel
  }
 });
 
+test('both founder trees return directly to the family tree after sharing, reload, Back and Forward',async()=>{
+  for(const phone of [false,true])for(const id of ['shlomo','yona']){
+    const f=fixture('https://family.test/?lang=en-GB#founder-tree/'+id,{phone}),length=f.history.length;
+    f.reload();assert.equal(f.history.length,length);
+    assert.equal(f.nav.returnTo('#tree'),true);await f.flush();assert.equal(f.location.hash,'#tree');
+    f.history.forward();await f.flush();assert.equal(f.location.hash,'#founder-tree/'+id);
+    assert.equal(f.location.search,'?lang=en-GB');
+  }
+});
+
 test('all direct game links have a lobby parent on desktop and in a phone app, including legacy links',async()=>{
   const ids=fixture('https://family.test/#games').nav.gameIds;
   for(const phone of [false,true])for(const id of ids)for(const legacy of [false,true]){

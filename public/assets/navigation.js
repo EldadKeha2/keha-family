@@ -2,7 +2,7 @@
   'use strict';
   const key='familyNavigation';
   const gameIds=['photos','kinship','missing','trivia','chick','differences','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
-  const views=new Set(['home','tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
+  const views=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const root=()=>matchMedia('(max-width:700px)').matches?'#home':'#tree';
   const path=url=>url.pathname+url.search+url.hash;
   const current=()=>new URL(location.href);
@@ -24,7 +24,8 @@
     const next=new URL(url);
     if(next.searchParams.has('media')){next.searchParams.delete('media');return next;}
     const [view,id]=next.hash.slice(1).split('/');
-    if(id&&['games','weddings','nursery','updates','memorial','nostalgia'].includes(view))next.hash='#'+view;
+    if(view==='founder-tree')next.hash='#tree';
+    else if(id&&['games','weddings','nursery','updates','memorial','nostalgia'].includes(view))next.hash='#'+view;
     else if(view==='person'&&id)next.hash='#directory';
     else if(views.has(view)&&next.hash!==root()&&view!=='home'&&view!=='tree')next.hash=root();
     else return null;
