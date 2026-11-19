@@ -8,7 +8,7 @@ const plain=value=>JSON.parse(JSON.stringify(value));
 
 // Model layout measurements and the animation frame queue, leaving actual pill
 // position, safe-area spacing and touch target appearance to phone browser QA.
-function fixture({mobile=true,view='home',markerTop=1800,height=800,english=false,reducedMotion=false,appReducedMotion=null}={}){
+function fixture({mobile=true,view='home',markerTop=1800,height=800,scrollTop=0,english=false,reducedMotion=false,appReducedMotion=null}={}){
   const nodes=new Map(),scrolls=[],observers=[],frames=new Map(),listenerOptions=[];let nextFrame=1,reads=0,dialogOpen=false;
   class Element extends EventTarget{
     constructor(){super();this.hidden=false;this.dataset={};this.attrs=new Map();this.textContent='';this.innerHTML='';}
@@ -24,7 +24,7 @@ function fixture({mobile=true,view='home',markerTop=1800,height=800,english=fals
   document.getElementById=id=>nodes.get(id)||null;document.querySelector=selector=>selector==='dialog[open]'?(dialogOpen?new Element():null):selector.startsWith('#')?nodes.get(selector.slice(1))||null:null;
   const window=new EventTarget(),nativeAdd=window.addEventListener.bind(window);
   window.addEventListener=(type,listener,options)=>{listenerOptions.push({type,options});return nativeAdd(type,listener,options);};
-  window.FamilyI18n={isEnglish:english};window.innerHeight=height;window.scrollBy=options=>scrolls.push(options);
+  window.FamilyI18n={isEnglish:english};window.innerHeight=height;window.scrollY=scrollTop;window.scrollBy=options=>scrolls.push(options);
   if(appReducedMotion!==null)window.FamilyAccessibility={isReducedMotion:()=>appReducedMotion};
   const viewport=new EventTarget();viewport.height=height;viewport.offsetTop=0;window.visualViewport=viewport;
   const queries=new Map();
@@ -42,7 +42,7 @@ function fixture({mobile=true,view='home',markerTop=1800,height=800,english=fals
   const hint=nodes.get('homeMoreHint');
   return {window,document,nodes,hint,scrolls,queries,observers,frames,listenerOptions,flush,get reads(){return reads;},
     position(top){markerTop=top;},
-    scroll(){window.dispatchEvent(new Event('scroll'));},
+    scroll(top=window.scrollY){window.scrollY=top;window.dispatchEvent(new Event('scroll'));},
     click(){hint.dispatchEvent(new Event('click'));},
     mobile(value){const media=matchMedia('(max-width: 700px)');media.matches=value;media.dispatchEvent(new Event('change'));flush();},
     motion(value){const media=matchMedia('(prefers-reduced-motion: reduce)');media.matches=value;media.dispatchEvent(new Event('change'));},
@@ -61,9 +61,13 @@ test('more-pages hint appears only on the phone homepage while remaining tiles a
   assert.equal(fixture({markerTop:650}).hint.hidden,true);
 });
 
-test('scrolling to the last homepage tile hides the hint, and scrolling back reveals it again',()=>{
-  const f=fixture();f.position(600);f.scroll();f.flush();assert.equal(f.hint.hidden,true);
-  f.position(1600);f.scroll();f.flush();assert.equal(f.hint.hidden,false);
+test('the first downward scroll hides the hint until the homepage returns to the top',()=>{
+  const f=fixture();f.scroll(1);f.flush();assert.equal(f.hint.hidden,true);
+  f.scroll(300);f.flush();assert.equal(f.hint.hidden,true);
+  f.mutate();assert.equal(f.hint.hidden,true);
+  f.scroll(100);f.flush();assert.equal(f.hint.hidden,true);
+  f.scroll(0);f.flush();assert.equal(f.hint.hidden,false);
+  assert.equal(fixture({scrollTop:300}).hint.hidden,true);
 });
 
 test('a hint tap moves down most of a screen and honors reduced motion',()=>{

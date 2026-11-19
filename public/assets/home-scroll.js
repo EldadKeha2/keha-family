@@ -9,7 +9,7 @@
   const viewport=()=>({height:window.visualViewport?.height||window.innerHeight,offset:window.visualViewport?.offsetTop||0});
   function update(){
     const visible=viewport();
-    hint.hidden=!phoneQuery.matches||document.body.dataset.activeView!=='home'||home.hidden||document.visibilityState==='hidden'||Boolean(document.querySelector('dialog[open]'))||end.getBoundingClientRect().bottom<=visible.offset+visible.height;
+    hint.hidden=!phoneQuery.matches||document.body.dataset.activeView!=='home'||home.hidden||window.scrollY>0||document.visibilityState==='hidden'||Boolean(document.querySelector('dialog[open]'))||end.getBoundingClientRect().bottom<=visible.offset+visible.height;
   }
   function schedule(){
     if(scheduled)return;
