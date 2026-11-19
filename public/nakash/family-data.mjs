@@ -24,6 +24,15 @@ const PEOPLE = [
   ['shalom-malkhi', 'שלום מלכי', 'Shalom Malkhi', 'm', 'u-nakash-naomi'],
   ['avner-nakash', 'אבנר נקאש', 'Avner Nakash', 'm', 'u-nakash-avner'],
   ['rivka-nakash', 'רבקה נקאש', 'Rivka Nakash', 'f', 'u-nakash-avner'],
+  // Immediate family from Haim and Shoshana's handwritten diagram. Keep the
+  // established Avner/Rivka IDs; the less legible descendant links need review.
+  ['doron-nir', 'דורון ניר', 'Doron Nir', 'm', 'u-nakash-doron', ['דורון נקאש', 'Doron Nakash']],
+  ['dvora-nir', 'דבורה', 'Dvora', 'f', 'u-nakash-doron'],
+  ['yossi-nakash', 'יוסי נקאש', 'Yossi Nakash', 'm', 'u-nakash-yossi'],
+  ['yona-yaakobi', 'יונה יעקבי', 'Yona Yaakobi', 'f', 'u-nakash-yona', ['יונה נקאש יעקבי']],
+  ['david-yaakobi', 'דוד יעקבי', 'David Yaakobi', 'm', 'u-nakash-yona', [], {deceased:true}],
+  ['alona-shai', 'אלונה', 'Alona', 'f', 'u-nakash-alona', ['אלונה שי', 'אלונה נקאש']],
+  ['yaakov-shai', 'יעקב שי', 'Yaakov Shai', 'm', 'u-nakash-alona'],
 ];
 
 const UNITS = [
@@ -31,14 +40,18 @@ const UNITS = [
   ['u-nakash-medina', ['ruma-nakash', 'joseph-medina'], ['u-nakash-roni'], ROOT_UNIT],
   ['u-root', ['yona', 'shlomo'], [], ROOT_UNIT],
   ['u-nakash-yehuda', ['yehuda-nakash', 'zehor'], ['u-nakash-naomi'], ROOT_UNIT],
-  ['u-nakash-haim', ['haim-nakash', 'shoshana'], ['u-nakash-avner'], ROOT_UNIT],
+  ['u-nakash-haim', ['haim-nakash', 'shoshana'], ['u-nakash-doron', 'u-nakash-yossi', 'u-nakash-yona', 'u-nakash-avner', 'u-nakash-alona'], ROOT_UNIT],
   ['u-nakash-roni', ['roni-medina', 'leah-medina'], [], 'u-nakash-medina', 'former'],
   ['u-nakash-naomi', ['naomi-malkhi', 'shalom-malkhi'], [], 'u-nakash-yehuda'],
   ['u-nakash-avner', ['avner-nakash', 'rivka-nakash'], [], 'u-nakash-haim'],
+  ['u-nakash-doron', ['doron-nir', 'dvora-nir'], [], 'u-nakash-haim'],
+  ['u-nakash-yossi', ['yossi-nakash'], [], 'u-nakash-haim'],
+  ['u-nakash-yona', ['yona-yaakobi', 'david-yaakobi'], [], 'u-nakash-haim'],
+  ['u-nakash-alona', ['alona-shai', 'yaakov-shai'], [], 'u-nakash-haim'],
 ];
 
 export function createFamily(keha = {}) {
-  const people = Object.assign(Object.create(null), Object.fromEntries(PEOPLE.map(([id, name, englishName, gender, unit, aliases]) => [id, {id, name, englishName, gender, unit, aliases}])));
+  const people = Object.assign(Object.create(null), Object.fromEntries(PEOPLE.map(([id, name, englishName, gender, unit, aliases, details]) => [id, {id, name, englishName, gender, unit, aliases, ...details}])));
   const units = Object.assign(Object.create(null), Object.fromEntries(UNITS.map(([id, members, children, parent = null, relationship = 'spouse']) => [id, {id, people: [...members], children: [...children], parent, relationship}])));
 
   // Read the existing Keha tree through its restricted projection. Traverse
