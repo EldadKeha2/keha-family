@@ -187,6 +187,40 @@ test('saving preserves face traversal order and focus after feedback, streamed d
  const ignored=saved[0];f.window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'face-ignore',item:{id:'tab-save',kind:'photo'},faces:[],ignoredFaces:[ignored.rect]}}));
  press({target:f.document.body});assert.equal(selected(),original[2],'A removed current face advances to the following surviving face');f.faces.clear();
 });
+test('Tab and automatic tagging pan a zoomed photo to distant faces while keeping the picker beside them',async()=>{
+ const regions=[{rect:{x:.04,y:.06,width:.06,height:.08},score:.95},{rect:{x:.47,y:.46,width:.06,height:.08},score:.95},{rect:{x:.9,y:.85,width:.06,height:.08},score:.95}];
+ for(const automatic of [false,true]){
+  const f=fixture(regions,{desktop:true}),person={id:'yona',name:'יונה'},saved=[];
+  f.window.FamilyTags.findPeople=async()=>{await new Promise(resolve=>setImmediate(resolve));return [person];};
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(path.endsWith('/save')){const input=JSON.parse(options.body),face={id:'saved-'+saved.length,rect:input.rect,personId:person.id,person};saved.push(face);return Response.json({faces:saved,face});}
+   return Response.json({faces:saved});
+  };
+  await f.mount('zoom-follow-'+automatic);for(let i=0;i<6;i++)f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');
+  const c=f.stage._familyFaceContext,scroll=c.scroller,surface=c.surface,zoom=c.zoom,rects=c.faces.map(face=>({...face.rect}));
+  if(automatic)f.window.FamilyMedia={refreshPhotoPresentation(){scroll.scrollLeft=scroll.scrollTop=0;}};
+  const check=rect=>{
+   assert.equal(c.zoom,zoom);assert.equal(c.active.rect.x,rect.x);assert.equal(c.active.rect.y,rect.y);
+   const width=parseFloat(surface.style.width),height=parseFloat(surface.style.height),clamp=(value,max)=>Math.max(0,Math.min(max,value));
+   assert.ok(Math.abs(scroll.scrollLeft-clamp((rect.x+rect.width/2)*width-scroll.clientWidth/2,width-scroll.clientWidth))<.001,'Selected face is centered horizontally or at the image edge');
+   assert.ok(Math.abs(scroll.scrollTop-clamp((rect.y+rect.height/2)*height-scroll.clientHeight/2,height-scroll.clientHeight))<.001,'Selected face is centered vertically or at the image edge');
+   const image=f.image.getBoundingClientRect(),face={left:image.left+rect.x*width,top:image.top+rect.y*height,width:rect.width*width,height:rect.height*height},panel=f.find('face-popover face-picker'),box=panel.getBoundingClientRect();
+   assert.ok(face.left>=-.001&&face.left+face.width<=scroll.clientWidth+.001);assert.ok(face.top>=99.999&&face.top+face.height<=100+scroll.clientHeight+.001);
+   assert.ok(box.left+box.width<=face.left||box.left>=face.left+face.width||box.top+box.height<=face.top||box.top>=face.top+face.height,'The picker does not cover the selected face');
+   assert.equal(f.document.activeElement,panel.querySelector('input'));
+  };
+  f.emit(f.stage,'click',{target:c.buttons.children[0],detail:0});check(rects[0]);
+  for(const rect of rects.slice(1)){
+   if(automatic){
+    const panel=f.find('face-popover face-picker'),host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];
+    await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();
+   }else f.emit(f.document,'keydown',{key:'Tab',target:f.document.activeElement});
+   check(rect);
+  }
+  f.emit(f.document,'keydown',{key:'Tab',shiftKey:true,target:f.document.activeElement});check(rects[1]);
+  assert.deepEqual(c.faces.filter(face=>!face.person).map(face=>({...face.rect})),rects.slice(automatic?2:0),'Panning never changes face coordinates');f.faces.clear();
+ }
+});
 test('Tab leaves unrelated fields, editing controls and modified keys alone, and selection ends on outside focus or another photo',async()=>{
  const f=fixture([first,second],{desktop:true});await f.mount('tab-guards');const hits=()=>f.find('face-hit-buttons').children,select=()=>f.emit(f.stage,'click',{target:hits()[0],detail:0}),press=properties=>f.emit(f.document,'keydown',{key:'Tab',target:f.document.activeElement,...properties});select();
  const panel=f.find('face-popover face-picker'),outside=f.document.createElement('input');f.dialog.append(outside);
@@ -891,7 +925,7 @@ test('backslash toggles the existing all-faces button in every album that offers
  }
 });
 
-test('backslash leaves typing, modified keys, hidden controls, other dialogs and face editing alone',async()=>{
+test('backslash leaves unrelated typing, modified keys, hidden controls, other dialogs and frame adjustment alone',async()=>{
  const f=fixture([],{desktop:true}),requests=[];f.window.FamilyI18n.fetch=async(path,options)=>{if(path.endsWith('/review'))requests.push(JSON.parse(options.body));return Response.json({faces:[],item:{id:'guarded',kind:'photo',scope:'gallery',faceSummary:{reviewed:true}}});};await f.mount('guarded',{}, {scope:'gallery'});
  const button=f.find('face-review-button'),press=properties=>f.emit(f.document,'keydown',{key:'\\',target:f.stage,...properties});
  for(const properties of [{key:'/'},{key:'|',shiftKey:true},{ctrlKey:true},{metaKey:true},{altKey:true},{shiftKey:true},{repeat:true},{isComposing:true}])assert.equal(press(properties).defaultPrevented,false);
@@ -907,10 +941,40 @@ test('backslash leaves typing, modified keys, hidden controls, other dialogs and
  f.dialog.open=false;assert.equal(press().defaultPrevented,false);f.dialog.open=true;
  const other=f.document.createElement('dialog'),otherField=f.document.createElement('div');other.open=true;other.append(otherField);f.document.body.append(other);
  assert.equal(press({target:otherField}).defaultPrevented,false);f.document.activeElement=otherField;assert.equal(press({target:f.document.body}).defaultPrevented,false);f.document.activeElement=null;assert.equal(press({target:f.document.body}).defaultPrevented,false);other.remove();
- const openPicker=()=>{const r=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,target:f.stage,clientX:r.left+r.width/2,clientY:r.top+r.height/2});};openPicker();assert.ok(f.find('face-popover face-picker'));assert.equal(press().defaultPrevented,false);
+ const openPicker=()=>{const r=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,target:f.stage,clientX:r.left+r.width/2,clientY:r.top+r.height/2});};openPicker();assert.ok(f.find('face-popover face-picker'));
  f.emit(f.find('face-popover face-picker').querySelector('[data-face-adjust]'),'click');assert.equal(press().defaultPrevented,false);f.faces.dismiss();await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,0);
  assert.equal(press({target:f.document.body}).defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);f.faces.clear();
  const absent=fixture([],{desktop:true});await absent.mount('native-photo',{}, {scope:'photos',collections:['photos']});assert.equal(absent.find('face-review-button'),undefined);assert.equal(absent.emit(absent.document,'keydown',{key:'\\',target:absent.stage}).defaultPrevented,false);absent.faces.clear();
+});
+
+test('backslash from a focused picker immediately closes it and confirms completion even when already reviewed',async()=>{
+ for(const initiallyReviewed of [false,true])for(const code of ['Backslash','IntlBackslash']){
+  const f=fixture([],{desktop:true}),requests=[],changes=[],person={id:'yona',name:'יונה'};let reviewed=initiallyReviewed,finish;
+  const item=()=>({id:'picker-review',kind:'photo',scope:'gallery',tags:[person],faceSummary:{reviewed}});
+  f.window.addEventListener('family-media-changed',event=>changes.push(event.detail));
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   if(path.endsWith('/review')){requests.push(JSON.parse(options.body));await new Promise(resolve=>finish=resolve);reviewed=requests.at(-1).complete;return Response.json({operation:'face-review',scope:'gallery',item:item()});}
+   return Response.json({faces:[{...first,id:'named',personId:person.id,person}],item:item()});
+  };
+  await f.mount('picker-review',{},item());await new Promise(resolve=>setImmediate(resolve));f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});
+  const panel=f.find('face-popover face-picker'),input=panel.querySelector('input');input.tagName='input';input.value='unfinished search';
+  for(const extra of [{repeat:true},{isComposing:true},{ctrlKey:true},{metaKey:true},{altKey:true},{shiftKey:true}])assert.equal(f.emit(f.document,'keydown',{key:'\\',target:input,...extra}).defaultPrevented,false);
+  assert.equal(f.find('face-popover face-picker'),panel);
+  assert.equal(f.emit(f.document,'keydown',{key:'\\',code,target:input}).defaultPrevented,true);
+  assert.equal(f.find('face-popover face-picker'),undefined,'Close before waiting for the network');assert.equal(f.stage._familyFaceContext.tabFace,null);assert.equal(f.document.activeElement,f.find('face-review-button'));assert.equal(input.value,'unfinished search');
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);assert.equal(requests[0].complete,true);assert.equal(changes.filter(change=>change.reviewShowAll).length,0,'Only a successful confirmation changes the category');
+  assert.equal(f.emit(f.document,'keydown',{key:'\\',repeat:true,target:f.document.activeElement}).defaultPrevented,false);finish();await f.faces.flush();
+  assert.equal(reviewed,true);assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(changes.at(-1).reviewShowAll,true);assert.equal(requests.length,1);f.faces.clear();
+ }
+});
+
+test('a failed picker completion leaves the photo unreviewed and permits retry without a category change',async()=>{
+ const f=fixture([first],{desktop:true}),changes=[];let fail=true;
+ f.window.addEventListener('family-media-changed',event=>changes.push(event.detail));
+ f.window.FamilyI18n.fetch=async(path)=>path.endsWith('/review')?(fail?Response.json({error:'save failed'},{status:409}):Response.json({operation:'face-review',scope:'gallery',item:{id:'retry-review',kind:'photo',scope:'gallery',faceSummary:{reviewed:true}}})):Response.json({faces:[]});
+ await f.mount('retry-review',{}, {scope:'gallery'});const open=()=>f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});open();
+ f.emit(f.document,'keydown',{key:'\\',target:f.document.activeElement});await f.faces.flush();assert.equal(changes.filter(change=>change.reviewShowAll).length,0);assert.equal(f.find('face-review-button')['aria-pressed'],'false');assert.equal(f.find('face-review-status').hidden,false);assert.equal(f.find('face-review-status').textContent,'save failed');
+ fail=false;open();f.emit(f.document,'keydown',{key:'\\',target:f.document.activeElement});await f.faces.flush();assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(changes.at(-1).reviewShowAll,true);f.faces.clear();
 });
 
 test('holding backslash cannot repeat a save or approve the next photo after navigation',async()=>{

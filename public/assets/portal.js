@@ -87,7 +87,7 @@
     const collection = state.collections[kind], query = normalize(state.query),items=kind==='videos'?(window.FamilyVideoFilter?.filter(collection.items)||collection.items):collection.items;
     const filtered = kind==='gallery'?items.filter(item=>galleryPage.filter==='untagged'?!item.tags?.length&&!item.faceSummary?.reviewed:galleryPage.filter==='partial'?item.faceSummary?.partial:galleryPage.filter==='complete'?item.faceSummary?.reviewed:true):items.filter(item => !query || normalize(item.caption+' '+item.name+' '+(item.tags||[]).map(person=>I18n.searchNames(person)).join(' ')).includes(query));
     const isVideo = kind === 'videos',compact=kind==='gallery',untagged=compact&&galleryPage.filter==='untagged',partial=compact&&galleryPage.filter==='partial',complete=compact&&galleryPage.filter==='complete';
-    window.FamilyMedia.register(kind,filtered,{retainCurrent:compact&&!reviewNavigation,advanceRemoved:compact&&reviewNavigation&&(untagged||partial),pagination:compact?collection.pagination:undefined});
+    window.FamilyMedia.register(kind,filtered,{retainCurrent:compact&&(!reviewNavigation||galleryPage.filter==='all'),advanceRemoved:compact&&reviewNavigation&&(untagged||partial),pagination:compact?collection.pagination:undefined});
     if(isVideo)window.FamilyVideoCategories?.render(collection.categories);
     $(collectionId(kind,'Count')).textContent = collection.items.length ? I18n.html`${filtered.length}${filtered.length!==collection.items.length?I18n.t(' מתוך ')+collection.items.length:''} ${I18n.isEnglish?(isVideo?I18n.word(filtered.length,'video','videos'):I18n.word(filtered.length,'photo','photos')):(isVideo?I18n.t('סרטונים'):I18n.t('תמונות'))} באלבום המשותף` : isVideo?I18n.t('רגעים ששווה לראות שוב'):I18n.t('אלבום משותף לכל המשפחה');
     $(collectionId(kind,'Empty')).hidden = (compact?filtered:collection.items).length > 0;
@@ -352,12 +352,17 @@
         }
         return;
       }
-      const result=event.detail,kind=result.scope;if(!['photos','videos','gallery'].includes(kind))return;
-      if(kind==='gallery'&&result.operation==='face-review'&&result.item){
+      const result=event.detail,kind=result.scope;
+      if(result.operation==='face-review'&&result.item&&(kind==='gallery'||result.reviewShowAll&&window.FamilyMedia.isOpen?.('gallery'))){
         galleryDeferred=false;
         state.collections.gallery.items=state.collections.gallery.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
+        if(result.reviewShowAll&&result.item.faceSummary?.reviewed){
+          galleryPage.filter='all';galleryPage.page=1;window.FamilyGalleryFilter?.category('all');
+          for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter==='all'));
+        }
         revisions.gallery=null;refreshCollection('gallery',true,{reviewNavigation:true});return;
       }
+      if(!['photos','videos','gallery'].includes(kind))return;
       if(kind==='gallery'&&holdGallery()&&result.item&&['tags','faces','face-detection','face-review','face-ignore'].includes(result.operation)){
         // Tags are saved immediately. Keep this gallery session's cards and
         // category counts stable until the visitor closes the photo viewer.

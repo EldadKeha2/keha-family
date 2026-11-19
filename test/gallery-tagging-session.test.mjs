@@ -53,7 +53,7 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
   open:id=>window.FamilyMedia.openFrom('gallery',id),close:()=>get('closeMediaViewer').click(),poll:()=>intervals.forEach(fn=>fn()),defer(){nextDeferred=true;},
   change(id,operation='tags',tagCount=1){const item=server.find(i=>i.id===id);item.tags=Array.from({length:tagCount},(_,i)=>({id:'person-'+i,name:'Person '+i}));item.tagsRevision='tags-'+(++revision);item.faceSummary={total:2,unmatched:2-tagCount,partial:tagCount>0,reviewed:false};window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation,scope:'gallery',item:structuredClone(item)}}));},
   edit(id){const item=server.find(i=>i.id===id);item.photoRevision='edit-'+(++revision);item.src='/media/'+id+'?v='+item.photoRevision;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'photo-edit',scope:'gallery',item:structuredClone(item)}}));return item.src;},
-  review(id,complete=true){const item=server.find(i=>i.id===id);item.faceSummary={...item.faceSummary,reviewed:complete,partial:!complete&&item.tags.length>0};revision++;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'face-review',scope:'gallery',item:structuredClone(item)}}));},
+  review(id,complete=true,reviewShowAll=false){const item=server.find(i=>i.id===id);item.faceSummary={...item.faceSummary,reviewed:complete,partial:!complete&&item.tags.length>0};revision++;window.dispatchEvent(new CustomEvent('family-media-changed',{detail:{operation:'face-review',scope:item.scope,item:structuredClone(item),reviewShowAll}}));},
   get cards(){return get('sharedGalleryGrid').children.map(card=>card.dataset.mediaFile);}
  };
 }
@@ -135,6 +135,25 @@ test('a gallery response requested before opening the photo cannot apply midway 
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.defer();f.poll();assert.equal(f.pending.length,1);f.open('a');f.change('a');f.change('a','face-detection');f.pending.shift()();await f.flush();
  assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/a');assert.deepEqual(f.cards,['a.jpg','b.jpg']);
  f.review('a');await f.flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/b');f.close();await f.flush();assert.deepEqual(f.cards,['b.jpg']);assert.equal(f.window.FamilyPortal.galleryQuery().filter,'untagged');
+});
+
+test('picker shortcut completion selects All and preserves the current photo from every tagging category and page',async()=>{
+ for(const phone of [false,true])for(const filter of ['all','untagged','partial','complete'])for(const deferred of [false,true]){
+  const items=Array.from({length:205},(_,i)=>photo(String(i),filter==='untagged'?[]:[{id:'person-0'}]));
+  if(filter==='complete')for(const item of items){item.faceSummary.reviewed=true;item.faceSummary.partial=false;}
+  const f=fixture(items,{phone,allPageSize:100,routing:true});await f.flush();if(filter!=='all'){f.filter(filter);await f.flush();}await f.window.FamilyPortal.sortGallery('taken-asc');await f.window.FamilyPortal.pageGallery(2);await f.flush();f.open('150');
+  if(deferred){f.defer();f.poll();}
+  f.review('150',true,true);if(deferred){assert.equal(f.pending.length,1);f.pending.shift()();}await f.flush();
+  assert.equal(f.window.FamilyPortal.galleryQuery().filter,'all');assert.equal(f.filters[0].getAttribute('aria-pressed'),'true');assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/150');assert.equal(f.server[150].faceSummary.reviewed,true);assert.equal(f.window.FamilyPortal.galleryQuery().sort,'taken-asc');
+  f.close();await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().filter,'all');
+ }
+});
+
+test('picker confirmation switches the active gallery to All for photos originating in other albums',async()=>{
+ for(const scope of ['photos','personal:yona']){
+  const item={...photo('linked',[{id:'yona'}]),scope,collections:[scope,'gallery']},f=fixture([item]);await f.flush();f.filter('partial');await f.flush();f.open(item.id);f.review(item.id,true,true);await f.flush();
+  assert.equal(f.window.FamilyPortal.galleryQuery().filter,'all');assert.equal(f.get('mediaViewer').open,true);assert.equal(f.get('mediaOriginal').href,'/media/linked');assert.equal(f.server[0].faceSummary.reviewed,true);
+ }
 });
 
 test('completion keeps partial selected, advances to its next photo and puts only the completed photo in complete',async()=>{
