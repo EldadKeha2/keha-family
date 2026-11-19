@@ -63,6 +63,7 @@
       if(Date.now()-start.time<=4000&&Math.abs(dx)>=distance&&Math.abs(dx)>=Math.abs(dy)*1.5){blockClick();nativeEnd?.(dx);}
     };
     document.addEventListener('pointerdown',event=>{
+      verticalWheel?.reset();
       if(touchOnly())return;
       if(gesture&&event.pointerId!==gesture.id){blockClick();reset();}
       if(pickerAt(event)&&!stage.contains?.(event.target))begin(event);
@@ -220,6 +221,7 @@
     stage.addEventListener('click',event=>{
       if(event.detail!==0&&Date.now()<suppressClickUntil){event.preventDefault();event.stopImmediatePropagation();}
     },{capture:true});
+    document.addEventListener('keydown',()=>verticalWheel?.reset(),{capture:true});
     window.addEventListener('blur',reset);
     document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
     return {reset,isActive:()=>Boolean(gesture||touchStart||wheelGesture),whenIdle:()=>gesture||touchStart&&!touchStart.native||wheelGesture?new Promise(resolve=>idle.add(resolve)):null};

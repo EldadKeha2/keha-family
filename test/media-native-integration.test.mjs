@@ -889,6 +889,13 @@ test('released vertical pad flicks can browse fitted photos without scroll space
  }
 });
 
+test('starting a new click or keyboard action cancels a pending vertical flick before tagging can begin',async()=>{
+ for(const supported of [true,false])for(const type of ['pointerdown','keydown']){
+  const f=fixture({supported});await f.open();const image=f.get('mediaStage').querySelector('img');for(const deltaY of [-90,-40,-12])f.emit(image,'wheel',{deltaX:0,deltaY});
+  f.emit(f.document.body,type,type==='keydown'?{key:'Shift'}:{pointerType:'mouse',pointerId:19,isPrimary:true,button:0});await new Promise(resolve=>setTimeout(resolve,150));await flush();assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+ }
+});
+
 test('opening Labels restores scrolling everywhere until the dropdown is closed again',async()=>{
  for(const supported of [true,false]){
   const f=fixture({supported});await f.open();
