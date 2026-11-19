@@ -353,13 +353,9 @@
         return;
       }
       const result=event.detail,kind=result.scope;
-      if(result.operation==='face-review'&&result.item&&(kind==='gallery'||result.reviewShowAll&&window.FamilyMedia.isOpen?.('gallery'))){
+      if(result.operation==='face-review'&&result.item&&(kind==='gallery'||window.FamilyMedia.isOpen?.('gallery'))){
         galleryDeferred=false;
         state.collections.gallery.items=state.collections.gallery.items.map(item=>item.id===result.item.id?{...item,...result.item}:item);
-        if(result.reviewShowAll&&result.item.faceSummary?.reviewed){
-          galleryPage.filter='all';galleryPage.page=1;window.FamilyGalleryFilter?.category('all');
-          for(const button of document.querySelectorAll('[data-gallery-filter]'))button.setAttribute('aria-pressed',String(button.dataset.galleryFilter==='all'));
-        }
         revisions.gallery=null;refreshCollection('gallery',true,{reviewNavigation:true});return;
       }
       if(!['photos','videos','gallery'].includes(kind))return;

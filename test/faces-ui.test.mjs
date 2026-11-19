@@ -962,9 +962,9 @@ test('backslash from a focused picker immediately closes it and confirms complet
   assert.equal(f.find('face-popover face-picker'),panel);
   assert.equal(f.emit(f.document,'keydown',{key:'\\',code,target:input}).defaultPrevented,true);
   assert.equal(f.find('face-popover face-picker'),undefined,'Close before waiting for the network');assert.equal(f.stage._familyFaceContext.tabFace,null);assert.equal(f.document.activeElement,f.find('face-review-button'));assert.equal(input.value,'unfinished search');
-  await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);assert.equal(requests[0].complete,true);assert.equal(changes.filter(change=>change.reviewShowAll).length,0,'Only a successful confirmation changes the category');
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);assert.equal(requests[0].complete,true);assert.equal(changes.filter(change=>change.operation==='face-review').length,0,'Wait for a successful confirmation before updating the gallery');
   assert.equal(f.emit(f.document,'keydown',{key:'\\',repeat:true,target:f.document.activeElement}).defaultPrevented,false);finish();await f.faces.flush();
-  assert.equal(reviewed,true);assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(changes.at(-1).reviewShowAll,true);assert.equal(requests.length,1);f.faces.clear();
+  assert.equal(reviewed,true);assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(changes.at(-1).operation,'face-review');assert.equal('reviewShowAll' in changes.at(-1),false,'Picker confirmation must preserve the selected gallery filter');assert.equal(requests.length,1);f.faces.clear();
  }
 });
 
@@ -973,8 +973,8 @@ test('a failed picker completion leaves the photo unreviewed and permits retry w
  f.window.addEventListener('family-media-changed',event=>changes.push(event.detail));
  f.window.FamilyI18n.fetch=async(path)=>path.endsWith('/review')?(fail?Response.json({error:'save failed'},{status:409}):Response.json({operation:'face-review',scope:'gallery',item:{id:'retry-review',kind:'photo',scope:'gallery',faceSummary:{reviewed:true}}})):Response.json({faces:[]});
  await f.mount('retry-review',{}, {scope:'gallery'});const open=()=>f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});open();
- f.emit(f.document,'keydown',{key:'\\',target:f.document.activeElement});await f.faces.flush();assert.equal(changes.filter(change=>change.reviewShowAll).length,0);assert.equal(f.find('face-review-button')['aria-pressed'],'false');assert.equal(f.find('face-review-status').hidden,false);assert.equal(f.find('face-review-status').textContent,'save failed');
- fail=false;open();f.emit(f.document,'keydown',{key:'\\',target:f.document.activeElement});await f.faces.flush();assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(changes.at(-1).reviewShowAll,true);f.faces.clear();
+ f.emit(f.document,'keydown',{key:'\\',target:f.document.activeElement});await f.faces.flush();assert.equal(changes.filter(change=>change.operation==='face-review').length,0);assert.equal(f.find('face-review-button')['aria-pressed'],'false');assert.equal(f.find('face-review-status').hidden,false);assert.equal(f.find('face-review-status').textContent,'save failed');
+ fail=false;open();f.emit(f.document,'keydown',{key:'\\',target:f.document.activeElement});await f.faces.flush();assert.equal(f.find('face-review-button')['aria-pressed'],'true');assert.equal(changes.at(-1).operation,'face-review');assert.equal('reviewShowAll' in changes.at(-1),false);f.faces.clear();
 });
 
 test('holding backslash cannot repeat a save or approve the next photo after navigation',async()=>{

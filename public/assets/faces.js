@@ -612,12 +612,12 @@
       }
       c.reviewButton.hidden=false;
       if(!c.reviewButton.isConnected){if(reviewHost)reviewHost.append(c.reviewButton);else{const title=document.getElementById('mediaViewerTitle'),edit=document.getElementById('editOpenedPhoto');title.insertBefore(c.reviewButton,edit.parentNode===title?edit:null);}}
-      c.saveReview=async({complete,showAll=false}={})=>{
+      c.saveReview=async({complete}={})=>{
         if(!live(c)||c.reviewSaving||c.saving)return;c.reviewSaving=true;c.reviewError=false;c.reviewButton.disabled=true;c.reviewButton.setAttribute('aria-busy','true');c.reviewStatus.hidden=true;c.reviewStatus.textContent='';
         try{
           await c.loading;if(!c.adapter)await window.FamilyTags?.flush?.(c.item.id);if(!live(c))return;
           const payload={complete:complete??!c.reviewed,photoRevision:c.item.photoRevision||'original',tagsRevision:c.item.tagsRevision||'empty'},result=c.adapter?await c.adapter.review(payload):await request('api/media/'+item.id+'/faces/review',{method:'POST',body:JSON.stringify(payload)});
-          changed(c,showAll?{...result,reviewShowAll:true}:result);
+          changed(c,result);
           if(live(c)){c.item={...c.item,...result.item};c.reviewed=Boolean(result.item.faceSummary?.reviewed);closePopup(c);paint(c);announce(c,c.reviewed?tr('כל הפרצופים תויגו.','All faces tagged.'):tr('אישור התיוג בוטל.','Tagging confirmation removed.'));}
         }catch(error){c.reviewError=true;if(live(c)){c.reviewStatus.hidden=false;c.reviewStatus.textContent=error.message;}}
         finally{c.reviewSaving=false;if(live(c)){c.reviewButton.disabled=false;c.reviewButton.setAttribute('aria-busy','false');if(!c.adapter)refreshPhotoPresentation(c);}}
@@ -688,7 +688,7 @@
       const activeDialog=target?.closest?.('dialog[open]')||document.activeElement?.closest?.('dialog[open]')||[...document.querySelectorAll('dialog[open]')].at(-1);
       if(activeDialog&&activeDialog!==c.dialog)return;
       event.preventDefault();event.stopPropagation();
-      if(picker){stopTabFaces(c);closePopup(c);button.focus({preventScroll:true});c.pendingSave=c.saveReview({complete:true,showAll:true});}
+      if(picker){stopTabFaces(c);closePopup(c);button.focus({preventScroll:true});c.pendingSave=c.saveReview({complete:true});}
       else button.click();
     },{capture:true});
     on(document,'keyup',event=>{
