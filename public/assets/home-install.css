@@ -13,6 +13,17 @@
 .home-install .home-install-status[data-install-feedback]{inset-inline-start:auto;left:var(--install-feedback-left);right:auto;top:var(--install-feedback-top);bottom:auto;transform:none;max-width:var(--install-feedback-width);padding:8px 10px;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.5}
 .home-install-dialog{box-sizing:border-box;width:calc(100% - 28px);max-width:480px;max-height:calc(100dvh - 32px);margin:auto;padding:25px 23px 22px;border:1px solid #beaa7d;border-radius:15px;background:#fcf8ed;color:#635739;text-align:start;overflow:auto;overscroll-behavior:contain;box-shadow:0 14px 65px #30291840}
 .home-install-dialog::backdrop{background:#302b235e}
+.home-install-dialog[data-home-install-kind=share-choice]{max-width:440px;padding:24px 20px 22px}
+.home-install-dialog .home-share-choices{display:grid;gap:12px;margin-top:20px}
+.home-install-dialog .home-share-choice{display:flex;align-items:center;gap:14px;width:100%;min-height:94px;padding:16px 14px;border:1px solid #b5c19f;border-radius:12px;background:#f1f4e9;color:var(--olive,#59664d);text-align:start}
+.home-install-dialog .home-share-choice:hover{border-color:#708258;background:#e8efdb}
+.home-install-dialog .home-share-choice:focus-visible{outline:3px solid #59664d;outline-offset:3px}
+.home-install-dialog .home-share-choice>span:last-child{min-width:0;flex:1}
+.home-install-dialog .home-share-choice strong{display:block;font:700 calc(19px * var(--a11y-text-scale,1))/1.45 var(--sans)}
+.home-install-dialog .home-share-choice small{display:block;margin-top:4px;font:calc(15px * var(--a11y-text-scale,1))/1.6 var(--sans);color:#6d745f}
+.home-share-choice-icon{width:42px;height:42px;flex:0 0 42px;display:grid;place-items:center;border:1px solid #d0d8bd;border-radius:10px;background:#fffdf8}
+.home-share-choice-icon svg{display:block;width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:360px){.home-install-dialog .home-share-choice{gap:10px;padding:14px 10px}.home-share-choice-icon{width:34px;height:34px;flex-basis:34px}.home-install-dialog .home-share-choice strong{font-size:calc(18px * var(--a11y-text-scale,1))}}
 .home-install-dialog h2{margin:12px 0 7px;padding-inline-end:22px;font:calc(27px * var(--a11y-text-scale,1))/1.4 var(--serif);color:#5e714b}
 .home-install-dialog h3{font:600 calc(17px * var(--a11y-text-scale,1))/1.5 var(--sans);color:#5e714b;margin:20px 0 7px}
 .home-install-dialog-icon{display:block;width:48px;height:48px;margin-block-start:34px;margin-inline:auto;border:1px solid #d4c4a0;border-radius:12px}

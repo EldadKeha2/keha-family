@@ -247,10 +247,17 @@ test('English toolbar and platform instructions contain localized visible copy',
   assert.equal(f.button().getAttribute('aria-label'),'Install site shortcut');assert.equal(f.button().textContent,'Install');assert.match(f.dialog.innerHTML,/Share/);assert.doesNotMatch(f.card.innerHTML+f.dialog.innerHTML,/[\u0590-\u05ff]/);
 });
 
-test('share on phones and computers sends the same localized installation invitation only after a tap',async()=>{
+function shareWebsite(f){
+  f.click(f.card.querySelector('[data-home-install-share]'));
+  const choice=f.dialog.querySelector('[data-home-share-site]');if(choice)f.click(choice);
+}
+
+test('general sharing keeps the existing localized invitation after the phone scope choice',async()=>{
   for(const mobile of [true,false]){
     const f=fixture({mobile,share:'works',english:true,userAgent:mobile?'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36'});assert.equal(f.shared.length,0);assert.equal(f.card.hidden,false);
-    f.click(f.card.querySelector('[data-home-install-share]'));assert.equal(f.shared.length,1);await tick();
+    f.click(f.card.querySelector('[data-home-install-share]'));
+    if(mobile){assert.equal(f.shared.length,0);assert.equal(f.dialog.open,true);f.click(f.dialog.querySelector('[data-home-share-site]'));}
+    assert.equal(f.shared.length,1);await tick();
     assert.equal(f.copied.length,0);assert.equal(f.shared[0].title,'Keha Family Home');
     assert.equal(f.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
     assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
@@ -259,18 +266,18 @@ test('share on phones and computers sends the same localized installation invita
 });
 
 test('cancelling the native share sheet is silent and does not copy anything',async()=>{
-  const f=fixture({share:'AbortError'});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
+  const f=fixture({share:'AbortError'});shareWebsite(f);await tick();
   assert.equal(f.shared.length,1);assert.equal(f.copied.length,0);assert.equal(f.card.querySelector('[data-home-install-share-status]').textContent,'');
   assert.ok(!f.nodes.get('homeInstallShareLink')||f.nodes.get('homeInstallShareLink').hidden);assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
 });
 
 test('missing or failed Web Share copies the invitation, and unavailable clipboard exposes a selected readable invitation',async()=>{
   for(const share of ['missing','NotAllowedError']){
-    const f=fixture({share});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
+    const f=fixture({share});shareWebsite(f);await tick();
     assert.deepEqual(f.copied,['https://family.example/?lang=he&install=1#home']);assert.ok(!f.nodes.get('homeInstallShareLink')||f.nodes.get('homeInstallShareLink').hidden);
   }
   for(const clipboard of ['missing','blocked']){
-    const f=fixture({clipboard});f.click(f.card.querySelector('[data-home-install-share]'));await tick();
+    const f=fixture({clipboard});shareWebsite(f);await tick();
     const input=f.nodes.get('homeInstallShareLink');assert.equal(f.dialog.open,true);assert.equal(input.hidden,false);assert.equal(input.selected,true);
     assert.equal(input.value,'https://family.example/?lang=he&install=1#home');assert.equal(f.document.activeElement,input);
     assert.equal(f.dialog.querySelector('label[for="homeInstallShareLink"]').hidden,false);
@@ -280,7 +287,7 @@ test('missing or failed Web Share copies the invitation, and unavailable clipboa
 
 test('an installed sender shares an installation invitation that an independent recipient can install',async()=>{
   const sender=fixture({standalone:true,share:'works',english:true}),senderOffer=sender.offer();
-  sender.click(sender.card.querySelector('[data-home-install-share]'));await tick();
+  shareWebsite(sender);await tick();
   assert.equal(senderOffer.calls,0);assert.equal(sender.shared.length,1);
   assert.equal(sender.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
   const recipient=fixture({entryUrl:sender.shared[0].url,english:true});await tick();
@@ -290,6 +297,48 @@ test('an installed sender shares an installation invitation that an independent 
   const recipientOffer=recipient.offer({outcome:'accepted'});assert.equal(recipientOffer.calls,0);
   recipient.click(recipient.dialog.querySelector('[data-home-install-invite-start]'));await tick();
   assert.equal(recipientOffer.calls,1);assert.equal(senderOffer.calls,0);
+});
+
+test('phone sharing first offers two clearly described scopes and closing it shares nothing',async()=>{
+  for(const nativeDialog of [true,false])for(const english of [false,true]){
+    const f=fixture({nativeDialog,english,share:'works'}),trigger=f.card.querySelector('[data-home-install-share]');
+    f.click(trigger);assert.equal(f.dialog.open,true);assert.equal(f.shared.length,0);assert.equal(f.copied.length,0);
+    assert.ok(f.dialog.querySelector('[data-home-share-page]'));assert.ok(f.dialog.querySelector('[data-home-share-site]'));
+    assert.equal(f.dialog.getAttribute('aria-describedby'),'homeShareChoiceIntro');
+    assert.equal(trigger.getAttribute('aria-haspopup'),'dialog');assert.equal(trigger.getAttribute('aria-controls'),'homeInstallDialog');
+    assert.match(f.dialog.innerHTML,english?/A direct link to the page you are viewing/:/קישור ישיר לעמוד שבו אתם נמצאים/);
+    if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
+    f.click(f.dialog.querySelector('[data-home-install-close]'));await tick();
+    assert.equal(f.dialog.open,false);assert.equal(f.shared.length,0);assert.equal(f.copied.length,0);assert.equal(f.document.activeElement,trigger);
+  }
+});
+
+test('page sharing preserves the current nested route and language without adding an installation invitation',async()=>{
+  const f=fixture({english:true,share:'works',standalone:true,entryUrl:'https://family.example/?lang=en-US#founder-tree/yona'});
+  f.click(f.card.querySelector('[data-home-install-share]'));
+  f.click(f.dialog.querySelector('[data-home-share-page]'));
+  assert.equal(f.shared.length,1,'Native sharing starts directly in the choice tap');await tick();
+  assert.equal(f.shared[0].url,'https://family.example/?lang=en-US#founder-tree/yona');assert.equal(f.dialog.open,false);assert.equal(f.copied.length,0);
+  f.location.hash='#person/shlomo';f.click(f.card.querySelector('[data-home-install-share]'));f.click(f.dialog.querySelector('[data-home-share-page]'));await tick();
+  assert.equal(f.shared[1].url,'https://family.example/?lang=en-US#person/shlomo');assert.doesNotMatch(f.shared[1].text,/Install/);
+});
+
+test('page-share copy and manual fallbacks retain the chosen page instead of the home invitation',async()=>{
+  for(const clipboard of ['works','blocked','missing']){
+    const f=fixture({clipboard,entryUrl:'https://family.example/?lang=he#person/yona'});
+    f.click(f.card.querySelector('[data-home-install-share]'));f.click(f.dialog.querySelector('[data-home-share-page]'));await tick();
+    const expected='https://family.example/?lang=he#person/yona';
+    if(clipboard==='works'){assert.deepEqual(f.copied,[expected]);assert.equal(f.dialog.open,false);}
+    else{assert.equal(f.dialog.open,true);assert.equal(f.dialog.querySelector('#homeInstallShareLink').value,expected);assert.match(f.dialog.innerHTML,/שיתוף העמוד הנוכחי/);assert.doesNotMatch(f.dialog.innerHTML,/קישור להתקנת/);}
+    assert.equal(f.card.querySelector('[data-home-install-share]').disabled,false);
+  }
+});
+
+test('sharing a subscription settings page does not disclose its private management link',async()=>{
+  const f=fixture({share:'works',entryUrl:'https://family.example/?lang=he#updates/manage/private-token'});
+  f.click(f.card.querySelector('[data-home-install-share]'));f.click(f.dialog.querySelector('[data-home-share-page]'));await tick();
+  assert.equal(f.shared[0].url,'https://family.example/?lang=he#updates');
+  assert.doesNotMatch(f.shared[0].url,/private-token/);
 });
 
 test('incoming invitation waits for DOM readiness and a user tap before prompting',async()=>{
@@ -503,7 +552,7 @@ test('translated installer continues to the English home only when Continue is c
   }
   const help=fixture({recordNavigation:true,share:'works'});help.click(help.button());await tick();help.click(help.dialog.querySelector('[data-home-install-language]'));
   assert.deepEqual(help.assignments,[]);help.click(help.dialog.querySelector('[data-home-install-close]'));assert.deepEqual(help.assignments,[]);assert.equal(help.button().textContent,'התקן');
-  help.click(help.card.querySelector('[data-home-install-share]'));await tick();assert.equal(help.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
+  shareWebsite(help);await tick();assert.equal(help.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
 });
 
 test('manifest has a stable identity, home launch and real correctly sized phone icons',async()=>{

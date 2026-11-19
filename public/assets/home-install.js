@@ -69,6 +69,8 @@
   }
   function showDialog(kind,returnFocus){
     dialogKind=kind;dialogReturnFocus=returnFocus;
+    dialog.setAttribute('data-home-install-kind',kind);
+    if(kind==='share-choice')dialog.setAttribute('aria-describedby','homeShareChoiceIntro');else dialog.removeAttribute('aria-describedby');
     dialog.setAttribute('dir',english?'ltr':'rtl');
     dialog.setAttribute('data-ios-guide',String(ios&&['invite','install'].includes(kind)&&!hasInstalledShortcut()));
     dialog.querySelector('[data-home-install-close]').addEventListener('click',()=>closeDialog());
@@ -111,26 +113,52 @@
     dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירה','Close')+'">×</button>'+languageControl()+'<div class="home-install-success-mark" aria-hidden="true">✓</div><div data-home-install-success role="status" aria-live="polite"><h2 id="homeInstallTitle">'+(successConfirmedByUser?tr('האייקון מוכן!','Your icon is ready!'):tr('ההתקנה הושלמה','Installation complete'))+'</h2><p class="home-install-dialog-intro">'+tr('בית משפחת קהא במרחק נגיעה.','Keha Family Home is just a tap away.')+'</p></div><button type="button" class="home-install-invite-primary" data-home-install-success-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
     dialog.querySelector('[data-home-install-success-browse]').addEventListener('click',continueToSite);showDialog('success',returnFocus);
   }
-  function openShareFallback(){
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת השיתוף','Close sharing')+'">×</button><h2 id="homeInstallTitle">'+tr('שולחים קישור להתקנה','Share an installation link')+'</h2><p class="home-install-dialog-intro">'+tr('הקישור יפתח אצל בני המשפחה את אפשרות הוספת האתר למסך הבית. העתיקו אותו ושלחו בווטסאפ.','This link opens the option to add the website to your family’s home screen. Copy it and send it on WhatsApp.')+'</p><div class="home-install-link-tools"><label for="homeInstallShareLink">'+tr('קישור להתקנת קיצור דרך','Shortcut installation link')+'</label><input id="homeInstallShareLink" value="'+escape(invitationURL.href)+'" readonly dir="ltr"></div>';
+  function websiteSharePayload(){
+    return {title:tr('בית משפחת קהא','Keha Family Home'),text:tr('בית משפחת קהא במסך הבית שלכם. פתחו את הקישור ולחצו ״התקן״.','Keha Family Home on your home screen. Open the link and tap “Install”.'),url:invitationURL.href};
+  }
+  function currentPageSharePayload(){
+    const page=new URL(location.href),language=window.FamilyI18n?.language;
+    page.searchParams.delete('install');
+    if(page.hash.startsWith('#updates/manage/'))page.hash='#updates';
+    if(['he','en-US','en-GB'].includes(language))page.searchParams.set('lang',language);
+    const person=location.hash.startsWith('#person/')?document.getElementById('personPageContent')?.querySelector('.person-page-hero h2')?.textContent.trim():'';
+    const pageTitle=person||document.getElementById('workspaceTitle')?.textContent.trim()||'';
+    const siteTitle=tr('בית משפחת קהא','Keha Family Home');
+    return {title:pageTitle?pageTitle+' · '+siteTitle:siteTitle,text:pageTitle?siteTitle+' · '+pageTitle:siteTitle,url:page.href};
+  }
+  function openShareChoices(){
+    const page=currentPageSharePayload(),website=websiteSharePayload();
+    const pageIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9M15 3h6v6m0-6-10 10"/></svg>';
+    const homeIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg>';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת השיתוף','Close sharing')+'">×</button><h2 id="homeInstallTitle">'+tr('מה תרצו לשתף?','What would you like to share?')+'</h2><p class="home-install-dialog-intro" id="homeShareChoiceIntro">'+tr('בחרו קישור לעמוד הזה או הזמנה כללית לאתר.','Choose a link to this page or a general website invitation.')+'</p><div class="home-share-choices"><button type="button" class="home-share-choice" data-home-share-page><span class="home-share-choice-icon">'+pageIcon+'</span><span><strong>'+tr('שיתוף העמוד הנוכחי','Share this page')+'</strong><small>'+tr('קישור ישיר לעמוד שבו אתם נמצאים','A direct link to the page you are viewing')+'</small></span></button><button type="button" class="home-share-choice" data-home-share-site><span class="home-share-choice-icon">'+homeIcon+'</span><span><strong>'+tr('שיתוף האתר','Share the website')+'</strong><small>'+tr('קישור למסך הבית של בית משפחת קהא','A link to the Keha Family Home screen')+'</small></span></button></div>';
+    dialog.querySelector('[data-home-share-page]').addEventListener('click',()=>{closeDialog();void sharePayload(page,true);});
+    dialog.querySelector('[data-home-share-site]').addEventListener('click',()=>{closeDialog();void sharePayload(website);});
+    showDialog('share-choice',shareButton);
+  }
+  function openShareFallback(payload,currentPage=false){
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת השיתוף','Close sharing')+'">×</button><h2 id="homeInstallTitle">'+(currentPage?tr('שיתוף העמוד הנוכחי','Share this page'):tr('שולחים קישור להתקנה','Share an installation link'))+'</h2><p class="home-install-dialog-intro">'+(currentPage?tr('העתיקו את הקישור לעמוד ושלחו אותו בדרך שנוחה לכם.','Copy the page link and send it however you prefer.'):tr('הקישור יפתח אצל בני המשפחה את אפשרות הוספת האתר למסך הבית. העתיקו אותו ושלחו בווטסאפ.','This link opens the option to add the website to your family’s home screen. Copy it and send it on WhatsApp.'))+'</p><div class="home-install-link-tools"><label for="homeInstallShareLink">'+(currentPage?tr('קישור לעמוד הנוכחי','Current page link'):tr('קישור להתקנת קיצור דרך','Shortcut installation link'))+'</label><input id="homeInstallShareLink" value="'+escape(payload.url)+'" readonly dir="ltr"></div>';
     showDialog('share',shareButton);
     const input=dialog.querySelector('#homeInstallShareLink');input.focus();input.select();input.setSelectionRange?.(0,input.value.length);
   }
-  shareButton.addEventListener('click',async()=>{
+  async function sharePayload(payload,currentPage=false){
     if(shareButton.disabled)return;
     shareButton.disabled=true;shareStatus.textContent='';status.textContent='';
     try{
       if(typeof navigator.share==='function'){
         try{
-          await navigator.share({title:tr('בית משפחת קהא','Keha Family Home'),text:tr('בית משפחת קהא במסך הבית שלכם. פתחו את הקישור ולחצו ״התקן״.','Keha Family Home on your home screen. Open the link and tap “Install”.'),url:invitationURL.href});
+          await navigator.share(payload);
           announce(shareStatus,tr('הקישור הועבר לשיתוף','Link ready to share'));return;
         }catch(error){if(error?.name==='AbortError')return;}
       }
       try{
-        await navigator.clipboard.writeText(invitationURL.href);
+        await navigator.clipboard.writeText(payload.url);
         announce(shareStatus,tr('הקישור הועתק','Link copied'));
-      }catch{openShareFallback();}
+      }catch{openShareFallback(payload,currentPage);}
     }finally{shareButton.disabled=false;}
+  }
+  shareButton.addEventListener('click',()=>{
+    if(shareButton.disabled)return;
+    if(mobileDevice||phoneQuery.matches)openShareChoices();else void sharePayload(websiteSharePayload());
   });
 
   function hasInstalledShortcut(){return nativeDesktop||installed||relatedInstalled||standaloneQuery.matches||navigator.standalone===true;}
@@ -147,6 +175,7 @@
   }
   function update(){
     if(!card)return;
+    if(mobileDevice||phoneQuery.matches){shareButton.setAttribute('aria-haspopup','dialog');shareButton.setAttribute('aria-controls','homeInstallDialog');}
     const isInstalled=hasInstalledShortcut();
     if(isInstalled&&attemptActive){completeInstallation();return;}
     // Keep the phone invitation and desktop actions together in the shared header.
