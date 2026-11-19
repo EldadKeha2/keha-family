@@ -3,6 +3,7 @@
   let active=null,ignoredTouchStage=null,ignoredTouchIds=new Set();
   const boundStages=new WeakSet();
   const completedPointerStarts=new WeakSet();
+  const pickerWheelTargets=new WeakSet(),handledWheelEvents=new WeakSet();
   const PAD_QUIET=80;
   // Pad animation is a separate device preference; it must never reverse
   // album selection or the already saved screen-touch reference.
@@ -38,11 +39,23 @@
   function clearPadFinish(){const old=padFinish;if(!old)return;padFinish=null;clearTimeout(old.timer);for(const animation of old.animations)animation.cancel();old.node.remove();}
   // Only wheel input is widened to the open viewer. The established screen
   // contact owners, coordinates and saved touch direction stay unchanged.
+  function pickerWheel(stage,event){
+    const picker=stage?._familyFaceContext?.popup;
+    if(!picker?.classList.contains('face-picker')||!picker.contains(event.target)||event.ctrlKey||event.metaKey||event.altKey)return false;
+    const x=event.deltaX||event.shiftKey&&event.deltaY||0,y=event.shiftKey&&!event.deltaX?0:event.deltaY||0;
+    return Number.isFinite(x)&&x!==0&&Math.abs(x)>=Math.abs(y)*1.15;
+  }
+  function bindPickerWheel(stage,picker){
+    if(pickerWheelTargets.has(picker))return;pickerWheelTargets.add(picker);
+    picker.addEventListener('wheel',event=>{if(!picker.isConnected&&active?.stage===stage)active.handleWheel(event);},{capture:true,passive:false});
+  }
   function wheelScope(stage,event,root=stage?.closest?.('dialog')){
     const target=event?.target;if(!stage||!target)return false;
     const inside=stage.contains(target);if(!inside&&!root)return false;
     if(root&&(root.hidden||root.tagName==='DIALOG'&&!root.open))return false;
     const other=target.closest?.('dialog');if(root&&other&&other!==root)return false;
+    const picker=stage?._familyFaceContext?.popup;
+    if(picker?.classList.contains('face-picker')&&picker.contains(target))return pickerWheel(stage,event);
     if(!inside&&!verticalWheelDirection(event)){const editor=target.closest?.('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]');if(editor&&!editor.readOnly&&!editor.disabled)return false;}
     return true;
   }
@@ -246,6 +259,7 @@
     };
     const nativeControl=event=>{
       const target=event.target;
+      if(pickerWheel(stage,event))return false;
       b.protectedMatch=null;let nonEditable=false;
       const protect=(node,reason)=>{b.protectedMatch=targetLabel(node)+' role='+(node.getAttribute?.('role')||'none')+' contenteditable='+(node.getAttribute?.('contenteditable')??'none')+' '+reason;return true;};
       // Controls outside this viewer cannot own its image gestures. In
@@ -381,6 +395,7 @@
       if(!pointer){const g=b.contact;b.contactTimer=setTimeout(()=>{if(active===b&&b.contact===g&&!g.axis)b.cancel();},650);}
     };
     b.handleWheel=event=>{
+      if(handledWheelEvents.has(event))return;handledWheelEvents.add(event);
       // The stable gallery binding also works when zoom or image loading
       // temporarily unmounts the native strip.
       if(stage._familyGalleryWheel&&verticalWheelDirection(event))return;
@@ -390,6 +405,7 @@
       if(active!==b)return;
       if(!b.enabled()){b.lastDecision='disabled';return;}
       if(!anchor(b)){b.lastDecision='zero-width';return;}
+      if(pickerWheel(stage,event))bindPickerWheel(stage,stage._familyFaceContext.popup);
       if(b.zoomWheel?.(event)){blockClick(b);b.cancel();b.lastDecision='zoom-pad';return;}
       const mouseDirection=mouseWheelDirection(event);
       if(mouseDirection){
@@ -432,5 +448,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:19,mount,reset,has,claim,note,supported,diagnostics,padOffset,mouseWheelDirection,verticalWheelDirection,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:20,mount,reset,has,claim,note,supported,diagnostics,padOffset,mouseWheelDirection,verticalWheelDirection,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();

@@ -541,6 +541,7 @@
       wheelEnabled:()=>canNavigatePhoto({pending:true,wheel:true})||canNavigateVideo({pending:true}),wheelStep:arrowStep,
       nativeScroll:()=>window.FamilyPhotoNative?.has?.(stage)===true,strictStart:true,
       wheelRoot:()=>$('mediaViewer'),
+      pickerSurface:()=>{const picker=stage._familyFaceContext?.popup;return picker?.classList.contains('face-picker')?picker:null;},
       videoSurface:()=>current()?.kind==='video'?stage.querySelector('video'):null,
       vertical:scrollPhotoVertically,
       zoomWheel,horizontalStart:horizontalPhotoStarted,

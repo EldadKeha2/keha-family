@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,mouseEnabled=enabled,wheelEnabled=enabled,wheelStep,step,right,left,move,cancel,claim,nativeEnd,vertical,zoomWheel,horizontalStart,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
+  function bind(stage,{enabled,mouseEnabled=enabled,wheelEnabled=enabled,wheelStep,step,right,left,move,cancel,claim,nativeEnd,vertical,zoomWheel,horizontalStart,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,pickerSurface=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
     stage._familyGalleryWheel=true;
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
     const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
@@ -24,6 +24,15 @@
     };
     const idle=new Set(),finished=()=>{for(const resolve of idle)resolve();idle.clear();};
     const controls='a,input,textarea,select,video,iframe,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
+    const pickerAt=event=>{const picker=pickerSurface();return picker?.contains(event.target)?picker:null;};
+    const detachedPickers=new WeakSet(),seenTouchEvents=new WeakSet(),seenWheelEvents=new WeakSet();
+    const bindDetachedPicker=picker=>{
+      if(detachedPickers.has(picker))return;detachedPickers.add(picker);
+      // Touch targets can remain inside the removed picker after the first
+      // horizontal move closes it. Keep its final packets on the same owner.
+      for(const [type,handler]of [['touchmove',onTouchMove],['touchend',onTouchEnd],['touchcancel',onTouchCancel]])picker.addEventListener(type,event=>{if(!picker.isConnected)handler(event);},{capture:true,passive:false});
+      picker.addEventListener('wheel',event=>{if(!picker.isConnected)onWheel(event,picker);},{capture:true,passive:false});
+    };
     const controlAt=event=>{
       let control=event.target.closest(controls);
       if(control&&typeof stage.contains==='function'&&!stage.contains(event.target))return control;
@@ -53,33 +62,38 @@
     },{capture:true,passive:true});
     const begin=event=>{
       const touch=['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents;
+      const picker=pickerAt(event);if(picker&&!touch)return;
       // A CSS snap strip owns real touch and precision-trackpad input. Do not
       // capture or replay those events; mouse dragging remains available.
-      if(touch&&nativeScroll())return;
+      if(touch&&nativeScroll()&&!picker)return;
       const isMouse=!touch&&event.pointerType==='mouse'&&mouse()&&!event.ctrlKey&&!event.metaKey&&!event.altKey;
-      const control=controlAt(event),video=control?.tagName==='VIDEO'?previewVideo(event):null;
+      const control=picker?null:controlAt(event),video=control?.tagName==='VIDEO'?previewVideo(event):null;
       if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||isMouse&&!mouseEnabled()||control&&!video)return;
       suppressClickUntil=0;
-      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse(),video,threshold:distance()};
-      const ownership=claim?.(event)||'manual',mode=isMouse?'queued':ownership;
+      gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse(),video,picker,threshold:distance()};
+      if(picker)bindDetachedPicker(picker);
+      const ownership=picker?'queued':claim?.(event)||'manual',mode=isMouse?'queued':ownership;
       if(mode==='native'){nativePointer=gesture;gesture=null;return mode;}
       // Capture the stable stage before face/image setup reparents the target.
       // Touch browsers otherwise lose the end of an implicitly captured stream.
-      if(!isMouse&&!video&&typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
+      if(!isMouse&&!video&&!picker&&typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       gesture.mode=mode;gesture.mouse=isMouse;return mode;
     };
     // Phones use the real touch stream. Windows hybrid browsers can emit a
     // touchstart without subsequent touchmove events; keep their pointer stream
     // active, retaining TouchEvents as a fallback if the browser cancels it.
     stage.addEventListener('pointerdown',event=>{freshVideoTouch(event);if(!touchOnly())begin(event);},{capture:true,passive:true});
+    document.addEventListener('pointerdown',event=>{if(!touchOnly()&&pickerAt(event)&&!stage.contains?.(event.target))begin(event);},{capture:true,passive:true});
     const moved=event=>{
       const g=gesture;if(!g||event.pointerId!==g.id)return;
       if(!enabled()||g.mouse&&(!mouseEnabled()||event.buttons===0)){if(g.dragged)blockClick();reset();return;}
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
+      if(g.picker&&!g.dragged&&Date.now()-g.time>400){reset();return;}
       if(!g.dragged&&!g.vertical){
         // Precision touch input often starts with a few diagonal pixels.
         // Lock the axis only once the direction is clear, then keep it.
         if(Math.abs(dy)>(g.desktop?24:10)&&Math.abs(dy)>=Math.abs(dx)*(g.desktop?1.4:1)){
+          if(g.picker){reset();return;}
           if(g.desktop&&!g.mouse&&vertical)g.vertical=true;else {reset();return;}
         }
         if(!g.vertical&&(Math.abs(dx)<10||Math.abs(dx)<Math.abs(dy)*(g.desktop?1.2:1.3)))return;
@@ -90,8 +104,8 @@
       if(g.vertical){blockClick();if(event.cancelable)event.preventDefault();vertical(g.lastY-event.clientY);g.lastY=event.clientY;return;}
       if(!g.dragged){
         g.dragged=true;stage.classList.add('photo-pointer-dragging');
-        horizontalStart?.();
         if(typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
+        horizontalStart?.();
       }
       blockClick();if(event.cancelable)event.preventDefault();
       if(!g.mouse&&g.desktop)desktopBridge()?.observeTouchGesture?.(dx);
@@ -116,34 +130,43 @@
     // native photo scroller claims a gesture. Keep a single-touch fallback;
     // only one stream can finish a swipe, so normal phones never advance twice.
     const fromTouch=(event,touch)=>({pointerId:'touch-'+touch.identifier,pointerType:'touch',isPrimary:true,button:0,clientX:touch.clientX,clientY:touch.clientY,target:touch.target||event.target,cancelable:event.cancelable,preventDefault:()=>event.preventDefault()});
-    stage.addEventListener('touchstart',event=>{
+    const onTouchStart=event=>{
       freshVideoTouch(event);
       // Some hybrid laptops emit a mouse-like pointer before the real touch
       // stream. Once the native touch owner is present, discard that manual
       // companion so it cannot commit a second or reversed action on release.
-      if(nativeScroll()){if(gesture||nativePointer||touchStart)reset();return;}
+      if(nativeScroll()&&!pickerAt(event)){if(gesture||nativePointer||touchStart)reset();return;}
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
       touchStart=fromTouch(event,event.touches[0]);touchStart.time=Date.now();
       if(!gesture){const mode=begin(touchStart);touchStart.native=mode==='native';if(strictStart&&!mode){touchStart=null;finished();}}
-    },{capture:true,passive:true});
-    document.addEventListener('touchmove',event=>{
+    };
+    stage.addEventListener('touchstart',onTouchStart,{capture:true,passive:true});
+    document.addEventListener('touchstart',event=>{if(pickerAt(event)&&!stage.contains?.(event.target))onTouchStart(event);},{capture:true,passive:true});
+    const onTouchMove=event=>{
+      if(seenTouchEvents.has(event))return;seenTouchEvents.add(event);
       if(!touchStart)return;
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
       if(!touchStart||touchStart.native)return;
       const touch=fromTouch(event,event.touches[0]);
       if(!gesture)begin(touchStart);
       if(gesture)moved({...touch,pointerId:gesture.id});
-    },{capture:true,passive:false});
-    document.addEventListener('touchend',event=>{
+    };
+    document.addEventListener('touchmove',onTouchMove,{capture:true,passive:false});
+    const onTouchEnd=event=>{
+      if(seenTouchEvents.has(event))return;seenTouchEvents.add(event);
       if(touchStart?.native){const touch=[...event.changedTouches].find(touch=>'touch-'+touch.identifier===touchStart.pointerId);if(touch)nativeEnded({x:touchStart.clientX,y:touchStart.clientY,time:touchStart.time},fromTouch(event,touch));nativePointer=null;}
       if(touchStart&&!touchStart.native&&!gesture)begin(touchStart);
       if(touchStart&&gesture){const touch=[...event.changedTouches].find(touch=>'touch-'+touch.identifier===touchStart.pointerId);if(touch)released({...fromTouch(event,touch),pointerId:gesture.id});}
       touchStart=null;if(!gesture)finished();
-    },{capture:true,passive:false});
-    document.addEventListener('touchcancel',()=>{touchStart=null;blockClick();reset();},{capture:true,passive:true});
+    };
+    document.addEventListener('touchend',onTouchEnd,{capture:true,passive:false});
+    const onTouchCancel=event=>{if(seenTouchEvents.has(event))return;seenTouchEvents.add(event);touchStart=null;blockClick();reset();};
+    document.addEventListener('touchcancel',onTouchCancel,{capture:true,passive:true});
     stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!controlAt(event))event.preventDefault();});
-    const onWheel=event=>{
-      if(event.defaultPrevented)return;
+    const onWheel=(event,detachedPicker=null)=>{
+      if(event.defaultPrevented||seenWheelEvents.has(event))return;seenWheelEvents.add(event);
+      const picker=pickerAt(event)||(detachedPicker?.contains(event.target)?detachedPicker:null),pickerX=event.deltaX||event.shiftKey&&event.deltaY||0,pickerY=event.shiftKey&&!event.deltaX?0:event.deltaY||0;
+      if(picker&&(!Number.isFinite(pickerX)||!pickerX||Math.abs(pickerX)<Math.abs(pickerY)*1.15))return;
       const wheelDirection=window.FamilyPhotoNative?.verticalWheelDirection?.(event);
       if(wheelDirection&&mouse()&&wheelEnabled()){
         const root=wheelRoot()||stage;
@@ -159,8 +182,9 @@
         return;
       }
       if(nativeScroll())return;
-      const outside=typeof stage.contains==='function'&&!stage.contains(event.target),candidate=outside?event.target.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]'):controlAt(event),control=outside&&(candidate?.readOnly||candidate?.disabled)?null:candidate;
+      const outside=typeof stage.contains==='function'&&!stage.contains(event.target),candidate=picker?null:outside?event.target.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]'):controlAt(event),control=outside&&(candidate?.readOnly||candidate?.disabled)?null:candidate;
       if(!mouse()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
+      if(picker)bindDetachedPicker(picker);
       if(zoomWheel?.(event)){blockClick();return;}
       if(!enabled())return;
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;

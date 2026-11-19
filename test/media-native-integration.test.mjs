@@ -157,7 +157,7 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
 
 test('production loads the native controller before the gallery binds gesture input',()=>{
  const f=fixture();for(const name of names)assert.ok(f.loaded.includes(name),name+' must be loaded by the production page');
- assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,19,'The loaded implementation, not only its script URL, must be version nineteen');
+ assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,20,'The loaded implementation, not only its script URL, must be version twenty');
 });
 
 test('a cold gallery link adopts a retained random page even when that page omits the opened photo',async()=>{
@@ -640,7 +640,7 @@ test('explicit device calibration maps a negative physical-right wheel packet to
  assert.equal(sample.event.defaultPrevented,true);assert.equal(viewport.clientWidth-sample.after,238,'A calibrated negative device packet moves the current pixels right');
  assert.equal(settings.wheelFactor(),-1);assert.equal(settings.isCalibrating(),false);assert.equal(storage.get('keha-gallery-pad-direction-v2'),'-1');
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
- const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 19/);assert.match(trace,/native implementation 19/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
+ const trace=f.get('galleryGestureCheck').querySelector('output').textContent;assert.match(trace,/build 20/);assert.match(trace,/native implementation 20/);assert.match(trace,/controller \{/);assert.match(trace,/wheel -140 → 140/);assert.match(trace,/factor -1/);assert.match(trace,/photo-native\.js/);f.close();
  const restored=fixture({storage});assert.equal(restored.window.FamilyGalleryInput.wheelFactor(),-1);assert.equal(restored.window.FamilyGalleryInput.isCalibrating(),false);assert.equal(restored.get('galleryGestureCheck'),null,'Ordinary browsing shows no diagnostic or calibration interface');
  await restored.open('photo','photos',1);const next=restored.strip(),again=browserWheel(restored,next.children[1].querySelector('img'),-140);assert.equal(next.clientWidth-again.after,238);
  await new Promise(resolve=>setTimeout(resolve,320));await flush();assert.equal(restored.window.FamilyMedia.current().id,'c');restored.close();
@@ -942,6 +942,61 @@ test('vertical desktop touch pans the zoomed photo instead of the outer viewer',
   const f=fixture({supported});await f.open();f.zoom(2);const stage=f.get('mediaStage'),scroller=stage.querySelector('.face-photo-scroll'),image=scroller.querySelector('img');scroller.scrollTop=160;f.get('mediaViewer').scrollTop=20;
   for(const [type,y]of [['pointerdown',250],['pointermove',330],['pointerup',330]])f.emit(image,type,{pointerType:'touch',pointerId:9,isPrimary:true,button:0,clientX:300,clientY:y});
   await flush();assert.equal(scroller.scrollTop,80);assert.equal(f.get('mediaViewer').scrollTop,20);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+ }
+});
+
+function openTestPicker(f){
+ const stage=f.get('mediaStage'),panel=f.document.createElement('div');panel.className='face-popover face-picker';
+ panel.innerHTML='<header><strong>Who?</strong></header><input type="search"><div class="face-person-results" role="listbox"><button type="button" class="face-person-option" role="option"><span><img><strong>Name</strong></span></button></div>';
+ const input=panel.querySelector('input');input.value='Unsubmitted search';panel.querySelector('.face-person-results').scrollTop=20;
+ f.get('mediaViewer').append(panel);stage._familyFaceContext.popup=panel;input.focus();return {panel,input,row:panel.querySelector('button'),avatar:panel.querySelector('img'),header:panel.querySelector('header')};
+}
+
+test('pad strokes over the picker search, name choices, portraits and header browse without saving and retain detached release packets',async()=>{
+ for(const supported of [true,false])for(const zoom of [1,2])for(const part of ['input','row','avatar','header']){
+  const f=fixture({supported});await f.open('photo','photos',1);if(zoom>1)f.zoom(zoom);const picker=openTestPicker(f),target=picker[part];
+  assert.equal(f.emit(target,'wheel',{deltaX:140,deltaY:0,...(zoom>1?{momentum:false}:{})}).defaultPrevented,true,part);
+  assert.equal(picker.panel.isConnected,false,'The popover disappears on the first packet, even when the packet targets its search field');assert.equal(f.window.FamilyMedia.current().id,'b');
+  if(zoom>1)assert.equal(f.emit(target,'wheel',{deltaX:12,deltaY:0,momentum:true}).defaultPrevented,true,'A release still reaches the controller after its original target was removed');else await new Promise(resolve=>setTimeout(resolve,100));
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'c',part+' over '+(supported?'native':'fallback')+' zoom '+zoom);assert.equal(f.requests.length,0);assert.equal(picker.input.value,'Unsubmitted search');f.close();
+ }
+});
+
+test('screen swipes starting on picker inputs and name rows finish after the popover is removed on desktops and phones',async()=>{
+ for(const options of [{supported:true},{supported:false},{mobile:true}])for(const zoom of [1,2])for(const part of ['input','row']){
+  const f=fixture(options);await f.open('photo','photos',1);if(zoom>1)f.zoom(zoom);const picker=openTestPicker(f),target=picker[part],dx=options.mobile?-160:160;
+  if(options.mobile){
+   touchEvent(f,target,'touchstart',[[71,300,250]]);touchEvent(f,target,'touchmove',[[71,300+dx,250]]);assert.equal(picker.panel.isConnected,false);
+   touchEvent(f,target,'touchend',[],[[71,300+dx,250]]);
+  }else{
+   for(const [type,x]of [['pointerdown',300],['pointermove',300+dx]])f.emit(target,type,{pointerType:'touch',pointerId:71,isPrimary:true,button:0,clientX:x,clientY:250});
+   assert.equal(picker.panel.isConnected,false);assert.ok(f.captures.some(c=>c.node===f.get('mediaStage')&&c.id===71),'The stable image stage captures before the picker is removed');
+   f.emit(f.get('mediaStage'),'pointerup',{pointerType:'touch',pointerId:71,isPrimary:true,button:0,clientX:300+dx,clientY:250});
+  }
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.requests.length,0);f.close();
+ }
+});
+
+test('picker vertical scrolling, search input and ordinary name taps keep their own interaction',async()=>{
+ for(const options of [{supported:true},{supported:false},{mobile:true}]){
+  const f=fixture(options);await f.open('photo','photos',1);const picker=openTestPicker(f);let clicks=0;picker.row.addEventListener('click',()=>clicks++);
+  for(const target of [picker.input,picker.row,picker.panel.querySelector('.face-person-results')])assert.equal(f.emit(target,'wheel',{deltaX:0,deltaY:94}).defaultPrevented,false);
+  touchEvent(f,picker.row,'touchstart',[[71,300,250]]);assert.equal(touchEvent(f,picker.row,'touchmove',[[71,303,360]]).defaultPrevented,false);touchEvent(f,picker.row,'touchend',[],[[71,303,360]]);
+  assert.equal(picker.panel.isConnected,true);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(picker.input.value,'Unsubmitted search');
+  f.emit(picker.row,'pointerdown',{pointerType:'mouse',pointerId:72,isPrimary:true,button:0,clientX:300,clientY:250});f.emit(picker.row,'pointerup',{pointerType:'mouse',pointerId:72,isPrimary:true,button:0,clientX:300,clientY:250});assert.equal(f.emit(picker.row,'click',{detail:1}).defaultPrevented,false);
+  assert.equal(clicks,1);assert.equal(picker.panel.isConnected,true);assert.equal(f.requests.length,0);f.close();
+ }
+});
+
+test('saving and frame edits still block navigation when gestures originate on the picker',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported});await f.open('photo','photos',1);const picker=openTestPicker(f),c=f.get('mediaStage')._familyFaceContext;
+  for(const key of ['saving','reviewSaving','adjust','resizeDrag']){
+   c[key]=true;assert.equal(f.emit(picker.input,'wheel',{deltaX:140,deltaY:0}).defaultPrevented,false);
+   for(const [type,x]of [['pointerdown',300],['pointermove',460],['pointerup',460]])f.emit(picker.input,type,{pointerType:'touch',pointerId:71,isPrimary:true,button:0,clientX:x,clientY:250});
+   await flush();assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(picker.panel.isConnected,true);c[key]=false;
+  }
+  assert.equal(f.requests.length,0);f.close();
  }
 });
 
