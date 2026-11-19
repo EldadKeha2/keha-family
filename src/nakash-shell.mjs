@@ -8,6 +8,14 @@ const branchMap = new Map(BRANCHES.map(branch => [branch.id, branch]));
 const mediaBranch = 'keha';
 const familyName = 'משפחת נקאש';
 const branchPaths = new Set(['', 'inside', ...branchMap.keys()]);
+const relationshipStyles = `<style>
+  .tree-unit .tree-partnerships{position:absolute;inset-inline-start:0;top:calc(70px * var(--a11y-tree-scale,1));width:100%;height:calc(12px * var(--a11y-tree-scale,1));pointer-events:none}
+  .tree-partnerships path{fill:none;stroke:#c3b18f;stroke-width:1;vector-effect:non-scaling-stroke}
+  .tree-partnerships .former{stroke-dasharray:4 4}
+  .person-card .person-partnership{display:block;margin-top:5px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.35;color:#536641}
+  .person-partnership[data-partnership="former"]{color:#786d69}
+  @media(max-width:700px){.tree-unit .tree-partnerships{top:calc(31px * var(--a11y-tree-scale,1))}}
+</style>`;
 const standaloneScripts = new Set([
   'family-fallback.js', 'family-data.js', 'screensaver.js', 'family-ai.js',
   'living-family.js', 'memories.js', 'updates.js', 'archive.js', 'calendar.js',
@@ -58,7 +66,7 @@ export function nakashHTML(original, section, isInternal = false) {
     .replace(/((?:href|src)=")assets\//g, '$1/assets/')
     .replace(/  <script src="(?:\/assets\/)?([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>\n/g,
       (tag, script) => standaloneScripts.has(script) ? '' : tag)
-    .replace('<head>', '<head>\n  <meta name="robots" content="noindex,nofollow">\n' + scripts)
+    .replace('<head>', '<head>\n  <meta name="robots" content="noindex,nofollow">\n' + scripts + '\n' + relationshipStyles)
     .replace('<span>בית משפחת קהא</span>', '<span>' + name + '</span>')
     .replace('משורש משותף, שישה ענפים של אהבה', 'משורש משותף, ארבעה ענפים')
     .replaceAll('קהא · חריזי · בקר · נובל · פיש · בלום', 'נקאש · מדינה · קהא')

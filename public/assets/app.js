@@ -73,15 +73,16 @@
       (death?eventHTML('death',I18n.isEnglish?'Died':p.gender==='f'?'נפטרה':'נפטר',I18n.date(p.deathDate),deathAge):'');
   }
 
-  function personCardHTML(p) {
+  function personCardHTML(p,partnership) {
     const unset = birthdayOf(p) === '1.1.1111',rootPerson=data.units[data.root].people.includes(p.id);
+    const partnershipHTML=partnership?`<span class="person-partnership" data-partnership="${safe(partnership.relationship)}">${safe(I18n.isEnglish?partnership.labelEn:partnership.label)}</span>`:'';
     const founderLink=rootPerson?(window.FamilyFounderTrees?.linkHTML(p.id)||''):'';
     if(rootPerson&&!isPhone()){
       const memorial=!scopedViews||p.deceased;
       const label=I18n.t('פתיחת העמוד האישי של ')+nameOf(p);
       return I18n.html`<article class="person-card${memorial?' memorial':''} root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${memorial?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday root-person-birth" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only>${birthdayHTML(p,false,true)}</div></div><div class="root-person-details" data-root-history="${p.id}">${rootHistoryHTML(p)}</div>${founderLink}</article>`;
     }
-    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}>${birthdayHTML(p,!rootPerson)}</div>${founderLink}</article>`;
+    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}>${birthdayHTML(p,!rootPerson)}</div>${partnershipHTML}${founderLink}</article>`;
   }
   function toast(message,action) {
     clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -161,6 +162,20 @@
     $('emptySearch').hidden = selected.length > 0;
   }
 
+  function treePeopleHTML(unit) {
+    const display=unit.displayPeople||unit.people;
+    const cards=display.map(id=>personCardHTML(data.people[id],id===unit.people[0]?null:unit.relationships?.find(item=>item.people.includes(id)))).join('');
+    if(!unit.relationships)return cards;
+    const links=unit.relationships.map(item=>{
+      const coordinates=item.people.map(id=>{
+        const coordinate=(display.indexOf(id)+.5)/display.length*100;
+        return I18n.isEnglish?coordinate:100-coordinate;
+      });
+      return `<path class="${safe(item.relationship)}" d="M${Math.min(...coordinates)} 6H${Math.max(...coordinates)}"/>`;
+    }).join('');
+    return `<svg class="tree-partnerships" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">${links}</svg>`+cards;
+  }
+
   function renderTree(preserveCamera=false) {
     window.FamilyTreeGuide?.hide();
     const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
@@ -172,21 +187,25 @@
     const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?195:desktopOverview?275:340)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
     const positions=[],lines=[],connections=[],widths=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
-    const nodeWidth=unit=>(!phone&&unit.id===data.root?788:unit.people.length===2?(phone?174:desktopOverview?300:320):(phone?80:desktopOverview?132:146))*textScale;
+    const nodeWidth=unit=>(!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
     function measure(id){const unit=data.units[id],kids=children(unit),total=kids.reduce((sum,child)=>sum+measure(child),0)+Math.max(0,kids.length-1)*gap,width=Math.max(nodeWidth(unit),total);widths.set(id,width);return width;}
-    function place(id,left,depth){
-      const unit=data.units[id],width=widths.get(id),x=left+width/2,y=top+depth*levelHeight+(depth?rootHistorySpace:0);
+    function place(id,left,depth,spacing=0){
+      const unit=data.units[id],width=widths.get(id),x=left+width/2,y=top+depth*levelHeight+(depth?rootHistorySpace:0)+spacing,partnershipSpace=phone&&unit.relationships?100*textScale:0;
       positions.push({id,unit,x,y,width:nodeWidth(unit),depth});const kids=children(unit),total=kids.reduce((sum,child)=>sum+widths.get(child),0)+Math.max(0,kids.length-1)*gap;let right=left+width-(width-total)/2;const centers=[];
-      for(const child of kids){const w=widths.get(child);centers.push(right-w/2);place(child,right-w,depth+1);right-=w+gap;}
-      if(kids.length)connections.push({id,x,y,centers,depth});
+      for(const child of kids){const w=widths.get(child);centers.push(right-w/2);place(child,right-w,depth+1,spacing+partnershipSpace);right-=w+gap;}
+      if(kids.length){
+        const union=unit.relationships?.find(item=>kids.every(child=>item.children.includes(child))),display=unit.displayPeople||unit.people;
+        const offset=union?union.people.reduce((sum,id)=>sum+(display.indexOf(id)+.5)/display.length,0)/union.people.length-.5:0;
+        connections.push({id,x:x+(I18n.isEnglish?1:-1)*offset*nodeWidth(unit),y,centers,depth,partnershipSpace});
+      }
     }
     let width,height;
     if(phone&&overview){
       width=520*textScale;height=(scopedViews?570:740)*textScale;const root=data.units[data.root];positions.push({id:root.id,unit:root,x:260*textScale,y:45*textScale,width:174*textScale,depth:0});lines.push(`<path d="M${260*textScale} ${158*textScale}V${(scopedViews?360:530)*textScale}"/>`);
       data.branches.forEach((branch,index)=>{const x=(index%2===0?380:140)*textScale,y=(220+Math.floor(index/2)*170)*textScale,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174*textScale,depth:1});lines.push(`<path d="M${260*textScale} ${y-30*textScale}H${x}V${y-10*textScale}"/>`);});
-    }else{width=measure(rootId)+2*pad;place(rootId,pad,0);const maxDepth=Math.max(...positions.map(item=>item.depth));height=top+maxDepth*levelHeight+(maxDepth?rootHistorySpace:0)+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
+    }else{width=measure(rootId)+2*pad;place(rootId,pad,0);height=Math.max(...positions.map(item=>item.y))+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
     camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.setProperty('--a11y-tree-scale',String(textScale));world.style.width=width+'px';world.style.height=height+'px';
-    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${unit.people.map(id=>personCardHTML(data.people[id])).join('')}${open}</div>`;}).join('');
+    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
     let rootSpacingAdjustment=0,rootContentHeight=0;
     if(!phone&&rootHistorySpace){
       const rootElement=world.querySelector(`[data-unit="${treeUnitKey(rootId)}"]`),firstChild=positions.find(item=>item.depth===1);
@@ -213,8 +232,8 @@
         camera.height=height;world.style.height=height+'px';
       }
     }
-    for(const {x,y,centers,depth} of connections){
-      const extra=depth===0?rootHistorySpace+rootSpacingAdjustment:0,historyRoot=depth===0&&rootContentHeight>0;
+    for(const {x,y,centers,depth,partnershipSpace=0} of connections){
+      const extra=(depth===0?rootHistorySpace+rootSpacingAdjustment:0)+partnershipSpace,historyRoot=depth===0&&rootContentHeight>0;
       const start=historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
       const middle=historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra,end=y+levelHeight-7*textScale+extra;
       lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);

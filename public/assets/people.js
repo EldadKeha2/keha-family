@@ -83,7 +83,7 @@
   function relationsHTML(person) {
     const relatives=window.FamilyRelations?.forPerson(window.FAMILY_DATA,person.id)||{partners:[],parents:[],children:[],siblings:[]};
     const former=nakashHome&&window.FAMILY_DATA?.units[person.unit]?.relationship==='former';
-    const groups=[['partners',former?tr('בן/בת זוג לשעבר','Former partner'):tr('בן/בת זוג','Partner')],['parents',tr('הורים','Parents')],['children',tr('ילדים','Children')],['siblings',tr('אחים/אחיות','Siblings')]];
+    const groups=[['partners',former?tr('בן/בת זוג לשעבר','Former partner'):tr('בן/בת זוג','Partner')],...(relatives.formerPartners?.length?[['formerPartners',tr('בן/בת זוג לשעבר','Former partner')]]:[]),['parents',tr('הורים','Parents')],['children',tr('ילדים','Children')],['siblings',tr('אחים/אחיות','Siblings')]];
     const emptyLabel=tr('טרם נוספו פרטים','No details added yet');
     return `<section class="person-family" aria-label="${tr('משפחה קרובה','Close family')}">${groups.map(([key,title])=>`<section class="person-family-group" data-relative-kind="${key}" aria-labelledby="personFamily-${key}"><h3 id="personFamily-${key}">${title}</h3>${relatives[key].length?`<ul class="person-family-list">${relatives[key].map(id=>relativeCard(id,key)).join('')}</ul>`:`<p class="person-family-empty" title="${emptyLabel}"><span aria-hidden="true">—</span><span class="visually-hidden">${emptyLabel}</span></p>`}</section>`).join('')}</section>`;
   }

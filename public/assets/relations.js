@@ -11,10 +11,13 @@
     // A child unit begins with the descendant; its other member is their partner.
     const childIds=parent=>(parent?.children||[]).map(id=>units[id]?.people?.[0]);
     const parent=unit.people[0]===personId?units[unit.parent]:null;
+    const unions=unit.relationships?.filter(item=>item.people.includes(personId));
+    const parents=parent?.relationships?parent.relationships.filter(item=>item.children.includes(unit.id)).flatMap(item=>item.people):parent?.people||[];
     return {
-      partners:known(unit.people),
-      parents:known([...(parent?.people||[]),...explicitParents]),
-      children:known([...childIds(unit),...explicitChildren]),
+      partners:known(unions?unions.filter(item=>item.relationship!=='former').flatMap(item=>item.people):unit.people),
+      ...(unions?{formerPartners:known(unions.filter(item=>item.relationship==='former').flatMap(item=>item.people))}:{}),
+      parents:known([...parents,...explicitParents]),
+      children:known([...(unions?unions.flatMap(item=>childIds(item)):childIds(unit)),...explicitChildren]),
       siblings:known([...(parent?childIds(parent).filter(id=>id!==unit.people[0]):[]),...explicitSiblings])
     };
   }
