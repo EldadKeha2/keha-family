@@ -18,7 +18,6 @@
   function render(){
     if(section.hidden)return;
     const id=location.hash.split('/')[1],tree=Object.hasOwn(trees,id)?trees[id]:null;
-    if(id==='yona'&&location.protocol!=='file:'){location.replace(treeHref(id));return;}
     const heading=tree?title(id):tr('העצים המשפחתיים','Our family trees');
     for(const key of ['workspaceTitle','mobileViewTitle']){const node=document.getElementById(key);if(node)node.textContent=heading;}
     const subtitle=document.getElementById('workspaceSubtitle');if(subtitle)subtitle.textContent=tree?tree.family():tr('לכל משפחה, שורשים משלה','Every family has its own roots');
@@ -29,7 +28,8 @@
     const initials=name.split(/\s+/).filter(Boolean).map(part=>part[0]).slice(0,2).join('');
     const portrait=person.profile?`<img class="profile-photo" ${window.FamilyPhotoFraming?.profile(person)||''} src="${safe(person.profile)}" alt="" width="84" height="96" decoding="async">`:`<span>${safe(initials)}</span>`;
     const other=id==='shlomo'?'yona':'shlomo';
-    section.innerHTML=`<nav class="founder-tree-navigation">${back}<a class="founder-tree-other" href="${treeHref(other)}">${safe(tr('לעץ של ','The tree of ')+trees[other].person())}</a></nav><figure class="founder-tree-figure" data-founder-canvas="${id}"><img class="founder-tree-art" src="${tree.image}" alt="${safe(tree.alt())}" width="1280" height="1280" fetchpriority="high" decoding="async"><figcaption><a class="founder-tree-person" href="#person/${id}" aria-label="${safe(tr('פתיחת העמוד האישי של ','Open the personal page of ')+name)}"><span class="founder-tree-portrait">${portrait}</span><strong>${safe(name)}</strong></a></figcaption></figure>`;
+    const openNakash=id==='yona'&&location.protocol!=='file:'?`<a class="founder-tree-other" href="${treeHref(id)}">${tr('לאילן היוחסין של משפחת נקאש','Open the Nakash family tree')}</a>`:'';
+    section.innerHTML=`<nav class="founder-tree-navigation">${back}${openNakash}<a class="founder-tree-other" href="${treeHref(other)}">${safe(tr('לעץ של ','The tree of ')+trees[other].person())}</a></nav><figure class="founder-tree-figure" data-founder-canvas="${id}"><img class="founder-tree-art" src="${tree.image}" alt="${safe(tree.alt())}" width="1280" height="1280" fetchpriority="high" decoding="async"><figcaption><a class="founder-tree-person" href="#person/${id}" aria-label="${safe(tr('פתיחת העמוד האישי של ','Open the personal page of ')+name)}"><span class="founder-tree-portrait">${portrait}</span><strong>${safe(name)}</strong></a></figcaption></figure>`;
   }
   function activate(view){section.hidden=view!=='founder-tree';render();}
   section.addEventListener('click',event=>{

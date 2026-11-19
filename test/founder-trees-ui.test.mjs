@@ -30,7 +30,7 @@ test('both founding portraits keep their personal action and get independent ill
     for(const id of ['yona','shlomo']){
       const card=root.querySelector(`[data-person-card="${id}"]`),link=card.querySelector('a.founder-tree-link');
       assert.ok(card.querySelector(`button[data-person="${id}"]`));
-      assert.equal(link.getAttribute('href'),'#founder-tree/'+id);
+      assert.equal(link.getAttribute('href'),id==='yona'?'/nakash/inside/':'#founder-tree/shlomo');
       assert.match(link.querySelector('img').getAttribute('src'),new RegExp('founder-tree-'+id+'-thumb-v1\\.webp$'));
       assert.ok(link.querySelector('svg'));
       assert.equal(link.closest('[data-person]'),null,'The tree link must not trigger the personal profile action');
@@ -48,9 +48,11 @@ test('each direct tree route shows its own image and founder, and switching rout
     assert.equal(f.section.hidden,false);
     assert.match(f.section.querySelector('.founder-tree-art').getAttribute('src'),/shlomo-v1\.webp$/);
     assert.equal(f.section.querySelector('.founder-tree-person').getAttribute('href'),'#person/shlomo');
+    assert.equal(f.section.querySelector('.founder-tree-other').getAttribute('href'),'/nakash/inside/');
     f.route('#founder-tree/yona');
     assert.match(f.section.querySelector('.founder-tree-art').getAttribute('src'),/yona-v1\.webp$/);
     assert.equal(f.section.querySelector('.founder-tree-person').getAttribute('href'),'#person/yona');
+    assert.ok(f.section.querySelector('a[href="/nakash/inside/"]'),'Old Yona links offer the new Nakash tree');
     assert.match(f.document.getElementById('workspaceTitle').textContent,english?/Grandma Yona/:/סבתא יונה/);
     assert.equal(f.section.querySelectorAll('.founder-tree-person').length,1,'Only known family information belongs in the new tree');
     f.route('#tree');assert.equal(f.section.hidden,true);assert.equal(f.document.getElementById('treeView').hidden,false);
