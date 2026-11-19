@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f2e7">
+  <meta name="description" content="אילן היוחסין, התמונות והסרטונים של משפחת נקאש וארבעת ענפיה.">
+  <title>משפחת נקאש</title>
+  <link rel="icon" href="/nakash/brand-nakash.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/nakash/site.css">
+  <link rel="stylesheet" href="/nakash/tree.css">
+  <script type="module" src="/nakash/site.mjs"></script>
+</head>
+<body>
+  <a href="#content" class="nk-skip">דילוג לתוכן</a>
+  <header class="nk-header">
+    <div class="nk-header-inner">
+      <a class="nk-brand" id="brand" href="/nakash/">
+        <img id="brand-mark" src="/nakash/brand-nakash.svg" alt="" width="50" height="50">
+        <span id="brand-name">משפחת נקאש</span>
+      </a>
+      <div class="nk-tools">
+        <form id="search" class="nk-search" role="search">
+          <label class="nk-sr-only" for="search-input">חיפוש בני משפחה</label>
+          <input type="search" id="search-input" placeholder="חיפוש בני משפחה…" maxlength="100" autocomplete="off" aria-controls="search-results">
+          <ul id="search-results" aria-label="תוצאות חיפוש" hidden></ul>
+        </form>
+        <button type="button" id="share" class="nk-tool">שיתוף</button>
+        <button type="button" id="install" class="nk-tool">התקנה</button>
+      </div>
+    </div>
+    <nav id="main-nav" class="nk-main-nav" aria-label="עמודי המשפחה">
+      <a data-view="tree" href="#tree">אילן יוחסין</a>
+      <a data-view="people" href="#people">בני משפחה</a>
+      <a data-view="photos" href="#photos">גלריית תמונות</a>
+      <a data-view="videos" href="#videos">סרטונים</a>
+    </nav>
+  </header>
+
+  <main id="content" class="nk-content" tabindex="-1">
+    <div id="load-note" class="nk-note" role="status" hidden></div>
+    <div id="view"></div>
+  </main>
+
+  <footer class="nk-footer">
+    <nav id="family-links" aria-label="אתרי ענפי המשפחה"></nav>
+    <p>אילן היוחסין של משפחת נקאש</p>
+  </footer>
+
+  <dialog id="media-dialog" class="nk-media-dialog" aria-labelledby="media-title">
+    <form method="dialog" class="nk-dialog-top">
+      <h2 id="media-title"></h2><button type="submit" class="nk-tool" aria-label="סגירה">×</button>
+    </form>
+    <div id="media-display"></div>
+    <div class="nk-media-controls">
+      <button type="button" id="media-previous" class="nk-tool">הקודם</button>
+      <span id="media-counter" aria-live="polite"></span>
+      <button type="button" id="media-next" class="nk-tool">הבא</button>
+    </div>
+  </dialog>
+
+  <dialog id="upload-dialog" class="nk-upload-dialog" aria-labelledby="upload-title">
+    <form id="upload-form">
+      <div class="nk-dialog-top"><h2 id="upload-title"></h2><button type="button" id="upload-close" class="nk-tool" aria-label="סגירה">×</button></div>
+      <label for="upload-file">בחירת קובץ</label>
+      <input id="upload-file" type="file" name="file" required>
+      <label for="upload-caption">תיאור</label>
+      <input id="upload-caption" type="text" name="caption" maxlength="240">
+      <label for="upload-person">תיוג בני משפחה שמופיעים בקובץ</label>
+      <div class="nk-tag-input">
+        <input id="upload-person" type="search" list="upload-people" autocomplete="off">
+        <datalist id="upload-people"></datalist>
+        <button type="button" id="upload-add-person" class="nk-tool">הוספת תיוג</button>
+      </div>
+      <ul id="upload-tagged" class="nk-tag-list" aria-label="בני משפחה שתויגו"></ul>
+      <fieldset id="upload-branches"><legend>ענפים שמופיעים בקובץ</legend></fieldset>
+      <p>הקובץ יופיע בגלריות של הענפים שנבחרו או תויגו. אם לא בוחרים ענף או מתייגים אדם המשויך לענף, הקובץ יופיע בגלריה שממנה מעלים.</p>
+      <label for="upload-code">קוד העלאה של הענף</label>
+      <input id="upload-code" type="password" autocomplete="off" required maxlength="200">
+      <button id="upload-submit" class="nk-primary" type="submit">העלאה</button>
+      <p id="upload-status" role="status"></p>
+    </form>
+  </dialog>
+
+  <dialog id="share-dialog" class="nk-upload-dialog" aria-labelledby="share-title">
+    <form method="dialog" class="nk-dialog-top"><h2 id="share-title">שיתוף העמוד</h2><button class="nk-tool" aria-label="סגירה">×</button></form>
+    <label for="share-url">קישור לשיתוף</label>
+    <input id="share-url" type="url" readonly dir="ltr">
+    <button type="button" class="nk-primary" id="copy-link">העתקת קישור</button>
+    <p id="share-status" role="status"></p>
+  </dialog>
+
+  <dialog id="install-dialog" class="nk-upload-dialog" aria-labelledby="install-title">
+    <form method="dialog" class="nk-dialog-top"><h2 id="install-title">התקנת אתר המשפחה</h2><button class="nk-tool" aria-label="סגירה">×</button></form>
+    <p>בתפריט הדפדפן בחרו ״התקנה״ או ״הוספה למסך הבית״. ב־Safari באייפון, לחצו על שיתוף ואז ״הוספה למסך הבית״.</p>
+  </dialog>
+  <dialog id="admin-dialog" class="nk-upload-dialog" aria-labelledby="admin-title">
+    <form method="dialog" class="nk-dialog-top"><h2 id="admin-title">קודי העלאה לענפים</h2><button class="nk-tool" aria-label="סגירה">×</button></form>
+    <form id="admin-login" hidden>
+      <label for="admin-password">סיסמת המנהל של סל המחזור</label>
+      <input id="admin-password" type="password" required autocomplete="current-password">
+      <button class="nk-primary" type="submit">כניסה</button>
+    </form>
+    <form id="admin-codes" hidden>
+      <label for="admin-branch">ענף משפחה</label>
+      <select id="admin-branch" required></select>
+      <button class="nk-primary" type="submit">יצירת קוד העלאה חדש</button>
+      <p>קוד חדש מחליף את הקוד הקודם של הענף. את הקוד שולחים לבני הענף בנפרד מהקישור.</p>
+    </form>
+    <div id="admin-result" hidden>
+      <label for="admin-code">קוד ההעלאה החדש</label>
+      <input id="admin-code" type="text" readonly dir="ltr">
+      <button type="button" id="admin-copy" class="nk-tool">העתקת הקוד</button>
+    </div>
+    <p id="admin-status" role="status"></p>
+  </dialog>
+</body>
+</html>

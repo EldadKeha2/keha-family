@@ -1,0 +1,26 @@
+{
+  "id": "/nakash/yehuda/",
+  "name": "משפחת נקאש (יהודה)",
+  "short_name": "משפחת נקאש (יהודה)",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/nakash/yehuda/",
+  "scope": "/nakash/yehuda/",
+  "display": "standalone",
+  "background_color": "#f6f2e7",
+  "theme_color": "#715477",
+  "icons": [
+    {
+      "src": "/nakash/brand-yehuda-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/nakash/brand-yehuda-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

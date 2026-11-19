@@ -1,5 +1,6 @@
 import family from './family.mjs';
 import {uploadRecording} from './voices-route.mjs';
+import {nakashRoute} from './nakash.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {multipartVideo} from './video-multipart.mjs';
@@ -246,6 +247,10 @@ export default {
       if(!env.FAMILY_STATE)throw new HttpError(503,'צריך להשלים את הגדרת השמירה באתר.');
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
+      if(path==='/nakash'||path.startsWith('/nakash/')){
+        const result=await nakashRoute(request,env,db,ctx,{family,sniff,streamUpload,limits:LIMITS,recycleRoute});
+        if(result)return secure(result);
+      }
       if(['/api/gallery/download','/api/media/download'].includes(path)&&request.method==='POST'){
         checkOrigin(request);
         const form=new URLSearchParams(new TextDecoder().decode(await boundedBody(request,4_000_000)));

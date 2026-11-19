@@ -39,6 +39,8 @@ import {nameCorrectionKey,normalizedName,matchingPeople,correctPersonName,correc
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
 // One SQLite-backed object serializes updates for this family. Binary files live in HF.
+import {handleNakashState} from './nakash-state.mjs';
+
 export class FamilyState {
   constructor(ctx,env){
     this.ctx=ctx;this.env=env;this.sql=ctx.storage.sql;this.peopleRevision=uid();this.peopleCache=null;
@@ -1152,6 +1154,7 @@ export class FamilyState {
       if(this.initializationError&&Date.now()>=this.nextInitializationAttempt)this.initializeState();
       if(this.initializationError)throw this.initializationError;
       const {action,...p}=await request.json();
+      if(action?.startsWith('nakash.'))return json(await handleNakashState(this,action,p,RecycleAccess));
       if(action==='family-ai.removal.setup')return json(await new FamilyAiRemovalAccess(this).setup(p));
       if(action==='family-ai.exclude'&&p.excluded!==false)await new FamilyAiRemovalAccess(this).authorize(p);
       if(action==='media.delete'&&(['family-ai','living-family'].includes(p.scope)||this.media(p.id).category==='family-ai')){

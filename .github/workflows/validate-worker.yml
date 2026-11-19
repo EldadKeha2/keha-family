@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'public/assets/**'
+      - 'public/nakash/**'
       - 'public/index.html'
       - 'public/_headers'
       - 'scripts/**'
@@ -35,3 +36,4 @@ jobs:
         run: npm run check
       - name: Bundle without publishing
         run: npx wrangler deploy --dry-run --outdir /tmp/keha-worker-build
+

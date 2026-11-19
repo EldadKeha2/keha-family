@@ -1,0 +1,26 @@
+{
+  "id": "/nakash/keha/",
+  "name": "משפחת קהא",
+  "short_name": "משפחת קהא",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/nakash/keha/",
+  "scope": "/nakash/keha/",
+  "display": "standalone",
+  "background_color": "#f6f2e7",
+  "theme_color": "#536641",
+  "icons": [
+    {
+      "src": "/nakash/brand-keha-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/nakash/brand-keha-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
