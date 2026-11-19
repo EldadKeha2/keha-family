@@ -24,7 +24,7 @@
     }
     function finish(allowNavigation=false){
       const g=gesture;if(!g)return;reset();const now=Date.now(),duration=g.releasedAt===null?Infinity:g.releasedAt-g.started;
-      const flick=allowNavigation&&enabled()&&!g.scrollOnly&&g.releasedAt!==null&&duration<=QUICK&&Math.abs(g.dy)>=64&&Math.abs(g.dy)/Math.max(32,duration)>=.45;
+      const flick=allowNavigation&&enabled()&&g.contact&&!g.scrollOnly&&g.releasedAt!==null&&duration<=QUICK&&Math.abs(g.dy)>=64&&Math.abs(g.dy)/Math.max(32,duration)>=.45;
       recent={at:now,peak:g.peak,sign:g.sign,navigated:flick};if(!flick)panUntil=now+320;
       if(flick)step(-Math.sign(g.dy),'pad-vertical');
     }
@@ -50,7 +50,7 @@
       if(!gesture&&recent?.navigated&&now-recent.at<500&&(event.momentum===true||Math.sign(dy)===recent.sign&&magnitude<recent.peak*.55)){
         recent.at=now;prevent(event);return true;
       }
-      gesture||={started:now,dy:0,sign:Math.sign(dy),peak:0,last:0,falling:0,releasedAt:null,scrollOnly:now<panUntil,momentumKnown:false};
+      gesture||={started:now,dy:0,sign:Math.sign(dy),peak:0,last:0,falling:0,releasedAt:null,scrollOnly:now<panUntil,momentumKnown:false,contact:event.momentum!==true};
       const g=gesture;g.momentumKnown||=typeof event.momentum==='boolean';
       // Once scrolling has moved this gesture, reaching the bottom cannot
       // reinterpret its remaining contact or momentum as Next photo.

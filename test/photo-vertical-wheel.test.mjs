@@ -67,6 +67,12 @@ test('sustained contact and silent held fingers never become a release, even whe
  const isolated=fixture();isolated.wheel(120);isolated.tick(1000);assert.deepEqual(isolated.steps,[]);
 });
 
+test('momentum arriving without its original contact can scroll but cannot start a new photo swipe',()=>{
+ for(const scrollHeight of [600,1000]){
+  const f=fixture({scrollHeight});f.wheel(120,{momentum:true});f.tick(30);f.wheel(80,{momentum:true});f.tick(500);assert.deepEqual(f.steps,[]);assert.equal(f.viewer.scrollTop,scrollHeight===600?0:200);
+ }
+});
+
 test('browsers without momentum flags require falling samples and confirmation; renewed contact cancels the flick',()=>{
  for(const renewed of [false,true]){
   const f=fixture();for(const dy of [90,40,12]){f.wheel(dy);f.tick(20);}
