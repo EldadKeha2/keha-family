@@ -1,122 +1,83 @@
 import assert from 'node:assert/strict';
-import {access, readFile} from 'node:fs/promises';
-import {test} from 'node:test';
+import {readFile} from 'node:fs/promises';
+import test from 'node:test';
 import vm from 'node:vm';
 import {parseHTML} from 'linkedom';
-import keha from '../src/family.mjs';
-import {BRANCHES, createFamily, findPeople} from '../public/nakash/family-data.mjs';
-import {renderDirectory, renderProfile, renderTree} from '../public/nakash/tree-view.mjs';
+import {nakashHTML, nakashShell} from '../src/nakash-shell.mjs';
+import {nakashProjection} from '../src/nakash.mjs';
+import family from '../src/family.mjs';
 
-const publicRoot = new URL('../public/', import.meta.url);
-const html = await readFile(new URL('nakash/index.html', publicRoot), 'utf8');
-const script = (await readFile(new URL('nakash/site.mjs', publicRoot), 'utf8'))
-  .replace(/^import .+;\n/gm, '');
+const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const appSource = await readFile(new URL('../public/assets/app.js', import.meta.url), 'utf8');
 const origin = 'https://family.example';
-const flush = () => new Promise(resolve => setImmediate(resolve));
+const projection = () => nakashProjection(family, new Map());
 
-async function portal(path, referrer = '') {
-  const {window, document} = parseHTML(html);
-  const location = new URL(path, origin);
-  const requests = [];
-  const shares = [];
-  Object.defineProperty(document, 'referrer', {value: referrer});
-  vm.runInNewContext(script, {
-    window, document, location, URL, navigator: {share: async payload => shares.push(payload)},
-    BRANCHES, createFamily, findPeople, renderDirectory, renderProfile, renderTree,
-    fetch: async path => {
-      requests.push(path);
-      // The legacy family fixture intentionally contains more than the public
-      // projection. Verify those fields are also omitted by the display layer.
-      return {ok: true, json: async () => ({keha})};
-    },
-  }, {filename: 'nakash/site.mjs'});
-  await flush();
-  const view = document.querySelector('#view');
-  return {
-    document,
-    view,
-    requests,
-    shares,
-    route(hash) {
-      location.hash = hash;
-      window.dispatchEvent(new window.Event('hashchange'));
-    },
-    search(query) {
-      const input = document.querySelector('#search-input');
-      input.value = query;
-      input.dispatchEvent(new window.Event('input'));
-      return Array.from(document.querySelectorAll('#search-results a'), link => link.getAttribute('href'));
-    },
-  };
-}
-
-function showsKehaReturn(page) {
-  const link = page.document.querySelector('#back-keha');
-  return Boolean(link && !link.hidden && link.hasAttribute('href'));
-}
-
-test('direct Nakash pages keep the branch identity and display the shared genealogy without legacy private fields', async () => {
-  const page = await portal('/nakash/medina/');
-  assert.equal(page.document.querySelector('#brand-name').textContent, 'משפחת מדינה');
-  assert.equal(showsKehaReturn(page), false);
-  assert.deepEqual(page.requests, ['/nakash/api/family']);
-  const parentNames = Array.from(page.view.querySelectorAll('.nk-chart > .nk-couple .nk-person-name'), element => element.textContent);
-  assert.deepEqual(parentNames, ['מרגלית נקאש', 'זכריה נקאש']);
-  const branchCouples = Array.from(page.view.querySelectorAll('.nk-overview-branch'), couple =>
-    Array.from(couple.querySelectorAll('.nk-person-name'), member => member.textContent));
-  assert.deepEqual(branchCouples, [['רומה נקאש', 'יוסף מדינה'], ['יונה נקאש קהא', 'שלמה קהא'], ['יהודה נקאש', 'זהור'], ['חיים נקאש', 'שושנה']]);
-  assert.deepEqual(page.search('Joseph'), ['/nakash/medina/#person/joseph-medina']);
-  assert.deepEqual(page.search('אבנר'), []);
-
-  const examples = [
-    ['medina', 'roni-medina', ['רוני מדינה', 'לאה']],
-    ['haim', 'avner-nakash', ['אבנר נקאש', 'רבקה נקאש']],
-    ['yehuda', 'naomi-malkhi', ['נעמי מלכי', 'שלום מלכי']],
-  ];
-  for (const [branch, personId, names] of examples) {
-    page.route('#tree/' + branch);
-    assert.deepEqual(Array.from(page.view.querySelectorAll('.nk-tree-generation .nk-person-name'), name => name.textContent), names);
-    assert.ok(page.view.querySelector(`a[href="/nakash/medina/#person/${personId}"]`));
-  }
-  page.route('#person/roni-medina');
-  assert.match(page.view.textContent, /בני זוג לשעבר.*לאה/);
-  assert.match(page.view.textContent, /אין ילדים משותפים/);
-  page.route('#people');
-  assert.ok(page.view.querySelector('a[href="/nakash/medina/#person/avner-nakash"]'));
-  assert.ok(page.view.querySelector('a[href="/nakash/medina/#person/ruti"]'));
-  page.route('#person/ruti');
-  assert.equal(page.view.querySelector('h1').textContent, keha.people.ruti.name);
-  assert.ok(page.view.querySelector('a[href="/nakash/medina/#tree/keha"]'));
-  assert.ok(!page.view.innerHTML.includes(keha.people.ruti.folder));
-  assert.ok(!page.view.textContent.includes(keha.people.ruti.birthday));
-  assert.ok(!Object.hasOwn(createFamily(keha).people, 'robin'), 'Extended people outside the shared tree do not become public profiles');
-
-  for (const branch of [null, ...BRANCHES]) {
-    const path = '/nakash/' + (branch ? `${branch.id}/` : '');
-    const manifestPath = path + 'manifest.webmanifest';
-    const manifest = JSON.parse(await readFile(new URL(manifestPath.slice(1), publicRoot), 'utf8'));
-    assert.equal(manifest.id, path);
-    assert.equal(manifest.scope, path);
-    assert.equal(manifest.start_url, path);
-    assert.equal(manifest.name, branch?.label || 'משפחת נקאש');
-    assert.ok(manifest.icons.length);
-    for (const icon of manifest.icons) {
-      assert.ok(icon.src.startsWith(`/nakash/brand-${branch?.id || 'nakash'}`));
-      await access(new URL(icon.src.slice(1), publicRoot));
+test('Nakash branch pages retain the original components and limit top-level navigation', () => {
+  const original = parseHTML(html).document;
+  for (const branch of ['haim', 'yehuda', 'medina', 'keha']) {
+    const {document} = parseHTML(nakashHTML(html, branch));
+    assert.equal(document.documentElement.dataset.nakashSearchBranch, branch);
+    assert.equal(document.querySelector('link[rel="manifest"]').getAttribute('href'), '/nakash/' + branch + '/manifest.webmanifest');
+    assert.equal(document.querySelector('#homeLink img').getAttribute('src'), '/nakash/brand-' + branch + '.svg');
+    assert.deepEqual([...document.querySelectorAll('#mainNav button')].map(button => button.dataset.view),
+      ['tree', 'directory', 'videos', 'gallery']);
+    assert.equal(document.querySelector('link[rel="stylesheet"]').getAttribute('href'),
+      '/' + original.querySelector('link[rel="stylesheet"]').getAttribute('href'));
+    for (const id of ['treeViewport', 'directoryGrid', 'galleryHeaderUpload', 'videoHeaderUpload', 'personView', 'mediaViewer']) {
+      assert.equal(document.getElementById(id).tagName, original.getElementById(id).tagName, id);
     }
-    const direct = await portal(path);
-    assert.equal(direct.document.querySelector('link[rel="manifest"]').getAttribute('href'), manifestPath);
-    assert.equal(direct.document.querySelector('#brand-name').textContent, manifest.name);
-    assert.equal(showsKehaReturn(direct), false);
+    const scripts = [...document.querySelectorAll('script[src]')].map(script => script.getAttribute('src'));
+    assert.ok(scripts.indexOf('/nakash/media-adapter.js') < scripts.findIndex(src => src.startsWith('/assets/app.js')));
+    assert.ok(scripts.includes('/nakash/api/site-data.js'));
+    assert.ok(!scripts.some(src => /^\/(?:family-data\.js|assets\/family-fallback\.js)/.test(src)));
+    assert.equal(document.querySelector('a[href="/#home"]'), null);
   }
+});
 
-  const inside = await portal('/nakash/inside/#tree/haim', origin + '/');
-  assert.equal(showsKehaReturn(inside), true);
-  assert.ok(inside.view.querySelector('a[href="/nakash/inside/#person/avner-nakash"]'));
-  inside.document.querySelector('#share').click();
-  await flush();
-  assert.equal(inside.shares[0].url, origin + '/nakash/#tree/haim');
-  const shared = await portal(new URL(inside.shares[0].url).pathname + '#tree/haim', 'https://elsewhere.example/');
-  assert.equal(showsKehaReturn(shared), false);
-  assert.ok(shared.view.querySelector('a[href="/nakash/#person/avner-nakash"]'));
+test('Only the internal entry from the Keha site has a return link', async () => {
+  const env = {ASSETS:{fetch:async request => {
+    assert.equal(new URL(request.url).pathname, '/');
+    return new Response(html);
+  }}};
+  for (const referrer of [undefined, origin + '/nakash/haim/', 'https://elsewhere.example/']) {
+    const response = await nakashShell(new Request(origin + '/nakash/inside/', {headers:referrer ? {Referer:referrer} : {}}), env, projection);
+    assert.equal(parseHTML(await response.text()).document.querySelector('a[href="/#home"]'), null);
+  }
+  const response = await nakashShell(new Request(origin + '/nakash/inside/', {headers:{Referer:origin + '/'}}), env, projection);
+  const {document} = parseHTML(await response.text());
+  assert.ok(document.querySelector('a[href="/#home"]'));
+  assert.equal(document.documentElement.dataset.nakashHome, '/nakash/');
+});
+
+test('Scoped tree data supplies the original tree renderer with the four Nakash branches', async () => {
+  const response = await nakashShell(new Request(origin + '/nakash/api/site-data.js'), {}, projection);
+  const script = await response.text();
+  const data = JSON.parse(script.split('\n')[0].slice('window.FAMILY_DATA='.length, -1));
+  assert.equal(data.branches.length, 4);
+  assert.deepEqual(data.units[data.root].people, ['margalit-nakash', 'zecharia-nakash']);
+  for (const id of ['roni-medina', 'naomi-malkhi', 'avner-nakash', 'yona', 'shlomo']) assert.ok(data.people[id]);
+  assert.ok(data.units[data.root].children.includes(data.people.yona.unit));
+});
+
+test('The original desktop and phone tree renderer opens each sample branch', async () => {
+  const script = await (await nakashShell(new Request(origin + '/nakash/api/site-data.js'), {}, projection)).text();
+  for (const phone of [false, true]) {
+    const {document, window:dom} = parseHTML(nakashHTML(html, 'haim'));
+    const window = {addEventListener(){}, dispatchEvent(){}, scrollTo(){}};
+    window.FamilyI18n = {t:value=>value, html:(parts,...values)=>parts.reduce((output,part,index)=>output+part+(values[index]??''),''),
+      personName:person=>person.name, branchName:branch=>branch?.title, searchNames:person=>person.name, date:value=>value};
+    window.FamilyDates = {age:()=>null, parse:()=>null};
+    const location = {hash:'#tree'};
+    const vmContext = vm.createContext({document, window, location, history:{pushState(){}}, matchMedia:query=>({matches:phone&&query.includes('700px')}),
+      requestAnimationFrame(){}, cancelAnimationFrame(){}, setInterval(){}, innerWidth:phone?390:1280, innerHeight:900, CustomEvent:dom.CustomEvent});
+    vm.runInContext(script, vmContext);
+    window.LOCAL_FAMILY_SERVER = false;
+    vm.runInContext(appSource, vmContext);
+    assert.equal(document.querySelectorAll('#treeNodes [data-open-branch]').length, 4);
+    assert.ok(document.querySelector('#treeNodes [data-person="margalit-nakash"]'));
+    for (const [branch, id] of [['haim','avner-nakash'],['yehuda','naomi-malkhi'],['medina','roni-medina'],['keha','ruti']]) {
+      document.querySelector('#branchBar [data-branch="'+branch+'"]').click();
+      assert.ok(document.querySelector('#treeNodes [data-person="'+id+'"]'), branch);
+    }
+  }
 });

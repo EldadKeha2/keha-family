@@ -15,13 +15,15 @@
   const ua=navigator.userAgent||'',iphone=/iPhone/i.test(ua)&&!/iPad|iPod/i.test(ua),ios=iphone||/iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1);
   const android=/Android/i.test(ua),embedded=/FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(ua);
   const mobileDevice=ios||android||navigator.userAgentData?.mobile===true||/Mobile|Tablet/i.test(ua);
-  const nativeDesktop=/KehaFamilyDesktop\//i.test(ua);
-  const url=new URL('/',location.origin),language=window.FamilyI18n?.language;
+  const nakash=document.documentElement?.dataset,siteHome=nakash?.nakashHome,siteName=()=>nakash?.nakashName||tr('בית משפחת קהא','Keha Family Home');
+  const nativeDesktop=!siteHome&&/KehaFamilyDesktop\//i.test(ua);
+  const url=new URL(siteHome||'/',location.origin),language=window.FamilyI18n?.language;
   if(['he','en-US','en-GB'].includes(language))url.searchParams.set('lang',language);
   url.hash='home';
   const invitationURL=new URL(url.href);invitationURL.searchParams.set('install','1');
   const installationInvitation=new URLSearchParams(location.search).get('install')==='1';
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const appIcon=siteHome?document.querySelector('link[rel=apple-touch-icon]')?.getAttribute('href')||'assets/app-icons/icon-192.png':'assets/app-icons/icon-192.png';
   const shortcutIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="2" width="12" height="20" rx="2"/><path d="M8 18h4M19 5v8m-4-4h8"/></svg>';
   const desktopIcon='<svg class="home-install-icon desktop-shortcut-logo" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4M12 6v7m-3-3 3 3 3-3"/></svg>';
   const bookmarkIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg>';
@@ -114,23 +116,24 @@
     dialog.querySelector('[data-home-install-success-browse]').addEventListener('click',continueToSite);showDialog('success',returnFocus);
   }
   function websiteSharePayload(){
-    return {title:tr('בית משפחת קהא','Keha Family Home'),text:tr('בית משפחת קהא במסך הבית שלכם. פתחו את הקישור ולחצו ״התקן״.','Keha Family Home on your home screen. Open the link and tap “Install”.'),url:invitationURL.href};
+    return {title:siteName(),text:siteHome?siteName()+'. '+tr('פתחו את הקישור ולחצו ״התקן״.','Open the link and tap “Install”.'):tr('בית משפחת קהא במסך הבית שלכם. פתחו את הקישור ולחצו ״התקן״.','Keha Family Home on your home screen. Open the link and tap “Install”.'),url:invitationURL.href};
   }
   function currentPageSharePayload(){
     const page=new URL(location.href),language=window.FamilyI18n?.language;
+    if(siteHome)page.pathname=siteHome;
     page.searchParams.delete('install');
     if(page.hash.startsWith('#updates/manage/'))page.hash='#updates';
     if(['he','en-US','en-GB'].includes(language))page.searchParams.set('lang',language);
     const person=location.hash.startsWith('#person/')?document.getElementById('personPageContent')?.querySelector('.person-page-hero h2')?.textContent.trim():'';
     const pageTitle=person||document.getElementById('workspaceTitle')?.textContent.trim()||'';
-    const siteTitle=tr('בית משפחת קהא','Keha Family Home');
+    const siteTitle=siteName();
     return {title:pageTitle?pageTitle+' · '+siteTitle:siteTitle,text:pageTitle?siteTitle+' · '+pageTitle:siteTitle,url:page.href};
   }
   function openShareChoices(){
     const page=currentPageSharePayload(),website=websiteSharePayload();
     const pageIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9M15 3h6v6m0-6-10 10"/></svg>';
     const homeIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/></svg>';
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת השיתוף','Close sharing')+'">×</button><h2 id="homeInstallTitle">'+tr('מה תרצו לשתף?','What would you like to share?')+'</h2><p class="home-install-dialog-intro" id="homeShareChoiceIntro">'+tr('בחרו קישור לעמוד הזה או הזמנה כללית לאתר.','Choose a link to this page or a general website invitation.')+'</p><div class="home-share-choices"><button type="button" class="home-share-choice" data-home-share-page><span class="home-share-choice-icon">'+pageIcon+'</span><span><strong>'+tr('שיתוף העמוד הנוכחי','Share this page')+'</strong><small>'+tr('קישור ישיר לעמוד שבו אתם נמצאים','A direct link to the page you are viewing')+'</small></span></button><button type="button" class="home-share-choice" data-home-share-site><span class="home-share-choice-icon">'+homeIcon+'</span><span><strong>'+tr('שיתוף האתר','Share the website')+'</strong><small>'+tr('קישור למסך הבית של בית משפחת קהא','A link to the Keha Family Home screen')+'</small></span></button></div>';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת השיתוף','Close sharing')+'">×</button><h2 id="homeInstallTitle">'+tr('מה תרצו לשתף?','What would you like to share?')+'</h2><p class="home-install-dialog-intro" id="homeShareChoiceIntro">'+tr('בחרו קישור לעמוד הזה או הזמנה כללית לאתר.','Choose a link to this page or a general website invitation.')+'</p><div class="home-share-choices"><button type="button" class="home-share-choice" data-home-share-page><span class="home-share-choice-icon">'+pageIcon+'</span><span><strong>'+tr('שיתוף העמוד הנוכחי','Share this page')+'</strong><small>'+tr('קישור ישיר לעמוד שבו אתם נמצאים','A direct link to the page you are viewing')+'</small></span></button><button type="button" class="home-share-choice" data-home-share-site><span class="home-share-choice-icon">'+homeIcon+'</span><span><strong>'+tr('שיתוף האתר','Share the website')+'</strong><small>'+(siteHome?escape(siteName()):tr('קישור למסך הבית של בית משפחת קהא','A link to the Keha Family Home screen'))+'</small></span></button></div>';
     dialog.querySelector('[data-home-share-page]').addEventListener('click',()=>{closeDialog();void sharePayload(page,true);});
     dialog.querySelector('[data-home-share-site]').addEventListener('click',()=>{closeDialog();void sharePayload(website);});
     showDialog('share-choice',shareButton);
@@ -165,7 +168,7 @@
   function checkInstalledShortcut(){
     if(window.top!==window||typeof navigator.getInstalledRelatedApps!=='function')return Promise.resolve();
     if(installationCheck)return installationCheck;
-    const manifestURL=new URL('/manifest.webmanifest',location.origin).href,appID=new URL('/',location.origin).href;
+    const manifestURL=new URL(nakash?.nakashManifest||'/manifest.webmanifest',location.origin).href,appID=new URL(siteHome||'/',location.origin).href;
     installationCheck=Promise.resolve().then(()=>navigator.getInstalledRelatedApps()).then(apps=>{
         relatedInstalled=apps.some(app=>app.platform==='webapp'&&(app.url===manifestURL||app.id===appID));
         if(relatedInstalled)installPrompt=null;
@@ -219,14 +222,14 @@
   function openBookmarkHelp(returnFocus=bookmarkButton){
     if(!desktopView()||nativeDesktop)return;
     const shortcut=/Macintosh|Mac OS X/.test(ua)?'⌘ + D':'Ctrl + D';
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('מועדפים בדפדפן','Browser bookmark')+'</h2><p class="home-install-dialog-intro">'+tr('שמרו את העמוד במועדפים, לפתיחה מהירה מתוך הדפדפן.','Save this page as a bookmark for quick access from your browser.')+'</p><div class="home-install-bookmark-shortcut" data-desktop-bookmark-shortcut><kbd dir="ltr">'+shortcut+'</kbd></div>'+steps([tr('לחצו על צירוף המקשים שמופיע למעלה, או על הכוכב שבשורת הכתובת.','Press the shortcut shown above, or select the star in the address bar.'),tr('בחרו ״סרגל הסימניות״ או ״סרגל המועדפים״ ואשרו את השמירה.','Choose the Bookmarks bar or Favorites bar and confirm the save.')])+'<p class="home-install-invite-note">'+tr('הדפדפן פותח את חלון השמירה. האתר אינו מוסיף סימנייה באופן אוטומטי.','Your browser opens the save dialog. This website does not add a bookmark automatically.')+'</p>';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="'+escape(appIcon)+'" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('מועדפים בדפדפן','Browser bookmark')+'</h2><p class="home-install-dialog-intro">'+tr('שמרו את העמוד במועדפים, לפתיחה מהירה מתוך הדפדפן.','Save this page as a bookmark for quick access from your browser.')+'</p><div class="home-install-bookmark-shortcut" data-desktop-bookmark-shortcut><kbd dir="ltr">'+shortcut+'</kbd></div>'+steps([tr('לחצו על צירוף המקשים שמופיע למעלה, או על הכוכב שבשורת הכתובת.','Press the shortcut shown above, or select the star in the address bar.'),tr('בחרו ״סרגל הסימניות״ או ״סרגל המועדפים״ ואשרו את השמירה.','Choose the Bookmarks bar or Favorites bar and confirm the save.')])+'<p class="home-install-invite-note">'+tr('הדפדפן פותח את חלון השמירה. האתר אינו מוסיף סימנייה באופן אוטומטי.','Your browser opens the save dialog. This website does not add a bookmark automatically.')+'</p>';
     showDialog('bookmark',returnFocus);
   }
   function openDesktopHelp(returnFocus=desktopButton){
     const alreadyInstalled=hasInstalledShortcut();
     const intro=alreadyInstalled?tr('האפליקציה כבר מותקנת. פתחו אותה מהסמל שלה במחשב.','The app is already installed. Open it from its icon on your computer.'):tr('מתקינים פעם אחת, ופותחים מהסמל של המשפחה.','Install once and open from the family icon.');
     const fallback=/Macintosh|Mac OS X/.test(ua)&&/Safari/.test(ua)&&!/Chrome|Chromium|Edg\//.test(ua)?tr('ב־Safari: קובץ ← הוספה ל־Dock.','In Safari: File → Add to Dock.'):tr('אם כפתור ההתקנה לא מופיע, בחרו Install app בתפריט הדפדפן.','If the install button is unavailable, choose Install app in your browser menu.');
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירה','Close')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('בית משפחת קהא במחשב','Keha Family on your computer')+'</h2><p class="home-install-dialog-intro">'+intro+'</p><button type="button" class="home-install-invite-primary" data-desktop-native-start hidden>'+tr('התקן','Install')+'</button><p class="home-install-invite-note" data-desktop-install-instructions>'+fallback+'</p><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירה','Close')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="'+escape(appIcon)+'" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+(siteHome?escape(siteName()):tr('בית משפחת קהא במחשב','Keha Family on your computer'))+'</h2><p class="home-install-dialog-intro">'+intro+'</p><button type="button" class="home-install-invite-primary" data-desktop-native-start hidden>'+tr('התקן','Install')+'</button><p class="home-install-invite-note" data-desktop-install-instructions>'+fallback+'</p><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>';
     dialog.querySelector('[data-desktop-native-start]').addEventListener('click',()=>requestDesktopInstallation(returnFocus));
     showDialog('desktop-install',returnFocus);update();
   }
@@ -273,7 +276,7 @@
   function openHelp(returnFocus=button){
     const embeddedNote=embedded?'<p class="home-install-browser-note">'+tr('בתפריט ⋮ או השיתוף של האפליקציה בחרו ״פתיחה בדפדפן״. אחרי הפתיחה לחצו שוב ״התקן״.','In this app’s ⋮ or Share menu, choose “Open in browser”. Then tap “Install” again.')+'</p>':'';
     const help=ios?appleHelp():android?androidHelp():'<h3>iPhone / iPad</h3>'+appleHelp()+'<h3>Android</h3>'+androidHelp();
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('התקנת בית משפחת קהא','Install Keha Family Home')+'</h2><button type="button" class="home-install-invite-primary" data-home-install-native-start hidden>'+tr('התקן','Install')+'</button>'+progressControl()+'<div data-home-install-instructions>'+embeddedNote+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>'+iconConfirmation();
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="'+escape(appIcon)+'" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('התקנת בית משפחת קהא','Install Keha Family Home')+'</h2><button type="button" class="home-install-invite-primary" data-home-install-native-start hidden>'+tr('התקן','Install')+'</button>'+progressControl()+'<div data-home-install-instructions>'+embeddedNote+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>'+iconConfirmation();
     dialog.querySelector('[data-home-install-native-start]').addEventListener('click',()=>requestInstallation(true));
     showDialog('install',returnFocus);
     update();
@@ -289,9 +292,9 @@
     }else{
       content='<p class="home-install-dialog-intro">'+tr('אייקון האתר במסך הבית של הטלפון — המשפחה במרחק נגיעה.','The website icon on your phone’s home screen — your family just a tap away.')+'</p>'+welcomeArt()+'<button type="button" class="home-install-invite-primary" data-home-install-invite-start>'+tr('התקן','Install')+'</button>'+platformLogos()+progressControl()+'<p class="home-install-invite-status" data-home-install-invite-status role="status" aria-live="polite"></p>'+iconConfirmation(true);
     }
-    const heading=alreadyInstalled?tr('הבית שלנו כבר אצלכם','Our home is already with you'):ios?tr('מוסיפים למסך הבית','Add to your Home Screen'):tr('התקנת בית משפחת קהא','Install Keha Family Home');
+    const heading=alreadyInstalled?tr('הבית שלנו כבר אצלכם','Our home is already with you'):ios?tr('מוסיפים למסך הבית','Add to your Home Screen'):siteHome?escape(siteName()):tr('התקנת בית משפחת קהא','Install Keha Family Home');
     const browse=ios&&!alreadyInstalled?'':'<button type="button" class="home-install-invite-browse" data-home-install-invite-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההזמנה','Close invitation')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="assets/app-icons/icon-192.png" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+heading+'</h2>'+content+browse;
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההזמנה','Close invitation')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="'+escape(appIcon)+'" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+heading+'</h2>'+content+browse;
     dialog.querySelector('[data-home-install-invite-start]')?.addEventListener('click',()=>requestInstallation(true));
     dialog.querySelector('[data-home-install-invite-browse]')?.addEventListener('click',continueToSite);
     showDialog('invite',returnFocus);update();

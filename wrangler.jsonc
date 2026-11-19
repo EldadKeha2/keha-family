@@ -12,7 +12,9 @@
       "/api/*",
       "/media/*",
       "/family-data.js",
-      "/nakash/api/*"
+      "/nakash/api/*",
+      "/nakash/",
+      "/nakash/index.html"
     ]
   },
   "durable_objects": {

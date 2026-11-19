@@ -3,6 +3,7 @@
   const I18n=window.FamilyI18n;
   const $=id=>document.getElementById(id),app=()=>window.FamilyApp;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const scopedViews=document.documentElement?.dataset?.nakashViews;
   const destinations=[['tree',I18n.t('אילן היוחסין'),I18n.t('משורש אחד, משפחה שלמה')],['timeline',I18n.t('ציר זמן משפחתי'),I18n.t('דורות של אנשים ורגעים, עשור אחר עשור')],['gallery',I18n.t('גלריה משפחתית'),I18n.t('תמונות ותיוגים, רגע אחרי רגע')],['screensaver',I18n.t('שומר מסך משפחתי'),I18n.t('כל המשפחה, זיכרון אחרי זיכרון')],['calendar',I18n.t('לוח שנה משפחתי'),I18n.t('ימי הולדת, חגים וסיבות לחגוג')],['directory',I18n.t('בני המשפחה'),I18n.t('האנשים והאלבומים של כולנו')],['photos',I18n.t('תמונות משפחתיות'),I18n.t('האלבום המשותף שלנו')],['videos',(I18n.isEnglish?'Videos':I18n.t('סרטונים')),I18n.t('הקולות והצחוק שנשארים')],['weddings',I18n.t('חתונות'),I18n.t('סיפורי האהבה שלנו')],['stories',I18n.t('הסיפורים שלנו'),I18n.t('זיכרונות שעוברים מדור לדור')],['voices',I18n.t('בקולם'),I18n.t('הקולות והסיפורים של המשפחה שלנו')],['family-ai',I18n.t('בינה משפחתית'),I18n.t('רגעים של פעם מתעוררים לחיים')],['nostalgia',I18n.t('פינת הנוסטלגיה'),I18n.t('עוד מבט ברגעים של פעם')],['updates',I18n.t('הרשמה לעדכונים'),I18n.t('התזכורות המשפחתיות שלנו')],['games',I18n.isEnglish?'Family Games':'משחקי משפחה',I18n.isEnglish?'How well do you know the family?':'כמה טוב אתם מכירים את המשפחה?'],['nursery',I18n.t('התינוקייה'),I18n.t('החיוכים הראשונים של כולנו')],['memorial',I18n.t('לזכרם'),I18n.t('מדליקים נר לזכרם')]];
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
   const TRANSITION_MS=650,CAPTION_DELAY_MS=1300,HOLD_MS=3500,FILM_SPEED=38;
@@ -137,7 +138,7 @@
     };
     if(moving)carousel.trimTimer=setTimeout(trim,TRANSITION_MS+100);else trim();startFilm();
   }
-  const tiles=()=>destinations.map(([view,title,description],index)=>`<button class="home-tile home-tile-${view}" data-view="${view}" style="--tile-delay:${index*35}ms"><span class="home-tile-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><use href="assets/home-icons.svg?v=voices-v2#${view}"></use></svg></span><span><strong>${title}</strong><small>${description}</small></span><span class="home-tile-arrow" aria-hidden="true">←</span></button>`).join('');
+  const tiles=()=>destinations.filter(([view])=>!scopedViews||scopedViews.split(' ').includes(view)).map(([view,title,description],index)=>`<button class="home-tile home-tile-${view}" data-view="${view}" style="--tile-delay:${index*35}ms"><span class="home-tile-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><use href="assets/home-icons.svg?v=voices-v2#${view}"></use></svg></span><span><strong>${title}</strong><small>${description}</small></span><span class="home-tile-arrow" aria-hidden="true">←</span></button>`).join('');
   const canAdvance=()=>state.view==='home'&&!state.paused&&!reducedMotion()&&state.items.length>1&&document.visibilityState==='visible'&&!$('mediaViewer')?.open;
   function stopAdvance(){clearTimeout(state.advanceTimer);state.advanceTimer=null;stopFilm();}
   function scheduleAdvance(){

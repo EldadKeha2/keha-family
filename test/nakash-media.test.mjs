@@ -47,6 +47,7 @@ test('Nakash route projects the Keha family tree and only serves the dedicated N
   assert.equal(Object.hasOwn(projected.people.yona, 'profile'), false);
   const env = {ASSETS: {fetch: request => Response.json({asset: new URL(request.url).pathname})}};
   const db = async (action) => {
+    if (action === 'nakash.compat.portraits') return {portraits:{}};
     assert.equal(action, 'dates');
     return {people:[{id:'yona', name:'יונה נקאש קהא', birthday:'private'}]};
   };
@@ -59,4 +60,88 @@ test('Nakash route projects the Keha family tree and only serves the dedicated N
   const payload = await (await route('/nakash/api/family')).json();
   assert.equal(payload.people.yona.name, 'יונה נקאש קהא');
   assert.equal(Object.hasOwn(payload.people.yona, 'birthday'), false);
+});
+
+test('Shared Nakash upload and profile contracts keep branch media and profile edits isolated', async () => {
+  const {default:worker,PUBLIC_WRITE_TOKEN}=await import('../src/worker.mjs');
+  const {NAKASH_WRITE_TOKEN}=await import('../src/nakash-shell.mjs');
+  const {fail,json}=await import('../src/http.mjs');
+  const storage=new DatabaseSync(':memory:');
+  const mainPortrait={id:'a'.repeat(32),key:'original/portrait.png',mime:'image/png',size:68};
+  const state={
+    sql:{exec:(query,...values)=>storage.prepare(query).run(...values)},
+    rows:(query,...values)=>storage.prepare(query).all(...values),
+    ctx:{storage:{transactionSync(fn){
+      storage.exec('BEGIN');
+      try{const value=fn();storage.exec('COMMIT');return value;}
+      catch(error){storage.exec('ROLLBACK');throw error;}
+    }}},
+    run:()=>({people:{yona:{id:'yona',name:'יונה נקאש קהא',profileMediaId:mainPortrait.id,profileFraming:{x:.45,y:.5}}}}),
+    media:id=>id===mainPortrait.id?mainPortrait:null,
+  };
+  const doBinding={async fetch(request) {
+    const {action,...args}=await request.json();
+    try {
+      if(action==='dates')return json({people:[{id:'yona',name:'יונה נקאש קהא',birthday:'16.10.1921'}]});
+      return json(await handleNakashState(state,action,args));
+    }catch(error){return fail(error);}
+  }};
+  const env={FAMILY_STATE:{get:()=>doBinding,idFromName:name=>name},HF_NAMESPACE:'fixture',HF_BUCKET:'fixture',HF_ACCESS_KEY_ID:'demo',HF_SECRET_ACCESS_KEY:'demo'};
+  const bytes=Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNTsAAAAASUVORK5CYII=', 'base64'));
+  const objects=new Map([['/fixture/fixture/'+mainPortrait.key,bytes]]);
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async request=>{
+    const url=new URL(request.url);assert.equal(url.hostname,'s3.hf.co');
+    if(request.method==='PUT'){objects.set(url.pathname,new Uint8Array(await request.arrayBuffer()));return new Response('');}
+    if(request.method==='DELETE'){objects.delete(url.pathname);return new Response('');}
+    return new Response(objects.get(url.pathname),{status:objects.has(url.pathname)?200:404});
+  };
+  const origin='https://family.example',ctx={waitUntil(){}};
+  const go=(path,options)=>worker.fetch(new Request(origin+path,options),env,ctx);
+  const branch=(id,path)=>'/nakash/api/compat/'+id+'/api/'+path;
+  const post=(id,path,value)=>go(branch(id,path),{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Family-Token':NAKASH_WRITE_TOKEN},body:JSON.stringify(value)});
+  const gallery=async(id,filter='all')=>(await go(branch(id,'collections/gallery?filter='+filter))).json();
+  try {
+    const marker=await (await go('/nakash/api/site-data.js')).text();
+    assert.ok(marker.includes(NAKASH_WRITE_TOKEN));
+    assert.ok(!marker.includes(PUBLIC_WRITE_TOKEN));
+    assert.equal((await go('/nakash/api/profile-photo/yona')).status,200);
+    assert.equal((await go('/nakash/api/profile-photo/avner-nakash')).status,404);
+    assert.equal((await gallery('keha')).items.length,0);
+
+    const uploaded=await go(branch('haim','collections/gallery/upload?filename=fixture.png'),{
+      method:'POST',headers:{Origin:origin,'Content-Type':'image/png','Content-Length':String(bytes.length),'X-Family-Token':NAKASH_WRITE_TOKEN},body:bytes,
+    });
+    assert.equal(uploaded.status,201);
+    const image=(await uploaded.json()).collection.items[0];
+    assert.ok(image.src.startsWith('/nakash/api/media/'));
+    assert.equal((await gallery('haim','untagged')).items.length,1);
+    assert.equal((await gallery('keha')).items.length,0);
+    assert.equal((await post('haim','media/'+image.id+'/tags/patch',{changes:[{personId:'yona',tagged:true}]})).status,200);
+    assert.equal((await gallery('haim')).items.length,0);
+    assert.equal((await gallery('keha','partial')).items.length,1);
+    assert.equal((await post('haim','media/'+image.id+'/tags/patch',{changes:[{personId:'avner-nakash',tagged:true}]})).status,200);
+    assert.equal((await gallery('haim','partial')).items.length,1);
+    assert.equal((await gallery('keha','partial')).items.length,1);
+    assert.equal((await gallery('medina')).items.length,0);
+    assert.equal((await post('haim','media/'+image.id+'/faces/review',{complete:true})).status,200);
+    assert.equal((await gallery('haim','complete')).items.length,1);
+    assert.equal((await go(branch('yehuda','media/'+image.id+'/view'))).status,404);
+
+    for(const [path,body] of [
+      ['birthday',{birthday:'2.3.1980',expectedBirthday:'1.1.1111'}],
+      ['about',{about:'סיפור בדיקה',expectedAbout:'',language:'he'}],
+      ['biography',{section:'occupation',value:'מורה',expectedValue:'',language:'he'}],
+      ['biography',{section:'languages',value:['עברית'],expectedValue:[],language:'he'}],
+    ]) assert.equal((await post('haim','people/avner-nakash/'+path,body)).status,200,path);
+    const data=await (await go(branch('medina','people/avner-nakash/page'))).json();
+    assert.equal(data.person.birthday,'2.3.1980');
+    assert.equal(data.person.about,'סיפור בדיקה');
+    assert.equal(data.person.occupation,'מורה');
+    assert.deepEqual(data.person.languages,['עברית']);
+    assert.equal((await go('/api/people/avner-nakash/about',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Family-Token':NAKASH_WRITE_TOKEN},body:'{}'})).status,403);
+  } finally {
+    globalThis.fetch=originalFetch;
+    storage.close();
+  }
 });

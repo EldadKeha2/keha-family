@@ -60,6 +60,7 @@ export function createFamily(keha = {}) {
         ...people[member], id: member, unit: id, name: person.name,
         englishName: person.englishName || person.nameEn || people[member]?.englishName,
         gender: person.gender, deceased: person.deceased === true,
+        ...(person.profile ? {profile:person.profile,profileFraming:person.profileFraming} : {}),
       };
       return true;
     });

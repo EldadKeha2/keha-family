@@ -8,7 +8,7 @@
     return /Windows|Macintosh|Linux|CrOS/i.test(ua)||matchMedia('(min-width:701px)').matches;
   }
   function siteLink(){
-    const url=new URL('.',location.href),language=window.FamilyI18n?.language;
+    const url=new URL(document.documentElement?.dataset?.nakashHome||'.',location.href),language=window.FamilyI18n?.language;
     if(language==='en-US'||language==='en-GB')url.searchParams.set('lang',language);
     return url.href;
   }
@@ -27,7 +27,7 @@
   }
   function open(trigger){
     const panel=ensureDialog();if(panel.open)return;
-    opener=trigger;const token=++session,url=siteLink(),title=tr('בית משפחת קהא','The Keha Family Home');panel.dir=window.FamilyI18n?.isEnglish?'ltr':'rtl';
+    opener=trigger;const token=++session,url=siteLink(),title=document.documentElement?.dataset?.nakashName||tr('בית משפחת קהא','The Keha Family Home');panel.dir=window.FamilyI18n?.isEnglish?'ltr':'rtl';
     panel.innerHTML=`<header><h2 id="desktopSiteShareTitle">${tr('שיתוף האתר','Share the website')}</h2><button type="button" data-site-share-close aria-label="${tr('סגירה','Close')}">×</button></header><div class="desktop-site-share-options"><a class="desktop-site-share-option" data-site-share-whatsapp target="_blank" rel="noopener noreferrer"><span class="desktop-site-share-icon share-whatsapp">${icons.whatsapp}</span><span>${tr('שיתוף דרך WhatsApp','Share via WhatsApp')}</span></a><a class="desktop-site-share-option" data-site-share-facebook target="_blank" rel="noopener noreferrer"><span class="desktop-site-share-icon share-facebook">${icons.facebook}</span><span>${tr('שיתוף בפייסבוק','Share on Facebook')}</span></a><button type="button" class="desktop-site-share-option" data-site-share-copy><span class="desktop-site-share-icon share-link">${icons.link}</span><span>${tr('העתקת קישור לאתר','Copy website link')}</span></button></div><p class="desktop-site-share-status" role="status" aria-live="polite"></p><input class="desktop-site-share-url" aria-label="${tr('קישור לאתר','Website link')}" readonly hidden dir="ltr">`;
     panel.querySelector('[data-site-share-whatsapp]').href='https://wa.me/?text='+encodeURIComponent(title+'\n'+url);
     panel.querySelector('[data-site-share-facebook]').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);

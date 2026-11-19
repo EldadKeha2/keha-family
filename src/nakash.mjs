@@ -1,6 +1,7 @@
 import {BRANCHES, branchForPerson, createFamily} from '../public/nakash/family-data.mjs';
 import {configured, deleteObject, getObject, putObject} from './hf.mjs';
 import {checkOrigin, HttpError, json, readJSON, sha256, text, uid} from './http.mjs';
+import {compatRoute,portraitPath} from './nakash-compat.mjs';
 
 const branchIds = new Set(BRANCHES.map(branch => branch.id));
 const capsule = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
@@ -78,7 +79,13 @@ function readMetadata(request) {
 
 async function currentProjection(family, db) {
   const {people} = await db('dates');
-  return nakashProjection(family, new Map(people.map(person => [person.id, person.name])));
+  const result = nakashProjection(family, new Map(people.map(person => [person.id, person.name])));
+  const {portraits} = await db('nakash.compat.portraits', {ids:Object.keys(result.people)});
+  for (const [id,framing] of Object.entries(portraits)) {
+    result.people[id].profile = portraitPath+id;
+    result.people[id].profileFraming = framing;
+  }
+  return result;
 }
 
 function adminSession(request) {
@@ -86,13 +93,25 @@ function adminSession(request) {
     .find(value => value.startsWith(sessionCookie + '='))?.slice(sessionCookie.length + 1) || '';
 }
 
-export async function nakashRoute(request, env, db, ctx, {family, sniff, streamUpload, limits, recycleRoute}) {
+export async function nakashRoute(request, env, db, ctx, options) {
+  const {family, sniff, streamUpload, limits, recycleRoute} = options;
   const url = new URL(request.url);
   const {pathname: path} = url;
   const method = request.method;
   const branch = url.searchParams.get('branch');
   const kind = url.searchParams.get('kind');
 
+  if(path.startsWith('/nakash/api/compat/')){
+    const result=await compatRoute(request,env,db,ctx,options,()=>currentProjection(family,db));
+    if(!result)throw notFound();
+    return result;
+  }
+  if(path.startsWith(portraitPath)&&['GET','HEAD'].includes(method)){
+    const id=path.slice(portraitPath.length),people=nakashProjection(family,new Map()).people;
+    if(!capsule.test(id)||!Object.hasOwn(people,id))throw notFound();
+    const {item}=await db('nakash.compat.portrait',{id});
+    return getObject(env,item,request);
+  }
   if (method === 'POST') checkOrigin(request);
   if (path === adminPath + '/login' && method === 'POST') {
     return recycleRoute(new Request(url.origin + '/api/trash/login', {
@@ -118,9 +137,7 @@ export async function nakashRoute(request, env, db, ctx, {family, sniff, streamU
       return json({items: result.items.map(publicMedia), hasMore: result.hasMore});
     }
     if (method !== 'POST') throw notFound();
-    const code = request.headers.get('X-Nakash-Upload-Code') || '';
-    if (!/^[a-f0-9]{32}$/.test(code)) throw new HttpError(403, 'קוד ההעלאה של הענף אינו תקין.');
-    await db('nakash.authorize', {branch, digest: await sha256(code)});
+    if (request.headers.get('X-Family-Token') !== options.nakashToken) throw new HttpError(403, 'יש לרענן את הדף לפני ההעלאה.');
     if (!configured(env)) throw new HttpError(503, 'אחסון הקבצים אינו זמין כרגע.');
     const metadata = readMetadata(request);
     const branches = new Set(metadata.sharedBranches);
@@ -167,6 +184,15 @@ export async function nakashRoute(request, env, db, ctx, {family, sniff, streamU
     const id = path.slice(galleryPath.length + 1);
     if (!/^[a-f0-9]{32}$/.test(id)) throw notFound();
     const {item} = await db('nakash.get', {id});
+    if(item.deletedAt)throw notFound();
+    const version=url.searchParams.get('version');
+    if(version&&version!==(item.photoRevision||'original')){
+      const saved=item.versions?.find(candidate=>candidate.id===version);
+      if(!saved)throw notFound();
+      return getObject(env,{...item,...saved},request);
+    }
+    const asset = url.searchParams.get('asset');
+    if(['thumbnail','preview'].includes(asset)&&item[asset])return getObject(env,{...item,...item[asset]},request);
     return getObject(env, item, request);
   }
 
@@ -177,7 +203,7 @@ export async function nakashRoute(request, env, db, ctx, {family, sniff, streamU
     const asset = new Request(url.origin + assetPath, {method, headers: request.headers});
     return env.ASSETS.fetch(asset);
   }
-  if (/^(?:brand-[a-z]+(?:-192|-512)?\.(?:svg|png)|(?:site|tree)\.css|(?:site|tree-view|family-data)\.mjs|sw\.js|(?:(?:keha|haim|yehuda|medina)\/)?manifest\.webmanifest)$/.test(section)) {
+  if (/^(?:brand-[a-z]+(?:-192|-512)?\.(?:svg|png)|media-adapter\.js|sw\.js|(?:(?:keha|haim|yehuda|medina)\/)?manifest\.webmanifest)$/.test(section)) {
     return env.ASSETS.fetch(request);
   }
   throw notFound();

@@ -155,7 +155,8 @@ function download(){
   if(!state.ids.size||state.busy)return;
   let frame=document.getElementById('mediaSelectionDownload');
   if(!frame){frame=document.createElement('iframe');frame.id=frame.name='mediaSelectionDownload';frame.hidden=true;frame.title=tr('הורדת הפריטים שנבחרו','Selected media download');document.body.append(frame);frame.addEventListener('load',()=>{try{const result=JSON.parse(frame.contentDocument.body.textContent);if(result.error)status(I.error(result.error),true);}catch{}});}
-  const form=document.createElement('form');form.method='POST';form.action='api/media/download';form.target=frame.name;form.hidden=true;
+  const form=document.createElement('form'),branch=document.documentElement?.dataset?.nakashBranch;
+  form.method='POST';form.action=branch?'/nakash/api/compat/'+branch+'/api/media/download':'api/media/download';form.target=frame.name;form.hidden=true;
   for(const [name,value]of Object.entries({ids:JSON.stringify([...state.ids]),token:window.FAMILY_API_TOKEN})){const field=document.createElement('input');field.type='hidden';field.name=name;field.value=value;form.append(field);}
   document.body.append(form);form.submit();form.remove();status(tr('הורדת קובץ ה־ZIP החלה.','Your ZIP download has started.'));
 }

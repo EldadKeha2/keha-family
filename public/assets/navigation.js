@@ -3,7 +3,9 @@
   const key='familyNavigation';
   const gameIds=['photos','kinship','missing','trivia','chick','differences','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
   const views=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
-  const root=()=>matchMedia('(max-width:700px)').matches?'#home':'#tree';
+  const site=globalThis.document?.documentElement?.dataset;
+  const root=()=>site?.nakashEntryView?'#'+site.nakashEntryView:matchMedia('(max-width:700px)').matches?'#home':'#tree';
+  const scopedViews=site?.nakashViews?.split(' ');
   const path=url=>url.pathname+url.search+url.hash;
   const current=()=>new URL(location.href);
   const entry=()=>history.state?.[key];
@@ -13,6 +15,14 @@
     const legacy=url.searchParams.get('game');
     if(legacy&&(!url.hash||url.hash==='#games'))url.hash=gameIds.includes(legacy)?'#games/'+legacy:'#games';
     url.searchParams.delete('game');
+    if(scopedViews){
+      const [view,id]=url.hash.slice(1).split('/');
+      if(view==='photos'||view==='photo')url.hash='#gallery';
+      else if(view==='video')url.hash='#videos';
+      else if(view==='people')url.hash='#directory';
+      else if(view==='profile'&&id)url.hash='#person/'+id;
+      else if(view&&!scopedViews.includes(view))url.hash=root();
+    }
     if(!url.hash)url.hash=root();
     return url;
   }

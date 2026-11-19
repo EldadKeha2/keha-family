@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {uploadRecording} from './voices-route.mjs';
-import {nakashRoute} from './nakash.mjs';
+import {nakashProjection,nakashRoute} from './nakash.mjs';
+import {NAKASH_WRITE_TOKEN,nakashShell} from './nakash-shell.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
 import {multipartVideo} from './video-multipart.mjs';
@@ -248,7 +249,17 @@ export default {
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
       if(path==='/nakash'||path.startsWith('/nakash/')){
-        const result=await nakashRoute(request,env,db,ctx,{family,sniff,streamUpload,limits:LIMITS,recycleRoute});
+        const options={family,sniff,archiveFormat,streamUpload,saveThumbnail,editPhoto,limits:LIMITS,recycleRoute,nakashToken:NAKASH_WRITE_TOKEN};
+        const shell=await nakashShell(request,env,async()=>{
+          const dataRequest=new Request(new URL('/nakash/api/family',url));
+          try {
+            return await (await nakashRoute(dataRequest,env,db,ctx,options)).json();
+          } catch {
+            return nakashProjection(family,new Map());
+          }
+        });
+        if(shell)return secure(shell);
+        const result=await nakashRoute(request,env,db,ctx,options);
         if(result)return secure(result);
       }
       if(['/api/gallery/download','/api/media/download'].includes(path)&&request.method==='POST'){

@@ -65,7 +65,9 @@
     swipeHintNode=hint;$('mediaStage').append(hint);
   }
   function shareURL(item){
-    const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);
+    const url=new URL(document.documentElement?.dataset?.nakashHome||'/',location.origin);
+    if(item.profilePersonId){url.searchParams.set('lang',I18n.language);url.hash='person/'+encodeURIComponent(item.profilePersonId);return url.href;}
+    url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);
     const scope=viewerAlbumScope()||item.scope||'gallery';
     url.hash=scope.startsWith('personal:')?'person/'+encodeURIComponent(scope.slice(9)):scope.startsWith('wedding:')?'weddings/'+encodeURIComponent(scope.slice(8)):scope.startsWith('nursery:')?'nursery/'+encodeURIComponent(scope.slice(8)):scope.startsWith('nostalgia')?'nostalgia':['photos','videos','family-ai','living-family'].includes(scope)?(scope==='living-family'?'family-ai':scope):'gallery';
     return url.href;
@@ -148,7 +150,7 @@
     const descriptionLabel=item.kind==='video'?tr('הוסף תיאור לסרטון','Add a video description'):item.kind==='document'?tr('הוסף תיאור למסמך','Add a document description'):tr('הוסף תיאור לתמונה','Add a photo description');
     const desktopDescriptionLabel=item.kind==='video'?tr('להוספת תיאור לסרטון','Add a video description'):item.kind==='document'?tr('להוספת תיאור למסמך','Add a document description'):tr('להוספת תיאור לתמונה','Add a photo description');
     $('editOpenedCaption').querySelector('[data-media-caption-mobile]').textContent=I18n.isEnglish?'Add a description':descriptionLabel;$('editOpenedCaption').querySelector('[data-media-caption-desktop]').textContent=desktopDescriptionLabel;$('editOpenedCaption').setAttribute('aria-label',desktopDescriptionLabel);$('editOpenedCaption').title=desktopDescriptionLabel;
-    const url=shareURL(item),label=(item.caption||I18n.mediaName(item)||'Keha Family').replace(/[\r\n]/g,' ');
+    const url=shareURL(item),label=(item.caption||I18n.mediaName(item)||document.documentElement?.dataset?.nakashName||'Keha Family').replace(/[\r\n]/g,' ');
     $('shareMediaWhatsApp').href='https://wa.me/?text='+encodeURIComponent(label+'\n'+url);
     $('shareMediaFacebook').href='https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);
     $('shareMediaEmail').href='mailto:?subject='+encodeURIComponent(label)+'&body='+encodeURIComponent(label+'\n\n'+url);
@@ -220,7 +222,7 @@
       if(!navigator.canShare({files:[file]})){await instagramFallback(item);return;}
       if(navigator.userActivation?.isActive===false){$('mediaShareStatus').textContent=tr('התמונה מוכנה. לחצו שוב על Instagram ובחרו אותו בחלון השיתוף.','The photo is ready. Tap Instagram again, then choose it in the sharing menu.');return;}
       $('mediaShareStatus').textContent=tr('בחרו Instagram בחלון השיתוף של הטלפון.','Choose Instagram in your phone’s sharing menu.');
-      await navigator.share({files:[file],title:item.caption||I18n.mediaName(item)||'Keha Family'});
+      await navigator.share({files:[file],title:item.caption||I18n.mediaName(item)||document.documentElement?.dataset?.nakashName||'Keha Family'});
     }catch(error){if(!isCurrent())return;if(error.name==='AbortError'){$('mediaShareStatus').textContent='';return;}await instagramFallback(item);}
     finally{if(isCurrent()){button.disabled=false;button.removeAttribute('aria-busy');}}
   }
@@ -443,6 +445,7 @@
   }
   function captionControls(){
     const inline=inlineCaption(),video=current()?.kind==='video',input=$('openedCaptionText'),form=$('openedCaptionForm');
+    if(current()?.profilePersonId){$('mediaViewer').classList.remove('media-caption-inline');$('editOpenedCaption').hidden=true;form.hidden=true;return;}
     $('mediaViewer').classList.toggle('media-caption-inline',inline);$('editOpenedCaption').hidden=inline;
     form.hidden=!(inline||captionEditing);
     form.classList.toggle('caption-editing',captionEditing);
@@ -590,7 +593,7 @@
     window.FamilyPhotoKeyboard?.bindNavigation({available:canControlNavigate,capture:()=>({session:state.session,navigation:state.navigation,id:identity(current())}),navigate:controlNavigate});
     $('shareMediaInstagram').addEventListener('click',shareInstagram);
     $('shareMediaMessenger').addEventListener('click',async event=>{
-      const item=current();if(!item){event.preventDefault();return;}const url=shareURL(item),title=item.caption||I18n.mediaName(item)||'Keha Family';
+      const item=current();if(!item){event.preventDefault();return;}const url=shareURL(item),title=item.caption||I18n.mediaName(item)||document.documentElement?.dataset?.nakashName||'Keha Family';
       if(navigator.share){event.preventDefault();try{await navigator.share({title,url});}catch(error){if(error.name!=='AbortError'){$('mediaShareStatus').textContent=tr('אפשר להעתיק את הקישור ולשלוח ב-Messenger.','Copy the link and send it in Messenger.');}}return;}
       try{await navigator.clipboard.writeText(url);$('mediaShareStatus').textContent=tr('הקישור הועתק. בחרו שיחה ב-Messenger והדביקו אותו.','Link copied. Choose a Messenger conversation and paste it.');}
       catch{$('mediaLinkFallback').value=url;$('mediaLinkFallback').hidden=false;$('mediaShareStatus').textContent=tr('העתיקו את הקישור מהשדה והדביקו בשיחה ב-Messenger.','Copy the link from the field and paste it in Messenger.');}

@@ -8,12 +8,18 @@
   const phoneQuery=matchMedia('(max-width:700px)'),isPhone=()=>phoneQuery.matches;
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
   const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
+  const scopedViews=document.documentElement?.dataset?.nakashViews;
+  if(scopedViews)for(const view of validViews)if(!scopedViews.split(' ').includes(view))validViews.delete(view);
+  const searchBranch=document.documentElement?.dataset?.nakashSearchBranch;
+  const inSearchBranch=person=>!searchBranch||!person.branch||person.branch===searchBranch;
   const requestedView=location.hash.slice(1).split('/')[0];
   const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
   let motionFrame=0,suppressClickUntil=0,treeRenderVersion=0,treeCameraApplied=false;
   const treeTextScale=()=>Math.max(1,Math.min(2,(Number(window.FamilyAccessibility?.getSettings?.().text)||100)/100));
   let observedTextScale=treeTextScale();
+  // Keep the original root-couple CSS on the top pair of either tree.
+  const treeUnitKey=id=>scopedViews?id===data.root?'u-root':id==='u-root'?'u-nakash-keha':id:id;
   const branchFor = id => data.branches.find(b => b.id === id);
   const getMedia = p => media.get(p.id) || {};
   const nameOf = p => I18n.personName({...p,...getMedia(p)});
@@ -32,7 +38,7 @@
   let toastTimer;
 
   function portraitHTML(p) {
-    const src = getMedia(p).profile;
+    const src = scopedViews?(getMedia(p).profile ?? p.profile):getMedia(p).profile;
     return `<span class="portrait" aria-hidden="true">${silhouette}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" ${window.FamilyPhotoFraming?.profile({...p,...getMedia(p)})||''} src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
   }
   function birthdayHTML(p, editable = true, birthOnly = false) {
@@ -71,8 +77,9 @@
     const unset = birthdayOf(p) === '1.1.1111',rootPerson=data.units[data.root].people.includes(p.id);
     const founderLink=rootPerson?(window.FamilyFounderTrees?.linkHTML(p.id)||''):'';
     if(rootPerson&&!isPhone()){
+      const memorial=!scopedViews||p.deceased;
       const label=I18n.t('פתיחת העמוד האישי של ')+nameOf(p);
-      return I18n.html`<article class="person-card memorial root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${I18n.t(' <span class="memorial-inline">ז״ל</span>')}</span></button><div class="person-birthday root-person-birth" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only>${birthdayHTML(p,false,true)}</div></div><div class="root-person-details" data-root-history="${p.id}">${rootHistoryHTML(p)}</div>${founderLink}</article>`;
+      return I18n.html`<article class="person-card${memorial?' memorial':''} root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${memorial?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday root-person-birth" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only>${birthdayHTML(p,false,true)}</div></div><div class="root-person-details" data-root-history="${p.id}">${rootHistoryHTML(p)}</div>${founderLink}</article>`;
     }
     return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}>${birthdayHTML(p,!rootPerson)}</div>${founderLink}</article>`;
   }
@@ -113,7 +120,7 @@
     $('treeView').hidden = !isTree;
     $('directoryView').hidden = !isDirectory;
     $('branchBar').hidden = global||(isDirectory&&state.directoryGroup!=='main');
-    const titles = {search:[I18n.isEnglish?'Family search':'חיפוש משפחתי',I18n.isEnglish?'People, memories and moments from across our home':'אנשים, זיכרונות ורגעים מכל הבית שלנו'],voices:[I18n.t('בקולם'),I18n.t('הקולות והסיפורים של המשפחה שלנו')],'family-ai':[I18n.t('בינה משפחתית'),I18n.t('רגעים של פעם מתעוררים לחיים')],screensaver:[I18n.t('שומר מסך משפחתי'),I18n.t('כל המשפחה, זיכרון אחרי זיכרון')],timeline:[I18n.t('ציר זמן משפחתי'),I18n.t('דורות של אנשים ורגעים, עשור אחר עשור')],nursery:[I18n.t('התינוקייה'),I18n.t('ההתחלה של כולנו')],games:[I18n.isEnglish?'Family Games':'משחקי משפחה',I18n.isEnglish?'The faces that make us a family':'מכירים את הפנים שמרכיבות את המשפחה'],memorial:[I18n.t('לזכרם'),I18n.t('הזיכרונות נשארים איתנו')],person:[I18n.t('עמוד אישי'),I18n.t('סיפור חיים, תמונות וזיכרונות')],updates:[I18n.t('הרשמה לעדכונים'),I18n.t('תזכורות משפחתיות, ישר למייל')],home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה המשפחתית'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('השנה המשפחתית שלנו')],tree:[I18n.t('האילן המשפחתי'),I18n.t('משורש משותף, שישה ענפים של אהבה')],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
+    const titles = {search:[I18n.isEnglish?'Family search':'חיפוש משפחתי',I18n.isEnglish?'People, memories and moments from across our home':'אנשים, זיכרונות ורגעים מכל הבית שלנו'],voices:[I18n.t('בקולם'),I18n.t('הקולות והסיפורים של המשפחה שלנו')],'family-ai':[I18n.t('בינה משפחתית'),I18n.t('רגעים של פעם מתעוררים לחיים')],screensaver:[I18n.t('שומר מסך משפחתי'),I18n.t('כל המשפחה, זיכרון אחרי זיכרון')],timeline:[I18n.t('ציר זמן משפחתי'),I18n.t('דורות של אנשים ורגעים, עשור אחר עשור')],nursery:[I18n.t('התינוקייה'),I18n.t('ההתחלה של כולנו')],games:[I18n.isEnglish?'Family Games':'משחקי משפחה',I18n.isEnglish?'The faces that make us a family':'מכירים את הפנים שמרכיבות את המשפחה'],memorial:[I18n.t('לזכרם'),I18n.t('הזיכרונות נשארים איתנו')],person:[I18n.t('עמוד אישי'),I18n.t('סיפור חיים, תמונות וזיכרונות')],updates:[I18n.t('הרשמה לעדכונים'),I18n.t('תזכורות משפחתיות, ישר למייל')],home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה המשפחתית'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('השנה המשפחתית שלנו')],tree:[I18n.t('האילן המשפחתי'),(scopedViews?(I18n.isEnglish?'Four branches from shared roots':'משורש משותף, ארבעה ענפים'):I18n.t('משורש משותף, שישה ענפים של אהבה'))],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
     const [title,subtitle] = titles[state.view] || titles.tree;
     $('workspaceTitle').textContent = title;
     $('mobileViewTitle').textContent=title;
@@ -140,7 +147,7 @@
     if (isTree) renderTree(); else if (isDirectory) renderDirectory();
   }
   function directoryMatches(query) {
-    return people.filter(p => (state.directoryGroup==='friends'?p.extra&&getMedia(p).mediaCount>0:state.directoryGroup==='extended'?p.extended&&!p.extra:!p.extended&&!p.extra) && (state.directoryGroup!=='main'||state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
+    return people.filter(p => (state.directoryGroup==='friends'?p.extra&&getMedia(p).mediaCount>0:state.directoryGroup==='extended'?p.extended&&!p.extra:!p.extended&&!p.extra) && (state.directoryGroup!=='main'||state.branch === 'all' || p.branch === state.branch) && (!query || inSearchBranch(p)&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
   }
   function renderDirectory() {
     const query = normalize(state.query);
@@ -175,20 +182,20 @@
     }
     let width,height;
     if(phone&&overview){
-      width=520*textScale;height=740*textScale;const root=data.units[data.root];positions.push({id:root.id,unit:root,x:260*textScale,y:45*textScale,width:174*textScale,depth:0});lines.push(`<path d="M${260*textScale} ${158*textScale}V${530*textScale}"/>`);
+      width=520*textScale;height=(scopedViews?570:740)*textScale;const root=data.units[data.root];positions.push({id:root.id,unit:root,x:260*textScale,y:45*textScale,width:174*textScale,depth:0});lines.push(`<path d="M${260*textScale} ${158*textScale}V${(scopedViews?360:530)*textScale}"/>`);
       data.branches.forEach((branch,index)=>{const x=(index%2===0?380:140)*textScale,y=(220+Math.floor(index/2)*170)*textScale,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174*textScale,depth:1});lines.push(`<path d="M${260*textScale} ${y-30*textScale}H${x}V${y-10*textScale}"/>`);});
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);const maxDepth=Math.max(...positions.map(item=>item.depth));height=top+maxDepth*levelHeight+(maxDepth?rootHistorySpace:0)+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
     camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.setProperty('--a11y-tree-scale',String(textScale));world.style.width=width+'px';world.style.height=height+'px';
-    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${unit.id}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${unit.people.map(id=>personCardHTML(data.people[id])).join('')}${open}</div>`;}).join('');
+    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${unit.people.map(id=>personCardHTML(data.people[id])).join('')}${open}</div>`;}).join('');
     let rootSpacingAdjustment=0,rootContentHeight=0;
     if(!phone&&rootHistorySpace){
-      const rootElement=world.querySelector(`[data-unit="${rootId}"]`),firstChild=positions.find(item=>item.depth===1);
+      const rootElement=world.querySelector(`[data-unit="${treeUnitKey(rootId)}"]`),firstChild=positions.find(item=>item.depth===1);
       if(rootElement&&firstChild){
         // Reserve space below the actual dates for the connector and branch labels.
         rootContentHeight=rootElement.offsetHeight;
         rootSpacingAdjustment=Math.max(0,top+rootContentHeight+96*textScale-firstChild.y);
         if(rootSpacingAdjustment){
-          for(const item of positions)if(item.depth>0){item.y+=rootSpacingAdjustment;world.querySelector(`[data-unit="${item.id}"]`).style.top=item.y+'px';}
+          for(const item of positions)if(item.depth>0){item.y+=rootSpacingAdjustment;world.querySelector(`[data-unit="${treeUnitKey(item.id)}"]`).style.top=item.y+'px';}
           for(const connection of connections)if(connection.depth>0)connection.y+=rootSpacingAdjustment;
           height+=rootSpacingAdjustment;camera.height=height;world.style.height=height+'px';
         }
@@ -216,7 +223,9 @@
     }
     $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
 
-    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?I18n.t('כל המשפחה · ששת הענפים'):I18n.t('כל המשפחה · כל הדורות')):I18n.html`יונה ושלמה › ${I18n.branchName(branchFor(state.branch))}`;
+    const roots=scopedViews?data.units[data.root].people.map(id=>nameOf(data.people[id])).join(' · '):I18n.t('יונה ושלמה');
+    const branchesLabel=scopedViews?(I18n.isEnglish?'All the family · Four branches':'כל המשפחה · ארבעת הענפים'):I18n.t('כל המשפחה · ששת הענפים');
+    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?branchesLabel:I18n.t('כל המשפחה · כל הדורות')):roots+' › '+I18n.branchName(branchFor(state.branch));
     for(const [id,selected]of [['overviewButton',overview],['fullTreeButton',!overview]]){$(id).classList.toggle('selected',selected);$(id).setAttribute('aria-pressed',String(selected));}
     const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     $('treeHelpInline').textContent=phone?'':guidance;
@@ -433,7 +442,7 @@
     if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyMemories?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);window.FamilyTimeline?.search(state.query);window.FamilyNursery?.search(state.query);window.FamilyAI?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory')renderDirectory();
     if(!query&&state.view!=='directory'){$('searchResults').hidden=true;return;}
-    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
+    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&inSearchBranch(p)&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
     $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button type="button" class="search-result" data-search-person="${p.id}">${portraitHTML(p)}<span class="search-result-text"><span class="person-name">${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></span></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
     $('searchResults').hidden=false;
     fitSearchResults();
@@ -623,7 +632,10 @@
   window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],getPersonSummary:id=>({...data.people[id],...media.get(id)}),getPeople:()=>people.filter(person=>!person.extended&&!person.extra).map(person=>({...person,name:nameOf(person)})),nameOf:id=>data.people[id]?nameOf(data.people[id]):id,birthdayOf:id=>birthdayOf(data.people[id]),openPerson,birthdayHTML:id=>birthdayHTML(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
   function simpleRoute(){const view=location.hash.slice(1).split('/')[0];if(['weddings','nostalgia'].includes(view))return;const target=validViews.has(view)?view:(!view?(isPhone()?'home':'tree'):null);if(target&&target!==state.view)setView(target,false);}
   window.addEventListener('hashchange',simpleRoute);window.addEventListener('popstate',simpleRoute);
-  renderBranches();renderView();
+  const routedBranch=()=>scopedViews&&location.hash.startsWith('#tree/')?location.hash.split('/')[1]:null;
+  const activateRoutedBranch=()=>{const branch=routedBranch();if(branchFor(branch)&&state.branch!==branch)selectBranch(branch);};
+  renderBranches();renderView();activateRoutedBranch();
+  if(scopedViews){window.addEventListener('hashchange',activateRoutedBranch);window.addEventListener('popstate',activateRoutedBranch);}
   if(apiEnabled){
     loadFamilyMedia();
     setInterval(()=>{if(document.visibilityState!=='hidden')refreshOpenGallery();},10000);

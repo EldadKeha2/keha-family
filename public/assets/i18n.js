@@ -32,7 +32,9 @@
   function date(value){if(!isEnglish)return value;const match=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(value));if(!match)return value;const [day,month,year]=match.slice(1).map(Number);return new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:'numeric'}).format(new Date(year,month-1,day,12));}
   function error(value){if(!isEnglish||typeof value!=='string')return value;let result=value;for(const person of Object.values(window.FAMILY_DATA?.people||{}))if(person.nameEn)result=result.split(person.name).join(person.nameEn);return t(result);}
   async function localizedFetch(input,options={}){
-    const url=new URL(typeof input==='string'?input:input.url,location.href);
+    const value=typeof input==='string'?input:input.url;
+    const path=document.documentElement?.dataset?.nakashBranch&&/^api\//.test(value)?'/'+value:value;
+    const url=new URL(path,location.href);
     if(url.origin===location.origin&&url.pathname==='/api/calendar')url.searchParams.set('lang',language);
     const response=await fetch(url,options);
     if(!isEnglish||response.ok||response.status===304||!response.headers.get('Content-Type')?.includes('json'))return response;
