@@ -3,7 +3,7 @@
   // Pointer events cover phones, tablets and touch screens regardless of width.
   function bind(stage,{enabled,mouseEnabled=enabled,wheelEnabled=enabled,wheelStep,step,right,left,move,cancel,claim,nativeEnd,vertical,zoomWheel,horizontalStart,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,pickerSurface=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
     stage._familyGalleryWheel=true;
-    let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
+    let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null,verticalWheel=null;
     const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
     const clearPreview=()=>{if(previewFrame!==null)cancelAnimationFrame(previewFrame);previewFrame=null;pendingPreview=null;};
     const flushPreview=()=>{const pending=pendingPreview;clearPreview();if(pending)move?.(pending.dx,pending.options);};
@@ -55,7 +55,7 @@
       return rect&&event.clientY>=rect.top&&event.clientY<rect.bottom-72?video:null;
     };
     const freshVideoTouch=event=>{if(videoSurface&&event.target.closest('video')===videoSurface())suppressClickUntil=0;};
-    const reset=(preserveTouch=false)=>{clearPreview();gesture=null;nativePointer=null;stage.classList.remove('photo-pointer-dragging');clearTimeout(wheelTimer);wheelTimer=null;wheelGesture=null;if(preserveTouch!==true){touchStart=null;finished();cancel?.();}else if(!touchStart||touchStart.native)finished();};
+    const reset=(preserveTouch=false)=>{verticalWheel?.reset();clearPreview();gesture=null;nativePointer=null;stage.classList.remove('photo-pointer-dragging');clearTimeout(wheelTimer);wheelTimer=null;wheelGesture=null;if(preserveTouch!==true){touchStart=null;finished();cancel?.();}else if(!touchStart||touchStart.native)finished();};
     const blockClick=()=>{suppressClickUntil=Date.now()+700;};
     const distance=()=>mouse()?Math.max(32,Math.min(56,stage.clientWidth*.06)):Math.max(40,Math.min(80,stage.clientWidth*.12));
     const nativeEnded=(start,event)=>{
@@ -169,22 +169,24 @@
     const onTouchCancel=event=>{if(repeatedPickerTouch(event))return;touchStart=null;blockClick();reset();};
     document.addEventListener('touchcancel',onTouchCancel,{capture:true,passive:true});
     stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!controlAt(event))event.preventDefault();});
+    const navigateVertical=(direction,input)=>{
+      reset();if(window.FamilyPhotoNative?.isActive?.(stage))window.FamilyPhotoNative.reset(stage);blockClick();
+      if(wheelStep){stage.setAttribute?.('data-gallery-last-input',input);stage.setAttribute?.('data-gallery-last-action',direction>0?'next':'previous');wheelStep(direction,{queued:true,input});}
+      else navigate(direction,{queued:true,input});
+    };
+    verticalWheel=window.FamilyPhotoVerticalWheel?.bind(stage,{root:()=>wheelRoot()||stage,enabled:()=>mouse()&&wheelEnabled(),step:navigateVertical});
     const onWheel=(event,detachedPicker=null)=>{
       if(event.defaultPrevented||seenWheelEvents.has(event))return;seenWheelEvents.add(event);
       const picker=pickerAt(event)||(detachedPicker?.contains(event.target)?detachedPicker:null),pickerX=event.deltaX||event.shiftKey&&event.deltaY||0,pickerY=event.shiftKey&&!event.deltaX?0:event.deltaY||0;
       if(picker&&(!Number.isFinite(pickerX)||!pickerX||Math.abs(pickerX)<Math.abs(pickerY)*1.15))return;
+      if(verticalWheel?.handle(event))return;
       const wheelDirection=window.FamilyPhotoNative?.verticalWheelDirection?.(event);
       if(wheelDirection&&mouse()&&wheelEnabled()){
         const root=wheelRoot()||stage;
-        // The open Labels dropdown returns the wheel to normal scrolling
-        // throughout the viewer, including over the photo and its controls.
-        if(root.querySelector?.('[data-photo-label-toggle][aria-expanded="true"]'))return;
-        reset();if(window.FamilyPhotoNative?.isActive?.(stage))window.FamilyPhotoNative.reset(stage);
-        if(event.cancelable)event.preventDefault();blockClick();
-        if(wheelStep){
-          stage.setAttribute?.('data-gallery-last-input','mouse-wheel');stage.setAttribute?.('data-gallery-last-action',wheelDirection>0?'next':'previous');
-          wheelStep(wheelDirection,{queued:true,input:'mouse-wheel'});
-        }else navigate(wheelDirection,{queued:true,input:'mouse-wheel'});
+        // A cached page missing the precision handler must still leave its
+        // metadata and ambiguous pad packets available for ordinary scrolling.
+        if(!stage.contains?.(event.target)||!window.FamilyPhotoNative?.mouseWheelDirection?.(event)||root.querySelector?.('[data-photo-label-toggle][aria-expanded="true"]')||event.cancelable===false)return;
+        if(event.cancelable)event.preventDefault();navigateVertical(wheelDirection,'mouse-wheel');
         return;
       }
       if(nativeScroll())return;

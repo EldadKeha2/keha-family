@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import {parseHTML} from 'linkedom';
 
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
-const names=['gallery-input-settings.js','photo-zoom-pad.js','photo-native.js','photo-swipe.js','media.js'];
+const names=['gallery-input-settings.js','photo-zoom-pad.js','photo-native.js','photo-vertical-wheel.js','photo-swipe.js','media.js'];
 const sources=new Map(await Promise.all(names.map(async name=>[name,await readFile(new URL('../public/assets/'+name,import.meta.url),'utf8')])));
 const stylesheet=await readFile(new URL('../public/'+html.match(/<link[^>]*rel="stylesheet"[^>]*href="([^"]+)"/)[1],import.meta.url),'utf8');
 const nativeRule=stylesheet.match(/(?:^|})\s*\.native-photo-strip\{([^}]+)\}/)?.[1]||'';
@@ -131,7 +131,7 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
   const image=document.createElement('img');Object.defineProperty(image,'src',{configurable:true,get(){return this.getAttribute('src')||'';},set(value){this.setAttribute('src',value);queueMicrotask(()=>{image.onload?.();image.dispatchEvent(new window.Event('load'));});}});return image;
  }
  const location={origin:'https://family.test',href:'https://family.test/'+query+'#'+route};
- const context=vm.createContext({window,document,navigator,...(dateNow?{Date:class extends Date{static now(){return dateNow();}}}:{}),...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location,matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
+ const context=vm.createContext({window,document,navigator,...(dateNow?{Date:class extends Date{static now(){return dateNow();}}}:{}),...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location,matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:node=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4',overflowY:node.matches?.('.media-viewer-footer,.face-photo-scroll')?'auto':'visible'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
  // Follow production ordering when loading the scripts under test.
  const loaded=[];
  for(const script of document.querySelectorAll('script[src]')){
@@ -844,19 +844,48 @@ test('viewer-wide horizontal pad handling preserves editors, other dialogs, brow
  }
 });
 
-test('every vertical mouse delta navigates once over the entire open photo or video viewer',async()=>{
+test('discrete mouse wheels navigate over the photograph while captions and tags retain ordinary vertical scrolling',async()=>{
  for(const supported of [true,false])for(const kind of ['photo','video']){
   const f=fixture({supported});await f.open(kind,kind==='photo'?'gallery':'nostalgia');
-  const points=[()=>f.get('mediaNext'),()=>f.get('mediaViewerCaption'),()=>f.get('openedCaptionText'),()=>f.get('mediaViewer').querySelector('footer'),()=>f.get('shareMediaWhatsApp'),()=>f.get('mediaStage').querySelector('img,video'),()=>f.document.body,()=>f.get('mediaViewer')];
+  const points=[()=>f.get('mediaNext'),()=>f.get('mediaViewerCaption'),()=>f.get('openedCaptionText'),()=>f.get('mediaViewer').querySelector('footer'),()=>f.get('shareMediaWhatsApp'),()=>f.document.body,()=>f.get('mediaViewer')];
   const deltas=[-1,-2.75,-40,-53,-94,-140,-160,-100];let index=0;
   for(const [i,point]of points.entries()){
-   const event=f.emit(point(),'wheel',{deltaX:0,deltaY:deltas[i],clientX:400,clientY:250});
-   assert.equal(event.defaultPrevented,true,`${supported?'native':'fallback'} ${kind} point ${i}`);await flush();index=(index+1)%3;
-   assert.equal(f.window.FamilyMedia.current().id,['a','b','c'][index],'Each event advances exactly once across both document and stage listeners');
+   const event=f.emit(point(),'wheel',{deltaX:0,deltaY:deltas[i],deltaMode:1,clientX:400,clientY:250});
+   assert.equal(event.defaultPrevented,false,`${supported?'native':'fallback'} ${kind} metadata point ${i}`);await flush();
+   assert.equal(f.window.FamilyMedia.current().id,'a','Scrolling metadata never navigates');
   }
-  const down=f.emit(f.get('openedCaptionText'),'wheel',{deltaX:0,deltaY:.5,clientX:400,clientY:250});assert.equal(down.defaultPrevented,true);await flush();
+  for(const deltaY of deltas){const event=f.emit(f.get('mediaStage').querySelector('img,video'),'wheel',{deltaX:0,deltaY,deltaMode:1,clientX:400,clientY:250});assert.equal(event.defaultPrevented,true);await flush();index=(index+1)%3;assert.equal(f.window.FamilyMedia.current().id,['a','b','c'][index]);}
+  const down=f.emit(f.get('mediaStage').querySelector('img,video'),'wheel',{deltaX:0,deltaY:53,wheelDeltaY:-120,clientX:400,clientY:250});assert.equal(down.defaultPrevented,true);await flush();
   assert.equal(f.window.FamilyMedia.current().id,['a','b','c'][(index+2)%3]);f.close();
   assert.equal(f.emit(f.document.body,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,false,'Closed galleries restore ordinary page scrolling');
+ }
+});
+
+test('precision scrolling over a fitted photo reveals the lower metadata and cannot navigate when it reaches the bottom',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported});await f.open();const viewer=f.get('mediaViewer');Object.defineProperties(viewer,{clientHeight:{configurable:true,value:600},scrollHeight:{configurable:true,value:1000}});viewer.scrollTop=0;
+  const image=f.get('mediaStage').querySelector('img');
+  for(const deltaY of [100,90,80,70,60,50,40])assert.equal(f.emit(image,'wheel',{deltaX:0,deltaY,momentum:false}).defaultPrevented,true);
+  assert.equal(viewer.scrollTop,400);f.emit(image,'wheel',{deltaX:0,deltaY:12,momentum:true});await flush();assert.equal(f.window.FamilyMedia.current().id,'a');
+  assert.equal(f.emit(f.get('mediaTagPanel'),'wheel',{deltaX:0,deltaY:94,deltaMode:1}).defaultPrevented,false,'Mouse wheels can also scroll while reading the tags');
+  f.get('mediaNext').click();await flush();assert.equal(f.window.FamilyMedia.current().id,'b','A completed precision scroll cannot hold queued navigation open');f.close();
+ }
+});
+
+test('scrolling over a fixed desktop photo reaches its separate people-and-tags footer',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported});await f.open();const footer=f.get('mediaViewer').querySelector('.media-viewer-footer');Object.defineProperties(footer,{clientHeight:{configurable:true,value:300},scrollHeight:{configurable:true,value:900}});footer.scrollTop=0;
+  const image=f.get('mediaStage').querySelector('img');f.emit(image,'wheel',{deltaX:0,deltaY:80,momentum:false});f.emit(image,'wheel',{deltaX:2,deltaY:60,momentum:false});assert.equal(footer.scrollTop,140);
+  f.emit(image,'wheel',{deltaX:0,deltaY:12,momentum:true});await flush();assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+ }
+});
+
+test('released vertical pad flicks can browse fitted photos without scroll space and never consume their inertial tail twice',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported});await f.open();const image=f.get('mediaStage').querySelector('img');
+  assert.equal(f.emit(image,'wheel',{deltaX:0,deltaY:-90,momentum:false}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'a');
+  f.emit(image,'wheel',{deltaX:0,deltaY:-12,momentum:true});await flush();assert.equal(f.window.FamilyMedia.current().id,'b');
+  f.emit(f.get('mediaStage').querySelector('img'),'wheel',{deltaX:0,deltaY:-6,momentum:true});await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
  }
 });
 
@@ -868,7 +897,7 @@ test('opening Labels restores scrolling everywhere until the dropdown is closed 
    const event=f.emit(point,'wheel',{deltaX:0,deltaY,clientX:400,clientY:250});assert.equal(event.defaultPrevented,false,'The browser scrolls even when the pointer is outside the open dropdown');
   }
   await flush();assert.equal(f.window.FamilyMedia.current().id,'a');
-  toggle.setAttribute('aria-expanded','false');assert.equal(f.emit(f.document.body,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+  toggle.setAttribute('aria-expanded','false');assert.equal(f.emit(f.get('mediaStage').querySelector('img'),'wheel',{deltaX:0,deltaY:-94,deltaMode:1}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
  }
 });
 
@@ -1014,7 +1043,7 @@ test('zoomed horizontal gestures preserve face editing, other dialogs and pinch 
   assert.equal(f.emit(dialog,'wheel',{deltaX:140,deltaY:0}).defaultPrevented,false);dialog.open=false;dialog.removeAttribute('open');dialog.remove();
   for(const modifier of ['ctrlKey','metaKey'])assert.equal(f.emit(f.document.body,'wheel',{deltaX:140,deltaY:-94,[modifier]:true}).defaultPrevented,false);
   await flush();assert.equal(f.window.FamilyMedia.current().id,'a');f.zoom(1);
-  assert.equal(f.emit(f.get('mediaStage').querySelector('img'),'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+  assert.equal(f.emit(f.get('mediaStage').querySelector('img'),'wheel',{deltaX:0,deltaY:-94,deltaMode:1}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
  }
 });
 
