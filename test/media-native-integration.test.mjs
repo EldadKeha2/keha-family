@@ -66,7 +66,7 @@ async function finishWheel(f,viewport){
 // production index, DOM tree, native scroller, gesture binding and media state
 // machine are real, so missing script wiring or reparenting cannot be hidden
 // by the lightweight object fixtures used in the individual unit suites.
-function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,delayedFaces=false,realPresentation=false,hiddenDialogGeometry=false,query='',route='photos',linkedItem=null,loadView=null,storage=new Map([[directionKey,'1']])}={}){
+function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,delayedFaces=false,realPresentation=false,hiddenDialogGeometry=false,query='',route='photos',linkedItem=null,loadView=null,dateNow=null,storage=new Map([[directionKey,'1']])}={}){
  const {window,document}=parseHTML(html),requests=[],captures=[],observers=[],faceReady=[],faceMounts=[],animations=[],frames=new Map();let failSave=false,layoutReady=!hiddenDialogGeometry,frameId=0;
  const get=id=>document.getElementById(id);
  Object.defineProperty(document,'scripts',{configurable:true,get:()=>document.querySelectorAll('script[src]')});
@@ -131,7 +131,7 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
   const image=document.createElement('img');Object.defineProperty(image,'src',{configurable:true,get(){return this.getAttribute('src')||'';},set(value){this.setAttribute('src',value);queueMicrotask(()=>{image.onload?.();image.dispatchEvent(new window.Event('load'));});}});return image;
  }
  const location={origin:'https://family.test',href:'https://family.test/'+query+'#'+route};
- const context=vm.createContext({window,document,navigator,...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location,matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
+ const context=vm.createContext({window,document,navigator,...(dateNow?{Date:class extends Date{static now(){return dateNow();}}}:{}),...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location,matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:()=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
  // Follow production ordering when loading the scripts under test.
  const loaded=[];
  for(const script of document.querySelectorAll('script[src]')){
@@ -735,13 +735,14 @@ test('a continuous trackpad episode including its fractional tail commits exactl
 
 test('sparse pad momentum cannot skip images after a photo or video is rebuilt, including the manual fallback',async()=>{
  for(const supported of [true,false])for(const kind of ['photo','video']){
-  const f=fixture({supported,realPresentation:supported});await f.open(kind,kind==='photo'?'photos':'nostalgia');
+  // Model 140ms input gaps independently of CI scheduling stalls.
+  let inputTime=0;const f=fixture({supported,realPresentation:supported,dateNow:()=>inputTime});await f.open(kind,kind==='photo'?'photos':'nostalgia');
   const packet=dx=>{const target=f.get('mediaStage').querySelector(kind==='photo'?'.face-photo-scroll img':'video');return f.emit(target,'wheel',{deltaX:dx,deltaY:0,deltaMode:0,clientX:400,clientY:250});};
   const settle=async()=>{await new Promise(resolve=>setTimeout(resolve,140));await flush();};
   packet(320);packet(160);await settle();assert.equal(f.window.FamilyMedia.current().id,'b');
-  for(const tail of [80,40,8]){assert.equal(packet(tail).defaultPrevented,true);await settle();assert.equal(f.window.FamilyMedia.current().id,'b',kind+' momentum must not advance again after repaint');}
+  for(const tail of [80,40,8]){inputTime+=140;assert.equal(packet(tail).defaultPrevented,true);await settle();assert.equal(f.window.FamilyMedia.current().id,'b',kind+' momentum must not advance again after repaint');}
   f.emit(f.get('mediaNext'),'click');await flush();assert.equal(f.window.FamilyMedia.current().id,'c');
-  packet(320);await settle();assert.equal(f.window.FamilyMedia.current().id,'a','A renewed strong pad stroke still works immediately after arrows');f.close();
+  inputTime+=140;packet(320);await settle();assert.equal(f.window.FamilyMedia.current().id,'a','A renewed strong pad stroke still works immediately after arrows');f.close();
  }
 });
 

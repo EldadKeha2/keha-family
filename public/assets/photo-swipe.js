@@ -26,6 +26,12 @@
     const controls='a,input,textarea,select,video,iframe,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"],button:not(.face-hit)'+(photoButtons?':not(.home-carousel-card):not(.home-slide-open)':'')+',.face-picker,.face-name,.face-label-list,.face-adjust-guide,[data-face-handle]';
     const pickerAt=event=>{const picker=pickerSurface();return picker?.contains(event.target)?picker:null;};
     const detachedPickers=new WeakSet(),seenTouchEvents=new WeakSet(),seenWheelEvents=new WeakSet();
+    const repeatedPickerTouch=event=>{
+      if(!event||typeof event!=='object')return false;
+      if(seenTouchEvents.has(event))return true;
+      if(gesture?.picker)seenTouchEvents.add(event);
+      return false;
+    };
     const bindDetachedPicker=picker=>{
       if(detachedPickers.has(picker))return;detachedPickers.add(picker);
       // Touch targets can remain inside the removed picker after the first
@@ -59,6 +65,7 @@
     document.addEventListener('pointerdown',event=>{
       if(touchOnly())return;
       if(gesture&&event.pointerId!==gesture.id){blockClick();reset();}
+      if(pickerAt(event)&&!stage.contains?.(event.target))begin(event);
     },{capture:true,passive:true});
     const begin=event=>{
       const touch=['touch','pen'].includes(event.pointerType)||event.sourceCapabilities?.firesTouchEvents;
@@ -83,7 +90,6 @@
     // touchstart without subsequent touchmove events; keep their pointer stream
     // active, retaining TouchEvents as a fallback if the browser cancels it.
     stage.addEventListener('pointerdown',event=>{freshVideoTouch(event);if(!touchOnly())begin(event);},{capture:true,passive:true});
-    document.addEventListener('pointerdown',event=>{if(!touchOnly()&&pickerAt(event)&&!stage.contains?.(event.target))begin(event);},{capture:true,passive:true});
     const moved=event=>{
       const g=gesture;if(!g||event.pointerId!==g.id)return;
       if(!enabled()||g.mouse&&(!mouseEnabled()||event.buttons===0)){if(g.dragged)blockClick();reset();return;}
@@ -143,7 +149,7 @@
     stage.addEventListener('touchstart',onTouchStart,{capture:true,passive:true});
     document.addEventListener('touchstart',event=>{if(pickerAt(event)&&!stage.contains?.(event.target))onTouchStart(event);},{capture:true,passive:true});
     const onTouchMove=event=>{
-      if(seenTouchEvents.has(event))return;seenTouchEvents.add(event);
+      if(repeatedPickerTouch(event))return;
       if(!touchStart)return;
       if(event.touches.length!==1){touchStart=null;blockClick();reset();return;}
       if(!touchStart||touchStart.native)return;
@@ -153,14 +159,14 @@
     };
     document.addEventListener('touchmove',onTouchMove,{capture:true,passive:false});
     const onTouchEnd=event=>{
-      if(seenTouchEvents.has(event))return;seenTouchEvents.add(event);
+      if(repeatedPickerTouch(event))return;
       if(touchStart?.native){const touch=[...event.changedTouches].find(touch=>'touch-'+touch.identifier===touchStart.pointerId);if(touch)nativeEnded({x:touchStart.clientX,y:touchStart.clientY,time:touchStart.time},fromTouch(event,touch));nativePointer=null;}
       if(touchStart&&!touchStart.native&&!gesture)begin(touchStart);
       if(touchStart&&gesture){const touch=[...event.changedTouches].find(touch=>'touch-'+touch.identifier===touchStart.pointerId);if(touch)released({...fromTouch(event,touch),pointerId:gesture.id});}
       touchStart=null;if(!gesture)finished();
     };
     document.addEventListener('touchend',onTouchEnd,{capture:true,passive:false});
-    const onTouchCancel=event=>{if(seenTouchEvents.has(event))return;seenTouchEvents.add(event);touchStart=null;blockClick();reset();};
+    const onTouchCancel=event=>{if(repeatedPickerTouch(event))return;touchStart=null;blockClick();reset();};
     document.addEventListener('touchcancel',onTouchCancel,{capture:true,passive:true});
     stage.addEventListener('dragstart',event=>{if(mouse()&&enabled()&&!controlAt(event))event.preventDefault();});
     const onWheel=(event,detachedPicker=null)=>{
