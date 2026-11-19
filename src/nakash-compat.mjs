@@ -14,7 +14,8 @@ import {photoFrame} from './photo-framing.mjs';
 import {photoTransform, transformPhotoFaces} from './photo-versions.mjs';
 import {searchNakash} from './nakash-search.mjs';
 import {zipStream} from './zip.mjs';
-import {renderVideoRange} from './video-clip-route.mjs';
+import {renderVideoRange, videoClipRoute, videoEditRoute} from './video-clip-route.mjs';
+import {VideoEdits} from './video-edits.mjs';
 
 const route = /^\/nakash\/api\/compat\/(keha|haim|yehuda|medina)(\/api\/.*)$/;
 const absent = () => new HttpError(404, 'הפריט המבוקש לא נמצא.');
@@ -89,6 +90,8 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     const saved=profiles[id]||{};
     return [id,{...p,...saved,...(saved.profileFile?{profile:mediaPath+saved.profileMediaId}:{} )}];
   }));
+  for(const [id,p] of Object.entries(profiles))if(p.extra&&!Object.hasOwn(names,id))names[id]=p;
+  const newProfiles=new Map();
   async function categories() {
     return [...DEFAULT_VIDEO_CATEGORIES,...(await db('nakash.compat.categories',{branch})).categories];
   }
@@ -96,6 +99,19 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     if (!Object.hasOwn(names,id)) throw absent();
     return names[id];
   };
+  async function tagPerson(selection) {
+    if(selection?.personId)return person(selection.personId);
+    const name=text(selection?.name,'שם',120,true).replace(/\s+/g,' ');
+    const normalized=normalizeSearch(name);
+    if(!normalized)throw new HttpError(400,'הזינו שם תקין.');
+    const id='extra-nakash-'+(await sha256(branch+'\u001f'+normalized)).slice(0,24);
+    if(Object.hasOwn(names,id))return names[id];
+    const known=Object.values(names).find(p=>!p.extra&&searchNames(p).some(alias=>normalizeSearch(alias)===normalized));
+    if(known)return known;
+    const extra={id,name,branch,birthday:'1.1.1111',extra:true,revision:uid()};
+    names[id]=extra;newProfiles.set(id,extra);
+    return extra;
+  }
   const collection = async (kind,personId) =>
     (await db('nakash.compat.items',{branch,...(kind?{kind}:{}),...(personId?{personId}:{})})).items.filter(item=>!item.deletedAt);
   const describe = item => ({
@@ -110,7 +126,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     return item;
   };
   const update = async (item,changes,expected={}) => {
-    const result = await db('nakash.compat.update',{id:item.id,branch,changes:{...changes,updatedAt:new Date().toISOString()},expected});
+    const result = await db('nakash.compat.update',{id:item.id,branch,changes:{...changes,updatedAt:new Date().toISOString()},expected,people:[...newProfiles.values()]});
     return result.item;
   };
   const itemFilter = (items, query, options) => {
@@ -127,7 +143,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   const isFull = item => Boolean(item.faceSummary?.reviewed || item.reviewed);
   const status = item => isFull(item) ? 'complete' : item.people?.length ? 'partial' : 'untagged';
   function subjectBranches(people, homeBranch) {
-    const subjects = [...new Set(people.map(id=>branchForPerson(family,id)).filter(Boolean))];
+    const subjects = [...new Set(people.map(id=>branchForPerson(family,id)||names[id]?.branch).filter(Boolean))];
     return subjects.length ? subjects : [homeBranch];
   }
   function tagsUpdate(item, people, fields={}) {
@@ -188,12 +204,18 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       if (found.item.branch!==branch||found.item.filename!==filename) throw new HttpError(409,'הקובץ השתנה. בחרו אותו מחדש.');
       return json(owner?{saved:true,file:found.item.file,...await personPage(owner)}:{saved:true,file:found.item.file,collection:await gallery(category)});
     }
-    const people = [...new Set([owner,...(meta?.faces||[]).map(face=>face.personId)].filter(id=>id&&Object.hasOwn(names,id)))];
+    const faceTags=[];
+    for(const face of meta?.faces||[]){
+      let tagged;
+      try{tagged=await tagPerson(face);}catch(error){await incoming.body.cancel().catch(()=>{});throw error;}
+      faceTags.push({personId:tagged.id,rect:face.rect,id:uid(),revision:uid()});
+    }
+    const people = [...new Set([owner,...faceTags.map(face=>face.personId)].filter(Boolean))];
     const branches = subjectBranches(people,branch);
     const item = {id, key:'nakash/'+uid()+format.ext,size:incoming.size,mime:format.mime,kind,branch,branches,people,
       personId:owner||null, file:id+format.ext,filename,caption:meta?.caption||'',takenDate:meta?.date||null,
       createdAt:new Date().toISOString(),...kind==='photo'&&meta?{
-        faces:(meta.faces||[]).filter(face=>face.personId&&Object.hasOwn(names,face.personId)).map(face=>({...face,id:uid(),revision:uid()})),
+        faces:faceTags,
         labels:meta.labels,faceSummary:{reviewed:!!meta.complete},
       }:{},
       ...(kind==='video'?{videoCategory:params.get('group')||'family'}:{})};
@@ -203,7 +225,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       transfer=body.pipeTo(fixed.writable);transfer.catch(()=>{});body=fixed.readable;
     }
     await Promise.all([putObject(env,item.key,body,item.size,item.mime),transfer]);
-    try {await db('nakash.add',{item});}catch(error){ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));throw error;}
+    try {await db('nakash.add',{item,people:[...newProfiles.values()]});}catch(error){ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));throw error;}
     return json(owner?{saved:true,file:item.file,...await personPage(owner)}:{saved:true,file:item.file,collection:await gallery(category)},201);
   }
   async function finalizeVideo(item, body) {
@@ -213,7 +235,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     }
     let metadata;
     try{metadata=videoUploadMetadata(body.metadata);}catch{throw new HttpError(400,'פרטי הסרטון אינם תקינים.');}
-    const people=[...new Set([item.personId,...metadata.people.map(tag=>person(tag.personId).id)].filter(Boolean))];
+    const people=[...new Set([item.personId,...(await Promise.all(metadata.people.map(tagPerson))).map(person=>person.id)].filter(Boolean))];
     const rendered=metadata.range?await renderVideoRange(request,env,ctx,item,metadata.range,item.id):null;
     const changes={name:metadata.name,caption:metadata.caption,takenDate:metadata.date,people,
       branches:subjectBranches(people,item.branch),tagsRevision:uid(),videoRevision:uid(),
@@ -227,6 +249,62 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     }
     if(rendered)ctx.waitUntil(deleteObject(env,item.key).catch(()=>{}));
     return {saved:true,item:describe(saved),scope:'videos',operation:'video-upload',collection:await gallery('videos')};
+  }
+  async function changeVideo(item, action) {
+    if (item.kind !== 'video' || item.branch !== branch) throw absent();
+    const scope=describe(item).scope;
+    const changed=(item,operation)=>({saved:true,item:describe(item),operation,scope});
+    const edits=new VideoEdits({
+      media:()=>item,
+      tagsRevision:()=>item.tagsRevision||'empty',
+      mediaChanged:changed,
+    });
+    const peopleFor=async selection=>selection===undefined?(item.people||[]):
+      [...new Set([item.personId,...(await Promise.all(selection.map(tagPerson))).map(person=>person.id)].filter(Boolean))];
+    const stored=async id=>{
+      try{return (await db('nakash.get',{id})).item;}catch(error){if(error.status!==404)throw error;return null;}
+    };
+    const videoDb=async (operation,args)=>{
+      if(operation==='video.edit.prepare')return edits.prepare(args);
+      if(operation==='video.edit.save'){
+        const {metadata,range,rendered}=args;
+        const prepared=metadata||args;
+        const people=await peopleFor(prepared.people);
+        const original=item.videoOriginal||{key:item.key,mime:item.mime,size:item.size,duration:item.duration||null};
+        const fields={name:prepared.name,caption:prepared.caption,nameEn:null,people,branches:subjectBranches(people,branch),
+          tagsRevision:prepared.people?uid():item.tagsRevision||'empty',
+          videoEdit:{operationId:prepared.operationId,fingerprint:prepared.fingerprint},
+          ...(range&&rendered?{...rendered,videoOriginal:original,videoRevision:uid()}:{}),
+        };
+        const next=await update(item,fields,{key:item.key,videoRevision:item.videoRevision||null,updatedAt:item.updatedAt||null});
+        return {...changed(next,'video-edit'),taggedPeople:[],storedKey:next.key};
+      }
+      if(operation==='video.clip.prepare'){
+        if(!validId(args.clipId)||args.clipId===item.id)throw new HttpError(400,'אישור השמירה אינו תקין.');
+        const prepared=edits.prepare({...args,operationId:args.clipId,range:{start:args.start,end:args.end}});
+        const existing=await stored(args.clipId);
+        if(existing){
+          if(existing.clipSource!==item.id||existing.branch!==branch)throw new HttpError(409,'פרטי העריכה השתנו.');
+          return {existing:{...changed(existing,'video-clip'),alreadySaved:true}};
+        }
+        return {...prepared,clipId:args.clipId,start:args.start,end:args.end};
+      }
+      if(operation==='video.clip.save'){
+        const people=await peopleFor(args.people);
+        const clip={...item,...args.item,id:args.clipId,name:args.name,caption:args.caption,people,
+          nameEn:null,branches:subjectBranches(people,branch),clipSource:item.id,videoRevision:null,videoEdit:null,videoOriginal:null,
+          filename:args.name+'.mp4',file:args.clipId+'.mp4',createdAt:new Date().toISOString(),updatedAt:null};
+        try{await db('nakash.add',{item:clip,people:[...newProfiles.values()]});}catch(error){
+          const existing=await stored(args.clipId);
+          if(!existing||existing.clipSource!==item.id||existing.branch!==branch)throw error;
+          return {...changed(existing,'video-clip'),storedKey:existing.key,alreadySaved:true};
+        }
+        return {...changed(clip,'video-clip'),storedKey:clip.key,taggedPeople:[]};
+      }
+      throw absent();
+    };
+    return action==='clip'?videoClipRoute(request,env,videoDb,ctx,item.id):
+      videoEditRoute(request,env,videoDb,ctx,item.id,{removeOnly:action==='video-remove'});
   }
   const currentVersion=item=>({
     id:item.photoRevision||'original',key:item.key,mime:item.mime,size:item.size,filename:item.filename,
@@ -310,6 +388,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       if(action==='versions'&&item.kind==='photo')return json(versionsResponse(item));
     }
     if(method==='POST'){
+      if(['video-edit','video-remove','clip'].includes(action))return changeVideo(item,action);
       if(action==='edit'&&item.kind==='photo') {
         const nested=async (operation,args)=>{
           const reference=history(item).find(version=>version.id===args.baseVersion);
@@ -363,7 +442,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
         }
         const taggedPeople=[];
         for(const change of tagChanges){
-          const p=person(change.personId);
+          const p=await tagPerson(change);
           if(change.tagged)people.add(p.id);else people.delete(p.id);
           if(change.tagged)taggedPeople.push({id:p.id,name:p.name,key:change.key||p.id});
         }
@@ -374,7 +453,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
         const rect=box(body.rect),faces=(item.faces||[]).filter(face=>face.id!==body.faceId);
         const removed=(item.faces||[]).find(face=>face.id===body.faceId);
         if(removed&&removed.revision!==body.expectedRevision)throw new HttpError(409,'התיוג השתנה. פתחו שוב לפני השמירה.');
-        const target=body.personId ? person(body.personId) : null;
+        const target=body.personId||body.name ? await tagPerson(body) : null;
         const face=target?{id:removed?.id||uid(),personId:target.id,rect,revision:uid()}:null;
         if(face)faces.push(face);
         const people=new Set(item.people||[]);

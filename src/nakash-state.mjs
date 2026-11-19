@@ -95,7 +95,7 @@ export async function handleNakashState(state, action, args, RecycleAccess) {
       return {item};
     }
     case 'nakash.compat.update': {
-      const {id, branch, changes, expected} = args;
+      const {id, branch, changes, expected, people} = args;
       return state.ctx.storage.transactionSync(() => {
         const row = state.rows('SELECT data FROM nakash_media WHERE id = ?', id)[0];
         if (!row) throw new HttpError(404, 'הקובץ המבוקש לא נמצא.');
@@ -105,6 +105,7 @@ export async function handleNakashState(state, action, args, RecycleAccess) {
           if (JSON.stringify(item[field] ?? null) !== JSON.stringify(value)) throw new HttpError(409, 'הקובץ השתנה. פתחו אותו מחדש לפני שמירה.');
         }
         Object.assign(item, changes);
+        for(const person of people||[])sql.exec('INSERT OR IGNORE INTO nakash_profiles (person_id,data) VALUES (?,?)',person.id,JSON.stringify(person));
         sql.exec('UPDATE nakash_media SET data = ? WHERE id = ?', JSON.stringify(item), id);
         if (Object.hasOwn(changes, 'branches')) {
           sql.exec('DELETE FROM nakash_media_branches WHERE media_id = ?', id);
@@ -114,8 +115,9 @@ export async function handleNakashState(state, action, args, RecycleAccess) {
       });
     }
     case 'nakash.add': {
-      const {item} = args;
+      const {item,people} = args;
       state.ctx.storage.transactionSync(() => {
+        for(const person of people||[])sql.exec('INSERT OR IGNORE INTO nakash_profiles (person_id,data) VALUES (?,?)',person.id,JSON.stringify(person));
         sql.exec('INSERT INTO nakash_media (id, kind, data, created_at) VALUES (?, ?, ?, ?)', item.id, item.kind, JSON.stringify(item), Date.now());
         for (const branch of item.branches) sql.exec('INSERT INTO nakash_media_branches (media_id, branch) VALUES (?, ?)', item.id, branch);
       });
