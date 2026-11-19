@@ -361,6 +361,8 @@ test('mouse browsing waits for fit while horizontal gesture browsing can opt int
  f.emit(toolbar.querySelector('[data-face-zoom-reset]'),'click');assert.equal(f.faces.canNavigate(f.stage),true);assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);
  f.emit(f.stage,'click',{target:f.image,clientX:200,clientY:220,detail:1});assert.equal(f.faces.canNavigate(f.stage),false);
  assert.equal(f.faces.canNavigate(f.stage,{allowZoom:true}),false,'A face picker still blocks gesture navigation');
+ assert.equal(f.faces.canNavigate(f.stage,{allowZoom:true,allowPicker:true}),true,'Album gestures can leave an open picker without changing its face');
+ for(const key of ['saving','reviewSaving','adjust','resizeDrag']){f.stage._familyFaceContext[key]=true;assert.equal(f.faces.canNavigate(f.stage,{allowZoom:true,allowPicker:true}),false);f.stage._familyFaceContext[key]=false;}
  f.faces.dismiss();assert.equal(f.faces.canNavigate(f.stage),true);
  f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');f.faces.clear();assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);assert.equal(f.faces.canNavigate(f.stage),true);
 });

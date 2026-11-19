@@ -331,11 +331,11 @@
     state.pageRender=null;
     try{state.pageRequest=Promise.resolve(pagingApi().pageGallery(state.pageTarget)).then(()=>state.pageRender);await state.pageRequest;}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;state.pageRequest=null;state.pageRender=null;if($('mediaViewer').open)metadata();}}
   }
-  function canNavigatePhoto({pending=false,wheel=false,allowZoom=false}={}){
+  function canNavigatePhoto({pending=false,wheel=false,allowZoom=false,allowPicker=false}={}){
     if(state.fullscreen&&window.FamilyPhotoFullscreen?.isBlocked?.())return false;
     const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&
       (pending||!stage.classList.contains?.('photo-slide-running'))&&(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1&&
-      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(allowZoom||!stage.classList.contains('face-photo-enlarged'))&&(wheel||(window.FamilyFaces?.canNavigate?.(stage,{allowZoom})??true));
+      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(allowZoom||!stage.classList.contains('face-photo-enlarged'))&&(wheel||(window.FamilyFaces?.canNavigate?.(stage,{allowZoom,allowPicker})??true));
   }
   function scrollPhotoVertically(dy){
     const stage=$('mediaStage'),scroller=stage.classList.contains('face-photo-enlarged')&&stage.querySelector('.face-photo-scroll');
@@ -355,7 +355,7 @@
     if(browserScroll&&faceTimer===null){
       const waiting=state.photoLoading?state.items.findIndex(item=>identity(item)===state.photoTarget):-1,from=waiting>=0?waiting:state.index;
       native.mount(stage,{previous:photoNeighbour(-1,from),next:photoNeighbour(1,from),pending:state.photoLoading||state.paging,
-        enabled:()=>canNavigatePhoto({pending:true,allowZoom:true})||canNavigateVideo({pending:true}),step,touchStep:arrowStep,
+        enabled:()=>canNavigatePhoto({pending:true,allowZoom:true,allowPicker:true})||canNavigateVideo({pending:true}),step,touchStep:arrowStep,
         vertical:scrollPhotoVertically,
         busy:()=>state.paging||state.photoLoading});
     }else native?.reset(stage);
@@ -526,7 +526,7 @@
     };
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
-      enabled:()=>canNavigatePhoto({pending:true,allowZoom:true})||canNavigateVideo({pending:true}),
+      enabled:()=>canNavigatePhoto({pending:true,allowZoom:true,allowPicker:true})||canNavigateVideo({pending:true}),
       mouseEnabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),mouse:desktopPhotoInput,touchOnly:phoneTouchInput,preferPointer:desktopPhotoInput,claim:()=> 'queued',
       wheelEnabled:()=>canNavigatePhoto({pending:true,wheel:true})||canNavigateVideo({pending:true}),wheelStep:arrowStep,
       nativeScroll:()=>window.FamilyPhotoNative?.has?.(stage)===true,strictStart:true,

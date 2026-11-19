@@ -117,8 +117,8 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
     };
     if(delayedFaces)faceReady.push(ready);else queueMicrotask(ready);
    },
-   clear(){const stage=get('mediaStage');delete stage._familyFaceContext;stage.classList.remove('face-photo-enlarged','face-photo-panning');},update(){},fit(){},
-   canNavigate(stage,{allowZoom=false}={}){const c=stage._familyFaceContext;return !c||(allowZoom||c.zoom===1)&&!c.saving&&!c.reviewSaving&&!c.adjust&&!c.resizeDrag&&!c.popup?.classList.contains('face-picker');}
+   clear(){const stage=get('mediaStage');stage._familyFaceContext?.popup?.remove?.();delete stage._familyFaceContext;stage.classList.remove('face-photo-enlarged','face-photo-panning');},update(){},fit(){},
+   canNavigate(stage,{allowZoom=false,allowPicker=false}={}){const c=stage._familyFaceContext;return !c||(allowZoom||c.zoom===1)&&!c.saving&&!c.reviewSaving&&!c.adjust&&!c.resizeDrag&&(allowPicker||!c.popup?.classList.contains('face-picker'));}
   }
  });
  class ResizeObserver{
@@ -901,6 +901,22 @@ test('zoomed touch swipes browse in both directions on Windows and phones while 
  }
 });
 
+test('horizontal pad and touch gestures leave an open face picker at fit and zoom without saving its search draft',async()=>{
+ for(const options of [{supported:true},{supported:false},{mobile:true}])for(const zoom of [1,2]){
+  const f=fixture(options);await f.open('photo','photos',1);if(zoom>1)f.zoom(zoom);const stage=f.get('mediaStage');
+  const picker=()=>{const panel=f.document.createElement('div');panel.className='face-popover face-picker';const input=f.document.createElement('input');input.value='Unsubmitted name';panel.append(input);f.get('mediaViewer').append(panel);stage._familyFaceContext.popup=panel;input.focus();return panel;};
+  const panel=picker(),image=stage.querySelector('.face-photo-scroll img');
+  if(!options.mobile){
+   assert.equal(f.emit(image,'wheel',{deltaX:140,deltaY:0}).defaultPrevented,true);await new Promise(resolve=>setTimeout(resolve,100));await flush();
+  }else for(const [type,x]of [['touchstart',350],['touchmove',190],['touchend',190]])touchEvent(f,image,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(panel.isConnected,false,'The old editor closes with its old photo');assert.equal(f.requests.length,0,'Browsing cannot submit the name search or create an empty face tag');
+  if(zoom>1)f.zoom(zoom);const previous=picker(),target=stage.querySelector('.face-photo-scroll img'),dx=options.mobile?160:-160;
+  if(options.mobile)for(const [type,x]of [['touchstart',300],['touchmove',300+dx],['touchend',300+dx]])touchEvent(f,target,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);
+  else for(const [type,x]of [['pointerdown',300],['pointermove',300+dx],['pointerup',300+dx]])f.emit(target,type,{pointerType:'touch',pointerId:9,isPrimary:true,button:0,clientX:x,clientY:250});
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(previous.isConnected,false);assert.equal(f.requests.length,0);f.close();
+ }
+});
+
 test('vertical desktop touch pans the zoomed photo instead of the outer viewer',async()=>{
  for(const supported of [true,false]){
   const f=fixture({supported});await f.open();f.zoom(2);const stage=f.get('mediaStage'),scroller=stage.querySelector('.face-photo-scroll'),image=scroller.querySelector('img');scroller.scrollTop=160;f.get('mediaViewer').scrollTop=20;
@@ -912,8 +928,8 @@ test('vertical desktop touch pans the zoomed photo instead of the outer viewer',
 test('zoomed horizontal gestures preserve face editing, other dialogs and pinch input',async()=>{
  for(const supported of [true,false]){
   const f=fixture({supported});await f.open();f.zoom(2);const stage=f.get('mediaStage'),c=stage._familyFaceContext;
-  for(const key of ['saving','reviewSaving','adjust','resizeDrag','popup']){
-   c[key]=key==='popup'?{classList:{contains:name=>name==='face-picker'}}:true;
+  for(const key of ['saving','reviewSaving','adjust','resizeDrag']){
+   c[key]=true;
    const image=stage.querySelector('.face-photo-scroll img');assert.equal(f.emit(image,'wheel',{deltaX:140,deltaY:0}).defaultPrevented,false);
    for(const [type,x]of [['pointerdown',200],['pointermove',360],['pointerup',360]])f.emit(image,type,{pointerType:'touch',pointerId:9,isPrimary:true,button:0,clientX:x,clientY:250});
    await flush();assert.equal(f.window.FamilyMedia.current().id,'a');c[key]=null;
