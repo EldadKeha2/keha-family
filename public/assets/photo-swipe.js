@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,mouseEnabled=enabled,wheelEnabled=enabled,wheelStep,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
+  function bind(stage,{enabled,mouseEnabled=enabled,wheelEnabled=enabled,wheelStep,step,right,left,move,cancel,claim,nativeEnd,vertical,zoomWheel,horizontalStart,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
     stage._familyGalleryWheel=true;
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
     const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
@@ -90,6 +90,7 @@
       if(g.vertical){blockClick();if(event.cancelable)event.preventDefault();vertical(g.lastY-event.clientY);g.lastY=event.clientY;return;}
       if(!g.dragged){
         g.dragged=true;stage.classList.add('photo-pointer-dragging');
+        horizontalStart?.();
         if(typeof event.pointerId==='number')try{stage.setPointerCapture?.(event.pointerId);}catch{}
       }
       blockClick();if(event.cancelable)event.preventDefault();
@@ -159,7 +160,9 @@
       }
       if(nativeScroll())return;
       const outside=typeof stage.contains==='function'&&!stage.contains(event.target),candidate=outside?event.target.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"]'):controlAt(event),control=outside&&(candidate?.readOnly||candidate?.disabled)?null:candidate;
-      if(!mouse()||!enabled()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
+      if(!mouse()||gesture||touchStart||event.ctrlKey||event.metaKey||control&&!previewVideo(event))return;
+      if(zoomWheel?.(event)){blockClick();return;}
+      if(!enabled())return;
       const unit=event.deltaMode===1?16:event.deltaMode===2?stage.clientWidth:1;
       const rawDx=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,dy=event.shiftKey&&!event.deltaX?0:(event.deltaY||0)*unit;
       // Windows Precision Touchpads can report a whole gesture in subpixel
@@ -173,6 +176,7 @@
       const complete=done=>{if(!done)return;window.FamilyPhotoNative?.finishWheelEpisode?.(stage,done.episode);window.FamilyGalleryInput?.finishWheelDirection?.();if(!wheelGesture)finished();if(enabled()&&Math.abs(done.dx)>0){flushPreview();navigate(done.dx,{dragX:wheelMotion(done.dx),queued:true,native:true,input:'wheel'});}else {clearPreview();cancel?.();}};
       const finish=()=>{wheelTimer=null;const done=wheelGesture;wheelGesture=null;complete(done);};
       if(sample?.ignore){if(wheelGesture){clearTimeout(wheelTimer);wheelTimer=setTimeout(finish,80);}return;}
+      if(!wheelGesture)horizontalStart?.();
       if(sample?.replace&&wheelGesture)wheelGesture.dx=0;
       if(sample?.split&&wheelGesture){clearTimeout(wheelTimer);const done=wheelGesture;wheelGesture={dx:0,episode:sample.episode};complete(done);}
       wheelGesture||={dx:0,episode:sample?.episode};wheelGesture.dx+=dx;desktopBridge()?.observePadGesture?.(wheelGesture.dx);preview(wheelMotion(wheelGesture.dx),{queued:true,actionDirection:Math.sign(wheelGesture.dx)});clearTimeout(wheelTimer);

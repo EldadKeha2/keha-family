@@ -52,8 +52,8 @@
   const linked=(item,scope)=>scope?.startsWith('personal:')&&item.scope!==scope;
   let noticeTimer,expectedCaption='',captionEditing=false,captionEditor=0,captionSave=null,captionLocked=false;
   let renderedVersion=null,instagramPrepared={key:null,file:null};
-  let restoringLink='',photoSwipe=null,faceTimer=null;
-  const photoInputIdle=()=>photoSwipe?.whenIdle?.()||window.FamilyPhotoNative?.whenIdle?.($('mediaStage'));
+  let restoringLink='',photoSwipe=null,zoomPad=null,faceTimer=null;
+  const photoInputIdle=()=>zoomPad?.whenIdle?.()||photoSwipe?.whenIdle?.()||window.FamilyPhotoNative?.whenIdle?.($('mediaStage'));
   const tr=(he,en)=>I18n.isEnglish?en:he;
   function hideSwipeHint(){state.swipeHintId=null;swipeHintNode?.remove();swipeHintNode=null;}
   function renderSwipeHint(){
@@ -223,6 +223,7 @@
   }
   function clearStage({preserveHandoff=false,nextItem=null}={}){
     clearTimeout(faceTimer);faceTimer=null;
+    zoomPad?.reset();
     photoSwipe?.reset();
     window.FamilyPhotoNative?.reset($('mediaStage'));
     window.FamilyPhotoPresentation?.cancel({preserveHandoff});
@@ -331,16 +332,18 @@
     state.pageRender=null;
     try{state.pageRequest=Promise.resolve(pagingApi().pageGallery(state.pageTarget)).then(()=>state.pageRender);await state.pageRequest;}finally{if(navigation===state.navigation){state.paging=false;state.pageTarget=null;state.pageRequest=null;state.pageRender=null;if($('mediaViewer').open)metadata();}}
   }
-  function canNavigatePhoto({pending=false,wheel=false,allowZoom=false,allowPicker=false}={}){
+  function canNavigatePhoto({pending=false,wheel=false,allowZoom=false,allowPicker=false,allowSingle=false}={}){
     if(state.fullscreen&&window.FamilyPhotoFullscreen?.isBlocked?.())return false;
     const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&
-      (pending||!stage.classList.contains?.('photo-slide-running'))&&(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1&&
+      (pending||!stage.classList.contains?.('photo-slide-running'))&&(allowSingle||(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1)&&
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(allowZoom||!stage.classList.contains('face-photo-enlarged'))&&(wheel||(window.FamilyFaces?.canNavigate?.(stage,{allowZoom,allowPicker})??true));
   }
   function scrollPhotoVertically(dy){
     const stage=$('mediaStage'),scroller=stage.classList.contains('face-photo-enlarged')&&stage.querySelector('.face-photo-scroll');
     const target=scroller||$('mediaViewer');target.scrollTop=(target.scrollTop||0)+dy;
   }
+  const horizontalPhotoStarted=()=>{if(current()?.kind==='photo')window.FamilyFaces?.dismiss?.();};
+  const zoomWheel=event=>zoomPad?.handle(event)??false;
   function canNavigateVideo({pending=false}={}){
     return $('mediaViewer').open&&current()?.kind==='video'&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&(pending||!state.paging)&&(albumPages.get(state.scope)?.total??state.items.length)>1&&
       !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#videoClipEditor[open],#photoDateDialog[open]');
@@ -357,6 +360,7 @@
       native.mount(stage,{previous:photoNeighbour(-1,from),next:photoNeighbour(1,from),pending:state.photoLoading||state.paging,
         enabled:()=>canNavigatePhoto({pending:true,allowZoom:true,allowPicker:true})||canNavigateVideo({pending:true}),step,touchStep:arrowStep,
         vertical:scrollPhotoVertically,
+        zoomWheel,horizontalStart:horizontalPhotoStarted,
         busy:()=>state.paging||state.photoLoading});
     }else native?.reset(stage);
   }
@@ -525,6 +529,12 @@
       button.click();
     };
     $('mediaPrevious').querySelector('[data-paging-arrow]').textContent='←';$('mediaNext').querySelector('[data-paging-arrow]').textContent='→';
+    zoomPad=window.FamilyPhotoZoomPad?.bind(stage,{
+      enabled:()=>desktopPhotoInput()&&stage.classList.contains('face-photo-enlarged')&&canNavigatePhoto({allowZoom:true,allowPicker:true,allowSingle:true}),
+      canNavigate:()=>canNavigatePhoto({allowZoom:true,allowPicker:true}),
+      pan:(dx,dy)=>{const scroller=stage.querySelector('.face-photo-scroll');if(scroller){scroller.scrollLeft+=dx;scroller.scrollTop+=dy;}},
+      start:horizontalPhotoStarted,step:(direction,options)=>step(direction,options)
+    });
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
       enabled:()=>canNavigatePhoto({pending:true,allowZoom:true,allowPicker:true})||canNavigateVideo({pending:true}),
       mouseEnabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),mouse:desktopPhotoInput,touchOnly:phoneTouchInput,preferPointer:desktopPhotoInput,claim:()=> 'queued',
@@ -533,6 +543,7 @@
       wheelRoot:()=>$('mediaViewer'),
       videoSurface:()=>current()?.kind==='video'?stage.querySelector('video'):null,
       vertical:scrollPhotoVertically,
+      zoomWheel,horizontalStart:horizontalPhotoStarted,
       step,right:options=>swipePhoto(1,options),left:options=>swipePhoto(-1,options),
       move:(dx,{queued=false,actionDirection=Math.sign(dx)}={})=>{
         if(current()?.kind!=='photo')return;
@@ -626,7 +637,7 @@
       if(event.key==='ArrowRight'){event.preventDefault();step(1);}
     });
   }
-  window.FamilyMedia={items:scope=>[...(albums.get(scope)||[])],register,controls,open,openFrom,requestDelete,notify,current,refreshPhotoPresentation,photoState,setFullscreen,step,isPhotoBrowsing:()=>Boolean($('mediaViewer')?.open&&current()?.kind==='photo'&&(state.photoLoading||state.paging||photoSwipe?.isActive?.()||Date.now()-state.photoActivity<800)),lookup:(scope,id)=>(albums.get(scope)||[]).find(item=>identity(item)===id||item.file===id),isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
+  window.FamilyMedia={items:scope=>[...(albums.get(scope)||[])],register,controls,open,openFrom,requestDelete,notify,current,refreshPhotoPresentation,photoState,setFullscreen,step,isPhotoBrowsing:()=>Boolean($('mediaViewer')?.open&&current()?.kind==='photo'&&(state.photoLoading||state.paging||zoomPad?.isActive?.()||photoSwipe?.isActive?.()||Date.now()-state.photoActivity<800)),lookup:(scope,id)=>(albums.get(scope)||[]).find(item=>identity(item)===id||item.file===id),isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
   document.addEventListener('DOMContentLoaded',init);
 })();
 

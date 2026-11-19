@@ -310,7 +310,7 @@ test('an unclaimed cancelled Windows pointer retains its joined TouchEvent conta
 });
 
 test('diagnostics expose the actual mounted controller and current input owner',()=>{
- const f=fixture();assert.equal(f.api.version,18);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
+ const f=fixture();assert.equal(f.api.version,19);f.api.mount(f.stage,f.options);const initial=f.api.diagnostics(f.stage);for(const field of ['mounted','enabled','lastDecision','lastEvent','phase','pointer','touch','wheel','width','protectedMatch'])assert.equal(Object.hasOwn(initial,field),true,field);assert.equal(initial.mounted,true);assert.equal(initial.enabled,true);assert.equal(initial.width,800);pointer(f,'pointerdown');const active=f.api.diagnostics(f.stage);assert.equal(active.pointer,true);f.api.reset();assert.equal(f.api.diagnostics(f.stage).mounted,false);
 });
 
 test('a tiny fallback TouchMove after pointercancel releases idle without navigation after quiet',async t=>{

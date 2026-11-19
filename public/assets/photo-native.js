@@ -212,18 +212,18 @@
   // never has authority to select a neighbouring item.
   function note(stage,dx){const b=active;if(b?.stage===stage&&Number.isFinite(dx)&&dx){b.cancel();b.navigate(Math.sign(dx));}}
   function claim(stage){return active?.stage===stage?'queued':'manual';}
-  function mount(stage,{previous,next,enabled,step,touchStep,busy,vertical,pending=false}){
+  function mount(stage,{previous,next,enabled,step,touchStep,busy,vertical,zoomWheel,horizontalStart,pending=false}){
     if(stage?.nodeType!==1||!supported()||!enabled()){reset(stage);return false;}
     const node=stage.querySelector('.face-photo-scroll')||(!stage._familyFaceContext?(active?.stage===stage?active.node:stage.querySelector('video,iframe,img')):null);
     if(!node)return false;
-    if(active?.stage===stage&&active.node===node){Object.assign(active,{enabled,step,touchStep,busy,vertical,previous,next});if(!pending)clearCover(active);if(active.wheel)arrangePad(active);else arrange(active);anchor(active);if(active.wheel){active.drawPad(active.wheel.dx);paintPad(active,active.wheel.dx);}return true;}
+    if(active?.stage===stage&&active.node===node){Object.assign(active,{enabled,step,touchStep,busy,vertical,zoomWheel,horizontalStart,previous,next});if(!pending)clearCover(active);if(active.wheel)arrangePad(active);else arrange(active);anchor(active);if(active.wheel){active.drawPad(active.wheel.dx);paintPad(active,active.wheel.dx);}return true;}
     const resumedWheel=active?.stage===stage?active.wheel:null;
     reset(undefined,Boolean(resumedWheel));const viewport=document.createElement('div');viewport.className='native-photo-strip';viewport.dir='ltr';
     Object.assign(viewport.style,{scrollBehavior:'auto',scrollSnapType:'none',touchAction:'pinch-zoom',visibility:'hidden',overflowX:'hidden'});
     const left=document.createElement('div'),center=document.createElement('div'),right=document.createElement('div');
     for(const pane of [left,center,right]){pane.className='native-photo-pane';viewport.append(pane);}
     node.before(viewport);center.append(node);stage.classList.add('has-native-photo-strip');
-    const b=active={stage,node,viewport,center,enabled,step,touchStep,busy,vertical,previous,next,width:0,anchored:false,pending:0,idle:new Set(),contact:null,wheel:null,lastDecision:'mounted',lastEvent:'mount',protectedMatch:null};
+    const b=active={stage,node,viewport,center,enabled,step,touchStep,busy,vertical,zoomWheel,horizontalStart,previous,next,width:0,anchored:false,pending:0,idle:new Set(),contact:null,wheel:null,lastDecision:'mounted',lastEvent:'mount',protectedMatch:null};
     arrange(b);anchor(b);
     const clearWheelPaint=()=>{b.padDx=null;for(const pane of viewport.children){pane.style.transform='';pane.style.willChange='';}};
     b.drawPad=dx=>{b.padDx=dx;viewport.scrollLeft=b.width;const transform='translateX('+padOffset(dx,b.width)+'px)';for(const pane of viewport.children){pane.style.transform=transform;pane.style.willChange='transform';}};
@@ -293,6 +293,7 @@
       }
       if(g.axis==='y'){b.lastDecision='vertical';blockClick(b);prevent(event);b.vertical?.(g.lastY-event.clientY);g.lastY=event.clientY;return;}
       if(g.axis!=='x'){b.lastDecision='await-axis';return;}
+      if(!g.horizontalStarted){g.horizontalStarted=true;b.horizontalStart?.();}
       b.lastDecision='horizontal';
       window.FamilyGalleryInput?.observeTouchGesture?.(g.dx);arrange(b);
       blockClick(b);prevent(event);draw(g);
@@ -389,6 +390,7 @@
       if(active!==b)return;
       if(!b.enabled()){b.lastDecision='disabled';return;}
       if(!anchor(b)){b.lastDecision='zero-width';return;}
+      if(b.zoomWheel?.(event)){blockClick(b);b.cancel();b.lastDecision='zoom-pad';return;}
       const mouseDirection=mouseWheelDirection(event);
       if(mouseDirection){
         prevent(event);blockClick(b);b.cancel();clearPadFinish();b.lastDecision='mouse-wheel';
@@ -402,6 +404,7 @@
       prevent(event);blockClick(b);
       const sample=wheelSample(stage,dx);
       if(sample.ignore){b.lastDecision='wheel-momentum-ignored';if(b.wheel){clearTimeout(b.wheelTimer);b.wheelTimer=setTimeout(()=>{if(active===b)finishWheel();},PAD_QUIET);}return;}
+      if(!b.wheel)b.horizontalStart?.();
       if(sample.replace&&b.wheel)b.wheel.dx=0;
       if(b.contact){
         // Wheel input proves a new owner. Finish a real horizontal finger
@@ -429,5 +432,5 @@
     return true;
   }
   function diagnostics(stage){const b=active?.stage===stage?active:null;return {mounted:Boolean(b),enabled:Boolean(b?.enabled()),lastDecision:b?.lastDecision||'unmounted',lastEvent:b?.lastEvent||'none',protectedMatch:b?.protectedMatch||null,phase:b?.contact?(b.contact.axis==='x'?'horizontal':b.contact.axis==='y'?'vertical':'contact-pending'):b?.wheel?'wheel':'idle',pointer:b?.contact?.pointerId!=null,touch:b?.contact?.touchId!=null||Boolean(b?.contact?.group),wheel:Boolean(b?.wheel),width:b?.width||0,lastInput:stage?.getAttribute?.('data-gallery-last-input')||'none',lastAction:stage?.getAttribute?.('data-gallery-last-action')||'none'};}
-  window.FamilyPhotoNative={version:18,mount,reset,has,claim,note,supported,diagnostics,padOffset,mouseWheelDirection,verticalWheelDirection,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
+  window.FamilyPhotoNative={version:19,mount,reset,has,claim,note,supported,diagnostics,padOffset,mouseWheelDirection,verticalWheelDirection,wheelScope,wheelSample,finishWheelEpisode,clearWheelEpisode,preview:stage=>active?.stage===stage?active.previewImage:null,isActive:stage=>active?.stage===stage&&inputActive(active),whenIdle:stage=>active?.stage===stage&&inputActive(active)?new Promise(resolve=>active.idle.add(resolve)):null};
 })();
