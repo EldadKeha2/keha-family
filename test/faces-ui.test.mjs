@@ -352,12 +352,15 @@ test('rapid desktop navigation postpones automatic scans while saved faces and c
  await f.mount('reviewed',{}, {faceSummary:{scanned:true,reviewed:true}});f.faces.update({id:'reviewed',kind:'photo',faceSummary:{scanned:true,reviewed:false}});t.mock.timers.tick(650);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.detectionCalls,2,'Undoing confirmation can still restart detection');f.faces.clear();
 });
 
-test('photo navigation waits for fitted zoom and finished face editing, and clears zoom styling on the next photo',async()=>{
+test('mouse browsing waits for fit while horizontal gesture browsing can opt into zoom without bypassing face editing',async()=>{
  const f=fixture([first]);await f.mount();assert.equal(f.faces.canNavigate(f.stage),true);
  const toolbar=f.find('face-zoom-toolbar');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');
  assert.equal(f.faces.canNavigate(f.stage),false);assert.equal(f.stage.classList.contains('face-photo-enlarged'),true);
+ assert.equal(f.faces.canNavigate(f.stage,{allowZoom:true}),true);
+ for(const key of ['saving','reviewSaving','adjust','resizeDrag']){f.stage._familyFaceContext[key]=true;assert.equal(f.faces.canNavigate(f.stage,{allowZoom:true}),false);f.stage._familyFaceContext[key]=false;}
  f.emit(toolbar.querySelector('[data-face-zoom-reset]'),'click');assert.equal(f.faces.canNavigate(f.stage),true);assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);
  f.emit(f.stage,'click',{target:f.image,clientX:200,clientY:220,detail:1});assert.equal(f.faces.canNavigate(f.stage),false);
+ assert.equal(f.faces.canNavigate(f.stage,{allowZoom:true}),false,'A face picker still blocks gesture navigation');
  f.faces.dismiss();assert.equal(f.faces.canNavigate(f.stage),true);
  f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');f.faces.clear();assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);assert.equal(f.faces.canNavigate(f.stage),true);
 });

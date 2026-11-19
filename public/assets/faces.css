@@ -7,6 +7,12 @@
 :is(#mediaViewer,#photoUploadEditor) .media-stage.face-photo-enlarged :is(.face-photo-surface img,.face-hit){cursor:inherit}
 .media-stage.face-photo-enlarged.face-photo-panning:not(.face-adjusting):not(.face-resizing) .face-photo-scroll{cursor:grabbing;user-select:none}
 :is(#mediaViewer,#photoUploadEditor):has(.face-picker) .face-photo-enlarged .face-photo-scroll{cursor:auto}
+/* Zoom keeps horizontal album swipes; vertical touch pans the enlarged photo.
+   Desktop controllers own vertical movement too, while pinch remains native. */
+#mediaViewer #mediaStage.photo-swipe-enabled.face-photo-enlarged:not(.face-adjusting):not(.face-resizing),
+#mediaViewer #mediaStage.photo-swipe-enabled.face-photo-enlarged:not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,img,.face-hit){touch-action:pan-y pinch-zoom}
+#mediaViewer #mediaStage.photo-swipe-enabled.face-photo-enlarged:is(.has-native-photo-strip,.photo-manual-swipes):not(.face-adjusting):not(.face-resizing),
+#mediaViewer #mediaStage.photo-swipe-enabled.face-photo-enlarged:is(.has-native-photo-strip,.photo-manual-swipes):not(.face-adjusting):not(.face-resizing) :is(.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,img,.face-hit){touch-action:pinch-zoom}
 :is(#mediaViewer,#photoUploadEditor) .face-photo-surface img{width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;user-select:none;-webkit-user-drag:none}
 .face-zoom-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;padding:6px 10px;background:#f6f2e7;color:#64714e;border-bottom:1px solid #ddd4bc;font:calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 .face-zoom-toolbar>div{display:flex;align-items:center;gap:4px;direction:ltr}

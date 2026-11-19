@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // Pointer events cover phones, tablets and touch screens regardless of width.
-  function bind(stage,{enabled,wheelEnabled=enabled,wheelStep,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
+  function bind(stage,{enabled,mouseEnabled=enabled,wheelEnabled=enabled,wheelStep,step,right,left,move,cancel,claim,nativeEnd,vertical,mouse=()=>false,touchOnly=()=>false,preferPointer=()=>false,nativeScroll=()=>false,wheelRoot=()=>null,photoButtons=false,videoSurface=null,strictStart=false}){
     stage._familyGalleryWheel=true;
     let gesture=null,nativePointer=null,suppressClickUntil=0,touchStart=null,wheelGesture=null,wheelTimer=null,previewFrame=null,pendingPreview=null;
     const frames=typeof requestAnimationFrame==='function'&&typeof cancelAnimationFrame==='function';
@@ -58,7 +58,7 @@
       if(touch&&nativeScroll())return;
       const isMouse=!touch&&event.pointerType==='mouse'&&mouse()&&!event.ctrlKey&&!event.metaKey&&!event.altKey;
       const control=controlAt(event),video=control?.tagName==='VIDEO'?previewVideo(event):null;
-      if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||control&&!video)return;
+      if(!(touch||isMouse)||event.isPrimary===false||event.button>0||!enabled()||isMouse&&!mouseEnabled()||control&&!video)return;
       suppressClickUntil=0;
       gesture={id:event.pointerId,x:event.clientX,y:event.clientY,lastY:event.clientY,time:Date.now(),dragged:false,desktop:mouse(),video,threshold:distance()};
       const ownership=claim?.(event)||'manual',mode=isMouse?'queued':ownership;
@@ -74,7 +74,7 @@
     stage.addEventListener('pointerdown',event=>{freshVideoTouch(event);if(!touchOnly())begin(event);},{capture:true,passive:true});
     const moved=event=>{
       const g=gesture;if(!g||event.pointerId!==g.id)return;
-      if(!enabled()||g.mouse&&event.buttons===0){if(g.dragged)blockClick();reset();return;}
+      if(!enabled()||g.mouse&&(!mouseEnabled()||event.buttons===0)){if(g.dragged)blockClick();reset();return;}
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
       if(!g.dragged&&!g.vertical){
         // Precision touch input often starts with a few diagonal pixels.
@@ -102,7 +102,7 @@
       const dx=event.clientX-g.x,dy=event.clientY-g.y;
       if(g.vertical){blockClick();reset();return;}
       if(g.dragged||Math.abs(dx)>(g.video?g.threshold:10))blockClick();
-      if(!enabled()||!g.dragged&&Date.now()-g.time>4000||Math.abs(dx)<g.threshold||Math.abs(dx)<Math.abs(dy)*(g.desktop&&g.dragged?1:1.5)){reset();return;}
+      if(!enabled()||g.mouse&&!mouseEnabled()||!g.dragged&&Date.now()-g.time>4000||Math.abs(dx)<g.threshold||Math.abs(dx)<Math.abs(dy)*(g.desktop&&g.dragged?1:1.5)){reset();return;}
       flushPreview();
       gesture=null;touchStart=null;stage.classList.remove('photo-pointer-dragging');finished();
       if(event.cancelable)event.preventDefault();
@@ -190,3 +190,4 @@
   }
   window.FamilyPhotoSwipe={bind};
 })();
+

@@ -117,8 +117,8 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
     };
     if(delayedFaces)faceReady.push(ready);else queueMicrotask(ready);
    },
-   clear(){delete get('mediaStage')._familyFaceContext;},update(){},fit(){},
-   canNavigate(stage){const c=stage._familyFaceContext;return !c||c.zoom===1&&!c.saving&&!c.adjust;}
+   clear(){const stage=get('mediaStage');delete stage._familyFaceContext;stage.classList.remove('face-photo-enlarged','face-photo-panning');},update(){},fit(){},
+   canNavigate(stage,{allowZoom=false}={}){const c=stage._familyFaceContext;return !c||(allowZoom||c.zoom===1)&&!c.saving&&!c.reviewSaving&&!c.adjust&&!c.resizeDrag&&!c.popup?.classList.contains('face-picker');}
   }
  });
  class ResizeObserver{
@@ -870,17 +870,60 @@ test('opening Labels restores scrolling everywhere until the dropdown is closed 
  }
 });
 
-test('enlarged photos keep both wheel axes for panning and restore album browsing only after returning to fit',async()=>{
- const f=fixture();await f.open();f.zoom(2);assert.equal(f.strip(),null);
- for(const target of [f.get('mediaStage').querySelector('img'),f.get('openedCaptionText'),f.document.body])for(const delta of [{deltaX:0,deltaY:-94},{deltaX:140,deltaY:0},{deltaX:12,deltaY:24}]){
-  assert.equal(f.emit(target,'wheel',delta).defaultPrevented,false,'The gallery must leave panning to the zoomed photo or the surrounding scroller');
+test('zoom keeps vertical wheel panning and horizontal pad browsing available together',async()=>{
+ for(const supported of [true,false])for(const scope of ['photos','gallery','personal:ruti']){
+  const f=fixture({supported});await f.open('photo',scope,1);f.zoom(2);
+  for(const target of [f.get('mediaStage').querySelector('img'),f.get('openedCaptionText'),f.document.body]){
+   assert.equal(f.emit(target,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,false,'Zoomed vertical input stays with the photo or surrounding scroller');
+  }
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'b');
+  const image=f.get('mediaStage').querySelector('.face-photo-scroll img');
+  assert.equal(f.emit(image,'wheel',{deltaX:140,deltaY:0}).defaultPrevented,true);await new Promise(resolve=>setTimeout(resolve,100));await flush();
+  assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.get('mediaStage').classList.contains('face-photo-enlarged'),false,'The next photograph starts fitted');
+  f.zoom(2);assert.equal(f.emit(f.get('mediaStage').querySelector('.face-photo-scroll img'),'wheel',{deltaX:-140,deltaY:0}).defaultPrevented,true);await new Promise(resolve=>setTimeout(resolve,100));await flush();
+  assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
  }
- await flush();assert.equal(f.window.FamilyMedia.current().id,'a');
+});
+
+test('zoomed touch swipes browse in both directions on Windows and phones while mouse drags remain available for photo panning',async()=>{
+ for(const options of [{supported:true},{supported:false},{mobile:true}]){
+  const f=fixture(options);await f.open('photo','photos',1);f.zoom(2);
+  const stage=f.get('mediaStage'),image=stage.querySelector('.face-photo-scroll img');
+  for(const [type,x]of [['pointerdown',200],['pointermove',360],['pointerup',360]])f.emit(image,type,{pointerType:'mouse',pointerId:17,isPrimary:true,button:0,buttons:type==='pointerup'?0:1,clientX:x,clientY:250});
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(stage.classList.contains('photo-pointer-dragging'),false,'Mouse input must not claim an album swipe during zoom');
+  const swipe=async direction=>{
+   const image=stage.querySelector('.face-photo-scroll img'),dx=direction*(options.mobile?-160:160);
+   if(options.mobile)for(const [type,x]of [['touchstart',300],['touchmove',300+dx],['touchend',300+dx]])touchEvent(f,image,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);
+   else for(const [type,x]of [['pointerdown',300],['pointermove',300+dx],['pointerup',300+dx]])f.emit(image,type,{pointerType:'touch',pointerId:9,isPrimary:true,button:0,clientX:x,clientY:250});
+   await flush();
+  };
+  await swipe(1);assert.equal(f.window.FamilyMedia.current().id,'c');f.zoom(2);await swipe(-1);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+ }
+});
+
+test('vertical desktop touch pans the zoomed photo instead of the outer viewer',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported});await f.open();f.zoom(2);const stage=f.get('mediaStage'),scroller=stage.querySelector('.face-photo-scroll'),image=scroller.querySelector('img');scroller.scrollTop=160;f.get('mediaViewer').scrollTop=20;
+  for(const [type,y]of [['pointerdown',250],['pointermove',330],['pointerup',330]])f.emit(image,type,{pointerType:'touch',pointerId:9,isPrimary:true,button:0,clientX:300,clientY:y});
+  await flush();assert.equal(scroller.scrollTop,80);assert.equal(f.get('mediaViewer').scrollTop,20);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
+ }
+});
+
+test('zoomed horizontal gestures preserve face editing, other dialogs and pinch input',async()=>{
+ for(const supported of [true,false]){
+  const f=fixture({supported});await f.open();f.zoom(2);const stage=f.get('mediaStage'),c=stage._familyFaceContext;
+  for(const key of ['saving','reviewSaving','adjust','resizeDrag','popup']){
+   c[key]=key==='popup'?{classList:{contains:name=>name==='face-picker'}}:true;
+   const image=stage.querySelector('.face-photo-scroll img');assert.equal(f.emit(image,'wheel',{deltaX:140,deltaY:0}).defaultPrevented,false);
+   for(const [type,x]of [['pointerdown',200],['pointermove',360],['pointerup',360]])f.emit(image,type,{pointerType:'touch',pointerId:9,isPrimary:true,button:0,clientX:x,clientY:250});
+   await flush();assert.equal(f.window.FamilyMedia.current().id,'a');c[key]=null;
+  }
  const dialog=f.document.createElement('dialog');dialog.id='photoDateDialog';f.document.body.append(dialog);dialog.open=true;dialog.setAttribute('open','');
- assert.equal(f.emit(dialog,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,false);await flush();assert.equal(f.window.FamilyMedia.current().id,'a');dialog.open=false;dialog.removeAttribute('open');dialog.remove();
- for(const modifier of ['ctrlKey','metaKey'])assert.equal(f.emit(f.document.body,'wheel',{deltaX:0,deltaY:-94,[modifier]:true}).defaultPrevented,false);
- await flush();assert.equal(f.window.FamilyMedia.current().id,'a');f.zoom(1);
- assert.equal(f.emit(f.get('mediaStage').querySelector('img'),'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+  assert.equal(f.emit(dialog,'wheel',{deltaX:140,deltaY:0}).defaultPrevented,false);dialog.open=false;dialog.removeAttribute('open');dialog.remove();
+  for(const modifier of ['ctrlKey','metaKey'])assert.equal(f.emit(f.document.body,'wheel',{deltaX:140,deltaY:-94,[modifier]:true}).defaultPrevented,false);
+  await flush();assert.equal(f.window.FamilyMedia.current().id,'a');f.zoom(1);
+  assert.equal(f.emit(f.get('mediaStage').querySelector('img'),'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+ }
 });
 
 test('pad completion continues the last physical offset smoothly while touch retains its exact saved behavior',async()=>{
@@ -1052,9 +1095,9 @@ test('profile page loaders retain native swiping on the final single-item photo 
  }
 });
 
-test('native scrolling recenters on resize and yields cleanly to photo zoom and unsupported browsers',async()=>{
+test('native scrolling recenters on resize and keeps zoomed photos in the same input controller',async()=>{
  const f=fixture();await f.open();f.resize(640);assert.equal(viewPosition(f.strip()),640);await f.snap(0);assert.equal(f.window.FamilyMedia.current().id,'b');
- f.zoom(2);assert.equal(f.strip(),null);assert.ok(f.get('mediaStage').querySelector('.face-photo-scroll img'));
+ f.zoom(2);assert.ok(f.strip());assert.ok(f.get('mediaStage').querySelector('.face-photo-scroll img'));
  f.zoom(1);assert.ok(f.strip());await f.snap(2);assert.equal(f.window.FamilyMedia.current().id,'a');f.close();
  for(const options of [{supported:false},{mobile:true}]){
   const fallback=fixture(options);await fallback.open();assert.equal(fallback.strip(),null,'Unsupported browsers and phones keep the existing gesture path');
