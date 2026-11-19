@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-5782b89f20975add.css">
+  <link rel="stylesheet" href="assets/site-styles-020b5a2be0d81993.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
@@ -51,7 +51,7 @@
   <script src="assets/photo-vertical-wheel.js?v=scroll-priority-v2" defer></script>
   <script src="assets/photo-swipe.js?v=vertical-scroll-priority-v24" defer></script>
   <script src="assets/video-album-input.js?v=desktop-pad-surface-v15" defer></script>
-  <script src="assets/media.js?v=picker-surface-v23" defer></script>
+  <script src="assets/media.js?v=family-photo-viewer-v24" defer></script>
   <script src="assets/video-editor.js?v=delete-exit-v17" defer></script>
   <script src="assets/video-presentation.js?v=desktop-inline-date-v4" defer></script>
   <script src="assets/video-upload-wizard.js?v=delete-segment-v5" type="module"></script>
@@ -65,7 +65,7 @@
   <script src="assets/video-categories.js?v=milestone-category-v5" type="module"></script>
   <script src="assets/video-filter.js?v=duration-description-v1" type="module"></script>
   <script src="assets/memories.js?v=storyteller-portraits-v4" defer></script>
-  <script src="assets/portal.js?v=review-stay-filter-v5" defer></script>
+  <script src="assets/portal.js?v=family-photo-grid-v6" defer></script>
   <script src="assets/gallery-filter.js?v=long-press-v3" type="module"></script>
   <script src="assets/media-selection.js?v=person-gallery-v1" type="module"></script>
   <script src="assets/updates.js" defer></script>
@@ -199,9 +199,9 @@
           <div class="portal-empty" id="videosEmpty"><span class="empty-emblem" aria-hidden="true">▷</span><h3>עוד רגע, זיכרון בתנועה</h3><p>סרט מהחתונה, ברכה לסבתא או רגע קטן מהיום־יום.<br>הסרטון הראשון שלכם יתחיל את הגלריה.</p></div>
           <div class="collection-upload" id="videosDropzone"><div><span class="small-eyebrow">מוסיפים רגע לאלבום</span><h3>יש לכם סרטון משפחתי?</h3><p>בחרו מהטלפון או מהמחשב, או גררו לכאן סרטון.<br>עד 90MB לסרטון · MP4, WebM, MOV, M4V</p></div><div class="upload-buttons"><label class="video-upload-category">לאיזו קטגוריה להוסיף?<select id="videoUploadCategory"><option value="family">סרטונים משפחתיים</option><option value="special-birthdays">ימי הולדת עגולים</option><option value="__create_category__">＋ הוסף קטגוריה</option></select></label><button class="primary-button" data-upload-collection="videos">＋ העלאת סרטונים</button><button class="secondary-button mobile-camera" data-camera-collection="videos">צילום סרטון</button></div><div class="collection-upload-state" id="videosUploadState" role="status"></div><progress id="videosProgress" max="100" value="0" hidden aria-label="התקדמות העלאת הסרטונים"></progress></div>
         </section>
-        <section id="photosView" class="portal-view" aria-label="תמונות משפחתיות" hidden>
+        <section id="photosView" class="portal-view compact-gallery-view" aria-label="תמונות משפחתיות" hidden>
           <div class="collection-heading"><span class="collection-count" id="photosCount">אלבום משותף לכל המשפחה</span><span class="collection-kicker">יחד בתמונה</span></div>
-          <div class="shared-media-grid" id="photosGrid"></div>
+          <div class="compact-gallery-grid" id="photosGrid"></div>
           <div class="portal-empty" id="photosEmpty"><span class="empty-emblem" aria-hidden="true">▧</span><h3>לכל תמונה יש סיפור</h3><p>מפגשים, טיולים וחגים; כל הרגעים שבהם אנחנו יחד.<br>הוסיפו תמונה וכתבו מי מופיע בה, מתי ואיפה צולמה.</p></div>
           <div class="collection-upload" id="photosDropzone"><div><span class="small-eyebrow">האלבום של כולנו</span><h3>מצרפים זיכרון משפחתי</h3><p>בחרו תמונות מהטלפון או מהמחשב, או גררו לכאן.<br><span class="desktop-paste">אפשר גם להדביק צילום מסך עם <bdi>Ctrl+V</bdi> · </span>עד 50MB לתמונה</p></div><div class="upload-buttons"><button class="primary-button" data-upload-collection="photos">＋ העלאת תמונות</button><button class="secondary-button mobile-camera" data-camera-collection="photos">צילום תמונה</button></div><div class="collection-upload-state" id="photosUploadState" role="status"></div><progress id="photosProgress" max="100" value="0" hidden aria-label="התקדמות העלאת התמונות"></progress></div>
         </section>

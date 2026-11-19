@@ -1,6 +1,7 @@
 .photo-collections{display:flex;align-items:center;justify-content:center;gap:5px;padding:3px 0;min-width:0}
 .photo-collections .photo-collection-button,#mediaViewer .photo-collections .photo-collection-button{position:relative;display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;min-width:34px;min-height:34px;box-sizing:border-box;padding:6px;border:1px solid #d8cfb9;border-radius:7px;background:#faf7ee;color:#92866a;line-height:1;cursor:pointer}
 .photo-collections .photo-collection-button svg{display:block;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
+.photo-collection-button .photo-collection-name{display:none}
 .photo-collections .photo-collection-button.is-linked{background:#e8efdc;border-color:#91a570;color:#4f6839}
 #mediaViewer .photo-collections .photo-collection-button.is-linked{background:#5d743e;border-color:#435a2e;color:#fffdf5}
 .photo-collection-button.is-linked::after{content:'✓';position:absolute;right:0;bottom:0;display:grid;place-items:center;width:12px;height:12px;border-radius:50%;background:#607b46;color:#fff;font:10px/1 Arial,sans-serif;pointer-events:none}
@@ -10,14 +11,18 @@
 .photo-album-tile{min-width:0}.photo-album-tile>.person-media-tile{width:100%}
 .person-album-grid .photo-collections{gap:3px}.person-album-grid .photo-collection-button{flex-basis:28px;min-width:28px;width:28px;height:30px;min-height:30px;padding:4px}
 .shared-media-card>.photo-collections{padding:3px 8px;justify-content:flex-end}
-.family-photo-footer{display:flex;align-items:center;gap:8px;min-width:0;padding:3px 8px}
+.family-photo-footer{display:none;align-items:center;gap:8px;min-width:0;padding:3px 8px}
 .family-photo-footer>.photo-collections{flex:none;padding:0;margin-inline-start:auto}
 .family-photo-caption{display:none;flex:1;min-width:0}
 @media(min-width:801px){
+  #photosGrid>.compact-gallery-card{position:relative}
+  .family-photo-footer{display:flex;position:absolute;inset:auto 0 0;z-index:1;box-sizing:border-box;max-height:100%;background:#fffdf6f2;pointer-events:none}
+  .family-photo-footer:has(.family-photo-caption-editor:not([hidden])){inset-block:0;align-items:flex-start;overflow:auto;pointer-events:auto}
+  .family-photo-caption-edit{pointer-events:auto}
   .family-photo-caption{display:block}
   .family-photo-caption [hidden]{display:none}
   .family-photo-caption-preview{display:flex;align-items:center;gap:6px;min-height:34px}
-  .family-photo-caption-preview p{flex:1;min-width:0;margin:0;color:#4b483a;font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+  .family-photo-caption-preview p{flex:1;min-width:0;margin:0;color:#4b483a;font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.55;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
   .family-photo-caption-preview p.is-empty{color:#a0947c;font-size:calc(13px * var(--a11y-text-scale,1))}
   .family-photo-caption-edit{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border:1px solid transparent;border-radius:5px;color:#8c7e60;background:transparent}
   .family-photo-caption-edit:hover{color:#566b43;background:#f0f2e7;border-color:#dde2cc}
@@ -30,6 +35,9 @@
   .family-photo-caption-editor .caption-toolbar button{margin:0;min-height:30px;min-width:0;padding:3px 9px;font-size:calc(13px * var(--a11y-text-scale,1))}
   .family-photo-caption-editor [data-cancel-shared-caption]{background:transparent;color:#8c806b;border-color:transparent}
   .family-photo-caption button:disabled,.family-photo-caption textarea:disabled{opacity:.6;cursor:default}
+}
+@media(min-width:801px) and (hover:hover){
+  #photosGrid .compact-gallery-card:not(:hover):not(:focus-within)>.family-photo-footer:has(.family-photo-caption-editor[hidden]){opacity:0}
 }
 #mediaViewerCollections:empty{display:none}
 #mediaViewerCollections>.photo-collections{justify-content:flex-start;padding:0 0 7px}

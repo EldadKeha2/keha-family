@@ -116,7 +116,7 @@
         let card = previous.get(item.file);
         if (card && (card.dataset.mediaSrc !== item.src||isVideo&&card.dataset.videoTileVersion!==tileVersion(item))) card = null;
         if (!card) {
-          card = document.createElement('article');card.className='shared-media-card'+(compact?' compact-gallery-card':'')+(isVideo?' video-tile':'');card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;if(isVideo)card.dataset.videoTileVersion=tileVersion(item);
+          card = document.createElement('article');card.className=isVideo?'shared-media-card video-tile':'shared-media-card compact-gallery-card';card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;if(isVideo)card.dataset.videoTileVersion=tileVersion(item);
           const draft = drafts.get(captionKey(kind,item.file));
           const caption = draft?.dirty ? draft.value : item.caption;
           const viewer = isVideo?'':I18n.html`<button class="gallery-image" data-media-open="${safe(item.id||item.file)}" data-media-scope="${kind}" aria-label="פתיחת התמונה ${safe(I18n.mediaName(item))}"><img src="${safe(item.thumbnailSrc||item.src)}" ${window.FamilyPhotoThumbnails?.attributes(item)||''} alt="${safe(caption||item.name)}" loading="lazy" decoding="async"></button>`;

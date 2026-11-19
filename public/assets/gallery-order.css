@@ -1,6 +1,6 @@
 /* Keep the visible row order aligned with every +1 photo navigation action. */
-#sharedGalleryGrid{direction:ltr;grid-auto-flow:row}
-html[dir=rtl] #sharedGalleryGrid>.compact-gallery-card{direction:rtl}
+.compact-gallery-view>.compact-gallery-grid{direction:ltr;grid-auto-flow:row}
+html[dir=rtl] .compact-gallery-view>.compact-gallery-grid>.compact-gallery-card{direction:rtl}
 .gallery-header-upload,.gallery-page-size-mobile{display:none}
 .gallery-header-upload-actions,.photo-camera-shortcut{display:none}
 .person-photo-upload-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}

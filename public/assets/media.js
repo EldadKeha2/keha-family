@@ -9,6 +9,8 @@
   const identity=item=>item.id||item.file;
   const versionKey=item=>JSON.stringify([identity(item),item.src,item.photoRevision||'original']);
   const current=()=>state.items[state.index];
+  // The home slideshow has its own navigation order within the Family Photos album.
+  const viewerAlbumScope=()=>state.scope==='home:photos'?'photos':state.scope;
   const paginatedAlbum=scope=>scope==='gallery'||scope==='family-ai'||albumLoaders.has(scope);
   const pagingApi=()=>albumLoaders.get(state.scope)||(state.scope==='family-ai'?window.FamilyAI:window.FamilyPortal);
   const desktopPhotoInput=()=>window.FamilyPhotoPresentation?.desktop?.()===true||navigator.userAgentData?.platform==='Windows'||/Windows/i.test(navigator.userAgent||'');
@@ -64,7 +66,7 @@
   }
   function shareURL(item){
     const url=new URL('/',location.origin);url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);
-    const scope=state.scope||item.scope||'gallery';
+    const scope=viewerAlbumScope()||item.scope||'gallery';
     url.hash=scope.startsWith('personal:')?'person/'+encodeURIComponent(scope.slice(9)):scope.startsWith('wedding:')?'weddings/'+encodeURIComponent(scope.slice(8)):scope.startsWith('nursery:')?'nursery/'+encodeURIComponent(scope.slice(8)):scope.startsWith('nostalgia')?'nostalgia':['photos','videos','family-ai','living-family'].includes(scope)?(scope==='living-family'?'family-ai':scope):'gallery';
     return url.href;
   }
@@ -139,8 +141,9 @@
   }
   function metadata(){
     const item=current();if(!item)return;
-    $('mediaViewer').setAttribute('data-media-scope',state.scope||'');
-    const albumControls=$('mediaViewerCollections');if(albumControls){if(window.FamilyPhotoCollections?.mountViewer)window.FamilyPhotoCollections.mountViewer(albumControls,item,state.scope);else albumControls.innerHTML=window.FamilyPhotoCollections?.controls(item,state.scope,{viewer:true})||'';}
+    const scope=viewerAlbumScope();
+    $('mediaViewer').setAttribute('data-media-scope',scope||'');
+    const albumControls=$('mediaViewerCollections');if(albumControls){if(window.FamilyPhotoCollections?.mountViewer)window.FamilyPhotoCollections.mountViewer(albumControls,item,scope);else albumControls.innerHTML=window.FamilyPhotoCollections?.controls(item,scope,{viewer:true})||'';}
     $('mediaViewerCaption').textContent=$('mediaHeaderCaption').textContent=item.caption||'';
     const descriptionLabel=item.kind==='video'?tr('הוסף תיאור לסרטון','Add a video description'):item.kind==='document'?tr('הוסף תיאור למסמך','Add a document description'):tr('הוסף תיאור לתמונה','Add a photo description');
     const desktopDescriptionLabel=item.kind==='video'?tr('להוספת תיאור לסרטון','Add a video description'):item.kind==='document'?tr('להוספת תיאור למסמך','Add a document description'):tr('להוספת תיאור לתמונה','Add a photo description');

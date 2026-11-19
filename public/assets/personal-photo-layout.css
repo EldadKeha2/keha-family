@@ -24,7 +24,6 @@
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums #mediaViewerCollections{height:100%;margin:0;padding:0}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collections{height:100%;display:flex;flex-direction:column;justify-content:space-between;gap:var(--personal-rail-gap);padding:0}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-button{display:grid;place-items:center;box-sizing:border-box;flex:0 0 var(--personal-rail);width:var(--personal-rail);min-width:0;height:var(--personal-rail);min-height:0;margin:0;padding:10px;border:1px solid #cdbd99;border-radius:9px}
- #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-name{display:none}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-button.is-linked{background:#5d743e;border-color:#435a2e;color:#fffdf5}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums svg{display:block;width:32px;min-width:32px;max-width:32px;height:32px;min-height:32px;max-height:32px;flex:none}
  #mediaViewer.personal-photo-desktop #personalPhotoAlbums .photo-collection-button.is-linked::after{width:16px;height:16px;font-size:12px}
