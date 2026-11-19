@@ -870,13 +870,17 @@ test('opening Labels restores scrolling everywhere until the dropdown is closed 
  }
 });
 
-test('vertical wheel navigation works while a photo is enlarged and leaves other dialogs and pinch alone',async()=>{
+test('enlarged photos keep both wheel axes for panning and restore album browsing only after returning to fit',async()=>{
  const f=fixture();await f.open();f.zoom(2);assert.equal(f.strip(),null);
- assert.equal(f.emit(f.get('openedCaptionText'),'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');
+ for(const target of [f.get('mediaStage').querySelector('img'),f.get('openedCaptionText'),f.document.body])for(const delta of [{deltaX:0,deltaY:-94},{deltaX:140,deltaY:0},{deltaX:12,deltaY:24}]){
+  assert.equal(f.emit(target,'wheel',delta).defaultPrevented,false,'The gallery must leave panning to the zoomed photo or the surrounding scroller');
+ }
+ await flush();assert.equal(f.window.FamilyMedia.current().id,'a');
  const dialog=f.document.createElement('dialog');dialog.id='photoDateDialog';f.document.body.append(dialog);dialog.open=true;dialog.setAttribute('open','');
- assert.equal(f.emit(dialog,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,false);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');dialog.open=false;dialog.removeAttribute('open');dialog.remove();
+ assert.equal(f.emit(dialog,'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,false);await flush();assert.equal(f.window.FamilyMedia.current().id,'a');dialog.open=false;dialog.removeAttribute('open');dialog.remove();
  for(const modifier of ['ctrlKey','metaKey'])assert.equal(f.emit(f.document.body,'wheel',{deltaX:0,deltaY:-94,[modifier]:true}).defaultPrevented,false);
- await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+ await flush();assert.equal(f.window.FamilyMedia.current().id,'a');f.zoom(1);
+ assert.equal(f.emit(f.get('mediaStage').querySelector('img'),'wheel',{deltaX:0,deltaY:-94}).defaultPrevented,true);await flush();assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
 });
 
 test('pad completion continues the last physical offset smoothly while touch retains its exact saved behavior',async()=>{
@@ -1063,3 +1067,4 @@ test('native scrolling recenters on resize and yields cleanly to photo zoom and 
   await flush();assert.equal(fallback.window.FamilyMedia.current().id,'b','The fallback remains usable for its device input');fallback.close();
  }
 });
+

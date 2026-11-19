@@ -154,6 +154,7 @@
     clearTimeout(c.detectionTimer);
     c.resolvePaint?.();
     window.FamilyPhotoNative?.reset(c.stage);
+    stopPhotoPan(c);
     cancelPress(c);
     if(current===c)current=null;if(c.stage._familyFaceContext===c)delete c.stage._familyFaceContext;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);clearAnnotation(c,true);c.popup?.remove();c.layer?.remove();c.labelList?.remove();c.guide?.remove();c.status?.remove();
     if(preserveControls&&!c.adapter){releaseControls();retained={stage:c.stage,dialog:c.dialog,reviewLabel:c.reviewLabel,zoomEnabled:c.zoomEnabled,controls:Object.fromEntries([...controlRoots,'regionsText','reviewText'].map(key=>[key,c[key]]))};}
@@ -282,6 +283,57 @@
       Object.assign(line.style,{left:x+'px',top:(y-.75)+'px',width:Math.hypot(dx,dy)+'px',transform:'rotate('+Math.atan2(dy,dx)+'rad)'});
     }
   }
+  function canPanPhoto(c,target){
+    if(!live(c)||!desktopResize()||!(c.zoom>1)||c.saving||c.reviewSaving||c.adjust||c.resizeDrag||c.popup?.classList.contains('face-picker')||(c.adapter&&!c.adapter.enabled())||!c.scroller.contains(target))return false;
+    const control=target.closest?.('a,input,textarea,select,button,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"],.face-popover,.face-visible-label,.face-label-list,.face-adjust-guide,[data-face-handle]');
+    return !control||control.matches('.face-hit');
+  }
+  function stopPhotoPan(c){
+    const pan=c.photoPan;c.photoPan=null;c.stage.classList.remove('face-photo-panning');
+    if(pan?.moved)try{c.scroller.releasePointerCapture?.(pan.id);}catch{}
+  }
+  function setupPhotoPan(c){
+    const options={signal:c.events.signal},capture={...options,capture:true,passive:false};
+    c.scroller.addEventListener('wheel',event=>{
+      if(event.defaultPrevented||event.cancelable===false||event.ctrlKey||event.metaKey||event.altKey||!canPanPhoto(c,event.target))return;
+      const unit=event.deltaMode===1?16:event.deltaMode===2?c.scroller.clientHeight:1;
+      const x=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,y=(event.shiftKey&&!event.deltaX?0:event.deltaY||0)*unit;
+      if(!Number.isFinite(x)||!Number.isFinite(y)||!x&&!y)return;
+      if(event.cancelable)event.preventDefault();
+      c.scroller.scrollLeft+=x;c.scroller.scrollTop+=y;queuePlace(c);
+    },capture);
+    c.scroller.addEventListener('pointerdown',event=>{
+      // Arm without capturing or cancelling a click: face buttons retain their
+      // exact target until the mouse actually starts dragging the photograph.
+      if(event.defaultPrevented||event.pointerType!=='mouse'||event.sourceCapabilities?.firesTouchEvents||event.isPrimary===false||event.button!==0||event.ctrlKey||event.metaKey||event.altKey||!canPanPhoto(c,event.target))return;
+      stopPhotoPan(c);c.panClickUntil=0;
+      c.photoPan={id:event.pointerId,target:event.target,x:event.clientX,y:event.clientY,left:c.scroller.scrollLeft,top:c.scroller.scrollTop,moved:false};
+    },capture);
+    document.addEventListener('pointermove',event=>{
+      const pan=c.photoPan;if(!pan||event.pointerId!==pan.id)return;
+      if(!canPanPhoto(c,pan.target)||event.buttons===0){stopPhotoPan(c);return;}
+      const x=event.clientX-pan.x,y=event.clientY-pan.y;
+      if(!pan.moved){
+        if(Math.hypot(x,y)<5)return;
+        pan.moved=true;closePopup(c);clearHoverLabel(c);c.stage.classList.add('face-photo-panning');
+        try{c.scroller.setPointerCapture?.(pan.id);}catch{}
+      }
+      if(event.cancelable)event.preventDefault();c.panClickUntil=Date.now()+700;
+      c.scroller.scrollLeft=pan.left-x;c.scroller.scrollTop=pan.top-y;queuePlace(c);
+    },capture);
+    const finish=event=>{const pan=c.photoPan;if(!pan||event.pointerId!==pan.id)return;if(pan.moved){if(event.cancelable)event.preventDefault();c.panClickUntil=Date.now()+700;}stopPhotoPan(c);};
+    document.addEventListener('pointerup',finish,capture);
+    document.addEventListener('pointercancel',finish,capture);
+    document.addEventListener('pointerdown',event=>{if(c.photoPan&&event.pointerId!==c.photoPan.id)stopPhotoPan(c);},{...options,capture:true,passive:true});
+    c.scroller.addEventListener('lostpointercapture',finish,options);
+    c.scroller.addEventListener('dragstart',event=>{if(c.photoPan)event.preventDefault();},options);
+    c.stage.addEventListener('click',event=>{
+      // Dragging at a clamped edge must also suppress its synthetic face click.
+      // A fresh pointerdown clears the guard so the next deliberate click tags.
+      if(live(c)&&event.detail!==0&&Date.now()<(c.panClickUntil||0)){event.preventDefault();event.stopImmediatePropagation();}
+    },{...options,capture:true});
+    window.addEventListener('blur',()=>stopPhotoPan(c),options);
+  }
   function fitZoom(c){
     if(!c.surface)return;const maxHeight=(c.dialog.classList.contains('mobile-photo-frame')||c.stage.closest('#photoFullscreenRoot')?c.scroller.clientHeight:parseFloat(getComputedStyle(c.scroller).maxHeight))||innerHeight*.48;
     const scale=Math.min(1,c.scroller.clientWidth/imageWidth(c.image),maxHeight/imageHeight(c.image));
@@ -289,7 +341,7 @@
     Object.assign(c.surface.style,{width:c.base.width*c.zoom+'px',height:c.base.height*c.zoom+'px'});place(c);
   }
   function setZoom(c,value){
-    if(c.saving)return;const before=imageArea(c),r=c.scroller.getBoundingClientRect(),anchor={x:r.left+c.scroller.clientWidth/2,y:r.top+c.scroller.clientHeight/2};
+    if(c.saving)return;stopPhotoPan(c);const before=imageArea(c),r=c.scroller.getBoundingClientRect(),anchor={x:r.left+c.scroller.clientWidth/2,y:r.top+c.scroller.clientHeight/2};
     const p={x:(anchor.x-before.x)/before.width,y:(anchor.y-before.y)/before.height};
     closePopup(c);c.zoom=value;fitZoom(c);const after=imageArea(c);
     c.scroller.scrollLeft+=after.x+p.x*after.width-anchor.x;c.scroller.scrollTop+=after.y+p.y*after.height-anchor.y;
@@ -334,6 +386,7 @@
     },{capture:true,passive:false,signal:c.events.signal});
     c.scroller.addEventListener('scroll',()=>queuePlace(c),{passive:true,signal:c.events.signal});
     c.scroller.addEventListener('pointerdown',event=>{c.scrollStart={x:c.scroller.scrollLeft,y:c.scroller.scrollTop};},{passive:true,signal:c.events.signal});
+    setupPhotoPan(c);
     fitZoom(c);
   }
   function setupRegions(c,on){
@@ -555,7 +608,7 @@
 
     on(stage,'click',event=>{
       if(!live(c)||c.saving||c.reviewSaving||(c.adapter&&!c.adapter.enabled())||event.target.closest('.face-adjust-guide')||event.target.closest('[data-face-handle]')||c.adjust)return;
-      if(event.detail!==0&&Date.now()<(c.pressClickUntil||0)){event.preventDefault();return;}
+      if(event.detail!==0&&Date.now()<Math.max(c.pressClickUntil||0,c.panClickUntil||0)){event.preventDefault();return;}
       if(c.skipClick){c.skipClick=false;return;}
       if(c.scrollStart&&c.scroller&&(Math.abs(c.scroller.scrollLeft-c.scrollStart.x)>5||Math.abs(c.scroller.scrollTop-c.scrollStart.y)>5)){c.scrollStart=null;return;}c.scrollStart=null;
       const region=c.showRegions?event.target.closest('.face-tagged-region'):null;
@@ -677,3 +730,4 @@
   }
   window.FamilyFaces={mount,clear,update,canNavigate,saved,whenReady(stage,image){const c=stage._familyFaceContext;return c?.image===image?c.paintReady:Promise.resolve();},async flush(){await current?.pendingSave;},async finish(stage){const c=stage._familyFaceContext;if(!live(c))return false;await c.pendingSave;if(!live(c)||c.saving||c.reviewSaving||c.saveError||c.reviewError||c.adjust||c.resizeDrag)return false;stopTabFaces(c);closePopup(c);return true;},dismiss(){if(current){stopTabFaces(current);closePopup(current);}},fit(){if(current?.initialized&&imageWidth(current.image)){fitZoom(current);place(current);}}};
 })();
+

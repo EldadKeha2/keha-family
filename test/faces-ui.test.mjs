@@ -56,6 +56,51 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
  return {faces:window.FamilyFaces,stage,image,title,download,edit,view,window,document,dialog,footer,reboot,find,emit,frames,resizeCallbacks,get imageReads(){return imageReads;},paintFrames(){const batch=[...frames.values()];frames.clear();for(const fn of batch)fn();},get progress(){return progress;},get detectionImage(){return detectionImage;},get detectionCalls(){return detectionCalls;},async mount(id='photo',options={},item={}){await window.FamilyFaces.mount(stage,image,{id,kind:'photo',tags:[],...item},options);}};
 }
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
+const enlarge=f=>{for(let i=0;i<4;i++)f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');return f.stage._familyFaceContext.scroller;};
+const panMouse=(f,node,type,extra={})=>f.emit(node,type,{target:f.image,pointerType:'mouse',pointerId:71,isPrimary:true,button:0,buttons:type==='pointerup'?0:1,clientX:400,clientY:250,...extra});
+test('zoomed desktop photos pan both pad axes, including diagonal and fractional packets, without changing face geometry',async()=>{
+ for(const windows of [false,true]){
+  const f=fixture([first],{desktop:true,windows,hoverNone:windows});await f.mount();const scroller=enlarge(f),rect={...f.stage._familyFaceContext.faces[0].rect};
+  const wheel=extra=>f.emit(scroller,'wheel',{target:f.image,deltaX:22.5,deltaY:31.25,deltaMode:0,...extra});
+  const left=scroller.scrollLeft,top=scroller.scrollTop;assert.equal(wheel().defaultPrevented,true);assert.equal(scroller.scrollLeft,left+22.5);assert.equal(scroller.scrollTop,top+31.25);
+  wheel({deltaX:-12.5,deltaY:-21.25});assert.equal(scroller.scrollLeft,left+10);assert.equal(scroller.scrollTop,top+10);
+  wheel({deltaX:0,deltaY:2,deltaMode:1});assert.equal(scroller.scrollTop,top+42);
+  wheel({deltaX:0,deltaY:3,shiftKey:true});assert.equal(scroller.scrollLeft,left+13);assert.equal(scroller.scrollTop,top+42);
+  const unchanged=[scroller.scrollLeft,scroller.scrollTop];
+  for(const extra of [{ctrlKey:true},{metaKey:true},{altKey:true},{deltaX:0,deltaY:0},{cancelable:false}])assert.equal(wheel(extra).defaultPrevented,false);
+  assert.deepEqual([scroller.scrollLeft,scroller.scrollTop],unchanged,'Uncancellable events keep the browser default without applying the same delta twice');
+  assert.deepEqual(f.stage._familyFaceContext.faces[0].rect,rect);assert.equal(f.faces.canNavigate(f.stage),false);
+  f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-reset]'),'click');assert.equal(wheel().defaultPrevented,false);assert.equal(f.faces.canNavigate(f.stage),true);f.faces.clear();
+ }
+});
+test('mouse dragging pans immediately after a small movement and the next short click still opens the same face editor',async()=>{
+ const f=fixture([first],{desktop:true});await f.mount();const scroller=enlarge(f),hit=f.find('face-hit-buttons').children[0],left=scroller.scrollLeft,top=scroller.scrollTop;
+ const down=panMouse(f,scroller,'pointerdown',{target:hit});assert.equal(down.defaultPrevented,false);
+ panMouse(f,f.document,'pointermove',{clientX:402,clientY:252});assert.equal(f.stage.classList.contains('face-photo-panning'),false);
+ const move=panMouse(f,f.document,'pointermove',{clientX:430,clientY:280});assert.equal(move.defaultPrevented,true);assert.equal(scroller.scrollLeft,left-30);assert.equal(scroller.scrollTop,top-30);assert.equal(f.stage.classList.contains('face-photo-panning'),true);
+ panMouse(f,f.document,'pointerup',{clientX:430,clientY:280});assert.equal(f.stage.classList.contains('face-photo-panning'),false);
+ assert.equal(f.emit(f.stage,'click',{target:hit,detail:1}).defaultPrevented,true);assert.equal(f.find('face-popover face-picker'),undefined,'Releasing a pan cannot create or edit a face');
+ panMouse(f,scroller,'pointerdown',{target:hit});panMouse(f,f.document,'pointerup',{target:hit});f.emit(f.stage,'click',{target:hit,detail:1});assert.ok(f.find('face-popover face-picker'),'A fresh click retains face tagging');f.faces.clear();
+});
+test('dragging against a photo edge suppresses its release click even when browser clamping leaves the scroll position unchanged',async()=>{
+ const f=fixture([first],{desktop:true});await f.mount();const scroller=enlarge(f),hit=f.find('face-hit-buttons').children[0];
+ for(const name of ['scrollLeft','scrollTop'])Object.defineProperty(scroller,name,{get:()=>0,set(){},configurable:true});
+ panMouse(f,scroller,'pointerdown',{target:hit});panMouse(f,f.document,'pointermove',{clientX:500,clientY:350});panMouse(f,f.document,'pointerup');
+ assert.equal(f.emit(f.stage,'click',{target:hit,detail:1}).defaultPrevented,true);assert.equal(f.find('face-popover face-picker'),undefined);f.faces.clear();
+});
+test('panning yields to face editing, handles, touch input, saving and modifier clicks and cleans up on cancellation, fit and close',async()=>{
+ const f=fixture([first],{desktop:true});await f.mount();const scroller=enlarge(f),c=f.stage._familyFaceContext;
+ const attempt=extra=>{const before=[scroller.scrollLeft,scroller.scrollTop];panMouse(f,scroller,'pointerdown',extra);panMouse(f,f.document,'pointermove',{clientX:460,clientY:310});panMouse(f,f.document,'pointerup');assert.deepEqual([scroller.scrollLeft,scroller.scrollTop],before);assert.equal(c.photoPan,null);};
+ for(const extra of [{pointerType:'touch'},{pointerType:'pen'},{button:2},{ctrlKey:true},{metaKey:true},{altKey:true},{isPrimary:false}])attempt(extra);
+ for(const key of ['adjust','resizeDrag','saving','reviewSaving']){c[key]=true;attempt({});c[key]=false;}
+ const input=f.document.createElement('input');scroller.append(input);attempt({target:input});
+ const handle=f.document.createElement('span');handle.dataset.faceHandle='e';scroller.append(handle);attempt({target:handle});
+ const hit=f.find('face-hit-buttons').children[0];f.emit(f.stage,'click',{target:hit,detail:0});assert.ok(f.find('face-popover face-picker'));attempt({});f.faces.dismiss();
+ panMouse(f,scroller,'pointerdown');panMouse(f,f.document,'pointermove',{clientX:430});panMouse(f,f.document,'pointercancel');assert.equal(c.photoPan,null);assert.equal(f.stage.classList.contains('face-photo-panning'),false);
+ panMouse(f,scroller,'pointerdown');panMouse(f,f.document,'pointermove',{clientX:430});f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-reset]'),'click');assert.equal(c.photoPan,null);assert.equal(f.stage.classList.contains('face-photo-panning'),false);
+ enlarge(f);panMouse(f,scroller,'pointerdown');panMouse(f,f.document,'pointermove',{clientX:430});f.faces.clear();assert.equal(f.stage.classList.contains('face-photo-panning'),false);const left=scroller.scrollLeft;panMouse(f,f.document,'pointermove',{clientX:600});assert.equal(scroller.scrollLeft,left);
+ const phone=fixture();await phone.mount();const phoneScroller=enlarge(phone);panMouse(phone,phoneScroller,'pointerdown');assert.equal(phone.stage._familyFaceContext.photoPan,null);phone.faces.clear();
+});
 test('desktop pad pinch over a photo uses the existing zoom steps, returns to fit and never zooms the browser at the limits',async()=>{
  for(const windows of [false,true]){
   const f=fixture([],{desktop:true,windows,hoverNone:windows});await f.mount();
@@ -1044,3 +1089,4 @@ test('face scroll and resize bursts share one geometry pass and cleared photos c
  f.emit(scroller,'scroll');assert.equal(f.frames.size,1);f.faces.clear();assert.equal(f.frames.size,0,'Leaving a photo cancels its scheduled positioning');
  const after=f.imageReads;f.paintFrames();for(const notify of f.resizeCallbacks)notify();assert.equal(f.frames.size,0);assert.equal(f.imageReads,after,'A late observer from an old photo cannot measure or update its removed nodes');
 });
+

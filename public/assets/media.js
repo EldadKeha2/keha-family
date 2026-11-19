@@ -335,7 +335,7 @@
     if(state.fullscreen&&window.FamilyPhotoFullscreen?.isBlocked?.())return false;
     const stage=$('mediaStage');return $('mediaViewer').open&&current()?.kind==='photo'&&(pending||!state.paging&&!state.photoLoading)&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&
       (pending||!stage.classList.contains?.('photo-slide-running'))&&(state.fullscreen?photoState().total:(albumPages.get(state.scope)?.total??state.items.length))>1&&
-      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&(wheel||(window.FamilyFaces?.canNavigate?.(stage)??true));
+      !document.querySelector('#deleteMediaDialog[open],#tagPeopleDialog[open],#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')&&!stage.classList.contains('face-photo-enlarged')&&(wheel||(window.FamilyFaces?.canNavigate?.(stage)??true));
   }
   function canNavigateVideo({pending=false}={}){
     return $('mediaViewer').open&&current()?.kind==='video'&&(!captionEditing||desktopPhotoInput()&&inlineCaption())&&(pending||!state.paging)&&(albumPages.get(state.scope)?.total??state.items.length)>1&&
@@ -624,3 +624,4 @@
   window.FamilyMedia={items:scope=>[...(albums.get(scope)||[])],register,controls,open,openFrom,requestDelete,notify,current,refreshPhotoPresentation,photoState,setFullscreen,step,isPhotoBrowsing:()=>Boolean($('mediaViewer')?.open&&current()?.kind==='photo'&&(state.photoLoading||state.paging||photoSwipe?.isActive?.()||Date.now()-state.photoActivity<800)),lookup:(scope,id)=>(albums.get(scope)||[]).find(item=>identity(item)===id||item.file===id),isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
   document.addEventListener('DOMContentLoaded',init);
 })();
+
