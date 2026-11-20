@@ -473,3 +473,38 @@ test('Kehat’s own tree has two independent circles and renders each branch wit
     }
   }
 });
+
+test('Jidaan stays below Aharon with each marriage’s descendants on its own side',async()=>{
+  const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
+  for(const portal of [false,true])for(const phone of [false,true])for(const english of [false,true])for(const text of [100,160]){
+    const {document,window:dom}=parseHTML(portal?branchPortalHTML(originalHTML,'kehat'):extendedKehaHTML(originalHTML));
+    const data=toOriginalFamilyData(portal?createBranchPortal(family,'kehat'):createExtendedFamily(family));
+    const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){},FamilyAccessibility:{getSettings:()=>({text})}};
+    window.FamilyI18n={isEnglish:english,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};
+    window.FamilyDates={age:()=>null,parse:()=>null};
+    vm.runInNewContext(app,{window,document,location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    document.querySelector('#branchBar [data-branch="kehat"]').click();
+    const bounds=id=>{
+      const node=document.querySelector('#treeNodes [data-unit="'+id+'"]');
+      const left=parseFloat(node.style.left),width=parseFloat(node.style.width);
+      return {left,right:left+width,center:left+width/2};
+    };
+    const main=bounds('u-keha-kehat'),ancestor=bounds('u-kehat-aharon-elder');
+    assert.equal(ancestor.center,main.center,'The ancestor connects straight down to Jidaan');
+    const cards=[...document.querySelectorAll('[data-unit="u-keha-kehat"] [data-person-card]')].map(node=>node.dataset.personCard);
+    assert.deepEqual(cards,['kehat-first-wife','kehat-jidaan','kehat-miriam']);
+    const [first,second,unknown]=data.units['u-keha-kehat'].relationships;
+    const descendants=ids=>ids.flatMap(id=>[id,...descendants(data.units[id].children)]);
+    for(const [relation,right] of [[first,!english],[second,english]]){
+      for(const id of descendants(relation.children)){
+        const child=bounds(id);
+        assert.ok(right?child.left>main.right:child.right<main.left,'Every descendant stays on their mother’s side: '+id);
+      }
+      const connector=document.querySelector('[data-parent-unit="u-keha-kehat"][data-parent-people="'+relation.people.join(' ')+'"]');
+      assert.equal(connector.dataset.childUnits,relation.children.join(' '));
+    }
+    assert.deepEqual(unknown.people,['kehat-jidaan'],'No mother is inferred for Tzvia');
+    assert.equal(bounds('u-kehat-tzvia').center,main.center);
+    assert.equal(document.querySelectorAll('[data-unit="u-keha-kehat"] .tree-partnerships path').length,2);
+  }
+});

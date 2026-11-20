@@ -170,7 +170,7 @@
     const display=unit.displayPeople||unit.people;
     const cards=display.map(id=>personCardHTML(data.people[id],id===unit.people[0]?null:unit.relationships?.find(item=>item.people.includes(id)))).join('');
     if(!unit.relationships)return cards;
-    const links=unit.relationships.map(item=>{
+    const links=unit.relationships.filter(item=>item.people.length>1).map(item=>{
       const coordinates=item.people.map(id=>{
         const coordinate=(display.indexOf(id)+.5)/display.length*100;
         return I18n.isEnglish?coordinate:100-coordinate;
@@ -190,14 +190,46 @@
     const rootHistorySpace=!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
     const desktopOverview=!phone&&overview;
     const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?195:desktopOverview?275:340)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
-    const positions=[],lines=[],connections=[],widths=new Map();
+    const positions=[],lines=[],connections=[],widths=new Map(),layouts=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
     const nodeWidth=unit=>(!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
-    function measure(id){const unit=data.units[id],kids=children(unit),total=kids.reduce((sum,child)=>sum+measure(child),0)+Math.max(0,kids.length-1)*gap,width=Math.max(nodeWidth(unit),total);widths.set(id,width);return width;}
+    function measure(id){
+      const unit=data.units[id],kids=children(unit),childLefts=new Map();
+      kids.forEach(measure);
+      const rowWidth=row=>row.reduce((sum,child)=>sum+widths.get(child),0)+Math.max(0,row.length-1)*gap;
+      const row=(ids,left,span,rtl=true)=>{
+        let cursor=rtl?left+span:left;
+        for(const child of ids){const w=widths.get(child);childLefts.set(child,rtl?cursor-w:cursor);cursor+=(rtl?-1:1)*(w+gap);}
+      };
+      let width,anchor;
+      if(unit.splitPartnerships&&kids.length){
+        // Keep each marriage's whole subtree on its partner's side of the
+        // central parent. Children with no identified mother stay in the middle.
+        const display=unit.displayPeople||unit.people,pivot=display.indexOf(unit.people[0]),sides={before:[],after:[],middle:[]};
+        for(const child of kids){
+          const relation=unit.relationships?.find(item=>item.children.includes(child));
+          const partner=relation?.people.find(person=>person!==unit.people[0]);
+          sides[partner?(display.indexOf(partner)<pivot?'before':'after'):'middle'].push(child);
+        }
+        const left=I18n.isEnglish?sides.before:sides.after,right=I18n.isEnglish?sides.after:sides.before;
+        const lw=rowWidth(left),rw=rowWidth(right),cw=Math.max(nodeWidth(unit),rowWidth(sides.middle));
+        const centerLeft=lw+(left.length?gap:0);
+        anchor=centerLeft+cw/2;width=centerLeft+cw+(right.length?gap:0)+rw;
+        row(left,0,lw,!I18n.isEnglish);
+        row(sides.middle,centerLeft+(cw-rowWidth(sides.middle))/2,rowWidth(sides.middle),!I18n.isEnglish);
+        row(right,centerLeft+cw+(right.length?gap:0),rw,!I18n.isEnglish);
+      }else{
+        const total=rowWidth(kids),childAnchor=kids.length===1?layouts.get(kids[0]).anchor:total/2;
+        const before=Math.max(0,nodeWidth(unit)/2-childAnchor),after=Math.max(0,childAnchor+nodeWidth(unit)/2-total);
+        width=before+total+after;anchor=before+childAnchor;
+        row(kids,before,total);
+      }
+      widths.set(id,width);layouts.set(id,{anchor,childLefts});return width;
+    }
     function place(id,left,depth,spacing=0){
-      const unit=data.units[id],width=widths.get(id),x=left+width/2,y=top+depth*levelHeight+(depth?rootHistorySpace:0)+spacing,partnershipSpace=phone&&unit.relationships?100*textScale:0;
-      positions.push({id,unit,x,y,width:nodeWidth(unit),depth});const kids=children(unit),total=kids.reduce((sum,child)=>sum+widths.get(child),0)+Math.max(0,kids.length-1)*gap;let right=left+width-(width-total)/2;const centers=[];
-      for(const child of kids){const w=widths.get(child);centers.push(right-w/2);place(child,right-w,depth+1,spacing+partnershipSpace);right-=w+gap;}
+      const unit=data.units[id],layout=layouts.get(id),x=left+layout.anchor,y=top+depth*levelHeight+(depth?rootHistorySpace:0)+spacing,partnershipSpace=phone&&unit.relationships?100*textScale:0;
+      positions.push({id,unit,x,y,width:nodeWidth(unit),depth});const kids=children(unit),centers=[];
+      for(const child of kids){const childLeft=left+layout.childLefts.get(child);centers.push(childLeft+layouts.get(child).anchor);place(child,childLeft,depth+1,spacing+partnershipSpace);}
       if(kids.length){
         const display=unit.displayPeople||unit.people,groups=(unit.relationships||[]).map(union=>({union,kids:kids.filter(child=>union.children.includes(child))})).filter(group=>group.kids.length);
         const assigned=new Set(groups.flatMap(group=>group.kids)),remaining=kids.filter(child=>!assigned.has(child));
@@ -245,7 +277,7 @@
     for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,childUnits,lane=0} of connections){
       const extra=(depth===0?rootHistorySpace+rootSpacingAdjustment:0)+partnershipSpace,historyRoot=depth===0&&rootContentHeight>0;
       // Join the parents' relationship line; label clearance belongs below them.
-      const start=parentPeople?y+(phone?37:76)*textScale:historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
+      const start=parentPeople?.length>1?y+(phone?37:76)*textScale:historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
       const middle=(historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra)+lane,end=y+levelHeight-7*textScale+extra;
       if(parentPeople)lines.push(`<g data-parent-unit="${safe(id)}" data-parent-people="${safe(parentPeople.join(' '))}" data-child-units="${safe(childUnits.join(' '))}">`);
       lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);

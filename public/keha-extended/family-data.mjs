@@ -63,6 +63,8 @@ const units = [
   ['u-kehat-zechariah-ben-tzadok',['kehat-zechariah-ben-tzadok'],[],'u-kehat-tzadok-elder'],
   ['u-kehat-aharon-elder',['kehat-aharon-elder'],['u-keha-kehat'],null,{generation:0}],
   ['u-keha-kehat',['kehat-jidaan','kehat-first-wife','kehat-miriam'],[...firstChildren,...secondChildren,'u-kehat-tzvia'],'u-kehat-aharon-elder',{
+    displayPeople:['kehat-first-wife','kehat-jidaan','kehat-miriam'],
+    splitPartnerships:true,
     relationships:[
       {people:['kehat-jidaan','kehat-first-wife'],children:firstChildren,relationship:'spouse',label:'נישואין ראשונים',labelEn:'First marriage'},
       {people:['kehat-jidaan','kehat-miriam'],children:secondChildren,relationship:'spouse',label:'נישואין שניים',labelEn:'Second marriage'},
@@ -98,6 +100,7 @@ export function createExtendedFamily(original = {}) {
   for(const person of Object.values(result.people))for(const field of ['parents','siblings'])if(person[field])person[field]=person[field].map(canonical);
   for(const unit of Object.values(result.units)){
     unit.people=unit.people.map(canonical);
+    if(unit.displayPeople)unit.displayPeople=unit.displayPeople.map(canonical);
     for(const relationship of unit.relationships||[])relationship.people=relationship.people.map(canonical);
   }
   function copy(id,parent=null) {
