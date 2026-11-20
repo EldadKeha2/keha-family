@@ -1,8 +1,8 @@
 import {BRANCHES, createFamily} from '../public/nakash/family-data.mjs';
 import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {escapeHTML} from './http.mjs';
-import {appleLaunchImages, launchAssets, themedFamilies} from './nakash-launch.mjs';
 import {familyAppOrigins} from './family-app-origins.mjs';
+import {appleLaunchImages, launchAssets, themedFamilies} from './nakash-launch.mjs';
 
 export const NAKASH_WRITE_TOKEN = 'nakash-public-v1';
 const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'person', 'search'];
@@ -60,7 +60,9 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
   const themed = themedFamilies.has(section);
   const appleIcon = themed ? launchAssets(section) + '/icon-180.png' : logo + '-192.png';
   const navigation = BRANCHES.map(({id, label}) =>
-    '<a class="branch-chip" href="' + escapeHTML(appOrigins[id] || '') + '/nakash/' + id + '/"'+
+    '<a class="branch-chip" href="' + escapeHTML(id === 'keha'
+      ? 'https://keha-family.eldadkeha.workers.dev/#home'
+      : (appOrigins[id] || '') + '/nakash/' + id + '/') + '"'+
     (id === section ? ' aria-current="page"' : '') + '>' + escapeHTML(label) + '</a>'
   ).join('');
   const back = isInternal ? '<a class="nav-link" href="/#home" data-i18n-skip>חזרה לבית משפחת קהא</a>' : '';

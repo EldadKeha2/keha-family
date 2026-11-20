@@ -14,7 +14,7 @@ const origin = 'https://family.example';
 const projection = () => nakashProjection(family, new Map());
 
 test('only deployed, valid family origins are supplied to installation and branch navigation',async()=>{
-  assert.deepEqual(familyAppOrigins(),{});
+  assert.deepEqual(familyAppOrigins({FAMILY_APP_ORIGINS:{}}),{});
   assert.deepEqual(familyAppOrigins({FAMILY_APP_ORIGINS:'invalid'}),{});
   const env={FAMILY_APP_ORIGINS:JSON.stringify({yehuda:'https://yehuda.example',haim:'https://haim.example/',medina:'https://medina.example/unverified',keha:'https://name:password@keha.example',other:'https://unrelated.example'})};
   const origins=familyAppOrigins(env);
@@ -25,6 +25,17 @@ test('only deployed, valid family origins are supplied to installation and branc
   assert.ok(document.querySelector('a[href="/nakash/medina/"]'));
   const response=await nakashShell(new Request(origin+'/nakash/yehuda/'),{...env,ASSETS:{fetch:async()=>new Response(html)}},projection);
   assert.equal(parseHTML(await response.text()).document.documentElement.dataset.nakashOrigin,'https://yehuda.example');
+});
+
+test('live family origins persist across builds and family switching returns to the existing Keha app', async () => {
+  const origins = familyAppOrigins();
+  for (const family of ['medina', 'yehuda', 'haim']) {
+    assert.equal(origins[family], 'https://family-' + family + '.eldadkeha.workers.dev');
+    const response = await nakashShell(new Request(origin + '/nakash/' + family + '/'), {ASSETS:{fetch:() => new Response(html)}}, projection);
+    const {document} = parseHTML(await response.text());
+    assert.equal(document.documentElement.dataset.nakashOrigin, origins[family]);
+    assert.ok(document.querySelector('a.branch-chip[href="https://keha-family.eldadkeha.workers.dev/#home"]'));
+  }
 });
 
 test('Nakash branch pages retain the original components and limit top-level navigation', () => {
