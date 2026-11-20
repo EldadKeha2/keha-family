@@ -15,7 +15,7 @@ const diagramRetiredNames = {
 
 // Explicit links are supplied by the family owner. Keep the historical profile
 // and its selected portrait, and retain the old record as a reversible alias.
-function linkSharedProfile(state, identities, seed) {
+export function linkSharedProfile(state, identities, seed) {
   const targetId = seed.sharedProfileId;
   if (!targetId || identities[seed.id] === targetId) return;
   const targetRow = state.rows('SELECT data FROM people WHERE id=?', targetId)[0];

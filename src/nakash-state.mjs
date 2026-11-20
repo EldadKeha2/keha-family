@@ -27,7 +27,7 @@ export async function handleNakashState(state, action, args, RecycleAccess) {
   switch (action) {
     case 'nakash.extended.projection':
       initializeExtendedKeha(state);
-      return {sharedPeople:state.run('people').people};
+      return {sharedPeople:state.run('people').people,identities:state.sharedNakashIdentities};
     case 'nakash.extended.items':
       initializeExtendedKeha(state);
       return {items:extendedKehaItems(state,args)};

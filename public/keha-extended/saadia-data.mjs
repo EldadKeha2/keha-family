@@ -30,7 +30,7 @@ unit('tal',[person('tal','טל','Tal')],[],'zaki');
 
 const shalom=person('shalom','שלום קהא','Shalom Keha','m',{...dead,aliases:['שולם קהא'],about:'בתרשים המשפחתי מופיע גם הכינוי ״בכרא מקומו״. נישא לרחל קפרא ב־21.6.1949 בשעריים, לפי תעודת הנישואין H 100067.'});
 unit('shalom',[shalom,person('rachel','רחל קפרא קהא','Rachel Kapra Keha','f',{aliases:['רחל קפרא','רחל כפרא','רחל קהא'],about:'נישאה לשלום קהא ב־21.6.1949 בשעריים, לפי תעודת הנישואין H 100067.'})],['boaz','dalia','efi','yakira']);
-unit('boaz',[person('boaz','בועז קהא','Boaz Keha','m',dead),person('leah','לאה','Leah','f')],['inbal-boaz','ido','hila'],'shalom');
+unit('boaz',[person('boaz','בועז קהא','Boaz Keha','m',{...dead,sharedProfileId:'extra-b2c26d6299d747f083bf9490'}),person('leah','לאה','Leah','f')],['inbal-boaz','ido','hila'],'shalom');
 for(const [key,name,en,gender] of [['inbal-boaz','ענבל קהא','Inbal Keha','f'],['ido','עידו קהא','Ido Keha','m'],['hila','הילה קהא','Hila Keha','f']])unit(key,[person(key,name,en,gender)],[],'boaz');
 unit('dalia',[person('dalia','דליה קהא','Dalia Keha','f',dead),person('karl','קרל','Karl','m')],['amos','noam'],'shalom');
 unit('amos',[person('amos','עמוס','Amos','m',{about:'לפי המידע המשפחתי, מתגורר בהיידלברג. במחקר נמצא השם עמוס־קארל לאכט (ובכתיב לאכאט) לצד יורשי שלום קהא; זיהוי השם המלא עדיין טעון אישור משפחתי.'})],[],'dalia');
@@ -44,7 +44,7 @@ unit('oded',[person('oded','עודד וגנר','Oded Wagner','m'),person('daria'
 unit('inbar',[person('inbar','ענבר','Inbar')],[],'oded');
 unit('maor',[person('maor','מאור','Maor')],[],'oded');
 
-unit('saadia',[person('saadia','סעדיה קהא','Saadia Keha','m',{about:'אביהם של אביבה, טוני ורמי. בנו של זכריה קהא הבן ונכדו של סעדיה קהא הדוד. מופיע בפנקס הבוחר בשעריים משנת 1937, שורה 790: קהא, סעדיה, זכריה, שערים. נישא לסעידה ב־21.2.1945, לפי תעודה H 69399.'}),person('saida','סעידה קהא','Saida Keha','f',{about:'נישאה לסעדיה קהא ב־21.2.1945, לפי תעודת הנישואין H 69399.'})],['aviva','toni','rami']);
+unit('saadia',[person('saadia','סעדיה קהא','Saadia Keha','m',{about:'אביהם של אביבה, טוני ורמי. בנו של זכריה קהא הבן ונכדו של סעדיה קהא הדוד. מופיע בפנקס הבוחר בשעריים משנת 1937, שורה 790: קהא, סעדיה, זכריה, שערים. נישא לסעידה ב־21.2.1945, לפי תעודה H 69399.'}),person('saida','סעידה קהא','Saida Keha','f',{sharedProfileId:'extra-b3318c4c12cc4e83886ee902',parents:['saadia-saida-father','saadia-saida-mother'],about:'נישאה לסעדיה קהא ב־21.2.1945, לפי תעודת הנישואין H 69399. בתעודה נרשמו הוריה יוסף ושרה; פענוח שם המשפחה טרם הושלם.'})],['aviva','toni','rami']);
 unit('aviva',[person('aviva','אביבה ארצי','Aviva Arzi','f',{aliases:['אביבה קהא']}),person('alon','אלון ארצי','Alon Arzi','m')],['moshe-arzi','erez','oren'],'saadia');
 unit('moshe-arzi',[person('moshe-arzi','משה ארצי','Moshe Arzi','m'),person('orit','אורית','Orit','f')],[],'aviva');
 unit('erez',[person('erez','ארז ארצי','Erez Arzi','m')],[],'aviva');
@@ -72,6 +72,13 @@ unit('galit',[person('galit','גלית קהא','Galit Keha','f')],[],'israel');
 
 unit('aharon',[person('aharon','אהרון חובשי','Aharon Hovshi','m',{aliases:['אהרן חובשי','אהרון קהא'],about:'לפי המידע המשפחתי, התייתם ואומץ בידי זכריה קהא הבן. בהמשך חזר לשם המשפחה חובשי. הקשר לזכריה הוא קשר אימוץ; שמות הוריו הביולוגיים טרם נמסרו.'}),person('yona-hovshi','יונה חובשי','Yona Hovshi','f')],['shlomo-hovshi','tzvia','orly'],null,{parentage:'adopted'});
 for(const [key,name,en,gender] of [['shlomo-hovshi','שלמה חובשי','Shlomo Hovshi','m'],['tzvia','צביה חובשי','Tzvia Hovshi','f'],['orly','אורלי חובשי','Orly Hovshi','f']])unit(key,[person(key,name,en,gender)],[],'aharon');
+
+// Primary evidence: parents' column of marriage certificates H 100067 and
+// H 69399. These are the wives' own parents, never their husbands' parents.
+people.find(p=>p.id==='saadia-rachel').parents=['saadia-kapra-zechariah','saadia-kapra-sara'];
+unit('kapra-chaim',[person('kapra-chaim','חיים','Haim','m',{about:'אביו של זכריה בן חיים קפרא, לפי שם האב בתעודת הנישואין של רחל קפרא, H 100067. פרטים נוספים טרם נמסרו.'})],['kapra-parents'],null,{generation:0});
+unit('kapra-parents',[person('kapra-zechariah','זכריה בן חיים קפרא','Zechariah Kapra, son of Haim','m',{about:'אביה של רחל קפרא, לפי תעודת נישואיה לשלום קהא, H 100067, מ־21.6.1949.'}),person('kapra-sara','שרה קפרא','Sara Kapra','f',{about:'אמה של רחל קפרא, לפי תעודת נישואיה H 100067, מ־21.6.1949. שם משפחתה לפני הנישואין אינו ידוע.'})],[],'kapra-chaim');
+unit('saida-parents',[person('saida-father','יוסף','Yosef','m',{about:'אביה של סעידה קהא, לפי תעודת נישואיה H 69399, מ־21.2.1945. פענוח שם המשפחה טרם הושלם.'}),person('saida-mother','שרה','Sara','f',{about:'אמה של סעידה קהא, לפי תעודת נישואיה H 69399, מ־21.2.1945. פענוח שם המשפחה טרם הושלם.'})]);
 
 export const SAADIA_PEOPLE=Object.freeze(people.map(Object.freeze));
 export const SAADIA_UNITS=Object.freeze(units.map(item=>Object.freeze({...item,parent:['kadya','shalom','saadia','israel','aharon'].some(key=>item.id==='u-saadia-'+key)?'u-keha-zechariah':item.parent})));

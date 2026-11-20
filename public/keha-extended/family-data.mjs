@@ -89,7 +89,17 @@ export function createExtendedFamily(original = {}) {
   const result = {title:EXTENDED_NAME, root:'u-root', people:{}, units:{}, branches:EXTENDED_BRANCHES, branchIds:new Map(), identities:{}};
   for (const [id,members,children,parent,details={}] of units) result.units[id] = {id,people:[...members],children:[...children],parent,relationship:members.length>1?'spouse':'single',...structuredClone(details)};
   for (const unit of SAADIA_UNITS) result.units[unit.id]=structuredClone(unit);
-  for (const seed of EXTENDED_PEOPLE) result.people[seed.id] = {...seed,...roster[seed.id],extra:false,extended:false,unit:seed.unit};
+  for (const seed of EXTENDED_PEOPLE){
+    const id=original.identities?.[seed.id] || (seed.sharedProfileId&&roster[seed.sharedProfileId]?seed.sharedProfileId:seed.id);
+    if(id!==seed.id)result.identities[seed.id]=id;
+    result.people[id] = {...seed,...roster[id],id,englishName:roster[id]?.nameEn||seed.englishName,extra:false,extended:false,unit:seed.unit};
+  }
+  const canonical=id=>result.identities[id]||id;
+  for(const person of Object.values(result.people))for(const field of ['parents','siblings'])if(person[field])person[field]=person[field].map(canonical);
+  for(const unit of Object.values(result.units)){
+    unit.people=unit.people.map(canonical);
+    for(const relationship of unit.relationships||[])relationship.people=relationship.people.map(canonical);
+  }
   function copy(id,parent=null) {
     const unit=original.units?.[id];
     if (!unit || result.units[id]) return;
@@ -109,6 +119,7 @@ export function createExtendedFamily(original = {}) {
   }
   result.branchIds.set('keha-zechariah-father','shlomo');
   result.branchIds.set('saadia-elder','zechariah');
+  for(const seed of SAADIA_PEOPLE)result.branchIds.set(canonical(seed.id),'zechariah');
   // Kehat and Yissachar remain independent; no common ancestor is inferred.
   for (const branch of EXTENDED_BRANCHES) {
     const todo=[branch.unit];

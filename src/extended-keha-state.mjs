@@ -2,6 +2,7 @@ import family from './family.mjs';
 import {EXTENDED_PEOPLE,createExtendedFamily} from '../public/keha-extended/family-data.mjs';
 import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
 import {uid} from './http.mjs';
+import {linkSharedProfile} from './nakash-shared.mjs';
 
 export function initializeExtendedKeha(state) {
   if(state.extendedKehaReady)return;
@@ -39,6 +40,14 @@ export function initializeExtendedKeha(state) {
         state.savePerson(saved);
       }
     }
+    for(const seed of EXTENDED_PEOPLE){
+      if(!seed.sharedProfileId)continue;
+      linkSharedProfile(state,state.sharedNakashIdentities,seed);
+      if(seed.deceased){
+        const person=state.person(state.sharedNakashIdentities[seed.id]||seed.id);
+        if(!person.deceased){person.deceased=true;state.savePerson(person);}
+      }
+    }
     if(updateChart)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',migration,'done');
     if(updateKehat)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',kehatMigration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
@@ -47,7 +56,7 @@ export function initializeExtendedKeha(state) {
 }
 
 export function extendedKehaItems(state,args={}) {
-  const ids=JSON.stringify(Object.keys((args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)(family).people));
+  const ids=JSON.stringify(Object.keys((args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)({...family,sharedPeople:state.run('people').people}).people));
   const categories=JSON.stringify(args.branch==='shlomo'?['nakash:shlomo','gallery','videos','nostalgia']:['nakash:extended','nakash:shlomo','gallery','videos','nostalgia']);
   return state.rows("SELECT data FROM media WHERE category IN (SELECT value FROM json_each(?)) OR person_id IN (SELECT value FROM json_each(?)) OR id IN (SELECT media_id FROM media_tags WHERE person_id IN (SELECT value FROM json_each(?))) ORDER BY rowid DESC",categories,ids,ids).map(row=>JSON.parse(row.data))
     .filter(item=>!args.kind || (item.kind || (item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document'))===args.kind)

@@ -133,8 +133,45 @@ test('Saadia’s chart retains five subbranches, correct generations and the exp
   assert.match(data.people['saadia-ofir'].about,/אמו תקוה/);
   assert.deepEqual(data.units['u-saadia-roni'].children,[],'Unnamed six or seven children are not fabricated');
   assert.equal(data.people['saadia-dagnit'].deathDate,undefined,'A funeral date is not a death date');
+  assert.deepEqual(relatives('saadia-rachel').parents,['saadia-kapra-zechariah','saadia-kapra-sara']);
+  assert.deepEqual(relatives('saadia-kapra-zechariah').parents,['saadia-kapra-chaim']);
+  assert.deepEqual(relatives('saadia-kapra-zechariah').children,['saadia-rachel']);
+  assert.deepEqual(relatives('saadia-saida').parents,['saadia-saida-father','saadia-saida-mother']);
+  assert.deepEqual(relatives('saadia-saadia').parents,['keha-zechariah','keha-yehudit'],'The husband keeps his own parents');
   for(const person of Object.values(data.people))assert.ok(data.units[person.unit]);
   for(const unit of Object.values(data.units))for(const child of unit.children)assert.equal(data.units[child].parent,unit.id);
+});
+
+test('existing Saida and Boaz portraits, media and edits remain shared through their historical person IDs',async()=>{
+  const f=fixture();try{
+    const pairs=[['saadia-saida','extra-b3318c4c12cc4e83886ee902','סעידה קהא'],['saadia-boaz','extra-b2c26d6299d747f083bf9490','בועז קהא']];
+    const portraits=[];
+    for(const [seed,id,name] of pairs){
+      f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name,extra:true,birthday:'4.5.1920',profileId:null,revision:'before'}));
+      const uploaded=await f.json('/api/people/'+id+'/photos?filename=historical.jpg',{method:'POST',body:photo});
+      portraits.push(uploaded.person.profileMediaId);
+    }
+    const script=await(await f.call('/keha-extended/site-data.js')).text();
+    const data=JSON.parse(script.split('\n')[0].slice('window.FAMILY_DATA='.length,-1));
+    for(const [index,[seed,id]] of pairs.entries()){
+      assert.equal(data.identities[seed],id);
+      assert.ok(!data.people[seed]);
+      assert.equal(data.people[id].profileMediaId,portraits[index]);
+      const page=await f.json(site('people/'+seed+'/page'));
+      assert.equal(page.person.id,id);
+      assert.equal(page.albums.photos.total,1);
+      await f.json(site('people/'+seed+'/about'),{method:'POST',body:{about:'סיפור משותף',expectedAbout:page.person.about||'',language:'he'}});
+      assert.equal((await f.json('/api/people/'+id+'/page')).person.about,'סיפור משותף');
+    }
+    const relativesWindow={};vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window:relativesWindow});
+    assert.deepEqual([...relativesWindow.FamilyRelations.forPerson(data,pairs[0][1]).parents],['saadia-saida-father','saadia-saida-mother']);
+    assert.equal(data.people[pairs[1][1]].deceased,true);
+    const gallery=await f.json(site('collections/gallery?size=all'));
+    assert.ok(portraits.every(id=>gallery.items.some(item=>item.id===id)));
+    f.restart();
+    assert.equal((await f.json(site('people/'+pairs[0][0]+'/page'))).person.profileMediaId,portraits[0]);
+    assert.equal(f.objects.size,2,'Existing bytes are reused; linking creates no extra uploads');
+  }finally{f.close();}
 });
 
 test('the chart rename preserves the existing Zechariah ID, portrait, biography and later manual edits',async()=>{
