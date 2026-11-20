@@ -17,16 +17,17 @@ const relationshipStyles = `<style>
   @media(max-width:700px){.tree-unit .tree-partnerships{top:calc(31px * var(--a11y-tree-scale,1))}}
 </style>`;
 const layoutStyles = `<style>
-  .nakash-mobile-title{display:none}
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles){grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr}
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles)>.home-tile{grid-column:auto}
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree .home-tile-arrow{display:none}
   @media(max-width:700px){
-    html[data-nakash-home] body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px 88px minmax(0,1fr) clamp(44px,12vw,64px);grid-template-areas:"menu preferences shortcuts brand" "family-title family-title family-title family-title";grid-template-rows:auto auto;row-gap:6px}
-    html[data-nakash-home] body[data-active-view=home] .site-header #homeLink{min-height:44px}
-    html[data-nakash-home] body[data-active-view=home] .site-header #homeLink>span{display:none}
-    html[data-nakash-home] body[data-active-view=home] .nakash-mobile-title{display:block;grid-area:family-title;min-width:0;max-width:100%;padding:0 8px 4px;color:var(--ink);font:600 calc(16px * var(--a11y-text-scale,1))/1.4 var(--sans);text-align:center;white-space:normal;overflow-wrap:anywhere}
-    html[data-nakash-home][data-a11y-text] body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px minmax(88px,1fr) minmax(88px,1fr) 44px}
+    html[data-nakash-home] body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px 88px minmax(0,1fr) clamp(70px,21vw,88px);grid-template-areas:"menu preferences shortcuts brand";grid-template-rows:auto;row-gap:0}
+    html[data-nakash-home] body[data-active-view=home] .site-header #homeLink{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;width:100%;max-width:100%;min-height:44px;gap:3px}
+    html[data-nakash-home] body[data-active-view=home] .site-header #homeLink>span{display:block;min-width:0;width:100%;max-width:100%;text-align:center;white-space:normal}
+    html[data-nakash-home] body[data-active-view=home] .site-header #homeLink .brand-family-label{display:block}
+    html[data-nakash-home] body[data-active-view=home] .site-header #homeLink .brand-home-label{display:none}
+    html[data-nakash-home] body[data-active-view=home] .site-header #homeLink .brand-title-line{display:block;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+    html[data-nakash-home][data-a11y-text] body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px minmax(78px,1fr) minmax(88px,1fr) minmax(70px,1fr)}
     html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree strong{font-size:calc(clamp(16px,4.4vw,20px) * var(--a11y-text-scale,1))}
     html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree .home-tile-icon{width:42px;height:48px;flex-basis:42px}
     html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree .home-tile-icon svg{width:35px;height:35px}
@@ -83,7 +84,7 @@ export function nakashHTML(original, section, isInternal = false) {
     .replace(/  <script src="(?:\/assets\/)?([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>\n/g,
       (tag, script) => standaloneScripts.has(script) ? '' : tag)
     .replace('<head>', '<head>\n  <meta name="robots" content="noindex,nofollow">\n' + scripts + '\n' + relationshipStyles + '\n' + layoutStyles)
-    .replace('<span>בית משפחת קהא</span></a>', '<span>' + name + '</span></a><span class="nakash-mobile-title" data-i18n-skip>' + name + '</span>')
+    .replace('<span>בית משפחת קהא</span>', '<span>' + name + '</span>')
     .replace('משורש משותף, שישה ענפים של אהבה', 'משורש משותף, ארבעה ענפים')
     .replaceAll('קהא · חריזי · בקר · נובל · פיש · בלום', 'נקאש · מדינה · קהא')
     .replace(/(<nav [^>]*id="mainNav"[^>]*>)(.*?)(<\/nav>)/s, (_, start, children, end) =>
