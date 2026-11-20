@@ -3,12 +3,14 @@ import {createFamily, branchForPerson} from '../public/nakash/family-data.mjs';
 import {normalizeSearch, searchNames} from '../public/assets/site-search-core.mjs';
 import {uid} from './http.mjs';
 
-const diagramCorrectionKey = 'nakash-confirmed-names-2026-11-20-v3';
+const diagramCorrectionKey = 'nakash-confirmed-names-2026-11-20-v4';
 const diagramRetiredNames = {
   'doron-nir': ['דורון ניר', 'דורון נקאש', 'Doron Nir', 'Doron Nakash'],
   'alona-shai': ['אלונה', 'אלונה שי', 'אלונה נקאש', 'Alona', 'Alona Shai', 'Alona Nakash'],
   'yair-medina-wife': ['אשתו של יאיר', "Yair's wife"],
   'avner-former-wife': ['אמה של מור', "Mor's mother"],
+  'avrahumi-medina': ['אברהומי מדינה', 'Avrahumi Medina'],
+  'aharon-gueta': ['אהרון גואטה', 'Aharon Gueta'],
 };
 
 // Explicit links are supplied by the family owner. Keep the historical profile

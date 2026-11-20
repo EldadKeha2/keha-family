@@ -37,17 +37,19 @@ function fixture(){
 for (const [id, oldName, oldNameEn, name, nameEn, branch, unit, members] of [
   ['yair-medina-wife', 'אשתו של יאיר', "Yair's wife", 'יעל', 'Yael', 'medina', 'u-nakash-yair', ['yair-medina', 'yair-medina-wife']],
   ['avner-former-wife', 'אמה של מור', "Mor's mother", 'יפה', 'Yafa', 'haim', 'u-nakash-avner', ['avner-nakash', 'rivka-nakash', 'avner-former-wife']],
-]) test(nameEn+' replaces the retired wife placeholder on the same shared profile without losing its details or portrait',async()=>{
+  ['avrahumi-medina', 'אברהומי מדינה', 'Avrahumi Medina', 'אברהם מדינה', 'Avraham Medina', 'medina', 'u-nakash-avrahumi', ['avrahumi-medina']],
+  ['aharon-gueta', 'אהרון גואטה', 'Aharon Gueta', 'אריק גואטה', 'Arik Gueta', 'medina', 'u-nakash-yoni', ['yoni-gueta', 'aharon-gueta']],
+]) test(nameEn+' replaces the retired name on the same shared profile without losing its details or portrait',async()=>{
   const f=fixture();try{
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:oldName,nameEn:oldNameEn,firstName:oldName.split(' ')[0],lastName:oldName.split(' ').slice(1).join(' '),placeholder:true,extra:true,birthday:'2.3.1970',about:'פרטים קיימים',profileId:null,revision:'old-placeholder'}));
-    f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-confirmed-names-2026-11-20-v2','done');
+    f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-confirmed-names-2026-11-20-v3','done');
     const uploaded=await f.json('/api/people/'+id+'/photos?filename=portrait.jpg',{method:'POST',body:photo});
     const page=await f.json(f.site(branch,'people/'+id+'/page'));
     assert.equal(page.person.id,id);
     assert.equal(page.person.name,name);
     assert.equal(page.person.nameEn,nameEn);
-    assert.equal(page.person.firstName,name);
-    assert.equal(page.person.lastName,'');
+    assert.equal(page.person.firstName,name.split(' ')[0]);
+    assert.equal(page.person.lastName,name.split(' ').slice(1).join(' '));
     assert.notEqual(page.person.placeholder,true);
     assert.equal(page.person.birthday,'2.3.1970');
     assert.equal(page.person.about,'פרטים קיימים');
