@@ -56,6 +56,6 @@
     "HF_BUCKET": "keha-family"
   },
   "build": {
-    "command": "node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs"
+    "command": "node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs && node scripts/prepare-family-apps.mjs"
   }
 }

@@ -1,7 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {familyApp, UPSTREAM} from '../family-apps/worker.mjs';
+import worker, {familyApp, UPSTREAM} from '../family-apps/worker.mjs';
+
+test('the production proxy uses the existing backend service binding', async () => {
+  let received;
+  const response = await worker.fetch(new Request('https://haim.example/nakash/haim/'), {
+    FAMILY_BRANCH:'haim', FAMILY_SITE:{async fetch(request) {received = request; return new Response('shared backend');}},
+  });
+  assert.equal(received.url, UPSTREAM + '/nakash/haim/');
+  assert.equal(await response.text(), 'shared backend');
+});
 
 test('each dedicated family origin opens its own existing portal', async () => {
   for (const branch of ['haim', 'yehuda', 'medina', 'keha']) {

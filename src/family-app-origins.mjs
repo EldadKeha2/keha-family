@@ -3,7 +3,7 @@ const branches = ['haim', 'yehuda', 'medina', 'keha'];
 // Activate only after the dedicated Workers have been deployed and verified.
 // These public origins are configuration, not credentials.
 export function familyAppOrigins(env = {}) {
-  let configured = env.FAMILY_APP_ORIGINS || {};
+  let configured = env.FAMILY_APP_ORIGINS ?? verifiedOrigins;
   if (typeof configured === 'string') {
     try { configured = JSON.parse(configured); } catch { return {}; }
   }
@@ -16,3 +16,5 @@ export function familyAppOrigins(env = {}) {
   }
   return origins;
 }
+import verifiedOrigins from './family-app-origins.generated.mjs';
+

@@ -6,5 +6,11 @@
   "workers_dev": true,
   "vars": {
     "FAMILY_BRANCH": "yehuda"
-  }
+  },
+  "services": [
+    {
+      "binding": "FAMILY_SITE",
+      "service": "keha-family"
+    }
+  ]
 }

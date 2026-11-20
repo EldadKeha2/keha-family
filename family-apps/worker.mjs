@@ -67,6 +67,7 @@ export function familyApp(branch, upstreamFetch = fetch) {
 
 export default {
   fetch(request, env) {
-    return familyApp(env.FAMILY_BRANCH).fetch(request);
+    const backend = env.FAMILY_SITE ? request => env.FAMILY_SITE.fetch(request) : fetch;
+    return familyApp(env.FAMILY_BRANCH, backend).fetch(request);
   },
 };

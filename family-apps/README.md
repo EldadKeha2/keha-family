@@ -4,13 +4,23 @@ The original Keha PWA has scope `/`. Chrome therefore treats every existing
 `/nakash/.../` page as part of that installed app and may suppress the other
 families' installation prompts. Distinct manifest IDs alone do not fix this.
 
-Each configuration here deploys a small Worker on a separate origin. It forwards
-to the existing `keha-family` backend. Profiles, edits, galleries, uploads and
+Each configuration here deploys a small Worker on a separate origin. Its service
+binding forwards to the existing `keha-family` backend. Profiles, edits, galleries, uploads and
 media are shared; no database or media collection is copied. Each manifest keeps
 its existing family name, logo color and launch URL, with self-related app links
 adjusted to the dedicated origin.
 
 ## Activation
+
+The production `main` build runs `scripts/prepare-family-apps.mjs` using its
+existing Cloudflare API connection. It creates or updates only `family-haim`,
+`family-yehuda` and `family-medina`, then verifies each live page, manifest identity
+and PNG icon before compiling the returned origins into the main site. The
+original root Keha installation is retained. Local checks and preview builds do
+not deploy these apps. An API or verification failure stops the main deployment,
+leaving the existing live site and installation links in place.
+
+For manual activation instead:
 
 1. Connect each `family-<branch>` Worker to this repository with the corresponding
    `family-apps/<branch>` root, or deploy that directory's Wrangler configuration.
@@ -18,7 +28,7 @@ adjusted to the dedicated origin.
 2. Verify the actual returned production URL for each Worker. Open its home,
    manifest, a profile and a media file. Check installation with the root Keha
    app already installed. Never activate a guessed or undeployed hostname.
-3. Set the main `keha-family` Worker's `FAMILY_APP_ORIGINS` variable to JSON
+3. Set the main `keha-family` Worker's optional `FAMILY_APP_ORIGINS` variable to JSON
    mapping each verified branch to its HTTPS origin, without a path. Keep the
    original root Keha app at its current URL.
 4. Installation buttons and invitation/page/media shares then use the verified

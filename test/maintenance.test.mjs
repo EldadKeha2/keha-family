@@ -9,7 +9,7 @@ test('static assets are served without Worker quota consumption',()=>{
   const config=JSON.parse(read('../wrangler.jsonc'));
   assert.deepEqual(config.assets.run_worker_first,['/api/*','/media/*','/family-data.js','/nakash/api/*','/nakash/','/nakash/index.html']);
   assert.equal(config.assets.directory,'./public');
-  assert.equal(config.build.command,'node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs');
+  assert.equal(config.build.command,'node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs && node scripts/prepare-family-apps.mjs');
 });
 test('maintenance overlay has no manually navigable page or trigger',()=>{
   const html=read('../public/index.html');
