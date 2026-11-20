@@ -65,6 +65,7 @@ const PEOPLE = [
   ['dana-nakash', 'דנה נקאש', 'Dana Nakash', 'f', 'u-nakash-dana'],
   ['avner-nakash', 'אבנר נקאש', 'Avner Nakash', 'm', 'u-nakash-avner'],
   ['rivka-nakash', 'רבקה נקאש', 'Rivka Nakash', 'f', 'u-nakash-avner'],
+  ['avner-former-wife', 'אמה של מור', "Mor's mother", 'f', 'u-nakash-avner', [], {placeholder:true}],
   // Retain IDs from the first diagram transcription so existing portraits,
   // dates and tags stay attached when the displayed names are corrected.
   ['doron-nir', 'ציון ניר', 'Zion Nir', 'm', 'u-nakash-doron', ['ציון נקאש', 'Tzion Nir', 'Zion Nakash']],
@@ -88,7 +89,7 @@ const PEOPLE = [
   ['michal-pazarkar', 'מיכל פזרקר', 'Michal Pazarkar', 'f', 'u-nakash-michal-pazarkar'],
   ['shira-pazarkar', 'שירה פזרקר', 'Shira Pazarkar', 'f', 'u-nakash-shira-pazarkar'],
   ['eliya-nakash', 'אליה נקאש', 'Eliya Nakash', '', 'u-nakash-eliya'],
-  ['neriya-nakash', 'נריה נקאש', 'Neriya Nakash', 'm', 'u-nakash-neriya'],
+  ['neriya-nakash', 'נריה נקאש', 'Neriya Nakash', 'm', 'u-nakash-neriya', ['נרי נקאש', 'נרי', 'Neri Nakash']],
   ['tohar-nakash', 'טוהר', 'Tohar', 'f', 'u-nakash-neriya'],
   ['alona-shai', 'אילנה שי', 'Ilana Shai', 'f', 'u-nakash-alona', ['אילנה נקאש', 'Ilana Nakash']],
   ['yaakov-shai', 'יעקב שי', 'Yaakov Shai', 'm', 'u-nakash-alona'],
@@ -149,7 +150,13 @@ const UNITS = [
   ['u-nakash-tomer', ['tomer-nakash'], [], 'u-nakash-rafi'],
   ['u-nakash-zohar', ['zohar-nakash'], [], 'u-nakash-rafi'],
   ['u-nakash-dana', ['dana-nakash'], [], 'u-nakash-rafi'],
-  ['u-nakash-avner', ['avner-nakash', 'rivka-nakash'], ['u-nakash-mor', 'u-nakash-eliya', 'u-nakash-neriya'], 'u-nakash-haim'],
+  ['u-nakash-avner', ['avner-nakash', 'rivka-nakash', 'avner-former-wife'], ['u-nakash-mor', 'u-nakash-eliya', 'u-nakash-neriya'], 'u-nakash-haim', 'spouse', {
+    displayPeople:['avner-former-wife', 'avner-nakash', 'rivka-nakash'],
+    relationships:[
+      {people:['avner-nakash', 'avner-former-wife'], relationship:'former', children:['u-nakash-mor'], label:'אשתו הקודמת ואמה של מור', labelEn:"Former wife and Mor's mother"},
+      {people:['avner-nakash', 'rivka-nakash'], relationship:'spouse', children:['u-nakash-eliya', 'u-nakash-neriya'], label:'אשתו כיום', labelEn:'Current wife'},
+    ],
+  }],
   ['u-nakash-mor', ['mor-pazarkar', 'hen-pazarkar'], ['u-nakash-noam-pazarkar', 'u-nakash-michal-pazarkar', 'u-nakash-shira-pazarkar'], 'u-nakash-avner'],
   ['u-nakash-noam-pazarkar', ['noam-pazarkar'], [], 'u-nakash-mor'],
   ['u-nakash-michal-pazarkar', ['michal-pazarkar'], [], 'u-nakash-mor'],

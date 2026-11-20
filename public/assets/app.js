@@ -196,9 +196,14 @@
       positions.push({id,unit,x,y,width:nodeWidth(unit),depth});const kids=children(unit),total=kids.reduce((sum,child)=>sum+widths.get(child),0)+Math.max(0,kids.length-1)*gap;let right=left+width-(width-total)/2;const centers=[];
       for(const child of kids){const w=widths.get(child);centers.push(right-w/2);place(child,right-w,depth+1,spacing+partnershipSpace);right-=w+gap;}
       if(kids.length){
-        const union=unit.relationships?.find(item=>kids.every(child=>item.children.includes(child))),display=unit.displayPeople||unit.people;
-        const offset=union?union.people.reduce((sum,id)=>sum+(display.indexOf(id)+.5)/display.length,0)/union.people.length-.5:0;
-        connections.push({id,x:x+(I18n.isEnglish?1:-1)*offset*nodeWidth(unit),y,centers,depth,partnershipSpace});
+        const display=unit.displayPeople||unit.people,groups=(unit.relationships||[]).map(union=>({union,kids:kids.filter(child=>union.children.includes(child))})).filter(group=>group.kids.length);
+        const assigned=new Set(groups.flatMap(group=>group.kids)),remaining=kids.filter(child=>!assigned.has(child));
+        if(remaining.length)groups.push({union:null,kids:remaining});
+        groups.forEach(({union,kids:groupKids},index)=>{
+          const offset=union?union.people.reduce((sum,id)=>sum+(display.indexOf(id)+.5)/display.length,0)/union.people.length-.5:0;
+          connections.push({id,x:x+(I18n.isEnglish?1:-1)*offset*nodeWidth(unit),y,centers:groupKids.map(child=>centers[kids.indexOf(child)]),depth,partnershipSpace,
+            parentPeople:union?.people,childUnits:groupKids,lane:(index-(groups.length-1)/2)*14*textScale});
+        });
       }
     }
     let width,height;
@@ -234,13 +239,15 @@
         camera.height=height;world.style.height=height+'px';
       }
     }
-    for(const {x,y,centers,depth,partnershipSpace=0} of connections){
+    for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,childUnits,lane=0} of connections){
       const extra=(depth===0?rootHistorySpace+rootSpacingAdjustment:0)+partnershipSpace,historyRoot=depth===0&&rootContentHeight>0;
       const start=historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
-      const middle=historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra,end=y+levelHeight-7*textScale+extra;
+      const middle=(historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra)+lane,end=y+levelHeight-7*textScale+extra;
+      if(parentPeople)lines.push(`<g data-parent-unit="${safe(id)}" data-parent-people="${safe(parentPeople.join(' '))}" data-child-units="${safe(childUnits.join(' '))}">`);
       lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);
-      if(centers.length>1)lines.push(`<path d="M${Math.min(...centers)} ${middle}H${Math.max(...centers)}"/>`);
+      if(parentPeople||centers.length>1)lines.push(`<path d="M${Math.min(x,...centers)} ${middle}H${Math.max(x,...centers)}"/>`);
       for(const cx of centers)lines.push(`<path d="M${cx} ${middle}V${end}"/>`);
+      if(parentPeople)lines.push('</g>');
     }
     $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
 
