@@ -127,7 +127,9 @@
     const [title,subtitle] = titles[state.view] || titles.tree;
     $('workspaceTitle').textContent = title;
     $('mobileViewTitle').textContent=title;
-    $('workspaceSubtitle').textContent = subtitle;
+    const portal=document.documentElement?.dataset?.branchPortal;
+    const portalSubtitle=portal==='zechariah'?(I18n.isEnglish?'Zechariah and Yehudit Keha and their descendants':'זכריה ויהודית קהא וצאצאיהם'):portal==='kehat'?(I18n.isEnglish?'Tzadok and Aharon branches · relationship under research':'ענפי צדוק ואהרון · הקשר ביניהם בבירור'):null;
+    $('workspaceSubtitle').textContent = isTree&&portalSubtitle?portalSubtitle:subtitle;
     const workspaceDetail=$('workspaceDetail');workspaceDetail.hidden=state.view!=='calendar';workspaceDetail.textContent=state.view==='calendar'?I18n.t('ימי הולדת, חגים ומועדים בלוח עברי ולועזי'):'';
     $('searchInput').placeholder = state.view==='videos' ? (I18n.isEnglish?'Search':'חיפוש') : state.view==='timeline' ? I18n.t('חיפוש בשם או בשנת לידה') : state.view==='nursery' ? I18n.t('חיפוש בן או בת משפחה') : global ? state.view==='stories'?(isPhone()?(I18n.isEnglish?'Search stories':'חיפוש סיפורים'):I18n.t('חיפוש בסיפורים ובשנים')):I18n.t('חיפוש לפי כיתוב, שם קובץ או אדם') : I18n.t('חיפוש בן או בת משפחה');
     const searchWrap=$('searchInput').closest?.('.search-wrap');if(searchWrap)searchWrap.hidden=state.view==='family-ai';

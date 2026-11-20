@@ -417,11 +417,14 @@ test('the new portals have independent identities, palettes, manifests and the f
     window.FamilyI18n={isEnglish:false,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};window.FamilyDates={age:()=>null,parse:()=>null};
     const context=vm.createContext({window,document:page,location:{hash:'#home'},history:{pushState(){}},matchMedia:()=>({matches:false}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8'),context);
+    window.FamilyApp.setView('tree');
+    assert.equal(page.getElementById('workspaceSubtitle').textContent,portal.id==='zechariah'?'זכריה ויהודית קהא וצאצאיהם':'ענפי צדוק ואהרון · הקשר ביניהם בבירור');
     window.FamilyApp.getView=()=>'tree';
     context.clearTimeout=()=>{};context.setTimeout=()=>{};
     vm.runInContext(await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8'),context);
     page.dispatchEvent(new dom.Event('DOMContentLoaded'));
     assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,4);
+    if(portal.id==='kehat')assert.match(page.querySelector('#homeTiles .home-tile-tree').textContent,/ענפי צדוק ואהרון/);
   }
 });
 
