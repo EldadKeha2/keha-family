@@ -6,11 +6,26 @@ import {parseHTML} from 'linkedom';
 import {nakashHTML, nakashShell} from '../src/nakash-shell.mjs';
 import {nakashProjection} from '../src/nakash.mjs';
 import family from '../src/family.mjs';
+import {familyAppOrigins} from '../src/family-app-origins.mjs';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const appSource = await readFile(new URL('../public/assets/app.js', import.meta.url), 'utf8');
 const origin = 'https://family.example';
 const projection = () => nakashProjection(family, new Map());
+
+test('only deployed, valid family origins are supplied to installation and branch navigation',async()=>{
+  assert.deepEqual(familyAppOrigins(),{});
+  assert.deepEqual(familyAppOrigins({FAMILY_APP_ORIGINS:'invalid'}),{});
+  const env={FAMILY_APP_ORIGINS:JSON.stringify({yehuda:'https://yehuda.example',haim:'https://haim.example/',medina:'https://medina.example/unverified',keha:'https://name:password@keha.example',other:'https://unrelated.example'})};
+  const origins=familyAppOrigins(env);
+  assert.deepEqual(origins,{yehuda:'https://yehuda.example',haim:'https://haim.example'});
+  const {document}=parseHTML(nakashHTML(html,'yehuda',false,origins));
+  assert.equal(document.documentElement.dataset.nakashOrigin,'https://yehuda.example');
+  assert.equal(document.querySelector('.branch-chip[aria-current="page"]').getAttribute('href'),'https://yehuda.example/nakash/yehuda/');
+  assert.ok(document.querySelector('a[href="/nakash/medina/"]'));
+  const response=await nakashShell(new Request(origin+'/nakash/yehuda/'),{...env,ASSETS:{fetch:async()=>new Response(html)}},projection);
+  assert.equal(parseHTML(await response.text()).document.documentElement.dataset.nakashOrigin,'https://yehuda.example');
+});
 
 test('Nakash branch pages retain the original components and limit top-level navigation', () => {
   const original = parseHTML(html).document;

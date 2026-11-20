@@ -2,6 +2,7 @@ import {BRANCHES, createFamily} from '../public/nakash/family-data.mjs';
 import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {escapeHTML} from './http.mjs';
 import {appleLaunchImages, launchAssets, themedFamilies} from './nakash-launch.mjs';
+import {familyAppOrigins} from './family-app-origins.mjs';
 
 export const NAKASH_WRITE_TOKEN = 'nakash-public-v1';
 const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'person', 'search'];
@@ -50,7 +51,7 @@ function cameFromKeha(request) {
   }
 }
 
-export function nakashHTML(original, section, isInternal = false) {
+export function nakashHTML(original, section, isInternal = false, appOrigins = {}) {
   const branch = branchMap.get(section);
   const homePath = branch ? '/nakash/' + branch.id + '/' : '/nakash/';
   const manifest = homePath + 'manifest.webmanifest';
@@ -59,7 +60,7 @@ export function nakashHTML(original, section, isInternal = false) {
   const themed = themedFamilies.has(section);
   const appleIcon = themed ? launchAssets(section) + '/icon-180.png' : logo + '-192.png';
   const navigation = BRANCHES.map(({id, label}) =>
-    '<a class="branch-chip" href="/nakash/' + id + '/"'+
+    '<a class="branch-chip" href="' + escapeHTML(appOrigins[id] || '') + '/nakash/' + id + '/"'+
     (id === section ? ' aria-current="page"' : '') + '>' + escapeHTML(label) + '</a>'
   ).join('');
   const back = isInternal ? '<a class="nav-link" href="/#home" data-i18n-skip>חזרה לבית משפחת קהא</a>' : '';
@@ -69,6 +70,7 @@ export function nakashHTML(original, section, isInternal = false) {
     ['nakash-manifest', manifest],
     ['nakash-name', name],
     ['nakash-views', NAKASH_VIEWS.join(' ')],
+    ...(branch && appOrigins[branch.id] ? [['nakash-origin', escapeHTML(appOrigins[branch.id])]] : []),
     ...(section === 'inside' ? [['nakash-entry-view', 'tree']] : []),
     ...(branch ? [['nakash-search-branch', branch.id]] : []),
   ].map(([key, value]) => ' data-' + key + '="' + value + '"').join('');
@@ -137,6 +139,6 @@ export async function nakashShell(request, env, projection) {
   }
   const original = await env.ASSETS.fetch(new Request(new URL('/', url)));
   if (!original.ok) return original;
-  const html = nakashHTML(await original.text(), section, section === 'inside' && cameFromKeha(request));
+  const html = nakashHTML(await original.text(), section, section === 'inside' && cameFromKeha(request), familyAppOrigins(env));
   return new Response(request.method === 'HEAD' ? null : html, {headers:{'Content-Type':'text/html; charset=utf-8'}});
 }

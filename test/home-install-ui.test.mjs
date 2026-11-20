@@ -83,7 +83,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   const card=new Element('section'),dialog=new Element('dialog');nodes.set('homeInstall',card);nodes.set('homeInstallDialog',dialog);
   const windowsLink=new Element('a');windowsLink.setAttribute('href','#install-desktop');windowsLink.children.set('span',new Element('span'));nodes.set('desktopShortcutLink',windowsLink);
   document.documentElement=new Element('html');document.documentElement.lang=english?'en-US':'he';document.documentElement.clientWidth=390;
-  if(site)Object.assign(document.documentElement.dataset,{nakashHome:site.home,nakashName:site.name,nakashManifest:site.home+'manifest.webmanifest'});
+  if(site)Object.assign(document.documentElement.dataset,{nakashHome:site.home,nakashName:site.name,nakashManifest:site.home+'manifest.webmanifest',...(site.origin?{nakashOrigin:site.origin}:{})});
   const icon=new Element('link');icon.setAttribute('href',site?.icon||'/assets/app-icons/icon-192.png');
   document.querySelector=selector=>selector==='link[rel=apple-touch-icon]'?icon:null;
   document.getElementById=id=>nodes.get(id)||null;
@@ -760,6 +760,41 @@ test('the desktop install fallback stays short in both languages and the browser
 });
 
 const familySites=[['yehuda','משפחת נקאש (יהודה)'],['haim','משפחת נקאש (חיים)'],['medina','משפחת מדינה'],['keha','משפחת קהא']].map(([branch,name])=>({branch,name,home:'/nakash/'+branch+'/',icon:'/nakash/brand-'+branch+'-192.png'}));
+
+test('installation moves to the dedicated family origin before checking or requesting an enclosed app',async()=>{
+  for(const base of familySites)for(const mobile of [false,true]){
+    const site={...base,origin:'https://'+base.branch+'.example'};
+    const f=fixture({site,mobile,recordNavigation:true,standalone:true,userAgent:mobile?'Mozilla/5.0 (Linux; Android 16) Chrome/157.0 Mobile':desktopUA,entryUrl:'https://family.example'+site.home+'#gallery',webInstall:'works',installedRelated:[{platform:'webapp',id:'https://family.example'+site.home}]});
+    const oldPrompt=f.offer();await tick();
+    f.click(mobile?f.button():f.card.querySelector('[data-desktop-install-action]'));await tick();
+    assert.deepEqual(f.assignments,[site.origin+site.home+'?lang=he&install=1#home']);
+    assert.equal(f.webInstallCalls.length,0);
+    assert.equal(oldPrompt.calls,0);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+  }
+});
+
+test('dedicated-origin invitations and current-page shares keep the family, person and media',async()=>{
+  const site={...familySites[0],origin:'https://yehuda.example'};
+  const f=fixture({site,share:'works',entryUrl:'https://family.example'+site.home+'?source=homescreen&familyApp=yehuda&media=photo-1#person/example'});
+  f.click(f.card.querySelector('[data-home-install-share]'));f.click(f.dialog.querySelector('[data-home-share-site]'));await tick();
+  assert.equal(f.shared[0].url,site.origin+site.home+'?lang=he&install=1#home');
+  f.click(f.card.querySelector('[data-home-install-share]'));f.click(f.dialog.querySelector('[data-home-share-page]'));await tick();
+  assert.equal(f.shared[1].url,site.origin+site.home+'?media=photo-1&lang=he#person/example');
+  const arrival=fixture({site,recordNavigation:true,entryUrl:'https://family.example'+site.home+'?install=1#home'});
+  assert.deepEqual(arrival.assignments,[site.origin+site.home+'?lang=he&install=1#home']);
+});
+
+test('a dedicated origin uses its own install prompt and recognizes its own installed app',async()=>{
+  const site={...familySites[0],origin:'https://yehuda.example'};
+  const f=fixture({site,recordNavigation:true,entryUrl:site.origin+site.home+'?install=1#home'});
+  const prompt=f.offer();f.click(f.button());await tick();
+  assert.equal(prompt.calls,1);assert.deepEqual(f.assignments,[]);
+  const installed=fixture({site,recordNavigation:true,entryUrl:site.origin+site.home+'#home',installedRelated:[{platform:'webapp',id:site.origin+site.home}]});
+  await tick();installed.click(installed.button());await tick();
+  assert.equal(installed.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
+  assert.deepEqual(installed.assignments,[]);
+});
 
 test('installing Keha or another family never marks the current family as installed, including inside an existing app window',async()=>{
   const rootApp={platform:'webapp',id:'https://family.example/',url:'https://family.example/manifest.webmanifest'};

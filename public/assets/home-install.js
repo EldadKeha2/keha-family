@@ -16,6 +16,7 @@
   const android=/Android/i.test(ua),embedded=/FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(ua);
   const mobileDevice=ios||android||navigator.userAgentData?.mobile===true||/Mobile|Tablet/i.test(ua);
   const nakash=document.documentElement?.dataset,siteHome=nakash?.nakashHome,siteName=()=>nakash?.nakashName||tr('בית משפחת קהא','Keha Family Home');
+  const appOrigin=nakash?.nakashOrigin||location.origin,needsFamilyOrigin=Boolean(siteHome)&&appOrigin!==location.origin;
   const nativeDesktop=!siteHome&&/KehaFamilyDesktop\//i.test(ua);
   const appHome=new URL(siteHome||'/',location.origin).pathname;
   const manifestURL=new URL(nakash?.nakashManifest||'/manifest.webmanifest',location.origin).href,appID=new URL(appHome,location.origin).href;
@@ -28,7 +29,7 @@
     if(launch.get('source')==='homescreen'&&['nakash','haim','yehuda','medina','keha'].includes(family))rememberRunningApp(family==='nakash'?'/nakash/':'/nakash/'+family+'/');
     else if(!runningAppHome&&!siteHome&&location.pathname==='/')rememberRunningApp('/');
   }
-  const url=new URL(siteHome||'/',location.origin),language=window.FamilyI18n?.language;
+  const url=new URL(siteHome||'/',appOrigin),language=window.FamilyI18n?.language;
   if(['he','en-US','en-GB'].includes(language))url.searchParams.set('lang',language);
   url.hash='home';
   const invitationURL=new URL(url.href);invitationURL.searchParams.set('install','1');
@@ -130,7 +131,7 @@
     return {title:siteName(),text:siteHome?siteName()+'. '+tr('פתחו את הקישור ולחצו ״התקן״.','Open the link and tap “Install”.'):tr('בית משפחת קהא במסך הבית שלכם. פתחו את הקישור ולחצו ״התקן״.','Keha Family Home on your home screen. Open the link and tap “Install”.'),url:invitationURL.href};
   }
   function currentPageSharePayload(){
-    const page=new URL(location.href),language=window.FamilyI18n?.language;
+    const page=new URL(location.pathname+location.search+location.hash,appOrigin),language=window.FamilyI18n?.language;
     if(siteHome)page.pathname=siteHome;
     page.searchParams.delete('install');
     page.searchParams.delete('source');page.searchParams.delete('familyApp');
@@ -176,7 +177,7 @@
     if(mobileDevice||phoneQuery.matches)openShareChoices();else void sharePayload(websiteSharePayload());
   });
 
-  function hasInstalledShortcut(){return nativeDesktop||installed||relatedInstalled||(standaloneQuery.matches||navigator.standalone===true)&&runningAppHome===appHome;}
+  function hasInstalledShortcut(){return !needsFamilyOrigin&&(nativeDesktop||installed||relatedInstalled||(standaloneQuery.matches||navigator.standalone===true)&&runningAppHome===appHome);}
   function familyWebInstall(){return Boolean(siteHome)&&!ios&&!modernDesktopInstallFailed&&typeof navigator.install==='function';}
   function installThisApp(){return siteHome?navigator.install({manifest:manifestURL,manifestId:appID}):navigator.install();}
   function checkInstalledShortcut(){
@@ -249,6 +250,7 @@
   }
   async function requestDesktopInstallation(returnFocus=desktopButton){
     if(!desktopView()||busy)return;
+    if(needsFamilyOrigin){location.assign(invitationURL.href);return;}
     const modern=modernDesktopInstall();
     if(!modern&&(hasInstalledShortcut()||!installPrompt)){openDesktopHelp(returnFocus);void checkInstalledShortcut();return;}
     const prompt=modern?null:installPrompt;if(!modern)installPrompt=null;
@@ -314,9 +316,10 @@
     dialog.querySelector('[data-home-install-invite-browse]')?.addEventListener('click',continueToSite);
     showDialog('invite',returnFocus);update();
   }
-  function offerInvitation(){if(!installationInvitation||invitationOffered||!mobileDevice)return;invitationOffered=true;openInvitation();}
+  function offerInvitation(){if(!installationInvitation||invitationOffered)return;invitationOffered=true;if(needsFamilyOrigin){location.assign(invitationURL.href);return;}if(mobileDevice)openInvitation();else if(siteHome)openDesktopHelp();}
   async function requestInstallation(fromInvitation=false){
     if(busy||(!fromInvitation&&button.hidden))return;
+    if(needsFamilyOrigin){location.assign(invitationURL.href);return;}
     if(hasInstalledShortcut()){
       announceInstalledShortcut();
       return;

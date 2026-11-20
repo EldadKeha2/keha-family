@@ -8,7 +8,7 @@
     return /Windows|Macintosh|Linux|CrOS/i.test(ua)||matchMedia('(min-width:701px)').matches;
   }
   function siteLink(){
-    const url=new URL(document.documentElement?.dataset?.nakashHome||'.',location.href),language=window.FamilyI18n?.language;
+    const site=document.documentElement?.dataset,url=new URL(site?.nakashHome||'.',site?.nakashOrigin||location.href),language=window.FamilyI18n?.language;
     if(language==='en-US'||language==='en-GB')url.searchParams.set('lang',language);
     return url.href;
   }

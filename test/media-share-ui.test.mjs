@@ -16,7 +16,15 @@ test('sharing preserves the gallery that supplied the opened item',async()=>{
   await f.get('copyMediaLink').handlers.get('click')();const url=new URL(f.copied[0]);assert.equal(url.hash,hash,scope);assert.equal(url.searchParams.get('media'),'a');f.close();
  }
 });
-function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null,touchscreen=false}={}){
+test('shared family media opens on the independent family origin with the same person and item',async()=>{
+ const site={home:'/nakash/yehuda/',origin:'https://yehuda.example'},f=fixture({site});
+ f.window.FamilyMedia.open([f.photo('shared-photo')],0,'personal:shared-person');
+ await f.get('copyMediaLink').handlers.get('click')();
+ const url=new URL(f.copied[0]);
+ assert.equal(url.origin,site.origin);assert.equal(url.pathname,site.home);
+ assert.equal(url.hash,'#person/shared-person');assert.equal(url.searchParams.get('media'),'shared-photo');f.close();
+});
+function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null,touchscreen=false,site=null}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
     constructor(tag='div'){this.tagName=tag;this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.style={};const classes=new Set();this.classList={toggle(name,on){on=on??!classes.has(name);classes[on?'add':'delete'](name);},contains:name=>classes.has(name),add:name=>classes.add(name),remove:name=>classes.delete(name)};this.children=new Map();this.content=[];}
@@ -46,6 +54,7 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const navigator={userActivation:{isActive:true},clipboard:{async writeText(value){if(!clipboard)throw Error('Unavailable');copied.push(value);}}};
   if(native){navigator.canShare=()=>files;navigator.share=async data=>{shared.push(data);if(cancel)throw Object.assign(Error('Cancelled'),{name:'AbortError'});};}
   const document={activeElement:null,getElementById:get,querySelector:()=>null,querySelectorAll:()=>[],createElement:tag=>new Node(tag),createTextNode:text=>({textContent:text}),addEventListener:(type,callback)=>events.set(type,callback)};
+  if(site)document.documentElement={dataset:{nakashHome:site.home,nakashOrigin:site.origin}};
   if(browser)window.addEventListener=browser.addEventListener;
   const context=vm.createContext({window,document,location,navigator,File,Blob,URL,CustomEvent:class{constructor(type,{detail}){this.type=type;this.detail=detail;}},history:browser?.history||{replaceState(){}},matchMedia:()=>({matches:false}),clearTimeout,setTimeout});
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(keyboardSource,context);vm.runInContext(presentationSource,context);vm.runInContext(swipeSource,context);vm.runInContext(source,context);events.get('DOMContentLoaded')();

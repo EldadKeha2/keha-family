@@ -65,7 +65,7 @@
     swipeHintNode=hint;$('mediaStage').append(hint);
   }
   function shareURL(item){
-    const url=new URL(document.documentElement?.dataset?.nakashHome||'/',location.origin);
+    const site=document.documentElement?.dataset,url=new URL(site?.nakashHome||'/',site?.nakashOrigin||location.origin);
     if(item.profilePersonId){url.searchParams.set('lang',I18n.language);url.hash='person/'+encodeURIComponent(item.profilePersonId);return url.href;}
     url.searchParams.set('media',item.id);url.searchParams.set('lang',I18n.language);
     const scope=viewerAlbumScope()||item.scope||'gallery';
