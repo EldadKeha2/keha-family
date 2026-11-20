@@ -6,17 +6,22 @@ export const EXTENDED_HOME = '/keha-extended/';
 export const EXTENDED_BRANCHES = Object.freeze([
   {id:'shlomo', unit:'u-root', label:'משפחת שלמה קהא', shortLabel:'שלמה קהא', titleEn:'Shlomo Keha Family', color:EXTENDED_COLOR, mark:'❖'},
   {id:'zechariah', unit:'u-keha-zechariah', label:'משפחת זכריה קהא הבן', shortLabel:'זכריה קהא הבן', titleEn:'Family of Zechariah Keha the Younger', color:'#597d98', mark:'❖'},
-  {id:'kehat', unit:'u-keha-kehat', label:'משפחת קהת — ג׳ידעאן', shortLabel:'משפחת קהת', titleEn:'Kehat family — Jidaan', color:'#537b82', mark:'❖'},
+  {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'משפחת קהת — צדוק', shortLabel:'צדוק · זכריה', titleEn:'Kehat family — Tzadok', color:'#537b82', mark:'❖'},
+  {id:'kehat', unit:'u-kehat-aharon-elder', label:'משפחת קהת — אהרון', shortLabel:'אהרון · סעדיה', titleEn:'Kehat family — Aharon', color:'#537b82', mark:'❖'},
   {id:'yissachar', unit:'u-keha-yissachar', label:'יוסף יששכר', shortLabel:'יוסף יששכר', titleEn:'Yosef Yissachar', color:'#757d98', mark:'❖'},
 ].map(Object.freeze));
 
 // The supplied family chart is the source for these names and marriages.
-// Jidaan is a family nickname. No official name or common ancestor is inferred.
+// The owner identified Jidaan as Saadia, son of Aharon. Tzadok and Aharon's
+// branches remain independent until their relationship is established.
 const people = [
   ['keha-zechariah','זכריה קהא הבן','Zechariah Keha the Younger','m','u-keha-zechariah',['זכריה קהא'],{about:'בנו של סעדיה קהא ואחיינו של זכריה קהא האב. בן דודו של שלמה קהא, ולא בנו של זכריה קהא האב. נשוי ליהודית קהא.'}],
   ['keha-yehudit','יהודית קהא','Yehudit Keha','f','u-keha-zechariah'],
   ['keha-zechariah-father','זכריה קהא האב','Zechariah Keha the Elder','m','u-keha-zechariah-father',[],{deceased:true,siblings:['saadia-elder'],about:'אביו של שלמה קהא ואחיו של סעדיה קהא. נפטר בתימן לפני העלייה ולא זכה לעלות ארצה. שם אשתו טרם ידוע. זכריה קהא הבן הוא אחיינו, בנו של סעדיה.'}],
-  ['kehat-jidaan','ג׳ידעאן קהת','Jidaan Kehat','m','u-keha-kehat',['ג׳ימען קהת','גימען קהת','גידעאן קהת']],
+  ['kehat-tzadok-elder','צדוק קהא','Tzadok Keha','m','u-kehat-tzadok-elder'],
+  ['kehat-zechariah-ben-tzadok','זכריה בן צדוק קהת','Zechariah Kehat, son of Tzadok','m','u-kehat-zechariah-ben-tzadok',['זכריה בן צדוק קהא']],
+  ['kehat-aharon-elder','אהרון קהא','Aharon Keha','m','u-kehat-aharon-elder'],
+  ['kehat-jidaan','סעדיה (ג׳ידעאן) בן אהרון קהת','Saadia (Jidaan) Kehat, son of Aharon','m','u-keha-kehat',['ג׳ידעאן קהת','ג׳ימען קהת','גימען קהת','גידעאן קהת','סעדיה בן אהרון קהא','סעדיה בן אהרון קהת']],
   ['kehat-first-wife','שם האישה הראשונה טרם נמסר','First wife — name not yet known','f','u-keha-kehat',[],{placeholder:true}],
   ['kehat-miriam','מרים קהת','Miriam Kehat','f','u-keha-kehat'],
   ['kehat-yaakov','יעקב קהת','Yaakov Kehat','m','u-kehat-yaakov'],
@@ -54,7 +59,10 @@ const units = [
       {people:['keha-zechariah'],children:['u-saadia-aharon'],relationship:'adopted',label:'בן מאומץ',labelEn:'Adopted son'},
     ],
   }],
-  ['u-keha-kehat',['kehat-jidaan','kehat-first-wife','kehat-miriam'],[...firstChildren,...secondChildren,'u-kehat-tzvia'],null,{
+  ['u-kehat-tzadok-elder',['kehat-tzadok-elder'],['u-kehat-zechariah-ben-tzadok'],null,{generation:0}],
+  ['u-kehat-zechariah-ben-tzadok',['kehat-zechariah-ben-tzadok'],[],'u-kehat-tzadok-elder'],
+  ['u-kehat-aharon-elder',['kehat-aharon-elder'],['u-keha-kehat'],null,{generation:0}],
+  ['u-keha-kehat',['kehat-jidaan','kehat-first-wife','kehat-miriam'],[...firstChildren,...secondChildren,'u-kehat-tzvia'],'u-kehat-aharon-elder',{
     relationships:[
       {people:['kehat-jidaan','kehat-first-wife'],children:firstChildren,relationship:'spouse',label:'נישואין ראשונים',labelEn:'First marriage'},
       {people:['kehat-jidaan','kehat-miriam'],children:secondChildren,relationship:'spouse',label:'נישואין שניים',labelEn:'Second marriage'},

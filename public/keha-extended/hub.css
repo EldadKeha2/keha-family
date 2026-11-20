@@ -27,7 +27,13 @@ html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] :
 .extended-branch-note { font:calc(14px * var(--a11y-text-scale,1))/1.35 var(--sans); }
 .extended-shlomo { right:5%;top:160px; }
 .extended-zechariah { left:5%;top:160px; }
-.extended-kehat { right:5%;bottom:40px; }
+.extended-kehat-group { position:absolute;right:2%;bottom:28px;width:58%;display:grid;gap:12px;justify-items:center;text-align:center;color:var(--family-ink); }
+.extended-kehat-group h3 { margin:0;font:600 calc(20px * var(--a11y-text-scale,1))/1.35 var(--serif); }
+.extended-kehat-circles { display:flex;width:100%;justify-content:space-evenly;gap:16px; }
+.extended-kehat-small { position:relative;inset:auto;flex:none;width:154px;height:154px;max-width:none;padding:14px; }
+.extended-kehat-small strong { font-size:calc(18px * var(--a11y-text-scale,1)); }
+.extended-kehat-small .extended-branch-portrait { width:30px;height:30px; }
+.extended-kehat-group>p { margin:0;max-width:330px;padding:4px 8px;background:var(--paper);border-radius:12px;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);color:var(--muted); }
 .extended-yissachar { left:5%;bottom:40px; }
 .extended-branch-portrait { display:grid;place-items:center;position:relative;overflow:hidden;width:48px;height:48px;flex:none;border:1px solid var(--family-line);border-radius:50%;font:500 24px/1 var(--serif);background:#fffdf5; }
 .extended-branch-portrait img { width:100%;height:100%;object-fit:cover; }
@@ -38,7 +44,8 @@ html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] :
 html[data-extended-keha] #extendedKehaHomeHub { margin-block:0 24px; }
 html[data-extended-keha] .tree-partnerships path { stroke:var(--family-accent); }
 @media(max-width:700px){
-  .extended-hub-art { min-height:700px;margin-inline:-8px; }
+  .extended-hub-art { min-height:920px;margin-inline:-8px; }
+  .extended-hub-lines { height:700px; }
   .extended-olive-tree { width:78%;left:11%;top:245px; }
   .extended-ancestor { width:142px;min-height:136px;max-width:42%;padding:9px 7px; }
   .extended-ancestor strong { font-size:calc(16px * var(--a11y-text-scale,1)); }
@@ -53,9 +60,13 @@ html[data-extended-keha] .tree-partnerships path { stroke:var(--family-accent); 
   .extended-cousin-label { top:340px;font-size:calc(14px * var(--a11y-text-scale,1)); }
   .extended-branch-circle { width:142px;height:142px;max-width:42%;padding:10px;gap:5px; }
   .extended-shlomo,.extended-zechariah { top:176px; }
-  .extended-shlomo,.extended-kehat { right:3%; }
+  .extended-shlomo { right:3%; }
   .extended-zechariah,.extended-yissachar { left:3%; }
-  .extended-kehat,.extended-yissachar { bottom:30px; }
+  .extended-yissachar { bottom:30px; }
+  .extended-kehat-group { right:3%;bottom:28px;width:44%;gap:12px; }
+  .extended-kehat-group h3 { font-size:calc(18px * var(--a11y-text-scale,1)); }
+  .extended-kehat-circles { flex-direction:column;align-items:center;gap:18px; }
+  .extended-kehat-small { width:142px;height:142px;max-width:100%;padding:12px; }
   .extended-branch-circle strong { font-size:calc(16px * var(--a11y-text-scale,1)); }
   .extended-branch-portrait { width:34px;height:34px;font-size:19px; }
   .extended-branch-note { font-size:calc(13px * var(--a11y-text-scale,1)); }

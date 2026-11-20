@@ -8,6 +8,8 @@ export function initializeExtendedKeha(state) {
   state.ctx.storage.transactionSync(()=>{
     const migration='extended-saadia-chart-2026-11-20-v1';
     const updateChart=!state.rows('SELECT id FROM meta WHERE id=?',migration).length;
+    const kehatMigration='extended-kehat-two-branches-2026-11-20-v1';
+    const updateKehat=!state.rows('SELECT id FROM meta WHERE id=?',kehatMigration).length;
     for(const seed of EXTENDED_PEOPLE){
       if(seed.placeholder)continue;
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
@@ -25,8 +27,20 @@ export function initializeExtendedKeha(state) {
         saved.aliases=[...new Set([...(saved.aliases||[]),...seed.aliases])];
         state.savePerson(saved);
       }
+      if(updateKehat&&seed.id==='kehat-jidaan'){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',kehatMigration+':backup:'+seed.id,JSON.stringify(saved));
+        if(seed.aliases.includes(saved.name)){
+          saved.name=seed.name;delete saved.firstName;delete saved.lastName;
+        }
+        if(!saved.nameEn||saved.nameEn==='Jidaan Kehat')saved.nameEn=seed.nameEn;
+        if(!saved.englishName||saved.englishName==='Jidaan Kehat')saved.englishName=seed.englishName;
+        saved.aliases=[...new Set([...(saved.aliases||[]),...seed.aliases])];
+        state.savePerson(saved);
+      }
     }
     if(updateChart)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',migration,'done');
+    if(updateKehat)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',kehatMigration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;

@@ -47,10 +47,11 @@ function fixture(){
 test('only the two confirmed cousin branches share paternal kinship; Kehat and Yissachar remain independent',()=>{
   const tree=createExtendedFamily(family),data=toOriginalFamilyData(tree);
   assert.equal(data.title,EXTENDED_NAME);
-  assert.equal(data.branches.length,4);
+  assert.equal(data.branches.length,5);
   assert.equal(data.units['u-root'].parent,'u-keha-zechariah-father');
   assert.equal(data.units['u-keha-zechariah'].parent,'u-saadia-elder');
-  for(const id of ['u-keha-kehat','u-keha-yissachar','u-keha-zechariah-father','u-saadia-elder'])assert.equal(data.units[id].parent,null);
+  for(const id of ['u-kehat-tzadok-elder','u-kehat-aharon-elder','u-keha-yissachar','u-keha-zechariah-father','u-saadia-elder'])assert.equal(data.units[id].parent,null);
+  assert.equal(data.units['u-keha-kehat'].parent,'u-kehat-aharon-elder');
   assert.equal(data.people['zecharia-nakash'],undefined);
   assert.equal(data.people['margalit-nakash'],undefined);
   assert.deepEqual(data.units['u-keha-zechariah'].people,['keha-zechariah','keha-yehudit']);
@@ -61,6 +62,45 @@ test('only the two confirmed cousin branches share paternal kinship; Kehat and Y
   assert.equal(data.people.ora.id,family.people.ora.id);
   assert.equal(data.people['kehat-tzion'].branch,'kehat');
   assert.equal(createFamily(family).people['kehat-jidaan'],undefined);
+});
+
+test('Tzadok and Aharon have separate sons and no invented kinship between their branches',async()=>{
+  const data=toOriginalFamilyData(createExtendedFamily(family)),window={};
+  vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
+  const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
+  assert.deepEqual(relatives('kehat-tzadok-elder').children,['kehat-zechariah-ben-tzadok']);
+  assert.deepEqual(relatives('kehat-aharon-elder').children,['kehat-jidaan']);
+  assert.deepEqual(relatives('kehat-zechariah-ben-tzadok').parents,['kehat-tzadok-elder']);
+  assert.deepEqual(relatives('kehat-jidaan').parents,['kehat-aharon-elder']);
+  for(const id of ['kehat-tzadok-elder','kehat-aharon-elder']){
+    assert.deepEqual(relatives(id).parents,[]);
+    assert.deepEqual(relatives(id).siblings,[]);
+    assert.deepEqual(relatives(id).partners,[]);
+  }
+  assert.equal(data.people['kehat-zechariah-ben-tzadok'].branch,'kehat-tzadok');
+  assert.equal(data.people['kehat-jidaan'].branch,'kehat');
+  assert.equal(data.people['kehat-jidaan'].name,'סעדיה (ג׳ידעאן) בן אהרון קהת');
+  assert.deepEqual(relatives('kehat-jidaan').children,['kehat-yaakov','kehat-zechariah','kehat-aharon','kehat-yehudit','kehat-hadassah','kehat-shula','kehat-tzion','kehat-tzvia']);
+});
+
+test('identifying Jidaan as Saadia preserves his shared profile, albums and subsequent name edits',async()=>{
+  const f=fixture();try{
+    const id='kehat-jidaan';
+    f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'ג׳ידעאן קהת',nameEn:'Jidaan Kehat',about:'סיפור שכבר נכתב',birthday:'2.3.1900',extra:true,profileId:null}));
+    const first=await f.json(site('people/'+id+'/page'));
+    assert.equal(first.person.name,'סעדיה (ג׳ידעאן) בן אהרון קהת');
+    assert.equal(first.person.birthday,'2.3.1900');
+    assert.equal(first.person.about,'סיפור שכבר נכתב');
+    const portrait=await f.json(site('people/'+id+'/photos?filename=saadia.jpg'),{method:'POST',body:photo});
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    saved.name='סעדיה קהת — שם מעודכן';
+    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
+    f.restart();
+    const next=await f.json(site('people/'+id+'/page'));
+    assert.equal(next.person.name,saved.name);
+    assert.equal(next.person.profileMediaId,portrait.person.profileMediaId);
+    assert.equal(next.albums.photos.total,1);
+  }finally{f.close();}
 });
 
 test('Saadia’s chart retains five subbranches, correct generations and the explicit privacy request',async()=>{
@@ -277,7 +317,7 @@ test('the extended installation launches its own hub and never uses the root Keh
   assert.equal(installed.name,EXTENDED_NAME);
 });
 
-test('desktop and mobile keep all four circles on one hub, expand each branch in place, and open branches from Home',async()=>{
+test('desktop and mobile split Kehat into two circles and open each independent branch from the hub and Home',async()=>{
   const appSource=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   const hubSource=await readFile(new URL('../public/keha-extended/hub.js',import.meta.url),'utf8');
   for(const phone of [false,true]){
@@ -288,16 +328,20 @@ test('desktop and mobile keep all four circles on one hub, expand each branch in
     const location={hash:'#tree'};
     const context=vm.createContext({window,document,location,history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(hubSource,context);vm.runInContext(appSource,context);
-    assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,4);
+    assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,5);
+    assert.equal(document.querySelectorAll('#extendedKehaHub .extended-kehat-small').length,2);
+    assert.match(document.querySelector('#extendedKehaHub .extended-kehat-group').textContent,/הקשר בין שני הענפים טרם ידוע/);
     assert.equal(document.querySelectorAll('#extendedKehaHub .extended-ancestor').length,2);
     assert.match(document.querySelector('#extendedKehaHub .extended-cousin-label').textContent,/בני דודים/);
     assert.ok(document.querySelector('#extendedKehaHub [data-person="saadia-elder"]'));
     assert.ok(document.querySelector('#extendedKehaHub a[href="/keha-extended/shlomo/#home"]'));
-    for(const [branch,person] of [['zechariah','keha-zechariah'],['kehat','kehat-hadassah'],['yissachar','keha-yosef-yissachar']]){
+    for(const [branch,person] of [['zechariah','keha-zechariah'],['kehat','kehat-hadassah'],['kehat-tzadok','kehat-zechariah-ben-tzadok'],['yissachar','keha-yosef-yissachar']]){
       document.querySelector('#extendedKehaHub [data-branch="'+branch+'"]').click();
       assert.ok(document.querySelector('#treeNodes [data-person="'+person+'"]'),branch);
       assert.ok(document.getElementById('treeBreadcrumb').textContent.startsWith(EXTENDED_NAME+' › '));
-      assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,4);
+      assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,5);
+      if(branch==='kehat-tzadok')assert.equal(document.querySelector('#treeNodes [data-person="kehat-jidaan"]'),null);
+      if(branch==='kehat')assert.equal(document.querySelector('#treeNodes [data-person="kehat-zechariah-ben-tzadok"]'),null);
       document.querySelector('#extendedKehaHub [data-branch="all"]').click();
       assert.equal(document.body.dataset.extendedBranch,'all');
     }
