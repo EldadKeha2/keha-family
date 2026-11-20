@@ -193,7 +193,7 @@ export class FamilyState {
     return {...data,runId};
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
-  person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');return JSON.parse(row.data);}
+  person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');const person=JSON.parse(row.data);return person.mergedInto?this.person(person.mergedInto):person;}
   savePerson(item){item.revision=uid();this.sql.exec('UPDATE people SET data=? WHERE id=?',JSON.stringify(item),item.id);this.peopleRevision=uid();this.peopleCache=null;}
   media(id){const row=this.rows('SELECT data FROM media WHERE id=?',id)[0];if(!row)throw new HttpError(404,'הקובץ לא נמצא.');return JSON.parse(row.data);}
   photo(id){const item=this.media(id);if(mediaKind(item)!=='photo'||item.provider)throw new HttpError(400,'אפשר לערוך תמונות בלבד.');return item;}
@@ -410,7 +410,7 @@ export class FamilyState {
         if(!change.tagged)throw new HttpError(400,'יש לבחור את האדם שאת התיוג שלו רוצים להסיר.');
         const name=text(change.name,'שם',120,true).replace(/\s+/g,' '),key=normalizedName(name);
         if(!key)throw new HttpError(400,'יש להזין שם מלא.');
-        roster??=this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data));
+        roster??=this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)).filter(person=>!person.mergedInto);
         const matches=matchingPeople(roster,name);
         if(matches.length>1)throw new HttpError(409,'יש כמה אנשים בשם '+name+'. בחרו את האדם המתאים מהרשימה.');
         person=matches[0];
@@ -572,6 +572,7 @@ export class FamilyState {
     return {...cycle,count:row.n,lit};
   }
   run(action,p){
+    if(p?.id && (action.startsWith('person') || ['profile','birthday','death.date'].includes(action)))p={...p,id:this.person(p.id).id};
     switch(action){
       case 'site.search':return searchSite(this,p);
       case 'family-ai.list':return this.familyAi.list(p);
@@ -698,7 +699,7 @@ export class FamilyState {
             if(!byPerson.has(id))byPerson.set(id,new Map());byPerson.get(id).set(item.id,item);
           }
         }
-        const people=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,this.snapshot(JSON.parse(row.data),[...(byPerson.get(row.id)?.values()||[])],false)]));
+        const people=Object.fromEntries(this.rows('SELECT id,data FROM people').filter(row=>!JSON.parse(row.data).mergedInto).map(row=>[row.id,this.snapshot(JSON.parse(row.data),[...(byPerson.get(row.id)?.values()||[])],false)]));
         return this.peopleCache={people,revision:this.peopleRevision};
       }
       case 'people.revision':return {revision:this.peopleRevision};
@@ -949,8 +950,8 @@ export class FamilyState {
         if(p.expectedRevision!==this.tagsRevision(item.id))throw new HttpError(409,'התיוגים עודכנו בינתיים. פתחו שוב את התיוגים לפני השמירה.');
         if(!Array.isArray(p.personIds)||!Array.isArray(p.newNames)||p.personIds.length+p.newNames.length>150||p.newNames.length>50)throw new HttpError(400,'אפשר לתייג עד 150 אנשים בפריט.');
         const ids=new Set();
-        for(const id of p.personIds){if(typeof id!=='string')throw new HttpError(400,'יש לבחור אנשים מהרשימה.');this.person(id);ids.add(id);}
-        const roster=p.newNames.length?this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)):[];
+        for(const id of p.personIds){if(typeof id!=='string')throw new HttpError(400,'יש לבחור אנשים מהרשימה.');ids.add(this.person(id).id);}
+        const roster=p.newNames.length?this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)).filter(person=>!person.mergedInto):[];
         for(const value of p.newNames){
           const name=text(value,'שם',120,true).replace(/\s+/g,' '),normalized=normalizedName(name);
           if(!normalized)throw new HttpError(400,'יש להזין שם מלא.');

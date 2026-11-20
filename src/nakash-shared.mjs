@@ -9,6 +9,70 @@ const diagramRetiredNames = {
   'alona-shai': ['אלונה', 'אלונה שי', 'אלונה נקאש', 'Alona', 'Alona Shai', 'Alona Nakash'],
 };
 
+// Explicit links are supplied by the family owner. Keep the historical profile
+// and its selected portrait, and retain the old record as a reversible alias.
+function linkSharedProfile(state, identities, seed) {
+  const targetId = seed.sharedProfileId;
+  if (!targetId || identities[seed.id] === targetId) return;
+  const targetRow = state.rows('SELECT data FROM people WHERE id=?', targetId)[0];
+  if (!targetRow) return;
+  const sourceId = identities[seed.id] || seed.id;
+  if (sourceId === targetId) return;
+  const sourceRow = state.rows('SELECT data FROM people WHERE id=?', sourceId)[0];
+  const target = JSON.parse(targetRow.data), source = sourceRow ? JSON.parse(sourceRow.data) : null;
+  const backup = 'nakash-profile-link:' + seed.id + ':' + targetId;
+  state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)', backup, JSON.stringify({source, target}));
+  const replace = value => typeof value === 'string' ? value === sourceId ? targetId : value :
+    Array.isArray(value) ? value.map(replace) : value && typeof value === 'object' ?
+      Object.fromEntries(Object.entries(value).map(([key, item]) => {
+        const next = replace(item);
+        return [key, ['people','personIds','_profilePeople'].includes(key) && Array.isArray(next) ? [...new Set(next)] : next];
+      })) : value;
+  const affected = new Map(state.rows('SELECT media_id FROM media_tags WHERE person_id=?', sourceId)
+    .map(row => [row.media_id, state.tagsRevision(row.media_id)]));
+  state.sql.exec('INSERT OR IGNORE INTO media_tags (media_id,person_id) SELECT media_id,? FROM media_tags WHERE person_id=?', targetId, sourceId);
+  state.sql.exec('DELETE FROM media_tags WHERE person_id=?', sourceId);
+  for (const row of state.rows('SELECT media_id,id,data FROM media_faces WHERE person_id=?', sourceId)) {
+    const face = {...replace(JSON.parse(row.data)), revision:uid()};
+    state.sql.exec('UPDATE media_faces SET person_id=?,data=? WHERE media_id=? AND id=?', targetId, JSON.stringify(face), row.media_id, row.id);
+  }
+  for (const row of state.rows('SELECT id,data,person_id FROM media WHERE person_id=? OR instr(data,?)>0', sourceId, sourceId)) {
+    const item = replace(JSON.parse(row.data));
+    state.sql.exec('UPDATE media SET person_id=?,data=? WHERE id=?', row.person_id === sourceId ? targetId : row.person_id, JSON.stringify(item), row.id);
+    if (!affected.has(row.id)) affected.set(row.id, state.tagsRevision(row.id));
+  }
+  for (const table of ['media_trash', 'nakash_media', 'stories']) {
+    for (const row of state.rows('SELECT id,data FROM ' + table + ' WHERE instr(data,?)>0', sourceId)) {
+      state.sql.exec('UPDATE ' + table + ' SET data=? WHERE id=?', JSON.stringify(replace(JSON.parse(row.data))), row.id);
+    }
+  }
+  for (const row of state.rows('SELECT media_id,id,data FROM photo_versions WHERE instr(data,?)>0', sourceId)) {
+    state.sql.exec('UPDATE photo_versions SET data=? WHERE media_id=? AND id=?', JSON.stringify(replace(JSON.parse(row.data))), row.media_id, row.id);
+  }
+  if (source) {
+    for (const [field, value] of Object.entries(source)) {
+      if (['id', 'name', 'nameEn', 'revision', 'mergedInto'].includes(field)) continue;
+      if (target[field] == null || target[field] === '' || target[field] === '1.1.1111' || Array.isArray(target[field]) && !target[field].length) target[field] = value;
+    }
+    target.aliases = [...new Set([...(target.aliases || []), source.name, source.nameEn, ...(source.aliases || [])].filter(Boolean))];
+    state.savePerson({...source, mergedInto:targetId});
+  }
+  state.savePerson(target);
+  for (const [id, previous] of Object.entries(identities)) if (previous === sourceId) {
+    identities[id] = targetId;
+    state.sql.exec('UPDATE nakash_identities SET canonical_id=? WHERE person_id=?', targetId, id);
+  }
+  identities[seed.id] = targetId;
+  state.sql.exec('INSERT INTO nakash_identities (person_id,canonical_id) VALUES (?,?) ON CONFLICT(person_id) DO UPDATE SET canonical_id=excluded.canonical_id', seed.id, targetId);
+  for (const [id, revision] of affected) {
+    state.touchTags(id);
+    state.sql.exec('UPDATE media_face_reviews SET tags_revision=? WHERE media_id=? AND tags_revision=?', state.tagsRevision(id), id, revision);
+    const row = state.rows('SELECT data FROM media WHERE id=?', id)[0];
+    if (row) state.touchMedia(JSON.parse(row.data));
+  }
+  state.sql.exec("INSERT INTO meta (id,value) VALUES ('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value", uid());
+}
+
 // Person IDs and media records are shared with the original site. The branch
 // tables retain provenance; no image/video bytes are copied between sites.
 export function initializeSharedNakash(state) {
@@ -23,7 +87,8 @@ export function initializeSharedNakash(state) {
       const saved=JSON.parse(row.data);
       if(saved.extra)state.sql.exec('INSERT OR IGNORE INTO people (id,data) VALUES (?,?)',row.person_id,JSON.stringify({...saved,id:row.person_id,nakashBranch:saved.branch || null,profileId:null}));
     }
-    const roster = state.rows('SELECT data FROM people').map(row => JSON.parse(row.data));
+    for (const person of Object.values(tree.people)) linkSharedProfile(state, identities, person);
+    const roster = state.rows('SELECT data FROM people').map(row => JSON.parse(row.data)).filter(person => !person.mergedInto);
     const claimed=new Set(Object.values(identities)),aliasOwners=new Map();
     for(const p of Object.values(tree.people))for(const name of searchNames({...p,nameEn:p.englishName}).map(normalizeSearch)){
       if(!aliasOwners.has(name))aliasOwners.set(name,new Set());

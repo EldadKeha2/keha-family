@@ -74,6 +74,55 @@ test('Roma keeps her historical ID and shares original photos, biography, birth 
   }finally{f.close();}
 });
 
+test('Margalit Lulva links an already-created tree profile to her historical album without losing media or the selected portrait',async()=>{
+  const f=fixture();try{
+    const oldId='margalit-nakash', id='extra-3051638a17004175b329422f';
+    for(const person of [
+      {id,name:'מרגלית נקאש (לולוה)',extra:true,birthday:'1.1.1111',profileId:null,about:'הפרופיל המקורי',revision:'historical'},
+      {id:oldId,name:'מרגלית נקאש',extra:true,birthday:'2.3.1880',about:'פרטים מהעץ',profileId:null,revision:'tree'},
+    ]) f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(person.id,JSON.stringify(person));
+    const historical=await f.json('/api/people/'+id+'/photos?filename=portrait.jpg',{method:'POST',body:photo});
+    await f.json('/api/people/'+id+'/profile',{method:'POST',body:{file:historical.file}});
+    const treePhoto=await f.json('/api/people/'+oldId+'/photos?filename=tree.jpg',{method:'POST',body:photo});
+    const mediaId=treePhoto.person.profileMediaId,faceId='f'.repeat(32);
+    for(const personId of [oldId,id])f.database.prepare('INSERT OR IGNORE INTO media_tags (media_id,person_id) VALUES (?,?)').run(mediaId,personId);
+    const face={id:faceId,personId:oldId,rect:{x:.2,y:.2,width:.3,height:.4},revision:'face'};
+    f.database.prepare('INSERT INTO media_faces (media_id,id,person_id,data) VALUES (?,?,?,?)').run(mediaId,faceId,oldId,JSON.stringify(face));
+    f.database.prepare('INSERT INTO photo_versions (media_id,id,data) VALUES (?,?,?)').run(mediaId,'original',JSON.stringify({id:'original',faces:[face]}));
+    f.database.prepare('INSERT INTO stories (id,data) VALUES (?,?)').run('margalit-memory',JSON.stringify({id:'margalit-memory',title:'זיכרון',personIds:[oldId,id]}));
+    f.database.prepare('CREATE TABLE nakash_identities (person_id TEXT PRIMARY KEY,canonical_id TEXT NOT NULL)').run();
+    f.database.prepare('INSERT INTO nakash_identities (person_id,canonical_id) VALUES (?,?)').run(oldId,oldId);
+    const script=await (await f.call('/nakash/api/site-data.js')).text();
+    const tree=JSON.parse(script.split('\n')[0].slice('window.FAMILY_DATA='.length,-1));
+    assert.deepEqual(tree.units[tree.root].people,[id,'zecharia-nakash']);
+    assert.equal(tree.people[oldId],undefined);
+    assert.equal(tree.people[id].profileMediaId,historical.person.profileMediaId);
+    const page=await f.json('/api/people/'+id+'/page');
+    assert.equal(page.albums.photos.total,2);
+    assert.equal(page.person.profileIsManual,true);
+    assert.equal(page.person.birthday,'2.3.1880');
+    assert.equal(page.person.about,'הפרופיל המקורי');
+    assert.equal((await f.json('/api/people/'+oldId+'/page')).person.id,id);
+    assert.equal((await f.json(f.site('haim','people/'+oldId+'/page'))).person.id,id);
+    assert.deepEqual(f.state().tagIds(mediaId),[id]);
+    assert.equal(f.state().faces(mediaId)[0].personId,id);
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM photo_versions WHERE media_id=?').get(mediaId).data);
+    assert.equal(saved.faces[0].personId,id);
+    const story=JSON.parse(f.database.prepare('SELECT data FROM stories WHERE id=?').get('margalit-memory').data);
+    assert.deepEqual(story.personIds,[id]);
+    const roster=await f.json('/api/tag-people');
+    assert.equal(roster.people.some(person=>person.id===oldId),false);
+    assert.equal(roster.people.filter(person=>person.id===id).length,1);
+    const old=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(oldId).data);
+    assert.equal(old.mergedInto,id);
+    assert.equal(old.about,'פרטים מהעץ');
+    f.restart();
+    assert.equal((await f.json('/api/people/'+oldId+'/page')).person.id,id);
+    assert.equal((await f.json(f.site('medina','people/'+id+'/page'))).albums.photos.total,2);
+    assert.equal(f.objects.size,2,'linking profiles never copies their photo bytes');
+  }finally{f.close();}
+});
+
 test('Ora tagged in Yehuda appears in Keha, edits and removals stay shared, and deleted media never reappears on restart',async()=>{
   const f=fixture();try{
     const uploaded=await f.json(f.site('yehuda','collections/gallery/upload?filename=ora.jpg'),{method:'POST',body:photo});

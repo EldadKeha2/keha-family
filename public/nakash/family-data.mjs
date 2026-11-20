@@ -8,7 +8,9 @@ export const BRANCHES = Object.freeze([
 ].map(Object.freeze));
 
 const PEOPLE = [
-  ['margalit-nakash', 'מרגלית נקאש', 'Margalit Nakash', 'f', ROOT_UNIT],
+  ['margalit-nakash', 'מרגלית נקאש (לולוה)', 'Margalit Lulva Nakash', 'f', ROOT_UNIT,
+    ['מרגלית נקאש', 'מרגלית לולווה נקאש', 'מרגלית לולוה נקאש', 'מרגלית נקאש (לולווה)', 'Margalit Nakash'],
+    {sharedProfileId: 'extra-3051638a17004175b329422f'}],
   ['zecharia-nakash', 'זכריה נקאש', 'Zecharia Nakash', 'm', ROOT_UNIT],
   ['ruma-nakash', 'רומה מדינה', 'Roma Medina', 'f', 'u-nakash-medina', ['רומה נקאש', 'Roma Nakash', 'Ruma Nakash', 'Ruma Medina']],
   ['joseph-medina', 'יוסף מדינה', 'Joseph Medina', 'm', 'u-nakash-medina'],
