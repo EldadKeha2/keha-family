@@ -102,7 +102,7 @@
       pageHTML(root,`<nav class="person-page-breadcrumb"><a href="#directory" data-person-back>${I.isEnglish?'←':'→'} ${tr('חזרה','Back')}</a><span aria-hidden="true">›</span><span>${safe(name)}</span><button class="quiet-button" type="button" data-copy-person-link>${tr('העתקת קישור לאלבום','Copy album link')} ↗</button></nav><header class="person-page-hero"><button type="button" class="person-page-portrait" data-person-portrait aria-label="${tr('פתיחת תמונה מהאלבום','Open an album photo')}" ${p.profile?'':'disabled'}>${p.profile?`<img ${window.FamilyPhotoFraming?.profile(p)||''} src="${safe(p.profile)}" alt="${safe(name)}">`:`<span>${safe(initials)}</span>`}</button><div><span class="small-eyebrow">${tr('מכרים וחברי משפחה','Family friends and acquaintances')}</span><h2>${safe(name)}</h2><p>${tr('התמונות והסרטונים שבהם תויגו','Photos and videos in which they are tagged')}</p></div></header><p class="person-page-status" id="personPageStatus" role="status">${safe(state.status||state.error)}${state.partial?`<button class="secondary-button person-page-retry" type="button" data-person-retry>${tr('ניסיון נוסף','Try again')}</button>`:''}</p>${state.partial?`<p class="person-page-unavailable">${tr('התמונות יופיעו כשהחיבור לשמירה יחזור.','Photos will appear when the connection returns.')}</p>`:keys.map(album).join('')}`);
       return;
     }
-    pageHTML(root,`<nav class="person-page-breadcrumb"><a href="#directory" data-person-back>${I.isEnglish?'←':'→'} ${tr('חזרה','Back')}</a><span aria-hidden="true">›</span><span>${safe(name)}</span><button class="quiet-button" type="button" data-copy-person-link>${tr('העתקת קישור לעמוד','Copy page link')} ↗</button></nav><header class="person-page-hero"><button type="button" class="person-page-portrait" data-person-portrait aria-label="${tr('פתיחת תמונת הפרופיל','Open profile picture')}" ${p.profile?'':'disabled'}>${p.profile?`<img ${window.FamilyPhotoFraming?.profile(p)||''} src="${safe(p.profile)}" alt="${safe(name)}">`:`<span>${safe(initials)}</span>`}</button><div><span class="small-eyebrow">${tr('הסיפור של','The story of')}</span><h2>${safe(name)}${p.deceased?`${p.id==='becker-parent'?'&nbsp;':' '}<small>${tr('ז״ל','in loving memory')}</small>`:''}</h2><div class="person-page-dates" id="personPageBirthday">${dates()}${nakashHome&&!state.partial?`<button type="button" class="person-about-pencil" data-edit-profile-date aria-label="${tr('עריכת תאריך לידה','Edit date of birth')}" title="${tr('עריכת תאריך לידה','Edit date of birth')}">✎</button>`:''}</div></div><span class="person-page-emblem" aria-hidden="true">❖</span></header>${relationsHTML(p)}<section class="person-about"><header><h3>${tr('אודות','About')}</h3><button class="person-about-pencil" data-edit-about type="button" aria-label="${tr('עריכת אודות','Edit biography')}" title="${tr('עריכת אודות','Edit biography')}" ${state.partial||biography()?.isEditing()?'disabled':''}>✎</button></header><div class="person-about-text" ${state.aboutEditing?'hidden':''}>${state.partial?`<span class="person-about-placeholder">${tr('הפרטים אינם זמינים כרגע','Details are currently unavailable')}</span>`:p[aboutKey()]?safe(p[aboutKey()]):`<span class="person-about-placeholder">${tr('כאן אפשר לכתוב כמה מילים על החיים, האנשים והרגעים שחשוב לזכור.','Add a few words about a life, the people and the moments worth remembering.')}</span>`}</div><form id="personAboutForm" ${state.aboutEditing?'':'hidden'}><label class="visually-hidden" for="personAboutText">${tr('אודות','About')}</label><textarea dir="auto" id="personAboutText" rows="7" maxlength="10000">${safe(state.aboutDraft)}</textarea><p id="personAboutError" class="form-error" role="alert"></p><div class="form-actions"><button class="primary-button" type="submit">${tr('שמירת האודות','Save biography')}</button><button class="secondary-button" type="button" data-cancel-about>${tr('ביטול','Cancel')}</button></div></form>${biography()?.render(p,!state.partial)||''}</section><p class="person-page-status" id="personPageStatus" role="status">${safe(state.status||state.error)}${state.partial?`<button class="secondary-button person-page-retry" type="button" data-person-retry>${tr('ניסיון נוסף','Try again')}</button>`:''}</p>${state.partial?`<p class="person-page-unavailable">${tr('התמונות והקבצים יופיעו כשהחיבור לשמירה יחזור. פריטים קיימים אינם זמינים כרגע.','Photos and files will appear when the connection returns. Existing items are currently unavailable.')}</p>`:keys.map(album).join('')}`);
+    pageHTML(root,`<nav class="person-page-breadcrumb"><a href="#directory" data-person-back>${I.isEnglish?'←':'→'} ${tr('חזרה','Back')}</a><span aria-hidden="true">›</span><span>${safe(name)}</span><button class="quiet-button" type="button" data-copy-person-link>${tr('העתקת קישור לעמוד','Copy page link')} ↗</button></nav><header class="person-page-hero"><button type="button" class="person-page-portrait" data-person-portrait aria-label="${tr('פתיחת תמונת הפרופיל','Open profile picture')}" ${p.profile?'':'disabled'}>${p.profile?`<img ${window.FamilyPhotoFraming?.profile(p)||''} src="${safe(p.profile)}" alt="${safe(name)}">`:`<span>${safe(initials)}</span>`}</button><div><span class="small-eyebrow">${tr('הסיפור של','The story of')}</span><h2>${safe(name)}${p.deceased?`${p.id==='becker-parent'?'&nbsp;':' '}<small>${tr('ז״ל','in loving memory')}</small>`:''}</h2><div class="person-page-dates" id="personPageBirthday">${dates()}</div></div><span class="person-page-emblem" aria-hidden="true">❖</span></header>${relationsHTML(p)}<section class="person-about"><header><h3>${tr('אודות','About')}</h3><button class="person-about-pencil" data-edit-about type="button" aria-label="${tr('עריכת אודות','Edit biography')}" title="${tr('עריכת אודות','Edit biography')}" ${state.partial||biography()?.isEditing()?'disabled':''}>✎</button></header><div class="person-about-text" ${state.aboutEditing?'hidden':''}>${state.partial?`<span class="person-about-placeholder">${tr('הפרטים אינם זמינים כרגע','Details are currently unavailable')}</span>`:p[aboutKey()]?safe(p[aboutKey()]):`<span class="person-about-placeholder">${tr('כאן אפשר לכתוב כמה מילים על החיים, האנשים והרגעים שחשוב לזכור.','Add a few words about a life, the people and the moments worth remembering.')}</span>`}</div><form id="personAboutForm" ${state.aboutEditing?'':'hidden'}><label class="visually-hidden" for="personAboutText">${tr('אודות','About')}</label><textarea dir="auto" id="personAboutText" rows="7" maxlength="10000">${safe(state.aboutDraft)}</textarea><p id="personAboutError" class="form-error" role="alert"></p><div class="form-actions"><button class="primary-button" type="submit">${tr('שמירת האודות','Save biography')}</button><button class="secondary-button" type="button" data-cancel-about>${tr('ביטול','Cancel')}</button></div></form>${biography()?.render(p,!state.partial)||''}</section><p class="person-page-status" id="personPageStatus" role="status">${safe(state.status||state.error)}${state.partial?`<button class="secondary-button person-page-retry" type="button" data-person-retry>${tr('ניסיון נוסף','Try again')}</button>`:''}</p>${state.partial?`<p class="person-page-unavailable">${tr('התמונות והקבצים יופיעו כשהחיבור לשמירה יחזור. פריטים קיימים אינם זמינים כרגע.','Photos and files will appear when the connection returns. Existing items are currently unavailable.')}</p>`:keys.map(album).join('')}`);
   }
   async function load(force=false){
     if(!state.id)return;if(editing()){refreshPending=true;return;}const id=state.id,params=pageParams(),key=id+params;
@@ -121,6 +121,7 @@
     }catch(error){if(id===state.id){state.error=error.message;if(!state.data){state.partial=true;state.data={person:{...app().getPersonSummary(id)},albums:{}};}render();}}finally{state.loading=false;state.loadingKey=null;if(state.queued){state.queued=false;load(true);}}
   }
   function open(id,sync=true){
+    id=window.FAMILY_DATA?.identities?.[id] || id;
     if(!app().getPerson(id))return;
     portraitRequest++;albumEpoch++;
     if($('calendarDayDialog').open)$('calendarDayDialog').close();if($('mediaViewer').open)$('mediaViewer').close();if($('personDialog').open)$('personDialog').close();
@@ -128,7 +129,7 @@
     if(sync){const hash='#person/'+encodeURIComponent(id);if(window.FamilyNavigation)window.FamilyNavigation.go(hash);else if(location.hash!==hash)history.pushState(null,'',hash);}
     app().setView('person',false);window.scrollTo({top:0,behavior:'instant'});
   }
-  function route(){const match=/^#person\/([^/]+)$/.exec(location.hash);if(match)try{const id=decodeURIComponent(match[1]);if(state.view!=='person'||state.id!==id)open(id,false);}catch{app().toast(tr('הקישור לעמוד אינו תקין.','This page link is invalid.'));}}
+  function route(){const match=/^#person\/([^/]+)$/.exec(location.hash);if(match)try{const requestedId=decodeURIComponent(match[1]),id=window.FAMILY_DATA?.identities?.[requestedId] || requestedId;if(state.view!=='person'||state.id!==id)open(id,false);}catch{app().toast(tr('הקישור לעמוד אינו תקין.','This page link is invalid.'));}}
   function activate(view){
     if(view!=='person'){portraitRequest++;albumEpoch++;}
     state.view=view;$('personView').hidden=view!=='person';if(view!=='person'||!state.ready)return;
@@ -188,37 +189,9 @@
     }
     state.running=false;state.status=saved?tr('הקבצים נשמרו ✓','Files saved ✓'):tr('לא נשמרו קבצים. אפשר לנסות שוב.','No files were saved. Please try again.');if($('personPageStatus'))$('personPageStatus').textContent=state.status;
   }
-  function initProfileDates(root) {
-    if(!nakashHome)return;
-    const dialog=$('birthdayDialog'),form=$('birthdayForm'),error=$('birthdayError'),save=$('saveBirthday'),clear=$('clearBirthday');
-    const inputs=['birthDay','birthMonth','birthYear'].map($);
-    let editingId=null,expectedBirthday=null;
-    root.addEventListener('click',event=>{
-      if(!event.target.closest('[data-edit-profile-date]')||state.partial||!state.data)return;
-      editingId=state.id;expectedBirthday=state.data.person.birthday||'1.1.1111';
-      const birth=expectedBirthday==='1.1.1111'?null:window.FamilyDates.parse(expectedBirthday);
-      [birth?.day,birth?.month,birth?.year].forEach((value,index)=>{inputs[index].value=value??'';});
-      $('birthdayPersonName').textContent=app().nameOf(editingId);error.textContent='';
-      dialog.showModal();inputs[0].focus();
-    });
-    async function submit(birthday){
-      const id=editingId;if(!id||save.disabled)return;
-      error.textContent='';save.disabled=clear.disabled=true;
-      try{
-        const result=await api('api/people/'+encodeURIComponent(id)+'/birthday',{birthday,expectedBirthday});
-        app().updatePerson(id,result.person);
-        if(state.id===id){state.data.person={...state.data.person,...result.person};state.status=tr('התאריך עודכן ✓','Date updated ✓');render();}
-        dialog.close();
-      }catch(problem){error.textContent=problem.message;}
-      finally{save.disabled=clear.disabled=false;}
-    }
-    form.addEventListener('submit',event=>{event.preventDefault();submit(inputs.map(input=>input.value).join('.'));});
-    clear.addEventListener('click',()=>submit('1.1.1111'));
-  }
   function init(){
     state.ready=true;route();activate(app().getView());
     const root=$('personPageContent');
-    initProfileDates(root);
     biography()?.attach(root,{person:()=>state.data?.person,isBlocked:()=>state.aboutEditing||state.partial,render,save:(id,body)=>api('api/people/'+encodeURIComponent(id)+'/biography',body),saved:(id,person)=>{app().updatePerson(id,person);if(id===state.id){state.data.person={...state.data.person,...person};state.revision=null;state.status=tr('הפרטים נשמרו ✓','Details saved ✓');}},finished:finishEditing});
     root.addEventListener('click',async event=>{
       const relative=event.target.closest('[data-person-relative]');

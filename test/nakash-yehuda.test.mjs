@@ -75,7 +75,7 @@ test('all new profiles are scoped and searchable, and the two Yehudas keep diffe
   for (const query of ['רפי נקאש', 'רפאל נקאש', 'Rafi Nakash', 'Rafael Nakash']) {
     assert.equal(findPeople(roster, query, 'yehuda')[0].id, 'rafi-nakash');
   }
-  assert.ok(!findPeople(roster, 'רפי נקאש', 'haim').length);
+  assert.ok(findPeople(roster, 'רפי נקאש', 'haim').some(person => person.id === 'rafi-nakash'));
 });
 
 function browserFixture({phone = false, english = false, profile} = {}) {

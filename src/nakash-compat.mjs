@@ -83,15 +83,29 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   if (path==='/api/health' && method==='GET') return json({available:true,mediaConfigured:configured(env)});
   if (path==='/api/setup' && method==='GET') return json({mediaConfigured:configured(env)});
   const original = await projection();
+  const nativeRoute = original.sharedPeople && options.nativeRoute ? async (source,path) => {
+    const response=await options.nativeRoute(source,path);
+    if(!response.ok || !response.headers.get('Content-Type')?.includes('application/json'))return response;
+    const result=await response.json();
+    const display=person=>person&&names[person.id]?{...person,extra:names[person.id].extra,extended:names[person.id].extended,branch:names[person.id].branch}:person;
+    if(result.person)result.person=display(result.person);
+    if(result.people)result.people=Array.isArray(result.people)?result.people.map(display):Object.fromEntries(Object.entries(result.people).map(([id,p])=>[id,display(p)]));
+    if(result.taggedPeople)result.taggedPeople=result.taggedPeople.map(display);
+    const headers=new Headers(response.headers);headers.delete('Content-Length');
+    return json(result,response.status,Object.fromEntries(headers));
+  } : null;
   const family = createFamily(original);
   const scoped = toOriginalFamilyData(family);
   const profiles = (await db('nakash.compat.profiles')).profiles;
   const names = Object.fromEntries(Object.entries(scoped.people).map(([id,p]) => {
     const saved=profiles[id]||{};
-    return [id,{...p,...saved,...(saved.profileFile?{profile:mediaPath+saved.profileMediaId}:{} )}];
+    return [id,{...p,...saved,extra:false,extended:false,branch:p.branch}];
   }));
   for(const [id,p] of Object.entries(profiles))if(p.extra&&!Object.hasOwn(names,id))names[id]=p;
   const newProfiles=new Map();
+  // Both shells use the original editor and the same underlying media record.
+  // Authentication was checked above with the token for the originating shell.
+  if(nativeRoute && /^\/api\/media\/[a-f0-9]{32}\//.test(path))return nativeRoute(request,path);
   async function categories() {
     return [...DEFAULT_VIDEO_CATEGORIES,...(await db('nakash.compat.categories',{branch})).categories];
   }
@@ -177,6 +191,14 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       cover:items[0]?describe(items[0]):null};
   }
   async function personPage(id,{all=false}={}) {
+    if(nativeRoute) {
+      const headers=new Headers(request.headers);headers.delete('If-None-Match');
+      const response=await nativeRoute(new Request(request.url,{headers}),'/api/people/'+encodeURIComponent(id)+(all?'/selection':'/page'));
+      const result=await response.json();
+      if(!response.ok)throw new HttpError(response.status,result.error);
+      if(all)return result;
+      return {...result,person:{...result.person,extra:person(id).extra,extended:person(id).extended,branch:person(id).branch}};
+    }
     const p=person(id),items=await collection(null,id), data={};
     for(const [key,kind] of Object.entries(albums)){
       const options=Object.fromEntries(['person','unit','labels'].map(name=>[name,params.get(key+name[0].toUpperCase()+name.slice(1))]));
@@ -349,14 +371,16 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   }
   m=/^\/api\/people\/([a-z0-9_-]+)(?:\/([a-z-]+))?$/.exec(path);
   if(m){
-    const [,id,action]=m,p=person(id);
+    const [,requestedId,action]=m,id=original.identities?.[requestedId] || requestedId,p=person(id);
     if(method==='GET'){
+      if(nativeRoute&&(!action||action==='page'||action==='selection'))return nativeRoute(request,'/api/people/'+encodeURIComponent(id)+(action?'/'+action:''));
       const result=await personPage(id,{all:action==='selection'});
       if(action==='page')return json(result);
-      if(action==='selection')return json({ids:result.albums[params.get('kind')]?.items.map(item=>item.id)||[]});
+      if(action==='selection')return json(result.ids?result:{ids:result.albums[params.get('kind')]?.items.map(item=>item.id)||[]});
       if(!action)return json({...result,items:Object.values(result.albums).flatMap(album=>album.items)});
     }else if(method==='POST'){
       if(Object.hasOwn(albums,action))return upload(albums[action],id,'personal');
+      if(nativeRoute&&['profile','about','biography','death-date'].includes(action))return nativeRoute(request,'/api/people/'+encodeURIComponent(id)+'/'+action);
       const body=await readJSON(request,40000);
       let field,value,expected,fallback;
       if(action==='profile'){
@@ -374,7 +398,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       if(action==='death-date'){field='deathDate';value=body.date?calendarDate(body.date):null;expected=body.expectedDate;fallback=p.deathDate||null;}
       if(field){
         const {profile}=await db('nakash.compat.profile.save',{id,field,value,...(expected===undefined?{}:{expected}),fallback,revision:uid()});
-        return json({saved:true,person:{...p,...profile}});
+        return json({saved:true,person:{...p,...profile,extra:p.extra,extended:p.extended,branch:p.branch}});
       }
     }
   }
@@ -487,7 +511,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     if(!equal(body.get('token'),options.nakashToken))throw new HttpError(403,'יש לרענן את הדף לפני ההורדה.');
     let ids;try{ids=JSON.parse(body.get('ids'));}catch{throw new HttpError(400,'בחרו תמונות להורדה.');}
     if(!Array.isArray(ids)||!ids.length||ids.length>500||ids.some(id=>!validId(id)))throw new HttpError(400,'בחרו תמונות להורדה.');
-    const items=await Promise.all([...new Set(ids)].map(id=>itemById(id)));
+    const items=nativeRoute?(await db('media.download',{ids})).items:await Promise.all([...new Set(ids)].map(id=>itemById(id)));
     const files=items.map(item=>({name:item.filename||item.file||item.id,open:()=>getObject(env,item,new Request(url.origin+mediaPath+item.id))}));
     return new Response(zipStream(files),{headers:{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="Nakash-media.zip"'}});
   }

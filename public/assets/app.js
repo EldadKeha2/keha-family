@@ -11,7 +11,7 @@
   const scopedViews=document.documentElement?.dataset?.nakashViews;
   if(scopedViews)for(const view of validViews)if(!scopedViews.split(' ').includes(view))validViews.delete(view);
   const searchBranch=document.documentElement?.dataset?.nakashSearchBranch;
-  const inSearchBranch=person=>!searchBranch||!person.branch||person.branch===searchBranch;
+  const searchFamilyOrder=(a,b)=>Number(Boolean(searchBranch)&&b.branch===searchBranch)-Number(Boolean(searchBranch)&&a.branch===searchBranch);
   const requestedView=location.hash.slice(1).split('/')[0];
   const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
@@ -43,14 +43,16 @@
   }
   function birthdayHTML(p, editable = true, birthOnly = false) {
     const aliyah=p.aliyahMonth?new Intl.DateTimeFormat(I18n.locale,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(p.aliyahYear,p.aliyahMonth-1,1))):p.aliyahYear;
-    const deathEdit=''; // Read-only death dates on tree cards; retain the dates themselves.
+    const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5L9 20l-6 1 1-6ZM14 5l5 5"/></svg>';
+    const canEdit=Boolean(scopedViews&&apiEnabled&&!isPlaceholder(p));
+    const deathEdit=canEdit&&p.deceased?`<button type="button" class="birthday-edit" data-edit-death="${safe(p.id)}" aria-label="${I18n.isEnglish?'Edit date of death':'עריכת תאריך פטירה'}">${pencil}</button>`:'';
     if(p.extra)return I18n.t('<span class="directory-branch">אלבום מתמונות וסרטונים שתויגו</span>');
     const invalid = getMedia(p).invalidBirthday;
     const value = birthdayOf(p), death = p.deathDate ? window.FamilyDates.parse(p.deathDate) : null;
     const age = invalid ? null : p.deceased ? death ? window.FamilyDates.age(value,death.date) : null : window.FamilyDates.age(value);
     const unknown = value === '1.1.1111';
-    if(birthOnly)return `<span class="birthday-line"><bdi>${safe(invalid?I18n.t('תאריך לבדיקה'):unknown?I18n.t('טרם הוזן'):I18n.date(value))}</bdi></span>`;
-    const birthdayEdit=''; // Birth dates are maintained by the site owner.
+    const birthdayEdit=canEdit?`<button type="button" class="birthday-edit" data-edit-birthday="${safe(p.id)}" aria-label="${I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה'}">${pencil}</button>`:'';
+    if(birthOnly)return `<span class="birthday-line"><bdi>${safe(invalid?I18n.t('תאריך לבדיקה'):unknown?I18n.t('טרם הוזן'):I18n.date(value))}</bdi>${birthdayEdit}</span>${deathEdit}`;
     if(I18n.isEnglish)return `<span class="birthday-line"><bdi>${safe(invalid?'Date needs checking':unknown?'Not added yet':I18n.date(value))}</bdi>${birthdayEdit}</span>${age!==null?`<span class="person-age">(${p.deceased?`aged ${age} at death`:age})</span>`:''}${death?`<span class="person-death-date">Died on <bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathEdit}${p.aliyahYear?`<span class="person-aliyah-year">Moved to Israel in <bdi>${safe(aliyah)}</bdi></span>`:''}`;
     return I18n.html`<span class="birthday-line"><bdi>${safe(invalid ? I18n.t('תאריך לבדיקה') : unknown ? I18n.t('טרם הוזן') : I18n.date(value))}</bdi>${birthdayEdit}</span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?I18n.t('גיל בפטירה'):I18n.t('גיל')} ${age}">${p.deceased?I18n.html`(${p.gender==='f'?I18n.t('בת'):I18n.t('בן')} ${age} בפטירת${p.gender==='f'?I18n.t('ה'):I18n.t('ו')})`:`(${age})`}</span>` : ''}${death?I18n.html`<span class="person-death-date">${p.gender==='f'?I18n.t('נפטרה'):I18n.t('נפטר')} ב־<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathEdit}${p.aliyahYear?I18n.html`<span class="person-aliyah-year">${p.gender==='f'?I18n.t('עלתה'):I18n.t('עלה')} לארץ ב־<bdi>${safe(aliyah)}</bdi></span>`:''}`;
   }
@@ -148,7 +150,7 @@
     if (isTree) renderTree(); else if (isDirectory) renderDirectory();
   }
   function directoryMatches(query) {
-    return people.filter(p => (state.directoryGroup==='friends'?p.extra&&getMedia(p).mediaCount>0:state.directoryGroup==='extended'?p.extended&&!p.extra:!p.extended&&!p.extra) && (state.directoryGroup!=='main'||state.branch === 'all' || p.branch === state.branch) && (!query || inSearchBranch(p)&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)));
+    return people.filter(p => (state.directoryGroup==='friends'?p.extra&&getMedia(p).mediaCount>0:state.directoryGroup==='extended'?p.extended&&!p.extra:!p.extended&&!p.extra) && (state.directoryGroup!=='main'||state.branch === 'all' || p.branch === state.branch) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query))).sort(searchFamilyOrder);
   }
   function renderDirectory() {
     const query = normalize(state.query);
@@ -316,6 +318,7 @@
   }
 
   function openPerson(personId) {
+    personId=data.identities?.[personId] || personId;
     if(window.FamilyPeople){window.FamilyPeople.open(personId);return;}
     if (!data.people[personId]) return;
     if($('calendarDayDialog').open)$('calendarDayDialog').close();
@@ -461,7 +464,7 @@
     if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyMemories?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);window.FamilyTimeline?.search(state.query);window.FamilyNursery?.search(state.query);window.FamilyAI?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory')renderDirectory();
     if(!query&&state.view!=='directory'){$('searchResults').hidden=true;return;}
-    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&inSearchBranch(p)&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query));
+    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)).sort(searchFamilyOrder);
     $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button type="button" class="search-result" data-search-person="${p.id}">${portraitHTML(p)}<span class="search-result-text"><span class="person-name">${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></span></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
     $('searchResults').hidden=false;
     fitSearchResults();

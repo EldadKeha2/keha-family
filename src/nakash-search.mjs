@@ -1,4 +1,4 @@
-import {normalizeSearch, searchVariants, searchNames, personRank} from '../public/assets/site-search-core.mjs';
+import {normalizeSearch, searchVariants, searchNames, personRank, personSearchPriority} from '../public/assets/site-search-core.mjs';
 import {photoLabelName, photoLabelKey, photoLabels} from '../public/assets/photo-labels-catalog.mjs';
 
 function counts(items, values) {
@@ -22,11 +22,11 @@ export function searchNakash(people, media, branches, params, scope) {
   const entries = [];
   if (query || selectedId) {
     for (const p of people) {
-      if (p.placeholder || scope && p.branch && p.branch !== scope || selectedId && p.id !== selectedId) continue;
+      if (p.placeholder || selectedId && p.id !== selectedId) continue;
       const rank = personRank(p, query);
       if (!selectedId && !rank && !matchesText(p.about || '')) continue;
       entries.push({id:p.id,type:'person',title:p.name,titleEn:p.nameEn,href:'#person/'+encodeURIComponent(p.id),person:p,people:[p],
-        year:Number(String(p.birthday || '').split('.').at(-1)) || null,date:'',excerpt:p.about || '',score:rank+50,labels:[],branches:[p.branch]});
+        year:Number(String(p.birthday || '').split('.').at(-1)) || null,date:'',excerpt:p.about || '',score:rank+50+(2-personSearchPriority(p,query,scope))*200,labels:[],branches:[p.branch]});
     }
     for (const item of media) {
       const tagged = (item.people || item.tags || []).map(value => personById.get(typeof value === 'string' ? value : value.id)).filter(Boolean);

@@ -68,7 +68,10 @@
     // names. Within each group, spelling wins before generation breaks ties.
     const group=p=>Math.max(0,personPriority(p)-5);
     const nickname=p=>tagAliases[p.id]?.includes(query)?0:1;
-    return exactMadi(a)-exactMadi(b)||group(a)-group(b)||nickname(a)-nickname(b)||matchRank(a,query)-matchRank(b,query)||personPriority(a)-personPriority(b)||(preferred.has(b.id)-preferred.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale);
+    const scope=document.documentElement?.dataset?.nakashSearchBranch;
+    const local=p=>scope&&(window.FAMILY_DATA.people[p.id]?.branch||p.nakashBranch||p.branch)===scope?0:1;
+    const fullExact=p=>query.includes(' ')&&[p.name,p.nameEn,...(p.aliases||[])].filter(Boolean).some(name=>normalize(name)===query)?0:1;
+    return exactMadi(a)-exactMadi(b)||(scope?fullExact(a)-fullExact(b)||local(a)-local(b):0)||group(a)-group(b)||nickname(a)-nickname(b)||matchRank(a,query)-matchRank(b,query)||personPriority(a)-personPriority(b)||(preferred.has(b.id)-preferred.has(a.id))||I18n.personName(a).localeCompare(I18n.personName(b),I18n.locale);
   }
   function matchRank(person,query){
     if(!query)return 5;

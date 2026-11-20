@@ -4,7 +4,7 @@ import vm from'node:vm';
 import{readFile}from'node:fs/promises';
 import family from'../src/family.mjs';
 const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
-function fixture({phone=false,english=false,hash='#directory'}={}){
+function fixture({phone=false,english=false,hash='#directory',branch=null}={}){
  const nodes=new Map(),handlers=new Map(),opened=[];
  class Node extends EventTarget{
   constructor(){super();this.dataset={};this.style={};this.hidden=false;this.value='';this.innerHTML='';this.open=false;this.classList={add(){},remove(){},toggle(){}};}
@@ -13,7 +13,9 @@ function fixture({phone=false,english=false,hash='#directory'}={}){
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
  const document={getElementById:node,body:new Node(),documentElement:new Node(),querySelectorAll:()=>[],querySelector:()=>null,addEventListener:(name,fn)=>{if(!handlers.has(name))handlers.set(name,[]);handlers.get(name).push(fn);}};
  const window=new Node();window.scrollTo=()=>{};window.FAMILY_DATA=structuredClone(family);window.FamilyDates={parse:()=>null,age:()=>null};window.FamilyPeople={activate(){},open:id=>opened.push(id)};
+ if(branch){document.documentElement.dataset={nakashViews:'tree directory person gallery videos',nakashSearchBranch:branch,nakashHome:'/nakash/'+branch+'/'};window.LOCAL_FAMILY_SERVER=true;}
  window.FamilyI18n={isEnglish:english,locale:english?'en-US':'he-IL',t:s=>s,html:(p,...v)=>p.reduce((s,a,i)=>s+a+(v[i]??''),''),word:(n,a,b)=>n===1?a:b,personName:p=>english?p.nameEn||p.name:p.name,branchName:b=>b?.title||'',searchNames:p=>[p.name,p.nameEn].filter(Boolean).join(' '),date:s=>s};
+ window.FamilyI18n.fetch=()=>new Promise(()=>{});
  const location={hash};
  vm.runInNewContext(source,{window,document,location,history:{pushState(){}},matchMedia:q=>({matches:q.includes('700px')&&phone}),innerWidth:phone?390:1280,innerHeight:900,console,setTimeout,clearTimeout,setInterval:()=>0,requestAnimationFrame:()=>0,cancelAnimationFrame(){},CustomEvent});
  const click=(selector,dataset)=>{for(const fn of handlers.get('click')||[])fn({target:{closest:s=>s===selector?{dataset}:null},preventDefault(){}});};
@@ -28,6 +30,16 @@ test('the third directory group contains every active manual-only name, has no b
   assert.ok(!f.html.includes('data-person="yona"'));f.card(extra.id);assert.deepEqual(f.opened,[extra.id]);
   f.search(english?'New guest':'אורח');assert.match(f.html,/extra-new/);f.search('not-a-name');assert.equal(f.html,'');
   f.window.FamilyApp.updatePerson(extra.id,{...extra,photoCount:0,mediaCount:0});f.group('friends');assert.equal(f.html,'');
+ }
+});
+
+test('Nakash desktop and phone show date pencils in cards and profiles, while the original Keha birthday display stays unchanged',()=>{
+ for(const phone of [false,true])for(const english of [false,true]){
+  const f=fixture({phone,english,branch:'keha'});
+  assert.match(f.html,/data-edit-birthday="eldad"/);
+  assert.match(f.window.FamilyApp.birthdayHTML('eldad'),/data-edit-birthday="eldad"/);
+  assert.match(f.window.FamilyApp.birthdayHTML('yona'),/data-edit-death="yona"/);
+  assert.ok(!fixture({phone,english}).window.FamilyApp.birthdayHTML('eldad').includes('data-edit-birthday'));
  }
 });
 

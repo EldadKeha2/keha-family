@@ -3,7 +3,7 @@
   // One in-memory roster for tagging and both media filters. No family data is
   // written to persistent browser storage, and each consumer keeps its ranking.
   const people=new Map(),changedAt=new Map(),listeners=new Set(),ttl=300000;
-  const fields=['id','name','nameEn','aliases','extra','extended','branch','generation','placeholder','unit','parents','siblings','profile','profileFraming','profileMediaId'];
+  const fields=['id','name','nameEn','aliases','extra','extended','branch','nakashBranch','generation','placeholder','unit','parents','siblings','profile','profileFraming','profileMediaId'];
   let loaded=false,checkedAt=Date.now(),etag=null,pending=null,version=0;
   const snapshot=()=>[...people.values()];
   const failed=()=>Error(window.FamilyI18n.t?.('לא התקבלה תשובה מהשרת. נסו שוב.')||'The people list could not load.');

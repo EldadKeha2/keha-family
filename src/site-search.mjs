@@ -1,6 +1,6 @@
 import family from './family.mjs';
 import {HttpError,text} from './http.mjs';
-import {normalizeSearch,searchVariants,searchNames,personRank,SEARCH_TYPES} from '../public/assets/site-search-core.mjs';
+import {normalizeSearch,searchVariants,searchNames,personRank,personSearchPriority,SEARCH_TYPES} from '../public/assets/site-search-core.mjs';
 import {photoLabelName,photoLabels,normalizePhotoLabel} from '../public/assets/photo-labels-catalog.mjs';
 
 const yearOf=value=>{const n=Number(value);return Number.isInteger(n)&&n>=1000&&n!==1111&&n<=new Date().getUTCFullYear()?n:null;};
@@ -38,7 +38,7 @@ export function searchSite(state,options={}){
     const tagged=!selected&&ids.some(id=>queryPeople.has(id));
     if(terms.length&&!tagged&&!terms.some(words=>words.every(term=>haystack.includes(term))))return;
     const title=normalizeSearch([entry.title,entry.titleEn].join(' '));
-    const score=entry.type==='person'?personRank(people[entry.id],q)+50+(selected&&entry.id===person?110:0):(selected&&ids.includes(person)?90:tagged?80:queries.some(value=>title.includes(value))?70:40);
+    const score=entry.type==='person'?personRank(people[entry.id],q)+50+(2-personSearchPriority(people[entry.id],q,'keha-home'))*200+(selected&&entry.id===person?110:0):(selected&&ids.includes(person)?90:tagged?80:queries.some(value=>title.includes(value))?70:40);
     entries.push({...entry,personIds:ids,branches:[...new Set(ids.map(id=>people[id]?.branch).filter(Boolean))],labels:entry.labels||[],score,excerpt:plain(entry.excerpt).slice(0,230)});
   }
   if(query||person){

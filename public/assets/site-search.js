@@ -1,4 +1,4 @@
-import {suggestPeople,SEARCH_TYPES} from './site-search-core.mjs?v=bilingual-keyboard-v2';
+import {suggestPeople,SEARCH_TYPES} from './site-search-core.mjs?v=shared-families-v1';
 
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he,$=id=>document.getElementById(id);
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,10 +12,8 @@ function matchingSections(query){
   return suggestPeople(sections,query,5);
 }
 const nakashBranch=document.documentElement?.dataset?.nakashSearchBranch;
-const roster=()=>(window.FamilyPeopleRoster?.snapshot()||Object.values(window.FAMILY_DATA?.people||{})).filter(person=>{
-  const branch=window.FAMILY_DATA?.people[person.id]?.branch;
-  return !nakashBranch||!branch||branch===nakashBranch;
-});
+const roster=()=>(window.FamilyPeopleRoster?.snapshot()||Object.values(window.FAMILY_DATA?.people||{})).map(person=>({...person,...(window.FAMILY_DATA?.people[person.id]?.branch?{branch:window.FAMILY_DATA.people[person.id].branch}:{} )}));
+const personSuggestions=query=>suggestPeople(roster(),query,6,nakashBranch||'keha-home');
 const personName=person=>I.personName(person);
 const safeURL=value=>{try{const url=new URL(value,location.href);return url.origin===location.origin&&/^https?:$/.test(url.protocol)?url.pathname+url.search+url.hash:'';}catch{return '';}};
 const initials=person=>personName(person).split(' ').slice(0,2).map(part=>part[0]||'').join('');
@@ -36,7 +34,7 @@ function openProfile(id){closeDialog();window.FamilyApp?.openPerson(id);}
 function openSection(id){if(!Object.hasOwn(sectionAliases,id))return;closeDialog();window.FamilyApp?.setView(id);}
 function submitSuggestedSearch(query){
   query=query.trim();if(!query)return;
-  const first=suggestPeople(roster(),query)[0],section=matchingSections(query)[0];if(first)openProfile(first.id);else if(section)openSection(section.id);else search(query);
+  const first=personSuggestions(query)[0],section=matchingSections(query)[0];if(first)openProfile(first.id);else if(section)openSection(section.id);else search(query);
 }
 function suggestionNavigation(input,host,show){
   const selector='[data-site-search-person],[data-site-search-related],[data-site-search-section],.site-search-free';
@@ -82,7 +80,7 @@ function selectSuggestion(event){
   const related=event.target.closest('[data-site-search-related]');if(related){const p=roster().find(p=>p.id===related.dataset.siteSearchRelated);if(p)search(personName(p),p.id);}
 }
 function suggestions(reset=false){
-  const query=$('siteSearchQuickInput').value.trim(),people=suggestPeople(roster(),query),sections=matchingSections(query),host=$('siteSearchSuggestions');
+  const query=$('siteSearchQuickInput').value.trim(),people=personSuggestions(query),sections=matchingSections(query),host=$('siteSearchSuggestions');
   host.innerHTML=peopleSuggestions(people)+sectionSuggestions(sections);
   $('siteSearchQuickInput').setAttribute('aria-expanded',String(Boolean(query)));
   const free=$('siteSearchFree');free.hidden=!query;free.querySelector('span').textContent=tr('חיפוש חופשי של ״','Search all content for “')+query+tr('״','”');
@@ -97,7 +95,7 @@ function openQuick(){
 }
 function desktopSuggestions(reset=false){
   const query=desktopInput.value.trim();
-  $('siteSearchDesktopSuggestions').innerHTML=peopleSuggestions(suggestPeople(roster(),query))+sectionSuggestions(matchingSections(query));
+  $('siteSearchDesktopSuggestions').innerHTML=peopleSuggestions(personSuggestions(query))+sectionSuggestions(matchingSections(query));
   $('siteSearchDesktopFree').querySelector('span').textContent=tr('חיפוש חופשי של ״','Search all content for “')+query+tr('״','”');
   desktopMenu.hidden=!query;desktopInput.setAttribute('aria-expanded',String(Boolean(query)));
   if(query)desktopNavigation.refresh(reset);else desktopNavigation.clear();

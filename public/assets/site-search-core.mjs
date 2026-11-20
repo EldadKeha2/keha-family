@@ -22,5 +22,12 @@ export function personRank(person,query){
   }));
   return score?score-(person.extra?10:person.extended?5:0):0;
 }
-export function suggestPeople(people,query,limit=6){return people.map(person=>({person,score:personRank(person,query)})).filter(item=>item.score>0).sort((a,b)=>b.score-a.score||String(a.person.name).localeCompare(String(b.person.name),'he')).slice(0,limit).map(item=>item.person);}
+export function personSearchPriority(person,query,scope){
+  if(!scope)return 0;
+  const exact=normalizeSearch(query);
+  if(exact.includes(' ')&&searchNames(person).some(name=>normalizeSearch(name)===exact))return 0;
+  const local=scope==='keha-home'?!person.extra&&!person.extended:(person.nakashBranch||person.branch)===scope;
+  return local?1:2;
+}
+export function suggestPeople(people,query,limit=6,scope=null){return people.map(person=>({person,score:personRank(person,query)})).filter(item=>item.score>0).sort((a,b)=>personSearchPriority(a.person,query,scope)-personSearchPriority(b.person,query,scope)||b.score-a.score||String(a.person.name).localeCompare(String(b.person.name),'he')).slice(0,limit).map(item=>item.person);}
 export const SEARCH_TYPES=['person','photo','video','document','story','voice','wedding','event'];

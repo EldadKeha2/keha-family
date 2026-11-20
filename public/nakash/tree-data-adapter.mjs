@@ -17,5 +17,5 @@ export function toOriginalFamilyData(family) {
     return [person.id, {...person, firstName:person.firstName || firstName, lastName:person.lastName ?? rest.join(' '), nameEn:person.englishName,
       branch:branchForPerson(family, person.id), generation:units[person.unit].generation, birthday:person.birthday || '1.1.1111'}];
   }));
-  return {title:'משפחת נקאש', people, units, root:family.root, branches};
+  return {title:'משפחת נקאש', people, units, root:family.root, branches, identities:family.identities || {}};
 }

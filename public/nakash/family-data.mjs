@@ -10,7 +10,7 @@ export const BRANCHES = Object.freeze([
 const PEOPLE = [
   ['margalit-nakash', 'מרגלית נקאש', 'Margalit Nakash', 'f', ROOT_UNIT],
   ['zecharia-nakash', 'זכריה נקאש', 'Zecharia Nakash', 'm', ROOT_UNIT],
-  ['ruma-nakash', 'רומה נקאש', 'Ruma Nakash', 'f', 'u-nakash-medina'],
+  ['ruma-nakash', 'רומה מדינה', 'Roma Medina', 'f', 'u-nakash-medina', ['רומה נקאש', 'Roma Nakash', 'Ruma Nakash', 'Ruma Medina']],
   ['joseph-medina', 'יוסף מדינה', 'Joseph Medina', 'm', 'u-nakash-medina'],
   ['yona', 'יונה נקאש קהא', 'Yona Nakash Keha', 'f', 'u-root', ['יונה נקאש', 'Yona Nakash']],
   ['shlomo', 'שלמה קהא', 'Shlomo Keha', 'm', 'u-root'],
@@ -168,6 +168,22 @@ export function createFamily(keha = {}) {
   }
   addKehaUnit('u-root', ROOT_UNIT);
 
+  // Resolve a person already tagged on the original site to that existing ID.
+  // Tree membership belongs to this tree; biography and media belong to the person.
+  const identities = keha.identities || {};
+  for (const [oldId, p] of Object.entries(people)) {
+    const id = identities[oldId] || oldId, shared = keha.sharedPeople?.[id] || {};
+    people[id] = {...p,...shared,id,unit:p.unit,gender:p.gender,deceased:shared.deceased ?? p.deceased,
+      englishName:shared.nameEn || p.englishName,extra:false,extended:false,
+      aliases:[...new Set([...(p.aliases || []),...(shared.aliases || [])])]};
+    if(id !== oldId)delete people[oldId];
+  }
+  for(const unit of Object.values(units)){
+    unit.people=unit.people.map(id=>identities[id] || id);
+    if(unit.displayPeople)unit.displayPeople=unit.displayPeople.map(id=>identities[id] || id);
+    for(const relationship of unit.relationships || [])relationship.people=relationship.people.map(id=>identities[id] || id);
+  }
+
   const branchIds = new Map();
   for (const branch of BRANCHES) {
     const todo = [branch.unit];
@@ -177,7 +193,7 @@ export function createFamily(keha = {}) {
       todo.push(...unit.children);
     }
   }
-  return {people, units, root: ROOT_UNIT, branches: BRANCHES, branchIds};
+  return {people, units, root: ROOT_UNIT, branches: BRANCHES, branchIds, identities};
 }
 
 export function branchForPerson(family, id) {
@@ -191,7 +207,6 @@ export function findPeople(family, query = '', branch = null) {
   const normalized = normalize(query);
   const terms = normalized.split(/\s+/).filter(Boolean);
   return Object.values(family.people)
-    .filter(person => !branch || branchForPerson(family, person.id) === branch)
     .map(person => {
       const names = [person.name, person.englishName, ...(person.aliases || [])].map(normalize);
       const matches = terms.every(term => names.some(name => name.includes(term)));
@@ -199,6 +214,6 @@ export function findPeople(family, query = '', branch = null) {
       return {person, matches, rank};
     })
     .filter(result => result.matches)
-    .sort((a, b) => a.rank - b.rank || collator.compare(a.person.name, b.person.name))
+    .sort((a, b) => Number(Boolean(branch)&&branchForPerson(family,b.person.id)===branch)-Number(Boolean(branch)&&branchForPerson(family,a.person.id)===branch) || a.rank - b.rank || collator.compare(a.person.name, b.person.name))
     .map(result => result.person);
 }

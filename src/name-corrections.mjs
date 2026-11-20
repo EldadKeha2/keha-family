@@ -7,7 +7,7 @@ const yonaAliases=new Set(['יונה נקאש','יונה נקאש קהא','yona 
 // Old names still select the same person when tagging from an older open page.
 export function matchingPeople(roster,name){
   const key=normalizedName(name),known=roeiAliases.has(key)?'roi':yonaAliases.has(key)?'yona':null,person=known&&roster.find(person=>person.id===known);
-  return person?[person]:roster.filter(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalizedName(alias)===key));
+  return person?[person]:roster.filter(person=>[person.name,person.nameEn,...(person.aliases||[])].filter(Boolean).some(alias=>normalizedName(alias)===key));
 }
 
 export function correctPersonName(value){

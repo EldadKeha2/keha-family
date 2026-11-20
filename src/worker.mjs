@@ -240,7 +240,7 @@ function secure(response){
   headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com; media-src 'self' blob:; frame-src 'self' https://www.youtube-nocookie.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'");
   headers.set('Cache-Control','private, no-store');return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
-export default {
+const worker = {
   async fetch(request,env,ctx){
     try{
       const url=new URL(request.url),path=url.pathname;
@@ -249,7 +249,12 @@ export default {
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
       if(path==='/nakash'||path.startsWith('/nakash/')){
-        const options={family,sniff,archiveFormat,streamUpload,saveThumbnail,editPhoto,limits:LIMITS,recycleRoute,nakashToken:NAKASH_WRITE_TOKEN};
+        const options={family,sniff,archiveFormat,streamUpload,saveThumbnail,editPhoto,limits:LIMITS,recycleRoute,nakashToken:NAKASH_WRITE_TOKEN,
+          nativeRoute:async(source,path)=>{
+            const target=new URL(source.url);target.pathname=path;
+            const headers=new Headers(source.headers);headers.set('X-Family-Token',PUBLIC_WRITE_TOKEN);
+            return worker.fetch(new Request(target,new Request(source,{headers})),env,ctx);
+          }};
         const shell=await nakashShell(request,env,async()=>{
           const dataRequest=new Request(new URL('/nakash/api/family',url));
           try {
@@ -468,4 +473,5 @@ export default {
     ctx.waitUntil(familyAiTick(env,db,ctx));
   }
 };
+export default worker;
 

@@ -271,7 +271,7 @@
     if(files.length){event.preventDefault();addFiles(state.view,files,true);}
   }
   function openBirthday(id,mode='birth') {
-    if(mode!=='death')return;
+    if(mode!=='death'&&!document.documentElement.dataset.nakashHome)return;
     if(!canSave())return;state.birthdayId=id;state.dateMode=mode;
     $('birthdayTitle').textContent=I18n.t(mode==='death'?'עדכון תאריך פטירה':'עדכון יום הולדת');
     const value=mode==='death'?(app().getPerson(id).deathDate||''):app().birthdayOf(id),parts=window.FamilyDates.parse(value),known=parts&&parts.year!==1111;
@@ -283,9 +283,9 @@
   function birthdayValue(){return `${$('birthDay').value}.${$('birthMonth').value}.${$('birthYear').value}`;}
   function previewBirthday(){if(state.dateMode==='death'){$('birthdayPreview').textContent='';return;}const age=window.FamilyDates.age(birthdayValue());$('birthdayPreview').textContent=age===null?'':I18n.html`הגיל שיופיע בכרטיס: (${age})`;}
   async function saveBirthday(event,clear=false){
-    if(state.dateMode!=='death'){event.preventDefault();return;}
+    if(state.dateMode!=='death'&&!document.documentElement.dataset.nakashHome){event.preventDefault();return;}
     event.preventDefault();const button=$('saveBirthday');button.disabled=true;$('birthdayError').textContent='';
-    try{const death=state.dateMode==='death',result=await jsonPost('api/people/'+encodeURIComponent(state.birthdayId)+(death?'/death-date':'/birthday'),death?{date:clear?'':birthdayValue(),expectedDate:state.birthdayExpected}:{birthday:clear?'':birthdayValue(),expectedBirthday:state.birthdayExpected});app().updatePerson(state.birthdayId,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id:state.birthdayId}}));$('birthdayDialog').close();notify(I18n.t(death?'תאריך הפטירה עודכן ✓':'יום ההולדת עודכן ✓'));}
+    try{const death=state.dateMode==='death',result=await jsonPost('api/people/'+encodeURIComponent(state.birthdayId)+(death?'/death-date':'/birthday'),death?{date:clear?'':birthdayValue(),expectedDate:state.birthdayExpected}:{birthday:clear?'1.1.1111':birthdayValue(),expectedBirthday:state.birthdayExpected});app().updatePerson(state.birthdayId,result.person);window.dispatchEvent(new CustomEvent('family-person-changed',{detail:{id:state.birthdayId}}));$('birthdayDialog').close();notify(I18n.t(death?'תאריך הפטירה עודכן ✓':'יום ההולדת עודכן ✓'));}
     catch(error){$('birthdayError').textContent=error.message;}finally{button.disabled=false;}
   }
   function init(){
@@ -305,6 +305,7 @@
       }
       const close=event.target.closest('[data-close-dialog]');if(close){$(close.dataset.closeDialog).close();return;}
       const death=event.target.closest('[data-edit-death]');if(death){openBirthday(death.dataset.editDeath,'death');return;}
+      const birth=event.target.closest('[data-edit-birthday]');if(birth){openBirthday(birth.dataset.editBirthday);return;}
       const source=event.target.closest('[data-gallery-upload-source]');if(source){
         if(!canSave())return;const id={gallery:'sharedGalleryInput',camera:'sharedGalleryCamera'}[source.dataset.galleryUploadSource];if(!id)return;
         $('galleryUploadSource').close();const input=$(id);input.value='';input.click();return;

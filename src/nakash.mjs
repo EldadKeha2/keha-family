@@ -80,7 +80,8 @@ function readMetadata(request) {
 async function currentProjection(family, db) {
   const {people} = await db('dates');
   const result = nakashProjection(family, new Map(people.map(person => [person.id, person.name])));
-  const {portraits} = await db('nakash.compat.portraits', {ids:Object.keys(result.people)});
+  const {portraits,sharedPeople,identities} = await db('nakash.compat.portraits', {ids:Object.keys(result.people)});
+  if(sharedPeople)Object.assign(result,{sharedPeople,identities});
   for (const [id,framing] of Object.entries(portraits)) {
     result.people[id].profile = portraitPath+id;
     result.people[id].profileFraming = framing;
