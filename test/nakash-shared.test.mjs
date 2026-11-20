@@ -34,17 +34,19 @@ function fixture(){
   return {call,json,site,objects,database,state:()=>state,restart(){state=new FamilyState({storage},env);},close(){globalThis.fetch=originalFetch;database.close();}};
 }
 
-test('Yael replaces the retired wife placeholder on the same shared profile without losing its details or portrait',async()=>{
+for (const [id, oldName, oldNameEn, name, nameEn, branch, unit, members] of [
+  ['yair-medina-wife', 'אשתו של יאיר', "Yair's wife", 'יעל', 'Yael', 'medina', 'u-nakash-yair', ['yair-medina', 'yair-medina-wife']],
+  ['avner-former-wife', 'אמה של מור', "Mor's mother", 'יפה', 'Yafa', 'haim', 'u-nakash-avner', ['avner-nakash', 'rivka-nakash', 'avner-former-wife']],
+]) test(nameEn+' replaces the retired wife placeholder on the same shared profile without losing its details or portrait',async()=>{
   const f=fixture();try{
-    const id='yair-medina-wife';
-    f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'אשתו של יאיר',nameEn:"Yair's wife",firstName:'אשתו',lastName:'של יאיר',placeholder:true,extra:true,birthday:'2.3.1970',about:'פרטים קיימים',profileId:null,revision:'old-placeholder'}));
-    f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-haim-diagram-names-2026-11-20-v1','done');
-    const uploaded=await f.json('/api/people/'+id+'/photos?filename=yael.jpg',{method:'POST',body:photo});
-    const page=await f.json(f.site('medina','people/'+id+'/page'));
+    f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:oldName,nameEn:oldNameEn,firstName:oldName.split(' ')[0],lastName:oldName.split(' ').slice(1).join(' '),placeholder:true,extra:true,birthday:'2.3.1970',about:'פרטים קיימים',profileId:null,revision:'old-placeholder'}));
+    f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-confirmed-names-2026-11-20-v2','done');
+    const uploaded=await f.json('/api/people/'+id+'/photos?filename=portrait.jpg',{method:'POST',body:photo});
+    const page=await f.json(f.site(branch,'people/'+id+'/page'));
     assert.equal(page.person.id,id);
-    assert.equal(page.person.name,'יעל');
-    assert.equal(page.person.nameEn,'Yael');
-    assert.equal(page.person.firstName,'יעל');
+    assert.equal(page.person.name,name);
+    assert.equal(page.person.nameEn,nameEn);
+    assert.equal(page.person.firstName,name);
     assert.equal(page.person.lastName,'');
     assert.notEqual(page.person.placeholder,true);
     assert.equal(page.person.birthday,'2.3.1970');
@@ -52,13 +54,13 @@ test('Yael replaces the retired wife placeholder on the same shared profile with
     assert.equal(page.person.profileMediaId,uploaded.person.profileMediaId);
     const script=await (await f.call('/nakash/api/site-data.js')).text();
     const tree=JSON.parse(script.split('\n')[0].slice('window.FAMILY_DATA='.length,-1));
-    assert.deepEqual(tree.units['u-nakash-yair'].people,['yair-medina',id]);
-    assert.equal(tree.people[id].name,'יעל');
+    assert.deepEqual(tree.units[unit].people,members);
+    assert.equal(tree.people[id].name,name);
     assert.notEqual(tree.people[id].placeholder,true);
     const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
-    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify({...saved,name:'יעל (עריכה שמורה)'}),id);
+    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify({...saved,name:name+' (עריכה שמורה)'}),id);
     f.restart();
-    assert.equal((await f.json(f.site('medina','people/'+id+'/page'))).person.name,'יעל (עריכה שמורה)');
+    assert.equal((await f.json(f.site(branch,'people/'+id+'/page'))).person.name,name+' (עריכה שמורה)');
     assert.equal(f.objects.size,1);
   }finally{f.close();}
 });

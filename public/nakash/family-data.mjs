@@ -67,7 +67,7 @@ const PEOPLE = [
   ['dana-nakash', 'דנה נקאש', 'Dana Nakash', 'f', 'u-nakash-dana'],
   ['avner-nakash', 'אבנר נקאש', 'Avner Nakash', 'm', 'u-nakash-avner'],
   ['rivka-nakash', 'רבקה נקאש', 'Rivka Nakash', 'f', 'u-nakash-avner'],
-  ['avner-former-wife', 'אמה של מור', "Mor's mother", 'f', 'u-nakash-avner', [], {placeholder:true}],
+  ['avner-former-wife', 'יפה', 'Yafa', 'f', 'u-nakash-avner'],
   // Retain IDs from the first diagram transcription so existing portraits,
   // dates and tags stay attached when the displayed names are corrected.
   ['doron-nir', 'ציון ניר', 'Zion Nir', 'm', 'u-nakash-doron', ['ציון נקאש', 'Tzion Nir', 'Zion Nakash']],

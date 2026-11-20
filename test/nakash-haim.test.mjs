@@ -15,10 +15,13 @@ const relationsWindow = {};
 vm.runInNewContext(relationsSource, {window:relationsWindow});
 const relatives = id => JSON.parse(JSON.stringify(relationsWindow.FamilyRelations.forPerson(family, id)));
 
-test('Mor belongs to Avner and his former wife; Rivka parents only Eliya and Neriya', () => {
+test('Mor belongs to Avner and Yafa, his former wife; Rivka parents only Eliya and Neriya', () => {
   assert.deepEqual(relatives('mor-pazarkar').parents, ['avner-nakash', 'avner-former-wife']);
   assert.deepEqual(relatives('avner-former-wife').children, ['mor-pazarkar']);
-  assert.equal(family.people['avner-former-wife'].placeholder, true);
+  assert.equal(family.people['avner-former-wife'].name, 'יפה');
+  assert.equal(family.people['avner-former-wife'].nameEn, 'Yafa');
+  assert.notEqual(family.people['avner-former-wife'].placeholder, true);
+  assert.deepEqual(relatives('mor-pazarkar').partners, ['hen-pazarkar']);
   assert.deepEqual(relatives('avner-nakash').partners, ['rivka-nakash']);
   assert.deepEqual(relatives('avner-nakash').formerPartners, ['avner-former-wife']);
   assert.deepEqual(relatives('rivka-nakash').children, ['eliya-nakash', 'neriya-nakash']);
