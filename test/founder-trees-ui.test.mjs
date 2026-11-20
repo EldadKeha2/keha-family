@@ -30,7 +30,7 @@ test('both founding portraits keep their personal action and get independent ill
     for(const id of ['yona','shlomo']){
       const card=root.querySelector(`[data-person-card="${id}"]`),link=card.querySelector('a.founder-tree-link');
       assert.ok(card.querySelector(`button[data-person="${id}"]`));
-      assert.equal(link.getAttribute('href'),id==='yona'?'/nakash/inside/':'/keha-extended/');
+      assert.equal(link.getAttribute('href'),id==='yona'?'/nakash/inside/':'https://family-extended.eldadkeha.workers.dev/keha-extended/');
       assert.match(link.querySelector('img').getAttribute('src'),new RegExp('founder-tree-'+id+'-thumb-v1\\.webp$'));
       assert.ok(link.querySelector('svg'));
       assert.equal(link.closest('[data-person]'),null,'The tree link must not trigger the personal profile action');
