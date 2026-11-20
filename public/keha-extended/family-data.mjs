@@ -2,7 +2,7 @@ export const EXTENDED_NAME = 'משפחת קהא המורחבת';
 export const EXTENDED_COLOR = '#345d83';
 export const EXTENDED_HOME = '/keha-extended/';
 export const EXTENDED_BRANCHES = Object.freeze([
-  {id:'shlomo', unit:'u-root', label:'הענף של שלמה קהא', shortLabel:'שלמה קהא', titleEn:'Shlomo Keha’s branch', color:EXTENDED_COLOR, mark:'❖'},
+  {id:'shlomo', unit:'u-root', label:'משפחת שלמה קהא', shortLabel:'שלמה קהא', titleEn:'Shlomo Keha Family', color:EXTENDED_COLOR, mark:'❖'},
   {id:'zechariah', unit:'u-keha-zechariah', label:'זכריה ויהודית קהא', shortLabel:'זכריה ויהודית', titleEn:'Zechariah & Yehudit Keha', color:'#597d98', mark:'❖'},
   {id:'kehat', unit:'u-keha-kehat', label:'משפחת קהת — ג׳ידעאן', shortLabel:'משפחת קהת', titleEn:'Kehat family — Jidaan', color:'#537b82', mark:'❖'},
   {id:'yissachar', unit:'u-keha-yissachar', label:'יוסף יששכר', shortLabel:'יוסף יששכר', titleEn:'Yosef Yissachar', color:'#757d98', mark:'❖'},

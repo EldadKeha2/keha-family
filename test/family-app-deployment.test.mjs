@@ -5,7 +5,7 @@ import {prepareFamilyApps} from '../scripts/prepare-family-apps.mjs';
 
 const production = {WORKERS_CI:'1', WORKERS_CI_BRANCH:'main', WRANGLER_COMMAND:'deploy', CLOUDFLARE_ACCOUNT_ID:'test-account', CLOUDFLARE_API_TOKEN:'test-credential'};
 
-function fixture({existing = false, badIdentity = false, failUpload = false, extendedReady = false} = {}) {
+function fixture({existing = false, badIdentity = false, failUpload = false, extendedReady = false, shlomoReady = false} = {}) {
   const calls = [], writes = [], logs = [];
   async function apiFetch(url, options) {
     calls.push({url, options});
@@ -14,7 +14,7 @@ function fixture({existing = false, badIdentity = false, failUpload = false, ext
     const path = new URL(url).pathname;
     if (path.endsWith('/workers/subdomain')) return Response.json({success:true, result:{subdomain:'family-test'}});
     if (path.endsWith('/settings')) return existing ? Response.json({success:true, result:{bindings:[]}}) : new Response('', {status:404});
-    assert.ok(/\/scripts\/family-(haim|yehuda|medina|extended)(\/subdomain)?$/.test(path));
+    assert.ok(/\/scripts\/family-(haim|yehuda|medina|extended|shlomo)(\/subdomain)?$/.test(path));
     if (options.method === 'PUT') {
       if (failUpload) return Response.json({success:false, errors:[{code:10000}]}, {status:403});
       const branch = path.split('family-').at(-1);
@@ -31,8 +31,8 @@ function fixture({existing = false, badIdentity = false, failUpload = false, ext
   async function verifyFetch(url, options) {
     assert.equal(new Headers(options.headers).has('Authorization'), false);
     const parsed = new URL(url), branch = parsed.hostname.split('.')[0].slice('family-'.length);
-    if(parsed.hostname==='keha-family.eldadkeha.workers.dev')return extendedReady?Response.json(JSON.parse(await readFile(new URL('../public/keha-extended/manifest.webmanifest',import.meta.url)))):new Response('',{status:404});
-    const manifest = JSON.parse(await readFile(new URL(branch==='extended'?'../public/keha-extended/manifest.webmanifest':'../public/nakash/' + branch + '/manifest.webmanifest', import.meta.url), 'utf8'));
+    if(parsed.hostname==='keha-family.eldadkeha.workers.dev'){const shlomo=parsed.pathname.startsWith('/keha-extended/shlomo/');return (shlomo?shlomoReady:extendedReady)?Response.json(JSON.parse(await readFile(new URL(shlomo?'../public/keha-extended/shlomo/manifest.webmanifest':'../public/keha-extended/manifest.webmanifest',import.meta.url)))):new Response('',{status:404});}
+    const manifest = JSON.parse(await readFile(new URL(branch==='shlomo'?'../public/keha-extended/shlomo/manifest.webmanifest':branch==='extended'?'../public/keha-extended/manifest.webmanifest':'../public/nakash/' + branch + '/manifest.webmanifest', import.meta.url), 'utf8'));
     if (parsed.pathname.endsWith('manifest.webmanifest')) {
       manifest.related_applications = [{platform:'webapp', id:parsed.origin + manifest.id}];
       if (badIdentity) manifest.name = 'Another family';
@@ -78,4 +78,10 @@ test('the extended installation is activated only after its own route, manifest,
   assert.equal(result.extended,'https://family-extended.family-test.workers.dev');
   assert.equal(f.calls.filter(call=>call.options.method==='PUT').length,4);
   assert.ok(f.writes[0][1].includes('"extended"'));
+});
+
+test('Shlomo is published with a separate installation only after its restricted portal is live',async()=>{
+  const f=fixture({extendedReady:true,shlomoReady:true}),result=await prepareFamilyApps(f.options);
+  assert.deepEqual(Object.keys(result).sort(),['extended','haim','medina','shlomo','yehuda']);
+  assert.equal(f.calls.filter(call=>call.options.method==='PUT').length,5);
 });

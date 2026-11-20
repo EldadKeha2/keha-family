@@ -2,6 +2,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {BRANCHES} from '../public/nakash/family-data.mjs';
 import {EXTENDED_NAME,EXTENDED_HOME} from '../public/keha-extended/family-data.mjs';
+import {SHLOMO_NAME,SHLOMO_HOME} from '../public/keha-extended/shlomo-data.mjs';
 
 const families = BRANCHES.filter(branch => ['haim', 'yehuda', 'medina'].includes(branch.id));
 const generated = new URL('../src/family-app-origins.generated.mjs', import.meta.url);
@@ -35,10 +36,12 @@ export async function prepareFamilyApps({env = process.env, apiFetch = fetch, ve
   const targets=[...families];
   // A new route must be live before its independent installation can be
   // verified. The first deployment adds the route; the next activates the app.
-  try {
-    const ready=await verifyFetch('https://keha-family.eldadkeha.workers.dev'+EXTENDED_HOME+'manifest.webmanifest',{signal:AbortSignal.timeout(15000)});
-    if(ready.ok && (await ready.json()).name===EXTENDED_NAME)targets.push({id:'extended',label:EXTENDED_NAME,home:EXTENDED_HOME});
-  } catch { /* Keep the existing verified applications available during rollout. */ }
+  for(const family of [{id:'extended',label:EXTENDED_NAME,home:EXTENDED_HOME},{id:'shlomo',label:SHLOMO_NAME,home:SHLOMO_HOME}]){
+    try {
+      const ready=await verifyFetch('https://keha-family.eldadkeha.workers.dev'+family.home+'manifest.webmanifest',{signal:AbortSignal.timeout(15000)});
+      if(ready.ok && (await ready.json()).name===family.label)targets.push(family);
+    } catch { /* Keep the existing verified applications available during rollout. */ }
+  }
   for (const family of targets) {
     const config = JSON.parse(await read(new URL('../family-apps/' + family.id + '/wrangler.jsonc', import.meta.url), 'utf8'));
     const name = 'family-' + family.id;

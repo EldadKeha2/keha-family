@@ -1,5 +1,6 @@
 import family from './family.mjs';
 import {EXTENDED_PEOPLE,createExtendedFamily} from '../public/keha-extended/family-data.mjs';
+import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
 import {uid} from './http.mjs';
 
 export function initializeExtendedKeha(state) {
@@ -17,12 +18,13 @@ export function initializeExtendedKeha(state) {
 }
 
 export function extendedKehaItems(state,args={}) {
-  const ids=JSON.stringify(Object.keys(createExtendedFamily(family).people));
-  return state.rows("SELECT data FROM media WHERE category='nakash:extended' OR person_id IN (SELECT value FROM json_each(?)) OR id IN (SELECT media_id FROM media_tags WHERE person_id IN (SELECT value FROM json_each(?))) ORDER BY rowid DESC",ids,ids).map(row=>JSON.parse(row.data))
+  const ids=JSON.stringify(Object.keys((args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)(family).people));
+  const categories=JSON.stringify(args.branch==='shlomo'?['nakash:shlomo','gallery','videos']:['nakash:extended','nakash:shlomo','gallery','videos']);
+  return state.rows("SELECT data FROM media WHERE category IN (SELECT value FROM json_each(?)) OR person_id IN (SELECT value FROM json_each(?)) OR id IN (SELECT media_id FROM media_tags WHERE person_id IN (SELECT value FROM json_each(?))) ORDER BY rowid DESC",categories,ids,ids).map(row=>JSON.parse(row.data))
     .filter(item=>!args.kind || (item.kind || (item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document'))===args.kind)
     .map(item=>{
       const people=state.tagIds(item.id);
-      return {...item,people,branch:item.category?.startsWith('nakash:')?item.category.slice(7):'keha',branches:['extended']};
+      return {...item,people,branch:item.category?.startsWith('nakash:')?item.category.slice(7):'keha',branches:[args.branch || 'extended']};
     })
     .filter(item=>!args.personId || item.personId===args.personId || item.people.includes(args.personId))
     .map(item=>({...item,faces:state.faces(item.id),faceSummary:item.mime?.startsWith('image/')?state.faceSummary(item):undefined,tagsRevision:state.tagsRevision(item.id)}));

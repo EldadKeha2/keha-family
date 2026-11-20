@@ -1,0 +1,18 @@
+{
+  "id":"/keha-extended/shlomo/",
+  "name":"משפחת שלמה קהא",
+  "short_name":"שלמה קהא",
+  "description":"המשפחה של שלמה ויונה קהא — אילן יוחסין, בני המשפחה, סרטונים וגלריה",
+  "lang":"he",
+  "dir":"rtl",
+  "start_url":"/keha-extended/shlomo/?source=homescreen&familyApp=shlomo#home",
+  "scope":"/keha-extended/shlomo/",
+  "display":"standalone",
+  "background_color":"#536641",
+  "theme_color":"#536641",
+  "icons":[
+    {"src":"/keha-extended/shlomo/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/keha-extended/shlomo/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"}
+  ],
+  "prefer_related_applications":false
+}

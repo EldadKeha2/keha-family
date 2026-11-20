@@ -20,7 +20,13 @@
       "/keha-extended/site-data.js",
       "/keha-extended/api/*",
       "/keha-extended/assets/*",
-      "/keha-extended/privacy.html"
+      "/keha-extended/privacy.html",
+      "/keha-extended/shlomo",
+      "/keha-extended/shlomo/",
+      "/keha-extended/shlomo/site-data.js",
+      "/keha-extended/shlomo/api/*",
+      "/keha-extended/shlomo/assets/*",
+      "/keha-extended/shlomo/privacy.html"
     ]
   },
   "durable_objects": {
