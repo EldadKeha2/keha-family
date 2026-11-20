@@ -72,7 +72,8 @@ function page(items, params, {sizeDefault=100, sortDefault='uploaded-desc', page
 
 export async function compatRoute(request, env, db, ctx, options, projection) {
   const url = new URL(request.url);
-  const match = route.exec(url.pathname);
+  const extended = /^\/keha-extended\/api\/compat(\/api\/.*)$/.exec(url.pathname);
+  const match = extended ? [extended[0],'extended',extended[1]] : route.exec(url.pathname);
   if (!match) return null;
   const [,branch,path] = match, params = url.searchParams, method = request.method;
   const formDownload = method==='POST' && ['/api/media/download','/api/gallery/download'].includes(path);
@@ -94,14 +95,14 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     const headers=new Headers(response.headers);headers.delete('Content-Length');
     return json(result,response.status,Object.fromEntries(headers));
   } : null;
-  const family = createFamily(original);
+  const family = (options.createFamily || createFamily)(original);
   const scoped = toOriginalFamilyData(family);
   const profiles = (await db('nakash.compat.profiles')).profiles;
   const names = Object.fromEntries(Object.entries(scoped.people).map(([id,p]) => {
     const saved=profiles[id]||{};
     return [id,{...p,...saved,extra:false,extended:false,branch:p.branch}];
   }));
-  for(const [id,p] of Object.entries(profiles))if(p.extra&&!Object.hasOwn(names,id))names[id]=p;
+  for(const [id,p] of Object.entries(profiles))if(p.extra&&!Object.hasOwn(names,id)&&(extended?p.nakashBranch==='extended':!p.extendedKeha))names[id]=p;
   const newProfiles=new Map();
   // Both shells use the original editor and the same underlying media record.
   // Authentication was checked above with the token for the originating shell.
@@ -127,12 +128,13 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     return extra;
   }
   const collection = async (kind,personId) =>
-    (await db('nakash.compat.items',{branch,...(kind?{kind}:{}),...(personId?{personId}:{})})).items.filter(item=>!item.deletedAt);
+    (await db(extended?'nakash.extended.items':'nakash.compat.items',{branch,...(kind?{kind}:{}),...(personId?{personId}:{})})).items.filter(item=>!item.deletedAt);
   const describe = item => ({
     ...picture(item),
+    ...(extended?{src:'/media/'+item.id+(item.photoRevision?'?v='+item.photoRevision:'')}:{}),
     tags:(item.people||[]).filter(id=>Object.hasOwn(names,id)).map(id=>({id,personId:id,name:names[id].name})),
-    ...(item.thumbnail?{thumbnailSrc:mediaPath+item.id+'?asset=thumbnail&v='+encodeURIComponent(item.thumbnail.revision)}:{}),
-    ...(item.preview?{previewSrc:mediaPath+item.id+'?asset=preview&v='+encodeURIComponent(item.preview.revision)}:{}),
+    ...(item.thumbnail?{thumbnailSrc:(extended?'/media/':mediaPath)+item.id+'?asset=thumbnail&v='+encodeURIComponent(item.thumbnail.revision)}:{}),
+    ...(item.preview?{previewSrc:(extended?'/media/':mediaPath)+item.id+'?asset=preview&v='+encodeURIComponent(item.preview.revision)}:{}),
   });
   const itemById = async (id,{deleted=false,writing=false}={}) => {
     const {item} = await db('nakash.get',{id});
@@ -354,7 +356,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   if(method==='GET'){
     if(path==='/api/media')return json({people:names,revision:await sha256(JSON.stringify(names))});
     if(path==='/api/tag-people')return json({people:Object.values(names)});
-    if(path==='/api/search')return json(searchNakash(Object.values(names),(await collection()).map(describe),BRANCHES,params,branch));
+    if(path==='/api/search')return json(searchNakash(Object.values(names),(await collection()).map(describe),extended?scoped.branches:BRANCHES,params,branch));
     if(path==='/api/gallery/face-scan')return json({items:[],next:null});
     if(path==='/api/collections/videos/categories')return json({categories:await categories()});
   }

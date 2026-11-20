@@ -1,5 +1,6 @@
 import {HttpError, equal} from './http.mjs';
 import {initializeSharedNakash, importNakashMedia, sharedNakashItems, sharedNakashItem} from './nakash-shared.mjs';
+import {initializeExtendedKeha,extendedKehaItems} from './extended-keha-state.mjs';
 
 const PAGE_SIZE = 60;
 
@@ -24,6 +25,12 @@ export async function handleNakashState(state, action, args, RecycleAccess) {
   }
 
   switch (action) {
+    case 'nakash.extended.projection':
+      initializeExtendedKeha(state);
+      return {sharedPeople:state.run('people').people};
+    case 'nakash.extended.items':
+      initializeExtendedKeha(state);
+      return {items:extendedKehaItems(state,args)};
     case 'nakash.admin':
     case 'nakash.code': {
       await new RecycleAccess(state).authorize(args.session);

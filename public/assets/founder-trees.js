@@ -10,7 +10,7 @@
   };
   const title=id=>tr('העץ המלא של ','The full family tree of ')+trees[id].person();
   const linkLabel=id=>tr('לעץ המלא של ','The full family tree of ')+trees[id].person();
-  const treeHref=id=>id==='yona'&&location.protocol!=='file:'?'/nakash/inside/':'#founder-tree/'+id;
+  const treeHref=id=>location.protocol!=='file:'?(id==='yona'?'/nakash/inside/':'/keha-extended/'):'#founder-tree/'+id;
   function linkHTML(id){
     const tree=trees[id];if(!tree)return '';
     return `<a class="founder-tree-link" href="${treeHref(id)}" data-founder-tree="${id}" aria-label="${safe(linkLabel(id))}"><svg class="founder-tree-arrow" viewBox="0 0 48 32" aria-hidden="true"><path d="M3 27C13 10 25 8 43 12m-7-8 8 8-9 5"/></svg><img src="${tree.thumb}" alt="" width="154" height="154" decoding="async"><span><span>${tr('לעץ המלא של','The full family tree of')}</span><strong>${tree.person()}</strong></span></a>`;

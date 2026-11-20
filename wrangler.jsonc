@@ -14,7 +14,13 @@
       "/family-data.js",
       "/nakash/api/*",
       "/nakash/",
-      "/nakash/index.html"
+      "/nakash/index.html",
+      "/keha-extended",
+      "/keha-extended/",
+      "/keha-extended/site-data.js",
+      "/keha-extended/api/*",
+      "/keha-extended/assets/*",
+      "/keha-extended/privacy.html"
     ]
   },
   "durable_objects": {

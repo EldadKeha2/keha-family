@@ -1,6 +1,7 @@
 import {readFile, writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {BRANCHES} from '../public/nakash/family-data.mjs';
+import {EXTENDED_NAME,EXTENDED_HOME} from '../public/keha-extended/family-data.mjs';
 
 const families = BRANCHES.filter(branch => ['haim', 'yehuda', 'medina'].includes(branch.id));
 const generated = new URL('../src/family-app-origins.generated.mjs', import.meta.url);
@@ -31,7 +32,14 @@ export async function prepareFamilyApps({env = process.env, apiFetch = fetch, ve
   if (!/^[a-z0-9-]+$/.test(domain)) throw Error('Cloudflare did not return a valid existing workers.dev subdomain.');
   const source = await read(new URL('../family-apps/worker.mjs', import.meta.url), 'utf8');
   const origins = {};
-  for (const family of families) {
+  const targets=[...families];
+  // A new route must be live before its independent installation can be
+  // verified. The first deployment adds the route; the next activates the app.
+  try {
+    const ready=await verifyFetch('https://keha-family.eldadkeha.workers.dev'+EXTENDED_HOME+'manifest.webmanifest',{signal:AbortSignal.timeout(15000)});
+    if(ready.ok && (await ready.json()).name===EXTENDED_NAME)targets.push({id:'extended',label:EXTENDED_NAME,home:EXTENDED_HOME});
+  } catch { /* Keep the existing verified applications available during rollout. */ }
+  for (const family of targets) {
     const config = JSON.parse(await read(new URL('../family-apps/' + family.id + '/wrangler.jsonc', import.meta.url), 'utf8'));
     const name = 'family-' + family.id;
     if (config.name !== name || config.vars.FAMILY_BRANCH !== family.id) throw Error('Invalid family-app deployment target.');
@@ -49,7 +57,7 @@ export async function prepareFamilyApps({env = process.env, apiFetch = fetch, ve
     await api(path, {method:'PUT', body});
     await api(path + '/subdomain', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({enabled:true, previews_enabled:false})});
     const origin = 'https://' + name + '.' + domain + '.workers.dev';
-    const home = '/nakash/' + family.id + '/';
+    const home = family.home || '/nakash/' + family.id + '/';
     let verified = false;
     for (let attempt = 0; attempt < 10; attempt++) {
       try {

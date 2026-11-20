@@ -179,6 +179,7 @@
   }
 
   function renderTree(preserveCamera=false) {
+    if(window.FamilyExtendedKeha?.renderTree(state))return;
     window.FamilyTreeGuide?.hide();
     const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
     const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(viewport.clientWidth/2-camera.x)/(camera.width*camera.scale),y:(viewport.clientHeight/2-camera.y)/(camera.height*camera.scale)}:null;

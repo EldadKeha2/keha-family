@@ -7,7 +7,7 @@ import {PUBLIC_WRITE_TOKEN} from '../src/worker.mjs';
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 test('static assets are served without Worker quota consumption',()=>{
   const config=JSON.parse(read('../wrangler.jsonc'));
-  assert.deepEqual(config.assets.run_worker_first,['/api/*','/media/*','/family-data.js','/nakash/api/*','/nakash/','/nakash/index.html']);
+  assert.deepEqual(config.assets.run_worker_first,['/api/*','/media/*','/family-data.js','/nakash/api/*','/nakash/','/nakash/index.html','/keha-extended','/keha-extended/','/keha-extended/site-data.js','/keha-extended/api/*','/keha-extended/assets/*','/keha-extended/privacy.html']);
   assert.equal(config.assets.directory,'./public');
   assert.equal(config.build.command,'node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs && node scripts/prepare-family-apps.mjs');
 });
