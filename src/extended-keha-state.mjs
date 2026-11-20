@@ -19,7 +19,7 @@ export function initializeExtendedKeha(state) {
 
 export function extendedKehaItems(state,args={}) {
   const ids=JSON.stringify(Object.keys((args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)(family).people));
-  const categories=JSON.stringify(args.branch==='shlomo'?['nakash:shlomo','gallery','videos']:['nakash:extended','nakash:shlomo','gallery','videos']);
+  const categories=JSON.stringify(args.branch==='shlomo'?['nakash:shlomo','gallery','videos','nostalgia']:['nakash:extended','nakash:shlomo','gallery','videos','nostalgia']);
   return state.rows("SELECT data FROM media WHERE category IN (SELECT value FROM json_each(?)) OR person_id IN (SELECT value FROM json_each(?)) OR id IN (SELECT media_id FROM media_tags WHERE person_id IN (SELECT value FROM json_each(?))) ORDER BY rowid DESC",categories,ids,ids).map(row=>JSON.parse(row.data))
     .filter(item=>!args.kind || (item.kind || (item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document'))===args.kind)
     .map(item=>{

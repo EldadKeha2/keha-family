@@ -116,6 +116,21 @@ test('Shlomo’s installation has its own family name and launch URL',async()=>{
   assert.equal(installed.related_applications[0].id,'https://shlomo.example'+SHLOMO_HOME);
 });
 
+test('the Shlomo portal includes original untagged family movies without importing other families’ uploads',async()=>{
+  const f=fixture();try{
+    const before=(await f.json(shlomoSite('collections/videos'))).count;
+    for(const [id,category] of [['c'.repeat(32),'nostalgia'],['d'.repeat(32),'nakash:yehuda']]){
+      const item={id,category,kind:'video',mime:'video/mp4',file:'family.mp4',key:'legacy/'+id+'.mp4',filename:'family.mp4',createdAt:'2026-11-01T10:00:00Z'};
+      f.database.prepare('INSERT INTO media (id,category,person_id,data) VALUES (?,?,?,?)').run(id,category,null,JSON.stringify(item));
+    }
+    const videos=await f.json(shlomoSite('collections/videos'));
+    assert.equal(videos.count,before+1);
+    assert.ok(videos.items.some(item=>item.id==='c'.repeat(32)));
+    assert.ok(!videos.items.some(item=>item.id==='d'.repeat(32)));
+    assert.equal((await f.json(site('collections/videos'))).count,before+1);
+  }finally{f.close();}
+});
+
 test('Shlomo’s mobile and desktop tree keep all six descendant branches, including the final mobile row',async()=>{
   const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   for(const phone of [false,true]){

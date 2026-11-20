@@ -3,5 +3,6 @@ export default {
   "medina": "https://family-medina.eldadkeha.workers.dev",
   "yehuda": "https://family-yehuda.eldadkeha.workers.dev",
   "haim": "https://family-haim.eldadkeha.workers.dev",
-  "extended": "https://family-extended.eldadkeha.workers.dev"
+  "extended": "https://family-extended.eldadkeha.workers.dev",
+  "shlomo": "https://family-shlomo.eldadkeha.workers.dev"
 };
