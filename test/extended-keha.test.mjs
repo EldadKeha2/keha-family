@@ -563,7 +563,7 @@ test('Kehat’s own tree has two independent circles and renders each branch wit
         for(const id of ['kehat-tzadok','kehat-naomi','kehat-shori','kehat-gila','kehat-reuven','kehat-shimon','kehat-ron','kehat-gur'])assert.ok(document.querySelector('#treeNodes [data-person="'+id+'"]'));
         assert.match(window.FamilyApp.birthdayHTML('kehat-tzadok'),/1917 · פנקס תש״ב/);
         assert.doesNotMatch(window.FamilyApp.birthdayHTML('kehat-tzadok'),/1\.1\.1917/);
-        assert.match(window.FamilyApp.birthdayHTML('kehat-tzadok'),/גיל מחושב להיום: 108–109/);
+        assert.match(window.FamilyApp.birthdayHTML('kehat-tzadok'),/גיל מחושב להיום: <bdi dir="ltr">108–109<\/bdi>/);
         assert.ok(document.querySelector('#treeConnectors [data-parent-relationship="grandparent"][stroke-dasharray]'));
         const top=id=>parseFloat(document.querySelector('#treeNodes [data-person="'+id+'"]').closest('.tree-unit').style.top);
         assert.ok(top('kehat-ron')>top('kehat-reuven'));
@@ -571,7 +571,7 @@ test('Kehat’s own tree has two independent circles and renders each branch wit
       }
       if(branch==='kehat'){
         const hadassah=window.FamilyApp.birthdayHTML('kehat-hadassah');
-        assert.match(hadassah,/גיל בפטירה: 73–74/);assert.match(hadassah,/אילו הייתה בחיים היום: 84–85/);assert.match(hadassah,/12\.7\.2015/);
+        assert.match(hadassah,/גיל בפטירה: <bdi dir="ltr">73–74<\/bdi>/);assert.match(hadassah,/אילו הייתה בחיים היום: <bdi dir="ltr">84–85<\/bdi>/);assert.match(hadassah,/12\.7\.2015/);
       }
       document.querySelector('#branchBar [data-branch="all"]').click();
     }

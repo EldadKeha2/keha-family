@@ -54,11 +54,12 @@
     const firstYear=p.birthYear??p.birthYearMin,lastYear=p.birthYear??p.birthYearMax;
     const yearOnly=unknown&&Number.isInteger(firstYear)&&Number.isInteger(lastYear)&&firstYear>1111&&lastYear>=firstYear&&lastYear<=new Date().getFullYear();
     const yearSource=I18n.isEnglish?p.birthYearSourceEn:p.birthYearSource;
-    const unknownLabel=yearOnly?`${firstYear===lastYear?firstYear:firstYear+'–'+lastYear}${yearSource?' · '+yearSource:''}`:(I18n.isEnglish?'Not added yet':I18n.t('טרם הוזן'));
+    const unknownLabel=yearOnly?`${firstYear===lastYear?firstYear:'\u2066'+firstYear+'–'+lastYear+'\u2069'}${yearSource?' · '+yearSource:''}`:(I18n.isEnglish?'Not added yet':I18n.t('טרם הוזן'));
     const rangeLabel=range=>range?(range.min===range.max?String(range.min):range.min+'–'+range.max):'';
     const currentRange=!invalid&&yearOnly?rangeLabel(window.FamilyDates.ageRange?.(firstYear,lastYear)):!invalid&&p.deceased&&p.researchNotes&&!unknown?String(window.FamilyDates.age(value)??''):'';
     const deathRange=!invalid&&yearOnly&&death?rangeLabel(window.FamilyDates.ageRange?.(firstYear,lastYear,death.date)):'';
-    const yearAgeHTML=(deathRange?`<span class="person-age">${safe(I18n.isEnglish?`Aged ${deathRange} at death`:`גיל בפטירה: ${deathRange}`)}</span>`:'')+(currentRange?`<span class="person-age">${safe(I18n.isEnglish?(p.deceased?`Would be ${currentRange} today`:`Calculated age today: ${currentRange}`):(p.deceased?`אילו ${p.gender==='f'?'הייתה':'היה'} בחיים היום: ${currentRange}`:`גיל מחושב להיום: ${currentRange}`))}</span>`:'');
+    const ageLine=(label,range)=>range?`<span class="person-age">${safe(label)} <bdi dir="ltr">${safe(range)}</bdi></span>`:'';
+    const yearAgeHTML=ageLine(I18n.isEnglish?'Age at death:':'גיל בפטירה:',deathRange)+ageLine(I18n.isEnglish?(p.deceased?'Would be this age today:':'Calculated age today:'):(p.deceased?`אילו ${p.gender==='f'?'הייתה':'היה'} בחיים היום:`:'גיל מחושב להיום:'),currentRange);
     const deathBeforeHTML=!death&&p.deathBefore?`<span class="person-death-date">${safe(I18n.isEnglish?`Died before ${p.deathBefore}`:`${p.gender==='f'?'נפטרה':'נפטר'} לפני ${p.deathBefore}`)}</span>`:'';
     const birthdayEdit=canEdit?`<button type="button" class="birthday-edit" data-edit-birthday="${safe(p.id)}" aria-label="${I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה'}">${pencil}</button>`:'';
     if(birthOnly)return `<span class="birthday-line"><bdi>${safe(invalid?I18n.t('תאריך לבדיקה'):unknown?unknownLabel:I18n.date(value))}</bdi>${birthdayEdit}</span>${deathEdit}`;
