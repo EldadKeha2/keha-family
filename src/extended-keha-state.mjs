@@ -14,6 +14,9 @@ export function initializeExtendedKeha(state) {
     const updateKehat=!state.rows('SELECT id FROM meta WHERE id=?',kehatMigration).length;
     const researchMigration='extended-kehat-certificate-families-2026-11-20-v1';
     const updateResearch=!state.rows('SELECT id FROM meta WHERE id=?',researchMigration).length;
+    const parentageMigration='extended-kehat-yehudit-amna-2026-11-20-v1';
+    const updateParentage=!state.rows('SELECT id FROM meta WHERE id=?',parentageMigration).length;
+    const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     for(const seed of EXTENDED_PEOPLE){
       if(seed.placeholder)continue;
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
@@ -28,6 +31,12 @@ export function initializeExtendedKeha(state) {
         if(seed.deathDate&&!saved.deathDate){saved.deathDate=seed.deathDate;saved.deceased=true;}
         saved.unit=seed.unit;
         saved.aliases=[...new Set([...(saved.aliases||[]),...(seed.aliases||[])])];
+        state.savePerson(saved);
+      }
+      if(updateParentage&&parentageNotes.has(seed.id)){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',parentageMigration+':backup:'+seed.id,JSON.stringify(saved));
+        saved.researchNotes=seed.researchNotes;
         state.savePerson(saved);
       }
       if(updateChart&&seed.id==='keha-zechariah'){
@@ -65,6 +74,7 @@ export function initializeExtendedKeha(state) {
     if(updateChart)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',migration,'done');
     if(updateKehat)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',kehatMigration,'done');
     if(updateResearch)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',researchMigration,'done');
+    if(updateParentage)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',parentageMigration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;
