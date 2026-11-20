@@ -51,6 +51,13 @@ function cameFromKeha(request) {
   }
 }
 
+function withFamilyTabIcons(html, section) {
+  if (!themedFamilies.has(section)) return html;
+  const icon = launchAssets(section) + '/tab-medallion';
+  return html.replace(/<link rel="icon"[^>]*>/,
+    `<link rel="icon" type="image/png" sizes="32x32" href="${icon}-32.png">\n  <link rel="icon" type="image/svg+xml" sizes="any" href="${icon}.svg">`);
+}
+
 export function nakashHTML(original, section, isInternal = false, appOrigins = {}) {
   const branch = branchMap.get(section);
   const homePath = branch ? '/nakash/' + branch.id + '/' : '/nakash/';
@@ -101,7 +108,7 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
   if (!themed) return html;
   const startupLinks = appleLaunchImages(section).map(({href, media}) =>
     `  <link rel="apple-touch-startup-image" href="${href}" media="${media}">`).join('\n');
-  return html
+  return withFamilyTabIcons(html, section)
     .replace(/(<meta name="theme-color" content=")[^"]+/, '$1' + branch.color)
     .replace(/(<style id="familyStartupBackground">[^<]*)/, '$1:root{--family-accent:' + branch.color + '}@media(display-mode:standalone){html,body{background:var(--family-accent)}}')
     .replace('</head>', '  <link rel="stylesheet" href="/assets/nakash-theme.css?v=1">\n' + startupLinks + '\n</head>');
@@ -130,7 +137,7 @@ export async function nakashShell(request, env, projection) {
     const original = await env.ASSETS.fetch(new Request(new URL('/privacy.html', url)));
     if (!original.ok) return original;
     const html = (await original.text()).replaceAll('assets/app-icons/icon-192.png', icon).replace('href="/"', 'href="' + back + '"');
-    return new Response(request.method === 'HEAD' ? null : html, {headers:{'Content-Type':'text/html; charset=utf-8'}});
+    return new Response(request.method === 'HEAD' ? null : withFamilyTabIcons(html, policy[1]), {headers:{'Content-Type':'text/html; charset=utf-8'}});
   }
   const page = /^\/nakash(?:\/([^/]*))?\/?$/.exec(url.pathname);
   const section = page?.[1] || '';

@@ -75,6 +75,31 @@ test('Only the internal entry from the Keha site has a return link', async () =>
   assert.equal(document.documentElement.dataset.nakashHome, '/nakash/');
 });
 
+test('family browser tabs use the same transparent medallion in the branch color', async () => {
+  const privacy = await readFile(new URL('../public/privacy.html', import.meta.url), 'utf8');
+  const shapes = new Set();
+  for (const family of ['haim', 'yehuda', 'medina']) {
+    const page = nakashHTML(html, family);
+    const home = parseHTML(page).document;
+    const logo = home.querySelector('#homeLink img').getAttribute('src');
+    const svg = await readFile(new URL('../public' + logo, import.meta.url), 'utf8');
+    assert.doesNotMatch(svg, /<rect\b/);
+    shapes.add(svg.replaceAll(home.querySelector('meta[name="theme-color"]').content, 'currentColor'));
+
+    const response = await nakashShell(new Request(origin + '/nakash/' + family + '/privacy.html'),
+      {ASSETS:{fetch:() => new Response(privacy)}}, projection);
+    const base = '/assets/nakash-launch-v1/' + family + '/tab-medallion';
+    for (const document of [home, parseHTML(await response.text()).document]) {
+      const icons = [...document.querySelectorAll('link[rel="icon"]')];
+      assert.deepEqual(icons.map(link => ['type', 'sizes', 'href'].map(key => link.getAttribute(key))), [
+        ['image/png', '32x32', base + '-32.png'],
+        ['image/svg+xml', 'any', base + '.svg'],
+      ]);
+    }
+  }
+  assert.equal(shapes.size, 1);
+});
+
 test('the three themed shortcuts share their palette with the page and expose family-specific native launch art', async () => {
   const colors = new Set();
   for (const family of ['haim', 'yehuda', 'medina']) {

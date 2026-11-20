@@ -1,4 +1,4 @@
-import {mkdir, readFile} from 'node:fs/promises';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {basename, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import sharp from 'sharp';
@@ -11,6 +11,11 @@ const original = await readFile(join(assets, 'assets/app-icons/icon.svg'), 'utf8
 for (const {id, color} of BRANCHES.filter(family => themedFamilies.has(family.id))) {
   const output = join(assets, launchAssets(id));
   await mkdir(output, {recursive:true});
+  // Browser tabs use the transparent header medallion, including at small sizes.
+  const tabMedallion = await readFile(join(assets, 'nakash', 'brand-' + id + '.svg'));
+  await writeFile(join(output, 'tab-medallion.svg'), tabMedallion);
+  await sharp(tabMedallion, {density:144}).resize(32, 32).png().toFile(join(output, 'tab-medallion-32.png'));
+
   // Keep the original medallion geometry and ring. Only its palette changes.
   const emblem = Buffer.from(original
     .replaceAll('#f7f3e9', color).replaceAll('#eef0e2', '#fbf8ef')
