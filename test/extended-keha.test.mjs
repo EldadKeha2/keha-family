@@ -103,10 +103,9 @@ test('the confirmed Tzadok record expands both of Zechariah’s marriages and re
   assert.equal(data.units['u-kehat-naomi'].weddingDate,'21.6.1946');
   const marriages=data.units['u-kehat-zechariah-ben-tzadok'].relationships;
   assert.deepEqual(marriages[0].people,['kehat-zechariah-ben-tzadok','kehat-amna']);
-  assert.deepEqual(marriages[0].children,['u-kehat-tzadok','u-kehat-naomi','u-kehat-zechariah-yehudit']);
+  assert.deepEqual(marriages[0].children,['u-kehat-tzadok','u-kehat-naomi']);
   assert.deepEqual(marriages[1].people,['kehat-zechariah-ben-tzadok','kehat-tziona']);
-  assert.ok(marriages[1].children.includes('u-kehat-shori'));
-  assert.ok(!marriages[1].children.includes('u-kehat-zechariah-yehudit'));
+  assert.deepEqual(marriages[1].children,['u-kehat-zechariah-yehudit','u-kehat-shori','u-kehat-varda']);
   assert.ok(data.people['kehat-tzadok'].researchSources.every(s=>s.url.startsWith('https://journaliststudio.google.com/')));
 });
 
@@ -115,15 +114,46 @@ test('the marriage bridge uses one set of people and keeps both spouses’ own p
   vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
   const rel=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
   assert.deepEqual(rel('kehat-yaakov').parents,['kehat-jidaan','kehat-first-wife']);
-  assert.deepEqual(rel('kehat-yaakov-yehudit').parents,['kehat-zechariah-ben-tzadok','kehat-amna']);
+  assert.deepEqual(rel('kehat-yaakov-yehudit').parents,['kehat-zechariah-ben-tzadok','kehat-tziona']);
   assert.deepEqual(rel('kehat-gila').parents,['kehat-yaakov','kehat-yaakov-yehudit']);
   assert.deepEqual(rel('kehat-shori').parents,['kehat-zechariah-ben-tzadok','kehat-tziona']);
+  assert.deepEqual(rel('kehat-mordechai').parents,['kehat-zechariah-ben-tzadok','kehat-tziona']);
+  assert.deepEqual(rel('kehat-tziona').children,['kehat-yaakov-yehudit','kehat-shori','kehat-mordechai']);
+  assert.deepEqual(rel('kehat-amna').children,['kehat-tzadok','kehat-naomi']);
+  for(const id of ['kehat-yaakov-yehudit','kehat-shori','kehat-mordechai']){
+    assert.deepEqual(rel(id).siblings,['kehat-tzadok','kehat-naomi','kehat-yaakov-yehudit','kehat-shori','kehat-mordechai'].filter(other=>other!==id));
+  }
+  assert.deepEqual(rel('kehat-mordechai').partners,['kehat-varda']);
+  assert.deepEqual(rel('kehat-varda').parents,[]);
+  assert.deepEqual(rel('kehat-varda').partners,['kehat-mordechai']);
+  for(const id of ['kehat-merav','kehat-sharon-varda','kehat-adi-varda','kehat-tal-varda']){
+    assert.deepEqual(rel(id).parents,['kehat-mordechai','kehat-varda']);
+  }
   assert.deepEqual(rel('kehat-shori').partners,[]);
   assert.deepEqual(rel('kehat-yaakov-miriam').partners,[]);
   assert.deepEqual(rel('kehat-yehudit').parents,[]);
   for(const [parent,children] of [['kehat-jidaan',['kehat-yaakov']],['kehat-zechariah-ben-tzadok',['kehat-yaakov-yehudit']],['kehat-yaakov',['kehat-havazelet','kehat-ari','kehat-gila']],['kehat-yaakov-yehudit',['kehat-havazelet','kehat-ari','kehat-gila']]])for(const child of children)assert.ok(rel(parent).children.includes(child));
   assert.equal(data.people['kehat-yaakov'].branch,'kehat');
   assert.equal(data.people['kehat-yaakov-yehudit'].branch,'kehat-tzadok');
+  for(const id of ['kehat-havazelet','kehat-ari','kehat-gila']){
+    assert.deepEqual([...data.people[id].branches].sort(),['kehat','kehat-tzadok']);
+    assert.equal(Object.values(data.people).filter(person=>person.id===id).length,1);
+  }
+});
+
+test('Uri’s transcription correction retains the existing profile and its family edits',async()=>{
+  const f=fixture();try{
+    const id='kehat-ari',before={id,name:'ארי קהת',nameEn:'Ari Kehat',birthday:'2.3.1950',about:'זיכרון משפחתי',profileId:'existing-portrait',extra:true};
+    f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify(before));
+    const after=(await f.json('/keha-extended/kehat/api/compat/api/people/'+id+'/page')).person;
+    assert.equal(after.name,'אורי קהת');assert.equal(after.nameEn,'Uri Kehat');
+    for(const key of ['id','birthday','about'])assert.equal(after[key],before[key]);
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    assert.equal(saved.profileId,before.profileId);
+    assert.ok(saved.aliases.includes('ארי קהת'));
+    const backup=JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get('extended-kehat-uri-transcription-2026-11-20-v1:backup:'+id).value);
+    assert.equal(backup.name,'ארי קהת');
+  }finally{f.close();}
 });
 
 test('Ron is a grandson with an unresolved father, never a third son or sibling of Reuven and Shimon',async()=>{
@@ -157,17 +187,18 @@ test('research updates preserve names, dates, biography and portraits edited by 
   }finally{f.close();}
 });
 
-test('Yehudit’s confirmed biological mother replaces older research notes without replacing family edits',async()=>{
+test('Tziona parentage correction replaces the deployed Amna assumption once and preserves family edits',async()=>{
   const f=fixture();try{
-    const id='kehat-yaakov-yehudit',migration='extended-kehat-yehudit-amna-2026-11-20-v1';
-    const before={id,name:'יהודית שלנו',nameEn:'Our Yehudit',birthday:'2.3.1923',about:'זיכרונות אישיים של המשפחה',profileId:'portrait-to-preserve',researchNotes:'בתם של זכריה וציונה',extra:true};
+    const id='kehat-yaakov-yehudit',migration='extended-kehat-tziona-three-siblings-2026-11-20-v1';
+    const before={id,name:'יהודית שלנו',nameEn:'Our Yehudit',birthday:'2.3.1923',about:'זיכרונות אישיים של המשפחה',profileId:'portrait-to-preserve',researchNotes:'בתם של זכריה ואמנה',extra:true};
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify(before));
     f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('extended-kehat-certificate-families-2026-11-20-v1','done');
+    f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('extended-kehat-yehudit-amna-2026-11-20-v1','done');
     const after=(await f.json('/keha-extended/kehat/api/compat/api/people/'+id+'/page')).person;
     for(const key of ['name','nameEn','birthday','about'])assert.equal(after[key],before[key]);
-    assert.match(after.researchNotes,/זכריה בן צדוק קהא ואמנה/);
-    assert.match(after.researchNotes,/ציונה/);
-    assert.match(after.researchNotes,/השערה משפחתית/);
+    assert.match(after.researchNotes,/זכריה בן צדוק קהא וציונה/);
+    assert.match(after.researchNotes,/ציונה היא אמה הביולוגית/);
+    assert.doesNotMatch(after.researchNotes,/אמנה|השערה משפחתית/);
     const backup=JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(migration+':backup:'+id).value);
     assert.equal(backup.researchNotes,before.researchNotes);
     const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
@@ -176,6 +207,30 @@ test('Yehudit’s confirmed biological mother replaces older research notes with
     f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
     f.restart();
     assert.equal((await f.json(site('people/'+id+'/page'))).person.researchNotes,saved.researchNotes);
+  }finally{f.close();}
+});
+
+test('the sibling correction retains Suri and Dvora’s saved profiles and makes Mordechai the father',async()=>{
+  const f=fixture();try{
+    const migration='extended-kehat-tziona-three-siblings-2026-11-20-v1';
+    for(const id of ['extended-kehat-certificate-families-2026-11-20-v1','extended-kehat-yehudit-amna-2026-11-20-v1']){
+      f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run(id,'done');
+    }
+    for(const [id,name,nameEn] of [['kehat-shori','שורי קהת','Shori Kehat'],['kehat-varda','ורדה קהת','Varda Kehat']]){
+      f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name,nameEn,englishName:nameEn,birthday:'2.3.1930',about:'סיפור משפחתי שמור',profileId:'portrait-'+id,extra:true}));
+    }
+    for(const [id,name,nameEn] of [['kehat-shori','סורי קהת','Suri Kehat'],['kehat-varda','דבורה קהת','Dvora Kehat']]){
+      const page=await f.json('/keha-extended/kehat/api/compat/api/people/'+id+'/page');
+      assert.equal(page.person.name,name);assert.equal(page.person.nameEn,nameEn);
+      assert.equal(page.person.birthday,'2.3.1930');assert.equal(page.person.about,'סיפור משפחתי שמור');
+      const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+      assert.equal(saved.profileId,'portrait-'+id);
+      assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(migration+':backup:'+id).value).profileId,saved.profileId);
+    }
+    const father=(await f.json('/keha-extended/kehat/api/compat/api/people/kehat-mordechai/page')).person;
+    assert.equal(father.name,'מרדכי קהת');
+    f.restart();
+    assert.equal((await f.json('/keha-extended/kehat/api/compat/api/people/kehat-varda/page')).person.name,'דבורה קהת');
   }finally{f.close();}
 });
 

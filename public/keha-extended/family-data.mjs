@@ -128,11 +128,16 @@ export function createExtendedFamily(original = {}) {
   for(const seed of SAADIA_PEOPLE)result.branchIds.set(canonical(seed.id),'zechariah');
   for(const seed of EXTENDED_PEOPLE)if(seed.researchBranch)result.branchIds.set(canonical(seed.id),seed.researchBranch);
   // Kehat and Yissachar remain independent; no common ancestor is inferred.
+  for(const person of Object.values(result.people))person.branches=[];
   for (const branch of EXTENDED_BRANCHES) {
-    const todo=[branch.unit];
+    const todo=[branch.unit],seen=new Set();
     while(todo.length){
-      const unit=result.units[todo.pop()];if(!unit)continue;
-      for(const id of unit.people)if(result.people[id].unit===unit.id||!result.branchIds.has(id))result.branchIds.set(id,branch.id);
+      const unitId=todo.pop();if(seen.has(unitId))continue;seen.add(unitId);
+      const unit=result.units[unitId];if(!unit)continue;
+      for(const id of unit.people){
+        if(result.people[id].unit===unit.id||!result.branchIds.has(id))result.branchIds.set(id,branch.id);
+        if(!result.people[id].branches.includes(branch.id))result.people[id].branches.push(branch.id);
+      }
       todo.push(...unit.children);
     }
   }

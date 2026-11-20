@@ -24,12 +24,14 @@ export function createBranchPortal(original={},id){
     for(const relation of unit.relationships||[])relation.children=relation.children.filter(child=>result.units[child]);
   }
   for(const root of portal.roots)delete result.units[root].generation;
+  for(const person of Object.values(result.people))person.branches=[];
   result.identities=Object.fromEntries(Object.entries(source.identities).filter(([,canonical])=>allowed.has(canonical)));
   for(const id of allowed)if(source.people[id].researchBranch)result.branchIds.set(id,source.people[id].researchBranch);
   result.branches=id==='zechariah'?zechariahBranches.map(([key,label,titleEn])=>({id:'zechariah-'+key,unit:'u-saadia-'+key,label,shortLabel:label,titleEn,color:portal.color,mark:'❖'})):
     EXTENDED_BRANCHES.filter(branch=>portal.branches.includes(branch.id)).map(branch=>({...branch}));
   for(const branch of result.branches){
-    const visit=unitId=>{const unit=result.units[unitId];for(const personId of unit.people)if(result.people[personId].unit===unit.id||!result.branchIds.has(personId))result.branchIds.set(personId,branch.id);unit.children.forEach(visit);};
+    const seen=new Set();
+    const visit=unitId=>{if(seen.has(unitId))return;seen.add(unitId);const unit=result.units[unitId];for(const personId of unit.people){if(result.people[personId].unit===unit.id||!result.branchIds.has(personId))result.branchIds.set(personId,branch.id);if(!result.people[personId].branches.includes(branch.id))result.people[personId].branches.push(branch.id);}unit.children.forEach(visit);};
     visit(branch.unit);
   }
   return result;

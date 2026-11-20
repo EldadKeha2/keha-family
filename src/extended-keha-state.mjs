@@ -16,7 +16,12 @@ export function initializeExtendedKeha(state) {
     const updateResearch=!state.rows('SELECT id FROM meta WHERE id=?',researchMigration).length;
     const parentageMigration='extended-kehat-yehudit-amna-2026-11-20-v1';
     const updateParentage=!state.rows('SELECT id FROM meta WHERE id=?',parentageMigration).length;
+    const uriMigration='extended-kehat-uri-transcription-2026-11-20-v1';
+    const updateUri=!state.rows('SELECT id FROM meta WHERE id=?',uriMigration).length;
+    const familyCorrectionMigration='extended-kehat-tziona-three-siblings-2026-11-20-v1';
+    const updateFamilyCorrection=!state.rows('SELECT id FROM meta WHERE id=?',familyCorrectionMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
+    const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
       if(seed.placeholder)continue;
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
@@ -37,6 +42,29 @@ export function initializeExtendedKeha(state) {
         const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
         state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',parentageMigration+':backup:'+seed.id,JSON.stringify(saved));
         saved.researchNotes=seed.researchNotes;
+        state.savePerson(saved);
+      }
+      if(updateUri&&['kehat-ari','kehat-yaakov','kehat-yaakov-yehudit'].includes(seed.id)){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',uriMigration+':backup:'+seed.id,JSON.stringify(saved));
+        if(seed.id==='kehat-ari'&&saved.name==='ארי קהת'){
+          saved.name=seed.name;
+          for(const key of ['nameEn','englishName'])if(!saved[key]||saved[key]==='Ari Kehat')saved[key]='Uri Kehat';
+          saved.aliases=[...new Set([...(saved.aliases||[]),'ארי קהת'])];
+        }
+        if(saved.researchNotes)saved.researchNotes=saved.researchNotes.replaceAll('חבצלת, ארי וגילה','חבצלת, אורי וגילה');
+        state.savePerson(saved);
+      }
+      if(updateFamilyCorrection&&familyCorrectionNotes.has(seed.id)){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',familyCorrectionMigration+':backup:'+seed.id,JSON.stringify(saved));
+        saved.researchNotes=seed.researchNotes;
+        // Correct the old transcription while retaining profile and album IDs.
+        const oldName=seed.id==='kehat-varda'?'ורדה קהת':seed.id==='kehat-shori'?'שורי קהת':null;
+        const oldEnglish=seed.id==='kehat-varda'?'Varda Kehat':'Shori Kehat';
+        if(oldName&&saved.name===oldName){saved.name=seed.name;delete saved.firstName;delete saved.lastName;}
+        if(oldName)for(const key of ['nameEn','englishName'])if(!saved[key]||saved[key]===oldEnglish)saved[key]=seed[key];
+        saved.aliases=[...new Set([...(saved.aliases||[]),...(seed.aliases||[])])];
         state.savePerson(saved);
       }
       if(updateChart&&seed.id==='keha-zechariah'){
@@ -75,6 +103,8 @@ export function initializeExtendedKeha(state) {
     if(updateKehat)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',kehatMigration,'done');
     if(updateResearch)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',researchMigration,'done');
     if(updateParentage)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',parentageMigration,'done');
+    if(updateUri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',uriMigration,'done');
+    if(updateFamilyCorrection)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',familyCorrectionMigration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;
