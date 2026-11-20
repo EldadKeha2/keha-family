@@ -23,7 +23,7 @@ export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portal
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'')
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+EXTENDED_COLOR)
     .replace(/(<style id="familyStartupBackground">[^<]*)/,'$1:root{--family-accent:'+EXTENDED_COLOR+'}@media(display-mode:standalone){html,body{background:var(--family-accent)}}')
-    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"><link rel="stylesheet" href="/keha-extended/hub.css?v=6"></head>')
+    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"><link rel="stylesheet" href="/keha-extended/hub.css?v=7"></head>')
     .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/hub.js?v=11" defer></script>\n$1')
     .replace('<div id="treeView">','<div id="treeView"><section id="extendedKehaHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
     .replace(/(<header class="phone-home-intro">.*?<\/header>)/s,'$1<section id="extendedKehaHomeHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
