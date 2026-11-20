@@ -1,0 +1,9 @@
+{
+  "$schema":"../../node_modules/wrangler/config-schema.json",
+  "name":"family-zechariah",
+  "main":"../worker.mjs",
+  "compatibility_date":"2026-10-31",
+  "workers_dev":true,
+  "vars":{"FAMILY_BRANCH":"zechariah"},
+  "services":[{"binding":"FAMILY_SITE","service":"keha-family"}]
+}

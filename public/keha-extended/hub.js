@@ -5,6 +5,8 @@
   const tr=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const shlomoHome=(document.documentElement.dataset.kehaShlomoHome || '/keha-extended/shlomo/')+'#home';
+  const zechariahHome=(document.documentElement.dataset.kehaZechariahHome || '/keha-extended/zechariah/')+'#home';
+  const kehatHome=(document.documentElement.dataset.kehaKehatHome || '/keha-extended/kehat/')+'#home';
   const names={
     shlomo:()=>tr('משפחת שלמה קהא','Shlomo Keha Family'),
     zechariah:()=>tr('משפחת זכריה קהא הבן','Family of Zechariah Keha the Younger'),
@@ -18,7 +20,7 @@
       const p=window.FamilyApp?.getPersonSummary(id==='shlomo'?'shlomo':id==='zechariah'?'keha-zechariah':'keha-yosef-yissachar') || data.people[id==='shlomo'?'shlomo':''];
       const portrait=p?.profile?`<img src="${safe(p.profile)}" alt="" decoding="async">`:`<span aria-hidden="true">${symbols[id]}</span>`;
       const inner=`<span class="extended-branch-portrait">${portrait}</span><strong>${safe(names[id]())}</strong>${id==='yissachar'?'':`<span class="extended-branch-note">${safe(notes[id])}</span>`}`;
-      return id==='shlomo'?`<a class="extended-branch-circle extended-shlomo" href="${safe(shlomoHome)}">${inner}</a>`:
+      return ['shlomo','zechariah'].includes(id)?`<a class="extended-branch-circle extended-${id}" href="${safe(id==='shlomo'?shlomoHome:zechariahHome)}">${inner}</a>`:
         `<button type="button" class="extended-branch-circle extended-${id}" data-branch="${id}" aria-pressed="${branch===id}">${inner}</button>`;
     };
     const circles=['shlomo','zechariah'].map(circle).join('');
@@ -26,7 +28,7 @@
       const person=window.FamilyApp?.getPersonSummary(personId);
       const portrait=person?.profile?`<span class="extended-branch-portrait"><img src="${safe(person.profile)}" alt="" decoding="async"></span>`:'';
       const shortSon=id==='kehat-tzadok'?tr('זכריה','Zechariah'):tr('סעדיה (ג׳ידעאן)','Saadia (Jidaan)');
-      return `<div class="extended-kehat-item"><button type="button" class="extended-branch-circle extended-kehat-small" data-branch="${id}" aria-label="${safe(name+' · '+son)}" aria-pressed="${branch===id}">${portrait}<strong>${safe(name)}</strong></button><span class="extended-branch-note"><span class="extended-desktop-only">${safe(son)}</span><span class="extended-phone-only">${safe(shortSon)}</span></span></div>`;
+      return `<div class="extended-kehat-item"><a class="extended-branch-circle extended-kehat-small" href="${safe(kehatHome)}" aria-label="${safe(name+' · '+son)}">${portrait}<strong>${safe(name)}</strong></a><span class="extended-branch-note"><span class="extended-desktop-only">${safe(son)}</span><span class="extended-phone-only">${safe(shortSon)}</span></span></div>`;
     };
     const kehatGroup=`<section class="extended-kehat-group" aria-label="${tr('שני ענפי משפחת קהת','The two Kehat family branches')}"><h3>${names.kehat()}</h3><div class="extended-kehat-circles">${kehatCircle('kehat-tzadok','kehat-tzadok-elder',tr('צדוק','Tzadok'),tr('זכריה בן צדוק קהת','Zechariah Kehat, son of Tzadok'))}${kehatCircle('kehat','kehat-aharon-elder',tr('אהרון','Aharon'),tr('סעדיה (ג׳ידעאן) בן אהרון קהת','Saadia (Jidaan) Kehat, son of Aharon'))}</div><p>${tr('הקשר בין שני הענפים טרם ידוע','The relationship between these two branches is not yet known')}</p></section>`;
     const lowerBranches=`<div class="extended-lower-branches">${kehatGroup}<div class="extended-yissachar-group">${circle('yissachar')}<span class="extended-branch-note">${safe(notes.yissachar)}</span></div></div>`;
@@ -52,7 +54,9 @@
   };
   renderHome();
   document.addEventListener('click',event=>{
-    if(event.target.closest('[data-branch="shlomo"]')){event.preventDefault();event.stopPropagation();location.assign(shlomoHome);}
+    const branch=event.target.closest('[data-branch]')?.dataset.branch;
+    const destination={shlomo:shlomoHome,zechariah:zechariahHome,kehat:kehatHome,'kehat-tzadok':kehatHome}[branch];
+    if(destination){event.preventDefault();event.stopPropagation();location.assign(destination);}
   },true);
   document.getElementById('extendedKehaHomeHub')?.addEventListener('click',event=>{
     if(event.target.closest('[data-branch]'))window.FamilyApp?.setView('tree');

@@ -1,12 +1,12 @@
 // Each family has a separate origin so an installed Keha app cannot enclose it.
 // All data and media still come from the existing family backend.
 export const UPSTREAM = 'https://keha-family.eldadkeha.workers.dev';
-const branches = new Set(['haim', 'yehuda', 'medina', 'keha', 'extended', 'shlomo']);
+const branches = new Set(['haim', 'yehuda', 'medina', 'keha', 'extended', 'shlomo', 'zechariah', 'kehat']);
 const readonly = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export function familyApp(branch, upstreamFetch = fetch) {
   if (!branches.has(branch)) throw new Error('Unknown family branch');
-  const home = branch==='shlomo'?'/keha-extended/shlomo/':branch==='extended'?'/keha-extended/':'/nakash/' + branch + '/';
+  const home = ['shlomo','zechariah','kehat'].includes(branch)?'/keha-extended/'+branch+'/':branch==='extended'?'/keha-extended/':'/nakash/' + branch + '/';
   return {
     async fetch(request) {
       const incoming = new URL(request.url);

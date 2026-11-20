@@ -8,7 +8,8 @@ import {NAKASH_WRITE_TOKEN} from '../src/nakash-shell.mjs';
 import {createFamily} from '../public/nakash/family-data.mjs';
 import {createExtendedFamily,EXTENDED_BRANCHES,EXTENDED_NAME} from '../public/keha-extended/family-data.mjs';
 import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
-import {extendedKehaHTML,shlomoKehaHTML} from '../src/extended-keha.mjs';
+import {extendedKehaHTML,shlomoKehaHTML,branchPortalHTML} from '../src/extended-keha.mjs';
+import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {createShlomoFamily,SHLOMO_NAME,SHLOMO_HOME} from '../public/keha-extended/shlomo-data.mjs';
 import {familyApp} from '../family-apps/worker.mjs';
 import vm from 'node:vm';
@@ -354,7 +355,7 @@ test('the extended installation launches its own hub and never uses the root Keh
   assert.equal(installed.name,EXTENDED_NAME);
 });
 
-test('desktop and mobile split Kehat into two circles and open each independent branch from the hub and Home',async()=>{
+test('desktop and mobile open dedicated Zechariah and Kehat portals from the extended hub',async()=>{
   const appSource=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   const hubSource=await readFile(new URL('../public/keha-extended/hub.js',import.meta.url),'utf8');
   for(const phone of [false,true]){
@@ -372,19 +373,100 @@ test('desktop and mobile split Kehat into two circles and open each independent 
     assert.match(document.querySelector('#extendedKehaHub .extended-cousin-label').textContent,/בני דודים/);
     assert.ok(document.querySelector('#extendedKehaHub [data-person="saadia-elder"]'));
     assert.ok(document.querySelector('#extendedKehaHub a[href="/keha-extended/shlomo/#home"]'));
-    for(const [branch,person] of [['zechariah','keha-zechariah'],['kehat','kehat-hadassah'],['kehat-tzadok','kehat-zechariah-ben-tzadok'],['yissachar','keha-yosef-yissachar']]){
+    assert.ok(document.querySelector('#extendedKehaHub a[href="/keha-extended/zechariah/#home"]'));
+    assert.equal(document.querySelectorAll('#extendedKehaHub a[href="/keha-extended/kehat/#home"]').length,2);
+    for(const [branch,person] of [['yissachar','keha-yosef-yissachar']]){
       document.querySelector('#extendedKehaHub [data-branch="'+branch+'"]').click();
       assert.ok(document.querySelector('#treeNodes [data-person="'+person+'"]'),branch);
       assert.ok(document.getElementById('treeBreadcrumb').textContent.startsWith(EXTENDED_NAME+' › '));
       assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,5);
-      if(branch==='kehat-tzadok')assert.equal(document.querySelector('#treeNodes [data-person="kehat-jidaan"]'),null);
-      if(branch==='kehat')assert.equal(document.querySelector('#treeNodes [data-person="kehat-zechariah-ben-tzadok"]'),null);
       document.querySelector('#extendedKehaHub [data-branch="all"]').click();
       assert.equal(document.body.dataset.extendedBranch,'all');
     }
     window.FamilyApp.setView('home');
-    document.querySelector('#extendedKehaHomeHub [data-branch="kehat"]').click();
+    document.querySelector('#extendedKehaHomeHub [data-branch="yissachar"]').click();
     assert.equal(window.FamilyApp.getView(),'tree');
-    assert.ok(document.querySelector('#treeNodes [data-person="kehat-hadassah"]'));
+    assert.ok(document.querySelector('#treeNodes [data-person="keha-yosef-yissachar"]'));
+  }
+});
+
+test('the new portals have independent identities, palettes, manifests and the four original home tiles',async()=>{
+  for(const portal of Object.values(BRANCH_PORTALS)){
+    const data=toOriginalFamilyData(createBranchPortal(family,portal.id));
+    assert.equal(data.title,portal.name);
+    assert.ok(!data.people.shlomo&&!data.people.yona&&!data.people['yehuda-nakash']);
+    assert.ok(portal.id==='zechariah'?data.people['saadia-aviva']&&!data.people['kehat-jidaan']:data.people['kehat-jidaan']&&!data.people['saadia-aviva']);
+    const {document}=parseHTML(branchPortalHTML(originalHTML,portal.id,'https://'+portal.id+'.example'));
+    assert.equal(document.title,portal.name);
+    assert.equal(document.documentElement.dataset.nakashHome,portal.home);
+    assert.equal(document.documentElement.dataset.nakashEntryView,'home');
+    assert.equal(document.documentElement.dataset.nakashOrigin,'https://'+portal.id+'.example');
+    assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery']);
+    assert.ok(document.getElementById('homeTiles'));
+    assert.equal(document.querySelector('meta[name="theme-color"]').getAttribute('content'),portal.color);
+    assert.ok(document.querySelector('a.branch-chip[href="https://family-extended.eldadkeha.workers.dev/keha-extended/#tree"]'));
+    const ownManifest=JSON.parse(await readFile(new URL('../public'+portal.home+'manifest.webmanifest',import.meta.url)));
+    const app=familyApp(portal.id,()=>Response.json(ownManifest));
+    const response=await app.fetch(new Request('https://'+portal.id+'.example/manifest.webmanifest'));
+    const installed=await response.json();
+    assert.equal(installed.name,portal.name);assert.equal(installed.id,portal.home);
+    assert.equal(installed.related_applications[0].id,'https://'+portal.id+'.example'+portal.home);
+    assert.match(installed.start_url,new RegExp('familyApp='+portal.id));
+    const {document:page,window:dom}=parseHTML(branchPortalHTML(originalHTML,portal.id));
+    const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){}};
+    window.FamilyI18n={isEnglish:false,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};window.FamilyDates={age:()=>null,parse:()=>null};
+    const context=vm.createContext({window,document:page,location:{hash:'#home'},history:{pushState(){}},matchMedia:()=>({matches:false}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    vm.runInContext(await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8'),context);
+    window.FamilyApp.getView=()=>'tree';
+    context.clearTimeout=()=>{};context.setTimeout=()=>{};
+    vm.runInContext(await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8'),context);
+    page.dispatchEvent(new dom.Event('DOMContentLoaded'));
+    assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,4);
+  }
+});
+
+test('each portal can edit profiles and upload documents/photos while the central hub shares their records',async()=>{
+  const f=fixture();try{
+    const path=(branch,part)=>BRANCH_PORTALS[branch].home+'api/compat/api/'+part;
+    for(const [branch,id,other] of [['zechariah','saadia-aviva','kehat-jidaan'],['kehat','kehat-hadassah','saadia-aviva']]){
+      const before=await f.json(path(branch,'people/'+id+'/page'));
+      await f.json(path(branch,'people/'+id+'/about'),{method:'POST',body:{about:'סיפור משפחתי חדש',expectedAbout:before.person.about||'',language:'he'}});
+      assert.equal((await f.json(site('people/'+id+'/page'))).person.about,'סיפור משפחתי חדש');
+      await f.json(path(branch,'people/'+id+'/documents?filename=marriage.jpg'),{method:'POST',body:photo});
+      assert.equal((await f.json(site('people/'+id+'/page'))).albums.documents.total,1);
+      await f.json(path(branch,'collections/gallery/upload?filename=family.jpg'),{method:'POST',body:photo});
+      const gallery=await f.json(path(branch,'collections/gallery?size=all'));
+      assert.equal(gallery.count,1);
+      await f.json(path(branch,'media/'+gallery.items[0].id+'/tags/patch'),{method:'POST',body:{changes:[{name:'קרוב נוסף '+branch,tagged:true}]}});
+      assert.ok((await f.json(site('tag-people'))).people.some(p=>p.name==='קרוב נוסף '+branch));
+      assert.equal((await f.call(path(branch,'people/'+other+'/page'))).status,404);
+      const roster=await f.json(path(branch,'tag-people'));
+      assert.ok(roster.people.some(p=>p.id===id));assert.ok(!roster.people.some(p=>p.id===other));
+    }
+    assert.equal((await f.json(site('collections/gallery?size=all'))).count,2);
+    f.restart();
+    assert.equal((await f.json(path('zechariah','people/saadia-aviva/page'))).albums.documents.total,1);
+  }finally{f.close();}
+});
+
+test('Kehat’s own tree has two independent circles and renders each branch without a common parent',async()=>{
+  const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8'),hook=await readFile(new URL('../public/keha-extended/portal-tree.js',import.meta.url),'utf8');
+  for(const phone of [false,true]){
+    const {document,window:dom}=parseHTML(branchPortalHTML(originalHTML,'kehat'));
+    const data=toOriginalFamilyData(createBranchPortal(family,'kehat'));
+    assert.equal(data.units['u-kehat-tzadok-elder'].parent,null);
+    assert.equal(data.units['u-kehat-aharon-elder'].parent,null);
+    assert.equal(data.people['kehat-tzadok-elder'].generation,1);
+    assert.equal(data.people['kehat-aharon-elder'].generation,1);
+    const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){}};
+    window.FamilyI18n={isEnglish:false,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};window.FamilyDates={age:()=>null,parse:()=>null};
+    const context=vm.createContext({window,document,location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    vm.runInContext(hook,context);vm.runInContext(app,context);
+    assert.equal(document.querySelectorAll('#kehatPortalOverview .kehat-portal-circle').length,2);
+    for(const [branch,person] of [['kehat-tzadok','kehat-zechariah-ben-tzadok'],['kehat','kehat-jidaan']]){
+      document.querySelector('#kehatPortalOverview [data-branch="'+branch+'"]').click();
+      assert.ok(document.querySelector('#treeNodes [data-person="'+person+'"]'));
+      document.querySelector('#branchBar [data-branch="all"]').click();
+    }
   }
 });

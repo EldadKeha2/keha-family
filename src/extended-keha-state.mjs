@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {EXTENDED_PEOPLE,createExtendedFamily} from '../public/keha-extended/family-data.mjs';
 import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
+import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {uid} from './http.mjs';
 import {linkSharedProfile} from './nakash-shared.mjs';
 
@@ -56,8 +57,10 @@ export function initializeExtendedKeha(state) {
 }
 
 export function extendedKehaItems(state,args={}) {
-  const ids=JSON.stringify(Object.keys((args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)({...family,sharedPeople:state.run('people').people}).people));
-  const categories=JSON.stringify(args.branch==='shlomo'?['nakash:shlomo','gallery','videos','nostalgia']:['nakash:extended','nakash:shlomo','gallery','videos','nostalgia']);
+  const source={...family,sharedPeople:state.run('people').people,identities:state.sharedNakashIdentities};
+  const scoped=BRANCH_PORTALS[args.branch]?createBranchPortal(source,args.branch):(args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)(source);
+  const ids=JSON.stringify(Object.keys(scoped.people));
+  const categories=JSON.stringify(BRANCH_PORTALS[args.branch]?['nakash:'+args.branch]:args.branch==='shlomo'?['nakash:shlomo','gallery','videos','nostalgia']:['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:kehat','gallery','videos','nostalgia']);
   return state.rows("SELECT data FROM media WHERE category IN (SELECT value FROM json_each(?)) OR person_id IN (SELECT value FROM json_each(?)) OR id IN (SELECT media_id FROM media_tags WHERE person_id IN (SELECT value FROM json_each(?))) ORDER BY rowid DESC",categories,ids,ids).map(row=>JSON.parse(row.data))
     .filter(item=>!args.kind || (item.kind || (item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document'))===args.kind)
     .map(item=>{

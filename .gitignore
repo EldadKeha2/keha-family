@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .wrangler/
 /public/assets/nakash-launch-v1/
+/public/keha-extended/zechariah/
+/public/keha-extended/kehat/
 .dev.vars
 .env
 .env.*

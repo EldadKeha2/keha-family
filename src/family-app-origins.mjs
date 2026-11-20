@@ -1,4 +1,4 @@
-const branches = ['haim', 'yehuda', 'medina', 'keha', 'extended', 'shlomo'];
+const branches = ['haim', 'yehuda', 'medina', 'keha', 'extended', 'shlomo', 'zechariah', 'kehat'];
 
 // Activate only after the dedicated Workers have been deployed and verified.
 // These public origins are configuration, not credentials.

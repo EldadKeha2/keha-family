@@ -26,7 +26,19 @@
       "/keha-extended/shlomo/site-data.js",
       "/keha-extended/shlomo/api/*",
       "/keha-extended/shlomo/assets/*",
-      "/keha-extended/shlomo/privacy.html"
+      "/keha-extended/shlomo/privacy.html",
+      "/keha-extended/zechariah",
+      "/keha-extended/zechariah/",
+      "/keha-extended/zechariah/site-data.js",
+      "/keha-extended/zechariah/api/*",
+      "/keha-extended/zechariah/assets/*",
+      "/keha-extended/zechariah/privacy.html",
+      "/keha-extended/kehat",
+      "/keha-extended/kehat/",
+      "/keha-extended/kehat/site-data.js",
+      "/keha-extended/kehat/api/*",
+      "/keha-extended/kehat/assets/*",
+      "/keha-extended/kehat/privacy.html"
     ]
   },
   "durable_objects": {
@@ -68,6 +80,6 @@
     "HF_BUCKET": "keha-family"
   },
   "build": {
-    "command": "node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs && node scripts/prepare-family-apps.mjs"
+    "command": "node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs && node scripts/build-branch-portals.mjs && node scripts/prepare-family-apps.mjs"
   }
 }

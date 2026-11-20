@@ -26,7 +26,7 @@
   function rememberRunningApp(home){runningAppHome=home;try{window.sessionStorage?.setItem(runningAppKey,home);}catch{}}
   if(standaloneQuery.matches||navigator.standalone===true){
     const launch=new URLSearchParams(location.search),family=launch.get('familyApp');
-    if(launch.get('source')==='homescreen'&&['nakash','haim','yehuda','medina','keha','extended','shlomo'].includes(family))rememberRunningApp(family==='shlomo'?'/keha-extended/shlomo/':family==='extended'?'/keha-extended/':family==='nakash'?'/nakash/':'/nakash/'+family+'/');
+    if(launch.get('source')==='homescreen'&&['nakash','haim','yehuda','medina','keha','extended','shlomo','zechariah','kehat'].includes(family))rememberRunningApp(['shlomo','zechariah','kehat'].includes(family)?'/keha-extended/'+family+'/':family==='extended'?'/keha-extended/':family==='nakash'?'/nakash/':'/nakash/'+family+'/');
     else if(!runningAppHome&&!siteHome&&location.pathname==='/')rememberRunningApp('/');
   }
   const url=new URL(siteHome||'/',appOrigin),language=window.FamilyI18n?.language;
