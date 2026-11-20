@@ -7,20 +7,26 @@
   "start_url": "/nakash/medina/?source=homescreen&familyApp=medina#home",
   "scope": "/nakash/medina/",
   "display": "standalone",
-  "background_color": "#f6f2e7",
+  "background_color": "#9b561f",
   "theme_color": "#9b561f",
   "icons": [
     {
-      "src": "/nakash/brand-medina-192.png",
+      "src": "/assets/nakash-launch-v1/medina/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/nakash/brand-medina-512.png",
+      "src": "/assets/nakash-launch-v1/medina/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/assets/nakash-launch-v1/medina/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "prefer_related_applications": false,
@@ -30,5 +36,8 @@
       "url": "https://keha-family.eldadkeha.workers.dev/nakash/medina/manifest.webmanifest",
       "id": "https://keha-family.eldadkeha.workers.dev/nakash/medina/"
     }
-  ]
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }

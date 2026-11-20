@@ -849,7 +849,9 @@ test('each family manifest keeps an independent identity, home launch, matching 
     assert.equal(manifest.id,site.home);assert.equal(ids.has(manifest.id),false);ids.add(manifest.id);
     assert.equal(manifest.scope,site.home);assert.equal(manifest.name,site.name);assert.equal(manifest.short_name,site.name);
     const start=new URL(manifest.start_url,'https://family.example');assert.equal(start.pathname,site.home);assert.equal(start.hash,'#home');assert.equal(start.searchParams.get('familyApp'),site.branch);
-    assert.equal(manifest.icons.find(icon=>icon.sizes==='192x192').src,site.icon);
+    const themed = ['haim', 'yehuda', 'medina'].includes(site.branch);
+    const iconPath = themed ? '/assets/nakash-launch-v1/' + site.branch + '/icon-192.png' : site.icon;
+    assert.equal(manifest.icons.find(icon=>icon.sizes==='192x192').src,iconPath);
     assert.equal(manifest.prefer_related_applications,false);
     assert.deepEqual(manifest.related_applications,[{platform:'webapp',id:'https://keha-family.eldadkeha.workers.dev'+site.home,url:'https://keha-family.eldadkeha.workers.dev'+site.home+'manifest.webmanifest'}]);
     const svg=await readFile(new URL('../public/nakash/brand-'+site.branch+'.svg',import.meta.url),'utf8');assert.ok(svg.includes(manifest.theme_color));

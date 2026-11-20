@@ -1,0 +1,50 @@
+/* Loaded only by the three family portals with their own launch palettes. */
+:root:not([data-a11y-contrast]) {
+  --family-ink: color-mix(in srgb, var(--family-accent) 74%, #302b29);
+  --family-tint: color-mix(in srgb, var(--family-accent) 15%, #fffaf3);
+  --family-line: color-mix(in srgb, var(--family-accent) 39%, #f2e9dc);
+  --paper: color-mix(in srgb, var(--family-accent) 8%, #faf7f0);
+  --olive: var(--family-accent);
+  --gold: var(--family-accent);
+}
+
+html, body { background: var(--paper); }
+.page-shell > .site-header {
+  background: linear-gradient(115deg, var(--paper), var(--family-tint));
+  border-color: var(--family-line);
+}
+.site-header #homeLink,
+.workspace-title h2, .section-diamond, .person-family-group h3 {
+  color: var(--family-ink);
+}
+.workspace-header {
+  background: linear-gradient(120deg, #fffdf8, var(--paper));
+  border-color: var(--family-line);
+}
+#mainNav .nav-link, .site-footer .branch-chip[aria-current="page"],
+.branch-chip.active, .tree-mode button.selected {
+  color: var(--family-ink);
+  border-color: var(--family-line);
+  background: var(--family-tint);
+}
+#mainNav .nav-link:hover { border-color: var(--family-accent); }
+#mainNav .nav-link::before { border-color: currentColor; }
+#mainNav .nav-link.active, .primary-button, .home-install-invite-primary {
+  color: white;
+  border-color: var(--family-accent);
+  background: var(--family-accent);
+}
+.primary-button:hover:not(:disabled), .home-install-invite-primary:hover {
+  background: var(--family-ink);
+}
+:is(#homeTiles, #mobileMenuTiles, #desktopMenuTiles) .home-tile {
+  background: linear-gradient(145deg, #fffdf8 5%, var(--family-tint));
+  border-color: var(--family-line);
+}
+:is(#homeTiles, #mobileMenuTiles, #desktopMenuTiles) .home-tile:hover {
+  background: var(--family-tint);
+  border-color: var(--family-accent);
+}
+:is(#homeTiles, #mobileMenuTiles, #desktopMenuTiles) .home-tile :is(strong, .home-tile-icon, .home-tile-arrow) {
+  color: var(--family-ink);
+}

@@ -7,20 +7,26 @@
   "start_url": "/nakash/haim/?source=homescreen&familyApp=haim#home",
   "scope": "/nakash/haim/",
   "display": "standalone",
-  "background_color": "#f6f2e7",
+  "background_color": "#366d69",
   "theme_color": "#366d69",
   "icons": [
     {
-      "src": "/nakash/brand-haim-192.png",
+      "src": "/assets/nakash-launch-v1/haim/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/nakash/brand-haim-512.png",
+      "src": "/assets/nakash-launch-v1/haim/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/assets/nakash-launch-v1/haim/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "prefer_related_applications": false,
@@ -30,5 +36,8 @@
       "url": "https://keha-family.eldadkeha.workers.dev/nakash/haim/manifest.webmanifest",
       "id": "https://keha-family.eldadkeha.workers.dev/nakash/haim/"
     }
-  ]
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }

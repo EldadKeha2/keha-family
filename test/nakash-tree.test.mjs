@@ -49,6 +49,37 @@ test('Only the internal entry from the Keha site has a return link', async () =>
   assert.equal(document.documentElement.dataset.nakashHome, '/nakash/');
 });
 
+test('the three themed shortcuts share their palette with the page and expose family-specific native launch art', async () => {
+  const colors = new Set();
+  for (const family of ['haim', 'yehuda', 'medina']) {
+    const manifest = JSON.parse(await readFile(new URL('../public/nakash/' + family + '/manifest.webmanifest', import.meta.url)));
+    const start = new URL(manifest.start_url, origin);
+    const response = await nakashShell(new Request(start), {ASSETS:{fetch:() => new Response(html)}}, projection);
+    const {document} = parseHTML(await response.text());
+    assert.equal(document.documentElement.dataset.nakashSearchBranch, family);
+    assert.equal(document.querySelector('meta[name="theme-color"]').content, manifest.theme_color);
+    assert.equal(manifest.background_color, manifest.theme_color);
+    assert.equal(manifest.launch_handler.client_mode, 'navigate-existing');
+    colors.add(manifest.background_color);
+    assert.ok(document.getElementById('familyStartupBackground').textContent.includes(manifest.theme_color));
+    assert.ok(document.querySelector('link[href^="/assets/nakash-theme.css"]'));
+    const folder = '/assets/nakash-launch-v1/' + family + '/';
+    assert.ok(manifest.icons.every(icon => icon.src.startsWith(folder)));
+    assert.ok(manifest.icons.some(icon => icon.purpose === 'maskable' && icon.sizes === '512x512'));
+    assert.equal(document.querySelector('link[rel="apple-touch-icon"]').getAttribute('href'), folder + 'icon-180.png');
+    const screens = [...document.querySelectorAll('link[rel="apple-touch-startup-image"]')];
+    for (const [orientation, file] of [['portrait','1179x2556.png'], ['landscape','2556x1179.png']]) {
+      const link = screens.find(link => link.getAttribute('href') === folder + file);
+      assert.ok(link.getAttribute('media').includes('orientation: ' + orientation));
+    }
+    assert.ok(screens.every(link => link.getAttribute('href').startsWith(folder)));
+  }
+  assert.equal(colors.size, 3);
+  for (const page of [html, ...['keha', '', 'inside'].map(id => nakashHTML(html, id))]) {
+    assert.doesNotMatch(page, /nakash-theme\.css|nakash-launch-v1|--family-accent/);
+  }
+});
+
 test('Scoped tree data supplies the original tree renderer with the four Nakash branches', async () => {
   const response = await nakashShell(new Request(origin + '/nakash/api/site-data.js'), {}, projection);
   const script = await response.text();

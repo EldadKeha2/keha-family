@@ -1,6 +1,7 @@
 import {BRANCHES, createFamily} from '../public/nakash/family-data.mjs';
 import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {escapeHTML} from './http.mjs';
+import {appleLaunchImages, launchAssets, themedFamilies} from './nakash-launch.mjs';
 
 export const NAKASH_WRITE_TOKEN = 'nakash-public-v1';
 const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'person', 'search'];
@@ -55,6 +56,8 @@ export function nakashHTML(original, section, isInternal = false) {
   const manifest = homePath + 'manifest.webmanifest';
   const name = escapeHTML(branch?.label || familyName);
   const logo = '/nakash/brand-' + (branch?.id || 'nakash');
+  const themed = themedFamilies.has(section);
+  const appleIcon = themed ? launchAssets(section) + '/icon-180.png' : logo + '-192.png';
   const navigation = BRANCHES.map(({id, label}) =>
     '<a class="branch-chip" href="/nakash/' + id + '/"'+
     (id === section ? ' aria-current="page"' : '') + '>' + escapeHTML(label) + '</a>'
@@ -73,12 +76,12 @@ export function nakashHTML(original, section, isInternal = false) {
     '/nakash/media-adapter.js',
     '/nakash/api/site-data.js',
   ].map(src => '  <script src="' + src + '" defer></script>').join('\n');
-  return original
+  const html = original
     .replace('<html ', '<html' + config + ' ')
     .replace(/<title>[^<]*<\/title>/, '<title>' + name + '</title>')
     .replace(/(name="(?:description|application-name|apple-mobile-web-app-title)" content=")[^"]+/g, '$1' + name)
     .replace(/(<link rel="manifest" href=")[^"]+/, '$1' + manifest)
-    .replace(/(<link rel="apple-touch-icon"[^>]+href=")[^"]+/, '$1' + logo + '-192.png')
+    .replace(/(<link rel="apple-touch-icon"[^>]+href=")[^"]+/, '$1' + appleIcon)
     .replace(/(href|src)="assets\/medallion\.svg"/g, '$1="' + logo + '.svg"')
     .replace(/((?:href|src)=")assets\//g, '$1/assets/')
     .replace(/  <script src="(?:\/assets\/)?([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>\n/g,
@@ -91,6 +94,13 @@ export function nakashHTML(original, section, isInternal = false) {
       start + children.replace(/<button\b[^>]*data-view="([^"]+)"[^>]*>.*?<\/button>/gs,
         (button, view) => NAKASH_VIEWS.includes(view) ? button : '') + back + end)
     .replace('<footer class="site-footer">', '<footer class="site-footer"><nav class="branch-bar" aria-label="ענפי המשפחה">'+navigation+back+'</nav>');
+  if (!themed) return html;
+  const startupLinks = appleLaunchImages(section).map(({href, media}) =>
+    `  <link rel="apple-touch-startup-image" href="${href}" media="${media}">`).join('\n');
+  return html
+    .replace(/(<meta name="theme-color" content=")[^"]+/, '$1' + branch.color)
+    .replace(/(<style id="familyStartupBackground">[^<]*)/, '$1:root{--family-accent:' + branch.color + '}@media(display-mode:standalone){html,body{background:var(--family-accent)}}')
+    .replace('</head>', '  <link rel="stylesheet" href="/assets/nakash-theme.css?v=1">\n' + startupLinks + '\n</head>');
 }
 
 export async function nakashShell(request, env, projection) {
