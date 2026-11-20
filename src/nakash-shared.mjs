@@ -3,10 +3,11 @@ import {createFamily, branchForPerson} from '../public/nakash/family-data.mjs';
 import {normalizeSearch, searchNames} from '../public/assets/site-search-core.mjs';
 import {uid} from './http.mjs';
 
-const diagramCorrectionKey = 'nakash-haim-diagram-names-2026-11-20-v1';
+const diagramCorrectionKey = 'nakash-confirmed-names-2026-11-20-v2';
 const diagramRetiredNames = {
   'doron-nir': ['דורון ניר', 'דורון נקאש', 'Doron Nir', 'Doron Nakash'],
   'alona-shai': ['אלונה', 'אלונה שי', 'אלונה נקאש', 'Alona', 'Alona Shai', 'Alona Nakash'],
+  'yair-medina-wife': ['אשתו של יאיר', "Yair's wife"],
 };
 
 // Explicit links are supplied by the family owner. Keep the historical profile
@@ -111,8 +112,8 @@ export function initializeSharedNakash(state) {
         state.sql.exec('INSERT INTO people (id,data) VALUES (?,?)', id, JSON.stringify(person));
         roster.push(person);
       }
-      // Correct only the mistaken first transcription, including profiles that
-      // already resolved to a historical tag ID. Preserve all saved media and dates.
+      // Replace retired placeholders and known transcription errors, including
+      // historical tag IDs. Preserve all saved media and dates.
       const retiredNames = correctDiagramNames ? diagramRetiredNames[p.id] || [] : [];
       let nameChanged = false;
       if (retiredNames.includes(person.name)) {
@@ -125,6 +126,7 @@ export function initializeSharedNakash(state) {
         person.nameEn = p.englishName;
         nameChanged = true;
       }
+      if (nameChanged && !p.placeholder) delete person.placeholder;
       const aliases = [...new Set([...(person.aliases || []), p.name, p.englishName, ...(p.aliases || [])].filter(name => name && !retiredNames.includes(name)))];
       const nakashBranch = branchForPerson(tree, p.id);
       if (nameChanged || person.nakashBranch !== nakashBranch || JSON.stringify(person.aliases) !== JSON.stringify(aliases) || p.deceased && !person.deceased) {

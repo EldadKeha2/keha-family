@@ -27,7 +27,7 @@ const PEOPLE = [
   ['yoni-gueta', 'יוני גואטה', 'Yoni Gueta', 'f', 'u-nakash-yoni', ['יוני מדינה', 'Yoni Medina']],
   ['aharon-gueta', 'אהרון גואטה', 'Aharon Gueta', 'm', 'u-nakash-yoni'],
   ['yair-medina', 'יאיר מדינה', 'Yair Medina', 'm', 'u-nakash-yair'],
-  ['yair-medina-wife', 'אשתו של יאיר', "Yair's wife", 'f', 'u-nakash-yair', [], {placeholder: true}],
+  ['yair-medina-wife', 'יעל', 'Yael', 'f', 'u-nakash-yair'],
   ['avrahumi-medina', 'אברהומי מדינה', 'Avrahumi Medina', 'm', 'u-nakash-avrahumi', [], {deceased: true, notes: 'ללא ילדים'}],
   ['naomi-malkhi', 'נעמי מלכי', 'Naomi Malkhi', 'f', 'u-nakash-naomi'],
   ['shalom-malkhi', 'שלום מלכי', 'Shalom Malkhi', 'm', 'u-nakash-naomi'],

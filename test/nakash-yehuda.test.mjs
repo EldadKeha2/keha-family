@@ -78,10 +78,11 @@ test('all new profiles are scoped and searchable, and the two Yehudas keep diffe
   assert.ok(findPeople(roster, 'רפי נקאש', 'haim').some(person => person.id === 'rafi-nakash'));
 });
 
-function browserFixture({phone = false, english = false, profile} = {}) {
+function browserFixture({phone = false, english = false, profile, textScale = 1} = {}) {
   const {document, window: dom} = parseHTML(nakashHTML(html, 'yehuda'));
   const location = {hash: profile ? '#person/' + profile : '#tree/yehuda', search: '', origin: 'https://family.example'};
   const window = {FAMILY_DATA: family, addEventListener(){}, dispatchEvent(){}, scrollTo(){}};
+  window.FamilyAccessibility = {getSettings:() => ({text:100 * textScale}), isReducedMotion:() => false};
   window.FamilyI18n = {isEnglish: english, language: english ? 'en' : 'he', t: value => value,
     html: (parts, ...values) => parts.reduce((output, part, index) => output + part + (values[index] ?? ''), ''),
     personName: person => english ? person.nameEn : person.name, branchName: branch => branch?.title,
@@ -122,6 +123,21 @@ test('desktop and phone trees render every member once, with both unions labeled
     const child = document.querySelector('[data-unit="u-nakash-tomer"]');
     assert.ok(parseFloat(child.style.top) - parseFloat(unit.style.top) >= (phone ? 295 : 340));
     assert.ok(document.querySelector('[data-person-card="yechiel-nakash"].memorial'));
+  }
+});
+
+test('Rafi and Ahuva connect to their children directly from their union, including on phones with enlarged text', () => {
+  for (const phone of [false, true]) for (const english of [false, true]) for (const textScale of [1, 1.5]) {
+    const document = browserFixture({phone, english, textScale});
+    const parent = document.querySelector('[data-unit="u-nakash-rafi"]');
+    const trunk = document.querySelector('#treeConnectors g[data-parent-unit="u-nakash-rafi"]');
+    assert.equal(trunk.dataset.parentPeople, 'rafi-nakash ahuva-nakash');
+    assert.equal(trunk.dataset.childUnits, 'u-nakash-tomer u-nakash-zohar u-nakash-dana');
+    const relationY = Number(/ ([\d.]+)H/.exec(parent.querySelector('.tree-partnerships .former').getAttribute('d'))[1]);
+    const expectedStart = parseFloat(parent.style.top) + ((phone ? 31 : 70) + relationY) * textScale;
+    assert.equal(Number(trunk.querySelector('.connector-start').getAttribute('cy')), expectedStart);
+    const child = document.querySelector('[data-unit="u-nakash-tomer"]');
+    assert.ok(parseFloat(child.style.top) - parseFloat(parent.style.top) >= (phone ? 295 : 340) * textScale, 'Partnership labels keep their clearance');
   }
 });
 

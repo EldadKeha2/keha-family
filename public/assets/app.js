@@ -241,7 +241,8 @@
     }
     for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,childUnits,lane=0} of connections){
       const extra=(depth===0?rootHistorySpace+rootSpacingAdjustment:0)+partnershipSpace,historyRoot=depth===0&&rootContentHeight>0;
-      const start=historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
+      // Join the parents' relationship line; label clearance belongs below them.
+      const start=parentPeople?y+(phone?37:76)*textScale:historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
       const middle=(historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra)+lane,end=y+levelHeight-7*textScale+extra;
       if(parentPeople)lines.push(`<g data-parent-unit="${safe(id)}" data-parent-people="${safe(parentPeople.join(' '))}" data-child-units="${safe(childUnits.join(' '))}">`);
       lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);
