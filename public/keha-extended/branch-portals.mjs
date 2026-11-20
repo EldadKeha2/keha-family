@@ -25,10 +25,11 @@ export function createBranchPortal(original={},id){
   }
   for(const root of portal.roots)delete result.units[root].generation;
   result.identities=Object.fromEntries(Object.entries(source.identities).filter(([,canonical])=>allowed.has(canonical)));
+  for(const id of allowed)if(source.people[id].researchBranch)result.branchIds.set(id,source.people[id].researchBranch);
   result.branches=id==='zechariah'?zechariahBranches.map(([key,label,titleEn])=>({id:'zechariah-'+key,unit:'u-saadia-'+key,label,shortLabel:label,titleEn,color:portal.color,mark:'❖'})):
     EXTENDED_BRANCHES.filter(branch=>portal.branches.includes(branch.id)).map(branch=>({...branch}));
   for(const branch of result.branches){
-    const visit=unitId=>{const unit=result.units[unitId];for(const personId of unit.people)result.branchIds.set(personId,branch.id);unit.children.forEach(visit);};
+    const visit=unitId=>{const unit=result.units[unitId];for(const personId of unit.people)if(result.people[personId].unit===unit.id||!result.branchIds.has(personId))result.branchIds.set(personId,branch.id);unit.children.forEach(visit);};
     visit(branch.unit);
   }
   return result;

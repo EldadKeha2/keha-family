@@ -51,10 +51,19 @@
     const value = birthdayOf(p), death = p.deathDate ? window.FamilyDates.parse(p.deathDate) : null;
     const age = invalid ? null : p.deceased ? death ? window.FamilyDates.age(value,death.date) : null : window.FamilyDates.age(value);
     const unknown = value === '1.1.1111';
+    const firstYear=p.birthYear??p.birthYearMin,lastYear=p.birthYear??p.birthYearMax;
+    const yearOnly=unknown&&Number.isInteger(firstYear)&&Number.isInteger(lastYear)&&firstYear>1111&&lastYear>=firstYear&&lastYear<=new Date().getFullYear();
+    const yearSource=I18n.isEnglish?p.birthYearSourceEn:p.birthYearSource;
+    const unknownLabel=yearOnly?`${firstYear===lastYear?firstYear:firstYear+'–'+lastYear}${yearSource?' · '+yearSource:''}`:(I18n.isEnglish?'Not added yet':I18n.t('טרם הוזן'));
+    const rangeLabel=range=>range?(range.min===range.max?String(range.min):range.min+'–'+range.max):'';
+    const currentRange=!invalid&&yearOnly?rangeLabel(window.FamilyDates.ageRange?.(firstYear,lastYear)):!invalid&&p.deceased&&p.researchNotes&&!unknown?String(window.FamilyDates.age(value)??''):'';
+    const deathRange=!invalid&&yearOnly&&death?rangeLabel(window.FamilyDates.ageRange?.(firstYear,lastYear,death.date)):'';
+    const yearAgeHTML=(deathRange?`<span class="person-age">${safe(I18n.isEnglish?`Aged ${deathRange} at death`:`גיל בפטירה: ${deathRange}`)}</span>`:'')+(currentRange?`<span class="person-age">${safe(I18n.isEnglish?(p.deceased?`Would be ${currentRange} today`:`Calculated age today: ${currentRange}`):(p.deceased?`אילו ${p.gender==='f'?'הייתה':'היה'} בחיים היום: ${currentRange}`:`גיל מחושב להיום: ${currentRange}`))}</span>`:'');
+    const deathBeforeHTML=!death&&p.deathBefore?`<span class="person-death-date">${safe(I18n.isEnglish?`Died before ${p.deathBefore}`:`${p.gender==='f'?'נפטרה':'נפטר'} לפני ${p.deathBefore}`)}</span>`:'';
     const birthdayEdit=canEdit?`<button type="button" class="birthday-edit" data-edit-birthday="${safe(p.id)}" aria-label="${I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה'}">${pencil}</button>`:'';
-    if(birthOnly)return `<span class="birthday-line"><bdi>${safe(invalid?I18n.t('תאריך לבדיקה'):unknown?I18n.t('טרם הוזן'):I18n.date(value))}</bdi>${birthdayEdit}</span>${deathEdit}`;
-    if(I18n.isEnglish)return `<span class="birthday-line"><bdi>${safe(invalid?'Date needs checking':unknown?'Not added yet':I18n.date(value))}</bdi>${birthdayEdit}</span>${age!==null?`<span class="person-age">(${p.deceased?`aged ${age} at death`:age})</span>`:''}${death?`<span class="person-death-date">Died on <bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathEdit}${p.aliyahYear?`<span class="person-aliyah-year">Moved to Israel in <bdi>${safe(aliyah)}</bdi></span>`:''}`;
-    return I18n.html`<span class="birthday-line"><bdi>${safe(invalid ? I18n.t('תאריך לבדיקה') : unknown ? I18n.t('טרם הוזן') : I18n.date(value))}</bdi>${birthdayEdit}</span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?I18n.t('גיל בפטירה'):I18n.t('גיל')} ${age}">${p.deceased?I18n.html`(${p.gender==='f'?I18n.t('בת'):I18n.t('בן')} ${age} בפטירת${p.gender==='f'?I18n.t('ה'):I18n.t('ו')})`:`(${age})`}</span>` : ''}${death?I18n.html`<span class="person-death-date">${p.gender==='f'?I18n.t('נפטרה'):I18n.t('נפטר')} ב־<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathEdit}${p.aliyahYear?I18n.html`<span class="person-aliyah-year">${p.gender==='f'?I18n.t('עלתה'):I18n.t('עלה')} לארץ ב־<bdi>${safe(aliyah)}</bdi></span>`:''}`;
+    if(birthOnly)return `<span class="birthday-line"><bdi>${safe(invalid?I18n.t('תאריך לבדיקה'):unknown?unknownLabel:I18n.date(value))}</bdi>${birthdayEdit}</span>${deathEdit}`;
+    if(I18n.isEnglish)return `<span class="birthday-line"><bdi>${safe(invalid?'Date needs checking':unknown?unknownLabel:I18n.date(value))}</bdi>${birthdayEdit}</span>${age!==null?`<span class="person-age">(${p.deceased?`aged ${age} at death`:age})</span>`:''}${yearAgeHTML}${death?`<span class="person-death-date">Died on <bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathBeforeHTML}${deathEdit}${p.aliyahYear?`<span class="person-aliyah-year">Moved to Israel in <bdi>${safe(aliyah)}</bdi></span>`:''}`;
+    return I18n.html`<span class="birthday-line"><bdi>${safe(invalid ? I18n.t('תאריך לבדיקה') : unknown ? unknownLabel : I18n.date(value))}</bdi>${birthdayEdit}</span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?I18n.t('גיל בפטירה'):I18n.t('גיל')} ${age}">${p.deceased?I18n.html`(${p.gender==='f'?I18n.t('בת'):I18n.t('בן')} ${age} בפטירת${p.gender==='f'?I18n.t('ה'):I18n.t('ו')})`:`(${age})`}</span>` : ''}${yearAgeHTML}${death?I18n.html`<span class="person-death-date">${p.gender==='f'?I18n.t('נפטרה'):I18n.t('נפטר')} ב־<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathBeforeHTML}${deathEdit}${p.aliyahYear?I18n.html`<span class="person-aliyah-year">${p.gender==='f'?I18n.t('עלתה'):I18n.t('עלה')} לארץ ב־<bdi>${safe(aliyah)}</bdi></span>`:''}`;
   }
 
   function rootHistoryHTML(p) {
@@ -229,7 +238,7 @@
     function place(id,left,depth,spacing=0){
       const unit=data.units[id],layout=layouts.get(id),x=left+layout.anchor,y=top+depth*levelHeight+(depth?rootHistorySpace:0)+spacing,partnershipSpace=phone&&unit.relationships?100*textScale:0;
       positions.push({id,unit,x,y,width:nodeWidth(unit),depth});const kids=children(unit),centers=[];
-      for(const child of kids){const childLeft=left+layout.childLefts.get(child);centers.push(childLeft+layouts.get(child).anchor);place(child,childLeft,depth+1,spacing+partnershipSpace);}
+      for(const child of kids){const childLeft=left+layout.childLefts.get(child);centers.push(childLeft+layouts.get(child).anchor);place(child,childLeft,depth+(data.units[child].parentage==='grandchild'?2:1),spacing+partnershipSpace);}
       if(kids.length){
         const display=unit.displayPeople||unit.people,groups=(unit.relationships||[]).map(union=>({union,kids:kids.filter(child=>union.children.includes(child))})).filter(group=>group.kids.length);
         const assigned=new Set(groups.flatMap(group=>group.kids)),remaining=kids.filter(child=>!assigned.has(child));
@@ -237,7 +246,7 @@
         groups.forEach(({union,kids:groupKids},index)=>{
           const offset=union?union.people.reduce((sum,id)=>sum+(display.indexOf(id)+.5)/display.length,0)/union.people.length-.5:0;
           connections.push({id,x:x+(I18n.isEnglish?1:-1)*offset*nodeWidth(unit),y,centers:groupKids.map(child=>centers[kids.indexOf(child)]),depth,partnershipSpace,
-            parentPeople:union?.people,childUnits:groupKids,lane:(index-(groups.length-1)/2)*14*textScale});
+            parentPeople:union?.people,parentRelationship:union?.relationship,childUnits:groupKids,depthStep:union?.relationship==='grandparent'?2:1,lane:(index-(groups.length-1)/2)*14*textScale});
         });
       }
     }
@@ -247,7 +256,7 @@
       data.branches.forEach((branch,index)=>{const x=(index%2===0?380:140)*textScale,y=(220+Math.floor(index/2)*170)*textScale,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174*textScale,depth:1});lines.push(`<path d="M${260*textScale} ${y-30*textScale}H${x}V${y-10*textScale}"/>`);});
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);height=Math.max(...positions.map(item=>item.y))+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
     camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.setProperty('--a11y-tree-scale',String(textScale));world.style.width=width+'px';world.style.height=height+'px';
-    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(unit.parentage==='adopted')label=`<span class="branch-label">${I18n.isEnglish?'Adopted son':'בן מאומץ'}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
+    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(unit.parentage==='adopted')label=`<span class="branch-label">${I18n.isEnglish?'Adopted son':'בן מאומץ'}</span>`;if(unit.parentage==='grandchild')label=`<span class="branch-label">${I18n.isEnglish?'Grandson · father under research':'נכד · האב בבירור'}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>person.branch===unit.branch&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
     let rootSpacingAdjustment=0,rootContentHeight=0;
     if(!phone&&rootHistorySpace){
       const rootElement=world.querySelector(`[data-unit="${treeUnitKey(rootId)}"]`),firstChild=positions.find(item=>item.depth===1);
@@ -274,12 +283,12 @@
         camera.height=height;world.style.height=height+'px';
       }
     }
-    for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,childUnits,lane=0} of connections){
+    for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,parentRelationship,childUnits,depthStep=1,lane=0} of connections){
       const extra=(depth===0?rootHistorySpace+rootSpacingAdjustment:0)+partnershipSpace,historyRoot=depth===0&&rootContentHeight>0;
       // Join the parents' relationship line; label clearance belongs below them.
       const start=parentPeople?.length>1?y+(phone?37:76)*textScale:historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
-      const middle=(historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra)+lane,end=y+levelHeight-7*textScale+extra;
-      if(parentPeople)lines.push(`<g data-parent-unit="${safe(id)}" data-parent-people="${safe(parentPeople.join(' '))}" data-child-units="${safe(childUnits.join(' '))}">`);
+      const middle=(historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra)+lane,end=y+levelHeight*depthStep-7*textScale+extra;
+      if(parentPeople)lines.push(`<g data-parent-unit="${safe(id)}" data-parent-people="${safe(parentPeople.join(' '))}" data-child-units="${safe(childUnits.join(' '))}" data-parent-relationship="${safe(parentRelationship)}"${parentRelationship==='grandparent'?' stroke-dasharray="6 5"':''}>`);
       lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);
       if(parentPeople||centers.length>1)lines.push(`<path d="M${Math.min(x,...centers)} ${middle}H${Math.max(x,...centers)}"/>`);
       for(const cx of centers)lines.push(`<path d="M${cx} ${middle}V${end}"/>`);

@@ -12,11 +12,24 @@ export function initializeExtendedKeha(state) {
     const updateChart=!state.rows('SELECT id FROM meta WHERE id=?',migration).length;
     const kehatMigration='extended-kehat-two-branches-2026-11-20-v1';
     const updateKehat=!state.rows('SELECT id FROM meta WHERE id=?',kehatMigration).length;
+    const researchMigration='extended-kehat-certificate-families-2026-11-20-v1';
+    const updateResearch=!state.rows('SELECT id FROM meta WHERE id=?',researchMigration).length;
     for(const seed of EXTENDED_PEOPLE){
       if(seed.placeholder)continue;
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
       // Never replace an existing date, biography, portrait or name on deploy.
       state.sql.exec('INSERT OR IGNORE INTO people (id,data) VALUES (?,?)',seed.id,JSON.stringify(person));
+      if(updateResearch&&(seed.id.startsWith('kehat-')||['saadia-saadia','saadia-shalom'].includes(seed.id))){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',researchMigration+':backup:'+seed.id,JSON.stringify(saved));
+        // Biography, names chosen by relatives, dates and portraits stay intact.
+        // Source notes and graph membership are separate, versioned metadata.
+        for(const key of ['researchNotes','researchSources','researchBranch','birthYear','birthYearMin','birthYearMax','birthYearSource','birthYearSourceEn','deathBefore','lifeRecords'])if(seed[key]!==undefined)saved[key]=structuredClone(seed[key]);
+        if(seed.deathDate&&!saved.deathDate){saved.deathDate=seed.deathDate;saved.deceased=true;}
+        saved.unit=seed.unit;
+        saved.aliases=[...new Set([...(saved.aliases||[]),...(seed.aliases||[])])];
+        state.savePerson(saved);
+      }
       if(updateChart&&seed.id==='keha-zechariah'){
         const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
         state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',migration+':backup:'+seed.id,JSON.stringify(saved));
@@ -51,6 +64,7 @@ export function initializeExtendedKeha(state) {
     }
     if(updateChart)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',migration,'done');
     if(updateKehat)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',kehatMigration,'done');
+    if(updateResearch)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',researchMigration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;

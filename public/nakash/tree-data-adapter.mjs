@@ -11,7 +11,7 @@ export function toOriginalFamilyData(family) {
     const unit = family.units[id];
     if(unit.generation===0)generation=0;
     units[id] = {...unit, generation, branch:branchForPerson(family, unit.people[0]), hasWedding:unit.relationship==='spouse'};
-    unit.children.forEach(child => visit(child, generation + 1));
+    unit.children.forEach(child => visit(child, generation + (family.units[child].parentage==='grandchild'?2:1)));
   }
   visit(family.root, 1);
   for (const branch of family.branches) if (!units[branch.unit]) visit(branch.unit, 1);

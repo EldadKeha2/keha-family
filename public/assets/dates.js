@@ -15,7 +15,13 @@
     if (today.getMonth() + 1 < born.month || (today.getMonth() + 1 === born.month && today.getDate() < born.day)) years--;
     return years >= 0 ? years : null;
   }
-  window.FamilyDates = {parse, age};
+  // A source year is not a birthday. Keep the possible completed ages as a range.
+  function ageRange(firstYear, lastYear = firstYear, today = new Date()) {
+    const current = today.getFullYear();
+    if (!Number.isInteger(firstYear) || !Number.isInteger(lastYear) || firstYear <= 1111 || lastYear < firstYear || lastYear > current) return null;
+    return {min: Math.max(0, current - lastYear - (today.getMonth() === 11 && today.getDate() === 31 ? 0 : 1)), max: current - firstYear};
+  }
+  window.FamilyDates = {parse, age, ageRange};
 
   // Keep numeric validation, but expose a keyboard with a space key on phones.
   const groups = '.date-fields, .photo-date-fields, .photo-edit-date-fields';

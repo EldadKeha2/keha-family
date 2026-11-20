@@ -1,4 +1,5 @@
 import {SAADIA_PEOPLE,SAADIA_UNITS,ZECHARIAH_CHILDREN} from './saadia-data.mjs';
+import {KEHAT_RESEARCH_PEOPLE,applyKehatResearchUnits} from './kehat-research.mjs';
 
 export const EXTENDED_NAME = 'משפחת קהא המורחבת';
 export const EXTENDED_COLOR = '#345d83';
@@ -46,8 +47,10 @@ const people = [
   ['kehat-lihi','ליהי קהת','Lihi Kehat','f','u-kehat-lihi'],
   ['keha-yosef-yissachar','יוסף יששכר','Yosef Yissachar','m','u-keha-yissachar'],
 ];
-export const EXTENDED_PEOPLE = Object.freeze([...people.map(([id,name,englishName,gender,unit,aliases=[],details={}]) =>
-  Object.freeze({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE]);
+const seedPeople=new Map([...people.map(([id,name,englishName,gender,unit,aliases=[],details={}]) =>
+  ({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE].map(p=>[p.id,p]));
+for(const update of KEHAT_RESEARCH_PEOPLE){const before=seedPeople.get(update.id)||{};seedPeople.set(update.id,{...before,...update,aliases:[...new Set([...(before.aliases||[]),...(update.aliases||[])])]});}
+export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(Object.freeze));
 
 const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);
 // The owner confirmed all four children of Saadia and Miriam, in this order.
@@ -90,6 +93,7 @@ export function createExtendedFamily(original = {}) {
   const result = {title:EXTENDED_NAME, root:'u-root', people:{}, units:{}, branches:EXTENDED_BRANCHES, branchIds:new Map(), identities:{}};
   for (const [id,members,children,parent,details={}] of units) result.units[id] = {id,people:[...members],children:[...children],parent,relationship:members.length>1?'spouse':'single',...structuredClone(details)};
   for (const unit of SAADIA_UNITS) result.units[unit.id]=structuredClone(unit);
+  applyKehatResearchUnits(result.units);
   for (const seed of EXTENDED_PEOPLE){
     const id=original.identities?.[seed.id] || (seed.sharedProfileId&&roster[seed.sharedProfileId]?seed.sharedProfileId:seed.id);
     if(id!==seed.id)result.identities[seed.id]=id;
@@ -122,12 +126,13 @@ export function createExtendedFamily(original = {}) {
   result.branchIds.set('keha-zechariah-father','shlomo');
   result.branchIds.set('saadia-elder','zechariah');
   for(const seed of SAADIA_PEOPLE)result.branchIds.set(canonical(seed.id),'zechariah');
+  for(const seed of EXTENDED_PEOPLE)if(seed.researchBranch)result.branchIds.set(canonical(seed.id),seed.researchBranch);
   // Kehat and Yissachar remain independent; no common ancestor is inferred.
   for (const branch of EXTENDED_BRANCHES) {
     const todo=[branch.unit];
     while(todo.length){
       const unit=result.units[todo.pop()];if(!unit)continue;
-      for(const id of unit.people)result.branchIds.set(id,branch.id);
+      for(const id of unit.people)if(result.people[id].unit===unit.id||!result.branchIds.has(id))result.branchIds.set(id,branch.id);
       todo.push(...unit.children);
     }
   }

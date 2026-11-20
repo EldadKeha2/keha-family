@@ -28,9 +28,21 @@ function fixture(userAgent = 'Android Mobile') {
   }
   const fields = group();
   const navigator = {userAgent};
-  vm.runInNewContext(source, {window: {}, document, navigator});
-  return {document, fields, group, emit, navigator};
+  const window={};
+  vm.runInNewContext(source, {window, document, navigator});
+  return {window, document, fields, group, emit, navigator};
 }
+
+test('year-only records retain possible ages without inventing a birthday',()=>{
+  const {ageRange}=fixture().window.FamilyDates;
+  const range=(...args)=>JSON.parse(JSON.stringify(ageRange(...args)));
+  assert.deepEqual(range(1917,1917,new Date(2026,10,20)),{min:108,max:109});
+  assert.deepEqual(range(1921,1922,new Date(2026,10,20)),{min:103,max:105});
+  assert.deepEqual(range(1941,1941,new Date(2015,6,12)),{min:73,max:74});
+  assert.deepEqual(range(1936,1936,new Date(2026,11,31)),{min:90,max:90});
+  assert.deepEqual(range(2026,2026,new Date(2026,0,1)),{min:0,max:0});
+  for(const years of [[1111,1111],[2027,2027],[1922,1921],['1917',1917]])assert.equal(ageRange(...years,new Date(2026,10,20)),null);
+});
 
 test('phone spaces advance day to month to year and preserve all date values', () => {
   for (const ua of ['Android Mobile', 'iPhone', 'iPod']) {

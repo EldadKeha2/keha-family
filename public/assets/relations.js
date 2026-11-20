@@ -13,17 +13,22 @@
     const parent=unit.people[0]===personId?units[unit.parent]:null;
     const unions=unit.relationships?.filter(item=>item.people.includes(personId));
     const parentUnions=parent?.relationships?.filter(item=>item.children.includes(unit.id));
-    const parents=parentUnions?parentUnions.filter(item=>item.relationship!=='adopted').flatMap(item=>item.people):parent?.people||[];
+    const isGrandchild=parentUnions?.some(item=>item.relationship==='grandparent');
+    const parents=parentUnions?parentUnions.filter(item=>!['adopted','grandparent'].includes(item.relationship)).flatMap(item=>item.people):parent?.people||[];
+    const grandparents=known((parentUnions||[]).filter(item=>item.relationship==='grandparent').flatMap(item=>item.people));
+    const grandchildren=known((unions||[]).filter(item=>item.relationship==='grandparent').flatMap(item=>childIds(item)));
     const adoptedParents=known((parentUnions||[]).filter(item=>item.relationship==='adopted').flatMap(item=>item.people));
     const adoptedChildren=known((unions||[]).filter(item=>item.relationship==='adopted').flatMap(item=>childIds(item)));
     return {
       partners:known(unions?unions.filter(item=>item.relationship!=='former').flatMap(item=>item.people):unit.people),
       ...(unions?{formerPartners:known(unions.filter(item=>item.relationship==='former').flatMap(item=>item.people))}:{}),
       parents:known([...parents,...explicitParents]),
+      ...(grandparents.length?{grandparents}:{}),
+      ...(grandchildren.length?{grandchildren}:{}),
       ...(adoptedParents.length?{adoptedParents}:{}),
-      children:known([...(unions?unions.filter(item=>item.relationship!=='adopted').flatMap(item=>childIds(item)):childIds(unit)),...explicitChildren]),
+      children:known([...(unions?unions.filter(item=>!['adopted','grandparent'].includes(item.relationship)).flatMap(item=>childIds(item)):childIds(unit)),...explicitChildren]),
       ...(adoptedChildren.length?{adoptedChildren}:{}),
-      siblings:known([...(parent?childIds(parent).filter(id=>id!==unit.people[0]):[]),...explicitSiblings])
+      siblings:known([...(parent&&!isGrandchild?childIds(parent).filter(id=>id!==unit.people[0]&&units[people[id]?.unit]?.parentage!=='grandchild'):[]),...explicitSiblings])
     };
   }
   window.FamilyRelations=Object.freeze({forPerson});

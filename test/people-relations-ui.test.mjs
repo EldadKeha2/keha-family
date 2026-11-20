@@ -3,16 +3,18 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import family from '../src/family.mjs';
+import {createKehatFamily} from '../public/keha-extended/branch-portals.mjs';
+import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const relationsSource=await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8');
 const peopleSource=await readFile(new URL('../public/assets/people.js',import.meta.url),'utf8');
-async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overrides={},pageAlbums={},photoPages=null,pagedAlbums={},mediaView=null,pageView=null,phone=false,photoPrepare=async()=>[]}={}){
+async function fixture(id='eldad',{familyData=family,navigation=false,entryUrl,english=false,overrides={},pageAlbums={},photoPages=null,pagedAlbums={},mediaView=null,pageView=null,phone=false,photoPrepare=async()=>[]}={}){
   const browser=navigation?browserHistory(entryUrl||'https://family.test/#person/'+id):null;let view=browser?browser.location.hash.slice(1).split('/')[0]:'person';
   const nodes=new Map(),listeners=new Map(),requests=[],registered=[],toasts=[],prepared=[],location=browser?.location||{hash:'#person/'+id,origin:'https://family.test'},callbacks=new Map();
   function node(name){if(!nodes.has(name))nodes.set(name,{innerHTML:'',hidden:false,open:false,value:'',files:[],clicks:0,click(){this.clicks++;},showModal(){this.open=true;},close(){this.open=false;},scrollIntoView(){},addEventListener:(kind,callback)=>listeners.set(name+':'+kind,callback),querySelector:()=>null});return nodes.get(name);}
-  const summary=id=>({...family.people[id],...overrides[id]});
-  const window={FAMILY_DATA:family,FamilyMedia:{register:(...args)=>registered.push(args)},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',error:String,mediaName:item=>item.caption||item.name||'',fetch:async url=>{
+  const summary=id=>({...familyData.people[id],...overrides[id]});
+  const window={FAMILY_DATA:familyData,FamilyMedia:{register:(...args)=>registered.push(args)},FamilyI18n:{isEnglish:english,language:english?'en-US':'he',error:String,mediaName:item=>item.caption||item.name||'',fetch:async url=>{
     requests.push(String(url));if(String(url).startsWith('api/media/'))return mediaView?mediaView(String(url)):{ok:true,json:async()=>({item:{id:String(url).split('/')[2],kind:'photo',src:'/media/current'}})};
     if(pageView){const custom=pageView(String(url));if(custom)return custom;}
     const id=decodeURIComponent(String(url).match(/api\/people\/([^/]+)\/page/)[1]);
@@ -23,7 +25,7 @@ async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overr
       return [key,{items:pages[page-1],page,pages:pages.length,total:pages.flat().length,size:pages[0].length}];
     }))})};
   }},scrollTo(){},addEventListener(event,callback){callbacks.set(event,callback);browser?.addEventListener(event,callback);}};
-  window.FamilyApp={getPerson:id=>family.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},toast:message=>toasts.push(message),getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
+  window.FamilyApp={getPerson:id=>familyData.people[id],getPersonSummary:summary,nameOf:id=>english?summary(id).nameEn:summary(id).name,birthdayHTML:()=>'',updatePerson(){},toast:message=>toasts.push(message),getView:()=>view,setView(next,sync=true){if(browser&&sync)window.FamilyNavigation.go('#'+next);view=next;window.FamilyPeople.activate(next);}};
   window.FamilyPhotoEditor={prepare:(files,options)=>{prepared.push({files,options});return photoPrepare(files,options);}};
   const document={getElementById:node,addEventListener:(event,callback)=>callbacks.set(event,callback),querySelector:()=>null,visibilityState:'visible'};
   const context=vm.createContext({window,document,location,history:browser?.history||{pushState(_a,_b,hash){location.hash=hash;}},matchMedia:query=>({matches:phone&&query==='(max-width:700px)'}),URLSearchParams,URL,console,setInterval:()=>0,setTimeout,clearTimeout});
@@ -37,6 +39,30 @@ async function fixture(id='eldad',{navigation=false,entryUrl,english=false,overr
   }};
 }
 const group=(html,key)=>html.match(new RegExp('<section class="person-family-group" data-relative-kind="'+key+'"[\\s\\S]*?<\\/section>'))[0];
+
+test('documented Kehat records appear beside the editable biography with safe source links',async()=>{
+  const data=toOriginalFamilyData(createKehatFamily(family));
+  const f=await fixture('kehat-tzadok',{familyData:data});
+  assert.match(f.html,/תיעוד ומקורות/);assert.match(f.html,/H57320/);assert.match(f.html,/7\.1\.1944/);
+  assert.match(f.html,/document_id=bcabe2ef7e3d3a93_294dece0e6a0b728#page=81/);
+  assert.match(f.html,/data-edit-about/);
+  const malicious=await fixture('eldad',{overrides:{eldad:{researchNotes:'<script>bad()</script>',researchSources:[{label:'Unsafe',url:'javascript:bad()'},{label:'A & B',url:'https://example.test/?a=1&b=2'}]}}});
+  assert.doesNotMatch(malicious.html,/<script>|href="javascript:/);assert.match(malicious.html,/&lt;script&gt;/);assert.match(malicious.html,/a=1&amp;b=2/);
+});
+
+test('a known grandfather appears as a grandfather while an unresolved father stays empty',async()=>{
+  const data=toOriginalFamilyData(createKehatFamily(family)),f=await fixture('kehat-ron',{familyData:data});
+  assert.match(group(f.html,'grandparents'),/kehat-tzadok/);
+  assert.doesNotMatch(group(f.html,'parents'),/kehat-tzadok|kehat-reuven|kehat-shimon/);
+  assert.match(group(f.html,'children'),/kehat-gur/);
+});
+
+test('possible life dates remain visibly qualified and do not become confirmed profile dates',async()=>{
+  const data=toOriginalFamilyData(createKehatFamily(family)),f=await fixture('kehat-jidaan',{familyData:data});
+  assert.match(f.html,/רישום מצבה אפשרי · הזיהוי בבירור/);
+  assert.match(f.html,/1876–1877/);assert.match(f.html,/9\.12\.1962/);assert.match(f.html,/גיל בפטירה: 85/);
+  assert.equal(data.people['kehat-jidaan'].deathDate,undefined);
+});
 
 test('phone profile photo uploads offer camera or gallery, while other media and desktop keep their picker',async()=>{
  const f=await fixture('eldad',{phone:true});f.window.FamilyApp.apiEnabled=true;
