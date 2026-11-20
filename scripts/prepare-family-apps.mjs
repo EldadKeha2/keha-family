@@ -3,6 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {BRANCHES} from '../public/nakash/family-data.mjs';
 import {EXTENDED_NAME,EXTENDED_HOME} from '../public/keha-extended/family-data.mjs';
 import {SHLOMO_NAME,SHLOMO_HOME} from '../public/keha-extended/shlomo-data.mjs';
+import {BRANCH_PORTALS} from '../public/keha-extended/branch-portals.mjs';
 
 const families = BRANCHES.filter(branch => ['haim', 'yehuda', 'medina'].includes(branch.id));
 const generated = new URL('../src/family-app-origins.generated.mjs', import.meta.url);
@@ -41,6 +42,13 @@ export async function prepareFamilyApps({env = process.env, apiFetch = fetch, ve
       const ready=await verifyFetch('https://keha-family.eldadkeha.workers.dev'+family.home+'manifest.webmanifest',{signal:AbortSignal.timeout(15000)});
       if(ready.ok && (await ready.json()).name===family.label)targets.push(family);
     } catch { /* Keep the existing verified applications available during rollout. */ }
+  }
+  // These routes have completed their initial rollout. A future transient
+  // failure must stop the build, not silently remove their working app links.
+  for(const portal of Object.values(BRANCH_PORTALS)){
+    const response=await verifyFetch('https://keha-family.eldadkeha.workers.dev'+portal.home+'manifest.webmanifest',{signal:AbortSignal.timeout(15000)});
+    if(!response.ok||(await response.json()).name!==portal.name)throw Error('The '+portal.id+' family portal must be live before its independent installation is activated.');
+    targets.push({id:portal.id,label:portal.name,home:portal.home});
   }
   for (const family of targets) {
     const config = JSON.parse(await read(new URL('../family-apps/' + family.id + '/wrangler.jsonc', import.meta.url), 'utf8'));
