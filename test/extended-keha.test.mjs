@@ -147,6 +147,7 @@ test('desktop and mobile keep all four circles on one hub, expand each branch in
     for(const [branch,person] of [['zechariah','keha-zechariah'],['kehat','kehat-hadassah'],['yissachar','keha-yosef-yissachar']]){
       document.querySelector('#extendedKehaHub [data-branch="'+branch+'"]').click();
       assert.ok(document.querySelector('#treeNodes [data-person="'+person+'"]'),branch);
+      assert.ok(document.getElementById('treeBreadcrumb').textContent.startsWith(EXTENDED_NAME+' › '));
       assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,4);
       document.querySelector('#extendedKehaHub [data-branch="all"]').click();
       assert.equal(document.body.dataset.extendedBranch,'all');

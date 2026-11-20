@@ -25,6 +25,7 @@
   }
   function renderHome(){const home=document.getElementById('extendedKehaHomeHub');if(home)home.innerHTML=markup('all','home');}
   window.FamilyExtendedKeha={
+    title:()=>tr('משפחת קהא המורחבת','The Extended Keha Family'),
     renderTree(state){
       const hub=document.getElementById('extendedKehaHub');
       document.body.dataset.extendedBranch=state.branch;

@@ -253,7 +253,7 @@
     }
     $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
 
-    const roots=scopedViews?data.units[data.root].people.map(id=>nameOf(data.people[id])).join(' · '):I18n.t('יונה ושלמה');
+    const roots=scopedViews?(window.FamilyExtendedKeha?.title?.()||data.units[data.root].people.map(id=>nameOf(data.people[id])).join(' · ')):I18n.t('יונה ושלמה');
     const branchesLabel=scopedViews?(I18n.isEnglish?'All the family · Four branches':'כל המשפחה · ארבעת הענפים'):I18n.t('כל המשפחה · ששת הענפים');
     $('treeBreadcrumb').textContent=state.branch==='all'?(overview?branchesLabel:I18n.t('כל המשפחה · כל הדורות')):roots+' › '+I18n.branchName(branchFor(state.branch));
     for(const [id,selected]of [['overviewButton',overview],['fullTreeButton',!overview]]){$(id).classList.toggle('selected',selected);$(id).setAttribute('aria-pressed',String(selected));}
