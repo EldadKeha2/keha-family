@@ -1,16 +1,30 @@
 (() => {
  'use strict';
  const key='keha-tree-guide-v1';let shown=false,host=null,target=null,timer=null,events=null;
+ let mobileHintShown=false;
  const tr=(he,en)=>window.FamilyI18n.isEnglish?en:he;
  function hide(){clearTimeout(timer);events?.abort();events=null;host?.remove();host=null;target?.classList.remove('tree-guide-target');target=null;}
+ function showMobileHint(){
+  const hint=document.querySelector('.tree-mobile-person-hint');
+  if(!hint||mobileHintShown)return;
+  mobileHintShown=true;
+  hint.classList.add('is-blinking');
+  let fallback;
+  const dismiss=()=>{clearTimeout(fallback);hint.hidden=true;hint.classList.remove('is-blinking');hint.removeEventListener('animationend',onAnimationEnd);};
+  const onAnimationEnd=event=>{if(event.target===hint&&event.animationName==='tree-profile-hint-blink')dismiss();};
+  hint.addEventListener('animationend',onAnimationEnd);
+  fallback=setTimeout(dismiss,2400);
+ }
  function show(force=false){
   if(document.body.dataset.activeView!=='tree')return;
+  const mobile=window.innerWidth<=700;
+  if(mobile&&!force){showMobileHint();return;}
   let seen=false;try{seen=sessionStorage.getItem(key)==='seen';}catch{}
   if(!force&&(shown||seen))return;
   const viewport=document.getElementById('treeViewport'),name=viewport?.querySelector('.tree-unit[data-unit="'+window.FAMILY_DATA.root+'"] .person-name')||viewport?.querySelector('.person-name');
   if(!viewport||!name)return;
   hide();shown=true;try{sessionStorage.setItem(key,'seen');}catch{}
-  target=name;target.classList.add('tree-guide-target');host=document.createElement('div');host.className='tree-guide-layer';
+  target=name;target.classList.add('tree-guide-target');host=document.createElement('div');host.className='tree-guide-layer'+(mobile?' tree-guide-mobile':'');
   host.innerHTML=`<svg class="tree-guide-arrow" aria-hidden="true"><defs><marker id="treeGuideArrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1L6 4L1 7"/></marker></defs><path class="tree-guide-arrow-line" marker-end="url(#treeGuideArrowhead)"/></svg><aside class="tree-guide-card" role="status" aria-live="polite"><span class="tree-guide-eyebrow"><img class="tree-guide-fez" src="assets/fez.svg" alt="" width="30" height="30">${tr('כל שם הוא סיפור','Every name tells a story')}</span><p>${tr('לחץ על שם לפתיחת העמוד האישי','Click a name to open their personal page')}</p><button type="button" class="tree-guide-close" aria-label="${tr('סגירת ההדרכה','Dismiss tip')}">×</button><span class="tree-guide-countdown" aria-hidden="true"></span></aside>`;
   viewport.append(host);
   const view=viewport.getBoundingClientRect(),r=name.getBoundingClientRect(),card=host.querySelector('.tree-guide-card'),arrow=host.querySelector('.tree-guide-arrow');
@@ -27,7 +41,7 @@
   viewport.addEventListener('pointerdown',event=>{if(!event.target.closest('.tree-guide-card'))hide();},options);
   viewport.addEventListener('wheel',hide,{...options,passive:true});
   window.addEventListener('resize',hide,options);document.addEventListener('keydown',event=>{if(event.key==='Escape')hide();},options);
-  timer=setTimeout(hide,8000);
+  timer=setTimeout(hide,mobile?2400:8000);
  }
  document.addEventListener('DOMContentLoaded',()=>document.getElementById('treeGuideButton')?.addEventListener('click',()=>show(true)));
  window.FamilyTreeGuide={show,hide};

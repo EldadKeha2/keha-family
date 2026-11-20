@@ -46,7 +46,7 @@ unit('maor',[person('maor','מאור','Maor')],[],'oded');
 
 unit('saadia',[person('saadia','סעדיה קהא','Saadia Keha','m',{birthYear:1918,birthYearSource:'אישור בתו אביבה',birthYearSourceEn:'Confirmed by his daughter Aviva',researchNotes:'שנת 1918 אושרה בידי בתו אביבה ונמסרה בידי אלדד. בפנקס תש״ב מופיעה 1920; הפער נשמר לבירור. יום וחודש הלידה אינם ידועים.',about:'אביהם של אביבה, טוני ורמי. בנו של זכריה קהא הבן ונכדו של סעדיה קהא הדוד. מופיע בפנקס הבוחר בשעריים משנת 1937, שורה 790: קהא, סעדיה, זכריה, שערים. נישא לסעידה ב־21.2.1945, לפי תעודה H 69399.'}),person('saida','סעידה קהא','Saida Keha','f',{sharedProfileId:'extra-b3318c4c12cc4e83886ee902',parents:['saadia-saida-father','saadia-saida-mother'],about:'נישאה לסעדיה קהא ב־21.2.1945, לפי תעודת הנישואין H 69399. בתעודה נרשמו הוריה יוסף ושרה; פענוח שם המשפחה טרם הושלם.'})],['aviva','toni','rami']);
 unit('aviva',[person('aviva','אביבה ארצי','Aviva Arzi','f',{aliases:['אביבה קהא']}),person('alon','אלון ארצי','Alon Arzi','m')],['moshe-arzi','erez','oren'],'saadia');
-unit('moshe-arzi',[person('moshe-arzi','משה ארצי','Moshe Arzi','m'),person('orit','אורית','Orit','f')],[],'aviva');
+unit('moshe-arzi',[person('moshe-arzi','תומר ארצי','Tomer Arzi','m'),person('orit','אורית','Orit','f')],[],'aviva');
 unit('erez',[person('erez','ארז ארצי','Erez Arzi','m')],[],'aviva');
 unit('oren',[person('oren','אורן ארצי','Oren Arzi','m')],[],'aviva');
 unit('toni',[person('toni','טוני קהא','Toni Keha')],[],'saadia');
