@@ -76,14 +76,14 @@
 
   function relativeCard(id,kind) {
     const person=app().getPersonSummary(id),name=app().nameOf(id),initials=name.split(/\s+/).filter(Boolean).map(part=>part[0]).slice(0,2).join('');
-    const role=kind==='parents'?({m:tr('אבא','Father'),f:tr('אמא','Mother')}[person.gender]||tr('הורה','Parent')):'';
+    const role=kind==='adoptedParents'?({m:tr('אבא מאמץ','Adoptive father'),f:tr('אמא מאמצת','Adoptive mother')}[person.gender]||tr('הורה מאמץ','Adoptive parent')):kind==='parents'?({m:tr('אבא','Father'),f:tr('אמא','Mother')}[person.gender]||tr('הורה','Parent')):'';
     const image=person.profile?`<img class="profile-photo" ${window.FamilyPhotoFraming?.profile(person)||''} src="${safe(person.profile)}" alt="" loading="lazy" decoding="async">`:`<span class="person-relative-initials">${safe(initials)}</span>`;
     return `<li><a class="person-relative-link" href="#person/${encodeURIComponent(id)}" data-person-relative="${safe(id)}" data-person="${safe(id)}" ${role?`title="${safe(role)}" `:''}aria-label="${safe((role?role+': ':'')+tr('פתיחת העמוד האישי של ','Open the personal page of ')+name)}"><span class="portrait" aria-hidden="true">${image}</span><span class="person-name">${safe(name)}${person.deceased?`&nbsp;<span class="memorial-inline">${tr('ז״ל','in memory')}</span>`:''}</span></a></li>`;
   }
   function relationsHTML(person) {
     const relatives=window.FamilyRelations?.forPerson(window.FAMILY_DATA,person.id)||{partners:[],parents:[],children:[],siblings:[]};
     const former=nakashHome&&window.FAMILY_DATA?.units[person.unit]?.relationship==='former';
-    const groups=[['partners',former?tr('בן/בת זוג לשעבר','Former partner'):tr('בן/בת זוג','Partner')],...(relatives.formerPartners?.length?[['formerPartners',tr('בן/בת זוג לשעבר','Former partner')]]:[]),['parents',tr('הורים','Parents')],['children',tr('ילדים','Children')],['siblings',tr('אחים/אחיות','Siblings')]];
+    const groups=[['partners',former?tr('בן/בת זוג לשעבר','Former partner'):tr('בן/בת זוג','Partner')],...(relatives.formerPartners?.length?[['formerPartners',tr('בן/בת זוג לשעבר','Former partner')]]:[]),['parents',tr('הורים','Parents')],...(relatives.adoptedParents?.length?[['adoptedParents',tr('הורים מאמצים','Adoptive parents')]]:[]),['children',tr('ילדים','Children')],...(relatives.adoptedChildren?.length?[['adoptedChildren',tr('ילדים מאומצים','Adopted children')]]:[]),['siblings',tr('אחים/אחיות','Siblings')]];
     const emptyLabel=tr('טרם נוספו פרטים','No details added yet');
     return `<section class="person-family" aria-label="${tr('משפחה קרובה','Close family')}">${groups.map(([key,title])=>`<section class="person-family-group" data-relative-kind="${key}" aria-labelledby="personFamily-${key}"><h3 id="personFamily-${key}">${title}</h3>${relatives[key].length?`<ul class="person-family-list">${relatives[key].map(id=>relativeCard(id,key)).join('')}</ul>`:`<p class="person-family-empty" title="${emptyLabel}"><span aria-hidden="true">—</span><span class="visually-hidden">${emptyLabel}</span></p>`}</section>`).join('')}</section>`;
   }

@@ -2,20 +2,33 @@ html[data-extended-keha] { --family-accent:#345d83; }
 html[data-extended-keha] .site-header .brand img { max-width:100%; }
 html[data-extended-keha] body[data-active-view=tree] .workspace-actions { display:none; }
 html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] :is(#treeViewport,.tree-topline,.tree-mobile-person-hint,.workspace-footer) { display:none; }
-.extended-hub-art { position:relative;isolation:isolate;max-width:1000px;min-height:570px;margin:0 auto; }
-.extended-olive-tree { position:absolute;width:49%;height:auto;left:25.5%;top:25px;z-index:-1;filter:drop-shadow(0 8px 12px #345d8314); }
+.extended-hub-art { position:relative;isolation:isolate;max-width:1000px;min-height:720px;margin:0 auto; }
+.extended-olive-tree { position:absolute;width:49%;height:auto;left:25.5%;top:170px;z-index:-1;filter:drop-shadow(0 8px 12px #345d8314); }
+.extended-ancestor { position:absolute;top:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:184px;min-height:112px;max-width:25%;padding:10px;border:1px solid var(--family-accent);border-radius:20px;background:var(--paper);color:var(--family-ink);text-decoration:none;text-align:center; }
+.extended-ancestor strong { font:600 calc(18px * var(--a11y-text-scale,1))/1.3 var(--serif); }
+.extended-ancestor span { font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans); }
+.extended-ancestor small { font:calc(12px * var(--a11y-text-scale,1))/1.35 var(--sans);color:var(--muted); }
+.extended-ancestor-shlomo { right:5%; }
+.extended-ancestor-zechariah { left:5%; }
+.extended-sibling-link { position:absolute;top:43px;left:calc(5% + 184px);right:calc(5% + 184px);height:1px;border-top:1px solid var(--family-accent);text-align:center; }
+.extended-sibling-link span { position:relative;top:-13px;padding:3px 12px;background:var(--paper);font:600 15px/1.4 var(--sans);color:var(--family-accent); }
+.extended-parent-line { position:absolute;top:112px;height:48px;border-inline-start:1px solid var(--family-accent); }
+.extended-parent-line::after { content:'';position:absolute;bottom:4px;left:-4px;width:7px;height:7px;border-bottom:1px solid var(--family-accent);border-right:1px solid var(--family-accent);transform:rotate(45deg); }
+.extended-parent-line-shlomo { right:calc(5% + 92px); }
+.extended-parent-line-zechariah { left:calc(5% + 92px); }
+.extended-cousin-label { position:absolute;top:354px;left:50%;transform:translateX(-50%);width:max-content;max-width:86%;margin:0;padding:5px 14px;border-radius:20px;background:var(--paper);text-align:center;color:var(--family-accent);font:600 calc(15px * var(--a11y-text-scale,1))/1.5 var(--sans); }
 .extended-hub-lines { position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:var(--family-accent);stroke-width:1.7;opacity:.65;z-index:-2; }
 .extended-hub-lines g>path { stroke-dasharray:5 6; }
 .extended-hub-lines marker path { stroke-width:1.1; }
 .extended-branch-circle { position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:184px;height:184px;max-width:25%;padding:16px;border:1px solid color-mix(in srgb,var(--family-accent) 48%,white);border-radius:50%;background:radial-gradient(circle at 40% 28%,#fffefa,var(--family-tint));color:var(--family-ink);text-align:center;box-shadow:0 0 0 5px var(--paper),0 0 0 6px var(--family-line),0 7px 20px #345d8310;text-decoration:none;cursor:pointer;transition:box-shadow .2s,background .2s; }
 .extended-branch-circle:hover,.extended-branch-circle[aria-pressed=true] { background:var(--family-tint);box-shadow:0 0 0 5px var(--paper),0 0 0 7px var(--family-accent),0 8px 24px #345d8322; }
-.extended-branch-circle:focus-visible,.extended-all-branches:focus-visible { outline:3px solid var(--family-accent);outline-offset:8px; }
+.extended-branch-circle:focus-visible,.extended-all-branches:focus-visible,.extended-ancestor:focus-visible { outline:3px solid var(--family-accent);outline-offset:8px; }
 .extended-branch-circle strong { font:600 calc(19px * var(--a11y-text-scale,1))/1.3 var(--serif);overflow-wrap:anywhere; }
 .extended-branch-note { font:calc(14px * var(--a11y-text-scale,1))/1.35 var(--sans); }
-.extended-shlomo { right:5%;top:40px; }
-.extended-zechariah { left:5%;top:40px; }
-.extended-kehat { right:5%;bottom:56px; }
-.extended-yissachar { left:5%;bottom:56px; }
+.extended-shlomo { right:5%;top:160px; }
+.extended-zechariah { left:5%;top:160px; }
+.extended-kehat { right:5%;bottom:40px; }
+.extended-yissachar { left:5%;bottom:40px; }
 .extended-branch-portrait { display:grid;place-items:center;position:relative;overflow:hidden;width:48px;height:48px;flex:none;border:1px solid var(--family-line);border-radius:50%;font:500 24px/1 var(--serif);background:#fffdf5; }
 .extended-branch-portrait img { width:100%;height:100%;object-fit:cover; }
 .extended-tree-seal { position:absolute;bottom:15px;left:calc(50% - 12px);font-size:24px;color:var(--family-accent); }
@@ -25,10 +38,21 @@ html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] :
 html[data-extended-keha] #extendedKehaHomeHub { margin-block:0 24px; }
 html[data-extended-keha] .tree-partnerships path { stroke:var(--family-accent); }
 @media(max-width:700px){
-  .extended-hub-art { min-height:490px;margin-inline:-8px; }
-  .extended-olive-tree { width:78%;left:11%;top:125px; }
+  .extended-hub-art { min-height:700px;margin-inline:-8px; }
+  .extended-olive-tree { width:78%;left:11%;top:245px; }
+  .extended-ancestor { width:142px;min-height:136px;max-width:42%;padding:9px 7px; }
+  .extended-ancestor strong { font-size:calc(16px * var(--a11y-text-scale,1)); }
+  .extended-ancestor span { font-size:calc(13px * var(--a11y-text-scale,1)); }
+  .extended-ancestor-shlomo { right:3%; }
+  .extended-ancestor-zechariah { left:3%; }
+  .extended-sibling-link { left:calc(3% + 142px);right:calc(3% + 142px);top:54px; }
+  .extended-sibling-link span { padding-inline:4px;font-size:12px;top:-11px; }
+  .extended-parent-line { top:136px;height:40px; }
+  .extended-parent-line-shlomo { right:calc(3% + 71px); }
+  .extended-parent-line-zechariah { left:calc(3% + 71px); }
+  .extended-cousin-label { top:340px;font-size:calc(14px * var(--a11y-text-scale,1)); }
   .extended-branch-circle { width:142px;height:142px;max-width:42%;padding:10px;gap:5px; }
-  .extended-shlomo,.extended-zechariah { top:18px; }
+  .extended-shlomo,.extended-zechariah { top:176px; }
   .extended-shlomo,.extended-kehat { right:3%; }
   .extended-zechariah,.extended-yissachar { left:3%; }
   .extended-kehat,.extended-yissachar { bottom:30px; }

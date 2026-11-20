@@ -44,11 +44,13 @@ function fixture(){
   return {call,json,objects,database,restart(){state=new FamilyState({storage},env);},close(){globalThis.fetch=originalFetch;database.close();}};
 }
 
-test('the extended family is a forest of four independent roots with no Nakash ancestry or invented parents',()=>{
+test('only the two confirmed cousin branches share paternal kinship; Kehat and Yissachar remain independent',()=>{
   const tree=createExtendedFamily(family),data=toOriginalFamilyData(tree);
   assert.equal(data.title,EXTENDED_NAME);
   assert.equal(data.branches.length,4);
-  for(const branch of EXTENDED_BRANCHES)assert.equal(data.units[branch.unit].parent,null);
+  assert.equal(data.units['u-root'].parent,'u-keha-zechariah-father');
+  assert.equal(data.units['u-keha-zechariah'].parent,'u-saadia-elder');
+  for(const id of ['u-keha-kehat','u-keha-yissachar','u-keha-zechariah-father','u-saadia-elder'])assert.equal(data.units[id].parent,null);
   assert.equal(data.people['zecharia-nakash'],undefined);
   assert.equal(data.people['margalit-nakash'],undefined);
   assert.deepEqual(data.units['u-keha-zechariah'].people,['keha-zechariah','keha-yehudit']);
@@ -59,6 +61,62 @@ test('the extended family is a forest of four independent roots with no Nakash a
   assert.equal(data.people.ora.id,family.people.ora.id);
   assert.equal(data.people['kehat-tzion'].branch,'kehat');
   assert.equal(createFamily(family).people['kehat-jidaan'],undefined);
+});
+
+test('Saadia’s chart retains five subbranches, correct generations and the explicit privacy request',async()=>{
+  const data=toOriginalFamilyData(createExtendedFamily(family)),window={};
+  vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
+  const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
+  assert.deepEqual(relatives('keha-zechariah-father').siblings,['saadia-elder']);
+  assert.deepEqual(relatives('saadia-elder').children,['keha-zechariah']);
+  assert.deepEqual(relatives('shlomo').parents,['keha-zechariah-father']);
+  assert.deepEqual(relatives('yona').parents,[],'Yona does not inherit Shlomo’s father');
+  assert.deepEqual(relatives('keha-zechariah').parents,['saadia-elder']);
+  assert.equal(data.people['keha-zechariah'].name,'זכריה קהא הבן');
+  for(const id of ['keha-zechariah-father','saadia-elder']){
+    assert.equal(data.people[id].deceased,true);
+    assert.match(data.people[id].about,/נפטר בתימן/);
+    assert.deepEqual(relatives(id).partners,[],'Unknown wives are not invented');
+  }
+  assert.equal(data.units['u-keha-zechariah'].children.length,5);
+  assert.deepEqual(relatives('keha-zechariah').children,['saadia-kadya','saadia-shalom','saadia-saadia','saadia-israel']);
+  assert.deepEqual(relatives('keha-zechariah').adoptedChildren,['saadia-aharon']);
+  assert.deepEqual(relatives('saadia-aharon').parents,[]);
+  assert.deepEqual(relatives('saadia-aharon').adoptedParents,['keha-zechariah']);
+  assert.equal(relatives('keha-yehudit').adoptedChildren,undefined,'Only Zechariah is named as adoptive parent');
+  assert.deepEqual(relatives('saadia-oded').children,['saadia-inbar','saadia-maor']);
+  assert.deepEqual(relatives('saadia-noam').children,['saadia-dalia-noam']);
+  assert.deepEqual(relatives('saadia-daniel').children,['saadia-amir','saadia-michael']);
+  assert.deepEqual(relatives('saadia-liron').children,['saadia-ori']);
+  assert.equal(data.people['saadia-dalia-noam'].generation,5);
+  assert.ok(!Object.values(data.people).some(person=>person.name.includes('תקוה')||person.name.includes('תקווה')));
+  assert.match(data.people['saadia-ofir'].about,/אמו תקוה/);
+  assert.deepEqual(data.units['u-saadia-roni'].children,[],'Unnamed six or seven children are not fabricated');
+  assert.equal(data.people['saadia-dagnit'].deathDate,undefined,'A funeral date is not a death date');
+  for(const person of Object.values(data.people))assert.ok(data.units[person.unit]);
+  for(const unit of Object.values(data.units))for(const child of unit.children)assert.equal(data.units[child].parent,unit.id);
+});
+
+test('the chart rename preserves the existing Zechariah ID, portrait, biography and later manual edits',async()=>{
+  const f=fixture();try{
+    // Simulate the already deployed seed before this chart was added.
+    const id='keha-zechariah';
+    f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'זכריה קהא',nameEn:'Zechariah Keha',about:'זיכרון קיים',birthday:'3.4.1900',extra:true,profileId:null}));
+    await f.call('/keha-extended/site-data.js');
+    const initial=await f.json(site('people/'+id+'/page'));
+    assert.equal(initial.person.name,'זכריה קהא הבן');
+    assert.equal(initial.person.about,'זיכרון קיים');
+    assert.equal(initial.person.birthday,'3.4.1900');
+    const portrait=await f.json(site('people/'+id+'/photos?filename=zechariah.jpg'),{method:'POST',body:photo});
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    saved.name='זכריה קהא הבן — שם משפחתי';
+    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
+    f.restart();
+    const next=await f.json(site('people/'+id+'/page'));
+    assert.equal(next.person.name,saved.name);
+    assert.equal(next.person.profileMediaId,portrait.person.profileMediaId);
+    assert.equal((await f.json(site('people/saadia-ofir/page'))).person.extra,false);
+  }finally{f.close();}
 });
 
 test('Shlomo’s portal contains only Yona, Shlomo and their descendants, with the four familiar tabs',()=>{
@@ -231,6 +289,9 @@ test('desktop and mobile keep all four circles on one hub, expand each branch in
     const context=vm.createContext({window,document,location,history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(hubSource,context);vm.runInContext(appSource,context);
     assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,4);
+    assert.equal(document.querySelectorAll('#extendedKehaHub .extended-ancestor').length,2);
+    assert.match(document.querySelector('#extendedKehaHub .extended-cousin-label').textContent,/בני דודים/);
+    assert.ok(document.querySelector('#extendedKehaHub [data-person="saadia-elder"]'));
     assert.ok(document.querySelector('#extendedKehaHub a[href="/keha-extended/shlomo/#home"]'));
     for(const [branch,person] of [['zechariah','keha-zechariah'],['kehat','kehat-hadassah'],['yissachar','keha-yosef-yissachar']]){
       document.querySelector('#extendedKehaHub [data-branch="'+branch+'"]').click();

@@ -6,12 +6,27 @@ import {uid} from './http.mjs';
 export function initializeExtendedKeha(state) {
   if(state.extendedKehaReady)return;
   state.ctx.storage.transactionSync(()=>{
+    const migration='extended-saadia-chart-2026-11-20-v1';
+    const updateChart=!state.rows('SELECT id FROM meta WHERE id=?',migration).length;
     for(const seed of EXTENDED_PEOPLE){
       if(seed.placeholder)continue;
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
       // Never replace an existing date, biography, portrait or name on deploy.
       state.sql.exec('INSERT OR IGNORE INTO people (id,data) VALUES (?,?)',seed.id,JSON.stringify(person));
+      if(updateChart&&seed.id==='keha-zechariah'){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',migration+':backup:'+seed.id,JSON.stringify(saved));
+        if(saved.name==='זכריה קהא'){
+          saved.name=seed.name;delete saved.firstName;delete saved.lastName;
+        }
+        if(!saved.nameEn||saved.nameEn==='Zechariah Keha')saved.nameEn=seed.nameEn;
+        if(!saved.englishName||saved.englishName==='Zechariah Keha')saved.englishName=seed.englishName;
+        if(!saved.about)saved.about=seed.about;
+        saved.aliases=[...new Set([...(saved.aliases||[]),...seed.aliases])];
+        state.savePerson(saved);
+      }
     }
+    if(updateChart)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',migration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;

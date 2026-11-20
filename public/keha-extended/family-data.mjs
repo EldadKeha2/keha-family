@@ -1,3 +1,5 @@
+import {SAADIA_PEOPLE,SAADIA_UNITS,ZECHARIAH_CHILDREN} from './saadia-data.mjs';
+
 export const EXTENDED_NAME = 'משפחת קהא המורחבת';
 export const EXTENDED_COLOR = '#345d83';
 export const EXTENDED_HOME = '/keha-extended/';
@@ -11,8 +13,9 @@ export const EXTENDED_BRANCHES = Object.freeze([
 // The supplied family chart is the source for these names and marriages.
 // Jidaan is a family nickname. No official name or common ancestor is inferred.
 const people = [
-  ['keha-zechariah','זכריה קהא','Zechariah Keha','m','u-keha-zechariah'],
+  ['keha-zechariah','זכריה קהא הבן','Zechariah Keha the Younger','m','u-keha-zechariah',['זכריה קהא'],{about:'בנו של סעדיה קהא ואחיינו של זכריה קהא האב. בן דודו של שלמה קהא, ולא בנו של זכריה קהא האב. נשוי ליהודית קהא.'}],
   ['keha-yehudit','יהודית קהא','Yehudit Keha','f','u-keha-zechariah'],
+  ['keha-zechariah-father','זכריה קהא האב','Zechariah Keha the Elder','m','u-keha-zechariah-father',[],{deceased:true,siblings:['saadia-elder'],about:'אביו של שלמה קהא ואחיו של סעדיה קהא. נפטר בתימן לפני העלייה ולא זכה לעלות ארצה. שם אשתו טרם ידוע. זכריה קהא הבן הוא אחיינו, בנו של סעדיה.'}],
   ['kehat-jidaan','ג׳ידעאן קהת','Jidaan Kehat','m','u-keha-kehat',['ג׳ימען קהת','גימען קהת','גידעאן קהת']],
   ['kehat-first-wife','שם האישה הראשונה טרם נמסר','First wife — name not yet known','f','u-keha-kehat',[],{placeholder:true}],
   ['kehat-miriam','מרים קהת','Miriam Kehat','f','u-keha-kehat'],
@@ -38,13 +41,19 @@ const people = [
   ['kehat-lihi','ליהי קהת','Lihi Kehat','f','u-kehat-lihi'],
   ['keha-yosef-yissachar','יוסף יששכר','Yosef Yissachar','m','u-keha-yissachar'],
 ];
-export const EXTENDED_PEOPLE = Object.freeze(people.map(([id,name,englishName,gender,unit,aliases=[],details={}]) =>
-  Object.freeze({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})));
+export const EXTENDED_PEOPLE = Object.freeze([...people.map(([id,name,englishName,gender,unit,aliases=[],details={}]) =>
+  Object.freeze({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE]);
 
 const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);
 const secondChildren = ['hadassah','shula','tzion'].map(id=>'u-kehat-'+id);
 const units = [
-  ['u-keha-zechariah',['keha-zechariah','keha-yehudit'],[],null],
+  ['u-keha-zechariah-father',['keha-zechariah-father'],['u-root'],null,{generation:0}],
+  ['u-keha-zechariah',['keha-zechariah','keha-yehudit'],ZECHARIAH_CHILDREN,'u-saadia-elder',{
+    relationships:[
+      {people:['keha-zechariah','keha-yehudit'],children:ZECHARIAH_CHILDREN.filter(id=>id!=='u-saadia-aharon'),relationship:'spouse'},
+      {people:['keha-zechariah'],children:['u-saadia-aharon'],relationship:'adopted',label:'בן מאומץ',labelEn:'Adopted son'},
+    ],
+  }],
   ['u-keha-kehat',['kehat-jidaan','kehat-first-wife','kehat-miriam'],[...firstChildren,...secondChildren,'u-kehat-tzvia'],null,{
     relationships:[
       {people:['kehat-jidaan','kehat-first-wife'],children:firstChildren,relationship:'spouse',label:'נישואין ראשונים',labelEn:'First marriage'},
@@ -71,6 +80,7 @@ export function createExtendedFamily(original = {}) {
   const roster = original.sharedPeople || {};
   const result = {title:EXTENDED_NAME, root:'u-root', people:{}, units:{}, branches:EXTENDED_BRANCHES, branchIds:new Map(), identities:{}};
   for (const [id,members,children,parent,details={}] of units) result.units[id] = {id,people:[...members],children:[...children],parent,relationship:members.length>1?'spouse':'single',...structuredClone(details)};
+  for (const unit of SAADIA_UNITS) result.units[unit.id]=structuredClone(unit);
   for (const seed of EXTENDED_PEOPLE) result.people[seed.id] = {...seed,...roster[seed.id],extra:false,extended:false,unit:seed.unit};
   function copy(id,parent=null) {
     const unit=original.units?.[id];
@@ -83,7 +93,15 @@ export function createExtendedFamily(original = {}) {
     unit.children.forEach(child=>copy(child,id));
   }
   copy('u-root');
-  // Four independent roots. These are navigation branches, not an asserted pedigree.
+  // Only the owner's confirmed paternal connection is added. Reorder this root
+  // in the extended projection so Yona does not inherit Shlomo's father.
+  if(result.units['u-root']){
+    result.units['u-root'].parent='u-keha-zechariah-father';
+    result.units['u-root'].people=['shlomo',...result.units['u-root'].people.filter(id=>id!=='shlomo')];
+  }
+  result.branchIds.set('keha-zechariah-father','shlomo');
+  result.branchIds.set('saadia-elder','zechariah');
+  // Kehat and Yissachar remain independent; no common ancestor is inferred.
   for (const branch of EXTENDED_BRANCHES) {
     const todo=[branch.unit];
     while(todo.length){
