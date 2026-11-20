@@ -164,3 +164,45 @@ test('Two Yehudas with the same name keep separate connected profiles and dates'
     assert.equal((await f.json(f.site('yehuda','people/yechiel-nakash/page'))).person.deceased,true);
   }finally{f.close();}
 });
+
+test('Haim diagram name corrections retain canonical profile IDs, dates and portraits and run only once',async()=>{
+  const f=fixture();try{
+    f.database.exec('CREATE TABLE nakash_identities (person_id TEXT PRIMARY KEY,canonical_id TEXT NOT NULL)');
+    const insertPerson=f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)');
+    const insertIdentity=f.database.prepare('INSERT INTO nakash_identities (person_id,canonical_id) VALUES (?,?)');
+    for(const [seed,id,name,nameEn] of [
+      ['doron-nir','extra-zion','דורון ניר','Doron Nir'],
+      ['alona-shai','extra-ilana','אלונה','Alona'],
+    ]){
+      insertPerson.run(id,JSON.stringify({id,name,nameEn,aliases:[name,nameEn],extra:true,birthday:'2.3.1940',about:'הסיפור הקיים',profileId:null,revision:'old'}));
+      insertIdentity.run(seed,id);
+    }
+    const upload=await f.json('/api/people/extra-zion/photos?filename=zion.jpg',{method:'POST',body:photo});
+    const portrait=upload.person.profileMediaId;
+    const dataScript=await (await f.call('/nakash/api/site-data.js')).text();
+    const tree=JSON.parse(dataScript.split('\n')[0].slice('window.FAMILY_DATA='.length,-1));
+    assert.equal(tree.people['extra-zion'].name,'ציון ניר');
+    assert.equal(tree.people['extra-zion'].nameEn,'Zion Nir');
+    assert.equal(tree.people['extra-ilana'].name,'אילנה שי');
+    assert.equal(tree.people['extra-ilana'].nameEn,'Ilana Shai');
+    assert.equal(tree.people['doron-nir'],undefined);
+    assert.equal(tree.people['alona-shai'],undefined);
+    const page=await f.json(f.site('haim','people/doron-nir/page'));
+    assert.equal(page.person.id,'extra-zion');
+    assert.equal(page.person.name,'ציון ניר');
+    assert.equal(page.person.profileMediaId,portrait);
+    assert.equal(page.person.birthday,'2.3.1940');
+    assert.equal(page.person.about,'הסיפור הקיים');
+    assert.equal(page.albums.photos.total,1);
+    assert.ok(!page.person.aliases.includes('דורון ניר'));
+    assert.equal(f.objects.size,1);
+    const saved=f.state().person('extra-zion');
+    saved.name='ציון (ציוני) ניר';
+    f.state().savePerson(saved);
+    f.restart();
+    const next=await f.json(f.site('haim','people/doron-nir/page'));
+    assert.equal(next.person.name,'ציון (ציוני) ניר');
+    assert.equal(next.person.profileMediaId,portrait);
+    assert.equal(next.albums.photos.total,1);
+  }finally{f.close();}
+});

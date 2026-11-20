@@ -3,6 +3,12 @@ import {createFamily, branchForPerson} from '../public/nakash/family-data.mjs';
 import {normalizeSearch, searchNames} from '../public/assets/site-search-core.mjs';
 import {uid} from './http.mjs';
 
+const diagramCorrectionKey = 'nakash-haim-diagram-names-2026-11-20-v1';
+const diagramRetiredNames = {
+  'doron-nir': ['דורון ניר', 'דורון נקאש', 'Doron Nir', 'Doron Nakash'],
+  'alona-shai': ['אלונה', 'אלונה שי', 'אלונה נקאש', 'Alona', 'Alona Shai', 'Alona Nakash'],
+};
+
 // Person IDs and media records are shared with the original site. The branch
 // tables retain provenance; no image/video bytes are copied between sites.
 export function initializeSharedNakash(state) {
@@ -11,6 +17,7 @@ export function initializeSharedNakash(state) {
     state.sql.exec('CREATE TABLE IF NOT EXISTS nakash_identities (person_id TEXT PRIMARY KEY, canonical_id TEXT NOT NULL)');
     const identities = Object.fromEntries(state.rows('SELECT person_id, canonical_id FROM nakash_identities').map(row => [row.person_id, row.canonical_id]));
     const tree = createFamily(family);
+    const correctDiagramNames = !state.rows('SELECT id FROM meta WHERE id=?', diagramCorrectionKey).length;
     // Include historical free-name tags before resolving tree identities.
     for (const row of state.rows('SELECT person_id,data FROM nakash_profiles')) {
       const saved=JSON.parse(row.data);
@@ -39,9 +46,23 @@ export function initializeSharedNakash(state) {
         state.sql.exec('INSERT INTO people (id,data) VALUES (?,?)', id, JSON.stringify(person));
         roster.push(person);
       }
-      const aliases = [...new Set([...(person.aliases || []), p.name, p.englishName, ...(p.aliases || [])].filter(Boolean))];
+      // Correct only the mistaken first transcription, including profiles that
+      // already resolved to a historical tag ID. Preserve all saved media and dates.
+      const retiredNames = correctDiagramNames ? diagramRetiredNames[p.id] || [] : [];
+      let nameChanged = false;
+      if (retiredNames.includes(person.name)) {
+        person.name = p.name;
+        const [firstName, ...rest] = p.name.split(' ');
+        Object.assign(person, {firstName, lastName:rest.join(' ')});
+        nameChanged = true;
+      }
+      if (retiredNames.includes(person.nameEn)) {
+        person.nameEn = p.englishName;
+        nameChanged = true;
+      }
+      const aliases = [...new Set([...(person.aliases || []), p.name, p.englishName, ...(p.aliases || [])].filter(name => name && !retiredNames.includes(name)))];
       const nakashBranch = branchForPerson(tree, p.id);
-      if (person.nakashBranch !== nakashBranch || JSON.stringify(person.aliases) !== JSON.stringify(aliases) || p.deceased && !person.deceased) {
+      if (nameChanged || person.nakashBranch !== nakashBranch || JSON.stringify(person.aliases) !== JSON.stringify(aliases) || p.deceased && !person.deceased) {
         Object.assign(person, {nakashBranch, aliases});
         if(p.deceased)person.deceased=true;
         state.savePerson(person);
@@ -68,6 +89,7 @@ export function initializeSharedNakash(state) {
       }
       state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', migration, 'done');
     }
+    if (correctDiagramNames) state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', diagramCorrectionKey, 'done');
     state.peopleRevision = uid();
     state.peopleCache = null;
   });
