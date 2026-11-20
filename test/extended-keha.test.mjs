@@ -81,7 +81,16 @@ test('Tzadok and Aharon have separate sons and no invented kinship between their
   assert.equal(data.people['kehat-zechariah-ben-tzadok'].branch,'kehat-tzadok');
   assert.equal(data.people['kehat-jidaan'].branch,'kehat');
   assert.equal(data.people['kehat-jidaan'].name,'סעדיה (ג׳ידעאן) בן אהרון קהת');
-  assert.deepEqual(relatives('kehat-jidaan').children,['kehat-yaakov','kehat-zechariah','kehat-aharon','kehat-yehudit','kehat-hadassah','kehat-shula','kehat-tzion','kehat-tzvia']);
+  assert.deepEqual(relatives('kehat-jidaan').children,['kehat-yaakov','kehat-zechariah','kehat-aharon','kehat-yehudit','kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah']);
+  const secondChildren=['kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah'];
+  assert.deepEqual(relatives('kehat-miriam').children,secondChildren);
+  for(const id of secondChildren){
+    assert.deepEqual(relatives(id).parents,['kehat-jidaan','kehat-miriam']);
+    assert.equal(data.people[id].branch,'kehat');
+  }
+  assert.deepEqual(relatives('kehat-first-wife').children,['kehat-yaakov','kehat-zechariah','kehat-aharon','kehat-yehudit']);
+  assert.notEqual(data.people['kehat-zechariah'].id,data.people['kehat-zechariah-ben-tzadok'].id);
+  assert.ok(!relatives('kehat-jidaan').children.includes('kehat-zechariah-ben-tzadok'));
 });
 
 test('identifying Jidaan as Saadia preserves his shared profile, albums and subsequent name edits',async()=>{
@@ -493,7 +502,8 @@ test('Jidaan stays below Aharon with each marriage’s descendants on its own si
     assert.equal(ancestor.center,main.center,'The ancestor connects straight down to Jidaan');
     const cards=[...document.querySelectorAll('[data-unit="u-keha-kehat"] [data-person-card]')].map(node=>node.dataset.personCard);
     assert.deepEqual(cards,['kehat-first-wife','kehat-jidaan','kehat-miriam']);
-    const [first,second,unknown]=data.units['u-keha-kehat'].relationships;
+    const [first,second]=data.units['u-keha-kehat'].relationships;
+    assert.equal(data.units['u-keha-kehat'].relationships.length,2);
     const descendants=ids=>ids.flatMap(id=>[id,...descendants(data.units[id].children)]);
     for(const [relation,right] of [[first,!english],[second,english]]){
       for(const id of descendants(relation.children)){
@@ -503,8 +513,9 @@ test('Jidaan stays below Aharon with each marriage’s descendants on its own si
       const connector=document.querySelector('[data-parent-unit="u-keha-kehat"][data-parent-people="'+relation.people.join(' ')+'"]');
       assert.equal(connector.dataset.childUnits,relation.children.join(' '));
     }
-    assert.deepEqual(unknown.people,['kehat-jidaan'],'No mother is inferred for Tzvia');
-    assert.equal(bounds('u-kehat-tzvia').center,main.center);
+    assert.deepEqual(second.children,['u-kehat-tzion','u-kehat-shula','u-kehat-tzvia','u-kehat-hadassah']);
+    const centers=second.children.map(id=>bounds(id).center);
+    assert.ok(centers.every((center,index)=>index===0||(english?center>centers[index-1]:center<centers[index-1])),'The four second-marriage branches follow the confirmed order');
     assert.equal(document.querySelectorAll('[data-unit="u-keha-kehat"] .tree-partnerships path').length,2);
   }
 });

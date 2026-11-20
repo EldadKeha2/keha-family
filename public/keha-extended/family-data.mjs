@@ -50,7 +50,8 @@ export const EXTENDED_PEOPLE = Object.freeze([...people.map(([id,name,englishNam
   Object.freeze({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE]);
 
 const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);
-const secondChildren = ['hadassah','shula','tzion'].map(id=>'u-kehat-'+id);
+// The owner confirmed all four children of Saadia and Miriam, in this order.
+const secondChildren = ['tzion','shula','tzvia','hadassah'].map(id=>'u-kehat-'+id);
 const units = [
   ['u-keha-zechariah-father',['keha-zechariah-father'],['u-root'],null,{generation:0}],
   ['u-keha-zechariah',['keha-zechariah','keha-yehudit'],ZECHARIAH_CHILDREN,'u-saadia-elder',{
@@ -62,14 +63,12 @@ const units = [
   ['u-kehat-tzadok-elder',['kehat-tzadok-elder'],['u-kehat-zechariah-ben-tzadok'],null,{generation:0}],
   ['u-kehat-zechariah-ben-tzadok',['kehat-zechariah-ben-tzadok'],[],'u-kehat-tzadok-elder'],
   ['u-kehat-aharon-elder',['kehat-aharon-elder'],['u-keha-kehat'],null,{generation:0}],
-  ['u-keha-kehat',['kehat-jidaan','kehat-first-wife','kehat-miriam'],[...firstChildren,...secondChildren,'u-kehat-tzvia'],'u-kehat-aharon-elder',{
+  ['u-keha-kehat',['kehat-jidaan','kehat-first-wife','kehat-miriam'],[...firstChildren,...secondChildren],'u-kehat-aharon-elder',{
     displayPeople:['kehat-first-wife','kehat-jidaan','kehat-miriam'],
     splitPartnerships:true,
     relationships:[
       {people:['kehat-jidaan','kehat-first-wife'],children:firstChildren,relationship:'spouse',label:'נישואין ראשונים',labelEn:'First marriage'},
       {people:['kehat-jidaan','kehat-miriam'],children:secondChildren,relationship:'spouse',label:'נישואין שניים',labelEn:'Second marriage'},
-      // Tzvia’s mother was not specified; connect her only to her father.
-      {people:['kehat-jidaan'],children:['u-kehat-tzvia'],relationship:'parent',label:'',labelEn:''},
     ],
   }],
   ['u-kehat-yaakov',['kehat-yaakov','kehat-yaakov-miriam'],[],'u-keha-kehat'],
