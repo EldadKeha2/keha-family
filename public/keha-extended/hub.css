@@ -4,15 +4,14 @@ html[data-extended-keha] body[data-active-view=tree] .workspace-actions { displa
 html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] :is(#treeViewport,.tree-topline,.tree-mobile-person-hint,.workspace-footer) { display:none; }
 .extended-hub-art { position:relative;isolation:isolate;max-width:1000px;min-height:720px;margin:0 auto; }
 .extended-olive-tree { position:absolute;width:49%;height:auto;left:25.5%;top:170px;z-index:-1;filter:drop-shadow(0 8px 12px #345d8314); }
-.extended-ancestor { position:absolute;top:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:184px;min-height:112px;max-width:25%;padding:10px;border:1px solid var(--corner-accent,var(--family-accent));border-radius:20px;background:var(--corner-tint,var(--paper));color:var(--corner-accent,var(--family-ink));text-decoration:none;text-align:center; }
-.extended-ancestor strong { font:600 calc(18px * var(--a11y-text-scale,1))/1.3 var(--serif); }
-.extended-ancestor span { font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans); }
-.extended-ancestor small { font:calc(12px * var(--a11y-text-scale,1))/1.35 var(--sans);color:var(--muted); }
+.extended-ancestor { position:absolute;top:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:184px;min-height:64px;max-width:25%;padding:8px;border:1px solid var(--corner-accent,var(--family-accent));border-radius:14px;background:var(--corner-tint,var(--paper));color:var(--corner-accent,var(--family-ink));text-decoration:none;text-align:center; }
+.extended-ancestor strong { font:600 calc(16px * var(--a11y-text-scale,1))/1.3 var(--serif); }
+.extended-ancestor span { font:calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans);white-space:nowrap; }
 .extended-ancestor-shlomo { right:5%; }
 .extended-ancestor-zechariah { left:5%; }
-.extended-sibling-link { position:absolute;top:43px;left:calc(5% + 184px);right:calc(5% + 184px);height:1px;border-top:1px solid var(--family-accent);text-align:center; }
+.extended-sibling-link { position:absolute;top:32px;left:calc(5% + 184px);right:calc(5% + 184px);height:1px;border-top:1px solid var(--family-accent);text-align:center; }
 .extended-sibling-link span { position:relative;top:-13px;padding:3px 12px;background:var(--paper);font:600 15px/1.4 var(--sans);color:var(--family-accent); }
-.extended-parent-line { position:absolute;top:112px;height:48px;border-inline-start:1px solid var(--family-accent); }
+.extended-parent-line { position:absolute;top:64px;height:96px;border-inline-start:1px solid var(--family-accent); }
 .extended-parent-line::after { content:'';position:absolute;bottom:4px;left:-4px;width:7px;height:7px;border-bottom:1px solid var(--family-accent);border-right:1px solid var(--family-accent);transform:rotate(45deg); }
 .extended-parent-line-shlomo { right:calc(5% + 92px); }
 .extended-parent-line-zechariah { left:calc(5% + 92px); }
@@ -52,38 +51,44 @@ html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] :
 html[data-extended-keha] #extendedKehaHomeHub { margin-block:0 24px; }
 html[data-extended-keha] .tree-partnerships path { stroke:var(--family-accent); }
 @media(max-width:700px){
-  .extended-hub-art { min-height:800px;margin-inline:-8px; }
-  .extended-hub-lines { height:700px; }
-  .extended-olive-tree { width:78%;left:11%;top:245px; }
-  .extended-ancestor { width:142px;min-height:136px;max-width:42%;padding:9px 7px; }
-  .extended-ancestor strong { font-size:calc(16px * var(--a11y-text-scale,1)); }
-  .extended-ancestor span { font-size:calc(13px * var(--a11y-text-scale,1)); }
+  html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] .workspace-header { padding:10px 12px 8px; }
+  html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] .workspace-title h2 { font-size:calc(20px * var(--a11y-text-scale,1));line-height:1.3; }
+  html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] #workspaceSubtitle { display:none; }
+  html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] .branch-bar { padding:0 10px 6px; }
+  .extended-hub-art { height:clamp(420px,calc(100svh - 210px),520px);min-height:0;margin-inline:0; }
+  .extended-hub-lines { display:none; }
+  .extended-olive-tree { width:68%;left:16%;top:135px; }
+  .extended-ancestor { width:43%;min-height:52px;max-width:164px;padding:6px 5px;gap:2px;border-radius:12px; }
+  .extended-ancestor strong { font-size:calc(14px * var(--a11y-text-scale,1)); }
+  .extended-ancestor span { font-size:calc(14px * var(--a11y-text-scale,1)); }
   .extended-ancestor-shlomo { right:3%; }
   .extended-ancestor-zechariah { left:3%; }
-  .extended-sibling-link { left:calc(3% + 142px);right:calc(3% + 142px);top:54px; }
+  .extended-sibling-link { left:46%;right:46%;top:26px; }
   .extended-sibling-link span { padding-inline:4px;font-size:12px;top:-11px; }
-  .extended-parent-line { top:136px;height:40px; }
-  .extended-parent-line-shlomo { right:calc(3% + 71px); }
-  .extended-parent-line-zechariah { left:calc(3% + 71px); }
-  .extended-cousin-label { top:340px;font-size:calc(14px * var(--a11y-text-scale,1)); }
-  .extended-branch-circle { width:142px;height:142px;max-width:42%;padding:10px;gap:5px; }
-  .extended-shlomo,.extended-zechariah { top:176px; }
+  .extended-parent-line { top:52px;height:26px; }
+  .extended-parent-line-shlomo { right:24.5%; }
+  .extended-parent-line-zechariah { left:24.5%; }
+  .extended-cousin-label { top:200px;font-size:calc(14px * var(--a11y-text-scale,1));max-width:96%;padding:3px 8px; }
+  .extended-branch-circle { width:108px;height:108px;max-width:42%;padding:8px;gap:4px; }
+  .extended-shlomo,.extended-zechariah { top:78px; }
+  .extended-shlomo .extended-branch-note,.extended-zechariah .extended-branch-note { display:none; }
   .extended-shlomo { right:3%; }
   .extended-zechariah { left:3%; }
-  .extended-lower-branches { --lower-heading-height:calc(22px * var(--a11y-text-scale,1));inset:auto 3% 28px;gap:16px; }
-  .extended-kehat-group { flex:1;width:auto;max-width:202px;gap:10px; }
+  .extended-lower-branches { --lower-heading-height:calc(22px * var(--a11y-text-scale,1));inset:auto 3% 8px;gap:16px; }
+  .extended-kehat-group { flex:1;width:auto;max-width:190px;gap:8px; }
   .extended-kehat-group h3 { font-size:calc(16px * var(--a11y-text-scale,1)); }
   .extended-kehat-circles { gap:12px; }
-  .extended-kehat-item { gap:8px; }
-  .extended-kehat-small { width:min(80px,100%);height:auto;aspect-ratio:1;max-width:100%;padding:8px; }
+  .extended-kehat-item { gap:6px; }
+  .extended-kehat-small { width:min(64px,100%);height:auto;aspect-ratio:1;max-width:100%;padding:6px; }
   .extended-kehat-small .extended-branch-portrait { width:24px;height:24px; }
-  .extended-yissachar-group { width:80px;padding-top:calc(var(--lower-heading-height) + 10px);gap:8px; }
-  .extended-yissachar { width:80px;height:80px;max-width:100%;padding:6px;gap:3px; }
-  .extended-yissachar.extended-branch-circle strong { font-size:calc(14px * var(--a11y-text-scale,1)); }
-  .extended-yissachar .extended-branch-portrait { width:24px;height:24px;font-size:18px; }
+  .extended-kehat-group>p { display:none; }
+  .extended-yissachar-group { width:68px;padding-top:calc(var(--lower-heading-height) + 8px);gap:6px; }
+  .extended-yissachar { width:64px;height:64px;max-width:100%;padding:4px;gap:2px; }
+  .extended-yissachar.extended-branch-circle strong { font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.2; }
+  .extended-yissachar .extended-branch-portrait { width:18px;height:18px;font-size:14px; }
   .extended-lower-branches .extended-branch-note { font-size:calc(14px * var(--a11y-text-scale,1)); }
-  .extended-branch-circle strong { font-size:calc(16px * var(--a11y-text-scale,1)); }
-  .extended-branch-portrait { width:34px;height:34px;font-size:19px; }
+  .extended-branch-circle strong { font-size:calc(15px * var(--a11y-text-scale,1)); }
+  .extended-branch-portrait { width:28px;height:28px;font-size:18px; }
   .extended-branch-note { font-size:calc(13px * var(--a11y-text-scale,1)); }
   .extended-hub-caption { font-size:calc(20px * var(--a11y-text-scale,1)); }
   .extended-tree-seal { bottom:-4px; }
