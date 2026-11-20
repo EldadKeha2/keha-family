@@ -7,7 +7,7 @@
   const shlomoHome=(document.documentElement.dataset.kehaShlomoHome || '/keha-extended/shlomo/')+'#home';
   const names={
     shlomo:()=>tr('משפחת שלמה קהא','Shlomo Keha Family'),
-    zechariah:()=>tr('זכריה ויהודית קהא','Zechariah & Yehudit Keha'),
+    zechariah:()=>tr('משפחת זכריה קהא הבן','Family of Zechariah Keha the Younger'),
     kehat:()=>tr('משפחת קהת','Kehat family'),
     yissachar:()=>tr('יוסף יששכר','Yosef Yissachar'),
   };
