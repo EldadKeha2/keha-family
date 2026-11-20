@@ -4,7 +4,7 @@
   "short_name": "משפחת נקאש",
   "lang": "he",
   "dir": "rtl",
-  "start_url": "/nakash/",
+  "start_url": "/nakash/?source=homescreen&familyApp=nakash#home",
   "scope": "/nakash/",
   "display": "standalone",
   "background_color": "#f6f2e7",
@@ -21,6 +21,14 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://keha-family.eldadkeha.workers.dev/nakash/manifest.webmanifest",
+      "id": "https://keha-family.eldadkeha.workers.dev/nakash/"
     }
   ]
 }

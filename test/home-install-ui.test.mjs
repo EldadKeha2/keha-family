@@ -25,7 +25,7 @@ const assertSuccess=f=>{
 
 // Only controller-facing DOM APIs are modeled. Native dialog focus containment,
 // operating-system install prompts and phone layout are checked in the browser.
-function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing',webInstall='missing'}={}){
+function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing',webInstall='missing',site=null,sessionState=new Map()}={}){
   const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[],reloads=[],webInstallCalls=[];
   const timers=new Map();let clock=0,nextTimer=0;
   const schedule=(fn,delay=0)=>{const id=++nextTimer;timers.set(id,{fn,at:clock+Math.max(0,Number(delay)||0)});return id;};
@@ -83,12 +83,16 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   const card=new Element('section'),dialog=new Element('dialog');nodes.set('homeInstall',card);nodes.set('homeInstallDialog',dialog);
   const windowsLink=new Element('a');windowsLink.setAttribute('href','#install-desktop');windowsLink.children.set('span',new Element('span'));nodes.set('desktopShortcutLink',windowsLink);
   document.documentElement=new Element('html');document.documentElement.lang=english?'en-US':'he';document.documentElement.clientWidth=390;
+  if(site)Object.assign(document.documentElement.dataset,{nakashHome:site.home,nakashName:site.name,nakashManifest:site.home+'manifest.webmanifest'});
+  const icon=new Element('link');icon.setAttribute('href',site?.icon||'/assets/app-icons/icon-192.png');
+  document.querySelector=selector=>selector==='link[rel=apple-touch-icon]'?icon:null;
   document.getElementById=id=>nodes.get(id)||null;
   const window=new EventTarget();window.top=iframe?{}:window;window.FamilyI18n={isEnglish:english,language:english?'en-US':'he'};
+  window.sessionStorage={getItem:key=>sessionState.get(key)||null,setItem:(key,value)=>sessionState.set(key,String(value))};
   const queries=new Map();
   const matchMedia=query=>{if(!queries.has(query)){const media=new EventTarget();media.matches=query.includes('display-mode')?standalone:mobile;queries.set(query,media);}return queries.get(query);};
   const navigator={userAgent,maxTouchPoints,standalone:iosStandalone,userAgentData:{mobile:userAgentMobile}};
-  if(webInstall!=='missing')navigator.install=()=>{webInstallCalls.push(true);if(webInstall==='works')return Promise.resolve({manifestId:'https://family.example/'});const error=Error('Install unavailable');error.name=webInstall;return Promise.reject(error);};
+  if(webInstall!=='missing')navigator.install=options=>{webInstallCalls.push(options);if(webInstall==='works')return Promise.resolve({});const error=Error('Install unavailable');error.name=webInstall;return Promise.reject(error);};
   if(clientHints!=='missing')navigator.userAgentData.getHighEntropyValues=async()=>{if(clientHints==='denied')throw Error('Client hints unavailable');return clientHints;};
   if(installedRelated!=='missing')navigator.getInstalledRelatedApps=async()=>{relatedCalls.push(true);if(installedRelated==='throw')throw Error('Detection unavailable');return typeof installedRelated==='function'?installedRelated():installedRelated;};
   if(share!=='missing')navigator.share=async payload=>{shared.push(payload);if(share!=='works'){const error=Error('Share unavailable');error.name=share;throw error;}};
@@ -753,4 +757,101 @@ test('the desktop install fallback stays short in both languages and the browser
     if(english)assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
   }
   const phone=fixture({webInstall:'works'});phone.click(phone.card.querySelector('[data-desktop-install-action]'));await tick();assert.equal(phone.webInstallCalls.length,0);assert.equal(phone.dialog.open,false);
+});
+
+const familySites=[['yehuda','משפחת נקאש (יהודה)'],['haim','משפחת נקאש (חיים)'],['medina','משפחת מדינה'],['keha','משפחת קהא']].map(([branch,name])=>({branch,name,home:'/nakash/'+branch+'/',icon:'/nakash/brand-'+branch+'-192.png'}));
+
+test('installing Keha or another family never marks the current family as installed, including inside an existing app window',async()=>{
+  const rootApp={platform:'webapp',id:'https://family.example/',url:'https://family.example/manifest.webmanifest'};
+  for(const site of familySites)for(const standalone of [false,true]){
+    const sessionState=new Map();
+    if(standalone)fixture({standalone:true,entryUrl:'https://family.example/?source=homescreen#home',sessionState});
+    const f=fixture({site,standalone,sessionState,entryUrl:'https://family.example'+site.home+'#home',installedRelated:[rootApp]});
+    await tick();f.click(f.button());await tick();
+    assert.equal(f.dialog.open,true,site.name);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+    assert.ok(f.dialog.innerHTML.includes(site.name));
+    assert.ok(f.dialog.innerHTML.includes(site.icon));
+    assert.doesNotMatch(f.dialog.innerHTML,/התקנת בית משפחת קהא|yona-invite/);
+    assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'');
+    if(standalone)assert.equal(new URL(f.dialog.querySelector('[data-family-install-browser]').getAttribute('href')).pathname,site.home);
+  }
+});
+
+test('each family recognizes only its own exact installed identity or manifest, and explicit app IDs take precedence',async()=>{
+  for(const site of familySites){
+    for(const ownApp of [{platform:'webapp',id:site.home},{platform:'webapp',url:'https://family.example'+site.home+'manifest.webmanifest'}]){
+      const f=fixture({site,entryUrl:'https://family.example'+site.home,installedRelated:[ownApp]});
+      await tick();f.click(f.button());await tick();
+      assert.equal(f.dialog.open,false);
+      assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
+    }
+    const other=familySites.find(candidate=>candidate!==site);
+    for(const app of [{platform:'webapp',id:other.home},{platform:'webapp',id:'/',url:'https://family.example'+site.home+'manifest.webmanifest'}]){
+      const f=fixture({site,entryUrl:'https://family.example'+site.home,installedRelated:[app]});
+      await tick();f.click(f.button());await tick();assert.equal(f.dialog.open,true);
+    }
+  }
+});
+
+test('a launch from a family icon is scoped to that app throughout navigation, with storage failure leaving other families installable',async()=>{
+  for(const site of familySites){
+    const sessionState=new Map();
+    const f=fixture({site,standalone:true,sessionState,entryUrl:'https://family.example'+site.home+'?source=homescreen&familyApp='+site.branch+'#home'});
+    f.click(f.button());await tick();assert.equal(f.dialog.open,false);assert.equal(sessionState.get('family-running-app'),site.home);
+    const other=familySites.find(candidate=>candidate!==site);
+    const g=fixture({site:other,standalone:true,sessionState,entryUrl:'https://family.example'+other.home+'#home'});
+    g.click(g.button());await tick();assert.equal(g.dialog.open,true);assert.equal(sessionState.get('family-running-app'),site.home);
+    const unavailable={get(){throw Error('Storage unavailable');},set(){throw Error('Storage unavailable');}};
+    const unknown=fixture({site,standalone:true,sessionState:unavailable,entryUrl:'https://family.example'+site.home});
+    unknown.click(unknown.button());await tick();assert.equal(unknown.dialog.open,true);
+  }
+});
+
+test('every family can request its own native install on phone and desktop with another family already installed',async()=>{
+  for(const site of familySites)for(const mobile of [false,true]){
+    const f=fixture({site,mobile,userAgent:mobile?'Mozilla/5.0 (Linux; Android 16) Chrome/157.0 Mobile':desktopUA,webInstall:'works',entryUrl:'https://family.example'+site.home,installedRelated:[{platform:'webapp',id:'https://family.example/'}]});
+    await tick();const action=mobile?f.button():f.card.querySelector('[data-desktop-install-action]');
+    f.click(action);assert.equal(f.webInstallCalls.length,1,'Native installation starts inside the original click');
+    assert.deepEqual(JSON.parse(JSON.stringify(f.webInstallCalls[0])),{manifest:'https://family.example'+site.home+'manifest.webmanifest',manifestId:'https://family.example'+site.home});
+    await tick();assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+    if(mobile){assertSuccess(f);assert.ok(f.dialog.innerHTML.includes(site.name));}
+  }
+});
+
+test('family browser prompts retain manual installation after cancellation or an unsupported modern API',async()=>{
+  for(const site of familySites){
+    const f=fixture({site,entryUrl:'https://family.example'+site.home,webInstall:'NotSupportedError'}),offer=f.offer({outcome:'dismissed'});
+    f.click(f.button());await tick();assert.equal(f.webInstallCalls.length,1);assert.equal(f.dialog.open,true);
+    f.click(f.dialog.querySelector('[data-home-install-native-start]'));await tick();assert.equal(offer.calls,1);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+  }
+  const cancelled=fixture({site:familySites[0],webInstall:'AbortError'});
+  cancelled.click(cancelled.button());await tick();assert.equal(cancelled.dialog.open,false);
+  cancelled.click(cancelled.button());await tick();assert.equal(cancelled.webInstallCalls.length,2);
+});
+
+test('sharing a family or its current page retains that family and omits app launch markers',async()=>{
+  for(const site of familySites){
+    const f=fixture({site,share:'works',standalone:true,entryUrl:'https://family.example'+site.home+'?source=homescreen&familyApp='+site.branch+'#person/example'});
+    const share=f.card.querySelector('[data-home-install-share]');
+    f.click(share);f.click(f.dialog.querySelector('[data-home-share-site]'));await tick();
+    const invitation=new URL(f.shared[0].url);assert.equal(invitation.pathname,site.home);assert.equal(invitation.hash,'#home');assert.equal(invitation.searchParams.get('install'),'1');assert.equal(f.shared[0].title,site.name);
+    f.click(share);f.click(f.dialog.querySelector('[data-home-share-page]'));await tick();
+    const page=new URL(f.shared[1].url);assert.equal(page.pathname,site.home);assert.equal(page.hash,'#person/example');assert.equal(page.searchParams.has('source'),false);assert.equal(page.searchParams.has('familyApp'),false);
+  }
+});
+
+test('each family manifest keeps an independent identity, home launch, matching icon color and self-only installation detection',async()=>{
+  const ids=new Set(['/']);
+  for(const site of [...familySites,{branch:'nakash',name:'משפחת נקאש',home:'/nakash/',icon:'/nakash/brand-nakash-192.png'}]){
+    const manifest=JSON.parse(await readFile(new URL('../public'+site.home+'manifest.webmanifest',import.meta.url),'utf8'));
+    assert.equal(manifest.id,site.home);assert.equal(ids.has(manifest.id),false);ids.add(manifest.id);
+    assert.equal(manifest.scope,site.home);assert.equal(manifest.name,site.name);assert.equal(manifest.short_name,site.name);
+    const start=new URL(manifest.start_url,'https://family.example');assert.equal(start.pathname,site.home);assert.equal(start.hash,'#home');assert.equal(start.searchParams.get('familyApp'),site.branch);
+    assert.equal(manifest.icons.find(icon=>icon.sizes==='192x192').src,site.icon);
+    assert.equal(manifest.prefer_related_applications,false);
+    assert.deepEqual(manifest.related_applications,[{platform:'webapp',id:'https://keha-family.eldadkeha.workers.dev'+site.home,url:'https://keha-family.eldadkeha.workers.dev'+site.home+'manifest.webmanifest'}]);
+    const svg=await readFile(new URL('../public/nakash/brand-'+site.branch+'.svg',import.meta.url),'utf8');assert.ok(svg.includes(manifest.theme_color));
+  }
 });

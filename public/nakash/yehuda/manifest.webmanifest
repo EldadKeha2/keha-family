@@ -4,7 +4,7 @@
   "short_name": "משפחת נקאש (יהודה)",
   "lang": "he",
   "dir": "rtl",
-  "start_url": "/nakash/yehuda/",
+  "start_url": "/nakash/yehuda/?source=homescreen&familyApp=yehuda#home",
   "scope": "/nakash/yehuda/",
   "display": "standalone",
   "background_color": "#f6f2e7",
@@ -21,6 +21,14 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://keha-family.eldadkeha.workers.dev/nakash/yehuda/manifest.webmanifest",
+      "id": "https://keha-family.eldadkeha.workers.dev/nakash/yehuda/"
     }
   ]
 }

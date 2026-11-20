@@ -4,7 +4,7 @@
   "short_name": "משפחת מדינה",
   "lang": "he",
   "dir": "rtl",
-  "start_url": "/nakash/medina/",
+  "start_url": "/nakash/medina/?source=homescreen&familyApp=medina#home",
   "scope": "/nakash/medina/",
   "display": "standalone",
   "background_color": "#f6f2e7",
@@ -21,6 +21,14 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://keha-family.eldadkeha.workers.dev/nakash/medina/manifest.webmanifest",
+      "id": "https://keha-family.eldadkeha.workers.dev/nakash/medina/"
     }
   ]
 }

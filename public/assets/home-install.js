@@ -17,6 +17,17 @@
   const mobileDevice=ios||android||navigator.userAgentData?.mobile===true||/Mobile|Tablet/i.test(ua);
   const nakash=document.documentElement?.dataset,siteHome=nakash?.nakashHome,siteName=()=>nakash?.nakashName||tr('בית משפחת קהא','Keha Family Home');
   const nativeDesktop=!siteHome&&/KehaFamilyDesktop\//i.test(ua);
+  const appHome=new URL(siteHome||'/',location.origin).pathname;
+  const manifestURL=new URL(nakash?.nakashManifest||'/manifest.webmanifest',location.origin).href,appID=new URL(appHome,location.origin).href;
+  const runningAppKey='family-running-app';
+  let runningAppHome=null;
+  try{runningAppHome=window.sessionStorage?.getItem(runningAppKey)||null;}catch{}
+  function rememberRunningApp(home){runningAppHome=home;try{window.sessionStorage?.setItem(runningAppKey,home);}catch{}}
+  if(standaloneQuery.matches||navigator.standalone===true){
+    const launch=new URLSearchParams(location.search),family=launch.get('familyApp');
+    if(launch.get('source')==='homescreen'&&['nakash','haim','yehuda','medina','keha'].includes(family))rememberRunningApp(family==='nakash'?'/nakash/':'/nakash/'+family+'/');
+    else if(!runningAppHome&&!siteHome&&location.pathname==='/')rememberRunningApp('/');
+  }
   const url=new URL(siteHome||'/',location.origin),language=window.FamilyI18n?.language;
   if(['he','en-US','en-GB'].includes(language))url.searchParams.set('lang',language);
   url.hash='home';
@@ -89,7 +100,7 @@
     dialog.querySelector('[data-home-install-close]').focus();
   }
   function languageControl(){return '<button type="button" class="home-install-language" data-home-install-language lang="en" dir="ltr">'+(english?'Hebrew':'English Translate')+'</button>';}
-  function welcomeArt(){return '<div class="home-install-welcome" data-home-install-welcome><img class="home-install-yona" src="assets/install/yona-invite.webp" width="640" height="640" alt="'+tr('סבתא יונה מחייכת ומזמינה אתכם להתקין','Grandma Yona smiles and invites you to install')+'"></div>';}
+  function welcomeArt(){return siteHome?'':'<div class="home-install-welcome" data-home-install-welcome><img class="home-install-yona" src="assets/install/yona-invite.webp" width="640" height="640" alt="'+tr('סבתא יונה מחייכת ומזמינה אתכם להתקין','Grandma Yona smiles and invites you to install')+'"></div>';}
   function platformLogos(){return '<div class="home-install-platforms" data-home-install-platforms dir="ltr"><span class="home-install-platform"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="#3c8b45"><path d="m7.2 4.4-1.4-2 .7-.5L8 4.1a9 9 0 0 1 8 0l1.5-2.2.7.5-1.4 2A6.7 6.7 0 0 1 20 10H4a6.7 6.7 0 0 1 3.2-5.6ZM4 11h16v8a2 2 0 0 1-2 2h-1v2h-3v-2h-4v2H7v-2H6a2 2 0 0 1-2-2Zm-3 0h2v8H1Zm20 0h2v8h-2Z"/><circle cx="8" cy="7" r=".8" fill="#fcf8ed"/><circle cx="16" cy="7" r=".8" fill="#fcf8ed"/></svg><span>Android</span></span><span class="home-install-platform"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.78 3.08.84 1.18-.24 2.31-.97 3.57-.88 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01ZM12.03 7.25C11.88 5.02 13.69 3.17 15.77 3c.29 2.58-2.34 4.5-3.74 4.25Z"/></svg><span>iPhone / iPad</span></span></div>';}
   function progressControl(){return '<div class="home-install-progress" data-home-install-progress role="progressbar" aria-label="'+tr('ממתינים להתקנה בטלפון','Waiting for installation on your phone')+'" hidden><span aria-hidden="true"></span></div>';}
   function iconConfirmation(hidden=false){return '<button type="button" class="home-install-invite-browse home-install-check-icon" data-home-install-check-icon'+(hidden?' hidden':'')+'>'+tr('האייקון מופיע במסך הבית','The icon is on my home screen')+'</button>';}
@@ -112,7 +123,7 @@
     update();
   }
   function openSuccess(returnFocus=button){
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירה','Close')+'">×</button>'+languageControl()+'<div class="home-install-success-mark" aria-hidden="true">✓</div><div data-home-install-success role="status" aria-live="polite"><h2 id="homeInstallTitle">'+(successConfirmedByUser?tr('האייקון מוכן!','Your icon is ready!'):tr('ההתקנה הושלמה','Installation complete'))+'</h2><p class="home-install-dialog-intro">'+tr('בית משפחת קהא במרחק נגיעה.','Keha Family Home is just a tap away.')+'</p></div><button type="button" class="home-install-invite-primary" data-home-install-success-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירה','Close')+'">×</button>'+languageControl()+'<div class="home-install-success-mark" aria-hidden="true">✓</div><div data-home-install-success role="status" aria-live="polite"><h2 id="homeInstallTitle">'+(successConfirmedByUser?tr('האייקון מוכן!','Your icon is ready!'):tr('ההתקנה הושלמה','Installation complete'))+'</h2><p class="home-install-dialog-intro">'+(siteHome?escape(siteName())+tr(' במרחק נגיעה.',' is just a tap away.'):tr('בית משפחת קהא במרחק נגיעה.','Keha Family Home is just a tap away.'))+'</p></div><button type="button" class="home-install-invite-primary" data-home-install-success-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
     dialog.querySelector('[data-home-install-success-browse]').addEventListener('click',continueToSite);showDialog('success',returnFocus);
   }
   function websiteSharePayload(){
@@ -122,6 +133,7 @@
     const page=new URL(location.href),language=window.FamilyI18n?.language;
     if(siteHome)page.pathname=siteHome;
     page.searchParams.delete('install');
+    page.searchParams.delete('source');page.searchParams.delete('familyApp');
     if(page.hash.startsWith('#updates/manage/'))page.hash='#updates';
     if(['he','en-US','en-GB'].includes(language))page.searchParams.set('lang',language);
     const person=location.hash.startsWith('#person/')?document.getElementById('personPageContent')?.querySelector('.person-page-hero h2')?.textContent.trim():'';
@@ -164,13 +176,15 @@
     if(mobileDevice||phoneQuery.matches)openShareChoices();else void sharePayload(websiteSharePayload());
   });
 
-  function hasInstalledShortcut(){return nativeDesktop||installed||relatedInstalled||standaloneQuery.matches||navigator.standalone===true;}
+  function hasInstalledShortcut(){return nativeDesktop||installed||relatedInstalled||(standaloneQuery.matches||navigator.standalone===true)&&runningAppHome===appHome;}
+  function familyWebInstall(){return Boolean(siteHome)&&!ios&&!modernDesktopInstallFailed&&typeof navigator.install==='function';}
+  function installThisApp(){return siteHome?navigator.install({manifest:manifestURL,manifestId:appID}):navigator.install();}
   function checkInstalledShortcut(){
     if(window.top!==window||typeof navigator.getInstalledRelatedApps!=='function')return Promise.resolve();
     if(installationCheck)return installationCheck;
-    const manifestURL=new URL(nakash?.nakashManifest||'/manifest.webmanifest',location.origin).href,appID=new URL(siteHome||'/',location.origin).href;
     installationCheck=Promise.resolve().then(()=>navigator.getInstalledRelatedApps()).then(apps=>{
-        relatedInstalled=apps.some(app=>app.platform==='webapp'&&(app.url===manifestURL||app.id===appID));
+        const absolute=value=>{try{return new URL(value,location.origin).href;}catch{return '';}};
+        relatedInstalled=apps.some(app=>app.platform==='webapp'&&(app.id?absolute(app.id)===appID:absolute(app.url)===manifestURL));
         if(relatedInstalled)installPrompt=null;
         update();
     }).catch(()=>{}).finally(()=>{installationCheck=null;});
@@ -201,7 +215,7 @@
     }
     if(dialog.open&&dialogKind==='install'){
       const action=dialog.querySelector('[data-home-install-native-start]'),instructions=dialog.querySelector('[data-home-install-instructions]');
-      if(action){action.hidden=!installPrompt&&!busy;action.disabled=busy||installState==='pending';}
+      if(action){action.hidden=!installPrompt&&!familyWebInstall()&&!busy;action.disabled=busy||installState==='pending';}
       if(instructions)instructions.hidden=Boolean(installPrompt)||busy||installState==='pending';
     }
     if(dialog.open&&dialogKind==='desktop-install'){
@@ -243,7 +257,7 @@
     busy=true;update();let promptTimer;
     try{
       // Both browser entry points must be called in the original click.
-      const request=modern?navigator.install().then(()=>({outcome:'installed-or-opened'})):(async()=>{await prompt.prompt();return prompt.userChoice;})();
+      const request=modern?installThisApp().then(()=>({outcome:'installed-or-opened'})):(async()=>{await prompt.prompt();return prompt.userChoice;})();
       const choice=await Promise.race([request,new Promise(resolve=>{promptTimer=setTimeout(()=>resolve({outcome:'unavailable'}),8000);})]);
       if(choice?.outcome==='installed-or-opened'){
         installed=true;installPrompt=null;if(dialogKind==='desktop-install')closeDialog();
@@ -275,8 +289,9 @@
   ]);}
   function openHelp(returnFocus=button){
     const embeddedNote=embedded?'<p class="home-install-browser-note">'+tr('בתפריט ⋮ או השיתוף של האפליקציה בחרו ״פתיחה בדפדפן״. אחרי הפתיחה לחצו שוב ״התקן״.','In this app’s ⋮ or Share menu, choose “Open in browser”. Then tap “Install” again.')+'</p>':'';
+    const browserLink=siteHome&&(standaloneQuery.matches||navigator.standalone===true)&&runningAppHome!==appHome?'<p><a class="home-install-invite-primary" data-family-install-browser href="'+escape(invitationURL.href)+'" target="_blank" rel="noopener external">'+tr('פתיחת ','Open ')+escape(siteName())+tr(' בדפדפן להתקנה',' in your browser to install')+'</a></p>':'';
     const help=ios?appleHelp():android?androidHelp():'<h3>iPhone / iPad</h3>'+appleHelp()+'<h3>Android</h3>'+androidHelp();
-    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="'+escape(appIcon)+'" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+tr('התקנת בית משפחת קהא','Install Keha Family Home')+'</h2><button type="button" class="home-install-invite-primary" data-home-install-native-start hidden>'+tr('התקן','Install')+'</button>'+progressControl()+'<div data-home-install-instructions>'+embeddedNote+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>'+iconConfirmation();
+    dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההנחיות','Close instructions')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="'+escape(appIcon)+'" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+(siteHome?tr('התקנת ','Install ')+escape(siteName()):tr('התקנת בית משפחת קהא','Install Keha Family Home'))+'</h2><button type="button" class="home-install-invite-primary" data-home-install-native-start hidden>'+tr('התקן','Install')+'</button>'+progressControl()+'<div data-home-install-instructions>'+browserLink+embeddedNote+help+'</div><p class="home-install-invite-status" data-home-install-help-status role="status" aria-live="polite"></p>'+iconConfirmation();
     dialog.querySelector('[data-home-install-native-start]').addEventListener('click',()=>requestInstallation(true));
     showDialog('install',returnFocus);
     update();
@@ -308,21 +323,27 @@
     }
     if(ios){openInvitation(button);return;}
     if(attemptActive&&(installState==='pending'||installState==='requesting')){if(!dialog.open)openInvitation(button);return;}
-    if(!installPrompt){
+    const modern=familyWebInstall();
+    if(!installPrompt&&!modern){
       if(window.top===window&&typeof navigator.getInstalledRelatedApps==='function')await checkInstalledShortcut();
       if(hasInstalledShortcut())announceInstalledShortcut();
       else openHelp();
       return;
     }
     if(!dialog.open||!['invite','install'].includes(dialogKind))openInvitation(button);
-    const prompt=installPrompt;installPrompt=null;busy=true;attemptActive=true;installState='requesting';clearInstallWait();clearTimeout(feedbackTimer);status.textContent='';shareStatus.textContent='';update();
+    const prompt=modern?null:installPrompt;if(!modern)installPrompt=null;
+    busy=true;attemptActive=true;installState='requesting';clearInstallWait();clearTimeout(feedbackTimer);status.textContent='';shareStatus.textContent='';update();
     try{
-      await prompt.prompt();
-      const choice=await prompt.userChoice;
+      const choice=modern?await installThisApp().then(()=>({outcome:'installed-or-opened'})):(await prompt.prompt(),await prompt.userChoice);
       if(installState==='done'||hasInstalledShortcut())return;
-      if(choice?.outcome==='accepted')waitForInstallation();
+      if(choice?.outcome==='installed-or-opened')completeInstallation();
+      else if(choice?.outcome==='accepted')waitForInstallation();
       else{attemptActive=false;installState='idle';clearInstallWait();announce(status,tr('לחצו שוב להנחיות ההוספה.','Tap again for installation instructions.'));}
-    }catch{if(installState!=='done'){attemptActive=false;installState='idle';clearInstallWait();openHelp();}}
+    }catch(error){if(installState!=='done'){
+      if(modern&&error?.name!=='AbortError')modernDesktopInstallFailed=true;
+      attemptActive=false;installState='idle';clearInstallWait();
+      if(modern&&error?.name==='AbortError'){status.textContent='';closeDialog();}else openHelp();
+    }}
     finally{busy=false;button.disabled=false;update();}
   }
   button.addEventListener('click',()=>requestInstallation());
@@ -333,7 +354,8 @@
     if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeDialog();
   });
   dialog.addEventListener('close',()=>{const focus=dialogReturnFocus||shareButton;if(!card.hidden)(focus.hidden?shareButton:focus).focus();dialogKind=null;});
-  for(const query of [phoneQuery,standaloneQuery])query.addEventListener?.('change',update);
+  phoneQuery.addEventListener?.('change',update);
+  standaloneQuery.addEventListener?.('change',()=>{if(standaloneQuery.matches&&attemptActive)rememberRunningApp(appHome);update();});
   window.addEventListener('pageshow',()=>{update();void checkInstalledShortcut();});
   window.addEventListener('focus',()=>{update();void checkInstalledShortcut();});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void checkInstalledShortcut();});
