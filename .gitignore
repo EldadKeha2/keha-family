@@ -17,3 +17,7 @@ desktop/native/obj/
 
 # Generated from the authored styles before validation and deployment.
 /public/assets/site-styles-*.css
+
+/public/assets/app-icons/launch-v2/
+/public/keha-extended/shlomo/icon-180.png
+/public/keha-extended/shlomo/maskable-512.png

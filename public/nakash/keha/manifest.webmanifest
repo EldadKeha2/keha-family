@@ -7,7 +7,7 @@
   "start_url": "/nakash/keha/?source=homescreen&familyApp=keha#home",
   "scope": "/nakash/keha/",
   "display": "standalone",
-  "background_color": "#f6f2e7",
+  "background_color": "#536641",
   "theme_color": "#536641",
   "icons": [
     {

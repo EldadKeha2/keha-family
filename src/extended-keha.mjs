@@ -23,7 +23,7 @@ export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portal
     .replaceAll('נקאש · מדינה · קהא','קהא · קהת · יששכר')
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'')
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+EXTENDED_COLOR)
-    .replace(/(<style id="familyStartupBackground">[^<]*)/,'$1:root{--family-accent:'+EXTENDED_COLOR+'}@media(display-mode:standalone){html,body{background:var(--family-accent)}}')
+    .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+EXTENDED_COLOR+'}:root{--family-accent:'+EXTENDED_COLOR+'}')
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"><link rel="stylesheet" href="/keha-extended/hub.css?v=9"></head>')
     .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/hub.js?v=four-families-v1" defer></script>\n$1')
     .replace('<div id="treeView">','<div id="treeView"><section id="extendedKehaHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
@@ -47,7 +47,7 @@ export function shlomoKehaHTML(original,appOrigin=''){
     .replaceAll('נקאש · מדינה · קהא','קהא · חריזי · בקר · נובל · פיש · בלום')
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'<nav class="branch-bar"><a class="branch-chip" href="https://family-extended.eldadkeha.workers.dev/keha-extended/#tree">משפחת קהא המורחבת</a></nav>')
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+SHLOMO_COLOR)
-    .replace(/(<style id="familyStartupBackground">[^<]*)/,'$1:root{--family-accent:'+SHLOMO_COLOR+'}')
+    .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+SHLOMO_COLOR+'}:root{--family-accent:'+SHLOMO_COLOR+'}')
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"></head>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+SHLOMO_NAME+'</h2>');
 }
@@ -69,7 +69,7 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
     .replaceAll('נקאש · מדינה · קהא',portal.tagline)
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'<nav class="branch-bar"><a class="branch-chip" href="'+extendedOrigin+EXTENDED_HOME+'#tree">משפחת קהא המורחבת</a></nav>')
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+portal.color)
-    .replace(/(<style id="familyStartupBackground">[^<]*)/,'$1:root{--family-accent:'+portal.color+'}@media(display-mode:standalone){html,body{background:var(--family-accent)}}')
+    .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+portal.color+'}:root{--family-accent:'+portal.color+'}')
     .replace(/<link rel="icon"[^>]*>/g,'<link rel="icon" type="image/svg+xml" href="'+portal.home+'brand.svg">')
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1">'+startup+'</head>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+portal.name+'</h2>')

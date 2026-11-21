@@ -25,7 +25,7 @@ const assertSuccess=f=>{
 
 // Only controller-facing DOM APIs are modeled. Native dialog focus containment,
 // operating-system install prompts and phone layout are checked in the browser.
-function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing',webInstall='missing',site=null,sessionState=new Map()}={}){
+function fixture({mobile=true,standalone=false,iosStandalone=false,english=false,userAgent='Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',maxTouchPoints=0,userAgentMobile=false,clipboard='works',share='missing',installedRelated='missing',iframe=false,entryUrl,autoReady=true,nativeDialog=true,recordNavigation=false,clientHints='missing',webInstall='missing',userActivation=false,site=null,sessionState=new Map()}={}){
   const nodes=new Map(),copied=[],shared=[],relatedCalls=[],assignments=[],reloads=[],webInstallCalls=[];
   const timers=new Map();let clock=0,nextTimer=0;
   const schedule=(fn,delay=0)=>{const id=++nextTimer;timers.set(id,{fn,at:clock+Math.max(0,Number(delay)||0)});return id;};
@@ -91,7 +91,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   window.sessionStorage={getItem:key=>sessionState.get(key)||null,setItem:(key,value)=>sessionState.set(key,String(value))};
   const queries=new Map();
   const matchMedia=query=>{if(!queries.has(query)){const media=new EventTarget();media.matches=query.includes('display-mode')?standalone:mobile;queries.set(query,media);}return queries.get(query);};
-  const navigator={userAgent,maxTouchPoints,standalone:iosStandalone,userAgentData:{mobile:userAgentMobile}};
+  const navigator={userAgent,maxTouchPoints,standalone:iosStandalone,userAgentData:{mobile:userAgentMobile},userActivation:{isActive:userActivation}};
   if(webInstall!=='missing')navigator.install=options=>{webInstallCalls.push(options);if(webInstall==='works')return Promise.resolve({});const error=Error('Install unavailable');error.name=webInstall;return Promise.reject(error);};
   if(clientHints!=='missing')navigator.userAgentData.getHighEntropyValues=async()=>{if(clientHints==='denied')throw Error('Client hints unavailable');return clientHints;};
   if(installedRelated!=='missing')navigator.getInstalledRelatedApps=async()=>{relatedCalls.push(true);if(installedRelated==='throw')throw Error('Detection unavailable');return typeof installedRelated==='function'?installedRelated():installedRelated;};
@@ -99,6 +99,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   if(clipboard!=='missing')navigator.clipboard={writeText:async value=>{if(clipboard==='blocked')throw Error('Clipboard denied');copied.push(value);}};
   const location=new URL(entryUrl||'https://family.example/?game=neto-tetris&lang='+window.FamilyI18n.language+'#games');window.location=location;
   location.reload=()=>reloads.push(location.href);
+  location.replace=value=>assignments.push(String(value));
   if(recordNavigation)location.assign=value=>assignments.push(String(value));
   const context=vm.createContext({window,document,navigator,location,matchMedia,URL,URLSearchParams,Event,console,setTimeout:schedule,clearTimeout:id=>timers.delete(id)});
   const ready=()=>{document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';};
@@ -119,9 +120,9 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
 
 test('phone toolbar responds to viewport changes and keeps both controls in installed apps',()=>{
   const f=fixture();assert.equal(f.card.hidden,false);assert.equal(f.dialog.open,false);assert.equal(f.button().getAttribute('aria-label'),'התקן קיצור דרך לאתר');assert.equal(f.card.querySelector('[data-home-install-share]').getAttribute('aria-label'),'שיתוף האתר');assert.equal(f.button().textContent,'התקן');assert.match(f.card.innerHTML,/>שיתוף</);
-  f.resize(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,true);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.resize(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
+  f.resize(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.resize(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
   f.standalone(true);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);assert.equal(f.card.querySelector('[data-home-install-share]').hidden,false);f.standalone(false);assert.equal(f.card.hidden,false);assert.equal(f.button().hidden,false);
-  assert.equal(fixture({mobile:false}).card.hidden,false);assert.equal(fixture({mobile:false}).button().hidden,true);
+  assert.equal(fixture({mobile:false}).card.hidden,false);assert.equal(fixture({mobile:false}).button().hidden,false);
   assert.equal(fixture({mobile:false,userAgentMobile:true}).card.hidden,false);
   for(const options of [{standalone:true},{iosStandalone:true}]){const installed=fixture(options);assert.equal(installed.card.hidden,false);assert.equal(installed.button().hidden,false);assert.equal(installed.card.querySelector('[data-home-install-share]').hidden,false);}
 });
@@ -767,7 +768,7 @@ test('installation moves to the dedicated family origin before checking or reque
     const f=fixture({site,mobile,recordNavigation:true,standalone:true,userAgent:mobile?'Mozilla/5.0 (Linux; Android 16) Chrome/157.0 Mobile':desktopUA,entryUrl:'https://family.example'+site.home+'#gallery',webInstall:'works',installedRelated:[{platform:'webapp',id:'https://family.example'+site.home}]});
     const oldPrompt=f.offer();await tick();
     f.click(mobile?f.button():f.card.querySelector('[data-desktop-install-action]'));await tick();
-    assert.deepEqual(f.assignments,[site.origin+site.home+'?lang=he&install=1#home']);
+    assert.deepEqual(f.assignments,[site.origin+site.home+(mobile?'?lang=he#gallery':'?lang=he&install=1#home')]);
     assert.equal(f.webInstallCalls.length,0);
     assert.equal(oldPrompt.calls,0);
     assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
@@ -782,7 +783,7 @@ test('dedicated-origin invitations and current-page shares keep the family, pers
   f.click(f.card.querySelector('[data-home-install-share]'));f.click(f.dialog.querySelector('[data-home-share-page]'));await tick();
   assert.equal(f.shared[1].url,site.origin+site.home+'?media=photo-1&lang=he#person/example');
   const arrival=fixture({site,recordNavigation:true,entryUrl:'https://family.example'+site.home+'?install=1#home'});
-  assert.deepEqual(arrival.assignments,[site.origin+site.home+'?lang=he&install=1#home']);
+  assert.deepEqual(arrival.assignments,[site.origin+site.home+'?install=1&lang=he#home']);
 });
 
 test('a dedicated origin uses its own install prompt and recognizes its own installed app',async()=>{
@@ -858,8 +859,8 @@ test('every family can request its own native install on phone and desktop with 
 test('family browser prompts retain manual installation after cancellation or an unsupported modern API',async()=>{
   for(const site of familySites){
     const f=fixture({site,entryUrl:'https://family.example'+site.home,webInstall:'NotSupportedError'}),offer=f.offer({outcome:'dismissed'});
-    f.click(f.button());await tick();assert.equal(f.webInstallCalls.length,1);assert.equal(f.dialog.open,true);
-    f.click(f.dialog.querySelector('[data-home-install-native-start]'));await tick();assert.equal(offer.calls,1);
+    f.click(f.button());await tick();assert.equal(f.webInstallCalls.length,0);assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);
+    f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assert.equal(f.webInstallCalls.length,1);assert.equal(offer.calls,1);
     assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
   }
   const cancelled=fixture({site:familySites[0],webInstall:'AbortError'});
@@ -887,7 +888,7 @@ test('each family manifest keeps an independent identity, home launch, matching 
     const start=new URL(manifest.start_url,'https://family.example');assert.equal(start.pathname,site.home);assert.equal(start.hash,'#home');assert.equal(start.searchParams.get('familyApp'),site.branch);
     const themed = ['haim', 'yehuda', 'medina'].includes(site.branch);
     const iconPath = themed ? '/assets/nakash-launch-v1/' + site.branch + '/icon-192.png' : site.icon;
-    assert.equal(manifest.icons.find(icon=>icon.sizes==='192x192').src,iconPath);
+    assert.equal(new URL(manifest.icons.find(icon=>icon.sizes==='192x192').src,'https://family.example').pathname,iconPath);
     assert.equal(manifest.prefer_related_applications,false);
     assert.deepEqual(manifest.related_applications,[{platform:'webapp',id:'https://keha-family.eldadkeha.workers.dev'+site.home,url:'https://keha-family.eldadkeha.workers.dev'+site.home+'manifest.webmanifest'}]);
     const svg=await readFile(new URL('../public/nakash/brand-'+site.branch+'.svg',import.meta.url),'utf8');assert.ok(svg.includes(manifest.theme_color));
@@ -914,8 +915,76 @@ test('all eight independent family origins ignore another installed family and r
     assertSuccess(f);
     f.click(f.dialog.querySelector('[data-home-install-missing-icon]'));
     assert.equal(f.dialog.getAttribute('data-home-install-kind'),'install');
+    assert.equal(f.dialog.open,true,'Launcher recovery remains visible even when the browser reports an installed app');
     assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
     assert.match(f.dialog.innerHTML,/רשימת כל האפליקציות/);
     assert.match(f.dialog.innerHTML,/לחיצה ארוכה/);
   }
+});
+
+test('Android Install uses the current family native browser offer in the first tap, ahead of the experimental API',async()=>{
+  for(const base of eightApps){
+    const origin='https://family-'+base.branch+'.example',site=base.branch==='original'?null:{...base,origin};
+    const f=fixture({site,webInstall:'works',entryUrl:origin+base.home});
+    const native=f.offer({outcome:'accepted'});f.click(f.button());
+    assert.equal(native.calls,1,base.branch);
+    assert.equal(f.webInstallCalls.length,0);
+    await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  }
+});
+
+test('an Android family prepares on its independent origin before a visitor taps Install, retaining the current profile and language',()=>{
+  const site={...eightApps.find(app=>app.branch==='kehat'),origin:'https://family-kehat.example'};
+  const f=fixture({site,recordNavigation:true,entryUrl:'https://family.example'+site.home+'?lang=en-US#person/kehat-jidaan'});
+  assert.deepEqual(f.assignments,[site.origin+site.home+'?lang=en-US#person/kehat-jidaan']);
+  f.click(f.button());assert.equal(f.assignments.length,1,'A pending navigation cannot start a second install');
+});
+
+test('the modern cross-origin API requests the actual family manifest directly during the click without a website confirmation',async()=>{
+  const site={...eightApps.find(app=>app.branch==='kehat'),origin:'https://family-kehat.example'};
+  const f=fixture({site,autoReady:false,recordNavigation:true,webInstall:'works'});
+  const outer=f.offer();f.click(f.button());
+  assert.equal(f.webInstallCalls.length,1);assert.equal(outer.calls,0);
+  assert.equal(f.webInstallCalls[0].manifest,site.origin+site.home+'manifest.webmanifest');
+  assert.equal(f.webInstallCalls[0].manifestId,site.origin+site.home);
+  assert.deepEqual(f.assignments,[]);await tick();assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+});
+
+test('a delayed Android offer keeps the install button honest and resumes the first tap while browser user activation remains',async()=>{
+  const base=eightApps.find(app=>app.branch==='kehat'),site={...base,origin:'https://family-kehat.example'};
+  for(const userActivation of [false,true]){
+    const f=fixture({site,userActivation,entryUrl:site.origin+site.home});
+    f.click(f.button());await tick();
+    assert.equal(f.dialog.open,true);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').disabled,true);
+    assert.doesNotMatch(f.dialog.innerHTML,/iPhone|iPad|Safari|הוספה למסך הבית/);
+    const offer=f.offer({outcome:'accepted'});await tick();
+    if(userActivation)assert.equal(offer.calls,1,'The original gesture still opens the browser prompt');
+    else{assert.equal(offer.calls,0);assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').disabled,false);assert.match(f.dialog.querySelector('[data-home-install-invite-status]').textContent,/Chrome מוכן/);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assert.equal(offer.calls,1);}
+    assertProgress(f,true);
+  }
+});
+
+test('changing Android family origin removes another app launch markers without losing its page',()=>{
+  const site={...eightApps.find(app=>app.branch==='kehat'),origin:'https://family-kehat.example'};
+  const f=fixture({site,entryUrl:'https://family.example'+site.home+'?source=homescreen&familyApp=kehat&media=photo-1#person/kehat-jidaan'});
+  const next=new URL(f.assignments[0]);
+  assert.equal(next.origin,site.origin);assert.equal(next.pathname,site.home);assert.equal(next.hash,'#person/kehat-jidaan');
+  assert.equal(next.searchParams.has('source'),false);assert.equal(next.searchParams.has('familyApp'),false);
+  assert.equal(next.searchParams.get('media'),'photo-1');assert.equal(next.searchParams.get('lang'),'he');
+});
+
+test('closing Android preparation cancels a delayed automatic install even while browser activation remains',async()=>{
+  const base=eightApps.find(app=>app.branch==='kehat'),site={...base,origin:'https://family-kehat.example'};
+  const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home});f.click(f.button());await tick();
+  f.click(f.dialog.querySelector('[data-home-install-close]'));
+  const offer=f.offer({outcome:'accepted'});await tick();assert.equal(offer.calls,0);assert.equal(f.dialog.open,false);
+});
+
+test('a slow Android package lookup cannot swallow the Install tap or delay the real browser offer',async()=>{
+  const base=eightApps.find(app=>app.branch==='kehat'),site={...base,origin:'https://family-kehat.example'};
+  const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home,installedRelated:()=>new Promise(()=>{})});
+  f.click(f.button());assert.equal(f.dialog.open,true,'Feedback appears during the original click');
+  const offer=f.offer({outcome:'accepted'});assert.equal(offer.calls,1,'Chrome installation does not wait for package-manager detection');
+  await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
 });

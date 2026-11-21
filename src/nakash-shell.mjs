@@ -114,7 +114,7 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
     `  <link rel="apple-touch-startup-image" href="${href}" media="${media}">`).join('\n');
   return withFamilyTabIcons(html, section)
     .replace(/(<meta name="theme-color" content=")[^"]+/, '$1' + branch.color)
-    .replace(/(<style id="familyStartupBackground">[^<]*)/, '$1:root{--family-accent:' + branch.color + '}@media(display-mode:standalone){html,body{background:var(--family-accent)}}')
+    .replace(/(<style id="familyStartupBackground">)[^<]*/, '$1html,body{background:' + branch.color + '}:root{--family-accent:' + branch.color + '}')
     .replace('</head>', '  <link rel="stylesheet" href="/assets/nakash-theme.css?v=1">\n' + startupLinks + '\n</head>');
 }
 
