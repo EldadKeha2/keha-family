@@ -500,7 +500,7 @@ test('matching installed-app detection confirms completion on return to the page
     const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
     f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);assertProgress(f,true);
     apps=[{platform:'webapp',id:'https://family.example/'}];f.window.dispatchEvent(new Event(eventName));await tick();
-    assertSuccess(f);assert.equal(offer.calls,1);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);assert.doesNotMatch(f.dialog.innerHTML,/icon is ready|icon.*(?:is|on).*home screen/i);
+    assertSuccess(f);assert.equal(offer.calls,1);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);assert.doesNotMatch(f.dialog.querySelector('[data-home-install-success]').innerHTML,/icon is ready|icon.*(?:is|on).*home screen/i);
     await f.advanceTime(20000);assertSuccess(f);
   }
 });
@@ -818,7 +818,8 @@ test('each family recognizes only its own exact installed identity or manifest, 
     for(const ownApp of [{platform:'webapp',id:site.home},{platform:'webapp',url:'https://family.example'+site.home+'manifest.webmanifest'}]){
       const f=fixture({site,entryUrl:'https://family.example'+site.home,installedRelated:[ownApp]});
       await tick();f.click(f.button());await tick();
-      assert.equal(f.dialog.open,false);
+      assert.equal(f.dialog.open,true);
+      assert.ok(f.dialog.querySelector('[data-home-install-missing-icon]'));
       assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
     }
     const other=familySites.find(candidate=>candidate!==site);
@@ -833,7 +834,7 @@ test('a launch from a family icon is scoped to that app throughout navigation, w
   for(const site of familySites){
     const sessionState=new Map();
     const f=fixture({site,standalone:true,sessionState,entryUrl:'https://family.example'+site.home+'?source=homescreen&familyApp='+site.branch+'#home'});
-    f.click(f.button());await tick();assert.equal(f.dialog.open,false);assert.equal(sessionState.get('family-running-app'),site.home);
+    f.click(f.button());await tick();assert.equal(f.dialog.open,true);assert.ok(f.dialog.querySelector('[data-home-install-missing-icon]'));assert.equal(sessionState.get('family-running-app'),site.home);
     const other=familySites.find(candidate=>candidate!==site);
     const g=fixture({site:other,standalone:true,sessionState,entryUrl:'https://family.example'+other.home+'#home'});
     g.click(g.button());await tick();assert.equal(g.dialog.open,true);assert.equal(sessionState.get('family-running-app'),site.home);
@@ -849,8 +850,8 @@ test('every family can request its own native install on phone and desktop with 
     await tick();const action=mobile?f.button():f.card.querySelector('[data-desktop-install-action]');
     f.click(action);assert.equal(f.webInstallCalls.length,1,'Native installation starts inside the original click');
     assert.deepEqual(JSON.parse(JSON.stringify(f.webInstallCalls[0])),{manifest:'https://family.example'+site.home+'manifest.webmanifest',manifestId:'https://family.example'+site.home});
-    await tick();assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
-    if(mobile){assertSuccess(f);assert.ok(f.dialog.innerHTML.includes(site.name));}
+    await tick();assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),mobile?'false':'true');
+    if(mobile){assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);assert.ok(f.dialog.innerHTML.includes(site.name));}
   }
 });
 
@@ -890,5 +891,31 @@ test('each family manifest keeps an independent identity, home launch, matching 
     assert.equal(manifest.prefer_related_applications,false);
     assert.deepEqual(manifest.related_applications,[{platform:'webapp',id:'https://keha-family.eldadkeha.workers.dev'+site.home,url:'https://keha-family.eldadkeha.workers.dev'+site.home+'manifest.webmanifest'}]);
     const svg=await readFile(new URL('../public/nakash/brand-'+site.branch+'.svg',import.meta.url),'utf8');assert.ok(svg.includes(manifest.theme_color));
+  }
+});
+
+const eightApps=[
+  {branch:'original',name:'משפחת קהא',home:'/',icon:'/assets/icon-192.png'},
+  ...familySites.filter(site=>site.branch!=='keha'),
+  {branch:'extended',name:'קהא המורחבת',home:'/keha-extended/',icon:'/keha-extended/icon-192.png'},
+  ...['zechariah','zechariah-tzadok','kehat'].map(branch=>({branch,name:branch==='kehat'?'משפחת קהת':branch==='zechariah'?'משפחת זכריה קהא בן סעדיה':'משפחת זכריה קהא בן צדוק',home:'/keha-extended/'+branch+'/',icon:'/keha-extended/'+branch+'/icon-192.png'}))
+];
+test('all eight independent family origins ignore another installed family and retain launcher recovery after native installation',async()=>{
+  for(const base of eightApps){
+    const origin='https://family-'+base.branch+'.example',site=base.branch==='original'?null:{...base,origin};
+    let apps=[{platform:'webapp',id:'https://another-family.example/'}];
+    const f=fixture({site,webInstall:'works',entryUrl:origin+base.home,installedRelated:()=>apps});
+    await tick();f.click(f.button());await tick();
+    if(site){assert.equal(f.webInstallCalls.length,1);assert.equal(f.webInstallCalls[0].manifestId,origin+base.home);}
+    else{const prompt=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-native-start]'));await tick();assert.equal(prompt.calls,1);}
+    assert.equal(f.dialog.querySelector('[data-home-install-success]'),null,'An API resolution is not proof of a new launcher icon');
+    apps=[{platform:'webapp',id:origin+base.home}];f.window.dispatchEvent(new Event('focus'));await tick();
+    assert.ok(f.dialog.querySelector('[data-home-install-success]'),base.branch+': '+f.dialog.textContent);
+    assertSuccess(f);
+    f.click(f.dialog.querySelector('[data-home-install-missing-icon]'));
+    assert.equal(f.dialog.getAttribute('data-home-install-kind'),'install');
+    assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+    assert.match(f.dialog.innerHTML,/רשימת כל האפליקציות/);
+    assert.match(f.dialog.innerHTML,/לחיצה ארוכה/);
   }
 });

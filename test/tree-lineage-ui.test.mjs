@@ -10,14 +10,16 @@ import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
-function fixture(portal,{phone=false,english=false,text=100,overrides={}}={}){
+const dateSource=await readFile(new URL('../public/assets/dates.js',import.meta.url),'utf8');
+function fixture(portal,{phone=false,english=false,text=100,unitHeight=0,overrides={}}={}){
   const {document,window:dom}=parseHTML(branchPortalHTML(html,portal));
+  Object.defineProperty(dom.HTMLElement.prototype,'offsetHeight',{configurable:true,get(){return this.classList?.contains('tree-unit')?unitHeight:0;}});
   const data=toOriginalFamilyData(createBranchPortal(family,portal));
   for(const [id,patch] of Object.entries(overrides))Object.assign(data.people[id],patch);
-  const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){},FamilyAccessibility:{getSettings:()=>({text})}};
+  const window={LOCAL_FAMILY_SERVER:true,FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){},FamilyAccessibility:{getSettings:()=>({text})}};
   window.FamilyI18n={isEnglish:english,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?(p.nameEn||p.englishName||p.name):p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};
-  window.FamilyDates={age:()=>null,parse:()=>null};
-  vm.runInNewContext(source,{window,document,location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+  vm.runInNewContext(dateSource,{window,document,navigator:{userAgent:'Desktop'}});
+  vm.runInNewContext(source,{window,document,location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),fetch:()=>new Promise(()=>{}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
   document.getElementById('fullTreeButton').click();
   const card=id=>document.querySelector('#treeNodes [data-person-card="'+id+'"]');
   const role=id=>card(id).querySelector('[data-tree-role]');
@@ -73,4 +75,38 @@ test('adoption labels preserve the recorded adoptive relationship rather than in
   const f=fixture('zechariah');
   assert.equal(f.role('saadia-aharon').textContent,'בן מאומץ של זכריה');
   assert.equal(f.role('saadia-yona-hovshi').textContent,'אשתו של אהרון');
+});
+
+test('Hebrew life dates keep each pencil before its own label and retain historical ranges and uncertain evidence',()=>{
+  for(const phone of [false,true])for(const text of [100,150,200]){
+    const f=fixture('kehat',{phone,text});
+    const birth=f.card('kehat-jidaan').querySelector('.birthday-line');
+    const death=f.card('kehat-jidaan').querySelector('[data-tree-death-year]');
+    assert.equal(birth.firstElementChild.dataset.editBirthday,'kehat-jidaan');
+    assert.equal(death.firstElementChild.dataset.editDeath,'kehat-jidaan');
+    assert.match(birth.querySelector('.tree-date-value').textContent,/לידה: 1870–1877/);
+    assert.match(death.querySelector('.tree-date-value').textContent,/פטירה: 1962/);
+    const candidate=f.card('tri-yona').querySelector('[data-tree-death-year]');
+    assert.ok(candidate.hasAttribute('data-year-candidate'));
+    assert.equal(candidate.querySelector('[data-edit-death]'),null,'Unconfirmed evidence is not silently promoted to an editable confirmed date');
+    assert.match(candidate.textContent,/1985\?/);
+  }
+});
+
+test('tall date cards reserve actual content height before the next generation and connectors end at the repositioned child',()=>{
+  for(const phone of [false,true])for(const unitHeight of [350,700]){
+    const f=fixture('kehat',{phone,text:200,unitHeight});
+    for(const path of f.document.querySelectorAll('#treeConnectors .descendant-connector')){
+      const child=f.document.querySelector('[data-unit="'+path.dataset.childUnit+'"]');
+      const childTop=parseFloat(child.style.top),d=path.getAttribute('d');
+      const [,middle,end]=/^M[-\d.]+ ([-\d.]+)V([-\d.]+)$/.exec(d);
+      assert.equal(Number(end),childTop-14);
+      assert.ok(Number(middle)<Number(end),'Sibling lines stay above the next portraits');
+    }
+    for(const unit of Object.values(f.data.units))for(const childId of unit.children){
+      const parent=f.document.querySelector('[data-unit="'+(unit.id===f.data.root?'u-root':unit.id)+'"]');
+      const child=f.document.querySelector('[data-unit="'+childId+'"]');
+      if(parent&&child)assert.ok(parseFloat(child.style.top)>=parseFloat(parent.style.top)+unitHeight+144,'No generation overlaps the preceding dates');
+    }
+  }
 });
