@@ -141,6 +141,8 @@ test('desktop and mobile show the ten siblings below a group heading, without a 
     for(const unit of data.units['u-keha-yissachar'].children)assert.ok(document.querySelector('#treeNodes [data-person="'+data.units[unit].people[0]+'"]'));
     assert.ok(document.querySelector('#treeNodes [data-person="tri-shifra"]'));
     assert.ok(document.querySelector('#treeNodes [data-person="tri-hezi"]'));
+    assert.ok(!document.getElementById('treeNodes').textContent.includes('undefined'));
+    assert.match(document.getElementById('treeNodes').textContent,/נישואים לפי עדות אורה/);
     assert.match(document.getElementById('treeBreadcrumb').textContent,/ענף טרי/);
     window.FamilyApp.setView('directory');
     assert.equal(document.querySelector('#directoryGrid [data-person="tri-siblings-group"]'),null);

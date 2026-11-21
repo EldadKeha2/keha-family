@@ -37,7 +37,7 @@ export function applyTriUnits(units){
   units['u-keha-yissachar']={id:'u-keha-yissachar',people:['tri-siblings-group'],children,parent:null,relationship:'group',siblingGroup:true};
   for(const id of TRI_SIBLINGS){const u=unitId(id);units[u]={id:u,people:[id],children:[],parent:'u-keha-yissachar',relationship:'single'};}
   units['u-tri-binyamin']={id:'u-tri-binyamin',people:['tri-binyamin','tri-shifra'],children:['u-tri-hezi'],parent:'u-keha-yissachar',relationship:'spouse',relationships:[
-    {people:['tri-binyamin','tri-shifra'],children:[],relationship:'spouse'},
+    {people:['tri-binyamin','tri-shifra'],children:[],relationship:'spouse',label:'נישואים לפי עדות אורה',labelEn:'Marriage reported by Ora'},
     {people:['tri-shifra'],children:['u-tri-hezi'],relationship:'parent',label:'בנה של שפרה',labelEn:'Shifra’s son'},
   ]};
   units['u-tri-hezi']={id:'u-tri-hezi',people:['tri-hezi'],children:[],parent:'u-tri-binyamin',relationship:'single'};
