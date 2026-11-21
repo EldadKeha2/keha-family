@@ -157,6 +157,10 @@ test('The original desktop and phone tree renderer opens each sample branch', as
     vm.runInContext(script, vmContext);
     window.LOCAL_FAMILY_SERVER = false;
     vm.runInContext(appSource, vmContext);
+    assert.equal(document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,'haim');
+    assert.ok(document.querySelector('#treeNodes [data-person="haim-nakash"]'));
+    assert.ok(document.querySelector('#treeNodes [data-person="shoshana"]'));
+    document.querySelector('#branchBar [data-branch="all"]').click();
     assert.equal(document.querySelectorAll('#treeNodes [data-open-branch]').length, 4);
     assert.ok(document.querySelector('#treeNodes [data-person="margalit-nakash"]'));
     for (const [branch, id] of [['haim','avner-nakash'],['yehuda','naomi-malkhi'],['medina','roni-medina'],['keha','ruti']]) {

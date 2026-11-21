@@ -15,7 +15,8 @@
   const searchBranch=document.documentElement?.dataset?.nakashSearchBranch;
   const searchFamilyOrder=(a,b)=>Number(Boolean(searchBranch)&&b.branch===searchBranch)-Number(Boolean(searchBranch)&&a.branch===searchBranch);
   const requestedView=location.hash.slice(1).split('/')[0];
-  const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:'all', mode:'overview', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
+  const initialTreeBranch=scopedViews&&data.branches.some(branch=>branch.id===searchBranch)?searchBranch:'all';
+  const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:initialTreeBranch, mode:initialTreeBranch==='all'?'overview':'branch', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
   let motionFrame=0,suppressClickUntil=0,treeRenderVersion=0,treeCameraApplied=false;
   const treeTextScale=()=>Math.max(1,Math.min(2,(Number(window.FamilyAccessibility?.getSettings?.().text)||100)/100));
@@ -204,6 +205,9 @@
     if(syncRoute){const target='#'+view;if(window.FamilyNavigation)window.FamilyNavigation.go(target);else if(location.hash!==target)history.pushState(null,'',target);}
     if($('mobileNavDialog').open)$('mobileNavDialog').close();
     state.view = view;
+    if(scopedViews&&view==='tree'&&previous!==view){
+      state.branch=initialTreeBranch;state.mode=initialTreeBranch==='all'?'overview':'branch';renderBranches();
+    }
     if (previous !== view) {state.query='';$('searchInput').value='';}
     $('searchResults').hidden = true;
     renderView({preserveGalleryState:!syncRoute});
@@ -424,7 +428,29 @@
     const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     $('treeHelpInline').textContent=phone?'':guidance;
     $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בין הענפים'):'';
-    requestAnimationFrame(()=>{if(state.view!=='tree'||renderVersion!==treeRenderVersion)return;const viewport=$('treeViewport');if(previous){camera.scale=previous.scale;camera.x=viewport.clientWidth/2-previous.x*width*camera.scale;camera.y=viewport.clientHeight/2-previous.y*height*camera.scale;clampCamera();}else{const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);camera.scale=phone?fit*textScale:desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;}treeCameraApplied=true;applyCamera();window.FamilyTreeGuide?.show();});
+    requestAnimationFrame(()=>{
+      if(state.view!=='tree'||renderVersion!==treeRenderVersion)return;
+      if(previous){
+        camera.scale=previous.scale;camera.x=viewport.clientWidth/2-previous.x*width*camera.scale;camera.y=viewport.clientHeight/2-previous.y*height*camera.scale;clampCamera();
+      }else if(scopedViews){
+        let focus=positions.find(item=>item.id===rootId);
+        // Retain older single ancestors above the founding parents, while
+        // opening on the family itself even when its descendants are uneven.
+        while(focus.unit.people.length===1&&!focus.unit.siblingGroup&&children(focus.unit).length===1){
+          const next=positions.find(item=>item.id===children(focus.unit)[0]);
+          if(!next)break;focus=next;
+        }
+        const element=world.querySelector(`[data-unit="${treeUnitKey(focus.id)}"]`);
+        const focusHeight=element.offsetHeight||(phone?150:278)*textScale;
+        camera.scale=Math.min(1.06,(viewport.clientWidth-32)/focus.width,(viewport.clientHeight-80)/focusHeight);
+        camera.x=viewport.clientWidth/2-focus.x*camera.scale;
+        camera.y=viewport.clientHeight/2-(focus.y+focusHeight/2)*camera.scale;
+      }else{
+        const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);
+        camera.scale=phone?fit*textScale:desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;
+      }
+      treeCameraApplied=true;applyCamera();window.FamilyTreeGuide?.show();
+    });
   }
   function applyCamera(){
     $('treeWorld').style.transform=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
@@ -434,6 +460,12 @@
   window.addEventListener('family-accessibility-changed',()=>{if(reducedMotion())stopTreeMotion();const next=treeTextScale();if(next!==observedTextScale){observedTextScale=next;if(state.view==='tree')renderTree(true);}});
   function clampCamera(){
     if(!isPhone())return;const viewport=$('treeViewport'),w=camera.width*camera.scale,h=camera.height*camera.scale;
+    if(scopedViews){
+      // Allow the parents near an edge of the tree to stay at the centre
+      // through a pinch or drag, instead of snapping to the whole-tree bounds.
+      camera.x=Math.max(viewport.clientWidth/2-w,Math.min(viewport.clientWidth/2,camera.x));
+      camera.y=Math.max(viewport.clientHeight/2-h,Math.min(viewport.clientHeight/2,camera.y));return;
+    }
     camera.x=w<viewport.clientWidth-20?(viewport.clientWidth-w)/2:Math.max(viewport.clientWidth-w-65,Math.min(65,camera.x));
     camera.y=h<viewport.clientHeight-40?Math.max(10,(viewport.clientHeight-55-h)/2):Math.max(viewport.clientHeight-h-65,Math.min(65,camera.y));
   }
