@@ -101,7 +101,7 @@ const PEOPLE = [
   ['david-yaakobi', 'דוד יעקבי', 'David Yaakobi', 'm', 'u-nakash-yona', [], {deceased:true}],
   ['odelia-yaakobi', 'אודליה יעקבי', 'Odelia Yaakobi', 'f', 'u-nakash-odelia'],
   ['mor-pazarkar', 'מור פזרקר', 'Mor Pazarkar', 'f', 'u-nakash-mor', ['מור נקאש', 'Mor Nakash']],
-  ['hen-pazarkar', 'חן פזרקר', 'Hen Pazarkar', 'm', 'u-nakash-mor'],
+  ['hen-pazarkar', 'בן-חן פזרקר', 'Ben-Chen Pazarkar', 'm', 'u-nakash-mor'],
   ['noam-pazarkar', 'נעם פזרקר', 'Noam Pazarkar', 'm', 'u-nakash-noam-pazarkar'],
   ['michal-pazarkar', 'מיכל פזרקר', 'Michal Pazarkar', 'f', 'u-nakash-michal-pazarkar'],
   ['shira-pazarkar', 'שירה פזרקר', 'Shira Pazarkar', 'f', 'u-nakash-shira-pazarkar'],

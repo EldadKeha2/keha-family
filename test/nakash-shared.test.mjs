@@ -39,10 +39,11 @@ for (const [id, oldName, oldNameEn, name, nameEn, branch, unit, members] of [
   ['avner-former-wife', 'אמה של מור', "Mor's mother", 'יפה', 'Yafa', 'haim', 'u-nakash-avner', ['avner-nakash', 'rivka-nakash', 'avner-former-wife']],
   ['avrahumi-medina', 'אברהומי מדינה', 'Avrahumi Medina', 'אברהם מדינה', 'Avraham Medina', 'medina', 'u-nakash-avrahumi', ['avrahumi-medina']],
   ['aharon-gueta', 'אהרון גואטה', 'Aharon Gueta', 'אריק גואטה', 'Arik Gueta', 'medina', 'u-nakash-yoni', ['yoni-gueta', 'aharon-gueta']],
+  ['hen-pazarkar', 'חן פזרקר', 'Hen Pazarkar', 'בן-חן פזרקר', 'Ben-Chen Pazarkar', 'haim', 'u-nakash-mor', ['mor-pazarkar', 'hen-pazarkar']],
 ]) test(nameEn+' replaces the retired name on the same shared profile without losing its details or portrait',async()=>{
   const f=fixture();try{
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:oldName,nameEn:oldNameEn,firstName:oldName.split(' ')[0],lastName:oldName.split(' ').slice(1).join(' '),placeholder:true,extra:true,birthday:'2.3.1970',about:'פרטים קיימים',profileId:null,revision:'old-placeholder'}));
-    f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-confirmed-names-2026-11-20-v3','done');
+    f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-confirmed-names-2026-11-20-v4','done');
     const uploaded=await f.json('/api/people/'+id+'/photos?filename=portrait.jpg',{method:'POST',body:photo});
     const page=await f.json(f.site(branch,'people/'+id+'/page'));
     assert.equal(page.person.id,id);
