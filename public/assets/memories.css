@@ -159,7 +159,8 @@
 .voice-tone-toggle{display:flex;gap:8px;align-items:center;padding:7px 0;min-height:44px;background:none;border:0;color:#eedbb4;font-size:.875rem;text-align:start;border-radius:5px}
 .voice-tone-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round}
 .voice-tone-toggle[aria-expanded=true]{color:#fff4cf}
-.voice-speed{display:flex;align-items:center;gap:7px;font-size:.875rem;color:#eadbb7}
+.voice-tone-toggle span{white-space:nowrap}
+.voice-speed{display:flex;align-items:center;gap:7px;font-size:.875rem;color:#eadbb7;flex-shrink:0;white-space:nowrap}
 .voice-speed select{font:inherit;direction:ltr;min-height:40px;border:1px solid #a78f5d88;border-radius:7px;padding:7px 21px 7px 9px;color:#f6e8c2;background-color:#2a4437;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23e5c78c' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-position:right 5px center;background-repeat:no-repeat;appearance:none;-webkit-appearance:none}
 .voice-tone-panel{border-top:1px solid #cfb37855;margin-top:13px;padding-top:16px}
 .voice-tone-panel[hidden]{display:none}
@@ -179,6 +180,7 @@
 .heirloom-player :disabled{opacity:.45;cursor:default}
 .voice-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:600px){.voices-view .voice-card{padding:20px}.voices-view .voice-card-heading{gap:10px}.voices-view .voice-card h4{font-size:1.2rem}.voices-view .voice-card-seal{width:40px;height:40px;font-size:23px;border-radius:12px}.heirloom-player{padding:18px 16px}.voice-player-art{gap:12px}.voice-player-tools{gap:8px}.voice-tone-toggle{gap:6px}.voice-speed{gap:5px}.voice-play{width:60px;height:60px}}
+@media(max-width:400px){.voice-speed>span{display:none}}
 @media(prefers-reduced-motion:reduce){.is-playing .voice-player-wave i{animation:none;transform:scaleY(.8)}}
 #voiceProgress{width:100%;height:9px;accent-color:#8a9b6d;margin:8px 0 14px}
 #mainNav .nav-link[data-view="voices"],:is(#homeTiles,#mobileMenuTiles) .home-tile-voices{--tab-top:#fff6e6;--tab-mid:#e7d7b5;--tab-low:#c9bb99;--tab-line:#b9a780;--tab-ink:#726043}
