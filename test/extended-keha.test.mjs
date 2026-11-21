@@ -264,7 +264,7 @@ test('the confirmed Tzadok record expands both of Zechariah’s marriages and re
   assert.equal(data.units['u-kehat-naomi'].weddingDate,'21.6.1946');
   const marriages=data.units['u-kehat-zechariah-ben-tzadok'].relationships;
   assert.deepEqual(marriages[0].people,['kehat-zechariah-ben-tzadok','kehat-amna']);
-  assert.deepEqual(marriages[0].children,['u-kehat-tzadok','u-kehat-naomi']);
+  assert.deepEqual(marriages[0].children,['u-kehat-tzadok','u-kehat-yaakov-ben-zechariah','u-kehat-naomi']);
   assert.deepEqual(marriages[1].people,['kehat-zechariah-ben-tzadok','kehat-tziona']);
   assert.deepEqual(marriages[1].children,['u-kehat-zechariah-yehudit','u-kehat-shori','u-kehat-varda']);
   assert.ok(data.people['kehat-tzadok'].researchSources.every(s=>s.url.startsWith('https://journaliststudio.google.com/')));
@@ -280,9 +280,9 @@ test('the marriage bridge uses one set of people and keeps both spouses’ own p
   assert.deepEqual(rel('kehat-shori').parents,['kehat-zechariah-ben-tzadok','kehat-tziona']);
   assert.deepEqual(rel('kehat-mordechai').parents,['kehat-zechariah-ben-tzadok','kehat-tziona']);
   assert.deepEqual(rel('kehat-tziona').children,['kehat-yaakov-yehudit','kehat-shori','kehat-mordechai']);
-  assert.deepEqual(rel('kehat-amna').children,['kehat-tzadok','kehat-naomi']);
+  assert.deepEqual(rel('kehat-amna').children,['kehat-tzadok','kehat-yaakov-ben-zechariah','kehat-naomi']);
   for(const id of ['kehat-yaakov-yehudit','kehat-shori','kehat-mordechai']){
-    assert.deepEqual(rel(id).siblings,['kehat-tzadok','kehat-naomi','kehat-yaakov-yehudit','kehat-shori','kehat-mordechai'].filter(other=>other!==id));
+    assert.deepEqual(rel(id).siblings,['kehat-tzadok','kehat-yaakov-ben-zechariah','kehat-naomi','kehat-yaakov-yehudit','kehat-shori','kehat-mordechai'].filter(other=>other!==id));
   }
   assert.deepEqual(rel('kehat-mordechai').partners,['kehat-varda']);
   assert.deepEqual(rel('kehat-varda').parents,[]);
@@ -301,6 +301,37 @@ test('the marriage bridge uses one set of people and keeps both spouses’ own p
     assert.deepEqual([...data.people[id].branches].sort(),['kehat','kehat-tzadok']);
     assert.equal(Object.values(data.people).filter(person=>person.id===id).length,1);
   }
+});
+
+test('Yaakov son of Zechariah joins Amna’s children and Tehiya keeps only her confirmed mother',async()=>{
+  const window={};
+  vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
+  const projections=[createExtendedFamily(family),createBranchPortal(family,'zechariah-tzadok')];
+  for(const projection of projections){
+    const data=toOriginalFamilyData(projection),rel=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
+    assert.deepEqual(rel('kehat-yaakov-ben-zechariah').parents,['kehat-zechariah-ben-tzadok','kehat-amna']);
+    assert.deepEqual(rel('kehat-yaakov-ben-zechariah').partners,['kehat-miriam-zarhi']);
+    assert.deepEqual(rel('kehat-yaakov-ben-zechariah').children,[]);
+    assert.deepEqual(rel('kehat-miriam-zarhi').parents,[]);
+    assert.deepEqual(rel('kehat-miriam-zarhi').partners,['kehat-yaakov-ben-zechariah']);
+    assert.deepEqual(rel('kehat-miriam-zarhi').children,['kehat-tehiya']);
+    assert.deepEqual(rel('kehat-tehiya').parents,['kehat-miriam-zarhi']);
+    assert.deepEqual(rel('kehat-tehiya').siblings,[]);
+    assert.deepEqual(rel('kehat-yaakov').partners,['kehat-yaakov-yehudit']);
+    assert.deepEqual(rel('kehat-yaakov-yehudit').parents,['kehat-zechariah-ben-tzadok','kehat-tziona']);
+    assert.equal(data.people['kehat-yaakov-ben-zechariah'].branch,'kehat-tzadok');
+    assert.equal(data.people['kehat-tehiya'].branch,'kehat-tzadok');
+    assert.equal(data.people['kehat-tehiya'].lastName,'');
+    assert.ok(data.people['kehat-tehiya'].researchNotes.includes('מנישואים קודמים'));
+  }
+  const f=fixture();try{
+    for(const id of ['kehat-yaakov-ben-zechariah','kehat-miriam-zarhi','kehat-tehiya']){
+      const page=(await f.json('/keha-extended/zechariah-tzadok/api/compat/api/people/'+id+'/page')).person;
+      assert.equal(page.id,id);
+      assert.equal(page.birthday,'1.1.1111');
+      assert.equal((await f.json(site('people/'+id+'/page'))).person.id,id);
+    }
+  }finally{f.close();}
 });
 
 test('Uri’s transcription correction retains the existing profile and its family edits',async()=>{

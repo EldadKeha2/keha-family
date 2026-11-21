@@ -28,6 +28,9 @@ KEHAT_RESEARCH_PEOPLE.push(
   p('kehat-tziona','ציונה קהא','Tziona Keha','f','u-kehat-zechariah-ben-tzadok',{aliases:['ציניה קהא'],researchNotes:'אשתו השנייה של זכריה בן צדוק ואמם הביולוגית של יהודית, שורי ומרדכי, לפי התיקון שאישר אלדד. בתעודת נישואי יהודית H88579 מ־14.3.1947 נרשמה ציונה כאמה. במצבה המועמדת נכתב ציניה בת צדוק; אין להסיק שזה אותו צדוק שהיה אביו של זכריה.'}),
   p('kehat-tzadok','צדוק קהת','Tzadok Kehat','m','u-kehat-tzadok',{aliases:['צדוק קהא','צדוק קהתי'],birthYear:1917,birthYearSource:'פנקס תש״ב',birthYearSourceEn:'1941–1942 register',researchNotes:'בנם של זכריה בן צדוק ושל אמנה. אלדד אישר את זיהויו עם שורה 3479 בפנקס תש״ב: צדוק קהא, אב זכריה, יליד 1917, שערים, דף מודפס 58, עמ׳ PDF 300. בתעודת H57320 נישא לשמחה מגילה ב־7.1.1944; שם החתן קהתי, אביו זכריה בן צדוק קהתי ואמו אמנה ז״ל. בתעודה גילו 28, המרמז על 1915–1916; פער זה נשמר לצד שנת הפנקס. ראובן ושמעון הם בניו לפי התרשים. רון נמסר כנכדו וגור כנינו; עדיין לא הוכרע מי משני הבנים הוא אביו של רון.'}),
   p('kehat-simha-magila','שמחה מגילה קהתי','Simha Magila Kehati','f','u-kehat-tzadok',{aliases:['שמחה מגילה'],researchNotes:'נישאה לצדוק קהתי ב־7.1.1944, לפי תעודת H57320. בתעודה בת 27, תושבת ירושלים; אביה ראובן מגילה ז״ל. שם אמה לא מולא. אימהותה לילדי צדוק טרם תועדה בנפרד.'}),
+  p('kehat-yaakov-ben-zechariah','יעקב קהא','Yaakov Keha','m','u-kehat-yaakov-ben-zechariah',{aliases:['יעקב בן זכריה קהא','יעקב קהת'],researchNotes:'בנם של זכריה בן צדוק ואמנה, ואחיהם של צדוק ונעמי מנישואיו הראשונים של זכריה, לפי העדות המשפחתית. נשוי למרים זרחי. לא היו לו ילדים ביולוגיים; תחיה היא בתה של מרים מנישואים קודמים ובתו החורגת. הוא אדם נפרד מיעקב בן סעדיה ושושנה, בעלה של יהודית.'}),
+  p('kehat-miriam-zarhi','מרים זרחי','Miriam Zarhi','f','u-kehat-yaakov-ben-zechariah',{researchNotes:'אשתו של יעקב בן זכריה בן צדוק קהא, ואמה של תחיה מנישואים קודמים, לפי העדות המשפחתית. אין שיוך של תחיה כבתו הביולוגית של יעקב.'}),
+  p('kehat-tehiya','תחיה','Tehiya','f','u-kehat-tehiya',{researchNotes:'בתה של מרים זרחי מנישואים קודמים ובתו החורגת של יעקב בן זכריה בן צדוק קהא, לפי העדות המשפחתית. שם אביה הביולוגי ושם משפחתה טרם נמסרו.'}),
   p('kehat-naomi','נעמי מזרחי','Naomi Mizrahi','f','u-kehat-naomi',{aliases:['נעמי קהא'],researchNotes:'בתם של זכריה ואמנה לפי תעודת H77495. נישאה לישראל מזרחי ב־21.6.1946 בשעריים, בגיל 30. היא נפרדת מנעמי בת מסעוד ורומה שנישאה לזכריה גמליאל ב־1944.'}),
   p('kehat-israel-mizrahi','ישראל מזרחי','Israel Mizrahi','m','u-kehat-naomi',{researchNotes:'נישא לנעמי קהא ב־21.6.1946, לפי תעודת H77495. בן 48 בעת הנישואין; הוריו עובדיה מזרחי וחמאמה.'}),
   p('kehat-shori','שורי קהת','Shori Kehat','f','u-kehat-shori',{aliases:['שורי קהת','שורי','סורי'],researchNotes:'בתם של זכריה בן צדוק וציונה ואחותם של יהודית ומרדכי, לפי התיקון המשפחתי. לא נישאה. יהודית היא אמה של גילה, ולכן שורי היא דודתה של גילה מצד אמה.'}),
@@ -81,11 +84,18 @@ export function applyKehatResearchUnits(units){
   set('u-kehat-yaakov',['kehat-yaakov','kehat-yaakov-yehudit'],coupleKids,'u-keha-kehat',{weddingDate:'14.3.1947',weddingYear:1947});
   set('u-kehat-zechariah-yehudit',['kehat-yaakov-yehudit','kehat-yaakov'],coupleKids,'u-kehat-zechariah-ben-tzadok',{mirrorOf:'u-kehat-yaakov',weddingDate:'14.3.1947',weddingYear:1947});
   for(const id of coupleKids)set(id,[id.slice(2)],[],'u-kehat-yaakov');
-  const amnaKids=['u-kehat-tzadok','u-kehat-naomi'],tzionaKids=['u-kehat-zechariah-yehudit','u-kehat-shori','u-kehat-varda'];
+  const amnaKids=['u-kehat-tzadok','u-kehat-yaakov-ben-zechariah','u-kehat-naomi'],tzionaKids=['u-kehat-zechariah-yehudit','u-kehat-shori','u-kehat-varda'];
   set('u-kehat-zechariah-ben-tzadok',['kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona'],[...amnaKids,...tzionaKids],'u-kehat-tzadok-elder',{splitPartnerships:true,displayPeople:['kehat-amna','kehat-zechariah-ben-tzadok','kehat-tziona'],relationships:[
     {people:['kehat-zechariah-ben-tzadok','kehat-amna'],children:amnaKids,relationship:'spouse',label:'נישואין ראשונים',labelEn:'First marriage'},
     {people:['kehat-zechariah-ben-tzadok','kehat-tziona'],children:tzionaKids,relationship:'spouse',label:'נישואין שניים',labelEn:'Second marriage'},
   ]});
+  // Tehiya belongs to Miriam's earlier marriage; the connection starts only
+  // at her mother and does not give Yaakov a biological child.
+  set('u-kehat-yaakov-ben-zechariah',['kehat-yaakov-ben-zechariah','kehat-miriam-zarhi'],['u-kehat-tehiya'],'u-kehat-zechariah-ben-tzadok',{relationships:[
+    {people:['kehat-yaakov-ben-zechariah','kehat-miriam-zarhi'],children:[],relationship:'spouse'},
+    {people:['kehat-miriam-zarhi'],children:['u-kehat-tehiya'],relationship:'parent',label:'בתה של מרים מנישואים קודמים',labelEn:'Miriam’s daughter from a previous marriage'},
+  ]});
+  set('u-kehat-tehiya',['kehat-tehiya'],[],'u-kehat-yaakov-ben-zechariah');
   set('u-kehat-naomi',['kehat-naomi','kehat-israel-mizrahi'],[],'u-kehat-zechariah-ben-tzadok',{weddingDate:'21.6.1946',weddingYear:1946});
   set('u-kehat-shori',['kehat-shori'],[],'u-kehat-zechariah-ben-tzadok');
   const vardaKids=['merav','sharon-varda','adi-varda','tal-varda'].map(k=>'u-kehat-'+k);
