@@ -151,7 +151,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     return extra;
   }
   const collection = async (kind,personId) =>
-    (await db(nativeRoute?'content.items':extended?'nakash.extended.items':'nakash.compat.items',{branch,...(kind?{kind}:{}),...(personId?{personId}:{})})).items.filter(item=>!item.deletedAt&&(!personId||item.personId===personId||item.people?.includes(personId)));
+    (await db(nativeRoute?'content.items':extended?'nakash.extended.items':'nakash.compat.items',{branch,...(kind?{kind}:{}),...(personId?{personId}:{}),...(branch==='extended'?{generation:params.get('generation')==='second'?'second':'first'}:{})})).items.filter(item=>!item.deletedAt&&(!personId||item.personId===personId||item.people?.includes(personId)));
   const describe = item => scopedMediaLinks({
     ...picture(item),
     ...(nativeRoute?{src:'/media/'+item.id+(item.photoRevision?'?v='+item.photoRevision:'')}:{}),
@@ -211,7 +211,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     const {items,...pagination}=base;
     const revision = await sha256(JSON.stringify([items,pagination,filters]));
     return {kind, items:items.map(describe),count:pagination.total??items.length,revision,
-      ...(base.page?{pagination:{...pagination,query:params.get('q')||'',filter,person:params.get('person')||'',unit:params.get('unit')||'',labels:params.get('labels')||''}}:{}),
+      ...(base.page?{pagination:{...pagination,query:params.get('q')||'',filter,person:params.get('person')||'',unit:params.get('unit')||'',labels:params.get('labels')||'',...(branch==='extended'?{generation:params.get('generation')==='second'?'second':'first'}:{})}}:{}),
       ...(kind==='gallery'?{filterCounts:filters}:{}), ...(kind==='videos'?{categories:await categories()}:{}),
       cover:items[0]?describe(items[0]):null};
   }

@@ -27,3 +27,15 @@ test('old and current names resolve to the stable Roi ID without selecting a dup
   for(const name of ['רועי חריזי','רועי אלחריזי','Roei Harizi','Roi Harizi','  ROEI   ELHARIZI ','Roi Elharizi'])assert.deepEqual(matchingPeople(roster,name).map(person=>person.id),['roi']);
   assert.deepEqual(matchingPeople(roster,'Ruth Harizi').map(person=>person.id),['ruti']);
 });
+
+test('Shori replaces Suri in displayed names and family text while old searches keep her canonical profile',()=>{
+  const person={id:'kehat-shori',name:'שורי קהת',nameEn:'Shori Kehat'};
+  const roster=[{id:'extra-old',name:'סורי קהת'},person];
+  for(const name of ['סורי','סורי קהת','שורי','שורי קהת','Suri Kehat','Shori Kehat'])assert.deepEqual(matchingPeople(roster,name).map(p=>p.id),[person.id]);
+  const before={...person,name:'סורי קהת',nameEn:'Suri Kehat',englishName:'Suri Kehat',firstName:'סורי',researchNotes:'יהודית וסורי הן אחיות',about:'סורי במשפחה',key:'portraits/סורי.jpg',url:'https://family.example/Suri',file:'סורי.jpg',aliases:['סורי קהת']};
+  const after=correctNamedContent(before);
+  assert.equal(after.name,'שורי קהת');assert.equal(after.nameEn,'Shori Kehat');assert.equal(after.englishName,'Shori Kehat');assert.equal(after.firstName,'שורי');assert.equal(after.researchNotes,'יהודית ושורי הן אחיות');assert.equal(after.about,'שורי במשפחה');
+  for(const key of ['id','key','url','file','aliases'])assert.deepEqual(after[key],before[key]);
+  assert.deepEqual(correctNamedContent(after),after);
+  assert.equal(correctNamedContent({body:'הקישורים הם היסטוריים'}).body,'הקישורים הם היסטוריים');
+});

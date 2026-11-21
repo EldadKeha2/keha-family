@@ -69,3 +69,7 @@ html[data-extended-keha] #extendedKehaHomeHub{margin-block:0 24px}
   .extended-related-families p{font-size:calc(15px * var(--a11y-text-scale,1))}
 }
 @media(prefers-reduced-motion:reduce){.extended-branch-circle{transition:none}}
+.extended-gallery-generations{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 18px;padding:5px;border-radius:18px;background:color-mix(in srgb,var(--family-accent,#536641) 9%,transparent)}
+.extended-gallery-generations button{flex:1;min-height:46px;padding:10px 18px;border:1px solid color-mix(in srgb,var(--family-accent,#536641) 30%,transparent);border-radius:14px;background:transparent;color:var(--family-accent,#536641);font:inherit;font-size:1rem;font-weight:700;cursor:pointer}
+.extended-gallery-generations button[aria-pressed=true]{color:#fff;background:var(--family-accent,#536641);box-shadow:0 3px 12px #22381825}
+.extended-gallery-generations button:focus-visible{outline:3px solid #b58945;outline-offset:3px}

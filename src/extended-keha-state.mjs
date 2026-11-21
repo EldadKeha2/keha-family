@@ -1,6 +1,7 @@
 import family from './family.mjs';
 import {EXTENDED_PEOPLE,createExtendedFamily} from '../public/keha-extended/family-data.mjs';
 import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
+import {extendedGalleryGenerations,extendedGalleryPhoto} from '../public/keha-extended/gallery-generations.mjs';
 import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {uid} from './http.mjs';
 import {linkSharedProfile} from './nakash-shared.mjs';
@@ -279,6 +280,8 @@ export function initializeExtendedKeha(state) {
 export function extendedKehaItems(state,args={}) {
   const source={...family,sharedPeople:state.run('people').people,identities:state.sharedNakashIdentities};
   const scoped=BRANCH_PORTALS[args.branch]?createBranchPortal(source,args.branch):(args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)(source);
+  const sharedGallery=!args.branch||args.branch==='extended';
+  const cohorts=sharedGallery?extendedGalleryGenerations(scoped,source.sharedPeople,new Set(Object.values(family.people).filter(person=>person.generation>=3).map(person=>person.id))):null;
   const ids=JSON.stringify(Object.keys(scoped.people));
   const categories=JSON.stringify(BRANCH_PORTALS[args.branch]?['nakash:'+args.branch]:args.branch==='shlomo'?['nakash:shlomo','gallery','videos','nostalgia']:['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:zechariah-tzadok','nakash:kehat','gallery','videos','nostalgia']);
   return state.rows("SELECT data FROM media WHERE category IN (SELECT value FROM json_each(?)) OR person_id IN (SELECT value FROM json_each(?)) OR id IN (SELECT media_id FROM media_tags WHERE person_id IN (SELECT value FROM json_each(?))) ORDER BY rowid DESC",categories,ids,ids).map(row=>JSON.parse(row.data))
@@ -287,6 +290,7 @@ export function extendedKehaItems(state,args={}) {
       const people=state.tagIds(item.id);
       return {...item,people,branch:item.category?.startsWith('nakash:')?item.category.slice(7):'keha',branches:[args.branch || 'extended']};
     })
+    .filter(item=>!sharedGallery||!(item.kind==='photo'||!item.kind&&item.mime?.startsWith('image/'))||extendedGalleryPhoto(item,cohorts,args.generation,id=>scoped.identities[id]||id))
     .filter(item=>!args.personId || item.personId===args.personId || item.people.includes(args.personId))
     .map(item=>({...item,faces:state.faces(item.id),faceSummary:item.mime?.startsWith('image/')?state.faceSummary(item):undefined,tagsRevision:state.tagsRevision(item.id)}));
 }

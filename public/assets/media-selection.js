@@ -143,7 +143,7 @@ async function selectAll(){
   try{
     let ids;
     if(state.scope==='gallery'){
-      const q=window.FamilyPortal.galleryQuery(),response=await I.fetch('api/gallery/selection?'+new URLSearchParams({q:q.query,person:q.person,unit:q.unit,labels:q.labels||'',filter:q.filter||'all'}),{cache:'no-store'}),result=await response.json();
+      const q=window.FamilyPortal.galleryQuery(),response=await I.fetch('api/gallery/selection?'+new URLSearchParams({q:q.query,person:q.person,unit:q.unit,labels:q.labels||'',filter:q.filter||'all',...(q.generation?{generation:q.generation}:{})}),{cache:'no-store'}),result=await response.json();
       if(!response.ok)throw Error(I.error(result.error));ids=result.ids;
     }else if(state.grid.dataset.personGrid)ids=await window.FamilyPeople.selectAlbum(state.grid);
     else ids=cards().filter(card=>card.parentElement===state.grid).map(card=>card.dataset.selectId);

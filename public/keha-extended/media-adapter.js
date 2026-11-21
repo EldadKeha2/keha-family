@@ -16,4 +16,26 @@
   const open=XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open=function(method,url,...options){return open.call(this,method,scoped(url)||url,...options);};
   if(navigator.serviceWorker)void navigator.serviceWorker.register('/keha-extended/sw.js',{scope:document.documentElement.dataset.nakashHome || '/keha-extended/'}).catch(()=>{});
+  if(document.documentElement.dataset.extendedKeha==='true'){
+    function renderGenerations(){
+      const selected=window.FamilyPortal?.galleryQuery().generation||'first',english=window.FamilyI18n?.isEnglish;
+      for(const button of document.querySelectorAll('[data-gallery-generation]')){
+        button.setAttribute('aria-pressed',String(button.dataset.galleryGeneration===selected));
+        button.querySelector('[data-generation-label]').textContent=button.dataset.galleryGeneration==='first'?(english?'First generation':'דור ראשון'):(english?'Include the second generation':'גם הדור השני');
+      }
+    }
+    document.addEventListener('DOMContentLoaded',()=>{
+      const portal=window.FamilyPortal;
+      for(const name of ['activate','refineGallery']){
+        const original=portal[name];
+        portal[name]=function(...args){const result=original.apply(this,args);renderGenerations();return result;};
+      }
+      renderGenerations();
+    });
+    document.addEventListener('click',event=>{
+      const button=event.target.closest('[data-gallery-generation]');if(!button)return;
+      window.FamilyGalleryFilter?.reset();
+      void window.FamilyPortal.refineGallery({generation:button.dataset.galleryGeneration});
+    });
+  }
 })();

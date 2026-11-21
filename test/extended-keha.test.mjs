@@ -372,7 +372,7 @@ test('Tziona parentage correction replaces the deployed Amna assumption once and
   }finally{f.close();}
 });
 
-test('the family corrections retain Suri, Dvora and Merav’s saved profiles and make Mordechai the father',async()=>{
+test('the family corrections retain Shori, Dvora and Merav’s saved profiles and make Mordechai the father',async()=>{
   const f=fixture();try{
     const migration='extended-kehat-tziona-three-siblings-2026-11-20-v1';
     for(const id of ['extended-kehat-certificate-families-2026-11-20-v1','extended-kehat-yehudit-amna-2026-11-20-v1']){
@@ -381,7 +381,7 @@ test('the family corrections retain Suri, Dvora and Merav’s saved profiles and
     for(const [id,name,nameEn] of [['kehat-shori','שורי קהת','Shori Kehat'],['kehat-varda','ורדה קהת','Varda Kehat'],['kehat-merav','מרב','Merav']]){
       f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name,nameEn,englishName:nameEn,birthday:'2.3.1930',about:'סיפור משפחתי שמור',profileId:'portrait-'+id,extra:true}));
     }
-    for(const [id,name,nameEn] of [['kehat-shori','סורי קהת','Suri Kehat'],['kehat-varda','דבורה קהת','Dvora Kehat'],['kehat-merav','מירב','Merav']]){
+    for(const [id,name,nameEn] of [['kehat-shori','שורי קהת','Shori Kehat'],['kehat-varda','דבורה קהת','Dvora Kehat'],['kehat-merav','מירב','Merav']]){
       const page=await f.json('/keha-extended/zechariah-tzadok/api/compat/api/people/'+id+'/page');
       assert.equal(page.person.name,name);assert.equal(page.person.nameEn,nameEn);
       assert.equal(page.person.birthday,'2.3.1930');assert.equal(page.person.about,'סיפור משפחתי שמור');
@@ -483,6 +483,7 @@ test('existing Saida and Boaz portraits, media and edits remain shared through t
       f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name,extra:true,birthday:'4.5.1920',profileId:null,revision:'before'}));
       const uploaded=await f.json('/api/people/'+id+'/photos?filename=historical.jpg',{method:'POST',body:photo});
       portraits.push(uploaded.person.profileMediaId);
+      await f.json('/api/media/'+uploaded.person.profileMediaId+'/tags/patch',{method:'POST',body:{changes:[{personId:id,tagged:true}]}});
     }
     const script=await(await f.call('/keha-extended/site-data.js')).text();
     const data=JSON.parse(script.split('\n')[0].slice('window.FAMILY_DATA='.length,-1));
@@ -572,7 +573,7 @@ test('Shlomo’s scope shares real Keha portraits and edits while excluding the 
     await f.json(site('collections/gallery/upload?filename=other-branch.jpg'),{method:'POST',body:photo});
     const own=await f.json(shlomoSite('collections/gallery?size=all'));
     assert.equal(own.count,0,'An untagged upload or a child-only portrait cannot enter the founders’ main gallery');
-    assert.equal((await f.json(site('collections/gallery?size=all'))).count,3);
+    assert.equal((await f.json(site('collections/gallery?size=all'))).count,0,'Unreviewed uploads and unrelated tags cannot enter the first-generation gallery');
     assert.equal((await f.call(shlomoSite('people/kehat-hadassah/page'))).status,404);
     f.restart();
     assert.equal((await f.json(shlomoSite('people/ora/page'))).person.birthday,'2.3.1950');
@@ -674,8 +675,11 @@ test('the central gallery shares tagged Keha photos and new uploads while its ro
     const tagged=await f.json('/api/people/ora/photos?filename=ora.jpg',{method:'POST',body:photo});
     await f.json(site('collections/gallery/upload?filename=shared.jpg'),{method:'POST',body:photo});
     const gallery=await f.json(site('collections/gallery?size=all'));
-    assert.equal(gallery.count,2);
-    assert.ok(gallery.items.some(item=>item.id===tagged.person.profileMediaId));
+    assert.equal(gallery.count,0);
+    const id=tagged.person.profileMediaId;
+    await f.json('/api/media/'+id+'/tags/patch',{method:'POST',body:{changes:[{personId:'ora',tagged:true}]}});
+    const next=await f.json(site('collections/gallery?size=all&generation=second'));
+    assert.equal(next.count,1);assert.ok(next.items.some(item=>item.id===id));
     for(const item of gallery.items)assert.ok(item.src.startsWith('/media/'));
     const roster=await f.json(site('tag-people'));
     assert.ok(roster.people.some(person=>person.id==='kehat-jidaan'));
@@ -788,7 +792,7 @@ test('each portal can edit profiles and upload documents/photos while the centra
       const roster=await f.json(path(branch,'tag-people'));
       assert.ok(roster.people.some(p=>p.id===id));assert.ok(!roster.people.some(p=>p.id===other));
     }
-    assert.equal((await f.json(site('collections/gallery?size=all'))).count,3);
+    assert.equal((await f.json(site('collections/gallery?size=all'))).count,0,'Unreviewed uploads and unrelated tags cannot enter the first-generation gallery');
     f.restart();
     assert.equal((await f.json(path('zechariah','people/saadia-aviva/page'))).albums.documents.total,1);
   }finally{f.close();}

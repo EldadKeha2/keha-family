@@ -32,7 +32,7 @@ function render(){
   if(!ready)return;
   const all=window.FamilyPortal.galleryQuery().filter==='all',open=all&&state.open,toggle=$('galleryFilterToggle');
   const collection=window.FamilyPortal.getCollection('gallery'),q=window.FamilyPortal.galleryQuery(),p=collection.pagination;
-  state.resultsReady=Boolean(p&&(p.person||'')===q.person&&(p.unit||'')===q.unit&&(p.labels||'')===(q.labels||'')&&(p.query||'')===q.query.trim());
+  state.resultsReady=Boolean(p&&(p.person||'')===q.person&&(p.unit||'')===q.unit&&(p.labels||'')===(q.labels||'')&&(p.query||'')===q.query.trim()&&(!q.generation||p.generation===q.generation));
   toggle.hidden=!all;toggle.setAttribute('aria-expanded',String(open));$('galleryFilterPanel').hidden=!open;
   $('clearGalleryFilter').hidden=!(state.people.size||state.families.size||state.labels.size);
   $('galleryPeopleChoiceCount').textContent=state.people.size?'('+state.people.size+')':'';

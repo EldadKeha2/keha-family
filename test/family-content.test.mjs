@@ -10,6 +10,7 @@ import {MISATTRIBUTED_YONA_DOCUMENT,contentContext,storyInContext} from '../src/
 import {parseHTML} from 'linkedom';
 import {KEHAT_DOCUMENTS} from '../src/kehat-documents.mjs';
 import {sha256} from '../src/http.mjs';
+import {nameCorrectionKey} from '../src/name-corrections.mjs';
 const researchIds=new Set(KEHAT_DOCUMENTS.map(item=>item.id));
 const addedItems=result=>result.items.filter(item=>!researchIds.has(item.id));
 async function ownerPassword(f){
@@ -46,6 +47,24 @@ test('extended stories stop at historical children and exclude Yona and younger 
   const c=contentContext('extended');
   for(const id of ['shlomo','keha-zechariah','saadia-elder','saadia-israel','kehat-jidaan','kehat-naomi','kehat-yaakov','kehat-yaakov-yehudit'])assert.equal(storyInContext({personIds:[id]},c),true,id);
   for(const id of ['yona','eldad','saadia-aviva','kehat-gila'])assert.equal(storyInContext({personIds:[id]},c),false,id);
+});
+
+test('the shared Shori correction updates existing profiles, captions and research notes without changing IDs or portraits',async()=>{
+  const f=fixture();try{
+    await f.json(scope('extended','tag-people'));
+    const id='kehat-shori',person=f.state.person(id);
+    f.sql.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify({...person,name:'סורי קהת',nameEn:'Suri Kehat',englishName:'Suri Kehat',birthday:'2.3.1930',about:'סורי עם יהודית',researchNotes:'יהודית וסורי הן אחיות',profileId:'kept-shori-portrait'}),id);
+    const image=f.media(id,{tags:[id],caption:'סורי קהת',key:'originals/סורי.jpg'});
+    f.sql.prepare('DELETE FROM meta WHERE id=?').run(nameCorrectionKey);f.restart();
+    for(const branch of ['extended','zechariah-tzadok']){
+      const page=await f.json(scope(branch,'people/'+id+'/page'));
+      assert.equal(page.person.id,id);assert.equal(page.person.name,'שורי קהת');assert.equal(page.person.nameEn,'Shori Kehat');assert.equal(page.person.birthday,'2.3.1930');assert.equal(page.person.about,'שורי עם יהודית');
+      const roster=await f.json(scope(branch,'tag-people'));assert.equal(roster.people.find(person=>person.id===id).name,'שורי קהת');
+    }
+    const saved=f.state.person(id);assert.equal(saved.profileId,'kept-shori-portrait');assert.equal(saved.researchNotes,'יהודית ושורי הן אחיות');
+    assert.equal(f.state.media(image.id).caption,'שורי קהת');assert.equal(f.state.media(image.id).key,'originals/סורי.jpg');assert.deepEqual(f.state.tagIds(image.id),[id]);
+    f.restart();assert.equal((await f.json('/api/people/'+id+'/page')).person.name,'שורי קהת');
+  }finally{f.close();}
 });
 
 test('new family stories use the existing editor contract and remain relevant to their own families',async()=>{
@@ -88,14 +107,14 @@ test('documents retain original grandparent records, deduplicate shared scans, a
 test('public family profiles keep founder and child photos and portraits while younger albums and selections stay empty',async()=>{
   const f=fixture();try{
     await f.json(scope('extended','tag-people'));
-    const younger=f.media('eldad');const child=f.media('ora');const grandfather=f.media('shlomo',{tags:['eldad']});
+    const younger=f.media('eldad');const child=f.media('ora',{tags:['ora']});const grandfather=f.media('shlomo',{tags:['eldad']});
     const original=await f.json('/api/people/eldad/page');assert.equal(original.albums.photos.total,2);
     for(const branch of ['keha','extended']){
       const page=await f.json(scope(branch,'people/eldad/page'));assert.equal(page.albums.photos.total,0);assert.equal(page.person.photoCount,0);assert.ok(page.person.profile);
       assert.deepEqual((await f.json(scope(branch,'people/eldad/selection?kind=photos'))).ids,[]);
       assert.equal((await f.json(scope(branch,'people/ora/page'))).albums.photos.total,1);
       assert.equal((await f.json(scope(branch,'people/shlomo/page'))).albums.photos.total,1);
-      const gallery=await f.json(scope(branch,'collections/gallery?size=all'));assert.ok(!gallery.items.some(item=>item.id===younger.id));assert.ok(gallery.items.some(item=>item.id===child.id));assert.equal(gallery.items.some(item=>item.id===grandfather.id),branch!=='extended');
+      const gallery=await f.json(scope(branch,'collections/gallery?size=all'+(branch==='extended'?'&generation=second':'')));assert.ok(!gallery.items.some(item=>item.id===younger.id));assert.ok(gallery.items.some(item=>item.id===child.id));assert.equal(gallery.items.some(item=>item.id===grandfather.id),branch!=='extended');
     }
     for(const branch of ['haim','yehuda','medina','kehat','zechariah'])assert.equal((await f.json(scope(branch,'collections/gallery?size=all'))).items.length,0,'unrelated galleries do not import the original family photos');
     assert.equal((await f.call('/media/'+younger.id,{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
@@ -116,11 +135,11 @@ test('extended gallery excludes every younger generation even in founder group p
       f.media(null,{category:'nakash:kehat',tags:['kehat-naomi','rami']}),
       f.media('eldad',{category:'nakash:extended'}),
     ];
-    const gallery=await f.json(scope('extended','collections/gallery?size=all'));
+    const gallery=await f.json(scope('extended','collections/gallery?size=all&generation=second'));
     const expected=new Set([founder.id,child.id,otherBranch.id]);
     assert.deepEqual(new Set(gallery.items.map(item=>item.id)),expected);
     assert.equal(gallery.count,3);assert.equal(gallery.filterCounts.all,3);
-    assert.deepEqual(new Set((await f.json(scope('extended','gallery/selection'))).ids),expected);
+    assert.deepEqual(new Set((await f.json(scope('extended','gallery/selection?generation=second'))).ids),expected);
     assert.equal((await f.json(scope('extended','collections/gallery?person=eldad'))).count,0);
     assert.equal((await f.json(scope('extended','collections/gallery?unit=u-eldad'))).count,0);
     for(const branch of ['original','keha']){
@@ -129,11 +148,42 @@ test('extended gallery excludes every younger generation even in founder group p
     }
     for(const item of hidden)assert.equal((await f.call('/media/'+item.id)).status,200,'Original files are retained');
     await f.json('/api/media/'+founder.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'eldad',tagged:true}]}});
-    const tagged=await f.json(scope('extended','collections/gallery?size=all'));
+    const tagged=await f.json(scope('extended','collections/gallery?size=all&generation=second'));
     assert.equal(tagged.count,2);assert.ok(!tagged.items.some(item=>item.id===founder.id));
     await f.json('/api/media/'+founder.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'eldad',tagged:false}]}});
-    assert.equal((await f.json(scope('extended','collections/gallery?size=all'))).count,3);
-    f.restart();assert.equal((await f.json(scope('extended','collections/gallery?size=all'))).count,3);
+    assert.equal((await f.json(scope('extended','collections/gallery?size=all&generation=second'))).count,3);
+    f.restart();assert.equal((await f.json(scope('extended','collections/gallery?size=all&generation=second'))).count,3);
+  }finally{f.close();}
+});
+
+test('the shared archive starts with tagged pre-1940 people and reveals only their next generation on request',async()=>{
+  const f=fixture();try{
+    await f.json(scope('extended','tag-people'));
+    const photo=(tags,more={})=>f.media(null,{category:'nakash:extended',tags,...more});
+    const grandparents=photo(['shlomo','yona']);
+    const avishai=photo(['avishai']);
+    const ruti=photo(['ruti']);
+    const parents=photo(['yehiel','ora']);
+    const mixed=photo(['yona','ruti']);
+    const grandchild=photo(['shlomo','eldad']);
+    const untagged=photo([],{faceSummary:{reviewed:true}});
+    const late=photo(['tri-hana']);
+    const unsupported=photo(['saadia-ronit']);
+    const first=await f.json(scope('extended','collections/gallery?size=all'));
+    assert.deepEqual(new Set(first.items.map(item=>item.id)),new Set([grandparents.id,avishai.id]));
+    assert.equal(first.pagination.generation,'first');assert.equal(first.filterCounts.untagged,0);
+    const second=await f.json(scope('extended','collections/gallery?size=all&generation=second'));
+    assert.deepEqual(new Set(second.items.map(item=>item.id)),new Set([grandparents.id,avishai.id,ruti.id,parents.id,mixed.id,late.id]));
+    assert.equal(second.pagination.generation,'second');
+    assert.deepEqual(new Set((await f.json(scope('extended','gallery/selection?generation=second'))).ids),new Set(second.items.map(item=>item.id)));
+    for(const suffix of ['&generation=all','&generation=third','&person=ruti'])assert.deepEqual(new Set((await f.json(scope('extended','collections/gallery?size=all'+suffix))).items.map(item=>item.id)),suffix.includes('person=')?new Set():new Set([grandparents.id,avishai.id]));
+    for(const item of [grandchild,untagged,unsupported])assert.ok(!second.items.some(found=>found.id===item.id));
+    const empty=await f.json(scope('extended','collections/gallery?filter=untagged&generation=second'));assert.equal(empty.count,0);
+    assert.equal((await f.json(scope('extended','collections/photos'))).count,2,'The main-page slideshow uses the first generation as well');
+    await f.json('/api/media/'+grandparents.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'ora',tagged:true}]}});
+    assert.equal((await f.json(scope('extended','collections/gallery?size=all'))).count,1);
+    assert.equal((await f.json(scope('extended','collections/gallery?size=all&generation=second'))).count,6);
+    f.restart();assert.equal((await f.json(scope('extended','collections/gallery?size=all'))).count,1);
   }finally{f.close();}
 });
 

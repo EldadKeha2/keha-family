@@ -168,7 +168,7 @@ export class FamilyState {
     // This one-time pass updates authored text, including deleted photos and history,
     // without retagging, copying or rewriting any binary photo.
     for(const table of ['people','media','media_trash','photo_versions','stories','weddings','greetings','trivia_questions']){
-      for(const row of this.rows('SELECT rowid AS row_id,data FROM '+table+' WHERE data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%')){
+      for(const row of this.rows('SELECT rowid AS row_id,data FROM '+table+' WHERE data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%','%סורי%','%Suri%')){
         const previous=JSON.parse(row.data),item=correctNamedContent(previous);
         if(JSON.stringify(item)===JSON.stringify(previous))continue;
         if(table==='people'){this.savePerson(item);continue;}
@@ -180,7 +180,7 @@ export class FamilyState {
       }
     }
     for(const table of ['jachnun_scores','rex_scores','neto_tetris_scores','ruti_house_scores','quiz_scores']){
-      for(const row of this.rows('SELECT id,name FROM '+table+' WHERE name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%')){
+      for(const row of this.rows('SELECT id,name FROM '+table+' WHERE name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%','%סורי%','%Suri%')){
         const name=correctPersonName(row.name);if(name!==row.name)this.sql.exec('UPDATE '+table+' SET name=? WHERE id=?',name,row.id);
       }
     }

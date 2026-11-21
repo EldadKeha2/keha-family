@@ -2,6 +2,7 @@ import original from './family.mjs';
 import {createFamily} from '../public/nakash/family-data.mjs';
 import {createExtendedFamily} from '../public/keha-extended/family-data.mjs';
 import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
+import {extendedGalleryGenerations,extendedGalleryPhoto} from '../public/keha-extended/gallery-generations.mjs';
 import {HttpError,text,uid} from './http.mjs';
 
 export const ORIGINAL_PHOTO_PEOPLE=new Set(['shlomo','yona','ruti','becker-parent','yehiel','avigail','ora','shosh']);
@@ -49,7 +50,8 @@ export function contentContext(branch,sharedPeople={},identities={}){
   if(branch==='original')for(const id of tree.units[tree.root]?.people||[])ids.add(id);
   const documentIds=branch==='original'||branch==='shlomo'?new Set(['shlomo','yona']):new Set(ids);
   const mediaIds=branch==='extended'?new Set(Object.keys(tree.people)):new Set(ids);
-  return {branch,tree,ids,mediaIds,documentIds,canonical};
+  const galleryGenerations=branch==='extended'?extendedGalleryGenerations(tree,sharedPeople,youngerOriginalPeople):null;
+  return {branch,tree,ids,mediaIds,documentIds,canonical,galleryGenerations};
 }
 
 export function contentHasSubjects(item,context,document=false){
@@ -78,10 +80,8 @@ export function mediaInContext(item,context){
   if(!item.category?.startsWith('nakash:')&&subjects(item).some(id=>originalPeople.has(id)))return false;
   return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.familyScopes?.includes(context.branch)||item.category==='nakash:'+context.branch||context.branch==='extended'&&['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:zechariah-tzadok','nakash:kehat'].includes(item.category);
 }
-function collectionInContext(item,context){
-  // A founder tag or an explicit shared-album assignment must never bring a
-  // photo of Yona and Shlomo's younger generations into the extended gallery.
-  if(context.branch==='extended'&&kind(item)==='photo'&&(item.people?.length?item.people:subjects(item)).some(id=>youngerOriginalPeople.has(context.canonical(id))))return false;
+function collectionInContext(item,context,generation='first'){
+  if(context.branch==='extended'&&kind(item)==='photo'&&!extendedGalleryPhoto(item,context.galleryGenerations,generation,context.canonical))return false;
   if(!mediaInContext(item,context))return false;
   if(context.branch==='shlomo'&&kind(item)!=='document')return (item.people||[]).some(id=>['shlomo','yona'].includes(context.canonical(id)));
   if(['haim','yehuda','medina','zechariah','zechariah-tzadok','kehat'].includes(context.branch)&&kind(item)!=='document')return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.category==='nakash:'+context.branch||item.familyScopes?.includes(context.branch);
@@ -223,7 +223,7 @@ export function handleFamilyContent(state,action,args){
     if(branch==='shlomo')return {items:shlomoItems(state,context).filter(item=>(!args.kind||kind(item)===args.kind)&&collectionInContext(item,context))};
     const tags=new Map();
     for(const row of state.rows('SELECT media_id,person_id FROM media_tags')){if(!tags.has(row.media_id))tags.set(row.media_id,[]);tags.get(row.media_id).push(row.person_id);}
-    const items=state.rows('SELECT data FROM media ORDER BY rowid DESC').map(row=>JSON.parse(row.data)).filter(item=>!args.kind||kind(item)===args.kind).map(item=>({...item,people:tags.get(item.id)||[]})).filter(item=>collectionInContext(item,context));
+    const items=state.rows('SELECT data FROM media ORDER BY rowid DESC').map(row=>JSON.parse(row.data)).filter(item=>!args.kind||kind(item)===args.kind).map(item=>({...item,people:tags.get(item.id)||[]})).filter(item=>collectionInContext(item,context,args.generation));
     const metadata=state.mediaPublicMany(items);
     return {items:items.map((item,i)=>({...item,faceSummary:metadata[i].faceSummary,tagsRevision:metadata[i].tagsRevision}))};
   }

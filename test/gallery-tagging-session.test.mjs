@@ -9,7 +9,7 @@ const portalSource=await readFile(new URL('../public/assets/portal.js',import.me
 const appSource=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
 const homeSource=await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8');
 const photo=(id='a',tags=[])=>({id,file:id+'.jpg',filename:id+'.jpg',scope:'gallery',kind:'photo',mime:'image/jpeg',src:'/media/'+id,name:'Photo '+id,caption:'',tags,tagsRevision:'initial',faceSummary:{total:2,unmatched:2,partial:tags.length>0,reviewed:false}});
-function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=false,phone=false,home=false,initialView='gallery'}={}){
+function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=false,phone=false,home=false,initialView='gallery',extended=false}={}){
  const nodes=new Map(),documentHandlers=new Map(),windowHandlers=new Map(),intervals=[],requests=[],pending=[];let nextDeferred=false,revision=1;
  const server=structuredClone(items),mounted=[];
  class Node{
@@ -30,10 +30,11 @@ function fixture(items=[photo('a'),photo('b')],{allPageSize=Infinity,routing=fal
  const pagers=[new Node(),new Node()];
  const listen=(map,name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);};
  const document={activeElement:null,visibilityState:'visible',body:new Node(),documentElement:new Node(),getElementById:get,createElement:()=>new Node(),createTextNode:text=>({textContent:text}),querySelector:()=>null,querySelectorAll:s=>s==='[data-gallery-filter]'?filters:s==='[data-gallery-pager]'?pagers:[],addEventListener:(name,fn)=>listen(documentHandlers,name,fn)};
+ if(extended)document.documentElement.dataset.extendedKeha='true';
  const collection=path=>{
   const params=new URL(path,'https://test/').searchParams,filter=params.get('filter')||'all',selected=server.filter(item=>filter==='untagged'?!item.tags.length&&!item.faceSummary.reviewed:filter==='partial'?item.faceSummary.partial:filter==='complete'?item.faceSummary.reviewed:true);
   const showAll=params.get('size')==='all',size=showAll?Math.max(1,selected.length):Math.min(Number(params.get('size'))||100,filter==='all'?allPageSize:Infinity),pages=Math.max(1,Math.ceil(selected.length/size)),page=Math.max(1,Math.min(pages,Number(params.get('page'))||1));
-  return{items:structuredClone(selected.slice((page-1)*size,page*size)),count:selected.length,revision:'gallery-'+revision+'-'+page,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length,complete:server.filter(i=>i.faceSummary.reviewed).length},pagination:{page,size,pages,total:selected.length,filter,...(showAll?{all:true}:{})}};
+  return{items:structuredClone(selected.slice((page-1)*size,page*size)),count:selected.length,revision:'gallery-'+revision+'-'+page,filterCounts:{all:server.length,untagged:server.filter(i=>!i.tags.length&&!i.faceSummary.reviewed).length,partial:server.filter(i=>i.faceSummary.partial).length,complete:server.filter(i=>i.faceSummary.reviewed).length},pagination:{page,size,pages,total:selected.length,filter,...(showAll?{all:true}:{}),...(params.has('generation')?{generation:params.get('generation')}:{})}};
  };
  const browser=routing?browserHistory('https://test/?lang=he#gallery'):null;
  const window={FamilyApp:{apiEnabled:true,getView:()=>initialView,toast(){}},FAMILY_DATA:{people:{},branches:[],units:{}},scrollTo(){},FamilyTags:{controls:()=>'',labels:()=>'',refresh(){},clearInline(){},mountInline:(_host,item)=>mounted.push(structuredClone(item))},addEventListener:(name,fn)=>{listen(windowHandlers,name,fn);browser?.addEventListener(name,fn);},dispatchEvent:event=>{for(const fn of windowHandlers.get(event.type)||[])fn(event);}};
@@ -246,4 +247,13 @@ test('All remains selected in both gallery pagers across filtering and can switc
   f.filter('partial');await f.flush();assert.equal(f.cards.length,5);for(const pager of f.pagers)assert.equal(pager.querySelector('[data-gallery-size]').value,'all');
   f.filter('all');await f.flush();assert.equal(f.cards.length,205);f.size('100');await f.flush();assert.equal(f.cards.length,100);assert.equal(f.window.FamilyPortal.galleryQuery().size,100);for(const pager of f.pagers)assert.equal(pager.querySelector('[data-gallery-size]').value,'100');
  }
+});
+
+test('extended gallery generation changes travel with paging and filters, clear stale photos and reset on a fresh visit',async()=>{
+ const f=fixture([photo('a',[{id:'shlomo'}]),photo('b',[{id:'ora'}])],{extended:true});await f.flush();
+ assert.equal(f.window.FamilyPortal.galleryQuery().generation,'first');assert.match(f.requests.at(-1),/generation=first/);
+ f.defer();const changing=f.window.FamilyPortal.refineGallery({generation:'second'});assert.deepEqual(f.cards,[],'The previous cohort clears immediately');await f.flush();f.pending.shift()();await changing;await f.flush();
+ assert.equal(f.window.FamilyPortal.galleryQuery().generation,'second');assert.match(f.requests.at(-1),/generation=second/);
+ await f.window.FamilyPortal.refineGallery({person:'ruti'});await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().generation,'second');assert.match(f.requests.at(-1),/generation=second/);
+ f.window.FamilyPortal.activate('home');f.window.FamilyPortal.activate('gallery');await f.flush();assert.equal(f.window.FamilyPortal.galleryQuery().generation,'first');assert.match(f.requests.at(-1),/generation=first/);
 });
