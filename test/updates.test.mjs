@@ -257,9 +257,9 @@ test('story form emails the storyteller, person and full text privately, without
   }
 });
 
-test('family questionnaires email the selected people for each family, including Margalit and her father Yahia',async()=>{
+test('family questionnaires email the selected people for each family, including Margalit and her husband Yahia',async()=>{
   for(const provider of ['brevo','resend']){
-    const f=fixture(provider),cases=[['grandparents',['margalit','yahia'],['סבתא מרגלית','סבא יחיא (אבא של מרגלית)']],['yehuda',['zehor','yehuda'],['זהור','דוד יהודה נקאש']],['haim',['haim','shoshana'],['חיים נקאש','שושנה']],['medina',['ruma','yosef'],['רומה מדינה','יוסף מדינה']]];
+    const f=fixture(provider),cases=[['grandparents',['margalit','yahia'],['סבתא מרגלית','סבא יחיא (אבא של יונה ובעלה של מרגלית)']],['yehuda',['zehor','yehuda'],['זהור','דוד יהודה נקאש']],['haim',['haim','shoshana'],['חיים נקאש','שושנה']],['medina',['ruma','yosef'],['רומה מדינה','יוסף מדינה']]];
     try{
       for(let index=0;index<cases.length;index++){
         const [scope,personIds,names]=cases[index],body={name:'Test Person',scope,personIds,story:'בדיקת סיפור משפחתי',requestId:(100+index).toString(16).padStart(32,'0')};

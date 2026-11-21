@@ -18,7 +18,7 @@ test('each questionnaire presents the right people and the global form leaves it
   const {document}=parseHTML(read('public/share-story/extended/index.html')),form=document.querySelector('#story-form');
   assert.equal(form.dataset.scope,'extended');assert.equal(form.querySelectorAll('[name="person"]').length,0);assert.equal(form.querySelector('#people').hasAttribute('required'),false);
   assert.ok([...form.querySelectorAll('input,textarea')].indexOf(form.querySelector('#people'))>[...form.querySelectorAll('input,textarea')].indexOf(form.querySelector('#story')));
-  const personal=read('public/share-story/index.html');assert.match(personal,/סבתא מרגלית/);assert.match(personal,/סבא יחיא<small>אבא של מרגלית/);
+  const personal=read('public/share-story/index.html');assert.match(personal,/סבתא מרגלית/);assert.match(personal,/סבא יחיא<small>אבא של יונה ובעלה של מרגלית/);
 });
 
 test('the original and every family portal place the matching questionnaire link inside the stories page',()=>{

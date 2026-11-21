@@ -1,7 +1,7 @@
 import {HttpError,escapeHTML} from './http.mjs';
 
 export const STORY_RECIPIENT='eldadkeha@gmail.com';
-export const STORY_PEOPLE=Object.freeze({shlomo:'סבא שלמה קהא',yona:'סבתא יונה קהא',both:'סבא שלמה וסבתא יונה קהא',margalit:'סבתא מרגלית',yahia:'סבא יחיא (אבא של מרגלית)'});
+export const STORY_PEOPLE=Object.freeze({shlomo:'סבא שלמה קהא',yona:'סבתא יונה קהא',both:'סבא שלמה וסבתא יונה קהא',margalit:'סבתא מרגלית',yahia:'סבא יחיא (אבא של יונה ובעלה של מרגלית)'});
 export const STORY_FORMS=Object.freeze({
   grandparents:{label:'משפחת קהא',people:{shlomo:STORY_PEOPLE.shlomo,yona:STORY_PEOPLE.yona,margalit:STORY_PEOPLE.margalit,yahia:STORY_PEOPLE.yahia}},
   yehuda:{label:'זהור ודוד יהודה נקאש',people:{zehor:'זהור',yehuda:'דוד יהודה נקאש'}},
