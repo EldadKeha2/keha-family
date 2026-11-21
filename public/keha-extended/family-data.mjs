@@ -4,6 +4,7 @@ import {TRI_RESEARCH_PEOPLE,applyTriUnits} from './tri-data.mjs';
 import {YISSACHAR_PEOPLE,applyYissacharUnits} from './yissachar-data.mjs';
 import {enrichHistoricalLifeEvidence} from './life-evidence.mjs';
 import {applyRegistryEvidence} from './registry-evidence.mjs';
+import {cleanProfileDescriptions} from './profile-descriptions.mjs';
 
 export const EXTENDED_NAME = 'משפחת קהא המורחבת';
 export const EXTENDED_COLOR = '#345d83';
@@ -55,7 +56,7 @@ const seedPeople=new Map([...people.map(([id,name,englishName,gender,unit,aliase
 for(const update of [...KEHAT_RESEARCH_PEOPLE,...TRI_RESEARCH_PEOPLE,...YISSACHAR_PEOPLE]){const before=seedPeople.get(update.id)||{};seedPeople.set(update.id,{...before,...update,aliases:[...new Set([...(before.aliases||[]),...(update.aliases||[])])]});}
 enrichHistoricalLifeEvidence(seedPeople);
 applyRegistryEvidence(seedPeople);
-export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(Object.freeze));
+export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(person=>Object.freeze(cleanProfileDescriptions(person))));
 
 const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);
 // The owner confirmed all four children of Saadia and Miriam, in this order.
