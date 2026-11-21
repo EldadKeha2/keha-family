@@ -33,7 +33,7 @@
   let runningAppHome=null;
   try{runningAppHome=window.sessionStorage?.getItem(runningAppKey)||null;}catch{}
   function rememberRunningApp(home){runningAppHome=home;try{window.sessionStorage?.setItem(runningAppKey,home);}catch{}}
-  if(standaloneQuery.matches||navigator.standalone===true){
+  if(!needsFamilyOrigin&&(standaloneQuery.matches||navigator.standalone===true)){
     const launch=new URLSearchParams(location.search),family=launch.get('familyApp');
     if(launch.get('source')==='homescreen'&&['nakash','haim','yehuda','medina','keha','extended','shlomo','zechariah','zechariah-tzadok','kehat'].includes(family))rememberRunningApp(['shlomo','zechariah','zechariah-tzadok','kehat'].includes(family)?'/keha-extended/'+family+'/':family==='extended'?'/keha-extended/':family==='nakash'?'/nakash/':'/nakash/'+family+'/');
     else if(!runningAppHome&&!siteHome&&location.pathname==='/')rememberRunningApp('/');

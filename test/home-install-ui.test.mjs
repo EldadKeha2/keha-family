@@ -988,3 +988,12 @@ test('a slow Android package lookup cannot swallow the Install tap or delay the 
   const offer=f.offer({outcome:'accepted'});assert.equal(offer.calls,1,'Chrome installation does not wait for package-manager detection');
   await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
 });
+
+test('a family link inside another installed app cannot replace the parent app launch identity before changing origin',()=>{
+  const site={...eightApps.find(app=>app.branch==='kehat'),origin:'https://family-kehat.example'};
+  const sessionState=new Map([['family-running-app','/']]);
+  const f=fixture({site,standalone:true,sessionState,entryUrl:'https://family.example'+site.home+'?source=homescreen&familyApp=kehat#tree'});
+  assert.equal(sessionState.get('family-running-app'),'/');
+  assert.equal(new URL(f.assignments[0]).origin,site.origin);
+  assert.equal(new URL(f.assignments[0]).searchParams.has('familyApp'),false);
+});
