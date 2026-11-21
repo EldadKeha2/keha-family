@@ -7,6 +7,7 @@ import {uid} from './http.mjs';
 import {linkSharedProfile} from './nakash-shared.mjs';
 import {initializeKehatDocuments,initializeRegistryDocuments} from './kehat-documents.mjs';
 import {REGISTRY_CORRECTION_IDS,REGISTRY_CORRECTION_FIELDS} from '../public/keha-extended/registry-evidence.mjs';
+import {cleanProfileDescriptions} from '../public/keha-extended/profile-descriptions.mjs';
 
 export function initializeExtendedKeha(state) {
   if(state.extendedKehaReady)return;
@@ -239,6 +240,16 @@ export function initializeExtendedKeha(state) {
         const person=state.person(state.sharedNakashIdentities[seed.id]||seed.id);
         if(!person.deceased){person.deceased=true;state.savePerson(person);}
       }
+    }
+    const descriptionsMigration='family-profile-descriptions-yona-children-2026-11-21-v1';
+    if(!state.rows('SELECT id FROM meta WHERE id=?',descriptionsMigration).length){
+      for(const row of state.rows('SELECT data FROM people')){
+        const saved=JSON.parse(row.data),cleaned=cleanProfileDescriptions(saved);
+        if(JSON.stringify(saved)===JSON.stringify(cleaned))continue;
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',descriptionsMigration+':backup:'+saved.id,row.data);
+        state.savePerson(cleaned);
+      }
+      state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',descriptionsMigration,'done');
     }
     if(updateChart)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',migration,'done');
     if(updateKehat)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',kehatMigration,'done');
