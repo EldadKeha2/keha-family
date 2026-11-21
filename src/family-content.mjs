@@ -5,10 +5,10 @@ import {HttpError,text,uid} from './http.mjs';
 
 export const ORIGINAL_PHOTO_PEOPLE=new Set(['shlomo','yona','ruti','becker-parent','yehiel','avigail','ora','shosh']);
 const originalPeople=new Set(Object.keys(original.people));
-const paternalScopes=new Set(['extended','zechariah','kehat']);
+const paternalScopes=new Set(['extended','zechariah','zechariah-tzadok','kehat']);
 const founderUnits=['u-root','u-keha-zechariah-father','u-saadia-elder','u-keha-zechariah','u-kehat-tzadok-elder','u-kehat-zechariah-ben-tzadok','u-kehat-aharon-elder','u-keha-kehat','u-kehat-zechariah','u-keha-yissachar'];
 export const MISATTRIBUTED_YONA_DOCUMENT='57537c6f78904f8fa31c876e8b4461d2';
-const validScopes=new Set(['original','nakash','keha','haim','yehuda','medina','extended','shlomo','zechariah','kehat']);
+const validScopes=new Set(['original','nakash','keha','haim','yehuda','medina','extended','shlomo','zechariah','zechariah-tzadok','kehat']);
 const kind=item=>item.kind||(item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document');
 const subjects=item=>[...new Set([item.personId,...(item.personIds||[]),...(item.people||[]),...(item.documentPeople||[])].filter(Boolean))];
 const caption=item=>[item.title,item.name,item.filename,item.caption].filter(Boolean).join(' ');
@@ -37,7 +37,7 @@ export function contentContext(branch,sharedPeople={},identities={}){
   }else if(paternal){
     ids=new Set(Object.keys(tree.people).filter(id=>{
       const value=tree.branchIds.get(id),members=tree.people[id].branches||[];
-      return branch==='kehat'?[value,...members].some(v=>v==='kehat'||v==='kehat-tzadok'):[value,...members].includes(branch);
+      return [value,...members].includes(branch==='zechariah-tzadok'?'kehat-tzadok':branch);
     }));
   }else{
     ids=new Set(Object.keys(tree.people).filter(id=>tree.branchIds.get(id)===branch));
@@ -64,11 +64,11 @@ export function mediaInContext(item,context){
   if(kind(item)==='document')return contentHasSubjects(item,context,true)||!subjects(item).length&&item.familyScopes?.includes(context.branch);
   if(subjects(item).some(id=>ORIGINAL_PHOTO_PEOPLE.has(id)&&context.tree.people[id]))return true;
   if(!item.category?.startsWith('nakash:')&&subjects(item).some(id=>originalPeople.has(id)))return false;
-  return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.familyScopes?.includes(context.branch)||item.category==='nakash:'+context.branch||context.branch==='extended'&&['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:kehat'].includes(item.category);
+  return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.familyScopes?.includes(context.branch)||item.category==='nakash:'+context.branch||context.branch==='extended'&&['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:zechariah-tzadok','nakash:kehat'].includes(item.category);
 }
 function collectionInContext(item,context){
   if(!mediaInContext(item,context))return false;
-  if(['haim','yehuda','medina','zechariah','kehat'].includes(context.branch)&&kind(item)!=='document')return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.category==='nakash:'+context.branch||item.familyScopes?.includes(context.branch);
+  if(['haim','yehuda','medina','zechariah','zechariah-tzadok','kehat'].includes(context.branch)&&kind(item)!=='document')return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.category==='nakash:'+context.branch||item.familyScopes?.includes(context.branch);
   return true;
 }
 

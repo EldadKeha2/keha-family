@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import family from '../src/family.mjs';
-import {createKehatFamily} from '../public/keha-extended/branch-portals.mjs';
+import {createKehatFamily,createTzadokFamily} from '../public/keha-extended/branch-portals.mjs';
 import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
@@ -41,7 +41,7 @@ async function fixture(id='eldad',{familyData=family,navigation=false,entryUrl,e
 const group=(html,key)=>html.match(new RegExp('<section class="person-family-group" data-relative-kind="'+key+'"[\\s\\S]*?<\\/section>'))[0];
 
 test('documented Kehat records appear beside the editable biography with safe source links',async()=>{
-  const data=toOriginalFamilyData(createKehatFamily(family));
+  const data=toOriginalFamilyData(createTzadokFamily(family));
   const f=await fixture('kehat-tzadok',{familyData:data});
   assert.match(f.html,/תיעוד ומקורות/);assert.match(f.html,/H57320/);assert.match(f.html,/7\.1\.1944/);
   assert.match(f.html,/document_id=bcabe2ef7e3d3a93_294dece0e6a0b728#page=81/);
@@ -51,7 +51,7 @@ test('documented Kehat records appear beside the editable biography with safe so
 });
 
 test('a known grandfather appears as a grandfather while an unresolved father stays empty',async()=>{
-  const data=toOriginalFamilyData(createKehatFamily(family)),f=await fixture('kehat-ron',{familyData:data});
+  const data=toOriginalFamilyData(createTzadokFamily(family)),f=await fixture('kehat-ron',{familyData:data});
   assert.match(group(f.html,'grandparents'),/kehat-tzadok/);
   assert.doesNotMatch(group(f.html,'parents'),/kehat-tzadok|kehat-reuven|kehat-shimon/);
   assert.match(group(f.html,'children'),/kehat-gur/);

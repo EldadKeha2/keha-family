@@ -1,10 +1,5 @@
-html[data-branch-portal=kehat] body[data-active-view=tree][data-kehat-overview=true] :is(#treeViewport,.tree-topline,.tree-mobile-person-hint,.workspace-footer,.workspace-actions){display:none}
-.kehat-portal-roots{display:flex;justify-content:center;align-items:center;gap:clamp(28px,8vw,100px);padding:50px 14px 35px}
-.kehat-portal-circle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;width:240px;height:240px;max-width:42vw;border-radius:50%;border:1px solid var(--family-accent);box-shadow:0 0 0 6px var(--paper),0 0 0 7px var(--family-line);background:radial-gradient(circle at 40% 25%,#fffefa,var(--family-tint));color:var(--family-ink);padding:25px;text-align:center;cursor:pointer;font:inherit}
-.kehat-portal-circle strong{font:600 25px/1.35 var(--serif)}
-.kehat-portal-circle small{font:16px/1.5 var(--sans)}
-.kehat-portal-circle>span{font-size:26px}
-.kehat-portal-circle:hover{background:var(--family-tint)}
-.kehat-portal-circle:focus-visible{outline:3px solid var(--family-accent);outline-offset:12px}
-.kehat-portal-note{text-align:center;color:var(--muted);font:16px/1.7 var(--sans);padding:0 15px 30px}
-@media(max-width:700px){.kehat-portal-roots{gap:24px;padding:40px 6px 25px}.kehat-portal-circle{width:150px;height:150px;gap:6px;padding:14px;max-width:40vw}.kehat-portal-circle strong{font-size:20px}.kehat-portal-circle small{font-size:14px}.kehat-portal-circle>span{font-size:19px}}
+.family-extended-access{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px 20px;margin:8px 16px 0;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans)}
+.family-extended-access a{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:5px 12px;border:1px solid var(--family-line);border-radius:20px;background:var(--paper);color:var(--family-ink);text-decoration:none}
+.family-extended-access a:hover{background:var(--family-tint);border-color:var(--family-accent)}
+.family-extended-access a:focus-visible{outline:3px solid var(--family-accent);outline-offset:3px}
+@media(max-width:700px){.family-extended-access{gap:6px;margin:6px 8px 0}.family-extended-access a{padding:5px 10px}}

@@ -74,7 +74,7 @@ function page(items, params, {sizeDefault=100, sortDefault='uploaded-desc', page
 
 export async function compatRoute(request, env, db, ctx, options, projection) {
   const url = new URL(request.url);
-  const extended = /^\/keha-extended\/(?:(shlomo|zechariah|kehat)\/)?api\/compat(\/api\/.*)$/.exec(url.pathname);
+  const extended = /^\/keha-extended\/(?:(shlomo|zechariah|zechariah-tzadok|kehat)\/)?api\/compat(\/api\/.*)$/.exec(url.pathname);
   const match = extended ? [extended[0],extended[1]||'extended',extended[2]] : route.exec(url.pathname);
   if (!match) return null;
   const [,branch,path] = match, params = url.searchParams, method = request.method;
@@ -119,7 +119,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     const saved=profiles[id]||{};
     return [id,{...p,...saved,...(saved.profile?.startsWith('/media/')?{profile:saved.profile+(saved.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(id)}:{}),...(restrictedOriginalPerson(id)?{photoCount:0,videoCount:0,documentCount:0,mediaCount:0,gallery:[]}:{}),extra:false,extended:false,branch:p.branch}];
   }));
-  for(const [id,p] of Object.entries(profiles))if(p.extra&&!Object.hasOwn(names,id)&&(extended?branch==='extended'?['extended','shlomo','zechariah','kehat'].some(app=>p.nakashBranch===app||p.familyApps?.includes(app)):p.nakashBranch===branch||p.familyApps?.includes(branch):!p.extendedKeha))names[id]=p;
+  for(const [id,p] of Object.entries(profiles))if(p.extra&&!Object.hasOwn(names,id)&&(extended?branch==='extended'?['extended','shlomo','zechariah','zechariah-tzadok','kehat'].some(app=>p.nakashBranch===app||p.familyApps?.includes(app)):p.nakashBranch===branch||p.familyApps?.includes(branch):!p.extendedKeha))names[id]=p;
   const newProfiles=new Map();
   // Both shells use the original editor and the same underlying media record.
   // Authentication was checked above with the token for the originating shell.

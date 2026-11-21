@@ -6,7 +6,7 @@ import {BRANCH_PORTALS} from '../public/keha-extended/branch-portals.mjs';
 
 const production = {WORKERS_CI:'1', WORKERS_CI_BRANCH:'main', WRANGLER_COMMAND:'deploy', CLOUDFLARE_ACCOUNT_ID:'test-account', CLOUDFLARE_API_TOKEN:'test-credential'};
 
-function fixture({existing = false, badIdentity = false, failUpload = false, extendedReady = false, shlomoReady = false, zechariahReady = true, kehatReady = true} = {}) {
+function fixture({existing = false, badIdentity = false, failUpload = false, extendedReady = false, shlomoReady = false, zechariahReady = true, kehatReady = true, tzadokReady = true} = {}) {
   const calls = [], writes = [], logs = [];
   async function apiFetch(url, options) {
     calls.push({url, options});
@@ -15,7 +15,7 @@ function fixture({existing = false, badIdentity = false, failUpload = false, ext
     const path = new URL(url).pathname;
     if (path.endsWith('/workers/subdomain')) return Response.json({success:true, result:{subdomain:'family-test'}});
     if (path.endsWith('/settings')) return existing ? Response.json({success:true, result:{bindings:[]}}) : new Response('', {status:404});
-    assert.ok(/\/scripts\/family-(haim|yehuda|medina|extended|shlomo|zechariah|kehat)(\/subdomain)?$/.test(path));
+    assert.ok(/\/scripts\/family-(haim|yehuda|medina|extended|shlomo|zechariah|zechariah-tzadok|kehat)(\/subdomain)?$/.test(path));
     if (options.method === 'PUT') {
       if (failUpload) return Response.json({success:false, errors:[{code:10000}]}, {status:403});
       const branch = path.split('family-').at(-1);
@@ -33,7 +33,7 @@ function fixture({existing = false, badIdentity = false, failUpload = false, ext
     assert.equal(new Headers(options.headers).has('Authorization'), false);
     const parsed = new URL(url), branch = parsed.hostname.split('.')[0].slice('family-'.length);
     if(parsed.hostname==='keha-family.eldadkeha.workers.dev'){
-      const choices=[{home:'/keha-extended/shlomo/',ready:shlomoReady},{home:'/keha-extended/',ready:extendedReady},...Object.values(BRANCH_PORTALS).map(p=>({...p,ready:p.id==='zechariah'?zechariahReady:kehatReady}))];
+      const choices=[{home:'/keha-extended/shlomo/',ready:shlomoReady},{home:'/keha-extended/',ready:extendedReady},...Object.values(BRANCH_PORTALS).map(p=>({...p,ready:p.id==='zechariah'?zechariahReady:p.id==='zechariah-tzadok'?tzadokReady:kehatReady}))];
       const target=choices.find(p=>parsed.pathname===p.home+'manifest.webmanifest');
       return target?.ready?Response.json(JSON.parse(await readFile(new URL('../public'+target.home+'manifest.webmanifest',import.meta.url)))):new Response('',{status:404});
     }
@@ -61,8 +61,8 @@ test('local checks and preview branches cannot publish family apps', async () =>
 
 test('the existing production connection deploys the scoped apps and activates only verified origins', async () => {
   const f = fixture(), result = await prepareFamilyApps(f.options);
-  assert.deepEqual(Object.keys(result).sort(), ['haim', 'kehat', 'medina', 'yehuda', 'zechariah']);
-  assert.equal(f.calls.filter(call => call.options.method === 'PUT').length, 5);
+  assert.deepEqual(Object.keys(result).sort(), ['haim', 'kehat', 'medina', 'yehuda', 'zechariah', 'zechariah-tzadok']);
+  assert.equal(f.calls.filter(call => call.options.method === 'PUT').length, 6);
   assert.equal(f.writes.length, 1);
   for (const branch of Object.keys(result)) assert.equal(result[branch], 'https://family-' + branch + '.family-test.workers.dev');
   assert.ok(f.writes[0][1].includes(JSON.stringify(result, null, 2)));
@@ -80,16 +80,16 @@ test('unrelated existing Workers, denied uploads and failed live checks leave in
 
 test('the extended installation is activated only after its own route, manifest, icon and independent origin pass live checks',async()=>{
   const f=fixture({extendedReady:true}),result=await prepareFamilyApps(f.options);
-  assert.deepEqual(Object.keys(result).sort(),['extended','haim','kehat','medina','yehuda','zechariah']);
+  assert.deepEqual(Object.keys(result).sort(),['extended','haim','kehat','medina','yehuda','zechariah','zechariah-tzadok']);
   assert.equal(result.extended,'https://family-extended.family-test.workers.dev');
-  assert.equal(f.calls.filter(call=>call.options.method==='PUT').length,6);
+  assert.equal(f.calls.filter(call=>call.options.method==='PUT').length,7);
   assert.ok(f.writes[0][1].includes('"extended"'));
 });
 
 test('Shlomo is published with a separate installation only after its restricted portal is live',async()=>{
   const f=fixture({extendedReady:true,shlomoReady:true}),result=await prepareFamilyApps(f.options);
-  assert.deepEqual(Object.keys(result).sort(),['extended','haim','kehat','medina','shlomo','yehuda','zechariah']);
-  assert.equal(f.calls.filter(call=>call.options.method==='PUT').length,7);
+  assert.deepEqual(Object.keys(result).sort(),['extended','haim','kehat','medina','shlomo','yehuda','zechariah','zechariah-tzadok']);
+  assert.equal(f.calls.filter(call=>call.options.method==='PUT').length,8);
 });
 
 test('Zechariah and Kehat cannot activate before both routes are live, and future outages preserve the deployed links',async()=>{
@@ -97,4 +97,17 @@ test('Zechariah and Kehat cannot activate before both routes are live, and futur
     const f=fixture(readiness);await assert.rejects(prepareFamilyApps(f.options));
     assert.equal(f.writes.length,0);assert.equal(f.calls.filter(c=>c.options.method==='PUT').length,0);
   }
+});
+
+
+test('a new Tzadok app waits for its route, while a previously deployed app cannot silently disappear',async()=>{
+  const first=fixture({tzadokReady:false});
+  const origins=await prepareFamilyApps(first.options);
+  assert.equal(origins['zechariah-tzadok'],undefined);
+  assert.equal(first.writes.length,1);
+  const existing=fixture({tzadokReady:false});
+  const originalFetch=existing.options.apiFetch;
+  existing.options.apiFetch=async(url,options)=>url.endsWith('/scripts/family-zechariah-tzadok/settings')?Response.json({success:true,result:{bindings:[{name:'FAMILY_BRANCH',type:'plain_text',text:'zechariah-tzadok'}]}}):originalFetch(url,options);
+  await assert.rejects(prepareFamilyApps(existing.options));
+  assert.equal(existing.writes.length,0);
 });

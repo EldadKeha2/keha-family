@@ -32,7 +32,7 @@ export async function handleNakashState(state, action, args, RecycleAccess) {
       initializeExtendedKeha(state);
       return {items:extendedKehaItems(state,args)};
     case 'nakash.extended.members': {
-      if(!['extended','shlomo','zechariah','kehat'].includes(args.branch))throw new HttpError(400,'המשפחה אינה מוכרת.');
+      if(!['extended','shlomo','zechariah','zechariah-tzadok','kehat'].includes(args.branch))throw new HttpError(400,'המשפחה אינה מוכרת.');
       for(const id of new Set(args.ids)){
         const person=state.person(id);if(!person.extra)continue;
         person.familyApps=[...new Set([...(person.familyApps||[]),args.branch])];

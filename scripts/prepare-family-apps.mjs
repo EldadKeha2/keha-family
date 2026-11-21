@@ -43,12 +43,21 @@ export async function prepareFamilyApps({env = process.env, apiFetch = fetch, ve
       if(ready.ok && (await ready.json()).name===family.label)targets.push(family);
     } catch { /* Keep the existing verified applications available during rollout. */ }
   }
-  // These routes have completed their initial rollout. A future transient
-  // failure must stop the build, not silently remove their working app links.
+  // Existing apps must remain available. A genuinely new app can wait for the
+  // first site deployment to expose its route, then activate on the next build.
   for(const portal of Object.values(BRANCH_PORTALS)){
     const response=await verifyFetch('https://keha-family.eldadkeha.workers.dev'+portal.home+'manifest.webmanifest',{signal:AbortSignal.timeout(15000)});
-    if(!response.ok||(await response.json()).name!==portal.name)throw Error('The '+portal.id+' family portal must be live before its independent installation is activated.');
-    targets.push({id:portal.id,label:portal.name,home:portal.home});
+    if(!response.ok){
+      if(portal.id==='zechariah-tzadok'&&response.status===404&&!await api('/scripts/family-'+portal.id+'/settings',{},true)){
+        log('Waiting for the first site deployment of the '+portal.id+' route.');continue;
+      }
+      throw Error('The '+portal.id+' family portal must be live before its independent installation is activated.');
+    }
+    const manifest=await response.json();
+    if(manifest.id!==portal.home||![portal.name,...(portal.previousNames||[])].includes(manifest.name))throw Error('The '+portal.id+' family portal identity does not match.');
+    // A rename is rolled out by the main Worker after this pre-deploy build.
+    // Validate its known current identity rather than dropping its working URL.
+    targets.push({id:portal.id,label:manifest.name,home:portal.home});
   }
   for (const family of targets) {
     const config = JSON.parse(await read(new URL('../family-apps/' + family.id + '/wrangler.jsonc', import.meta.url), 'utf8'));

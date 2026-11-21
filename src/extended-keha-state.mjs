@@ -197,7 +197,7 @@ export function extendedKehaItems(state,args={}) {
   const source={...family,sharedPeople:state.run('people').people,identities:state.sharedNakashIdentities};
   const scoped=BRANCH_PORTALS[args.branch]?createBranchPortal(source,args.branch):(args.branch==='shlomo'?createShlomoFamily:createExtendedFamily)(source);
   const ids=JSON.stringify(Object.keys(scoped.people));
-  const categories=JSON.stringify(BRANCH_PORTALS[args.branch]?['nakash:'+args.branch]:args.branch==='shlomo'?['nakash:shlomo','gallery','videos','nostalgia']:['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:kehat','gallery','videos','nostalgia']);
+  const categories=JSON.stringify(BRANCH_PORTALS[args.branch]?['nakash:'+args.branch]:args.branch==='shlomo'?['nakash:shlomo','gallery','videos','nostalgia']:['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:zechariah-tzadok','nakash:kehat','gallery','videos','nostalgia']);
   return state.rows("SELECT data FROM media WHERE category IN (SELECT value FROM json_each(?)) OR person_id IN (SELECT value FROM json_each(?)) OR id IN (SELECT media_id FROM media_tags WHERE person_id IN (SELECT value FROM json_each(?))) ORDER BY rowid DESC",categories,ids,ids).map(row=>JSON.parse(row.data))
     .filter(item=>!args.kind || (item.kind || (item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document'))===args.kind)
     .map(item=>{

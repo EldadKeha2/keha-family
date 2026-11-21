@@ -10,7 +10,7 @@ import {restrictedOriginalPerson} from './family-content.mjs';
 
 export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portalOrigins={}) {
   return nakashHTML(original,'keha')
-    .replace('<html ', '<html data-extended-keha="true" data-keha-shlomo-home="'+shlomoOrigin+SHLOMO_HOME+'" '+Object.values(BRANCH_PORTALS).map(portal=>'data-keha-'+portal.id+'-home="'+(portalOrigins[portal.id]||'')+portal.home+'"').join(' ')+' ')
+    .replace('<html ', '<html data-extended-keha="true" data-keha-original-home="https://keha-family.eldadkeha.workers.dev/" data-keha-shlomo-home="'+shlomoOrigin+SHLOMO_HOME+'" '+Object.values(BRANCH_PORTALS).map(portal=>'data-keha-'+portal.id+'-home="'+(portalOrigins[portal.id]||'')+portal.home+'"').join(' ')+' ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="extended" data-nakash-entry-view="tree"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')
     .replaceAll('/nakash/keha/',EXTENDED_HOME)
@@ -19,13 +19,13 @@ export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portal
     .replaceAll('/nakash/api/site-data.js',EXTENDED_HOME+'site-data.js')
     .replaceAll('/nakash/media-adapter.js',EXTENDED_HOME+'media-adapter.js')
     .replaceAll('משפחת קהא',EXTENDED_NAME)
-    .replaceAll('משורש משותף, ארבעה ענפים','ענפי המשפחה · הקשר המשפחתי בבירור')
+    .replaceAll('משורש משותף, ארבעה ענפים','קשר משפחתי ידוע · שורשים בבירור')
     .replaceAll('נקאש · מדינה · קהא','קהא · קהת · יששכר')
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'')
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+EXTENDED_COLOR)
     .replace(/(<style id="familyStartupBackground">[^<]*)/,'$1:root{--family-accent:'+EXTENDED_COLOR+'}@media(display-mode:standalone){html,body{background:var(--family-accent)}}')
-    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"><link rel="stylesheet" href="/keha-extended/hub.css?v=10"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/hub.js?v=15" defer></script>\n$1')
+    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"><link rel="stylesheet" href="/keha-extended/hub.css?v=9"></head>')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/hub.js?v=four-families-v1" defer></script>\n$1')
     .replace('<div id="treeView">','<div id="treeView"><section id="extendedKehaHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
     .replace(/(<header class="phone-home-intro">.*?<\/header>)/s,'$1<section id="extendedKehaHomeHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+EXTENDED_NAME+'</h2>')
@@ -56,7 +56,7 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
   const portal=BRANCH_PORTALS[id];
   const startup=appleLaunchImages(id).map(({href,media})=>'<link rel="apple-touch-startup-image" href="'+href+'" media="'+media+'">').join('\n');
   let html=nakashHTML(original,'keha')
-    .replace('<html ','<html data-branch-portal="'+id+'" data-keha-extended-home="'+extendedOrigin+EXTENDED_HOME+'" data-keha-api-prefix="'+portal.home+'api/compat" ')
+    .replace('<html ','<html data-branch-portal="'+id+'" data-branch-name-en="'+portal.nameEn+'" data-branch-tagline="'+portal.tagline+'" data-branch-tagline-en="'+portal.taglineEn+'" data-keha-extended-home="'+extendedOrigin+EXTENDED_HOME+'" data-keha-api-prefix="'+portal.home+'api/compat" ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="'+id+'" data-nakash-entry-view="home"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')
     .replaceAll('/nakash/keha/',portal.home)
@@ -73,10 +73,10 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
     .replace(/<link rel="icon"[^>]*>/g,'<link rel="icon" type="image/svg+xml" href="'+portal.home+'brand.svg">')
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1">'+startup+'</head>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+portal.name+'</h2>')
-    .replace('חמישה דורות, סיפור אחד',portal.tagline);
-  if(id==='kehat')html=html.replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=1"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=5" defer></script>\n$1')
-    .replace('<div id="treeView">','<div id="treeView"><section id="kehatPortalOverview" aria-label="ענפי משפחת קהת" data-i18n-skip></section>');
+    .replace('חמישה דורות, סיפור אחד',portal.tagline)
+    .replace('<main id="mainContent"','<nav class="family-extended-access" aria-label="קהא המורחבת" data-i18n-skip><a data-extended-tree-link href="'+extendedOrigin+EXTENDED_HOME+'#tree">קהא המורחבת</a><a data-extended-install-link href="'+extendedOrigin+EXTENDED_HOME+'?install=1#home">התקנת קהא המורחבת</a></nav><main id="mainContent"');
+  html=html.replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=2"></head>')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=single-family-v1" defer></script>\n$1');
   return html;
 }
 

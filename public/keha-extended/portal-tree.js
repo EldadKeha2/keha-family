@@ -1,21 +1,20 @@
 (() => {
   'use strict';
-  if(document.documentElement.dataset.branchPortal!=='kehat')return;
-  const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
-  const branchLabel=id=>I.branchName(window.FAMILY_DATA.branches.find(branch=>branch.id===id));
-  const triHome='#tree/kehat';
+  const config=document.documentElement.dataset;
+  if(!config.branchPortal)return;
+  const I=window.FamilyI18n;
+  const name=()=>I.isEnglish?config.branchNameEn:config.nakashName;
+  const treeLink=document.querySelector('[data-extended-tree-link]'),installLink=document.querySelector('[data-extended-install-link]');
+  if(treeLink)treeLink.textContent=I.isEnglish?'The extended Keha family':'קהא המורחבת';
+  if(installLink)installLink.textContent=I.isEnglish?'Install the extended family site':'התקנת קהא המורחבת';
   window.FamilyExtendedKeha={
-    title:()=>tr('משפחת קהת','Kehat Family'),
+    title:name,
     renderTree(state){
-      const root=document.getElementById('kehatPortalOverview'),overview=state.branch==='all';
-      document.body.dataset.kehatOverview=String(overview);root.hidden=!overview;
-      if(!overview)return false;
-      root.innerHTML=`<div class="kehat-portal-roots"><button class="kehat-portal-circle" type="button" data-branch="kehat-tzadok"><span aria-hidden="true">❖</span><strong>${branchLabel('kehat-tzadok')}</strong></button><button class="kehat-portal-circle" type="button" data-branch="kehat"><span aria-hidden="true">❖</span><strong>${branchLabel('kehat')}</strong></button></div><p class="kehat-portal-note">${tr('שני הענפים מתחברים בנישואי יעקב ויהודית ב־1947. הקרבה בין הסבים אהרון וצדוק עדיין בבירור.','The branches meet through Yaakov and Yehudit’s 1947 marriage. The relationship between their grandfathers Aharon and Tzadok is still under research.')}</p><p class="kehat-portal-note"><a href="${triHome}">${tr('לעשרת ילדיו של זכריה בן סעדיה בן אהרון','The ten children of Zechariah son of Saadia son of Aharon')}</a></p>`;
-      document.getElementById('workspaceTitle').textContent=tr('אילן היוחסין של משפחת קהת','The Kehat family tree');
-      document.getElementById('mobileViewTitle').textContent=tr('משפחת קהת','Kehat Family');
-      document.getElementById('workspaceSubtitle').textContent=tr('בחרו ענף כדי להכיר את בני המשפחה','Choose a branch to explore the family');
-      document.getElementById('workspaceDetail').hidden=true;
-      return true;
+      // Each single-family portal opens its full tree directly.
+      if(window.FAMILY_DATA.branches.length===1&&state.branch==='all')state.mode='full';
+      document.getElementById('workspaceTitle').textContent=(I.isEnglish?'The family tree of ':'האילן המשפחתי של ')+name();
+      document.getElementById('mobileViewTitle').textContent=name();
+      return false;
     },
   };
 })();

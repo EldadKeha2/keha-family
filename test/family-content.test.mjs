@@ -9,7 +9,7 @@ import {familyApp} from '../family-apps/worker.mjs';
 import {MISATTRIBUTED_YONA_DOCUMENT,contentContext,storyInContext} from '../src/family-content.mjs';
 import {parseHTML} from 'linkedom';
 
-const scope=(branch,path)=>['extended','shlomo','zechariah','kehat'].includes(branch)?'/keha-extended/'+(branch==='extended'?'':branch+'/')+'api/compat/api/'+path:'/nakash/api/compat/'+branch+'/api/'+path;
+const scope=(branch,path)=>['extended','shlomo','zechariah','zechariah-tzadok','kehat'].includes(branch)?'/keha-extended/'+(branch==='extended'?'':branch+'/')+'api/compat/api/'+path:'/nakash/api/compat/'+branch+'/api/'+path;
 function fixture(){
   const sql=new DatabaseSync(':memory:');
   const storage={sql:{exec(query,...args){const p=sql.prepare(query),rows=p.columns().length?p.all(...args):(p.run(...args),[]);return {toArray:()=>rows};}},transactionSync(fn){sql.exec('BEGIN');try{const value=fn();sql.exec('COMMIT');return value;}catch(error){sql.exec('ROLLBACK');throw error;}}};
@@ -70,7 +70,8 @@ test('documents retain original grandparent records, deduplicate shared scans, a
     const own=await f.json('/api/documents');assert.equal(own.items.length,2);assert.ok(own.items.some(d=>d.id===yona.id));
     const house=own.items.find(d=>d.id===shlomo.id);assert.deepEqual(house.personIds,['shlomo','yona']);assert.equal(house.tags.length,2);
     const extended=await f.json(scope('extended','documents'));assert.deepEqual(new Set(extended.items.map(d=>d.id)),new Set([shlomo.id,father.id]));
-    const kehat=await f.json(scope('kehat','documents'));assert.deepEqual(kehat.items.map(d=>d.id),[father.id]);
+    const kehat=await f.json(scope('kehat','documents'));assert.deepEqual(kehat.items,[]);
+    const tzadok=await f.json(scope('zechariah-tzadok','documents'));assert.deepEqual(tzadok.items.map(d=>d.id),[father.id]);
     assert.ok((await f.json(scope('keha','documents'))).items.some(d=>d.id===yona.id));
     assert.equal((await f.json(scope('haim','documents'))).items.length,0);
   }finally{f.close();}
@@ -129,4 +130,30 @@ test('scoped navigation never links to the complete original app and the separat
   }
   const app=familyApp('haim',()=>{throw Error('Unscoped API reached the backend');});
   for(const path of ['/api/export','/api/media','/api/people/eldad/page','/family-data.js'])assert.equal((await app.fetch(new Request('https://haim.example'+path))).status,404);
+});
+
+
+test('the separate Tzadok and Kehat archives retain their own records while one marriage document and profile serve both',async()=>{
+  const f=fixture();try{
+    await f.json(scope('extended','tag-people'));
+    const upload=async(branch,title,personIds)=>{
+      const bytes=new TextEncoder().encode('%PDF-1.4\n'+title+'\n%%EOF');
+      return f.json(scope(branch,'documents/upload?filename='+title+'.pdf'),{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length),'X-Family-Document':encodeURIComponent(JSON.stringify({title,caption:'original source',personIds}))}});
+    };
+    const shared=await upload('kehat','wedding',['kehat-yaakov','kehat-yaakov-yehudit']);
+    const first=await upload('kehat','saadia',['kehat-jidaan']);
+    const second=await upload('zechariah-tzadok','zechariah',['kehat-zechariah-ben-tzadok']);
+    const ids=async branch=>(await f.json(scope(branch,'documents'))).items.map(x=>x.id);
+    assert.deepEqual(new Set(await ids('kehat')),new Set([shared.item.id,first.item.id]));
+    assert.deepEqual(new Set(await ids('zechariah-tzadok')),new Set([shared.item.id,second.item.id]));
+    assert.deepEqual(new Set(await ids('extended')),new Set([shared.item.id,first.item.id,second.item.id]));
+    await f.json(scope('zechariah-tzadok','people/kehat-yaakov-yehudit/about'),{method:'POST',body:{about:'Our shared biography',expectedAbout:'',language:'he'}});
+    assert.equal((await f.json(scope('kehat','people/kehat-yaakov-yehudit/page'))).person.about,'Our shared biography');
+    f.restart();
+    assert.equal((await f.json(scope('zechariah-tzadok','people/kehat-yaakov/page'))).albums.documents.total,1);
+    assert.equal((await f.json(scope('kehat','people/kehat-yaakov/page'))).albums.documents.total,1);
+    assert.equal(f.objects.size,3);
+    assert.equal((await f.call(scope('kehat','people/kehat-naomi/page'))).status,404);
+    assert.equal((await f.call(scope('zechariah-tzadok','people/kehat-jidaan/page'))).status,404);
+  }finally{f.close();}
 });
