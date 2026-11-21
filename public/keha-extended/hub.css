@@ -105,3 +105,5 @@ html[data-extended-keha] .tree-partnerships path { stroke:var(--family-accent); 
   html[data-extended-keha] body:is([data-active-view=home],[data-active-view=tree][data-extended-branch=all]) .site-footer { display:none; }
 }
 @media(prefers-reduced-motion:reduce){.extended-branch-circle{transition:none;}}
+
+.tree-sibling-group{width:100%;box-sizing:border-box;padding:16px 18px;border:1px dashed #b39458;border-radius:14px;background:#fffaf0;text-align:center;color:#5e4822;display:grid;gap:8px;font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.5}.tree-sibling-group span{font-size:calc(14px * var(--a11y-text-scale,1))}

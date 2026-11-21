@@ -1,5 +1,6 @@
 import {SAADIA_PEOPLE,SAADIA_UNITS,ZECHARIAH_CHILDREN} from './saadia-data.mjs';
 import {KEHAT_RESEARCH_PEOPLE,applyKehatResearchUnits} from './kehat-research.mjs';
+import {TRI_RESEARCH_PEOPLE,applyTriUnits} from './tri-data.mjs';
 
 export const EXTENDED_NAME = 'משפחת קהא המורחבת';
 export const EXTENDED_COLOR = '#345d83';
@@ -9,7 +10,7 @@ export const EXTENDED_BRANCHES = Object.freeze([
   {id:'zechariah', unit:'u-keha-zechariah', label:'משפחת זכריה קהא הבן', shortLabel:'זכריה קהא הבן', titleEn:'Family of Zechariah Keha the Younger', color:'#875b79', mark:'❖'},
   {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'משפחת קהת — צדוק', shortLabel:'צדוק · זכריה', titleEn:'Kehat family — Tzadok', color:'#3f7e6f', mark:'❖'},
   {id:'kehat', unit:'u-kehat-aharon-elder', label:'משפחת קהת — אהרון', shortLabel:'אהרון · סעדיה', titleEn:'Kehat family — Aharon', color:'#3f7e6f', mark:'❖'},
-  {id:'yissachar', unit:'u-keha-yissachar', label:'יוסף יששכר', shortLabel:'יוסף יששכר', titleEn:'Yosef Yissachar', color:'#936e34', mark:'❖'},
+  {id:'yissachar', unit:'u-keha-yissachar', label:'ענף טרי · עשרת האחים', shortLabel:'עשרת האחים · טרי', titleEn:'Tri family · ten siblings', color:'#936e34', mark:'❖'},
 ].map(Object.freeze));
 
 // The supplied family chart is the source for these names and marriages.
@@ -45,11 +46,10 @@ const people = [
   ['kehat-oren','אורן קהת','Oren Kehat','m','u-kehat-oren'],
   ['kehat-tali','טלי קהת','Tali Kehat','f','u-kehat-tali'],
   ['kehat-lihi','ליהי קהת','Lihi Kehat','f','u-kehat-lihi'],
-  ['keha-yosef-yissachar','יוסף יששכר','Yosef Yissachar','m','u-keha-yissachar'],
 ];
 const seedPeople=new Map([...people.map(([id,name,englishName,gender,unit,aliases=[],details={}]) =>
   ({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE].map(p=>[p.id,p]));
-for(const update of KEHAT_RESEARCH_PEOPLE){const before=seedPeople.get(update.id)||{};seedPeople.set(update.id,{...before,...update,aliases:[...new Set([...(before.aliases||[]),...(update.aliases||[])])]});}
+for(const update of [...KEHAT_RESEARCH_PEOPLE,...TRI_RESEARCH_PEOPLE]){const before=seedPeople.get(update.id)||{};seedPeople.set(update.id,{...before,...update,aliases:[...new Set([...(before.aliases||[]),...(update.aliases||[])])]});}
 export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(Object.freeze));
 
 const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);
@@ -94,6 +94,7 @@ export function createExtendedFamily(original = {}) {
   for (const [id,members,children,parent,details={}] of units) result.units[id] = {id,people:[...members],children:[...children],parent,relationship:members.length>1?'spouse':'single',...structuredClone(details)};
   for (const unit of SAADIA_UNITS) result.units[unit.id]=structuredClone(unit);
   applyKehatResearchUnits(result.units);
+  applyTriUnits(result.units);
   for (const seed of EXTENDED_PEOPLE){
     const id=original.identities?.[seed.id] || (seed.sharedProfileId&&roster[seed.sharedProfileId]?seed.sharedProfileId:seed.id);
     if(id!==seed.id)result.identities[seed.id]=id;
@@ -127,7 +128,7 @@ export function createExtendedFamily(original = {}) {
   result.branchIds.set('saadia-elder','zechariah');
   for(const seed of SAADIA_PEOPLE)result.branchIds.set(canonical(seed.id),'zechariah');
   for(const seed of EXTENDED_PEOPLE)if(seed.researchBranch)result.branchIds.set(canonical(seed.id),seed.researchBranch);
-  // Kehat and Yissachar remain independent; no common ancestor is inferred.
+  // Tri's ten siblings remain a separate group while their parents are researched.
   for(const person of Object.values(result.people))person.branches=[];
   for (const branch of EXTENDED_BRANCHES) {
     const todo=[branch.unit],seen=new Set();

@@ -20,6 +20,8 @@ export function initializeExtendedKeha(state) {
     const updateUri=!state.rows('SELECT id FROM meta WHERE id=?',uriMigration).length;
     const familyCorrectionMigration='extended-kehat-tziona-three-siblings-2026-11-20-v1';
     const updateFamilyCorrection=!state.rows('SELECT id FROM meta WHERE id=?',familyCorrectionMigration).length;
+    const triMigration='extended-tri-ten-siblings-2026-11-21-v1';
+    const updateTri=!state.rows('SELECT id FROM meta WHERE id=?',triMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -27,6 +29,21 @@ export function initializeExtendedKeha(state) {
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
       // Never replace an existing date, biography, portrait or name on deploy.
       state.sql.exec('INSERT OR IGNORE INTO people (id,data) VALUES (?,?)',seed.id,JSON.stringify(person));
+      if(updateTri&&seed.triFamily){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',triMigration+':backup:'+seed.id,JSON.stringify(saved));
+        // Correct only the old empty branch label. Preserve relatives' names,
+        // dates, biographies, portraits, and every existing media/profile ID.
+        if(seed.id==='keha-yosef-yissachar'&&saved.name==='יוסף יששכר'){
+          saved.name=seed.name;delete saved.firstName;delete saved.lastName;
+          for(const key of ['nameEn','englishName'])if(!saved[key]||saved[key]==='Yosef Yissachar')saved[key]=seed.englishName;
+        }
+        for(const key of ['researchNotes','researchSources','recordedParents','burialDate','maritalStatus'])if(seed[key]!==undefined)saved[key]=structuredClone(seed[key]);
+        if(seed.deceased)saved.deceased=true;
+        saved.unit=seed.unit;
+        saved.aliases=[...new Set([...(saved.aliases||[]),...(seed.aliases||[])])];
+        state.savePerson(saved);
+      }
       if(updateResearch&&(seed.id.startsWith('kehat-')||['saadia-saadia','saadia-shalom'].includes(seed.id))){
         const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
         state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',researchMigration+':backup:'+seed.id,JSON.stringify(saved));
@@ -105,6 +122,7 @@ export function initializeExtendedKeha(state) {
     if(updateParentage)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',parentageMigration,'done');
     if(updateUri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',uriMigration,'done');
     if(updateFamilyCorrection)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',familyCorrectionMigration,'done');
+    if(updateTri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triMigration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;

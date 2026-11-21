@@ -14,7 +14,7 @@
     const unions=unit.relationships?.filter(item=>item.people.includes(personId));
     const parentUnions=parent?.relationships?.filter(item=>item.children.includes(unit.id));
     const isGrandchild=parentUnions?.some(item=>item.relationship==='grandparent');
-    const parents=parentUnions?parentUnions.filter(item=>!['adopted','grandparent'].includes(item.relationship)).flatMap(item=>item.people):parent?.people||[];
+    const parents=parent?.siblingGroup?[]:parentUnions?parentUnions.filter(item=>!['adopted','grandparent'].includes(item.relationship)).flatMap(item=>item.people):parent?.people||[];
     const grandparents=known((parentUnions||[]).filter(item=>item.relationship==='grandparent').flatMap(item=>item.people));
     const grandchildren=known((unions||[]).filter(item=>item.relationship==='grandparent').flatMap(item=>childIds(item)));
     const adoptedParents=known((parentUnions||[]).filter(item=>item.relationship==='adopted').flatMap(item=>item.people));

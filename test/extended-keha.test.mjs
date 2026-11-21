@@ -57,12 +57,94 @@ test('only the two confirmed cousin branches share paternal kinship; Kehat and Y
   assert.equal(data.people['margalit-nakash'],undefined);
   assert.deepEqual(data.units['u-keha-zechariah'].people,['keha-zechariah','keha-yehudit']);
   assert.equal(data.units['u-keha-kehat'].children.length,8);
-  assert.equal(data.units['u-keha-yissachar'].children.length,0);
+  assert.equal(data.units['u-keha-yissachar'].children.length,10);
+  assert.equal(data.units['u-keha-yissachar'].siblingGroup,true);
   assert.ok(data.people['kehat-hadassah'].aliases.includes('הדוס'));
   assert.notEqual(data.people['kehat-miriam'].id,data.people['kehat-yaakov-miriam'].id);
   assert.equal(data.people.ora.id,family.people.ora.id);
   assert.equal(data.people['kehat-tzion'].branch,'kehat');
   assert.equal(createFamily(family).people['kehat-jidaan'],undefined);
+});
+
+test('Ora’s ten siblings remain distinct, with no invented parent or confirmed link to the candidate Zechariah',async()=>{
+  const data=toOriginalFamilyData(createExtendedFamily(family)),window={};
+  vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
+  const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
+  const ids=data.units['u-keha-yissachar'].children.map(unit=>data.units[unit].people[0]);
+  assert.deepEqual(ids.map(id=>data.people[id].name),['מנחם','בנימין קהתי','יששכר טרי','דוד','יוסף טרי (קהא)','אסתר','רחל','רונית','מרים','חנה']);
+  assert.equal(new Set(ids).size,10);
+  assert.equal(ids.filter(id=>data.people[id].gender==='m').length,5);
+  assert.equal(ids.filter(id=>data.people[id].gender==='f').length,5);
+  for(const id of ids){
+    assert.deepEqual(relatives(id).parents,[],'The sibling group header is not a parent');
+    assert.deepEqual(relatives(id).siblings,ids.filter(other=>other!==id));
+  }
+  assert.deepEqual(relatives('kehat-zechariah').children,[],'Candidate parentage must not become a graph edge');
+  assert.equal(data.people['tri-menachem'].maritalStatus,'unmarried');
+  assert.match(data.people['tri-menachem'].researchNotes,/72/);
+  assert.match(data.people['tri-menachem'].researchNotes,/77/);
+  assert.equal(data.people['tri-binyamin'].burialDate,'2.4.2014');
+  assert.equal(data.people['tri-binyamin'].deathDate,undefined,'Burial dates must not be labeled as death dates');
+  assert.equal(data.people['tri-shifra'].deathDate,undefined);
+  for(const id of ['keha-yosef-yissachar','tri-yissachar','tri-binyamin']){
+    assert.equal(data.people[id].recordedParents.father,'זכריה');
+    assert.ok(data.people[id].researchSources.length>0);
+  }
+});
+
+test('Shifra’s son Hezi does not acquire an unconfirmed father through her marriage',async()=>{
+  const data=toOriginalFamilyData(createExtendedFamily(family)),window={};
+  vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
+  const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
+  assert.deepEqual(relatives('tri-hezi').parents,['tri-shifra']);
+  assert.deepEqual(relatives('tri-shifra').children,['tri-hezi']);
+  assert.deepEqual(relatives('tri-binyamin').children,[]);
+  assert.deepEqual(relatives('tri-binyamin').partners,['tri-shifra']);
+  assert.deepEqual(relatives('tri-shifra').partners,['tri-binyamin']);
+  assert.deepEqual(relatives('tri-shifra').siblings,[]);
+});
+
+test('correcting Yosef’s combined label retains his profile, family edits and original tagged media',async()=>{
+  const f=fixture();try{
+    const id='keha-yosef-yissachar',before={id,name:'יוסף יששכר',nameEn:'Yosef Yissachar',about:'זיכרון שהמשפחה כתבה',birthday:'2.3.1938',profileId:'existing-portrait',extra:true};
+    f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify(before));
+    const after=(await f.json(site('people/'+id+'/page'))).person;
+    assert.equal(after.id,id);assert.equal(after.name,'יוסף טרי (קהא)');
+    assert.equal(after.nameEn,'Yosef Tri (Keha)');
+    for(const key of ['birthday','about'])assert.equal(after[key],before[key]);
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    assert.equal(saved.profileId,before.profileId);
+    const backup=JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get('extended-tri-ten-siblings-2026-11-21-v1:backup:'+id).value);
+    assert.equal(backup.name,before.name);
+    const uploaded=await f.json(site('people/'+id+'/photos?filename=yosef.jpg'),{method:'POST',body:photo});
+    const mediaId=uploaded.albums.photos.items[0].id;
+    f.restart();
+    const page=await f.json(site('people/'+id+'/page'));
+    assert.equal(page.person.id,id);assert.equal(page.albums.photos.items[0].id,mediaId);
+    assert.deepEqual(new Uint8Array(await (await f.call('/media/'+mediaId)).arrayBuffer()),new Uint8Array(photo));
+    assert.equal(f.database.prepare('SELECT COUNT(*) AS n FROM people WHERE id=?').get('tri-siblings-group').n,0,'The group header must never become a person record');
+  }finally{f.close();}
+});
+
+test('desktop and mobile show the ten siblings below a group heading, without a fictitious parent profile',async()=>{
+  const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
+  for(const phone of [false,true]){
+    const {document,window:dom}=parseHTML(extendedKehaHTML(originalHTML));
+    const data=toOriginalFamilyData(createExtendedFamily(family));
+    const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){}};
+    window.FamilyI18n={isEnglish:false,t:value=>value,html:(parts,...values)=>parts.reduce((output,part,index)=>output+part+(values[index]??''),''),personName:person=>person.name,branchName:branch=>branch?.title,searchNames:person=>person.name,date:value=>value};
+    window.FamilyDates={age:()=>null,parse:()=>null};
+    const context=vm.createContext({window,document,location:{hash:'#tree/yissachar'},history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    vm.runInContext(source,context);
+    assert.match(document.querySelector('.tree-sibling-group').textContent,/ההורים בבירור/);
+    assert.equal(document.querySelector('#treeNodes [data-person="tri-siblings-group"]'),null);
+    for(const unit of data.units['u-keha-yissachar'].children)assert.ok(document.querySelector('#treeNodes [data-person="'+data.units[unit].people[0]+'"]'));
+    assert.ok(document.querySelector('#treeNodes [data-person="tri-shifra"]'));
+    assert.ok(document.querySelector('#treeNodes [data-person="tri-hezi"]'));
+    assert.match(document.getElementById('treeBreadcrumb').textContent,/ענף טרי/);
+    window.FamilyApp.setView('directory');
+    assert.equal(document.querySelector('#directoryGrid [data-person="tri-siblings-group"]'),null);
+  }
 });
 
 test('Tzadok and Aharon have separate sons and no invented kinship between their branches',async()=>{

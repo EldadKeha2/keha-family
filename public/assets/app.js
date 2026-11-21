@@ -3,7 +3,7 @@
   const I18n=window.FamilyI18n;
   const data = window.FAMILY_DATA;
   const $ = id => document.getElementById(id);
-  const people = Object.values(data.people);
+  const people = Object.values(data.people).filter(person=>!person.structuralGroup);
   const media = new Map();
   const phoneQuery=matchMedia('(max-width:700px)'),isPhone=()=>phoneQuery.matches;
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
@@ -178,6 +178,7 @@
   }
 
   function treePeopleHTML(unit) {
+    if(unit.siblingGroup)return `<div class="tree-sibling-group"><strong>${I18n.isEnglish?'Ten siblings':'עשרת האחים'}</strong><span>${I18n.isEnglish?'Ora’s family testimony · parents under research':'עדות אורה · ההורים בבירור'}</span></div>`;
     const display=unit.displayPeople||unit.people;
     const cards=display.map(id=>personCardHTML(data.people[id],id===unit.people[0]?null:unit.relationships?.find(item=>item.people.includes(id)))).join('');
     if(!unit.relationships)return cards;
@@ -203,7 +204,7 @@
     const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?195:desktopOverview?275:340)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
     const positions=[],lines=[],connections=[],widths=new Map(),layouts=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
-    const nodeWidth=unit=>(!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
+    const nodeWidth=unit=>(unit.siblingGroup?(phone?240:300):!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
     function measure(id){
       const unit=data.units[id],kids=children(unit),childLefts=new Map();
       kids.forEach(measure);
