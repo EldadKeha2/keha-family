@@ -22,6 +22,8 @@ export function initializeExtendedKeha(state) {
     const updateFamilyCorrection=!state.rows('SELECT id FROM meta WHERE id=?',familyCorrectionMigration).length;
     const triMigration='extended-tri-ten-siblings-2026-11-21-v1';
     const updateTri=!state.rows('SELECT id FROM meta WHERE id=?',triMigration).length;
+    const meravMigration='extended-kehat-merav-spelling-2026-11-21-v1';
+    const updateMerav=!state.rows('SELECT id FROM meta WHERE id=?',meravMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -84,6 +86,16 @@ export function initializeExtendedKeha(state) {
         saved.aliases=[...new Set([...(saved.aliases||[]),...(seed.aliases||[])])];
         state.savePerson(saved);
       }
+      if(updateMerav&&['kehat-merav','kehat-mordechai','kehat-varda'].includes(seed.id)){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',meravMigration+':backup:'+seed.id,JSON.stringify(saved));
+        if(seed.id==='kehat-merav'&&['מרב','מרב קהת'].includes(saved.name)){
+          saved.name=saved.name.replace('מרב','מירב');delete saved.firstName;delete saved.lastName;
+        }
+        if(seed.id==='kehat-merav')saved.aliases=[...new Set([...(saved.aliases||[]),'מרב'])];
+        if(saved.researchNotes)saved.researchNotes=saved.researchNotes.replaceAll('מרב, שרון, עדי וטל','מירב, שרון, עדי וטל');
+        state.savePerson(saved);
+      }
       if(updateChart&&seed.id==='keha-zechariah'){
         const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
         state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',migration+':backup:'+seed.id,JSON.stringify(saved));
@@ -123,6 +135,7 @@ export function initializeExtendedKeha(state) {
     if(updateUri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',uriMigration,'done');
     if(updateFamilyCorrection)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',familyCorrectionMigration,'done');
     if(updateTri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triMigration,'done');
+    if(updateMerav)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',meravMigration,'done');
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;
