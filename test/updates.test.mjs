@@ -241,6 +241,41 @@ test('head requests enforce small rate limits and never report a failed provider
 });
 
 
+test('story form emails the storyteller, person and full text privately, without requiring a family token',async()=>{
+  for(const provider of ['brevo','resend']){
+    const f=fixture(provider),body={name:'  אלדד   קהא  ',person:'both',story:'זיכרון משפחתי\nשורה שנייה <script>alert(1)</script>',requestId:'a'.repeat(32),to:'attacker@example.com'};
+    try{
+      const response=await f.call('/api/story-submissions',body,{'X-Family-Token':''});assert.equal(response.status,200,await response.clone().text());assert.deepEqual(await response.json(),{sent:true});
+      const mail=f.messages[0].body;assert.deepEqual(mail.to,provider==='brevo'?[{email:'eldadkeha@gmail.com'}]:['eldadkeha@gmail.com']);
+      assert.match(mail.subject,/אלדד קהא/);assert.match(mail.subject,/סבא שלמה וסבתא יונה/);assert.match(mail.textContent||mail.text,/זיכרון משפחתי\nשורה שנייה <script>/);assert.doesNotMatch(mail.htmlContent||mail.html,/<script>/);assert.match(mail.htmlContent||mail.html,/&lt;script&gt;/);
+      const stored=f.db.exec('SELECT * FROM story_submissions').toArray();assert.equal(stored.length,1);assert.equal(stored[0].status,'sent');assert.ok(!JSON.stringify(stored).includes('זיכרון משפחתי'));assert.ok(!JSON.stringify(stored).includes('אלדד קהא'));
+      assert.equal((await f.call('/api/story-submissions',body)).status,200);assert.equal(f.messages.length,1);
+      assert.equal((await f.call('/api/story-submissions',{...body,story:'שונה'})).status,409);
+      assert.equal((await f.call('/api/story-submissions',{...body,person:'yona',requestId:'b'.repeat(32)})).status,200);assert.equal(f.messages.length,2);assert.match(f.messages[1].body.subject,/סבתא יונה/);
+      const exported=await (await f.call('/api/export')).text();assert.ok(!exported.includes(body.story));assert.ok(!exported.includes('story_submissions'));assert.equal(f.db.exec('SELECT count(*) AS n FROM subscribers').toArray()[0].n,0);
+    }finally{f.close();}
+  }
+});
+
+test('story submissions reject missing full names, empty stories, arbitrary people, oversized text and cross-site requests',async()=>{
+  const f=fixture(),body={name:'Test Person',person:'shlomo',story:'A memory.',requestId:'c'.repeat(32)},path='/api/story-submissions';
+  try{
+    for(const change of [{name:'Test'},{name:''},{name:'A\nB'},{story:' '},{story:'a'.repeat(50001)},{person:'__proto__'},{person:'someone-else'},{requestId:'bad'},{website:'spam'}])assert.equal((await f.call(path,{...body,...change})).status,400);
+    assert.equal((await f.call(path)).status,405);assert.equal((await f.call(path,body,{Origin:'https://other.example'})).status,403);assert.equal(f.messages.length,0);assert.equal(f.db.exec('SELECT count(*) AS n FROM story_submissions').toArray()[0].n,0);
+    delete f.env.RESEND_API_KEY;assert.equal((await f.call(path,body)).status,503);assert.equal(f.messages.length,0);
+  }finally{f.close();}
+});
+
+test('story provider failures retain an encrypted copy and retry the same delivery without duplicates',async()=>{
+  const f=fixture('brevo'),body={name:'Test Person',person:'yona',story:'My memory',requestId:'d'.repeat(32)},path='/api/story-submissions';
+  try{
+    f.fail(503);const response=await f.call(path,body);assert.equal(response.status,503);assert.notEqual((await response.json()).sent,true);assert.equal(f.db.exec('SELECT status FROM story_submissions').toArray()[0].status,'pending');
+    const key=f.messages[0].body.headers.idempotencyKey;f.fail(false);assert.equal((await f.call(path,body)).status,200);assert.equal(f.messages[1].body.headers.idempotencyKey,key);assert.equal((await f.call(path,body)).status,200);assert.equal(f.messages.length,2);
+    for(let n=0;n<29;n++)assert.equal((await f.call(path,{...body,requestId:n.toString(16).padStart(32,'0')})).status,200);
+    assert.equal((await f.call(path,{...body,requestId:'e'.repeat(32)})).status,429);assert.equal(f.db.exec('SELECT count(*) AS n FROM story_submissions').toArray()[0].n,30);
+  }finally{f.close();}
+});
+
 test('year-only weddings never create an anniversary reminder on any day of the year',()=>{
   const people=[{id:'yehiel',name:'First',deceased:false},{id:'rachel-katan',name:'Second',deceased:false}],weddings=[{id:'u-yehiel',date:'1938'}];
   for(let day=0;day<366;day++){

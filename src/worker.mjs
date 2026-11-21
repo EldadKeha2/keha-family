@@ -11,7 +11,7 @@ import {videoClipRoute,videoEditRoute,videoUploadFinalize} from './video-clip-ro
 import {recycleRoute} from './recycle-route.mjs';
 import {couple,weddingCollection} from './weddings.mjs';
 import {calendarResponse} from './calendar.mjs';
-import {updatesRoute,dispatchUpdates,headRequestRoute} from './updates.mjs';
+import {updatesRoute,dispatchUpdates,headRequestRoute,storySubmissionRoute} from './updates.mjs';
 import {nurseryCollection} from './nursery.mjs';
 import {galleryRevision} from './gallery.mjs';
 import {personPageParams,personPageRevision} from './person-albums.mjs';
@@ -286,6 +286,10 @@ const worker = {
         const {items}=await db(path==='/api/gallery/download'?'gallery.download':'media.download',{ids});
         const entries=items.map(item=>item.provider==='youtube'?{name:(item.name||'video')+'.url',open:async()=>new Response('[InternetShortcut]\r\nURL=https://www.youtube.com/watch?v='+item.youtubeId+'&t='+Math.floor(item.youtubeStart||0)+'\r\n')}:{name:item.filename||item.name||item.file,open:signal=>getObject(env,item,new Request(url.origin+'/media/'+item.id),r=>fetch(r,{signal}))});
         return new Response(zipStream(entries),{headers:{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="Keha-Family-'+(path==='/api/gallery/download'?'Photos':'Media')+'-'+new Date().toISOString().slice(0,10)+'.zip"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+      }
+      if(path==='/api/story-submissions'){
+        checkOrigin(request);
+        return await storySubmissionRoute(request,env);
       }
       if(request.method==='POST'&&path!=='/api/updates/one-click'){
         checkOrigin(request);

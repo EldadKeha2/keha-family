@@ -1,5 +1,6 @@
 import {HttpError,json,fail,sha256,hmac,readJSON,boundedBody} from './http.mjs';
 import {couples} from './weddings.mjs';
+import {STORY_RECIPIENT,storySubmission,storyEmail} from './story-submissions.mjs';
 
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 const token=()=>crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
@@ -112,6 +113,7 @@ export class FamilyUpdates {
     this.sql.exec('CREATE INDEX IF NOT EXISTS subscriber_status ON subscribers(status)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS rate_limits(id TEXT PRIMARY KEY,n INTEGER NOT NULL,expires INTEGER NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS mail_requests(id TEXT PRIMARY KEY,status TEXT NOT NULL,started INTEGER NOT NULL)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS story_submissions(id TEXT PRIMARY KEY,payload_hash TEXT NOT NULL,data TEXT NOT NULL,status TEXT NOT NULL,created INTEGER NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS deliveries(id TEXT NOT NULL,day TEXT NOT NULL,status TEXT NOT NULL,data TEXT,revision TEXT,PRIMARY KEY(id,day))');
   }
   rows(q,...args){return this.sql.exec(q,...args).toArray();}
@@ -176,6 +178,27 @@ export class FamilyUpdates {
       });
     }
     await this.mail(HEAD_REQUEST_RECIPIENT,headRequestEmail(name,language),id);
+    return {sent:true};
+  }
+  async storySubmission(p){
+    const value=storySubmission(p),id='story-submission/'+value.requestId,now=Date.now();
+    const payloadHash=await this.digest('story:'+JSON.stringify(value)),ip=await this.digest('story-ip:'+p.ip);
+    const encrypted=await this.encrypt(value);
+    const alreadySent=this.tx(()=>{
+      const existing=this.rows('SELECT payload_hash,status FROM story_submissions WHERE id=?',id)[0];
+      if(existing){
+        if(existing.payload_hash!==payloadHash)throw new HttpError(409,'התוכן השתנה מאז ניסיון השליחה. יש לנסות שוב עם הסיפור המעודכן.');
+        return existing.status==='sent';
+      }
+      for(const [key,limit,span] of [['story-ip:'+ip,30,3600000],['story-all',100,86400000]])
+        if(!this.rate(key,limit,span,now))throw new HttpError(429,'נשלחו הרבה סיפורים בזמן קצר. הסיפור נשאר בטופס; נסו שוב מאוחר יותר.');
+      this.sql.exec("INSERT INTO story_submissions(id,payload_hash,data,status,created) VALUES(?,?,?,'pending',?)",id,payloadHash,encrypted,now);
+      return false;
+    });
+    if(!alreadySent){
+      await this.mail(STORY_RECIPIENT,storyEmail(value),id);
+      this.sql.exec("UPDATE story_submissions SET status='sent' WHERE id=?",id);
+    }
     return {sent:true};
   }
   links(data){const base=new URL(this.env.SITE_ORIGIN).origin+'/?lang='+data.language,manage=base+'#updates/manage/'+data.manageToken;return {manage,unsubscribe:manage,oneClick:new URL(this.env.SITE_ORIGIN).origin+'/api/updates/one-click?token='+data.manageToken};}
@@ -278,12 +301,19 @@ export class FamilyUpdates {
       if(action==='stats')return json(this.stats());
       if(!updatesConfigured(this.env))throw new HttpError(503,'שליחת העדכונים עדיין בהגדרה. ההרשמה תיפתח בקרוב.','UPDATES_NOT_CONFIGURED');
       const now=Date.now();this.sql.exec('DELETE FROM mail_requests WHERE started<?',now-7*86400000);this.sql.exec('DELETE FROM rate_limits WHERE expires<?',now);this.sql.exec("DELETE FROM subscribers WHERE status='pending' AND confirm_expires<?",now);this.sql.exec('DELETE FROM deliveries WHERE day<?',new Date(now-7*86400000).toISOString().slice(0,10));
-      const methods={register:'register',confirm:'confirm','request-link':'requestLink',preferences:'getPreferences',save:'savePreferences',unsubscribe:'unsubscribe',dispatch:'dispatch','head-request':'headRequest'};
+      const methods={register:'register',confirm:'confirm','request-link':'requestLink',preferences:'getPreferences',save:'savePreferences',unsubscribe:'unsubscribe',dispatch:'dispatch','head-request':'headRequest','story-submission':'storySubmission'};
       if(!methods[action])throw new HttpError(404,'הפעולה אינה זמינה.');
       const result=await this[methods[action]](p);
       return json(action==='confirm'||action==='unsubscribe'?{...result,...this.stats()}:result);
     }catch(error){return fail(error);}
   }
+}
+
+export async function storySubmissionRoute(request,env){
+  if(request.method!=='POST')throw new HttpError(405,'הפעולה אינה נתמכת.');
+  if(!updatesConfigured(env))throw new HttpError(503,'שליחת הסיפור אינה זמינה כרגע. הסיפור נשאר בטופס; נסו שוב מאוחר יותר.');
+  const value=storySubmission(await readJSON(request,250000));
+  return env.FAMILY_UPDATES.get(env.FAMILY_UPDATES.idFromName('keha-updates')).fetch(new Request('https://updates.internal/',{method:'POST',body:JSON.stringify({...value,action:'story-submission',ip:request.headers.get('CF-Connecting-IP')||'unknown'})}));
 }
 
 export async function headRequestRoute(request,env){
