@@ -8,52 +8,91 @@ import {parseHTML} from 'linkedom';
 const source=await readFile(new URL('../public/assets/pdf-documents.js',import.meta.url),'utf8');
 const tick=async()=>{for(let n=0;n<12;n++)await new Promise(resolve=>setImmediate(resolve));};
 const item={src:'/media/'+'a'.repeat(32)+'?version=original',filename:'תעודה.pdf',name:'תעודה משפחתית',mime:'application/pdf'};
-function fixture({branch,english=false,nativeShare,error=false,delayed=false,clipboard=true}={}){
+function fixture({branch,english=false,nativeShare,error=false,delayed=false,clipboard=true,pageCount=3,mixedSizes=false}={}){
   const {document,window:dom}=parseHTML('<html><body><main id="host"></main></body></html>');
   if(branch){document.documentElement.dataset.nakashBranch=branch;document.documentElement.dataset.nakashHome='/keha-extended/'+branch+'/';document.documentElement.dataset.nakashOrigin='https://family.example';}
-  const requests=[],renders=[],destroyed=[],copied=[],shared=[],observers=[],pending=[];
+  const requests=[],renders=[],destroyed=[],copied=[],shared=[],observers=[],pending=[],resizes=[],viewport={width:600,height:600};
   const create=document.createElement.bind(document);
   document.createElement=tag=>{
     const node=create(tag);
+    Object.defineProperty(node,'clientWidth',{get:()=>node.classList.contains('pdf-page-scroll')?viewport.width:parseFloat(node.style.width)||viewport.width});
+    Object.defineProperty(node,'clientHeight',{get:()=>node.classList.contains('pdf-page-scroll')?viewport.height:parseFloat(node.style.height)||viewport.height});
+    node.getBoundingClientRect=()=>({left:0,top:0,width:node.clientWidth,height:node.clientHeight});
     if(tag==='canvas'){node.getContext=()=>({});node.toDataURL=()=> 'data:image/webp;base64,thumbnail';}
     if(tag==='dialog'){node.showModal=()=>{node.open=true;};node.close=()=>{node.open=false;node.dispatchEvent(new dom.Event('close'));};}
     return node;
   };
   const pdfLibrary={GlobalWorkerOptions:{},getDocument(options){
     requests.push(options);const id=requests.length;
-    const pdf={numPages:3,async getPage(number){return {getViewport:({scale})=>({width:600*scale,height:800*scale}),render({canvas,viewport}){renders.push({id,number,canvas,viewport});let complete;const promise=delayed?new Promise(resolve=>{complete=resolve;pending.push(resolve);}):Promise.resolve();return {promise,cancel(){complete?.();}};},async getTextContent(){return {items:[{str:'Document '+id+' page '+number,hasEOL:true}]};}};}};
+    const pdf={numPages:pageCount,async getPage(number){return {getViewport:({scale})=>({width:600*scale,height:(mixedSizes&&number===2?400:800)*scale}),render({canvas,viewport}){renders.push({id,number,canvas,viewport});let complete;const promise=delayed?new Promise(resolve=>{complete=resolve;pending.push(resolve);}):Promise.resolve();return {promise,cancel(){complete?.();}};},async getTextContent(){return {items:[{str:'Document '+id+' page '+number,hasEOL:true}]};},cleanup(){}};}};
     return {promise:error?Promise.reject(Error('Missing document')):Promise.resolve(pdf),destroy:async()=>{destroyed.push(id);}};
   }};
   const location=new URL('https://family.example/'+(branch?'keha-extended/'+branch+'/':'')+'?media=old#person/yona');
   const history={state:{},replaceState(state,_,url){location.href=String(url);}};
   const navigator={...(clipboard?{clipboard:{writeText:async value=>{copied.push(value);}}}:{}),...(nativeShare?{share:async data=>{shared.push(data);if(nativeShare==='cancel')throw Object.assign(Error(),{name:'AbortError'});}}:{})};
   class Observer{constructor(callback){this.callback=callback;this.nodes=[];observers.push(this);}observe(node){this.nodes.push(node);}unobserve(node){this.nodes=this.nodes.filter(value=>value!==node);}}
-  const window={devicePixelRatio:2,FamilyI18n:{isEnglish:english,language:english?'en':'he'},testPdfLibrary:async()=>pdfLibrary};
-  vm.runInNewContext(source.replace("import(assetRoot+'pdf.mjs')",'window.testPdfLibrary()'),{document,window,location,history,navigator,URL,IntersectionObserver:Observer,setTimeout,clearTimeout});
-  return {document,dom,api:window.FamilyPDF,requests,renders,destroyed,copied,shared,observers,pending,host:document.getElementById('host'),location};
+  class Resize{constructor(callback){this.callback=callback;resizes.push(this);}observe(){}disconnect(){}}
+  const window={devicePixelRatio:2,FamilyI18n:{isEnglish:english,language:english?'en':'he'},testPdfLibrary:async()=>pdfLibrary,requestAnimationFrame:fn=>{queueMicrotask(fn);return 1;},cancelAnimationFrame(){}};
+  vm.runInNewContext(source.replace("import(assetRoot+'pdf.mjs')",'window.testPdfLibrary()'),{document,window,location,history,navigator,URL,IntersectionObserver:Observer,ResizeObserver:Resize,setTimeout,clearTimeout});
+  const mount=window.FamilyPDF.mount;
+  window.FamilyPDF.mount=(host,item)=>{
+    const dispose=mount(host,item),scroll=host.querySelector('.pdf-page-scroll');
+    Object.defineProperty(scroll,'clientWidth',{get:()=>viewport.width});Object.defineProperty(scroll,'clientHeight',{get:()=>viewport.height});
+    scroll.getBoundingClientRect=()=>({left:0,top:0,width:viewport.width,height:viewport.height});return dispose;
+  };
+  const fire=(node,type,values={})=>{const event=new dom.Event(type,{bubbles:true,cancelable:true});Object.assign(event,values);node.dispatchEvent(event);return event;};
+  return {document,dom,api:window.FamilyPDF,requests,renders,destroyed,copied,shared,observers,pending,host:document.getElementById('host'),location,fire,resizes,viewport};
 }
 
 test('PDF detection covers MIME, attachment names and URLs, and rejects foreign sources',()=>{
   const f=fixture();assert.equal(f.api.isPDF(item),true);assert.equal(f.api.isPDF({name:'attachment.PDF'}),true);assert.equal(f.api.isPDF({name:'Historical record',src:'/records/example.pdf?x=1'}),true);assert.equal(f.api.isPDF({filename:'record.docx'}),false);
   assert.equal(f.api.open({...item,src:'https://other.example/record.pdf'}),false);assert.equal(f.api.open({...item,src:'javascript:alert(1)'}),false);
 });
-test('the embedded reader renders pages, validates page numbers and zooms without a native PDF plugin',async()=>{
+test('the reader lays out every page in order, scrolls to a page number and keeps download controls',async()=>{
   const f=fixture();f.api.mount(f.host,item);await tick();
-  assert.equal(f.renders.length,1);assert.equal(f.renders[0].number,1);assert.match(f.host.querySelector('.pdf-page-total').textContent,/3/);assert.ok(f.host.querySelector('canvas'));assert.equal(f.host.querySelector('iframe'),null);
+  assert.deepEqual([...f.host.querySelectorAll('[data-pdf-page]')].map(node=>node.dataset.pdfPage),['1','2','3']);
+  assert.equal(f.renders[0].number,1);assert.match(f.host.querySelector('.pdf-page-total').textContent,/3/);assert.ok(f.host.querySelector('canvas'));assert.equal(f.host.querySelector('iframe'),null);assert.equal(f.host.querySelector('[data-pdf-action=next]'),null);assert.equal(f.host.querySelector('[data-pdf-action=previous]'),null);
   const download=new URL(f.host.querySelector('[data-pdf-download]').href);assert.equal(download.searchParams.get('download'),'1');assert.equal(download.searchParams.has('inline'),false);assert.equal(download.searchParams.get('version'),'original');
-  assert.equal(f.host.querySelector('[data-pdf-action=previous]').disabled,true);
-  f.host.querySelector('[data-pdf-action=next]').click();await tick();assert.equal(f.renders.at(-1).number,2);
-  const before=f.renders.at(-1).viewport.width;f.host.querySelector('[data-pdf-action=in]').click();await tick();assert.ok(f.renders.at(-1).viewport.width>before);
-  f.host.querySelector('[data-pdf-action=fit]').click();await tick();assert.equal(f.renders.at(-1).viewport.width,before);
-  const input=f.host.querySelector('.pdf-page-number');input.value='200';input.dispatchEvent(new f.dom.Event('change'));assert.equal(input.value,'2');
-  input.value='3';input.dispatchEvent(new f.dom.Event('change'));await tick();assert.equal(f.host.querySelector('[data-pdf-action=next]').disabled,true);assert.match(f.host.querySelector('.pdf-reader-text p').textContent,/page 3/);
+  const input=f.host.querySelector('.pdf-page-number');input.value='200';f.fire(input,'change');assert.equal(input.value,'1');
+  input.value='3';f.fire(input,'change');await tick();assert.ok(f.host.querySelector('[data-pdf-page="3"] canvas'));assert.match(f.host.querySelector('.pdf-reader-text p').textContent,/page 3/);
+  const before=f.host.querySelector('[data-pdf-page="3"]').style.width;f.host.querySelector('[data-pdf-action=in]').click();await tick();assert.ok(parseFloat(f.host.querySelector('[data-pdf-page="3"]').style.width)>parseFloat(before));
+  f.host.querySelector('[data-pdf-action=fit]').click();await tick();assert.equal(f.host.querySelector('[data-pdf-page="3"]').style.width,before);assert.equal(input.value,'3');
   f.api.unmount(f.host);await tick();assert.deepEqual(f.destroyed,[1]);
 });
 test('switching documents cancels old work and never paints an obsolete page',async()=>{
-  const f=fixture({delayed:true});f.api.mount(f.host,item);await tick();assert.equal(f.pending.length,1);
+  const f=fixture({delayed:true});f.api.mount(f.host,item);await tick();assert.equal(f.pending.length,2);
   f.api.mount(f.host,{...item,src:'/media/'+'b'.repeat(32)});await tick();
   for(const resolve of f.pending)resolve();await tick();
-  assert.equal(f.host.querySelectorAll('canvas').length,1);assert.equal(f.host.querySelector('canvas'),f.renders.at(-1).canvas);assert.deepEqual(f.destroyed,[1]);f.api.unmount(f.host);
+  assert.equal(f.host.querySelectorAll('canvas').length,2);for(const canvas of f.host.querySelectorAll('canvas'))assert.equal(f.renders.find(render=>render.canvas===canvas).id,2);assert.deepEqual(f.destroyed,[1]);f.api.unmount(f.host);
+});
+test('long documents load only nearby pages, release distant canvases and track ordinary scrolling',async()=>{
+  const f=fixture({pageCount:100});f.api.mount(f.host,item);await tick();
+  assert.equal(f.host.querySelectorAll('[data-pdf-page]').length,100);assert.ok(f.renders.length<5);const old=f.host.querySelector('[data-pdf-page="1"] canvas');
+  const scroll=f.host.querySelector('.pdf-page-scroll'),height=parseFloat(f.host.querySelector('.pdf-page-frame').style.height);scroll.scrollTop=12+9*(height+44);f.fire(scroll,'scroll');await tick();
+  assert.equal(f.host.querySelector('.pdf-page-number').value,'10');assert.ok(f.host.querySelector('[data-pdf-page="10"] canvas'));assert.equal(old.width,0);assert.equal(old.height,0);assert.equal(f.host.querySelector('[data-pdf-page="1"] canvas'),null);assert.ok(f.host.querySelectorAll('canvas').length<6);
+  f.host.querySelector('[data-pdf-action=in]').click();await tick();assert.equal(f.host.querySelector('.pdf-page-number').value,'10');f.api.unmount(f.host);
+});
+test('precision-pad pinch zooms around its point while plain wheel scrolling is left native',async()=>{
+  const f=fixture();f.api.mount(f.host,item);await tick();const scroll=f.host.querySelector('.pdf-page-scroll'),row=f.host.querySelector('[data-pdf-page="1"]'),before=parseFloat(row.style.width),canvas=row.querySelector('canvas'),count=f.renders.length;
+  const plain=f.fire(scroll,'wheel',{deltaY:120,deltaX:0,deltaMode:0,ctrlKey:false});assert.equal(plain.defaultPrevented,false);assert.equal(parseFloat(row.style.width),before);
+  const pinch=f.fire(scroll,'wheel',{deltaY:-80,deltaMode:0,ctrlKey:true,clientX:240,clientY:240});assert.equal(pinch.defaultPrevented,true);assert.ok(parseFloat(row.style.width)>before);assert.equal(row.querySelector('canvas'),canvas);assert.equal(f.renders.length,count);assert.ok(scroll.scrollTop>0);
+  await new Promise(resolve=>setTimeout(resolve,160));await tick();assert.ok(f.renders.length>count);assert.notEqual(row.querySelector('canvas'),canvas);
+  f.fire(scroll,'wheel',{deltaY:80,deltaMode:0,ctrlKey:true,clientX:240,clientY:240});assert.ok(Math.abs(parseFloat(row.style.width)-before)<.01);f.api.unmount(f.host);
+});
+test('touch pinch expands and contracts the document without intercepting a single-finger scroll',async()=>{
+  const f=fixture();f.api.mount(f.host,item);await tick();const scroll=f.host.querySelector('.pdf-page-scroll'),row=f.host.querySelector('[data-pdf-page="1"]'),before=parseFloat(row.style.width);
+  const one=[{clientX:200,clientY:200}];assert.equal(f.fire(scroll,'touchstart',{touches:one}).defaultPrevented,false);assert.equal(f.fire(scroll,'touchmove',{touches:one}).defaultPrevented,false);
+  const start=[{clientX:150,clientY:200},{clientX:250,clientY:200}],wide=[{clientX:100,clientY:200},{clientX:300,clientY:200}];
+  assert.equal(f.fire(scroll,'touchstart',{touches:start}).defaultPrevented,true);assert.equal(f.fire(scroll,'touchmove',{touches:wide}).defaultPrevented,true);assert.equal(parseFloat(row.style.width),before*2);assert.equal(f.host.querySelector('.pdf-zoom-label').textContent,'200%');
+  f.fire(scroll,'touchmove',{touches:start});assert.equal(parseFloat(row.style.width),before);f.fire(scroll,'touchend',{touches:[]});await tick();assert.ok(row.querySelector('canvas'));f.api.unmount(f.host);
+});
+test('Safari gestures and resize keep the reading position and honor zoom limits',async()=>{
+  const f=fixture({pageCount:20,mixedSizes:true});f.api.mount(f.host,item);await tick();assert.equal(parseFloat(f.host.querySelector('[data-pdf-page="2"] .pdf-page-frame').style.height),384);
+  const input=f.host.querySelector('.pdf-page-number');input.value='10';f.fire(input,'change');await tick();const scroll=f.host.querySelector('.pdf-page-scroll');
+  const readingPoint=y=>{const rows=[...f.host.querySelectorAll('[data-pdf-page]')],top=12+rows.slice(0,9).reduce((sum,node)=>sum+parseFloat(node.querySelector('.pdf-page-frame').style.height)+44,0);return (scroll.scrollTop+y-top)/parseFloat(rows[9].querySelector('.pdf-page-frame').style.height);};
+  const point=readingPoint(200);
+  f.fire(scroll,'gesturestart',{clientX:200,clientY:200});f.fire(scroll,'gesturechange',{scale:30});assert.equal(f.host.querySelector('.pdf-zoom-label').textContent,'800%');f.fire(scroll,'gesturechange',{scale:.01});assert.equal(f.host.querySelector('.pdf-zoom-label').textContent,'50%');f.fire(scroll,'gestureend');await tick();
+  assert.ok(Math.abs(readingPoint(200)-point)<.0001);const center=readingPoint(300);f.viewport.width=400;f.resizes[0].callback();await new Promise(resolve=>setTimeout(resolve,140));await tick();assert.ok(Math.abs(readingPoint(300)-center)<.0001);assert.ok(scroll.scrollTop>2000);assert.equal(parseFloat(f.host.querySelector('[data-pdf-page="10"]').style.width),188);f.api.unmount(f.host);
 });
 test('missing PDFs retain working download and share controls with a readable error',async()=>{
   const f=fixture({error:true});f.api.mount(f.host,item);await tick();
