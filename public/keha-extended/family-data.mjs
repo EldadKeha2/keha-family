@@ -25,7 +25,7 @@ const people = [
   ['kehat-tzadok-elder','צדוק קהא','Tzadok Keha','m','u-kehat-tzadok-elder'],
   ['kehat-zechariah-ben-tzadok','זכריה בן צדוק קהת','Zechariah Kehat, son of Tzadok','m','u-kehat-zechariah-ben-tzadok',['זכריה בן צדוק קהא']],
   ['kehat-aharon-elder','אהרון קהא','Aharon Keha','m','u-kehat-aharon-elder'],
-  ['kehat-jidaan','סעדיה (ג׳ידעאן) בן אהרון קהת','Saadia (Jidaan) Kehat, son of Aharon','m','u-keha-kehat',['ג׳ידעאן קהת','ג׳ימען קהת','גימען קהת','גידעאן קהת','סעדיה בן אהרון קהא','סעדיה בן אהרון קהת']],
+  ['kehat-jidaan','סעדיה (ג׳ידעאן) בן אהרון קהא','Saadia (Jidaan) Keha, son of Aharon','m','u-keha-kehat',['ג׳ידעאן קהא','ג׳ימען קהא','גימען קהא','גידעאן קהא','סעדיה בן אהרון קהא']],
   ['kehat-first-wife','שם האישה הראשונה טרם נמסר','First wife — name not yet known','f','u-keha-kehat',[],{placeholder:true}],
   ['kehat-miriam','מרים קהת','Miriam Kehat','f','u-keha-kehat'],
   ['kehat-yaakov','יעקב קהת','Yaakov Kehat','m','u-kehat-yaakov'],

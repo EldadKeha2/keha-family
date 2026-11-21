@@ -35,6 +35,8 @@ export function initializeExtendedKeha(state) {
     const updateTriDeath=!state.rows('SELECT id FROM meta WHERE id=?',triDeathMigration).length;
     const lifeYearsMigration='extended-historical-life-years-2026-11-21-v1';
     const updateLifeYears=!state.rows('SELECT id FROM meta WHERE id=?',lifeYearsMigration).length;
+    const saadiaNameMigration='extended-saadia-jidaan-keha-surname-2026-11-21-v1';
+    const updateSaadiaName=!state.rows('SELECT id FROM meta WHERE id=?',saadiaNameMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -187,6 +189,16 @@ export function initializeExtendedKeha(state) {
         if(seed.deceased)saved.deceased=true;
         state.savePerson(saved);
       }
+      if(updateSaadiaName&&seed.id==='kehat-jidaan'){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',saadiaNameMigration+':backup:'+seed.id,JSON.stringify(saved));
+        if(/קהת/.test(saved.name||'')||saved.lastName==='קהת'||seed.aliases.includes(saved.name)){
+          saved.name=seed.name;delete saved.firstName;delete saved.lastName;
+        }
+        for(const key of ['nameEn','englishName'])if(!saved[key]||/Kehat/i.test(saved[key]))saved[key]=seed[key];
+        saved.aliases=[...new Set([...(saved.aliases||[]).filter(alias=>!/קהת|Kehat/i.test(alias)),...(seed.aliases||[])])];
+        state.savePerson(saved);
+      }
     }
     for(const seed of EXTENDED_PEOPLE){
       if(!seed.sharedProfileId)continue;
@@ -206,6 +218,7 @@ export function initializeExtendedKeha(state) {
     if(updateTriParentage)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triParentageMigration,'done');
     if(updateTriDeath)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triDeathMigration,'done');
     if(updateLifeYears)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',lifeYearsMigration,'done');
+    if(updateSaadiaName)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',saadiaNameMigration,'done');
     if(updateMerav)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',meravMigration,'done');
     if(updateTriArchive){
       // This original scan was uploaded through the family archive and is

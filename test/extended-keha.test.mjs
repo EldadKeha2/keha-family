@@ -213,7 +213,7 @@ test('Tzadok and Aharon have separate sons and no invented kinship between their
   }
   assert.equal(data.people['kehat-zechariah-ben-tzadok'].branch,'kehat-tzadok');
   assert.equal(data.people['kehat-jidaan'].branch,'kehat');
-  assert.equal(data.people['kehat-jidaan'].name,'סעדיה (ג׳ידעאן) בן אהרון קהת');
+  assert.equal(data.people['kehat-jidaan'].name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
   assert.deepEqual(relatives('kehat-jidaan').children,['kehat-yaakov','kehat-zechariah','kehat-aharon','kehat-shlomo','kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah']);
   const secondChildren=['kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah'];
   assert.deepEqual(relatives('kehat-miriam').children,secondChildren);
@@ -392,7 +392,7 @@ test('identifying Jidaan as Saadia preserves his shared profile, albums and subs
     const id='kehat-jidaan';
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'ג׳ידעאן קהת',nameEn:'Jidaan Kehat',about:'סיפור שכבר נכתב',birthday:'2.3.1900',extra:true,profileId:null}));
     const first=await f.json(site('people/'+id+'/page'));
-    assert.equal(first.person.name,'סעדיה (ג׳ידעאן) בן אהרון קהת');
+    assert.equal(first.person.name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
     assert.equal(first.person.birthday,'2.3.1900');
     assert.equal(first.person.about,'סיפור שכבר נכתב');
     const portrait=await f.json(site('people/'+id+'/photos?filename=saadia.jpg'),{method:'POST',body:photo});
@@ -1009,5 +1009,35 @@ test('the public tree reuses saved wedding years and respects a deliberately cle
     assert.equal(window.FAMILY_DATA.units['u-fish'].weddingDate,'9.9.1980');
     assert.equal(window.FAMILY_DATA.units['u-root'].weddingYear,undefined);
     assert.equal(window.FAMILY_DATA.units['u-root'].weddingDate,'');
+  }finally{f.close();}
+});
+
+test('Saadia remains Keha after the children’s surname changes and an already deployed profile is corrected once',async()=>{
+  const f=fixture();try{
+    const id='kehat-jidaan',path=site('people/'+id+'/page');
+    await f.json(path);
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    Object.assign(saved,{name:'סעדיה (ג׳ידעאן) בן אהרון קהת',nameEn:'Saadia (Jidaan) Kehat, son of Aharon',englishName:'Saadia (Jidaan) Kehat, son of Aharon',firstName:'סעדיה (ג׳ידעאן)',lastName:'קהת',profileId:'existing-saadia-portrait',about:'זיכרון משפחתי שמור',aliases:['סעדיה בן אהרון קהת','שם מחקר נוסף']});
+    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
+    const migration='extended-saadia-jidaan-keha-surname-2026-11-21-v1';
+    f.database.prepare('DELETE FROM meta WHERE id=? OR id=?').run(migration,migration+':backup:'+id);
+    f.restart();
+    const corrected=(await f.json(path)).person;
+    assert.equal(corrected.id,id);assert.equal(corrected.name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
+    assert.equal(corrected.nameEn,'Saadia (Jidaan) Keha, son of Aharon');
+    assert.equal(corrected.firstName,undefined);assert.equal(corrected.lastName,undefined);
+    assert.equal(corrected.birthYearMin,1870);assert.equal(corrected.birthYearMax,1877);
+    assert.equal(corrected.deathDate,'9.12.1962');assert.equal(corrected.about,saved.about);
+    assert.ok(corrected.aliases.includes('שם מחקר נוסף'));assert.ok(!corrected.aliases.some(alias=>/קהת|Kehat/.test(alias)));
+    const stored=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    assert.equal(stored.profileId,'existing-saadia-portrait');
+    assert.match((await f.json(site('people/kehat-yaakov/page'))).person.name,/קהת/);
+    const tree=createExtendedFamily(family);
+    assert.equal(tree.people['kehat-jidaan'].name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
+    assert.equal(tree.people['kehat-yaakov'].name,'יעקב קהת');
+    assert.equal(tree.people['kehat-shlomo'].name,'שלמה קהת');
+    const backup=migration+':backup:'+id;
+    assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(backup).value).profileId,'existing-saadia-portrait');
+    f.restart();assert.equal((await f.json(path)).person.name,corrected.name);
   }finally{f.close();}
 });
