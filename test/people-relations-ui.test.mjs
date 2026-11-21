@@ -58,10 +58,18 @@ test('a known grandfather appears as a grandfather while an unresolved father st
 });
 
 test('possible life dates remain visibly qualified and do not become confirmed profile dates',async()=>{
-  const data=toOriginalFamilyData(createKehatFamily(family)),f=await fixture('kehat-jidaan',{familyData:data});
+  const data=toOriginalFamilyData(createKehatFamily(family)),f=await fixture('kehat-aharon',{familyData:data});
   assert.match(f.html,/רישום מצבה אפשרי · הזיהוי בבירור/);
-  assert.match(f.html,/1876–1877/);assert.match(f.html,/9\.12\.1962/);assert.match(f.html,/גיל בפטירה: 85/);
-  assert.equal(data.people['kehat-jidaan'].deathDate,undefined);
+  assert.match(f.html,/1904–1905/);assert.match(f.html,/1977/);assert.match(f.html,/גיל בפטירה: 72/);
+  assert.equal(data.people['kehat-aharon'].deathDate,undefined);
+});
+
+test('Saadia’s family-identified grave is a confirmed source while its birth estimate keeps year precision',async()=>{
+  const data=toOriginalFamilyData(createKehatFamily(family)),f=await fixture('kehat-jidaan',{familyData:data});
+  assert.match(f.html,/רישום מצבה · הזיהוי אושר במשפחה/);
+  assert.doesNotMatch(f.html,/רישום מצבה אפשרי · הזיהוי בבירור/);
+  assert.match(f.html,/1870–1877/);assert.match(f.html,/9\.12\.1962/);
+  assert.equal(data.people['kehat-jidaan'].birthday,'1.1.1111');
 });
 
 test('phone profile photo uploads offer camera or gallery, while other media and desktop keep their picker',async()=>{

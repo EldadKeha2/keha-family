@@ -42,7 +42,8 @@
     const src = scopedViews?(getMedia(p).profile ?? p.profile):getMedia(p).profile;
     return `<span class="portrait" aria-hidden="true">${silhouette}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" ${window.FamilyPhotoFraming?.profile({...p,...getMedia(p)})||''} src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
   }
-  function birthdayHTML(p, editable = true, birthOnly = false) {
+  function birthdayHTML(input, editable = true, birthOnly = false) {
+    const p={...input,...getMedia(input)};
     const aliyah=p.aliyahMonth?new Intl.DateTimeFormat(I18n.locale,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(p.aliyahYear,p.aliyahMonth-1,1))):p.aliyahYear;
     const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5L9 20l-6 1 1-6ZM14 5l5 5"/></svg>';
     const canEdit=Boolean(scopedViews&&apiEnabled&&!isPlaceholder(p));
@@ -52,10 +53,13 @@
     const value = birthdayOf(p), death = p.deathDate ? window.FamilyDates.parse(p.deathDate) : null;
     const age = invalid ? null : p.deceased ? death ? window.FamilyDates.age(value,death.date) : null : window.FamilyDates.age(value);
     const unknown = value === '1.1.1111';
-    const firstYear=p.birthYear??p.birthYearMin,lastYear=p.birthYear??p.birthYearMax;
+    const candidate=candidateLifeRecord(p),candidateBirth=!(p.birthYear??p.birthYearMin)&&Boolean(candidate?.birthYearMin);
+    const firstYear=p.birthYear??p.birthYearMin??candidate?.birthYearMin,lastYear=p.birthYear??p.birthYearMax??candidate?.birthYearMax;
     const yearOnly=unknown&&Number.isInteger(firstYear)&&Number.isInteger(lastYear)&&firstYear>1111&&lastYear>=firstYear&&lastYear<=new Date().getFullYear();
-    const yearSource=I18n.isEnglish?p.birthYearSourceEn:p.birthYearSource;
-    const unknownLabel=yearOnly?`${firstYear===lastYear?firstYear:'\u2066'+firstYear+'–'+lastYear+'\u2069'}${yearSource?' · '+yearSource:''}`:(I18n.isEnglish?'Not added yet':I18n.t('טרם הוזן'));
+    const yearSource=candidateBirth?(I18n.isEnglish?'Gravestone match under research':'לפי מצבה שהשיוך שלה בבדיקה'):I18n.isEnglish?p.birthYearSourceEn:p.birthYearSource;
+    const unknownLabel=yearOnly?`${firstYear===lastYear?firstYear:'\u2066'+firstYear+'–'+lastYear+'\u2069'}${candidateBirth?'?':''}${yearSource?' · '+yearSource:''}`:(I18n.isEnglish?'Not added yet':I18n.t('טרם הוזן'));
+    const deathEvidence=treeDeathEvidence(p);
+    const deathHTML=death?`<span class="person-death-date">${I18n.isEnglish?'Died on ':p.gender==='f'?'נפטרה ב־':'נפטר ב־'}<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:deathEvidence.year?`<span class="person-death-date" title="${safe(deathEvidence.source||'')}">${deathEvidence.candidate?(I18n.isEnglish?'Death · gravestone match under research: ':'פטירה · שיוך המצבה בבדיקה: '):(I18n.isEnglish?'Died in ':p.gender==='f'?'נפטרה ב־':'נפטר ב־')}<bdi dir="ltr">${deathEvidence.year}${deathEvidence.candidate?'?':''}</bdi></span>`:'';
     const rangeLabel=range=>range?(range.min===range.max?String(range.min):range.min+'–'+range.max):'';
     const currentRange=!invalid&&yearOnly?rangeLabel(window.FamilyDates.ageRange?.(firstYear,lastYear)):!invalid&&p.deceased&&p.researchNotes&&!unknown?String(window.FamilyDates.age(value)??''):'';
     const deathRange=!invalid&&yearOnly&&death?rangeLabel(window.FamilyDates.ageRange?.(firstYear,lastYear,death.date)):'';
@@ -64,8 +68,8 @@
     const deathBeforeHTML=!death&&p.deathBefore?`<span class="person-death-date">${safe(I18n.isEnglish?`Died before ${p.deathBefore}`:`${p.gender==='f'?'נפטרה':'נפטר'} לפני ${p.deathBefore}`)}</span>`:'';
     const birthdayEdit=canEdit?`<button type="button" class="birthday-edit" data-edit-birthday="${safe(p.id)}" aria-label="${I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה'}">${pencil}</button>`:'';
     if(birthOnly)return `<span class="birthday-line"><bdi>${safe(invalid?I18n.t('תאריך לבדיקה'):unknown?unknownLabel:I18n.date(value))}</bdi>${birthdayEdit}</span>${deathEdit}`;
-    if(I18n.isEnglish)return `<span class="birthday-line"><bdi>${safe(invalid?'Date needs checking':unknown?unknownLabel:I18n.date(value))}</bdi>${birthdayEdit}</span>${age!==null?`<span class="person-age">(${p.deceased?`aged ${age} at death`:age})</span>`:''}${yearAgeHTML}${death?`<span class="person-death-date">Died on <bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathBeforeHTML}${deathEdit}${p.aliyahYear?`<span class="person-aliyah-year">Moved to Israel in <bdi>${safe(aliyah)}</bdi></span>`:''}`;
-    return I18n.html`<span class="birthday-line"><bdi>${safe(invalid ? I18n.t('תאריך לבדיקה') : unknown ? unknownLabel : I18n.date(value))}</bdi>${birthdayEdit}</span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?I18n.t('גיל בפטירה'):I18n.t('גיל')} ${age}">${p.deceased?I18n.html`(${p.gender==='f'?I18n.t('בת'):I18n.t('בן')} ${age} בפטירת${p.gender==='f'?I18n.t('ה'):I18n.t('ו')})`:`(${age})`}</span>` : ''}${yearAgeHTML}${death?I18n.html`<span class="person-death-date">${p.gender==='f'?I18n.t('נפטרה'):I18n.t('נפטר')} ב־<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:''}${deathBeforeHTML}${deathEdit}${p.aliyahYear?I18n.html`<span class="person-aliyah-year">${p.gender==='f'?I18n.t('עלתה'):I18n.t('עלה')} לארץ ב־<bdi>${safe(aliyah)}</bdi></span>`:''}`;
+    if(I18n.isEnglish)return `<span class="birthday-line"><bdi>${safe(invalid?'Date needs checking':unknown?unknownLabel:I18n.date(value))}</bdi>${birthdayEdit}</span>${age!==null?`<span class="person-age">(${p.deceased?`aged ${age} at death`:age})</span>`:''}${yearAgeHTML}${deathHTML}${deathBeforeHTML}${deathEdit}${p.aliyahYear?`<span class="person-aliyah-year">Moved to Israel in <bdi>${safe(aliyah)}</bdi></span>`:''}`;
+    return I18n.html`<span class="birthday-line"><bdi>${safe(invalid ? I18n.t('תאריך לבדיקה') : unknown ? unknownLabel : I18n.date(value))}</bdi>${birthdayEdit}</span>${age !== null ? `<span class="person-age" aria-label="${p.deceased?I18n.t('גיל בפטירה'):I18n.t('גיל')} ${age}">${p.deceased?I18n.html`(${p.gender==='f'?I18n.t('בת'):I18n.t('בן')} ${age} בפטירת${p.gender==='f'?I18n.t('ה'):I18n.t('ו')})`:`(${age})`}</span>` : ''}${yearAgeHTML}${deathHTML}${deathBeforeHTML}${deathEdit}${p.aliyahYear?I18n.html`<span class="person-aliyah-year">${p.gender==='f'?I18n.t('עלתה'):I18n.t('עלה')} לארץ ב־<bdi>${safe(aliyah)}</bdi></span>`:''}`;
   }
 
   function rootHistoryHTML(p) {
@@ -91,10 +95,18 @@
     return Number.isInteger(year)&&year>1111&&year<=new Date().getFullYear()?year:null;
   }
   function treeDateYear(value){return treeYear(window.FamilyDates.parse(value)?.year);}
+  function candidateLifeRecord(person){return person.lifeRecords?.find(record=>record.showYears&&record.status!=='confirmed');}
+  function treeDeathEvidence(person){
+    const year=treeDateYear(person.deathDate)||treeYear(person.deathYear);
+    if(year)return {year,candidate:false,source:I18n.isEnglish?person.deathYearSourceEn:person.deathYearSource};
+    const record=candidateLifeRecord(person);
+    return {year:record&&(treeDateYear(record.deathDate)||treeYear(record.deathYear)),candidate:true,source:I18n.isEnglish?'The gravestone identity is under research. Open the profile for sources.':record?.note||'שיוך המצבה לאדם בבדיקה; המקורות בעמוד האישי.'};
+  }
   function treeBirthYears(p){
     const person={...p,...getMedia(p)},dateYear=!person.invalidBirthday&&treeDateYear(birthdayOf(p));
     if(dateYear)return [dateYear,dateYear];
-    const first=treeYear(person.birthYear??person.birthYearMin),last=treeYear(person.birthYear??person.birthYearMax);
+    const record=candidateLifeRecord(person);
+    const first=treeYear(person.birthYear??person.birthYearMin??record?.birthYearMin),last=treeYear(person.birthYear??person.birthYearMax??record?.birthYearMax);
     return first&&last&&last>=first?[first,last]:null;
   }
   function treeHistoricalPerson(p){
@@ -104,12 +116,15 @@
     return age!==null?age>=70:Boolean(years&&new Date().getFullYear()-years[1]>=70);
   }
   function treeLifeYearsHTML(p,editable=true){
-    const person={...p,...getMedia(p)},years=treeBirthYears(p),death=treeDateYear(person.deathDate)||treeYear(person.deathYear);
+    const person={...p,...getMedia(p)},years=treeBirthYears(p),death=treeDeathEvidence(person);
+    const candidateBirth=years&&!(!person.invalidBirthday&&treeDateYear(birthdayOf(p)))&&!(person.birthYear??person.birthYearMin)&&Boolean(candidateLifeRecord(person));
+    const uncertainty=I18n.isEnglish?'The gravestone identity is under research. Open the profile for sources.':'שיוך המצבה לאדם בבדיקה; המקורות בעמוד האישי.';
+    const mark=source=>`<abbr class="tree-year-uncertain" title="${safe(source||uncertainty)}" aria-label="${safe(uncertainty)}">?</abbr>`;
     const canEdit=editable&&scopedViews&&apiEnabled&&!isPlaceholder(p);
     const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5L9 20l-6 1 1-6ZM14 5l5 5"/></svg>';
     const edit=(kind,label)=>canEdit?`<button type="button" class="birthday-edit" data-edit-${kind}="${safe(p.id)}" aria-label="${safe(label)}">${pencil}</button>`:'';
-    const birth=years?`<span data-tree-birth-year>${I18n.isEnglish?'Born:':'לידה:'} <bdi dir="ltr">${years[0]===years[1]?years[0]:years[0]+'–'+years[1]}</bdi></span>`:'';
-    return `<span class="birthday-line">${birth}${edit('birthday',I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה')}</span>`+(death?`<span class="person-death-date" data-tree-death-year>${I18n.isEnglish?'Died:':'פטירה:'} <bdi dir="ltr">${death}</bdi>${edit('death',I18n.isEnglish?'Edit date of death':'עריכת תאריך פטירה')}</span>`:'');
+    const birth=years?`<span data-tree-birth-year${candidateBirth?' data-year-candidate':''}>${I18n.isEnglish?'Born:':'לידה:'} <bdi dir="ltr">${years[0]===years[1]?years[0]:years[0]+'–'+years[1]}${candidateBirth?mark():''}</bdi></span>`:'';
+    return `<span class="birthday-line">${birth}${edit('birthday',I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה')}</span>`+(death.year?`<span class="person-death-date" data-tree-death-year${death.candidate?' data-year-candidate':''}>${I18n.isEnglish?'Died:':'פטירה:'} <bdi dir="ltr">${death.year}${death.candidate?mark(death.source):''}</bdi>${death.candidate?'':edit('death',I18n.isEnglish?'Edit date of death':'עריכת תאריך פטירה')}</span>`:'');
   }
   function treePartnershipLabel(p,partnership,unit){
     if(!compactTreeYears)return partnership?(I18n.isEnglish?partnership.labelEn:partnership.label):'';
@@ -385,7 +400,7 @@
     const previous = getMedia(p);
     media.set(personId, {...previous, ...item});
     if(previous.profile!==item.profile||previous.profileFile!==item.profileFile)window.dispatchEvent(new CustomEvent('family-profile-changed',{detail:{id:personId}}));
-    if('deathDate' in item)p.deathDate=item.deathDate;
+    for(const field of ['deathDate','deathYear','deathYearSource','deathYearSourceEn','birthYear','birthYearMin','birthYearMax','birthYearSource','birthYearSourceEn','lifeRecords'])if(field in item)p[field]=item[field];
     if('deceased' in item)p.deceased=item.deceased;
     if('aliyahYear' in item)p.aliyahYear=item.aliyahYear;
     if('aliyahMonth' in item)p.aliyahMonth=item.aliyahMonth;
@@ -401,14 +416,14 @@
       const strong = node.querySelector('strong');
       if (strong) strong.innerHTML = safe(nameOf(p)) + (p.deceased ? I18n.t(' <span class="memorial-inline">ז״ל</span>') : '');
       const birthday = node.closest('[data-person-card]')?.querySelector('[data-birthday-for]');
-      const person={...p,...getMedia(p)},signature=[birthdayOf(p),person.invalidBirthday,person.deceased,person.deathDate,person.deathYear,person.birthYear,person.birthYearMin,person.birthYearMax,new Date().toDateString()].join('|');
+      const person={...p,...getMedia(p)},signature=[birthdayOf(p),person.invalidBirthday,person.deceased,person.deathDate,person.deathYear,person.birthYear,person.birthYearMin,person.birthYearMax,JSON.stringify(person.lifeRecords),new Date().toDateString()].join('|');
       if (birthday && birthday.dataset.dateSignature !== signature) {birthday.innerHTML=birthday.hasAttribute('data-tree-years')?treeLifeYearsHTML(p,!birthday.hasAttribute('data-birthday-readonly')):birthdayHTML(p,!birthday.hasAttribute('data-birthday-readonly'),birthday.hasAttribute('data-birthday-only'));birthday.dataset.dateSignature=signature;}
       const history=node.closest('.root-person-card')?.querySelector('[data-root-history]');if(history)history.innerHTML=compactTreeYears?'':rootHistoryHTML(p);
       node.setAttribute('aria-label', I18n.t('פתיחת העמוד האישי של ') + nameOf(p));
     }
     if (state.currentPerson === personId && $('personDialog').open) {
       $('galleryTitle').textContent = I18n.t('הגלריה של ') + nameOf(p);
-      const profileDate=$('profileBirthday'),signature=[birthdayOf(p),getMedia(p).invalidBirthday,p.deceased,p.deathDate,new Date().toDateString()].join('|');
+      const profileDate=$('profileBirthday'),signature=[birthdayOf(p),getMedia(p).invalidBirthday,p.deceased,p.deathDate,p.deathYear,p.birthYear,p.birthYearMin,p.birthYearMax,JSON.stringify(p.lifeRecords),new Date().toDateString()].join('|');
       if(profileDate && profileDate.dataset.dateSignature!==signature){profileDate.innerHTML=birthdayHTML(p);profileDate.dataset.dateSignature=signature;}
     }
   }

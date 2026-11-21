@@ -26,9 +26,11 @@ test('the confirmed 1949 household joins Sarah and Esther to Shlomo without inve
   assert.deepEqual(tree.units['u-kehat-shlomo'].people,['kehat-shlomo','kehat-shlomo-sarah']);
   assert.deepEqual(tree.units['u-kehat-shlomo'].children,['u-kehat-esther']);
   assert.equal(tree.units['u-kehat-esther'].parent,'u-kehat-shlomo');
-  for(const [id,year] of [['kehat-shlomo',1896],['kehat-shlomo-sarah',1900],['kehat-esther',1930]]){
+  for(const [id,year] of [['kehat-shlomo-sarah',1900],['kehat-esther',1930]]){
     assert.equal(tree.people[id].birthYear,year);assert.notEqual(tree.people[id].birthday,'1.1.'+year);
   }
+  assert.equal(tree.people['kehat-shlomo'].birthYearMin,1896);assert.equal(tree.people['kehat-shlomo'].birthYearMax,1903);
+  assert.equal(tree.people['kehat-shlomo'].birthYear,null);
   assert.match(tree.people['kehat-shlomo'].researchNotes,/1903/);
   assert.equal(tree.units['u-kehat-shlomo'].parent,'u-keha-kehat');
 });
@@ -226,7 +228,7 @@ test('Tzadok and Aharon have separate sons and no invented kinship between their
 
 test('the confirmed Tzadok record expands both of Zechariah’s marriages and retains source precision',()=>{
   const data=toOriginalFamilyData(createBranchPortal(family,'zechariah-tzadok'));
-  assert.equal(data.people['kehat-tzadok'].birthYear,1917);
+  assert.equal(data.people['kehat-tzadok'].birthYearMin,1915);assert.equal(data.people['kehat-tzadok'].birthYearMax,1917);
   assert.equal(data.people['kehat-tzadok'].birthday,'1.1.1111');
   assert.match(data.people['kehat-tzadok'].researchNotes,/3479/);
   assert.match(data.people['kehat-tzadok'].researchNotes,/1915–1916/);
@@ -310,7 +312,7 @@ test('research updates preserve names, dates, biography and portraits edited by 
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify(before));
     const after=(await f.json('/keha-extended/zechariah-tzadok/api/compat/api/people/'+id+'/page')).person;
     assert.equal(after.name,before.name);assert.equal(after.birthday,before.birthday);assert.equal(after.about,before.about);
-    assert.equal(after.birthYear,1917);assert.match(after.researchNotes,/H57320/);
+    assert.equal(after.birthYearMin,1915);assert.equal(after.birthYearMax,1917);assert.match(after.researchNotes,/H57320/);
     const row=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);assert.equal(row.profileId,'existing-portrait');
     const backup='extended-kehat-certificate-families-2026-11-20-v1:backup:'+id;
     assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(backup).value).about,before.about);
@@ -375,8 +377,11 @@ test('confirmed death dates migrate once while candidate gravestones never repla
     const tzion=await get(id),hadassah=await get('kehat-hadassah'),jidaan=await get('kehat-jidaan');
     assert.equal(tzion.birthYear,1936);assert.equal(tzion.deathDate,'3.8.2015');assert.equal(tzion.deceased,true);
     assert.equal(hadassah.birthYear,1941);assert.equal(hadassah.deathDate,'12.7.2015');
-    assert.equal(jidaan.deathDate,undefined);assert.equal(jidaan.birthday,'1.1.1111');
+    assert.equal(jidaan.deathDate,'9.12.1962');assert.equal(jidaan.birthday,'1.1.1111');
+    assert.equal(jidaan.birthYearMin,1870);assert.equal(jidaan.birthYearMax,1877);
+    assert.equal(jidaan.lifeRecords[0].status,'confirmed');
     assert.equal(jidaan.lifeRecords[0].deathDate,'9.12.1962');
+    assert.equal((await get('kehat-aharon')).deathDate,undefined,'An unresolved grave is not promoted to a confirmed date');
     f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify({...tzion,deathDate:'4.8.2015'}),id);
     f.restart();assert.equal((await get(id)).deathDate,'4.8.2015','A later family correction is preserved');
   }finally{f.close();}
@@ -925,6 +930,31 @@ test('known Tri death dates populate existing profiles once and preserve family 
   }finally{f.close();}
 });
 
+test('historical year enrichment reaches already deployed profiles once and retains exact family dates and portraits',async()=>{
+  const f=fixture();try{
+    // These earlier migrations have already run in production.
+    for(const migration of ['extended-kehat-certificate-families-2026-11-20-v1','extended-kehat-shlomo-sarah-esther-2026-11-21-v1','extended-tri-childbirth-archive-1954-2026-11-21-v1'])f.database.prepare('INSERT INTO meta(id,value) VALUES(?,?)').run(migration,'done');
+    const before={id:'kehat-jidaan',name:'סעדיה המשפחתי',birthday:'1.1.1111',about:'זיכרון אישי שמור',profileId:'existing-portrait'};
+    f.database.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(before.id,JSON.stringify(before));
+    const father=(await f.json(site('people/kehat-jidaan/page'))).person;
+    assert.equal(father.name,before.name);assert.equal(father.about,before.about);
+    assert.equal(father.birthYearMin,1870);assert.equal(father.birthYearMax,1877);assert.equal(father.birthYear,null);
+    assert.equal(father.deathDate,'9.12.1962');assert.equal(father.deceased,true);
+    assert.equal((await f.json(site('people/kehat-miriam/page'))).person.birthYear,1912);
+    const son=(await f.json(site('people/kehat-zechariah/page'))).person;
+    assert.equal(son.deathYear,1979);assert.equal(son.deathDate,undefined,'A year is not converted to a fabricated full date');
+    const source=f.database.prepare('SELECT data FROM people WHERE id=?').get(before.id),saved=JSON.parse(source.data);
+    assert.equal(saved.profileId,before.profileId);
+    const backupKey='extended-historical-life-years-2026-11-21-v1:backup:'+before.id;
+    assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(backupKey).value).profileId,before.profileId);
+    saved.birthday='3.4.1874';saved.deathDate='10.12.1962';saved.researchNotes='תיקון מחקר מאוחר';
+    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),before.id);
+    f.restart();const later=(await f.json(site('people/kehat-jidaan/page'))).person;
+    assert.equal(later.birthday,saved.birthday);assert.equal(later.deathDate,saved.deathDate);assert.equal(later.researchNotes,saved.researchNotes);
+    assert.equal(f.database.prepare('SELECT COUNT(*) AS n FROM meta WHERE id=?').get(backupKey).n,1);
+  }finally{f.close();}
+});
+
 test('concise life and marriage years reach both independent Kehat families and the other public Keha trees',async()=>{
   const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8'),dates=await readFile(new URL('../public/assets/dates.js',import.meta.url),'utf8');
   for(const portal of ['kehat','zechariah-tzadok','zechariah','shlomo'])for(const phone of [false,true])for(const english of [false,true]){
@@ -941,12 +971,21 @@ test('concise life and marriage years reach both independent Kehat families and 
     const married=year=>assert.ok([...document.querySelectorAll('#treeNodes .person-partnership')].some(e=>e.textContent===(english?'Married: ':'נישואין: ')+year),portal+': '+year);
     if(portal==='kehat'){
       born('kehat-zechariah',1902);born('tri-yona',1912);born('tri-esther',1934);
+      born('kehat-jidaan','1870–1877');died('kehat-jidaan',1962);born('kehat-miriam',1912);
+      born('kehat-shlomo','1896–1903');died('kehat-zechariah',1979);
+      born('kehat-aharon','1904–1906');died('kehat-aharon','1977?');
+      assert.ok(card('kehat-aharon').querySelector('[data-tree-death-year][data-year-candidate] abbr[title]'));
+      assert.equal(card('kehat-jidaan').querySelector('[data-year-candidate]'),null);
+      assert.match(window.FamilyApp.birthdayHTML('kehat-zechariah'),english?/Died in <bdi dir="ltr">1979/:/נפטר ב־<bdi dir="ltr">1979/);
       died('kehat-hadassah',2015);died('keha-yosef-yissachar',1985);died('tri-yissachar',1996);married(1947);
       assert.equal(card('tri-binyamin').querySelector('[data-tree-death-year]'),null,'Burial is not a death date');
     }else if(portal==='zechariah-tzadok'){
-      born('kehat-tzadok',1917);born('kehat-yaakov-yehudit','1923–1924');
+      born('kehat-tzadok','1915–1917');born('kehat-yaakov-yehudit','1923–1924');
       for(const year of [1944,1946,1947])married(year);
-      for(const id of ['kehat-amna','kehat-naomi'])assert.equal(card(id).querySelector('[data-tree-death-year]'),null,'Bounds and possible grave matches stay in the profile');
+      assert.equal(card('kehat-amna').querySelector('[data-tree-death-year]'),null,'A death bound is not an exact death year');
+      died('kehat-naomi','1982?');died('kehat-israel-mizrahi','1990?');
+      born('kehat-zechariah-ben-tzadok','1891–1892?');died('kehat-zechariah-ben-tzadok','1947?');
+      assert.ok(card('kehat-naomi').querySelector('[data-tree-death-year][data-year-candidate]'));
     }else if(portal==='zechariah'){
       born('saadia-shalom',1923);born('saadia-saadia',1918);married(1949);married(1945);
     }else{

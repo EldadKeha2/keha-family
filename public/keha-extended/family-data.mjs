@@ -2,6 +2,7 @@ import {SAADIA_PEOPLE,SAADIA_UNITS,ZECHARIAH_CHILDREN} from './saadia-data.mjs';
 import {KEHAT_RESEARCH_PEOPLE,applyKehatResearchUnits} from './kehat-research.mjs';
 import {TRI_RESEARCH_PEOPLE,applyTriUnits} from './tri-data.mjs';
 import {YISSACHAR_PEOPLE,applyYissacharUnits} from './yissachar-data.mjs';
+import {enrichHistoricalLifeEvidence} from './life-evidence.mjs';
 
 export const EXTENDED_NAME = 'משפחת קהא המורחבת';
 export const EXTENDED_COLOR = '#345d83';
@@ -51,6 +52,7 @@ const people = [
 const seedPeople=new Map([...people.map(([id,name,englishName,gender,unit,aliases=[],details={}]) =>
   ({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE].map(p=>[p.id,p]));
 for(const update of [...KEHAT_RESEARCH_PEOPLE,...TRI_RESEARCH_PEOPLE,...YISSACHAR_PEOPLE]){const before=seedPeople.get(update.id)||{};seedPeople.set(update.id,{...before,...update,aliases:[...new Set([...(before.aliases||[]),...(update.aliases||[])])]});}
+enrichHistoricalLifeEvidence(seedPeople);
 export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(Object.freeze));
 
 const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);

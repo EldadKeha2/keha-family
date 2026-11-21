@@ -33,6 +33,8 @@ export function initializeExtendedKeha(state) {
     const updateShlomo=!state.rows('SELECT id FROM meta WHERE id=?',shlomoMigration).length;
     const triDeathMigration='extended-tri-confirmed-death-dates-2026-11-21-v1';
     const updateTriDeath=!state.rows('SELECT id FROM meta WHERE id=?',triDeathMigration).length;
+    const lifeYearsMigration='extended-historical-life-years-2026-11-21-v1';
+    const updateLifeYears=!state.rows('SELECT id FROM meta WHERE id=?',lifeYearsMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -172,6 +174,19 @@ export function initializeExtendedKeha(state) {
           saved.deathDate=seed.deathDate;saved.deceased=true;state.savePerson(saved);
         }
       }
+      if(updateLifeYears&&seed.historicalLifeEvidence){
+        const saved=state.person(seed.id);
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',lifeYearsMigration+':backup:'+seed.id,JSON.stringify(saved));
+        // Keep exact dates, portraits and family edits. Research ranges are
+        // separate metadata, and an existing death date always takes priority.
+        for(const key of ['birthYear','birthYearMin','birthYearMax','birthYearSource','birthYearSourceEn','deathYearSource','deathYearSourceEn','lifeRecords','researchNotes','researchSources','historicalLifeEvidence'])if(seed[key]!==undefined)saved[key]=structuredClone(seed[key]);
+        if(!saved.deathDate&&!saved.deathYear){
+          if(seed.deathDate)saved.deathDate=seed.deathDate;
+          else if(seed.deathYear)saved.deathYear=seed.deathYear;
+        }
+        if(seed.deceased)saved.deceased=true;
+        state.savePerson(saved);
+      }
     }
     for(const seed of EXTENDED_PEOPLE){
       if(!seed.sharedProfileId)continue;
@@ -190,6 +205,7 @@ export function initializeExtendedKeha(state) {
     if(updateTri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triMigration,'done');
     if(updateTriParentage)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triParentageMigration,'done');
     if(updateTriDeath)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triDeathMigration,'done');
+    if(updateLifeYears)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',lifeYearsMigration,'done');
     if(updateMerav)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',meravMigration,'done');
     if(updateTriArchive){
       // This original scan was uploaded through the family archive and is

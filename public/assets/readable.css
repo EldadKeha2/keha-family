@@ -41,6 +41,7 @@ h1{font-size:calc(68px * var(--a11y-text-scale,1));margin:12px 0 13px}
 #treeNodes .person-card .tree-life-years{max-width:100%;gap:2px;line-height:1.35}
 #treeNodes .tree-life-years :is(.birthday-line,.person-death-date){display:flex;align-items:center;justify-content:center;gap:3px;white-space:nowrap}
 #treeNodes .tree-life-years bdi{font-variant-numeric:tabular-nums}
+#treeNodes .tree-year-uncertain{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}
 #treeNodes .tree-life-years .birthday-line:empty{display:none}
 .person-card .birthday-unset{color:#9b8661}
 .memorial-inline{font-size:calc(13px * var(--a11y-text-scale,1))}
