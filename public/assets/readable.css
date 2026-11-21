@@ -44,6 +44,9 @@ h1{font-size:calc(68px * var(--a11y-text-scale,1));margin:12px 0 13px}
 #treeNodes .tree-year-uncertain{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}
 #treeNodes .tree-life-years .birthday-line:empty{display:none}
 .person-card .birthday-unset{color:#9b8661}
+.tree-person-role{display:block;width:fit-content;max-width:100%;margin:5px auto 2px;padding:2px 7px;border:1px solid transparent;border-radius:12px;font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.4;color:#80765f;text-align:center;overflow-wrap:anywhere}
+.tree-person-role[data-tree-role=descendant]{border-color:#cbd4ba;background:#f1f4e9;color:#52643f;font-weight:600}
+@media(max-width:700px){.tree-person-role{font-size:calc(10px * var(--a11y-text-scale,1));padding:2px 4px;max-width:90px}}
 .memorial-inline{font-size:calc(13px * var(--a11y-text-scale,1))}
 .generation-label{font-size:calc(17px * var(--a11y-text-scale,1));top:-43px}
 .branch-label{font-size:calc(17px * var(--a11y-text-scale,1));top:-48px;padding:4px 12px}

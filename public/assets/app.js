@@ -33,6 +33,7 @@
   const initials = p => nameOf(p).split(/\s+/).filter(Boolean).map(s => s[0]).slice(0,2).join('');
   const normalize = s => s.normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase().trim();
   const silhouette = '<svg class="silhouette" viewBox="0 0 80 100" aria-hidden="true"><circle cx="40" cy="27" r="17"/><path d="M9 94V83c0-20 12-33 31-33s31 13 31 33v11Z"/></svg>';
+  const femaleSilhouette = '<svg class="silhouette silhouette-female" viewBox="0 0 80 100" aria-hidden="true" data-placeholder-gender="f"><path d="M18 49V29C18 13 27 5 40 5s22 8 22 24v20l-13-5H31Z"/><circle cx="40" cy="29" r="13"/><path d="M32 44h16v11c12 3 17 12 19 23l5 16H8l5-16c2-11 7-20 19-23Z"/></svg>';
   const arrow = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg>';
   const calendarIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16m-11 4h1m4 0h1m-6 3h1"/></svg>';
   const imageIcon = '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="5" width="24" height="23" rx="2"/><circle cx="11" cy="12" r="2.5"/><path d="m5 24 8-8 5 5 4-4 6 7"/></svg>';
@@ -40,7 +41,8 @@
 
   function portraitHTML(p) {
     const src = scopedViews?(getMedia(p).profile ?? p.profile):getMedia(p).profile;
-    return `<span class="portrait" aria-hidden="true">${silhouette}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" ${window.FamilyPhotoFraming?.profile({...p,...getMedia(p)})||''} src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
+    const person={...p,...getMedia(p)},placeholder=person.gender==='f'?femaleSilhouette:silhouette.replace('<svg ','<svg data-placeholder-gender="'+(person.gender==='m'?'m':'unknown')+'" ');
+    return `<span class="portrait" aria-hidden="true">${placeholder}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" ${window.FamilyPhotoFraming?.profile(person)||''} src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
   }
   function birthdayHTML(input, editable = true, birthOnly = false) {
     const p={...input,...getMedia(input)};
@@ -138,17 +140,45 @@
     return /\d{4}/.test(label||'')||union.relationship==='spouse'&&(unit.relationships||[]).filter(item=>item.relationship==='spouse').length<2?'':label;
   }
 
+  function treeRoleHTML(p,unit){
+    const person={...p,...getMedia(p)},descendant=unit.people[0]===p.id;
+    let label='',reference=null;
+    const shortName=id=>nameOf(data.people[id]).split(/\s+/)[0];
+    if(descendant){
+      const parent=data.units[unit.parent];
+      if(!parent||parent.siblingGroup)return '';
+      const unions=parent.relationships?.filter(relation=>relation.children.includes(unit.id));
+      const ids=unions?unions.flatMap(relation=>relation.people):parent.people;
+      const parents=ids.map(id=>data.people[id]).filter(person=>person&&!person.structuralGroup&&!isPlaceholder(person));
+      reference=parents.find(person=>person.gender==='m')||parents[0];if(!reference)return '';
+      const adopted=unit.parentage==='adopted'||unions?.some(relation=>relation.relationship==='adopted');
+      const grandchild=unit.parentage==='grandchild'||unions?.some(relation=>relation.relationship==='grandparent');
+      const kind=I18n.isEnglish?grandchild?(person.gender==='f'?'Granddaughter':person.gender==='m'?'Grandson':'Grandchild'):adopted?(person.gender==='f'?'Adopted daughter':person.gender==='m'?'Adopted son':'Adopted child'):(person.gender==='f'?'Daughter':person.gender==='m'?'Son':'Child'):grandchild?(person.gender==='f'?'נכדה':person.gender==='m'?'נכד':'נכד/ה'):adopted?(person.gender==='f'?'בת מאומצת':person.gender==='m'?'בן מאומץ':'ילד/ה מאומצ/ת'):(person.gender==='f'?'בת':person.gender==='m'?'בן':'ילד/ה');
+      label=kind+(I18n.isEnglish?' of ':' של ')+shortName(reference.id);
+    }else{
+      const union=unit.relationships?.find(relation=>relation.people.includes(p.id)&&relation.people.includes(unit.people[0]));
+      const relation=union?.relationship||unit.relationship;
+      if(!['spouse','former'].includes(relation))return '';
+      reference=data.people[unit.people[0]];if(!reference)return '';
+      const former=relation==='former';
+      const kind=I18n.isEnglish?(former?'Former ':'')+(person.gender==='f'?'wife':person.gender==='m'?'husband':'partner'):former?(person.gender==='f'?'בת זוג לשעבר':person.gender==='m'?'בן זוג לשעבר':'בן/בת זוג לשעבר'):(person.gender==='f'?'אשתו':person.gender==='m'?'בעלה':'בן/בת זוג');
+      label=(I18n.isEnglish?kind[0].toUpperCase()+kind.slice(1):kind)+(I18n.isEnglish?' of ':' של ')+shortName(reference.id);
+    }
+    return `<span class="tree-person-role" data-tree-role="${descendant?'descendant':'partner'}" data-role-person="${safe(reference.id)}" title="${safe(nameOf(reference))}">${safe(label)}</span>`;
+  }
+
   function personCardHTML(p,partnership,unit) {
     const unset = birthdayOf(p) === '1.1.1111',rootPerson=data.units[data.root].people.includes(p.id);
     const partnershipLabel=treePartnershipLabel(p,partnership,unit);
     const partnershipHTML=partnershipLabel?`<span class="person-partnership" data-partnership="${safe(partnership?.relationship||unit.relationship)}">${safe(partnershipLabel)}</span>`:'';
     const founderLink=rootPerson?(window.FamilyFounderTrees?.linkHTML(p.id)||''):'';
+    const roleHTML=treeRoleHTML(p,unit);
     if(rootPerson&&!isPhone()){
       const memorial=!scopedViews||p.deceased;
       const label=I18n.t('פתיחת העמוד האישי של ')+nameOf(p);
-      return I18n.html`<article class="person-card${memorial?' memorial':''} root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${memorial?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday root-person-birth${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,false):birthdayHTML(p,false,true)}</div>${partnershipHTML}</div><div class="root-person-details" data-root-history="${p.id}">${compactTreeYears?'':rootHistoryHTML(p)}</div>${founderLink}</article>`;
+      return I18n.html`<article class="person-card${memorial?' memorial':''} root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${memorial?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button>${roleHTML}<div class="person-birthday root-person-birth${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,false):birthdayHTML(p,false,true)}</div>${partnershipHTML}</div><div class="root-person-details" data-root-history="${p.id}">${compactTreeYears?'':rootHistoryHTML(p)}</div>${founderLink}</article>`;
     }
-    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button><div class="person-birthday${unset?' birthday-unset':''}${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,!rootPerson):birthdayHTML(p,!rootPerson)}</div>${partnershipHTML}${founderLink}</article>`;
+    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button>${roleHTML}<div class="person-birthday${unset?' birthday-unset':''}${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,!rootPerson):birthdayHTML(p,!rootPerson)}</div>${partnershipHTML}${founderLink}</article>`;
   }
   function toast(message,action) {
     clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -257,7 +287,7 @@
     const rootId=state.branch==='all'?data.root:branchFor(state.branch).unit;
     const rootHistorySpace=!compactTreeYears&&!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
     const desktopOverview=!phone&&overview;
-    const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?195:desktopOverview?275:340)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
+    const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?223:desktopOverview?303:372)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
     const positions=[],lines=[],connections=[],widths=new Map(),layouts=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
     const nodeWidth=unit=>(unit.siblingGroup?(phone?240:300):!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
@@ -342,15 +372,26 @@
         camera.height=height;world.style.height=height+'px';
       }
     }
+    const incomingAnchor=childId=>{
+      const child=data.units[childId],position=positions.find(item=>item.id===childId);
+      if(!child||!position)return null;
+      const node=world.querySelector(`[data-unit="${treeUnitKey(childId)}"] [data-person-card="${child.people[0]}"] .portrait`);
+      const rect=node?.getBoundingClientRect?.(),worldRect=world.getBoundingClientRect?.();
+      if(rect?.width&&worldRect?.width)return (rect.left+rect.width/2-worldRect.left)*width/worldRect.width;
+      const display=child.displayPeople||child.people,slot=(display.indexOf(child.people[0])+.5)/display.length-.5;
+      return position.x+(I18n.isEnglish?1:-1)*slot*position.width;
+    };
     for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,parentRelationship,childUnits,depthStep=1,lane=0} of connections){
+      const targets=childUnits.map(childId=>({unit:childId,person:data.units[childId].people[0],x:incomingAnchor(childId)}));
+      const childCenters=targets.map(target=>target.x);
       const extra=(depth===0?rootHistorySpace+rootSpacingAdjustment:0)+partnershipSpace,historyRoot=depth===0&&rootContentHeight>0;
       // Join the parents' relationship line; label clearance belongs below them.
       const start=parentPeople?.length>1?y+(phone?37:76)*textScale:historyRoot?y+rootContentHeight+12*textScale:y+(phone?115:261)*textScale+extra;
       const middle=(historyRoot?y+levelHeight+extra-60*textScale:y+(phone?155:294)*textScale+extra)+lane,end=y+levelHeight*depthStep-7*textScale+extra;
       if(parentPeople)lines.push(`<g data-parent-unit="${safe(id)}" data-parent-people="${safe(parentPeople.join(' '))}" data-child-units="${safe(childUnits.join(' '))}" data-parent-relationship="${safe(parentRelationship)}"${parentRelationship==='grandparent'?' stroke-dasharray="6 5"':''}>`);
       lines.push(`<path d="M${x} ${start}V${middle}"/><circle class="connector-start" cx="${x}" cy="${start}" r="2.5"/>`);
-      if(parentPeople||centers.length>1)lines.push(`<path d="M${Math.min(x,...centers)} ${middle}H${Math.max(x,...centers)}"/>`);
-      for(const cx of centers)lines.push(`<path d="M${cx} ${middle}V${end}"/>`);
+      if(parentPeople||childCenters.length>1)lines.push(`<path d="M${Math.min(x,...childCenters)} ${middle}H${Math.max(x,...childCenters)}"/>`);
+      for(const target of targets)lines.push(`<path class="descendant-connector" data-child-unit="${safe(target.unit)}" data-child-person="${safe(target.person)}" d="M${target.x} ${middle}V${end}"/>`);
       if(parentPeople)lines.push('</g>');
     }
     $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');

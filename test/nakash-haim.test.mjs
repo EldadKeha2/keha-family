@@ -72,7 +72,11 @@ test('each marriage has its own continuous connector to its children on desktop 
     const currentD = current.querySelectorAll('path')[1].getAttribute('d');
     const [, left, y, right] = /^M([\d.]+) ([\d.]+)H([\d.]+)$/.exec(formerD);
     const child = document.querySelector('[data-unit="u-nakash-mor"]');
-    const childX = parseFloat(child.style.left) + parseFloat(child.style.width) / 2;
+    const descendant=former.querySelector('path[data-child-unit="u-nakash-mor"]');
+    assert.equal(descendant.dataset.childPerson,'mor-pazarkar','Avner’s line reaches his daughter Mor through her shared profile');
+    const childX=Number(/^M(-?[\d.]+)/.exec(descendant.getAttribute('d'))[1]);
+    const coupleMiddle=parseFloat(child.style.left)+parseFloat(child.style.width)/2;
+    assert.ok(english?childX<coupleMiddle:childX>coupleMiddle,'The branch reaches Mor rather than the midpoint between her and Chen');
     const sourceX = Number(former.querySelector('circle').getAttribute('cx'));
     assert.equal(Number(left), Math.min(childX, sourceX));
     assert.equal(Number(right), Math.max(childX, sourceX));

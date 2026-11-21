@@ -1,0 +1,76 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import {parseHTML} from 'linkedom';
+import family from '../src/family.mjs';
+import {branchPortalHTML} from '../src/extended-keha.mjs';
+import {createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
+import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
+
+const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
+function fixture(portal,{phone=false,english=false,text=100,overrides={}}={}){
+  const {document,window:dom}=parseHTML(branchPortalHTML(html,portal));
+  const data=toOriginalFamilyData(createBranchPortal(family,portal));
+  for(const [id,patch] of Object.entries(overrides))Object.assign(data.people[id],patch);
+  const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){},FamilyAccessibility:{getSettings:()=>({text})}};
+  window.FamilyI18n={isEnglish:english,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?(p.nameEn||p.englishName||p.name):p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};
+  window.FamilyDates={age:()=>null,parse:()=>null};
+  vm.runInNewContext(source,{window,document,location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+  document.getElementById('fullTreeButton').click();
+  const card=id=>document.querySelector('#treeNodes [data-person-card="'+id+'"]');
+  const role=id=>card(id).querySelector('[data-tree-role]');
+  function incoming(id){
+    const path=document.querySelector('#treeConnectors [data-child-person="'+id+'"]');
+    assert.ok(path,'The ancestor branch reaches '+id);
+    const unit=document.querySelector('#treeNodes [data-unit="'+path.dataset.childUnit+'"]');
+    const middle=parseFloat(unit.style.left)+parseFloat(unit.style.width)/2;
+    return {path,middle,x:Number(/^M(-?[\d.]+)/.exec(path.getAttribute('d'))[1])};
+  }
+  return {document,window,data,card,role,incoming};
+}
+
+test('each parent branch reaches its own child and labels the spouse on either side of an RTL or English tree',()=>{
+  for(const phone of [false,true])for(const english of [false,true])for(const text of [100,160]){
+    const f=fixture('kehat',{phone,english,text});
+    assert.equal(f.role('kehat-shlomo').textContent,english?'Son of Saadia':'בן של סעדיה');
+    assert.equal(f.role('kehat-shlomo-sarah').textContent,english?'Wife of Shlomo':'אשתו של שלמה');
+    assert.equal(f.role('kehat-shlomo-sarah').dataset.treeRole,'partner');
+    assert.equal(f.role('kehat-shlomo').dataset.rolePerson,'kehat-jidaan');
+    const child=f.incoming('kehat-shlomo');
+    assert.ok(english?child.x<child.middle:child.x>child.middle,'The line ends over Shlomo’s portrait, away from the couple’s midpoint');
+    assert.equal(f.document.querySelector('#treeConnectors [data-child-person="kehat-shlomo-sarah"]'),null,'Sarah never acquires Saadia as a parent');
+    assert.equal(f.role('kehat-hadassah').textContent,english?'Daughter of Saadia':'בת של סעדיה');
+    const t=fixture('zechariah-tzadok',{phone,english,text});
+    assert.equal(t.role('kehat-yaakov-yehudit').textContent,english?'Daughter of Zechariah':'בת של זכריה');
+    assert.equal(t.role('kehat-yaakov').textContent,english?'Husband of Yehudit':'בעלה של יהודית');
+    const daughter=t.incoming('kehat-yaakov-yehudit');
+    assert.ok(english?daughter.x<daughter.middle:daughter.x>daughter.middle,'The same couple connects through Yehudit in her own parents’ branch');
+    assert.equal(t.role('kehat-ron').textContent,english?'Grandson of Tzadok':'נכד של צדוק');
+    assert.equal(t.role('kehat-shori').dataset.treeRole,'descendant','An unmarried daughter remains a daughter');
+  }
+});
+
+test('female silhouettes follow the recorded gender, actual portraits survive updates, and unknown gender stays neutral',()=>{
+  for(const phone of [false,true]){
+    const f=fixture('kehat',{phone});
+    assert.ok(f.card('kehat-shlomo-sarah').querySelector('svg.silhouette-female[data-placeholder-gender=f]'));
+    assert.ok(f.card('kehat-shlomo').querySelector('svg[data-placeholder-gender=m]'));
+    assert.equal(f.card('kehat-shlomo-sarah').querySelector('.profile-photo'),null);
+    f.window.FamilyApp.updatePerson('kehat-shlomo-sarah',{profile:'/media/original-family-portrait.jpg'});
+    assert.equal(f.card('kehat-shlomo-sarah').querySelector('.profile-photo').getAttribute('src'),'/media/original-family-portrait.jpg');
+    f.window.FamilyApp.updatePerson('kehat-shlomo-sarah',{profile:null});
+    assert.equal(f.card('kehat-shlomo-sarah').querySelector('.profile-photo'),null);
+    assert.ok(f.card('kehat-shlomo-sarah').querySelector('svg.silhouette-female'));
+    const neutral=fixture('kehat',{phone,overrides:{'kehat-shlomo-sarah':{gender:''}}});
+    assert.ok(neutral.card('kehat-shlomo-sarah').querySelector('svg[data-placeholder-gender=unknown]'),'A name does not determine gender');
+    assert.equal(neutral.role('kehat-shlomo-sarah').textContent,'בן/בת זוג של שלמה');
+  }
+});
+
+test('adoption labels preserve the recorded adoptive relationship rather than inventing a biological parent',()=>{
+  const f=fixture('zechariah');
+  assert.equal(f.role('saadia-aharon').textContent,'בן מאומץ של זכריה');
+  assert.equal(f.role('saadia-yona-hovshi').textContent,'אשתו של אהרון');
+});
