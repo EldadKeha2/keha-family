@@ -1,4 +1,5 @@
 node_modules/
+/public/assets/pdfjs/
 __pycache__/
 *.pyc
 .wrangler/

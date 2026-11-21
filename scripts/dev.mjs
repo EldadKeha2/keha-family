@@ -1,5 +1,7 @@
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {buildPdfAssets} from './build-pdf-assets.mjs';
+await buildPdfAssets();
 const args=process.argv.slice(2);
 const option=(...names)=>{for(let i=0;i<args.length;i++){for(const name of names){if(args[i]===name)return args[i+1];if(args[i].startsWith(name+'='))return args[i].slice(name.length+1);}}};
 const port=option('--port')||process.env.PORT||'8787',host=option('--host','--hostname','--ip')||'0.0.0.0';

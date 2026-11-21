@@ -41,6 +41,10 @@
 /assets/*.mjs
   Cache-Control: no-cache
 
+/assets/pdfjs/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; object-src 'none'
+  Cache-Control: public, max-age=31536000, immutable
+
 /assets/*.css
   Cache-Control: no-cache
 

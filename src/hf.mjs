@@ -83,6 +83,10 @@ export async function getObject(env,item,request,fetcher=fetch){
   const output=new Headers({'Content-Type':item.mime,'Cache-Control':cacheControl,'X-Content-Type-Options':'nosniff','Accept-Ranges':'bytes'});
   for(const name of ['Content-Length','Content-Range','ETag','Last-Modified'])if(response.headers.has(name))output.set(name,response.headers.get(name));
   if(etag)output.set('ETag',etag);
-  if(item.category==='attachment'||item.kind==='document'){const inline=new URL(request.url).searchParams.get('inline')==='1'&&/^(application\/pdf|text\/plain|text\/markdown|image\/(jpeg|png|webp|gif|avif))$/.test(item.mime);output.set('Content-Disposition',`${inline?'inline':'attachment'}; filename*=UTF-8''${encode(item.filename)}`);output.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'self'");}
+  if(item.category==='attachment'||item.kind==='document'){
+    const url=new URL(request.url),params=url.searchParams;
+    const inline=params.get('download')!=='1'&&(item.mime==='application/pdf'&&url.pathname.startsWith('/media/')||params.get('inline')==='1')&&/^(application\/pdf|text\/plain|text\/markdown|image\/(jpeg|png|webp|gif|avif))$/.test(item.mime);
+    output.set('Content-Disposition',`${inline?'inline':'attachment'}; filename*=UTF-8''${encode(item.filename)}`);output.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'self'");
+  }
   return new Response(method==='HEAD'?null:response.body,{status:response.status,headers:output});
 }

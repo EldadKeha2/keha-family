@@ -185,7 +185,7 @@ function openResult(index){
   }
   if(item.href){window.FamilyNavigation?.go(item.href);window.dispatchEvent(new Event('hashchange'));}
 }
-function listAttachments(items){return (items||[]).map(item=>{const url=safeURL(item.src);return url?'<p><a href="'+safe(url)+'" target="_blank" rel="noopener">'+safe(item.name)+'</a></p>':'';}).join('');}
+function listAttachments(items){return (items||[]).map(item=>{const url=safeURL(item.src);return url?(window.FamilyPDF?.isPDF(item)?window.FamilyPDF.attachment(item):'<p><a href="'+safe(url)+'" target="_blank" rel="noopener">'+safe(item.name)+'</a></p>'):'';}).join('');}
 function activate(name){
   if(!view)return;view.hidden=name!=='search';
   const host=name==='home'?document.querySelector('[data-home-install-actions]'):headerSlot;

@@ -227,6 +227,7 @@
     finally{if(isCurrent()){button.disabled=false;button.removeAttribute('aria-busy');}}
   }
   function clearStage({preserveHandoff=false,nextItem=null}={}){
+    window.FamilyPDF?.unmount($('mediaStage'));
     clearTimeout(faceTimer);faceTimer=null;
     zoomPad?.reset();
     photoSwipe?.reset();
@@ -273,6 +274,8 @@
       refreshPhotoPresentation();
       window.FamilyPhotoPresentation?.finishHandoff?.(handoff,img,window.FamilyFaces?.whenReady?.(stage,img));
       if(state.fullscreen)window.FamilyPhotoFullscreen?.present(item,img);
+    }else if(window.FamilyPDF?.isPDF(item)){
+      window.FamilyPDF.mount(stage,item);$('mediaPlaybackNote').hidden=true;
     }else if(['application/pdf','text/plain','text/markdown'].includes(item.mime)){
       const frame=document.createElement('iframe');frame.src=item.src+'?inline=1';frame.title=I18n.mediaName(item);frame.referrerPolicy='same-origin';stage.append(frame);$('mediaPlaybackNote').hidden=true;
     }else{

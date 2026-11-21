@@ -1335,7 +1335,7 @@ test('wedding galleries isolate couples, stream mixed media and retain captions'
       const uploaded=await response.json(),item=uploaded.collection.items[0];assert.equal(item.kind,kind);
       assert.deepEqual(new Uint8Array(await (await f.call(item.src)).arrayBuffer()),new Uint8Array(bytes));
       if(kind==='photo')photoFile=item.file;
-      if(kind==='document')assert.match((await f.call(item.src)).headers.get('Content-Disposition'),/^attachment;/);
+      if(kind==='document'){assert.match((await f.call(item.src)).headers.get('Content-Disposition'),/^inline;/);assert.match((await f.call(item.src+'?download=1')).headers.get('Content-Disposition'),/^attachment;/);}
       if(kind==='video'){const part=await f.call(item.src,{headers:{Range:'bytes=0-15'}});assert.equal(part.status,206);assert.deepEqual(new Uint8Array(await part.arrayBuffer()),new Uint8Array(video.subarray(0,16)));}
     }
     assert.equal((await f.call(root+'/caption',{method:'POST',body:{file:photoFile,caption:'בדרך לחופה'}})).status,200);
@@ -1772,8 +1772,10 @@ test('personal video and document uploads retain ownership, preview passive form
   await f.connect();const upload=(kind,name,body)=>f.call('/api/people/yehiel/'+kind+'?layout=page&filename='+encodeURIComponent(name),{method:'POST',body,headers:{'Content-Length':String(body.length)}});
   const v=await upload('videos','family.mp4',video);assert.equal(v.status,201);const vids=await v.json();assert.equal(vids.person.videoCount,1);assert.equal(vids.albums.videos.items.length,1);assert.equal(vids.person.gallery,undefined);
   const pdf=new TextEncoder().encode('%PDF-1.7\nExample certificate\n%%EOF'),d=await upload('documents','certificate.pdf',pdf);assert.equal(d.status,201);const doc=await d.json();assert.equal(doc.person.documentCount,1);assert.equal(doc.person.profile,null);
-  const item=doc.albums.documents.items[0],download=await f.call(item.src);assert.match(download.headers.get('Content-Disposition'),/^attachment/);
+  const item=doc.albums.documents.items[0],download=await f.call(item.src+'?download=1');assert.match(download.headers.get('Content-Disposition'),/^attachment/);
+  const defaultPreview=await f.call(item.src);assert.match(defaultPreview.headers.get('Content-Disposition'),/^inline/);
   const inline=await f.call(item.src+'?inline=1');assert.match(inline.headers.get('Content-Disposition'),/^inline/);assert.equal(inline.headers.get('Content-Type'),'application/pdf');
+  const explicitDownload=await f.call(item.src+'?inline=1&download=1');assert.match(explicitDownload.headers.get('Content-Disposition'),/^attachment/);
   const scan=await upload('documents','certificate.jpg',photo);assert.equal(scan.status,201);const scanned=await scan.json();assert.equal(scanned.person.documentCount,2);assert.equal(scanned.person.photoCount,0);assert.equal(scanned.person.profile,null);
   assert.equal((await f.call('/api/people/yehiel/profile',{method:'POST',body:{file:scanned.albums.documents.items[0].file}})).status,404);
   assert.equal((await upload('documents','video.mp4',video)).status,415);

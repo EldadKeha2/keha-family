@@ -97,7 +97,7 @@
     for(const node of document.querySelectorAll('[data-memory-narrator]')){const item=state.stories.find(item=>item.id===node.dataset.memoryNarrator);if(item)node.outerHTML=narratorHTML(item);}
   }
   const tagsHTML=(item,kind)=>(item.tags||[]).map(p=>`<button type="button" class="memory-person-chip" data-memory-filter-person="${safe(p.id)}" data-memory-kind="${kind}">${safe(I.personName(p))}</button>`).join('');
-  const filesHTML=files=>(files||[]).map(file=>`<a href="${safe(file.src)}" target="_blank" rel="noopener" download="${safe(file.name)}">▤ ${safe(file.name)} <span>↓</span></a>`).join('');
+  const filesHTML=files=>(files||[]).map(file=>window.FamilyPDF?.isPDF(file)?window.FamilyPDF.attachment(file):`<a href="${safe(file.src)}" target="_blank" rel="noopener" download="${safe(file.name)}">▤ ${safe(file.name)} <span>↓</span></a>`).join('');
   function filterOptions(select,values,allLabel){
     const old=select.value;select.innerHTML=`<option value="all">${safe(allLabel)}</option>`+values.map(([id,label])=>`<option value="${safe(id)}">${safe(label)}</option>`).join('');select.value=values.some(([id])=>String(id)===old)?old:'all';
   }

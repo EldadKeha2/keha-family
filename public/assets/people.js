@@ -60,7 +60,7 @@
     }
     if(key==='photos')content=`<img ${window.FamilyPhotoFraming?.attributes(item)||''} src="${safe(item.thumbnailSrc||item.src)}" ${window.FamilyPhotoThumbnails?.attributes(item)||''} alt="${safe(item.caption||I.mediaName(item))}" loading="lazy" decoding="async">`;
     else if(key==='videos')content=(item.poster?`<img src="${safe(item.poster)}" alt="" loading="lazy">`:`<span class="person-video-ornament" aria-hidden="true">❖</span>`)+`<span class="person-video-play" aria-hidden="true">▶</span><span class="person-file-title">${safe(item.caption||I.mediaName(item))}</span>`;
-    else content=(item.mime.startsWith('image/')?`<img src="${safe(item.src)}?inline=1" alt="" loading="lazy">`:`<span class="person-document-icon" aria-hidden="true">▤</span>`)+`<span class="person-file-title">${safe(I.mediaName(item))}</span><small>${safe(item.filename?.split('.').pop()?.toUpperCase()||'')}</small>`;
+    else content=(window.FamilyPDF?.isPDF(item)?window.FamilyPDF.preview(item):item.mime.startsWith('image/')?`<img src="${safe(item.src)}?inline=1" alt="" loading="lazy">`:`<span class="person-document-icon" aria-hidden="true">▤</span>`)+`<span class="person-file-title">${safe(I.mediaName(item))}</span><small>${safe(item.filename?.split('.').pop()?.toUpperCase()||'')}</small>`;
     return `<button type="button" class="person-media-tile person-media-${key}" data-person-item="${safe(item.id)}" data-person-kind="${key}" aria-label="${tr('פתיחת','Open')} ${safe(item.caption||I.mediaName(item))}">${content}</button>`;
   }
   function uploadActions(key,label){
