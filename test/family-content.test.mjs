@@ -107,7 +107,7 @@ test('public family profiles keep founder and child photos and portraits while y
 test('extended gallery excludes every younger generation even in founder group photos and explicitly shared uploads',async()=>{
   const f=fixture();try{
     await f.json(scope('extended','tag-people'));
-    const founder=f.media('shlomo',{category:'gallery',tags:['shlomo','yona']});
+    const founder=f.media('eldad',{category:'gallery',tags:['shlomo','yona']});
     const child=f.media('ora',{category:'gallery',tags:['ora']});
     const otherBranch=f.media('kehat-naomi',{tags:['kehat-naomi']});
     const hidden=[
