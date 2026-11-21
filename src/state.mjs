@@ -16,7 +16,7 @@ import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection,weddingDate} from './weddings.mjs';
 import {featuredVideos,weddingVideos} from './featured-videos.mjs';
-import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections,rootWeddingCorrectionKey} from './date-corrections.mjs';
+import {birthdayCorrections,correctionKey,grandparentCorrections,grandparentCorrectionKey,birthdayMonthDayCorrections,memorialCorrectionKey,memorialCorrections,rootWeddingCorrectionKey,avishaiObituaryCorrection} from './date-corrections.mjs';
 import {biographyDefaults,biographyValue,contentField} from './biography.mjs';
 import {memorialPeriod} from './memorial.mjs';
 import {makeQuiz,makeMissingQuiz} from '../public/assets/quiz.mjs';
@@ -131,6 +131,15 @@ export class FamilyState {
       if(!this.rows('SELECT value FROM meta WHERE id=?',memorialCorrectionKey).length){
         for(const [id,fields]of Object.entries(memorialCorrections)){const person=this.person(id);Object.assign(person,fields);this.savePerson(person);}
         this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',memorialCorrectionKey,'applied');
+      }
+      if(!this.rows('SELECT value FROM meta WHERE id=?',avishaiObituaryCorrection.key).length){
+        const {id,key,fields}=avishaiObituaryCorrection,person=this.person(id);
+        // Preserve any more precise date or subsequently supplied year.
+        if(!person.deathDate&&!person.deathYear){
+          Object.assign(person,fields,{researchSources:[...(person.researchSources||[]),...fields.researchSources]});
+          this.savePerson(person);
+        }
+        this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',key,'applied');
       }
       for(const correction of birthdayMonthDayCorrections){
         if(this.rows('SELECT value FROM meta WHERE id=?',correction.key).length)continue;
@@ -1183,4 +1192,3 @@ export class FamilyState {
     catch(error){return fail(error);}
   }
 }
-

@@ -60,6 +60,26 @@ function fixture(){
 }
 const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const video=await readFile(new URL('./fixtures/video.mp4',import.meta.url));
+test('Avishai obituary keeps year precision and preserves existing dates, sources and media through restarts',async()=>{
+ const f=fixture();try{
+  await f.connect();const item=await taggedUpload(f);await setTags(f,item,['avishai']);
+  const marker='avishai-obituary-2011-2026-11-21-v1';
+  const read=()=>JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('avishai').data);
+  const write=p=>f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(p),'avishai');
+  const p=read();delete p.deathYear;p.deathDate=null;p.deceased=false;p.profileId=item.id;
+  p.researchSources=[{label:'Existing source',url:'https://example.org/record'}];write(p);
+  f.database.prepare('DELETE FROM meta WHERE id=?').run(marker);f.restart();
+  let saved=(await(await f.call('/api/people/avishai/page')).json()).person;
+  assert.equal(saved.deceased,true);assert.equal(saved.deathYear,2011);assert.equal(saved.deathDate,null);
+  assert.equal(saved.birthday,'17.8.1933');assert.equal(saved.profileMediaId,item.id);assert.equal(saved.photoCount,1);
+  assert.equal(saved.researchSources.length,2);assert.match(saved.researchSources[1].url,/avelim\.co\.il/);
+  f.restart();assert.equal(read().researchSources.length,2,'The one-time migration must not duplicate sources');
+  const precise=read();precise.deathDate='25.9.2011';write(precise);
+  f.database.prepare('DELETE FROM meta WHERE id=?').run(marker);f.restart();assert.equal(read().deathDate,'25.9.2011');
+  const knownYear=read();delete knownYear.deathYear;knownYear.deathDate=null;knownYear.deathYear=2010;write(knownYear);
+  f.database.prepare('DELETE FROM meta WHERE id=?').run(marker);f.restart();assert.equal(read().deathYear,2010);
+ }finally{await f.close();}
+});
 test('selected photos and videos from different albums download together as original bytes and accept additive labels',async()=>{
  const f=fixture();try{
   const bootstrap=await f.connect(),token=JSON.parse(/window.FAMILY_API_TOKEN=("[^"]+")/.exec(bootstrap)[1]);
