@@ -41,18 +41,18 @@ h1{font-size:calc(68px * var(--a11y-text-scale,1));margin:12px 0 13px}
 #treeNodes .person-card .tree-life-years{display:flex;flex-direction:column;align-items:center;max-width:100%;gap:2px;line-height:1.35}
 #treeNodes .tree-life-years :is(.birthday-line,.person-death-date){display:flex;align-items:flex-start;justify-content:center;gap:3px;white-space:normal;max-width:100%;min-width:0;flex-shrink:0;font:inherit;line-height:1.5}
 #treeNodes .tree-life-years .tree-date-value{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;gap:0 4px;min-width:0;overflow-wrap:anywhere}
-#treeNodes .tree-life-years .tree-date-value bdi{white-space:nowrap}
+#treeNodes .tree-life-years .tree-date-value bdi{white-space:normal;overflow-wrap:anywhere}
 #treeNodes .tree-life-years .birthday-edit{flex:0 0 32px;width:32px;min-height:32px;height:32px;padding:6px}
 html[data-a11y-text] #treeNodes .tree-life-years .birthday-edit{flex-basis:44px;width:44px;min-height:44px;height:44px}
 html[dir=rtl] :is(.birthday-line,.person-death-date)>.birthday-edit{order:-1}
 :is(.person-birthday,.directory-date,.profile-birthday) .person-death-date:has(>.birthday-edit){display:flex;align-items:flex-start;justify-content:center;gap:3px;max-width:100%;white-space:normal}
 .life-date-value{min-width:0;overflow-wrap:anywhere}
+:is(.directory-date,.profile-birthday,.person-page-dates) .birthday-line{max-width:100%;min-width:0;white-space:normal}
+:is(.directory-date,.profile-birthday,.person-page-dates) .birthday-line>bdi{min-width:0;overflow-wrap:anywhere}
 html[dir=rtl] :is(.biography-section>header,.person-about>header){flex-direction:row-reverse;justify-content:flex-end}
 @media(max-width:700px){
-  html[data-branch-portal] #treeNodes .person-card,
-  html[data-shlomo-keha] #treeNodes .person-card{width:calc(136px * var(--a11y-tree-scale,1));min-width:calc(136px * var(--a11y-tree-scale,1))}
-  html[data-branch-portal] #treeNodes .person-name,
-  html[data-shlomo-keha] #treeNodes .person-name{max-width:100%}
+  html[data-branch-portal] #treeNodes .person-card{width:calc(136px * var(--a11y-tree-scale,1));min-width:calc(136px * var(--a11y-tree-scale,1))}
+  html[data-branch-portal] #treeNodes .person-name{max-width:100%}
 }
 #treeNodes .tree-life-years bdi{font-variant-numeric:tabular-nums}
 #treeNodes .tree-year-uncertain{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}

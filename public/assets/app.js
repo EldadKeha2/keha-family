@@ -10,6 +10,7 @@
   const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const scopedViews=document.documentElement?.dataset?.nakashViews;
   const compactTreeYears=Boolean(document.documentElement?.dataset?.extendedKeha||document.documentElement?.dataset?.branchPortal||document.documentElement?.dataset?.shlomoKeha==='true');
+  const adaptiveTreeLayout=Boolean(document.documentElement?.dataset?.branchPortal);
   if(scopedViews)for(const view of validViews)if(!scopedViews.split(' ').includes(view))validViews.delete(view);
   const searchBranch=document.documentElement?.dataset?.nakashSearchBranch;
   const searchFamilyOrder=(a,b)=>Number(Boolean(searchBranch)&&b.branch===searchBranch)-Number(Boolean(searchBranch)&&a.branch===searchBranch);
@@ -291,7 +292,7 @@
     const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?223:desktopOverview?303:372)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
     const positions=[],lines=[],connections=[],widths=new Map(),layouts=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
-    const nodeWidth=unit=>(unit.siblingGroup?(phone?240:300):phone&&compactTreeYears?unit.people.length*136+Math.max(0,unit.people.length-1)*14:!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
+    const nodeWidth=unit=>(unit.siblingGroup?(phone?240:300):adaptiveTreeLayout?unit.people.length*(phone?136:146)+Math.max(0,unit.people.length-1)*(phone?14:28):!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
     function measure(id){
       const unit=data.units[id],kids=children(unit),childLefts=new Map();
       kids.forEach(measure);
@@ -341,7 +342,7 @@
       }
     }
     let width,height;
-    if(phone&&overview){
+    if(phone&&overview&&!adaptiveTreeLayout){
       width=520*textScale;height=(scopedViews&&data.branches.length<=4?570:740)*textScale;const root=data.units[data.root];positions.push({id:root.id,unit:root,x:260*textScale,y:45*textScale,width:174*textScale,depth:0});lines.push(`<path d="M${260*textScale} ${158*textScale}V${(scopedViews&&data.branches.length<=4?360:530)*textScale}"/>`);
       data.branches.forEach((branch,index)=>{const x=(index%2===0?380:140)*textScale,y=(220+Math.floor(index/2)*170)*textScale,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174*textScale,depth:1});lines.push(`<path d="M${260*textScale} ${y-30*textScale}H${x}V${y-10*textScale}"/>`);});
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);height=Math.max(...positions.map(item=>item.y))+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}

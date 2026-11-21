@@ -11,7 +11,7 @@ import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
 const dateSource=await readFile(new URL('../public/assets/dates.js',import.meta.url),'utf8');
-function fixture(portal,{phone=false,english=false,text=100,unitHeight=0,overrides={}}={}){
+function fixture(portal,{phone=false,english=false,text=100,unitHeight=0,overview=false,overrides={}}={}){
   const {document,window:dom}=parseHTML(branchPortalHTML(html,portal));
   Object.defineProperty(dom.HTMLElement.prototype,'offsetHeight',{configurable:true,get(){return this.classList?.contains('tree-unit')?unitHeight:0;}});
   const data=toOriginalFamilyData(createBranchPortal(family,portal));
@@ -20,7 +20,7 @@ function fixture(portal,{phone=false,english=false,text=100,unitHeight=0,overrid
   window.FamilyI18n={isEnglish:english,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?(p.nameEn||p.englishName||p.name):p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};
   vm.runInNewContext(dateSource,{window,document,navigator:{userAgent:'Desktop'}});
   vm.runInNewContext(source,{window,document,location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),fetch:()=>new Promise(()=>{}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
-  document.getElementById('fullTreeButton').click();
+  if(!overview)document.getElementById('fullTreeButton').click();
   const card=id=>document.querySelector('#treeNodes [data-person-card="'+id+'"]');
   const role=id=>card(id).querySelector('[data-tree-role]');
   function incoming(id){
@@ -107,6 +107,16 @@ test('tall date cards reserve actual content height before the next generation a
       const parent=f.document.querySelector('[data-unit="'+(unit.id===f.data.root?'u-root':unit.id)+'"]');
       const child=f.document.querySelector('[data-unit="'+childId+'"]');
       if(parent&&child)assert.ok(parseFloat(child.style.top)>=parseFloat(parent.style.top)+unitHeight+144,'No generation overlaps the preceding dates');
+    }
+  }
+});
+
+test('compact family overview uses card widths for every displayed spouse instead of squeezing three portraits into a two-person frame',()=>{
+  for(const phone of [false,true])for(const text of [100,200]){
+    const f=fixture('kehat',{phone,text,overview:true,unitHeight:300});
+    for(const unit of f.document.querySelectorAll('#treeNodes .tree-unit')){
+      const count=unit.querySelectorAll('.person-card').length;
+      assert.ok(parseFloat(unit.style.width)>=(count*(phone?136:146)+Math.max(0,count-1)*(phone?14:28))*text/100);
     }
   }
 });
