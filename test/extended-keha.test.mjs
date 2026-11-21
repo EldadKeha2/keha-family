@@ -11,6 +11,7 @@ import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {extendedKehaHTML,shlomoKehaHTML,branchPortalHTML} from '../src/extended-keha.mjs';
 import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {createShlomoFamily,SHLOMO_NAME,SHLOMO_HOME} from '../public/keha-extended/shlomo-data.mjs';
+import {TRI_SIBLINGS} from '../public/keha-extended/tri-data.mjs';
 import {familyApp} from '../family-apps/worker.mjs';
 import vm from 'node:vm';
 import {parseHTML} from 'linkedom';
@@ -143,8 +144,8 @@ test('the 1954 questionnaire connects Ora’s ten siblings to their parents in b
   assert.equal(data.people['yissachar-yosef'].branch,'yissachar');
   assert.ok(!portal.people['yissachar-yosef']);
   assert.equal(data.people['tri-menachem'].maritalStatus,'unmarried');
-  assert.match(data.people['tri-menachem'].researchNotes,/72/);
-  assert.match(data.people['tri-menachem'].researchNotes,/77/);
+  assert.equal(data.people['tri-menachem'].researchNotes,'');
+  assert.equal(data.people['tri-menachem'].lifeRecords[0].ageAtDeath,72);
   assert.equal(data.people['tri-binyamin'].burialDate,'2.4.2014');
   assert.equal(data.people['tri-binyamin'].deathDate,undefined,'Burial dates must not be labeled as death dates');
   assert.equal(data.people['tri-shifra'].deathDate,undefined);
@@ -166,16 +167,16 @@ test('Shifra’s son Hezi does not acquire an unconfirmed father through her mar
   assert.deepEqual(relatives('tri-shifra').siblings,[]);
 });
 
-test('correcting Yosef’s combined label retains his profile, family edits and original tagged media',async()=>{
+test('correcting Yosef’s combined label retains his dates and media while his requested biography cleanup takes effect',async()=>{
   const f=fixture();try{
     const id='keha-yosef-yissachar',before={id,name:'יוסף יששכר',nameEn:'Yosef Yissachar',about:'זיכרון שהמשפחה כתבה',birthday:'2.3.1938',profileId:'existing-portrait',extra:true};
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify(before));
     const after=(await f.json(site('people/'+id+'/page'))).person;
     assert.equal(after.id,id);assert.equal(after.name,'יוסף טרי (קהא)');
     assert.equal(after.nameEn,'Yosef Tri (Keha)');
-    for(const key of ['birthday','about'])assert.equal(after[key],before[key]);
+    assert.equal(after.birthday,before.birthday);assert.equal(after.about,'');
     assert.equal(after.birthYear,1937);
-    assert.match(after.researchNotes,/2\.3\.1938/);
+    assert.equal(after.researchNotes,'');
     const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
     assert.equal(saved.profileId,before.profileId);
     const backup=JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get('extended-tri-ten-siblings-2026-11-21-v1:backup:'+id).value);
@@ -873,6 +874,60 @@ test('archival birth years migrate once, retaining later family edits and year p
   }finally{f.close();}
 });
 
+test('Yona’s ten children have clean descriptions and family research does not name the organizer',()=>{
+  const data=toOriginalFamilyData(createExtendedFamily(family));
+  for(const id of TRI_SIBLINGS){
+    for(const field of ['about','aboutEn','researchNotes','researchNotesEn'])assert.equal(data.people[id][field],'',id+':'+field);
+    assert.ok((data.people[id].lifeRecords||[]).every(record=>!record.note),id);
+    assert.ok(data.people[id].researchSources.length>0,id);
+  }
+  for(const person of Object.values(data.people)){
+    for(const field of ['about','aboutEn','researchNotes','researchNotesEn'])assert.doesNotMatch(person[field]||'',/אלדד|\bEldad\b/i,person.id+':'+field);
+  }
+  assert.equal(data.people.eldad.name,'אלדד קהא');
+  assert.match(data.people['tri-yona'].researchNotes,/שאלון פרס הילודה/);
+});
+
+test('deployed descriptions are cleaned once with recoverable originals, retaining records, dates and later edits',async()=>{
+  const f=fixture();try{
+    await f.json(site('people/tri-yona/page'));
+    const migration='family-profile-descriptions-yona-children-2026-11-21-v1',before=new Map();
+    for(const id of TRI_SIBLINGS){
+      const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+      Object.assign(saved,{about:'טקסט להסרה',aboutEn:'Text to clear',researchNotes:'הערות להסרה',researchNotesEn:'Notes to clear',profileId:'portrait-'+id});
+      if(saved.lifeRecords)saved.lifeRecords=saved.lifeRecords.map(record=>({...record,note:'הסבר להסרה'}));
+      before.set(id,saved);
+      f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
+    }
+    const parent=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get('tri-yona').data);
+    parent.about='לפי אישור אלדד. אמה של המשפחה.';
+    parent.aboutEn='Eldad confirmed the family account.';
+    parent.researchNotes='אשתו של זכריה, לפי זיהוי אלדד. תיעוד משנת 1954.';
+    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(parent),parent.id);
+    f.database.prepare('DELETE FROM meta WHERE id=?').run(migration);
+    f.restart();
+    for(const id of TRI_SIBLINGS){
+      const person=(await f.json(site('people/'+id+'/page'))).person,original=before.get(id);
+      for(const field of ['about','aboutEn','researchNotes','researchNotesEn'])assert.equal(person[field],'',id+':'+field);
+      for(const field of ['birthday','birthYear','deathDate','deathYear'])assert.equal(person[field],original[field],id+':'+field);
+      assert.deepEqual(person.researchSources,original.researchSources);
+      assert.ok((person.lifeRecords||[]).every(record=>!record.note));
+      const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+      assert.equal(saved.profileId,original.profileId);
+      assert.deepEqual(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(migration+':backup:'+id).value),original);
+    }
+    const mother=(await f.json(site('people/tri-yona/page'))).person;
+    assert.equal(mother.about,'לפי אישור המשפחה. אמה של המשפחה.');
+    assert.equal(mother.aboutEn,'The family confirmed the family account.');
+    assert.equal(mother.researchNotes,'אשתו של זכריה, לפי הזיהוי המשפחתי. תיעוד משנת 1954.');
+    const path=site('people/tri-esther/about');
+    await f.json(path,{method:'POST',body:{about:'זיכרון חדש שהמשפחה הוסיפה',expectedAbout:'',language:'he'}});
+    f.restart();
+    assert.equal((await f.json(site('people/tri-esther/page'))).person.about,'זיכרון חדש שהמשפחה הוסיפה');
+    assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(migration+':backup:tri-esther').value).about,'טקסט להסרה');
+  }finally{f.close();}
+});
+
 test('the new Yona profile receives the same uploaded scan without duplicating or replacing its original',async()=>{
   const f=fixture();try{
     const id='993b035c6bdf42fdb37950489f291c92';
@@ -966,7 +1021,7 @@ test('known Tri death dates populate existing profiles once and preserve family 
     const id='keha-yosef-yissachar';
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'יוסף טרי (קהא)',birthday:'1.1.1111',about:'זיכרון משפחתי',profileId:'portrait-to-preserve'}));
     const first=await f.json(site('people/'+id+'/page'));
-    assert.equal(first.person.deathDate,'15.7.1985');assert.equal(first.person.about,'זיכרון משפחתי');
+    assert.equal(first.person.deathDate,'15.7.1985');assert.equal(first.person.about,'');
     assert.equal((await f.json(site('people/tri-yissachar/page'))).person.deathDate,'13.4.1996');
     const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
     assert.equal(saved.profileId,'portrait-to-preserve');saved.deathDate='16.7.1985';
