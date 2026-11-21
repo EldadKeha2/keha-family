@@ -43,6 +43,12 @@
   url.hash='home';
   const invitationURL=new URL(url.href);invitationURL.searchParams.set('install','1');
   const installationInvitation=new URLSearchParams(location.search).get('install')==='1';
+  const chromeInstallArrival=new URLSearchParams(location.search).get('installBrowser')==='chrome';
+  function openChromeInstallation(){
+    const target=new URL(invitationURL.href);target.searchParams.set('installBrowser','chrome');
+    const intent='intent://'+target.host+target.pathname+target.search+'#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url='+encodeURIComponent(target.href)+';end';
+    waitingForPrompt=false;clearTimeout(preparationTimer);location.assign(intent);
+  }
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const appIcon=siteHome?document.querySelector('link[rel=apple-touch-icon]')?.getAttribute('href')||'assets/app-icons/icon-192.png':'assets/app-icons/icon-192.png';
   const shortcutIcon='<svg class="home-install-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="2" width="12" height="20" rx="2"/><path d="M8 18h4M19 5v8m-4-4h8"/></svg>';
@@ -148,7 +154,7 @@
     const page=new URL(location.pathname+location.search+location.hash,appOrigin),language=window.FamilyI18n?.language;
     if(siteHome)page.pathname=siteHome;
     page.searchParams.delete('install');
-    page.searchParams.delete('source');page.searchParams.delete('familyApp');
+    page.searchParams.delete('source');page.searchParams.delete('familyApp');page.searchParams.delete('installBrowser');
     if(page.hash.startsWith('#updates/manage/'))page.hash='#updates';
     if(['he','en-US','en-GB'].includes(language))page.searchParams.set('lang',language);
     const person=location.hash.startsWith('#person/')?document.getElementById('personPageContent')?.querySelector('.person-page-hero h2')?.textContent.trim():'';
@@ -226,10 +232,10 @@
       if(isInstalled&&!dialog.querySelector('[data-home-install-invite-installed]'))openInvitation();
       const action=dialog.querySelector('[data-home-install-invite-start]');
       const ready=Boolean(installPrompt)||familyWebInstall();
-      if(action){action.disabled=busy||installState==='pending'||android&&Boolean(siteHome)&&!ready;action.textContent=android&&siteHome&&!ready?tr('מכינים התקנה…','Preparing installation…'):tr('התקן','Install');}
+      if(action){action.disabled=busy||installState==='pending';action.textContent=android&&siteHome&&!ready&&!chromeInstallArrival?tr('התקן ב־Chrome','Install in Chrome'):tr('התקן','Install');}
       if(android&&siteHome&&!isInstalled&&!ready){
         const inline=dialog.querySelector('[data-home-install-invite-status]');
-        if(inline)inline.textContent=preparationExpired?tr('הדפדפן עדיין לא פתח אישור התקנה. פתחו את העמוד ב־Chrome ונסו שוב.','Your browser has not offered installation yet. Open this page in Chrome and try again.'):tr('ממתינים ל־Chrome שיכין את ההתקנה של המשפחה הזאת.','Waiting for Chrome to prepare this family’s installation.');
+        if(inline)inline.textContent=preparationExpired?tr('Chrome לא הציג עדיין אישור התקנה. אפשר ללחוץ שוב או לפתוח את עזרת ההתקנה.','Chrome has not offered installation yet. Try again or open installation help.'):chromeInstallArrival?tr('לחצו ״התקן״ כדי לבקש את אישור ההתקנה של המשפחה הזאת.','Tap “Install” to request installation of this family.'):tr('לחצו ״התקן ב־Chrome״ לפתיחת המשפחה בדפדפן ולהמשך ההתקנה.','Tap “Install in Chrome” to open this family in the browser and continue installation.');
       }
     }
     if(dialog.open&&dialogKind==='install'){
@@ -352,7 +358,7 @@
   }
   async function requestInstallation(fromInvitation=false){
     if(changingOrigin||busy||(!fromInvitation&&button.hidden))return;
-    if(needsFamilyOrigin&&!familyWebInstall()){location.assign(invitationURL.href);return;}
+    if(needsFamilyOrigin&&!familyWebInstall()){if(android)openChromeInstallation();else location.assign(invitationURL.href);return;}
     if(hasInstalledShortcut()){
       announceInstalledShortcut();if(siteHome)openInvitation(button);
       return;
@@ -361,6 +367,9 @@
     if(attemptActive&&(installState==='pending'||installState==='requesting')){if(!dialog.open)openInvitation(button);return;}
     const modern=(needsFamilyOrigin||!installPrompt)&&familyWebInstall();
     if(!installPrompt&&!modern){
+      // A PWA/custom tab can withhold installation offers. A real Android tap
+      // can open full Chrome; the return marker prevents a navigation loop.
+      if(android&&siteHome&&fromInvitation&&!chromeInstallArrival){openChromeInstallation();return;}
       if(android&&siteHome&&!embedded){
         // Package-manager detection can be slow. Keep the original tap alive
         // for a native offer instead of awaiting it before showing feedback.

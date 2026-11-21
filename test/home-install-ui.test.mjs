@@ -100,7 +100,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   const location=new URL(entryUrl||'https://family.example/?game=neto-tetris&lang='+window.FamilyI18n.language+'#games');window.location=location;
   location.reload=()=>reloads.push(location.href);
   location.replace=value=>assignments.push(String(value));
-  if(recordNavigation)location.assign=value=>assignments.push(String(value));
+  location.assign=value=>assignments.push(String(value));
   const context=vm.createContext({window,document,navigator,location,matchMedia,URL,URLSearchParams,Event,console,setTimeout:schedule,clearTimeout:id=>timers.delete(id)});
   const ready=()=>{document.readyState='interactive';document.dispatchEvent(new Event('DOMContentLoaded'));document.readyState='complete';};
   vm.runInContext(source,context);if(autoReady)ready();
@@ -956,7 +956,7 @@ test('a delayed Android offer keeps the install button honest and resumes the fi
     const f=fixture({site,userActivation,entryUrl:site.origin+site.home});
     f.click(f.button());await tick();
     assert.equal(f.dialog.open,true);
-    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').disabled,true);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').disabled,false,'The visitor can open Chrome while an install offer is unavailable');
     assert.doesNotMatch(f.dialog.innerHTML,/iPhone|iPad|Safari|הוספה למסך הבית/);
     const offer=f.offer({outcome:'accepted'});await tick();
     if(userActivation)assert.equal(offer.calls,1,'The original gesture still opens the browser prompt');
@@ -996,4 +996,39 @@ test('a family link inside another installed app cannot replace the parent app l
   assert.equal(sessionState.get('family-running-app'),'/');
   assert.equal(new URL(f.assignments[0]).origin,site.origin);
   assert.equal(new URL(f.assignments[0]).searchParams.has('familyApp'),false);
+});
+
+test('both additional Keha apps offer an active full-Chrome handoff instead of an indefinite preparing button',async()=>{
+  for(const branch of ['zechariah','zechariah-tzadok']){
+    const base=eightApps.find(app=>app.branch===branch),site={...base,origin:'https://family-'+branch+'.example'};
+    const f=fixture({site,standalone:true,sessionState:new Map([['family-running-app','/']]),entryUrl:site.origin+site.home+'?install=1#home'});
+    const install=f.dialog.querySelector('[data-home-install-invite-start]');
+    assert.equal(f.dialog.open,true);assert.equal(install.disabled,false);assert.equal(install.textContent,'התקן ב־Chrome');
+    assert.doesNotMatch(f.dialog.innerHTML,/מכינים התקנה|iPhone|iPad/);
+    f.click(install);assert.equal(f.assignments.length,1,'The handoff starts inside the tap');
+    const intent=f.assignments[0];assert.ok(intent.startsWith('intent://'+new URL(site.origin).host+site.home));
+    assert.match(intent,/;package=com\.android\.chrome;/);
+    const fallback=new URL(decodeURIComponent(/;S\.browser_fallback_url=([^;]+);end$/.exec(intent)[1]));
+    assert.equal(fallback.origin,site.origin);assert.equal(fallback.pathname,site.home);
+    assert.equal(fallback.searchParams.get('install'),'1');assert.equal(fallback.searchParams.get('installBrowser'),'chrome');assert.equal(fallback.hash,'#home');
+    assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  }
+});
+
+test('arrival in full Chrome keeps Install tappable and uses its own offer without a handoff loop',async()=>{
+  for(const branch of ['zechariah','zechariah-tzadok']){
+    const base=eightApps.find(app=>app.branch===branch),site={...base,origin:'https://family-'+branch+'.example'};
+    const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home+'?install=1&installBrowser=chrome#home'});
+    const install=f.dialog.querySelector('[data-home-install-invite-start]');assert.equal(install.disabled,false);assert.equal(install.textContent,'התקן');
+    f.click(install);assert.deepEqual(f.assignments,[]);
+    const native=f.offer({outcome:'accepted'});assert.equal(native.calls,1);await tick();assertProgress(f,true);
+    assert.deepEqual(f.assignments,[]);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  }
+});
+
+test('shared family pages discard the browser-handoff marker so a recipient retains their own installation flow',async()=>{
+  const base=eightApps.find(app=>app.branch==='zechariah'),site={...base,origin:'https://family-zechariah.example'};
+  const f=fixture({site,share:'works',entryUrl:site.origin+site.home+'?installBrowser=chrome#person/example'});
+  f.click(f.card.querySelector('[data-home-install-share]'));f.click(f.dialog.querySelector('[data-home-share-page]'));await tick();
+  const shared=new URL(f.shared[0].url);assert.equal(shared.searchParams.has('installBrowser'),false);assert.equal(shared.hash,'#person/example');
 });
