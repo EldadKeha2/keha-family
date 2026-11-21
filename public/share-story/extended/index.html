@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#183e4b">
+  <meta name="robots" content="noindex,nofollow">
+  <title>סיפורים וזיכרונות | קהא המורחבת</title>
+  <meta name="description" content="משתפים סיפורים וזיכרונות מקהא המורחבת. כותבים שם וסיפור ושולחים לאלדד. אפשר להוסיף שמות של אנשים שמוזכרים בסיפור.">
+  <meta property="og:title" content="הסיפורים של קהא המורחבת">
+  <meta property="og:description" content="סיפור קטן, זיכרון גדול. כותבים שם וסיפור ושולחים לאלדד.">
+  <link rel="stylesheet" href="/share-story/form.css">
+  <script src="/share-story/form.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="family">קהא המורחבת</p>
+      <h1>סיפורים וזיכרונות<br>מהמשפחה שלנו</h1>
+      <p class="intro">סיפור מצחיק, רגע מרגש או זיכרון קטן.<br>נשמח לשמור אותם יחד.</p>
+    </header>
+    <form id="story-form" data-scope="extended">
+      <label for="name">שם פרטי ושם משפחה</label>
+      <input id="name" name="name" autocomplete="name" maxlength="100" required enterkeyhint="next" placeholder="איך קוראים לך?">
+      <label for="story">הסיפור שלך</label>
+      <textarea id="story" name="story" rows="8" maxlength="50000" required dir="auto" placeholder="אפשר להתחיל ב״אני זוכר/ת ש…״"></textarea>
+      <label for="people">אנשים שמוזכרים בסיפור (לא חובה)</label>
+      <input id="people" name="people" type="text" maxlength="2000" autocomplete="off" dir="auto" placeholder="אפשר לכתוב שמות באופן חופשי">
+      <div class="trap" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+      <p id="error" role="alert" hidden></p>
+      <button id="send" type="submit">שלח</button>
+      <p class="note">הסיפור יישלח לאלדד במייל.</p>
+    </form>
+    <section id="success" tabindex="-1" hidden aria-labelledby="thanks">
+      <div class="check" aria-hidden="true">✓</div>
+      <h2 id="thanks">תודה על הסיפור!</h2>
+      <p>הסיפור נשלח לאלדד.<br>כל זיכרון הוא חלק מהסיפור של המשפחה.</p>
+      <button id="another" type="button">שליחת סיפור נוסף</button>
+    </section>
+    <noscript><p>כדי לשלוח סיפור יש להפעיל JavaScript בדפדפן.</p></noscript>
+  </main>
+</body>
+</html>

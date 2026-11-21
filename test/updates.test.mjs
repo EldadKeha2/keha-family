@@ -257,6 +257,31 @@ test('story form emails the storyteller, person and full text privately, without
   }
 });
 
+test('extended family stories accept optional free-text people and include them in private email and encrypted storage',async()=>{
+  for(const provider of ['brevo','resend']){
+    const f=fixture(provider),path='/api/story-submissions',body={name:'Test Person',scope:'extended',story:'זיכרון מקהא המורחבת',requestId:'f'.repeat(32)};
+    try{
+      const untagged=await f.call(path,body,{'X-Family-Token':''});assert.equal(untagged.status,200,await untagged.clone().text());assert.deepEqual(await untagged.json(),{sent:true});
+      const first=f.messages[0].body;assert.match(first.subject,/קהא המורחבת/);assert.match(first.textContent||first.text,/אנשים שמוזכרים בסיפור: לא צוינו/);assert.deepEqual(first.to,provider==='brevo'?[{email:'eldadkeha@gmail.com'}]:['eldadkeha@gmail.com']);
+      const people="  יונה נקאש, ג'ידען\n  בת המשפחה <b>שרה</b>  ",tagged={...body,people,requestId:'0f'.repeat(16)};
+      const response=await f.call(path,tagged);assert.equal(response.status,200,await response.clone().text());
+      const mail=f.messages[1].body;assert.match(mail.textContent||mail.text,/יונה נקאש, ג'ידען בת המשפחה <b>שרה<\/b>/);assert.match(mail.htmlContent||mail.html,/&lt;b&gt;שרה&lt;\/b&gt;/);assert.doesNotMatch(mail.htmlContent||mail.html,/<b>שרה/);
+      assert.equal((await f.call(path,tagged)).status,200);assert.equal(f.messages.length,2);assert.equal((await f.call(path,{...tagged,people:'שם אחר'})).status,409);
+      const rows=f.db.exec('SELECT * FROM story_submissions ORDER BY id').toArray();assert.equal(rows.length,2);assert.ok(!JSON.stringify(rows).includes('יונה נקאש'));
+      const saved=await f.updates.decrypt(rows.find(row=>row.id.endsWith(tagged.requestId)).data);assert.equal(saved.scope,'extended');assert.equal(saved.people,"יונה נקאש, ג'ידען בת המשפחה <b>שרה</b>");assert.equal(saved.story,body.story);
+    }finally{f.close();}
+  }
+});
+
+test('extended family forms validate optional people and retain origin checks and delivery failure behavior',async()=>{
+  const f=fixture('brevo'),path='/api/story-submissions',body={name:'Test Person',scope:'extended',story:'A memory',requestId:'fe'.repeat(16)};
+  try{
+    for(const change of [{scope:'arbitrary'},{people:['a']},{people:3},{people:'a'.repeat(2001)},{people:'a\u0000b'}])assert.equal((await f.call(path,{...body,...change})).status,400);
+    assert.equal((await f.call(path,body,{Origin:'https://other.example'})).status,403);assert.equal(f.messages.length,0);
+    f.fail(true);assert.equal((await f.call(path,body)).status,503);f.fail(false);assert.equal((await f.call(path,body)).status,200);assert.equal(f.messages[0].body.headers.idempotencyKey,f.messages[1].body.headers.idempotencyKey);
+  }finally{f.close();}
+});
+
 test('story submissions reject missing full names, empty stories, arbitrary people, oversized text and cross-site requests',async()=>{
   const f=fixture(),body={name:'Test Person',person:'shlomo',story:'A memory.',requestId:'c'.repeat(32)},path='/api/story-submissions';
   try{
