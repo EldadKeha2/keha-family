@@ -8,7 +8,7 @@ const source=await readFile(new URL('../public/assets/family-documents.js',impor
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(){
   const {document,window:dom}=parseHTML('<html><body data-active-view="tree"><section id="documentsView" hidden></section></body></html>');
-  const uploads=[],removals=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
+  const uploads=[],removals=[],previews=[],revoked=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
   const window={FamilyI18n:{isEnglish:false,error:v=>v,personName:p=>p.name,fetch:async(path,options)=>{
     if(options?.method==='POST'){
       if(options.headers?.['X-Family-Token']!=='test-token')return Response.json({error:'יש לרענן את הדף לפני שמירת השינוי.'},{status:403});
@@ -19,12 +19,14 @@ function fixture(){
     return Response.json({items,people:[{id:'yona',name:'יונה קהא'},{id:'shlomo',name:'שלמה קהא'}]});
   }},FAMILY_API_TOKEN:'test-token'};
   class XHR{constructor(){this.upload={};this.headers={};}open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}send(file){uploads.push({file,url:this.url,headers:this.headers});this.status=201;this.responseText='{"saved":true}';queueMicrotask(()=>this.onload());}}
-  vm.runInNewContext(source,{window,document,XMLHttpRequest:XHR,Response,CustomEvent:dom.CustomEvent});
+  const objectURL={createObjectURL(file){previews.push(file);return 'blob:captured-'+previews.length;},revokeObjectURL(url){revoked.push(url);}};
+  vm.runInNewContext(source,{window,document,XMLHttpRequest:XHR,Response,CustomEvent:dom.CustomEvent,URL:objectURL});
   for(const node of document.querySelectorAll('select'))Object.defineProperty(node,'value',{writable:true,value:'all'});
-  for(const node of document.querySelectorAll('dialog')){node.showModal=function(){this.open=true;};node.close=function(){this.open=false;};}
+  for(const node of document.querySelectorAll('dialog')){node.showModal=function(){this.open=true;};node.close=function(){this.open=false;this.dispatchEvent(new dom.Event('close'));};}
   document.getElementById('documentForm').reset=()=>{};
   Object.defineProperty(document.getElementById('documentFile'),'files',{configurable:true,value:[]});
-  return {document,dom,window,uploads,removals,items};
+  Object.defineProperty(document.getElementById('documentCamera'),'files',{configurable:true,value:[]});
+  return {document,dom,window,uploads,removals,items,previews,revoked};
 }
 test('the archive filters real documents and audio, searches descriptions, and opens the original image',async()=>{
   const f=fixture();f.window.FamilyDocuments.activate('documents');await tick();
@@ -44,6 +46,26 @@ test('adding a record requires a subject and sends the unmodified file with its 
   submit();await tick();assert.equal(f.uploads.length,1);assert.equal(f.uploads[0].file,original);assert.equal(f.uploads[0].headers['X-Family-Token'],'test-token');
   assert.deepEqual(JSON.parse(decodeURIComponent(f.uploads[0].headers['X-Family-Document'])),{title:'תעודה מקורית',caption:'המסמך מבית המשפחה',personIds:['yona']});
   assert.equal(f.document.getElementById('documentEditor').open,false);
+});
+test('the camera opens immediately and its photo is previewed and uploaded as the selected document',async()=>{
+  const f=fixture(),camera=f.document.getElementById('documentCamera');let opened=0;camera.click=()=>{opened++;};
+  assert.equal(camera.getAttribute('capture'),'environment');assert.match(camera.getAttribute('accept'),/image\/jpeg/);
+  f.document.getElementById('captureDocument').click();assert.equal(opened,1);assert.notEqual(f.document.getElementById('documentEditor').open,true);
+  const photo={name:'camera-document.jpg',size:800,type:'image/jpeg'};Object.defineProperty(camera,'files',{value:[photo]});camera.dispatchEvent(new f.dom.Event('change'));await tick();
+  assert.equal(f.document.getElementById('documentEditor').open,true);assert.equal(f.document.getElementById('documentFile').required,false);assert.equal(f.document.getElementById('documentCapturePreview').hidden,false);assert.equal(f.document.getElementById('documentCaptureImage').getAttribute('src'),'blob:captured-1');assert.equal(f.previews[0],photo);
+  f.document.getElementById('documentTitle').value='מסמך שצולם בטלפון';f.document.querySelector('#documentPeople input[value=yona]').setAttribute('checked','');
+  f.document.getElementById('documentForm').dispatchEvent(new f.dom.Event('submit',{bubbles:true,cancelable:true}));await tick();assert.equal(f.uploads.length,1);assert.equal(f.uploads[0].file,photo);assert.match(f.uploads[0].url,/filename=camera-document.jpg/);assert.equal(JSON.parse(decodeURIComponent(f.uploads[0].headers['X-Family-Document'])).title,'מסמך שצולם בטלפון');assert.deepEqual(f.revoked,['blob:captured-1']);
+});
+test('selecting another file replaces a captured photo and cancelling the camera does not open an empty editor',async()=>{
+  const f=fixture(),camera=f.document.getElementById('documentCamera');camera.dispatchEvent(new f.dom.Event('change'));await tick();assert.notEqual(f.document.getElementById('documentEditor').open,true);
+  const photo={name:'capture.jpg',size:300};Object.defineProperty(camera,'files',{value:[photo]});camera.dispatchEvent(new f.dom.Event('change'));await tick();
+  const original={name:'certificate.pdf',size:900},file=f.document.getElementById('documentFile');Object.defineProperty(file,'files',{value:[original]});file.dispatchEvent(new f.dom.Event('change'));
+  assert.equal(file.required,true);assert.equal(f.document.getElementById('documentCapturePreview').hidden,true);assert.deepEqual(f.revoked,['blob:captured-1']);
+  f.document.querySelector('#documentPeople input[value=yona]').setAttribute('checked','');f.document.getElementById('documentForm').dispatchEvent(new f.dom.Event('submit',{bubbles:true,cancelable:true}));await tick();assert.equal(f.uploads[0].file,original);
+});
+test('compact recording thumbnails open a player and closing it stops playback',async()=>{
+  const f=fixture();f.window.FamilyDocuments.activate('documents');await tick();f.document.querySelector('.document-recording-preview').click();
+  assert.equal(f.document.getElementById('documentViewer').open,true);const audio=f.document.querySelector('#documentViewerBody audio');assert.equal(audio.getAttribute('src'),'/media/b');assert.ok(audio.hasAttribute('controls'));let paused=0;audio.pause=()=>{paused++;};f.document.getElementById('documentViewer').close();assert.equal(paused,1);assert.equal(f.document.querySelector('#documentViewerBody audio'),null);
 });
 
 test('each record has a password dialog; a rejected deletion keeps the record and clears the password',async()=>{
