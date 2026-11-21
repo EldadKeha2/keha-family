@@ -48,7 +48,7 @@ function fixture(){
 test('Tri follows Saadia’s Kehat ancestry while Yissachar and the older roots stay independent',()=>{
   const tree=createExtendedFamily(family),data=toOriginalFamilyData(tree);
   assert.equal(data.title,EXTENDED_NAME);
-  assert.equal(data.branches.length,6);
+  assert.equal(data.branches.length,5);
   assert.equal(data.units['u-root'].parent,'u-keha-zechariah-father');
   assert.equal(data.units['u-keha-zechariah'].parent,'u-saadia-elder');
   for(const id of ['u-kehat-tzadok-elder','u-kehat-aharon-elder','u-keha-zechariah-father','u-saadia-elder'])assert.equal(data.units[id].parent,null);
@@ -166,7 +166,7 @@ test('desktop and mobile show the ten children under Zechariah inside Kehat',asy
     const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){}};
     window.FamilyI18n={isEnglish:false,t:value=>value,html:(parts,...values)=>parts.reduce((output,part,index)=>output+part+(values[index]??''),''),personName:person=>person.name,branchName:branch=>branch?.title,searchNames:person=>person.name,date:value=>value};
     window.FamilyDates={age:()=>null,parse:()=>null};
-    const context=vm.createContext({window,document,location:{hash:'#tree/tri'},history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    const context=vm.createContext({window,document,location:{hash:'#tree/kehat'},history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(source,context);
     assert.equal(document.querySelector('.tree-sibling-group'),null);
     for(const id of ['kehat-zechariah','tri-yona'])assert.ok(document.querySelector('#treeNodes [data-person="'+id+'"]'));
@@ -178,7 +178,7 @@ test('desktop and mobile show the ten children under Zechariah inside Kehat',asy
     assert.ok(document.querySelector('#treeNodes [data-person="tri-hezi"]'));
     assert.ok(!document.getElementById('treeNodes').textContent.includes('undefined'));
     assert.match(document.getElementById('treeNodes').textContent,/נישואים לפי עדות אורה/);
-    assert.match(document.getElementById('treeBreadcrumb').textContent,/ענף טרי/);
+    assert.match(document.getElementById('treeBreadcrumb').textContent,/סעדיה/);
     window.FamilyApp.setView('directory');
     assert.equal(document.querySelector('#directoryGrid [data-person="tri-siblings-group"]'),null);
   }

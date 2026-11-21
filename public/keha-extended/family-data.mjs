@@ -12,7 +12,6 @@ export const EXTENDED_BRANCHES = Object.freeze([
   {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'המשפחה של זכריה (בן צדוק) קהא', shortLabel:'זכריה בן צדוק', titleEn:'Keha family — Zechariah, son of Tzadok', color:'#b4523b', mark:'❖'},
   {id:'kehat', unit:'u-kehat-aharon-elder', label:'המשפחה של סעדיה (ג׳ידעאן) קהא', shortLabel:'סעדיה (ג׳ידעאן)', titleEn:'Kehat family — Saadia (Jidaan)', color:'#167d9a', mark:'❖'},
   {id:'yissachar', unit:'u-keha-yissachar', label:'משפחת יששכר · יוסף וצביה', shortLabel:'משפחת יששכר', titleEn:'Yissachar family · Yosef and Tzvia', color:'#6b645b', mark:'❖'},
-  {id:'tri', unit:'u-kehat-zechariah', label:'ענף טרי · עשרת האחים', shortLabel:'זכריה ויונה טירי', titleEn:'Tri family · ten siblings', color:'#167d9a', mark:'❖'},
 ].map(Object.freeze));
 
 // The supplied family chart is the source for these names and marriages.
