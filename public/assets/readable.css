@@ -38,7 +38,7 @@ h1{font-size:calc(68px * var(--a11y-text-scale,1));margin:12px 0 13px}
 .person-card .person-name.long-name{font-size:calc(18px * var(--a11y-text-scale,1))}
 .tree-unit[data-unit="u-root"] .person-name{font-size:calc(21px * var(--a11y-text-scale,1))}
 .person-card .person-birthday{font-size:calc(15px * var(--a11y-text-scale,1));line-height:1.5;color:#847354;margin-top:4px}
-#treeNodes .person-card .tree-life-years{max-width:100%;gap:2px;line-height:1.35}
+#treeNodes .person-card .tree-life-years{display:flex;flex-direction:column;align-items:center;max-width:100%;gap:2px;line-height:1.35}
 #treeNodes .tree-life-years :is(.birthday-line,.person-death-date){display:flex;align-items:center;justify-content:center;gap:3px;white-space:nowrap}
 #treeNodes .tree-life-years bdi{font-variant-numeric:tabular-nums}
 #treeNodes .tree-year-uncertain{cursor:help;text-decoration:underline dotted;text-underline-offset:3px}
