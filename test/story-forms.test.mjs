@@ -25,6 +25,6 @@ test('the original and every family portal place the matching questionnaire link
   const template=read('public/index.html');
   const cases=[['original',template,base],['keha',nakashHTML(template,'keha'),base],['yehuda',nakashHTML(template,'yehuda'),base+'yehuda/'],['haim',nakashHTML(template,'haim'),base+'haim/'],['medina',nakashHTML(template,'medina'),base+'medina/'],['extended',extendedKehaHTML(template),base+'extended/'],['shlomo',shlomoKehaHTML(template),base],...['zechariah','zechariah-tzadok','kehat'].map(id=>[id,branchPortalHTML(template,id),base+'extended/'])];
   for(const [id,html,url] of cases){
-    const {document}=parseHTML(html),links=document.querySelectorAll('#storyQuestionnaireLink');assert.equal(links.length,1,id);assert.ok(document.querySelector('#storiesView').contains(links[0]),id);assert.equal(links[0].getAttribute('href'),url,id);assert.equal(links[0].getAttribute('target'),'_blank',id);assert.equal(links[0].textContent,'כתיבת סיפור ושליחה לאלדד');
+    const {document}=parseHTML(html),links=document.querySelectorAll('#storyQuestionnaireLink');assert.equal(links.length,1,id);assert.ok(document.querySelector('#storiesView').contains(links[0]),id);assert.equal(links[0].getAttribute('href'),url,id);assert.equal(links[0].getAttribute('target'),'_blank',id);assert.equal(links[0].textContent,'כתיבת סיפור');
   }
 });

@@ -209,7 +209,7 @@
     if(view==='stories'){renderStories();refresh('stories');window.FamilyPeopleRoster?.load?.().then(refreshNarratorPortraits).catch(()=>{});}else if(view==='voices'){renderVoices();refresh('voices');}
   }
   function init(){
-    const questionnaire=$('storyQuestionnaireLink');if(questionnaire)questionnaire.textContent=t('כתיבת סיפור ושליחה לאלדד','Write a story and email Eldad');
+    const questionnaire=$('storyQuestionnaireLink');if(questionnaire)questionnaire.textContent=t('כתיבת סיפור','Write a story');
     window.FamilyPeopleRoster?.subscribe?.(refreshNarratorPortraits);
     window.addEventListener('family-profile-changed',refreshNarratorPortraits);
     window.addEventListener('family-people-loaded',refreshNarratorPortraits);
