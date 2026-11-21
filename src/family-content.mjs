@@ -81,7 +81,7 @@ export function mediaInContext(item,context){
 function collectionInContext(item,context){
   // A founder tag or an explicit shared-album assignment must never bring a
   // photo of Yona and Shlomo's younger generations into the extended gallery.
-  if(context.branch==='extended'&&kind(item)==='photo'&&subjects(item).some(id=>youngerOriginalPeople.has(context.canonical(id))))return false;
+  if(context.branch==='extended'&&kind(item)==='photo'&&(item.people?.length?item.people:subjects(item)).some(id=>youngerOriginalPeople.has(context.canonical(id))))return false;
   if(!mediaInContext(item,context))return false;
   if(context.branch==='shlomo'&&kind(item)!=='document')return (item.people||[]).some(id=>['shlomo','yona'].includes(context.canonical(id)));
   if(['haim','yehuda','medina','zechariah','zechariah-tzadok','kehat'].includes(context.branch)&&kind(item)!=='document')return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.category==='nakash:'+context.branch||item.familyScopes?.includes(context.branch);
