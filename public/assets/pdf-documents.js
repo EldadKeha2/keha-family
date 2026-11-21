@@ -29,6 +29,7 @@
   function loadOptions(item){return {url:fileURL(item),cMapUrl:assetRoot+'cmaps/',cMapPacked:true,standardFontDataUrl:assetRoot+'standard_fonts/',wasmUrl:assetRoot+'wasm/',useWorkerFetch:true,enableScripting:false};}
   const downloadIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>';
   const shareIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m9 10 6-4M9 14l6 4"/></svg>';
+  const rotateIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v5h-5M20 10a8 8 0 1 0-1.7 7.4"/></svg>';
   function preview(item){return `<span class="pdf-thumbnail" data-pdf-thumbnail="${safe(item.src)}" data-pdf-name="${safe(item.filename||item.name||'document.pdf')}"><span class="pdf-thumbnail-note">${t('טוענים תצוגה מקדימה…','Loading preview…')}</span><span class="pdf-thumbnail-badge">PDF · ${t('פתיחה לקריאה','Open to read')}</span></span>`;}
   function attachment(item){return `<button type="button" class="pdf-attachment" data-pdf-open="${safe(item.src)}" data-pdf-name="${safe(item.filename||item.name||'document.pdf')}" data-pdf-title="${safe(title(item))}">${preview(item)}<span class="pdf-attachment-title" dir="auto">${safe(title(item))}</span></button>`;}
 
@@ -36,12 +37,12 @@
   function mount(host,item){
     unmount(host);
     const root=document.createElement('section');root.className='pdf-reader';root.setAttribute('aria-label',t('מציג PDF','PDF viewer'));
-    root.innerHTML=`<div class="pdf-reader-actions"><a class="pdf-download-button" data-pdf-download download="${safe(item.filename||'document.pdf')}">${downloadIcon}<span>${t('הורדת המסמך','Download document')}</span></a><button type="button" data-pdf-action="share" class="pdf-share-button">${shareIcon}<span>${t('שיתוף המסמך','Share document')}</span></button></div><div class="pdf-reader-tools" role="group" aria-label="${t('כלי קריאה','Reading tools')}"><label>${t('עמוד','Page')} <input class="pdf-page-number" type="number" min="1" value="1" inputmode="numeric" aria-label="${t('מספר העמוד','Page number')}"> <span class="pdf-page-total"></span></label><span class="pdf-zoom-tools"><button type="button" data-pdf-action="out" aria-label="${t('הקטנה','Zoom out')}">−</button><span class="pdf-zoom-label">100%</span><button type="button" data-pdf-action="in" aria-label="${t('הגדלה','Zoom in')}">＋</button><button type="button" data-pdf-action="fit">${t('התאמה לרוחב','Fit width')}</button></span></div><p class="pdf-reader-status" role="status" aria-live="polite"></p><input class="pdf-share-fallback" readonly hidden aria-label="${t('קישור לשיתוף','Sharing link')}"><div class="pdf-page-scroll" tabindex="0" aria-label="${t('כל עמודי המסמך — גלילה רציפה וזום בשתי אצבעות','All document pages — continuous scrolling and two-finger zoom')}"><div class="pdf-page-surface"></div></div><details class="pdf-reader-text" hidden><summary>${t('טקסט העמוד','Page text')}</summary><p dir="auto"></p></details>`;
+    root.innerHTML=`<div class="pdf-reader-actions"><a class="pdf-download-button" data-pdf-download download="${safe(item.filename||'document.pdf')}">${downloadIcon}<span>${t('הורדת המסמך','Download document')}</span></a><button type="button" data-pdf-action="share" class="pdf-share-button">${shareIcon}<span>${t('שיתוף המסמך','Share document')}</span></button></div><div class="pdf-reader-tools" role="group" aria-label="${t('כלי קריאה','Reading tools')}"><label>${t('עמוד','Page')} <input class="pdf-page-number" type="number" min="1" value="1" inputmode="numeric" aria-label="${t('מספר העמוד','Page number')}"> <span class="pdf-page-total"></span></label><span class="pdf-rotation-tools" role="group" aria-label="${t('סיבוב המסמך','Document rotation')}"><button type="button" data-pdf-action="rotate-right">${rotateIcon}<span>${t('סובב ימינה','Rotate right')}</span></button><button type="button" data-pdf-action="rotate-left" class="pdf-rotate-left">${rotateIcon}<span>${t('סובב שמאלה','Rotate left')}</span></button></span><span class="pdf-zoom-tools"><button type="button" data-pdf-action="out" aria-label="${t('הקטנה','Zoom out')}">−</button><span class="pdf-zoom-label">100%</span><button type="button" data-pdf-action="in" aria-label="${t('הגדלה','Zoom in')}">＋</button><button type="button" data-pdf-action="fit">${t('התאמה לרוחב','Fit width')}</button></span></div><p class="pdf-reader-status" role="status" aria-live="polite"></p><input class="pdf-share-fallback" readonly hidden aria-label="${t('קישור לשיתוף','Sharing link')}"><div class="pdf-page-scroll" tabindex="0" aria-label="${t('כל עמודי המסמך — גלילה רציפה וזום בשתי אצבעות','All document pages — continuous scrolling and two-finger zoom')}"><div class="pdf-page-surface"></div></div><details class="pdf-reader-text" hidden><summary>${t('טקסט העמוד','Page text')}</summary><p dir="auto"></p></details>`;
     const find=selector=>root.querySelector(selector),status=find('.pdf-reader-status'),surface=find('.pdf-page-surface'),scroll=find('.pdf-page-scroll'),pageInput=find('.pdf-page-number');
     host.replaceChildren(root);find('[data-pdf-download]').href=fileURL(item,true);
     const requestFrame=window.requestAnimationFrame?.bind(window)||(fn=>setTimeout(fn,16));
     const cancelFrame=window.cancelAnimationFrame?.bind(window)||clearTimeout;
-    let disposed=false,task,pdf,revision=0,pageNumber=1,zoom=1,fitWidth=0,resizeTimer,zoomTimer,scrollFrame,textSequence=0,activeRenders=0,pinch=null,safariGesture=null,zoomPending=false;
+    let disposed=false,task,pdf,revision=0,pageNumber=1,zoom=1,rotation=0,fitWidth=0,resizeTimer,zoomTimer,scrollFrame,textSequence=0,activeRenders=0,pinch=null,safariGesture=null,zoomPending=false;
     let pages=[],wanted=new Set();
     const viewportWidth=()=>Math.max(180,scroll.clientWidth||host.clientWidth||750);
     const viewportHeight=()=>scroll.clientHeight||600;
@@ -71,7 +72,15 @@
     function layout(anchor){
       fitWidth=viewportWidth()-24;const width=fitWidth*zoom;let top=12;
       surface.style.width=Math.max(viewportWidth(),width+24)+'px';
-      for(const row of pages){row.width=width;row.height=width*row.ratio;row.top=top;row.node.style.width=width+'px';row.frame.style.height=row.height+'px';top+=row.height+28+16;}
+      for(const row of pages){
+        row.width=width;row.height=width*row.ratio;row.top=top;row.node.style.width=width+'px';row.frame.style.height=row.height+'px';top+=row.height+28+16;
+        // Keep the last painted page correctly oriented while its new,
+        // sharper rendering is prepared, including during rapid rotations.
+        if(row.canvas){
+          const turn=(rotation-Number(row.canvas.dataset.pdfRotation||0)+360)%360;
+          Object.assign(row.canvas.style,{width:(turn%180?row.height:row.width)+'px',height:(turn%180?row.width:row.height)+'px',inset:'auto',left:'50%',top:'50%',transform:`translate(-50%,-50%) rotate(${turn}deg)`});
+        }
+      }
       restoreAnchor(anchor);
     }
     function release(row){
@@ -114,10 +123,11 @@
       const valid=()=>!disposed&&generation===revision&&token===row.token&&wanted.has(row);
       try{
         row.proxyPromise||=pdf.getPage(row.number);row.proxy=await row.proxyPromise;if(!valid())return;
-        const base=row.proxy.getViewport({scale:1}),ratio=base.height/base.width;
+        const natural=row.proxy.getViewport({scale:1});row.nativeRatio=natural.height/natural.width;
+        const angle=((row.proxy.rotate||0)+rotation)%360,base=row.proxy.getViewport({scale:1,rotation:angle}),ratio=base.height/base.width;
         if(Math.abs(row.ratio-ratio)>.0001){const anchor=captureAnchor();row.ratio=ratio;layout(anchor);updateWindow();if(!valid())return;}
-        const viewport=row.proxy.getViewport({scale:row.width/base.width}),density=Math.min(window.devicePixelRatio||1,2,Math.sqrt(6000000/(viewport.width*viewport.height)));
-        canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width*density);canvas.height=Math.ceil(viewport.height*density);canvas.setAttribute('aria-label',title(item)+' · '+t('עמוד ','Page ')+row.number);
+        const viewport=row.proxy.getViewport({scale:row.width/base.width,rotation:angle}),density=Math.min(window.devicePixelRatio||1,2,Math.sqrt(6000000/(viewport.width*viewport.height)));
+        canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width*density);canvas.height=Math.ceil(viewport.height*density);canvas.dataset.pdfRotation=String(rotation);canvas.setAttribute('aria-label',title(item)+' · '+t('עמוד ','Page ')+row.number);
         row.renderTask=row.proxy.render({canvas,canvasContext:canvas.getContext('2d'),viewport,transform:density===1?null:[density,0,0,density,0,0]});await row.renderTask.promise;
         if(!valid())return;
         if(row.canvas){row.canvas.width=0;row.canvas.height=0;row.canvas.remove();}
@@ -143,12 +153,23 @@
       else restoreAnchor(anchor);
       zoomPending=defer;updateWindow();settleZoom(defer?130:0);
     }
+    function rotateDocument(step){
+      if(!pdf||disposed)return;
+      const anchor=captureAnchor();
+      if(anchor){const {fractionX:x,fractionY:y}=anchor;anchor.fractionX=step>0?1-y:y;anchor.fractionY=step>0?x:1-x;}
+      clearTimeout(zoomTimer);zoomPending=false;pinch=null;safariGesture=null;
+      rotation=(rotation+step+360)%360;revision++;
+      for(const row of pages){row.renderTask?.cancel();row.ratio=rotation%180?1/row.nativeRatio:row.nativeRatio;}
+      layout(anchor);controls();updateWindow();
+    }
     root.addEventListener('click',event=>{
       const action=event.target.closest('[data-pdf-action]')?.dataset.pdfAction;if(!action)return;
       if(action==='share'){void share(item,status,find('.pdf-share-fallback'));return;}
       if(action==='in')setZoom(zoom+.25);
       if(action==='out')setZoom(zoom-.25);
       if(action==='fit')setZoom(1);
+      if(action==='rotate-right')rotateDocument(90);
+      if(action==='rotate-left')rotateDocument(-90);
     });
     const changePage=()=>{
       if(!pdf)return;const value=Number(pageInput.value);
@@ -205,7 +226,7 @@
         pages=Array.from({length:pdf.numPages},(_,index)=>{
           const node=document.createElement('article');node.className='pdf-document-page';node.dataset.pdfPage=String(index+1);node.setAttribute('aria-label',t('עמוד ','Page ')+(index+1));node.setAttribute('aria-busy','true');
           node.innerHTML=`<div class="pdf-page-frame"><span class="pdf-page-loading">${t('טוענים עמוד…','Loading page…')}</span></div><span class="pdf-page-caption">${t('עמוד ','Page ')+(index+1)} ${t('מתוך ','of ')+pdf.numPages}</span>`;surface.append(node);
-          return {number:index+1,node,frame:node.querySelector('.pdf-page-frame'),note:node.querySelector('.pdf-page-loading'),ratio:base.height/base.width,proxy:index===0?first:null,proxyPromise:index===0?Promise.resolve(first):null,token:0,paintedRevision:-1,failedRevision:-1,rendering:false};
+          return {number:index+1,node,frame:node.querySelector('.pdf-page-frame'),note:node.querySelector('.pdf-page-loading'),nativeRatio:base.height/base.width,ratio:base.height/base.width,proxy:index===0?first:null,proxyPromise:index===0?Promise.resolve(first):null,token:0,paintedRevision:-1,failedRevision:-1,rendering:false};
         });
         scroll.scrollTop=0;scroll.scrollLeft=0;layout();status.textContent='';busy(false);controls();updateWindow();
       }catch{if(!disposed){busy(false);status.textContent=t('לא ניתן לפתוח את המסמך כרגע. כפתורי ההורדה והשיתוף זמינים למעלה.','The document could not be opened. Download and share are available above.');}}

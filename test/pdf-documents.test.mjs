@@ -8,7 +8,7 @@ import {parseHTML} from 'linkedom';
 const source=await readFile(new URL('../public/assets/pdf-documents.js',import.meta.url),'utf8');
 const tick=async()=>{for(let n=0;n<12;n++)await new Promise(resolve=>setImmediate(resolve));};
 const item={src:'/media/'+'a'.repeat(32)+'?version=original',filename:'תעודה.pdf',name:'תעודה משפחתית',mime:'application/pdf'};
-function fixture({branch,english=false,nativeShare,error=false,delayed=false,clipboard=true,pageCount=3,mixedSizes=false}={}){
+function fixture({branch,english=false,nativeShare,error=false,delayed=false,clipboard=true,pageCount=3,mixedSizes=false,nativeRotation=0}={}){
   const {document,window:dom}=parseHTML('<html><body><main id="host"></main></body></html>');
   if(branch){document.documentElement.dataset.nakashBranch=branch;document.documentElement.dataset.nakashHome='/keha-extended/'+branch+'/';document.documentElement.dataset.nakashOrigin='https://family.example';}
   const requests=[],renders=[],destroyed=[],copied=[],shared=[],observers=[],pending=[],resizes=[],viewport={width:600,height:600};
@@ -24,7 +24,7 @@ function fixture({branch,english=false,nativeShare,error=false,delayed=false,cli
   };
   const pdfLibrary={GlobalWorkerOptions:{},getDocument(options){
     requests.push(options);const id=requests.length;
-    const pdf={numPages:pageCount,async getPage(number){return {getViewport:({scale})=>({width:600*scale,height:(mixedSizes&&number===2?400:800)*scale}),render({canvas,viewport}){renders.push({id,number,canvas,viewport});let complete;const promise=delayed?new Promise(resolve=>{complete=resolve;pending.push(resolve);}):Promise.resolve();return {promise,cancel(){complete?.();}};},async getTextContent(){return {items:[{str:'Document '+id+' page '+number,hasEOL:true}]};},cleanup(){}};}};
+    const pdf={numPages:pageCount,async getPage(number){return {rotate:nativeRotation,getViewport:({scale,rotation=nativeRotation})=>{const width=600,height=mixedSizes&&number===2?400:800;return {width:(rotation%180?height:width)*scale,height:(rotation%180?width:height)*scale,rotation};},render({canvas,viewport}){renders.push({id,number,canvas,viewport});let complete;const promise=delayed?new Promise(resolve=>{complete=resolve;pending.push(resolve);}):Promise.resolve();return {promise,cancel(){complete?.();}};},async getTextContent(){return {items:[{str:'Document '+id+' page '+number,hasEOL:true}]};},cleanup(){}};}};
     return {promise:error?Promise.reject(Error('Missing document')):Promise.resolve(pdf),destroy:async()=>{destroyed.push(id);}};
   }};
   const location=new URL('https://family.example/'+(branch?'keha-extended/'+branch+'/':'')+'?media=old#person/yona');
@@ -94,6 +94,22 @@ test('Safari gestures and resize keep the reading position and honor zoom limits
   f.fire(scroll,'gesturestart',{clientX:200,clientY:200});f.fire(scroll,'gesturechange',{scale:30});assert.equal(f.host.querySelector('.pdf-zoom-label').textContent,'800%');f.fire(scroll,'gesturechange',{scale:.01});assert.equal(f.host.querySelector('.pdf-zoom-label').textContent,'50%');f.fire(scroll,'gestureend');await tick();
   assert.ok(Math.abs(readingPoint(200)-point)<.0001);const center=readingPoint(300);f.viewport.width=400;f.resizes[0].callback();await new Promise(resolve=>setTimeout(resolve,140));await tick();assert.ok(Math.abs(readingPoint(300)-center)<.0001);assert.ok(scroll.scrollTop>2000);assert.equal(parseFloat(f.host.querySelector('[data-pdf-page="10"]').style.width),188);f.api.unmount(f.host);
 });
+test('right and left rotation resize continuous pages, retain zoom and the reading area, and handle rapid turns',async()=>{
+  const f=fixture({pageCount:30,mixedSizes:true});f.api.mount(f.host,item);await tick();
+  const input=f.host.querySelector('.pdf-page-number');input.value='10';f.fire(input,'change');await tick();f.host.querySelector('[data-pdf-action=in]').click();await tick();
+  const row=f.host.querySelector('[data-pdf-page="10"]'),old=row.querySelector('canvas'),right=f.host.querySelector('[data-pdf-action=rotate-right]'),left=f.host.querySelector('[data-pdf-action=rotate-left]');
+  assert.match(right.textContent,/סובב ימינה/);assert.match(left.textContent,/סובב שמאלה/);
+  right.click();assert.match(old.style.transform,/rotate\(90deg\)/);await tick();
+  assert.equal(f.renders.findLast(render=>render.number===10).viewport.rotation,90);assert.equal(parseFloat(row.querySelector('.pdf-page-frame').style.height),540);assert.equal(f.host.querySelector('.pdf-zoom-label').textContent,'125%');assert.equal(old.width,0);
+  assert.ok(f.host.querySelector('.pdf-page-scroll').scrollTop>1000);assert.equal(f.host.querySelectorAll('[data-pdf-page]').length,30);
+  left.click();await tick();assert.equal(f.renders.findLast(render=>render.number===10).viewport.rotation,0);assert.equal(parseFloat(row.querySelector('.pdf-page-frame').style.height),960);
+  right.click();right.click();right.click();await tick();assert.equal(f.renders.findLast(render=>render.number===10).viewport.rotation,270);right.click();await tick();assert.equal(f.renders.findLast(render=>render.number===10).viewport.rotation,0);f.api.unmount(f.host);
+});
+test('rotation adds to the orientation stored in a PDF and resets when another document opens',async()=>{
+  const f=fixture({nativeRotation:90,english:true});f.api.mount(f.host,item);await tick();const first=f.renders[0].viewport;assert.equal(first.rotation,90);assert.ok(first.width>first.height);
+  const right=f.host.querySelector('[data-pdf-action=rotate-right]');assert.match(right.textContent,/Rotate right/);right.click();await tick();assert.equal(f.renders.findLast(render=>render.number===1).viewport.rotation,180);
+  f.api.mount(f.host,{...item,src:'/media/'+'c'.repeat(32)});await tick();assert.equal(f.renders.findLast(render=>render.id===2).viewport.rotation,90);f.api.unmount(f.host);
+});
 test('missing PDFs retain working download and share controls with a readable error',async()=>{
   const f=fixture({error:true});f.api.mount(f.host,item);await tick();
   assert.match(f.host.querySelector('.pdf-reader-status').textContent,/לא ניתן לפתוח/);assert.ok(f.host.querySelector('[data-pdf-download]').href);
@@ -137,5 +153,6 @@ test('the packaged Mozilla renderer reads and rasterizes both pages of a real PD
   const task=getDocument({data:samplePDF(),standardFontDataUrl:fileURLToPath(new URL('../public/assets/pdfjs/6.5.438/standard_fonts/',import.meta.url))});
   try{const pdf=await task.promise;assert.equal(pdf.numPages,2);
     for(let number=1;number<=2;number++){const page=await pdf.getPage(number),viewport=page.getViewport({scale:1}),canvas=createCanvas(viewport.width,viewport.height);await page.render({canvas,canvasContext:canvas.getContext('2d'),viewport}).promise;const text=await page.getTextContent();assert.match(text.items.map(item=>item.str).join(' '),number===1?/FIRST PAGE/:/SECOND PAGE/);assert.ok(canvas.toBuffer('image/png').length>2000);}
+    const page=await pdf.getPage(1),rotated=page.getViewport({scale:1,rotation:90}),canvas=createCanvas(rotated.width,rotated.height);assert.equal(rotated.width,240);assert.equal(rotated.height,300);await page.render({canvas,canvasContext:canvas.getContext('2d'),viewport:rotated}).promise;assert.ok(canvas.toBuffer('image/png').length>2000);
   }finally{await task.destroy();}
 });
