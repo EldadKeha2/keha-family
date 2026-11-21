@@ -95,12 +95,45 @@ test('public family profiles keep founder and child photos and portraits while y
       assert.deepEqual((await f.json(scope(branch,'people/eldad/selection?kind=photos'))).ids,[]);
       assert.equal((await f.json(scope(branch,'people/ora/page'))).albums.photos.total,1);
       assert.equal((await f.json(scope(branch,'people/shlomo/page'))).albums.photos.total,1);
-      const gallery=await f.json(scope(branch,'collections/gallery?size=all'));assert.ok(!gallery.items.some(item=>item.id===younger.id));assert.ok(gallery.items.some(item=>item.id===child.id));assert.ok(gallery.items.some(item=>item.id===grandfather.id));
+      const gallery=await f.json(scope(branch,'collections/gallery?size=all'));assert.ok(!gallery.items.some(item=>item.id===younger.id));assert.ok(gallery.items.some(item=>item.id===child.id));assert.equal(gallery.items.some(item=>item.id===grandfather.id),branch!=='extended');
     }
     for(const branch of ['haim','yehuda','medina','kehat','zechariah'])assert.equal((await f.json(scope(branch,'collections/gallery?size=all'))).items.length,0,'unrelated galleries do not import the original family photos');
     assert.equal((await f.call('/media/'+younger.id,{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
     assert.equal((await f.call('/media/'+younger.id+'?portrait=eldad',{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
     assert.equal((await f.call('/media/'+younger.id+'?portrait=ora',{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
+  }finally{f.close();}
+});
+
+test('extended gallery excludes every younger generation even in founder group photos and explicitly shared uploads',async()=>{
+  const f=fixture();try{
+    await f.json(scope('extended','tag-people'));
+    const founder=f.media('shlomo',{category:'gallery',tags:['shlomo','yona']});
+    const child=f.media('ora',{category:'gallery',tags:['ora']});
+    const otherBranch=f.media('kehat-naomi',{tags:['kehat-naomi']});
+    const hidden=[
+      f.media('shlomo',{category:'gallery',tags:['shlomo','eldad']}),
+      f.media(null,{category:'nakash:extended',tags:['amit'],familyScopes:['extended']}),
+      f.media(null,{category:'nakash:kehat',tags:['kehat-naomi','rami']}),
+      f.media('eldad',{category:'nakash:extended'}),
+    ];
+    const gallery=await f.json(scope('extended','collections/gallery?size=all'));
+    const expected=new Set([founder.id,child.id,otherBranch.id]);
+    assert.deepEqual(new Set(gallery.items.map(item=>item.id)),expected);
+    assert.equal(gallery.count,3);assert.equal(gallery.filterCounts.all,3);
+    assert.deepEqual(new Set((await f.json(scope('extended','gallery/selection'))).ids),expected);
+    assert.equal((await f.json(scope('extended','collections/gallery?person=eldad'))).count,0);
+    assert.equal((await f.json(scope('extended','collections/gallery?unit=u-eldad'))).count,0);
+    for(const branch of ['original','keha']){
+      const path=branch==='original'?'/api/collections/gallery?size=all':scope(branch,'collections/gallery?size=all');
+      assert.ok((await f.json(path)).items.some(item=>item.id===hidden[0].id));
+    }
+    for(const item of hidden)assert.equal((await f.call('/media/'+item.id)).status,200,'Original files are retained');
+    await f.json('/api/media/'+founder.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'eldad',tagged:true}]}});
+    const tagged=await f.json(scope('extended','collections/gallery?size=all'));
+    assert.equal(tagged.count,2);assert.ok(!tagged.items.some(item=>item.id===founder.id));
+    await f.json('/api/media/'+founder.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'eldad',tagged:false}]}});
+    assert.equal((await f.json(scope('extended','collections/gallery?size=all'))).count,3);
+    f.restart();assert.equal((await f.json(scope('extended','collections/gallery?size=all'))).count,3);
   }finally{f.close();}
 });
 
