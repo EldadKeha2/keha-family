@@ -5,7 +5,7 @@
   const tr=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const homes={
-    shlomo:(config.kehaOriginalHome||'https://keha-family.eldadkeha.workers.dev/')+'#home',
+    shlomo:(config.kehaShlomoHome||'/keha-extended/shlomo/')+'#home',
     zechariah:(config.kehaZechariahHome||'/keha-extended/zechariah/')+'#home',
     'kehat-tzadok':(config.kehaZechariahTzadokHome||'/keha-extended/zechariah-tzadok/')+'#home',
     kehat:(config.kehaKehatHome||'/keha-extended/kehat/')+'#home',

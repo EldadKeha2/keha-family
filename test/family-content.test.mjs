@@ -90,7 +90,7 @@ test('public family profiles keep founder and child photos and portraits while y
     await f.json(scope('extended','tag-people'));
     const younger=f.media('eldad');const child=f.media('ora');const grandfather=f.media('shlomo',{tags:['eldad']});
     const original=await f.json('/api/people/eldad/page');assert.equal(original.albums.photos.total,2);
-    for(const branch of ['keha','shlomo','extended']){
+    for(const branch of ['keha','extended']){
       const page=await f.json(scope(branch,'people/eldad/page'));assert.equal(page.albums.photos.total,0);assert.equal(page.person.photoCount,0);assert.ok(page.person.profile);
       assert.deepEqual((await f.json(scope(branch,'people/eldad/selection?kind=photos'))).ids,[]);
       assert.equal((await f.json(scope(branch,'people/ora/page'))).albums.photos.total,1);
@@ -99,8 +99,81 @@ test('public family profiles keep founder and child photos and portraits while y
     }
     for(const branch of ['haim','yehuda','medina','kehat','zechariah'])assert.equal((await f.json(scope(branch,'collections/gallery?size=all'))).items.length,0,'unrelated galleries do not import the original family photos');
     assert.equal((await f.call('/media/'+younger.id,{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
-    assert.equal((await f.call('/media/'+younger.id+'?portrait=eldad',{headers:{'X-Family-Content-Scope':'shlomo'}})).status,200);
+    assert.equal((await f.call('/media/'+younger.id+'?portrait=eldad',{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
     assert.equal((await f.call('/media/'+younger.id+'?portrait=ora',{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
+  }finally{f.close();}
+});
+
+test('Shlomo lite shares only reviewed, explicitly tagged founders and children across galleries, profiles, search and direct files',async()=>{
+  const f=fixture();try{
+    await f.json(scope('shlomo','tag-people'));
+    const review=item=>f.state.run('media.face.review',{id:item.id,photoRevision:item.photoRevision||'original',tagsRevision:f.state.tagsRevision(item.id),complete:true});
+    const photo=(owner,tags,more={})=>f.media(owner,{category:'gallery',tags,name:'lite-privacy-probe',...more});
+    const shared=photo('shlomo',['shlomo','yona','ora']);review(shared);
+    const child=f.media('ora',{tags:['ora'],name:'lite-privacy-probe'});review(child);
+    const partial=photo('shlomo',['shlomo']);
+    const untagged=photo('shlomo',[]);review(untagged);
+    const mixed=photo('shlomo',['shlomo','eldad']);review(mixed);
+    const ownedElsewhere=photo('eldad',['shlomo']);review(ownedElsewhere);
+    const stale=photo('yona',['yona'],{faceSummary:{reviewed:true}});
+    const scopedOnly=photo(null,[],{category:'nakash:shlomo',familyScopes:['shlomo']});
+    const younger=f.media('eldad',{tags:['eldad']});review(younger);
+    const blocked=[partial,untagged,mixed,stale,scopedOnly,younger];
+    const gallery=await f.json(scope('shlomo','collections/gallery?size=all'));
+    assert.deepEqual(new Set(gallery.items.map(item=>item.id)),new Set([shared.id,ownedElsewhere.id]),'Explicit face tags determine subjects, rather than album ownership');
+    assert.equal(gallery.filterCounts.complete,2);assert.equal(gallery.filterCounts.partial,0);assert.equal(gallery.filterCounts.untagged,0);
+    assert.match(gallery.items[0].src,/familyScope=shlomo/);
+    assert.deepEqual(new Set((await f.json(scope('shlomo','gallery/selection'))).ids),new Set([shared.id,ownedElsewhere.id]));
+    const album=await f.json(scope('shlomo','people/ora/page?photosSize=all'));
+    assert.deepEqual(new Set(album.albums.photos.items.map(item=>item.id)),new Set([shared.id,child.id]));
+    assert.equal(album.person.profileMediaId,child.id);
+    assert.equal((await f.json(scope('shlomo','people/shlomo/page'))).person.photoCount,2);
+    const hidden=await f.json(scope('shlomo','people/eldad/page'));
+    assert.equal(hidden.person.profile,null);assert.equal(hidden.person.photoCount,0);assert.equal(hidden.albums.photos.total,0);
+    assert.deepEqual((await f.json(scope('shlomo','people/eldad/selection?kind=photos'))).ids,[]);
+    const script=await (await f.call('/keha-extended/shlomo/site-data.js')).text();
+    const initial=JSON.parse(script.split('\n')[0].slice('window.FAMILY_DATA='.length,-1));
+    assert.equal(initial.people.eldad.profile,null);assert.equal(initial.people.ora.profileMediaId,child.id);
+    const roster=await f.json(scope('shlomo','tag-people'));
+    assert.equal(roster.people.find(p=>p.id==='eldad').profile,null);
+    const search=await f.json(scope('shlomo','search?q=lite-privacy-probe'));
+    assert.deepEqual(new Set(search.items.filter(item=>item.media).map(item=>item.id)),new Set([shared.id,ownedElsewhere.id]));
+    for(const item of blocked){
+      assert.equal((await f.call('/media/'+item.id+'?familyScope=shlomo')).status,404,item.id);
+      assert.equal((await f.call('/media/'+item.id+'?familyScope=shlomo&thumbnail=1&portrait=eldad')).status,404,item.id);
+      assert.equal((await f.call(scope('shlomo','media/'+item.id+'/view'))).status,404,item.id);
+    }
+    assert.equal((await f.call('/media/'+child.id+'?portrait=ora&familyScope=shlomo')).status,200);
+    assert.equal((await f.call('/media/'+child.id+'?version='+'a'.repeat(32)+'&familyScope=shlomo')).status,404,'A review of the current image does not authorize earlier image versions');
+    assert.equal((await f.call('/nakash/api/profile-photo/eldad',{headers:{'X-Family-Content-Scope':'shlomo'}})).status,404);
+    assert.equal((await f.call(scope('shlomo','people/ora/profile'),{method:'POST',body:{file:mixed.id}})).status,404);
+    const original=await f.json('/api/people/eldad/page');assert.ok(original.person.profile);assert.ok(original.albums.photos.total>0);
+    const changed=await f.json(scope('shlomo','people/ora/birthday'),{method:'POST',body:{birthday:'2.3.1950',expectedBirthday:album.person.birthday}});
+    assert.equal(changed.person.photoCount,2);assert.deepEqual(changed.person.gallery,[]);
+    await f.json('/api/media/'+shared.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'eldad',tagged:true}]}});
+    assert.equal((await f.json(scope('shlomo','collections/gallery?size=all'))).count,1);
+    review(shared);assert.equal((await f.json(scope('shlomo','collections/gallery?size=all'))).count,1,'Full review cannot override an outsider tag');
+    await f.json('/api/media/'+shared.id+'/tags/patch',{method:'POST',body:{changes:[{personId:'eldad',tagged:false}]}});
+    assert.equal((await f.json(scope('shlomo','collections/gallery?size=all'))).count,1,'A changed tag set needs a fresh full review');
+    review(shared);assert.equal((await f.json(scope('shlomo','collections/gallery?size=all'))).count,2);
+    f.restart();assert.equal((await f.json(scope('shlomo','collections/gallery?size=all'))).count,2);
+    assert.ok((await f.json('/api/collections/gallery?size=all')).items.some(item=>item.id===mixed.id),'Original media is retained');
+  }finally{f.close();}
+});
+
+test('Shlomo lite stories select only Shlomo and cannot create or edit memories about anyone else',async()=>{
+  const f=fixture();try{
+    const save=personIds=>f.json('/api/stories',{method:'POST',body:{title:'Existing memory',body:'A family account',category:'roots',personIds}});
+    const father=await save(['shlomo']),mother=await save(['yona']),mixed=await save(['shlomo','yona']),unknown=await save([]);
+    const before=await f.json('/api/stories');
+    const stories=await f.json(scope('shlomo','stories'));
+    assert.deepEqual(stories.stories.map(item=>item.id),[father.story.id]);
+    assert.deepEqual(stories.allowedPersonIds,['shlomo']);
+    for(const personIds of [[],['yona'],['ora'],['shlomo','yona']])assert.equal((await f.call(scope('shlomo','stories'),{method:'POST',body:{title:'Not permitted',body:'Not a Shlomo story',personIds}})).status,400);
+    for(const item of [mother,mixed,unknown])assert.equal((await f.call(scope('shlomo','stories/'+item.story.id),{method:'POST',body:{title:'Do not change',body:'Other family story',personIds:['shlomo'],expectedUpdatedAt:item.story.updatedAt}})).status,404);
+    assert.deepEqual((await f.json('/api/stories')).stories,before.stories,'Reading and rejecting writes leave all existing stories unchanged');
+    const created=await f.json(scope('shlomo','stories'),{method:'POST',body:{title:'A Shlomo memory',body:'About Shlomo',personIds:['shlomo']}});
+    assert.ok((await f.json(scope('shlomo','stories'))).stories.some(item=>item.id===created.story.id));
   }finally{f.close();}
 });
 

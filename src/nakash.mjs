@@ -111,6 +111,8 @@ export async function nakashRoute(request, env, db, ctx, options) {
     const id=path.slice(portraitPath.length),people=nakashProjection(family,new Map()).people;
     if(!capsule.test(id)||!Object.hasOwn(people,id))throw notFound();
     const {item}=await db('nakash.compat.portrait',{id});
+    const scope=request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope');
+    if(scope==='shlomo')await db('content.media.authorize',{branch:scope,id:item.id,portrait:id});
     return getObject(env,item,request);
   }
   if (method === 'POST') checkOrigin(request);

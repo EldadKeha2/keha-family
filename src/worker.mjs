@@ -390,7 +390,7 @@ const worker = {
       if((match=/^\/api\/documents\/([a-f0-9]{32})\/delete$/.exec(path))&&request.method==='POST')return deleteFamilyDocument(request,db,'original',match[1]);
       if(path==='/api/voices'&&request.method==='GET')return snapshot(request,await db('recordings'));
       if((match=/^\/api\/voices\/([a-f0-9]{32})\/audio$/.exec(path))&&['GET','HEAD'].includes(request.method)){
-        const scope=request.headers.get('X-Family-Content-Scope');if(scope)await db('content.voice.authorize',{branch:scope,id:match[1]});
+        const scope=request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope');if(scope)await db('content.voice.authorize',{branch:scope,id:match[1]});
         const item=await db('recording.get',{id:match[1]}),response=await getObject(env,item,request);
         if(!url.searchParams.has('download'))return response;
         const headers=new Headers(response.headers);headers.set('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(item.filename));return new Response(response.body,{status:response.status,headers});
@@ -399,8 +399,9 @@ const worker = {
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1]),paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia',paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
-        const scope=request.headers.get('X-Family-Content-Scope');
-        if(scope)await db('content.media.authorize',{branch:scope,id:match[1],portrait:url.searchParams.get('portrait')});
+        const scope=request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope');
+        const access=scope?await db('content.media.authorize',{branch:scope,id:match[1],portrait:url.searchParams.get('portrait')}):null;
+        if(scope==='shlomo'&&url.searchParams.has('version')&&url.searchParams.get('version')!==access.photoRevision)throw new HttpError(404,'הפריט לא נמצא.');
         let item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]}),derived=false;
         const variant=url.searchParams.get('thumbnail')==='1'?'thumbnail':url.searchParams.get('preview')==='1'?'preview':null;
         if(variant&&!url.searchParams.has('version')&&item[variant]?.revision===(item.photoRevision||'original')){item={...item,...item[variant]};derived=true;}

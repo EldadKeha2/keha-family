@@ -16,7 +16,7 @@ import {searchNakash} from './nakash-search.mjs';
 import {zipStream} from './zip.mjs';
 import {renderVideoRange, videoClipRoute, videoEditRoute} from './video-clip-route.mjs';
 import {VideoEdits} from './video-edits.mjs';
-import {restrictedOriginalPerson} from './family-content.mjs';
+import {restrictedOriginalPerson,scopedMediaLinks,ORIGINAL_PHOTO_PEOPLE} from './family-content.mjs';
 import {uploadFamilyDocument,deleteFamilyDocument} from './family-content-route.mjs';
 
 const route = /^\/nakash\/api\/compat\/(keha|haim|yehuda|medina)(\/api\/.*)$/;
@@ -81,7 +81,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   const contentBranch=branch==='keha'&&params.get('familyScope')==='nakash'?'nakash':branch;
   async function snapshot(result){
     const revision=result.revision||await sha256(JSON.stringify(result)),etag='"'+revision+'"';
-    return request.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json({...result,revision},200,{ETag:etag});
+    return request.headers.get('If-None-Match')===etag?new Response(null,{status:304,headers:{ETag:etag}}):json(scopedMediaLinks({...result,revision},branch),200,{ETag:etag});
   }
   const formDownload = method==='POST' && ['/api/media/download','/api/gallery/download'].includes(path);
   if (method==='POST') {
@@ -97,24 +97,26 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     const response=await options.nativeRoute(source,path);
     if(!response.ok || !response.headers.get('Content-Type')?.includes('application/json'))return response;
     const result=await response.json();
-    if(extended&&result.taggedPeople?.length){
+    if(extended&&branch!=='shlomo'&&result.taggedPeople?.length){
       const ids=result.taggedPeople.filter(person=>!Object.hasOwn(names,person.id)).map(person=>person.id);
       if(ids.length)await db('nakash.extended.members',{branch,ids});
     }
-    const display=p=>p&&names[p.id]?{...p,...(p.profile?.startsWith('/media/')?{profile:p.profile+(p.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(p.id)}:{}),...(restrictedOriginalPerson(p.id)?{photoCount:0,videoCount:0,documentCount:0,mediaCount:0,gallery:[]}:{}),extra:names[p.id].extra,extended:names[p.id].extended,branch:names[p.id].branch}:p;
+    const visible=branch==='shlomo'?(await db('content.people',{branch})).people:null;
+    const display=p=>p&&names[p.id]?{...p,...(visible?visible[p.id]:{}),...(p.profile?.startsWith('/media/')&&!visible?{profile:p.profile+(p.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(p.id)}:{}),...(restrictedOriginalPerson(p.id)?{photoCount:0,videoCount:0,documentCount:0,mediaCount:0,gallery:[]}:{}),extra:names[p.id].extra,extended:names[p.id].extended,branch:names[p.id].branch}:p;
     if(result.person)result.person=display(result.person);
     if(result.people)result.people=Array.isArray(result.people)?result.people.map(display):Object.fromEntries(Object.entries(result.people).map(([id,p])=>[id,display(p)]));
     if(result.taggedPeople)result.taggedPeople=result.taggedPeople.map(display);
+    if(branch==='shlomo'&&result.versions)result.versions=result.versions.filter(version=>version.current);
     // Native editors also return the original collection as a convenience.
     // A scoped app refreshes its own collection instead of receiving that album.
     delete result.albumUpdates;
     if(result.collection)delete result.collection;
     const headers=new Headers(response.headers);headers.delete('Content-Length');
-    return json(result,response.status,Object.fromEntries(headers));
+    return json(scopedMediaLinks(result,branch),response.status,Object.fromEntries(headers));
   } : null;
   const family = (options.createFamily || createFamily)(original);
   const scoped = toOriginalFamilyData(family);
-  const profiles = (await db('nakash.compat.profiles')).profiles;
+  const profiles = branch==='shlomo'?original.sharedPeople:(await db('nakash.compat.profiles')).profiles;
   const names = Object.fromEntries(Object.entries(scoped.people).map(([id,p]) => {
     const saved=profiles[id]||{};
     return [id,{...p,...saved,...(saved.profile?.startsWith('/media/')?{profile:saved.profile+(saved.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(id)}:{}),...(restrictedOriginalPerson(id)?{photoCount:0,videoCount:0,documentCount:0,mediaCount:0,gallery:[]}:{}),extra:false,extended:false,branch:p.branch}];
@@ -146,13 +148,13 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   }
   const collection = async (kind,personId) =>
     (await db(nativeRoute?'content.items':extended?'nakash.extended.items':'nakash.compat.items',{branch,...(kind?{kind}:{}),...(personId?{personId}:{})})).items.filter(item=>!item.deletedAt&&(!personId||item.personId===personId||item.people?.includes(personId)));
-  const describe = item => ({
+  const describe = item => scopedMediaLinks({
     ...picture(item),
     ...(nativeRoute?{src:'/media/'+item.id+(item.photoRevision?'?v='+item.photoRevision:'')}:{}),
     tags:(item.people||[]).filter(id=>Object.hasOwn(names,id)).map(id=>({id,personId:id,name:names[id].name})),
     ...(item.thumbnail?{thumbnailSrc:(nativeRoute?'/media/':mediaPath)+item.id+(nativeRoute?'?thumbnail=1&v=':'?asset=thumbnail&v=')+encodeURIComponent(item.thumbnail.revision)}:{}),
     ...(item.preview?{previewSrc:(nativeRoute?'/media/':mediaPath)+item.id+(nativeRoute?'?preview=1&v=':'?asset=preview&v=')+encodeURIComponent(item.preview.revision)}:{}),
-  });
+  },branch);
   const itemById = async (id,{deleted=false,writing=false}={}) => {
     const {item} = await db('nakash.get',{id});
     if ((!deleted && item.deletedAt) || !item.branches.includes(branch) && !(writing && item.branch===branch)) throw absent();
@@ -370,7 +372,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
 
   if(method==='GET'){
     if(path==='/api/stories')return snapshot(await db('content.stories',{branch:contentBranch}));
-    if(path==='/api/documents')return json(await db('content.documents',{branch:contentBranch}));
+    if(path==='/api/documents')return json(scopedMediaLinks(await db('content.documents',{branch:contentBranch}),branch));
     if(path==='/api/media')return json({people:names,revision:await sha256(JSON.stringify(names))});
     if(path==='/api/tag-people')return json({people:Object.values(names)});
     if(path==='/api/search')return json(searchNakash(Object.values(names),(await collection()).map(describe),extended?scoped.branches:BRANCHES,params,branch));
@@ -411,7 +413,14 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       if(!action)return json({...result,items:Object.values(result.albums).flatMap(album=>album.items)});
     }else if(method==='POST'){
       if(Object.hasOwn(albums,action))return upload(albums[action],id,'personal');
-      if(nativeRoute&&['profile','about','biography','death-date'].includes(action))return nativeRoute(request,'/api/people/'+encodeURIComponent(id)+'/'+action);
+      if(nativeRoute&&['profile','about','biography','death-date'].includes(action)){
+        if(branch==='shlomo'&&action==='profile'){
+          if(!ORIGINAL_PHOTO_PEOPLE.has(id))throw absent();
+          const body=await readJSON(request.clone(),4000);
+          if(!body.restorePrevious){const visible=await db('content.person',{branch,id,photosSize:'all'});if(!visible.albums.photos.items.some(item=>item.file===body.file||item.id===body.file))throw absent();}
+        }
+        return nativeRoute(request,'/api/people/'+encodeURIComponent(id)+'/'+action);
+      }
       const body=await readJSON(request,40000);
       let field,value,expected,fallback;
       if(action==='profile'){
@@ -429,7 +438,8 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       if(action==='death-date'){field='deathDate';value=body.date?calendarDate(body.date):null;expected=body.expectedDate;fallback=p.deathDate||null;}
       if(field){
         const {profile}=await db('nakash.compat.profile.save',{id,field,value,...(expected===undefined?{}:{expected}),fallback,revision:uid()});
-        return json({saved:true,person:{...p,...profile,extra:p.extra,extended:p.extended,branch:p.branch}});
+        const visible=branch==='shlomo'?(await db('content.people',{branch})).people[id]:profile;
+        return json({saved:true,person:{...p,...visible,extra:p.extra,extended:p.extended,branch:p.branch}});
       }
     }
   }

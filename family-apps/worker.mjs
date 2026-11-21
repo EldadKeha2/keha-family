@@ -25,6 +25,10 @@ export function familyApp(branch, upstreamFetch = fetch) {
       // URL must not turn a branch app into the full original family album.
       if(incoming.pathname.startsWith('/api/')&&!incoming.pathname.startsWith('/api/voices/'))return new Response('הפריט לא נמצא.',{status:404});
       if(incoming.pathname==='/family-data.js')return new Response('הפריט לא נמצא.',{status:404});
+      if(branch==='shlomo'&&(
+        incoming.pathname.includes('/api/')&&!incoming.pathname.startsWith(home+'api/compat/api/')&&!incoming.pathname.startsWith('/api/voices/')&&!incoming.pathname.startsWith('/nakash/api/profile-photo/')||
+        incoming.pathname.endsWith('/site-data.js')&&incoming.pathname!==home+'site-data.js'
+      ))return new Response('הפריט לא נמצא.',{status:404});
       // The upstream uses same-origin checks. Validate first, then translate
       // only this app's origin; never turn an unrelated origin into a trusted one.
       if (origin === incoming.origin) headers.set('Origin', UPSTREAM);

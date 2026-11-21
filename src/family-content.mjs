@@ -1,6 +1,7 @@
 import original from './family.mjs';
 import {createFamily} from '../public/nakash/family-data.mjs';
 import {createExtendedFamily} from '../public/keha-extended/family-data.mjs';
+import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
 import {HttpError,text,uid} from './http.mjs';
 
 export const ORIGINAL_PHOTO_PEOPLE=new Set(['shlomo','yona','ruti','becker-parent','yehiel','avigail','ora','shosh']);
@@ -17,10 +18,11 @@ const excluded=item=>item.archiveExcluded||item.id===MISATTRIBUTED_YONA_DOCUMENT
 export function contentContext(branch,sharedPeople={},identities={}){
   if(!validScopes.has(branch))throw new HttpError(400,'המשפחה אינה מוכרת.');
   const paternal=paternalScopes.has(branch);
-  const tree=(paternal?createExtendedFamily:createFamily)({...original,sharedPeople,identities});
+  const tree=(branch==='shlomo'?createShlomoFamily:paternal?createExtendedFamily:createFamily)({...original,sharedPeople,identities});
   const canonical=id=>tree.identities?.[id]||identities[id]||id;
   let ids;
-  if(branch==='original'||branch==='shlomo')ids=new Set(Object.keys(original.people));
+  if(branch==='original')ids=new Set(Object.keys(original.people));
+  else if(branch==='shlomo')ids=new Set(ORIGINAL_PHOTO_PEOPLE);
   else if(branch==='nakash')ids=new Set(Object.keys(tree.people));
   else if(branch==='extended'){
     ids=new Set();
@@ -54,13 +56,22 @@ export function contentHasSubjects(item,context,document=false){
   return subjects(item).some(id=>ids.has(context.canonical(id)));
 }
 export function storyInContext(story,context){
+  if(context.branch==='shlomo'){const ids=subjects(story).map(context.canonical);return ids.length>0&&ids.every(id=>id==='shlomo');}
   if(context.branch==='original')return !story.familyScopes?.length||story.familyScopes.includes('original')||contentHasSubjects(story,context);
   if(contentHasSubjects(story,context))return true;
   return context.branch!=='extended'&&!subjects(story).length&&story.familyScopes?.includes(context.branch);
 }
 export function restrictedOriginalPerson(id){return originalPeople.has(id)&&!ORIGINAL_PHOTO_PEOPLE.has(id);}
+function shlomoTaggedMedia(item,context){
+  const tags=(item.people||[]).map(context.canonical);
+  return tags.length>0&&tags.every(id=>ORIGINAL_PHOTO_PEOPLE.has(id));
+}
 export function mediaInContext(item,context){
   if(excluded(item))return false;
+  if(context.branch==='shlomo'){
+    if(kind(item)==='document')return contentHasSubjects(item,context,true)&&subjects(item).every(id=>context.documentIds.has(context.canonical(id)));
+    return shlomoTaggedMedia(item,context)&&(kind(item)==='photo'?item.faceSummary?.reviewed===true:(item.people||[]).some(id=>['shlomo','yona'].includes(context.canonical(id))));
+  }
   if(kind(item)==='document')return contentHasSubjects(item,context,true)||!subjects(item).length&&item.familyScopes?.includes(context.branch);
   if(subjects(item).some(id=>ORIGINAL_PHOTO_PEOPLE.has(id)&&context.tree.people[id]))return true;
   if(!item.category?.startsWith('nakash:')&&subjects(item).some(id=>originalPeople.has(id)))return false;
@@ -68,6 +79,7 @@ export function mediaInContext(item,context){
 }
 function collectionInContext(item,context){
   if(!mediaInContext(item,context))return false;
+  if(context.branch==='shlomo'&&kind(item)!=='document')return (item.people||[]).some(id=>['shlomo','yona'].includes(context.canonical(id)));
   if(['haim','yehuda','medina','zechariah','zechariah-tzadok','kehat'].includes(context.branch)&&kind(item)!=='document')return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.category==='nakash:'+context.branch||item.familyScopes?.includes(context.branch);
   return true;
 }
@@ -97,8 +109,40 @@ export function stateContentContext(state,branch){
   const people=Object.fromEntries(state.rows('SELECT id,data FROM people').map(row=>[row.id,JSON.parse(row.data)]));
   return contentContext(branch,people,state.sharedNakashIdentities||{});
 }
+function shlomoItems(state,context,source=null){
+  const tags=new Map();
+  const rows=source?state.rows('SELECT media_id,person_id FROM media_tags WHERE media_id IN (SELECT value FROM json_each(?))',JSON.stringify(source.map(item=>item.id))):state.rows('SELECT media_id,person_id FROM media_tags');
+  for(const {media_id,person_id} of rows){if(!tags.has(media_id))tags.set(media_id,[]);tags.get(media_id).push(context.canonical(person_id));}
+  const items=(source||state.rows('SELECT data FROM media ORDER BY rowid DESC').map(row=>JSON.parse(row.data)))
+    .map(item=>({...item,people:[...new Set(tags.get(item.id)||[])]}))
+    .filter(item=>!excluded(item)&&(kind(item)==='document'?mediaInContext(item,context):shlomoTaggedMedia(item,context)));
+  const metadata=state.mediaPublicMany(items);
+  return items.map((item,i)=>({...item,faceSummary:metadata[i].faceSummary,tagsRevision:metadata[i].tagsRevision})).filter(item=>mediaInContext(item,context));
+}
+function shlomoProfile(state,person,items){
+  const eligible=ORIGINAL_PHOTO_PEOPLE.has(person.id)?items.filter(item=>kind(item)==='document'?subjects(item).includes(person.id):item.people.includes(person.id)):[];
+  const snapshot=state.snapshot(person,eligible,false);
+  return {...person,...snapshot,profileId:snapshot.profileMediaId,profileHistory:[],gallery:[]};
+}
+export function scopedMediaLinks(value,branch){
+  if(branch!=='shlomo')return value;
+  if(typeof value==='string'&&/^\/(?:media\/[a-f0-9]{32}(?:\?|$)|api\/voices\/[a-f0-9]{32}\/audio(?:\?|$))/.test(value)){
+    const url=new URL(value,'https://family.invalid');url.searchParams.set('familyScope',branch);return url.pathname+url.search;
+  }
+  if(Array.isArray(value))return value.map(item=>scopedMediaLinks(item,branch));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,scopedMediaLinks(item,branch)]));
+  return value;
+}
 export function contentPerson(state,{branch,id,selection=false,...options}){
   const context=stateContentContext(state,branch);
+  if(branch==='shlomo'){
+    if(!context.tree.people[id])throw new HttpError(404,'האדם לא נמצא במשפחה הזאת.');
+    const items=shlomoItems(state,context,state.personMedia(id)).filter(item=>kind(item)==='document'?subjects(item).includes(id):item.people.includes(id));
+    const contentIds=ORIGINAL_PHOTO_PEOPLE.has(id)?items.map(item=>item.id):[];
+    if(selection)return state.personSelection(id,{...options,contentIds});
+    const result=state.personPage(id,{...options,contentIds});
+    return scopedMediaLinks({...result,person:shlomoProfile(state,result.person,items)},branch);
+  }
   const items=restrictedOriginalPerson(id)?[]:state.personMedia(id).filter(item=>!excluded(item)&&(kind(item)==='document'?context.mediaIds.has(id):mediaInContext({...item,people:[id]},context)));
   const contentIds=items.map(item=>item.id);
   return selection?state.personSelection(id,{...options,contentIds}):state.personPage(id,{...options,contentIds});
@@ -106,7 +150,7 @@ export function contentPerson(state,{branch,id,selection=false,...options}){
 
 export function contentDocuments(state,branch){
   const context=stateContentContext(state,branch),all=state.rows("SELECT data FROM media WHERE COALESCE(json_extract(data,'$.kind'),'')='document' OR category='attachment'").map(row=>JSON.parse(row.data));
-  const stories=state.run('stories').stories.filter(story=>contentHasSubjects(story,context,true));
+  const stories=state.run('stories').stories.filter(story=>branch==='shlomo'?storyInContext(story,context):contentHasSubjects(story,context,true));
   const attachments=new Set(stories.flatMap(story=>(story.attachments||[]).map(file=>file.src?.split('/').at(-1))));
   const merged=new Map();
   for(const source of all){
@@ -127,6 +171,12 @@ export function contentDocuments(state,branch){
 export function handleFamilyContent(state,action,args){
   const {branch='original'}=args,context=stateContentContext(state,branch);
   if(action==='content.person')return contentPerson(state,args);
+  if(action==='content.people'){
+    const result=state.run('people');
+    if(branch!=='shlomo')return result;
+    const items=shlomoItems(state,context);
+    return scopedMediaLinks({...result,people:Object.fromEntries(Object.entries(result.people).filter(([id])=>context.tree.people[id]).map(([id,person])=>[id,shlomoProfile(state,person,items)]))},branch);
+  }
   if(action==='content.documents')return contentDocuments(state,branch);
   if(action==='content.document.delete'){
     const item=contentDocuments(state,branch).items.find(item=>item.id===args.id);
@@ -152,19 +202,21 @@ export function handleFamilyContent(state,action,args){
   }
   if(action==='content.stories'){
     const result=state.run('stories');
-    return {...result,stories:result.stories.filter(item=>storyInContext(item,context)),allowedPersonIds:branch==='original'?null:[...context.ids],revision:result.revision+':'+branch+':v1'};
+    return {...result,stories:result.stories.filter(item=>storyInContext(item,context)),allowedPersonIds:branch==='original'?null:branch==='shlomo'?['shlomo']:[...context.ids],revision:result.revision+':'+branch+':v2'};
   }
   if(action==='content.story.save'){
     const fields={...args.fields};
     if(args.id){const row=state.rows('SELECT data FROM stories WHERE id=?',args.id)[0];if(!row||!storyInContext(JSON.parse(row.data),context))throw new HttpError(404,'הסיפור לא נמצא.');}
     if(fields.personIds!==undefined&&(!Array.isArray(fields.personIds)||fields.personIds.length>150||fields.personIds.some(id=>typeof id!=='string')))throw new HttpError(400,'בחרו אנשים מהרשימה.');
     fields.personIds=(fields.personIds||[]).map(context.canonical);
+    if(branch==='shlomo'&&(!fields.personIds.length||fields.personIds.some(id=>id!=='shlomo')))throw new HttpError(400,'במשפחה הזאת אפשר לשמור סיפורים על שלמה קהא בלבד.');
     if(fields.personIds.some(id=>!context.ids.has(id)))throw new HttpError(400,'בחרו את האנשים הרלוונטיים למשפחה הזאת.');
     if(branch==='extended'&&!fields.personIds.length)throw new HttpError(400,'בחרו אדם מהדורות המייסדים שאליו שייך הסיפור.');
     fields.familyScopes=[branch];
     return state.run('memory.story.save',{...args,fields});
   }
   if(action==='content.items'){
+    if(branch==='shlomo')return {items:shlomoItems(state,context).filter(item=>(!args.kind||kind(item)===args.kind)&&collectionInContext(item,context))};
     const tags=new Map();
     for(const row of state.rows('SELECT media_id,person_id FROM media_tags')){if(!tags.has(row.media_id))tags.set(row.media_id,[]);tags.get(row.media_id).push(row.person_id);}
     const items=state.rows('SELECT data FROM media ORDER BY rowid DESC').map(row=>JSON.parse(row.data)).filter(item=>!args.kind||kind(item)===args.kind).map(item=>({...item,people:tags.get(item.id)||[]})).filter(item=>collectionInContext(item,context));
@@ -173,6 +225,13 @@ export function handleFamilyContent(state,action,args){
   }
   if(action==='content.media.authorize'){
     const item=state.media(args.id);
+    if(branch==='shlomo'){
+      const tagged={...item,people:state.tagIds(item.id),faceSummary:kind(item)==='photo'?state.faceSummary(item):undefined};
+      if(args.portrait&&(!ORIGINAL_PHOTO_PEOPLE.has(args.portrait)||!tagged.people.includes(args.portrait)))throw new HttpError(404,'הפריט לא נמצא.');
+      if(mediaInContext(tagged,context))return {allowed:true,photoRevision:item.photoRevision||'original'};
+      if(kind(item)==='document'&&state.run('stories').stories.some(story=>storyInContext(story,context)&&story.attachments?.some(file=>file.src==='/media/'+item.id)))return {allowed:true};
+      throw new HttpError(404,'הפריט לא נמצא.');
+    }
     if(args.portrait&&context.tree.people[args.portrait]){
       const p=state.run('person',{id:args.portrait});
       if(p.profileMediaId===item.id)return {allowed:true};

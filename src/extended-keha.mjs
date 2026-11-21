@@ -16,7 +16,7 @@ function branchHomeHTML(original) {
 
 export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portalOrigins={}) {
   return nakashHTML(original,'keha')
-    .replace('<html ', '<html data-extended-keha="true" data-keha-original-home="https://keha-family.eldadkeha.workers.dev/" data-keha-shlomo-home="'+shlomoOrigin+SHLOMO_HOME+'" '+Object.values(BRANCH_PORTALS).map(portal=>'data-keha-'+portal.id+'-home="'+(portalOrigins[portal.id]||'')+portal.home+'"').join(' ')+' ')
+    .replace('<html ', '<html data-extended-keha="true" data-keha-shlomo-home="'+shlomoOrigin+SHLOMO_HOME+'" '+Object.values(BRANCH_PORTALS).map(portal=>'data-keha-'+portal.id+'-home="'+(portalOrigins[portal.id]||'')+portal.home+'"').join(' ')+' ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="extended" data-nakash-entry-view="tree"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')
     .replaceAll('/nakash/keha/',EXTENDED_HOME)
@@ -31,7 +31,7 @@ export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portal
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+EXTENDED_COLOR)
     .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+EXTENDED_COLOR+'}:root{--family-accent:'+EXTENDED_COLOR+'}')
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"><link rel="stylesheet" href="/keha-extended/hub.css?v=9"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/hub.js?v=family-circle-labels-v2" defer></script>\n$1')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/hub.js?v=shlomo-lite-v3" defer></script>\n$1')
     .replace('<div id="treeView">','<div id="treeView"><section id="extendedKehaHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
     .replace(/(<header class="phone-home-intro">.*?<\/header>)/s,'$1<section id="extendedKehaHomeHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+EXTENDED_NAME+'</h2>')
@@ -94,7 +94,11 @@ export async function extendedKehaRoute(request,env,db,ctx,options) {
   if(portal&&path===portal.home.slice(0,-1))return Response.redirect(new URL(portal.home+url.search,url),308);
   const shlomo=path.startsWith(SHLOMO_HOME),home=portal?.home || (shlomo?SHLOMO_HOME:EXTENDED_HOME);
   const createFamily=portal?original=>createBranchPortal(original,portal.id):shlomo?createShlomoFamily:createExtendedFamily;
-  const projection=async()=>({...options.family,...await db('nakash.extended.projection')});
+  const projection=async()=>{
+    const saved=await db('nakash.extended.projection');
+    if(shlomo)saved.sharedPeople=(await db('content.people',{branch:'shlomo'})).people;
+    return {...options.family,...saved};
+  };
   if(path.startsWith(home+'api/compat/'))return compatRoute(request,env,db,ctx,{...options,createFamily,nakashToken:NAKASH_WRITE_TOKEN},projection);
   if(!['GET','HEAD'].includes(request.method))return null;
   if(path===home+'privacy.html'){

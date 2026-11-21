@@ -533,11 +533,16 @@ test('Shlomo’s scope shares real Keha portraits and edits while excluding the 
     await f.json(shlomoSite('people/ora/birthday'),{method:'POST',body:{birthday:'2.3.1950',expectedBirthday:original.person.birthday}});
     assert.equal((await f.json('/api/people/ora/page')).person.birthday,'2.3.1950');
     const portrait=await f.json('/api/people/ora/photos?filename=ora.jpg',{method:'POST',body:photo});
+    assert.equal((await f.json(shlomoSite('people/ora/page'))).person.profileMediaId,null,'An untagged portrait stays in the original app');
+    const portraitId=portrait.person.profileMediaId;
+    await f.json('/api/media/'+portraitId+'/tags/patch',{method:'POST',body:{changes:[{personId:'ora',tagged:true}]}});
+    const details=await f.json('/api/media/'+portraitId+'/faces');
+    await f.json('/api/media/'+portraitId+'/faces/review',{method:'POST',body:{complete:true,photoRevision:'original',tagsRevision:details.item.tagsRevision}});
     assert.equal((await f.json(shlomoSite('people/ora/page'))).person.profileMediaId,portrait.person.profileMediaId);
     await f.json(shlomoSite('collections/gallery/upload?filename=ours.jpg'),{method:'POST',body:photo});
     await f.json(site('collections/gallery/upload?filename=other-branch.jpg'),{method:'POST',body:photo});
     const own=await f.json(shlomoSite('collections/gallery?size=all'));
-    assert.equal(own.count,2);
+    assert.equal(own.count,0,'An untagged upload or a child-only portrait cannot enter the founders’ main gallery');
     assert.equal((await f.json(site('collections/gallery?size=all'))).count,3);
     assert.equal((await f.call(shlomoSite('people/kehat-hadassah/page'))).status,404);
     f.restart();
@@ -555,7 +560,7 @@ test('Shlomo’s installation has its own family name and launch URL',async()=>{
   assert.equal(installed.related_applications[0].id,'https://shlomo.example'+SHLOMO_HOME);
 });
 
-test('the Shlomo portal shares original movies only when a founder or their child is identified',async()=>{
+test('the Shlomo portal shares original movies only when a founder is tagged and no outsider is tagged',async()=>{
   const f=fixture();try{
     const before=(await f.json(shlomoSite('collections/videos'))).count;
     for(const [id,category] of [['c'.repeat(32),'nostalgia'],['d'.repeat(32),'nakash:yehuda']]){
@@ -568,8 +573,12 @@ test('the Shlomo portal shares original movies only when a founder or their chil
     assert.ok(!videos.items.some(item=>item.id==='d'.repeat(32)));
     assert.equal((await f.json(site('collections/videos'))).count,before);
     f.database.prepare('INSERT INTO media_tags (media_id,person_id) VALUES (?,?)').run('c'.repeat(32),'ora');
+    assert.equal((await f.json(shlomoSite('collections/videos'))).count,before);
+    f.database.prepare('INSERT INTO media_tags (media_id,person_id) VALUES (?,?)').run('c'.repeat(32),'yona');
     assert.equal((await f.json(shlomoSite('collections/videos'))).count,before+1);
     assert.equal((await f.json(site('collections/videos'))).count,before+1);
+    f.database.prepare('INSERT INTO media_tags (media_id,person_id) VALUES (?,?)').run('c'.repeat(32),'eldad');
+    assert.equal((await f.json(shlomoSite('collections/videos'))).count,before);
   }finally{f.close();}
 });
 
@@ -673,7 +682,7 @@ test('desktop and mobile separate the four family corners and keep Yissachar bel
     const context=vm.createContext({window,document,location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(hubSource,context);vm.runInContext(appSource,context);
     assert.equal(document.querySelectorAll('#extendedKehaHub [data-family-corner]').length,4);
-    for(const [id,href]of [['shlomo','https://keha-family.eldadkeha.workers.dev/#home'],['zechariah','/keha-extended/zechariah/#home'],['kehat-tzadok','/keha-extended/zechariah-tzadok/#home'],['kehat','/keha-extended/kehat/#home']])assert.equal(document.querySelector('#extendedKehaHub [data-family-corner="'+id+'"]').getAttribute('href'),href);
+    for(const [id,href]of [['shlomo','/keha-extended/shlomo/#home'],['zechariah','/keha-extended/zechariah/#home'],['kehat-tzadok','/keha-extended/zechariah-tzadok/#home'],['kehat','/keha-extended/kehat/#home']])assert.equal(document.querySelector('#extendedKehaHub [data-family-corner="'+id+'"]').getAttribute('href'),href);
     assert.equal(document.querySelectorAll('#extendedKehaHub .extended-ancestor').length,2);
     assert.match(document.querySelector('#extendedKehaHub .extended-cousin-link').textContent,/בני דודים/);
     assert.match(document.querySelector('#extendedKehaHub .extended-connection-note').textContent,/קשר משפחתי ידוע/);

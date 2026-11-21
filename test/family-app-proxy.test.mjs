@@ -74,6 +74,13 @@ test('foreign-origin writes are rejected before any backend request', async () =
   }
 });
 
+test('Shlomo lite cannot read another family API or initial roster through its own origin',async()=>{
+  const app=familyApp('shlomo',()=>{throw Error('Another family scope reached the shared backend');});
+  for(const path of ['/nakash/api/family','/nakash/api/site-data.js','/nakash/api/compat/keha/api/collections/gallery','/keha-extended/api/compat/api/stories','/keha-extended/site-data.js','/keha-extended/zechariah/api/compat/api/media']){
+    assert.equal((await app.fetch(new Request('https://shlomo.example'+path))).status,404,path);
+  }
+});
+
 test('family manifests describe independent origins with their own existing brand', async () => {
   for (const branch of ['haim', 'yehuda', 'medina', 'keha']) {
     const original = JSON.parse(await readFile(new URL('../public/nakash/' + branch + '/manifest.webmanifest', import.meta.url), 'utf8'));
