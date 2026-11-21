@@ -24,6 +24,8 @@ export function initializeExtendedKeha(state) {
     const updateTri=!state.rows('SELECT id FROM meta WHERE id=?',triMigration).length;
     const meravMigration='extended-kehat-merav-spelling-2026-11-21-v1';
     const updateMerav=!state.rows('SELECT id FROM meta WHERE id=?',meravMigration).length;
+    const triArchiveMigration='extended-tri-childbirth-archive-1954-2026-11-21-v1';
+    const updateTriArchive=!state.rows('SELECT id FROM meta WHERE id=?',triArchiveMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -119,6 +121,20 @@ export function initializeExtendedKeha(state) {
         saved.aliases=[...new Set([...(saved.aliases||[]),...seed.aliases])];
         state.savePerson(saved);
       }
+      if(updateTriArchive&&seed.archiveBirthEvidence){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',triArchiveMigration+':backup:'+seed.id,JSON.stringify(saved));
+        for(const key of ['researchNotes','researchSources','parents','birthYear','birthYearSource','birthYearSourceEn','birthPlace','recordedParents','aliyahYear','occupation'])if(seed[key]!==undefined)saved[key]=structuredClone(seed[key]);
+        const existingYear=Number(saved.birthday?.split('.').at(-1));
+        if(existingYear>1111&&existingYear!==seed.birthYear)saved.researchNotes+=' תאריך הלידה השמור בפרופיל ('+saved.birthday+') שונה משנת '+seed.birthYear+' שבשאלון; שני הרישומים נשמרים לבירור.';
+        if(seed.id==='kehat-zechariah'&&saved.name==='זכריה קהת'){
+          saved.name=seed.name;delete saved.firstName;delete saved.lastName;
+          for(const key of ['nameEn','englishName'])if(!saved[key]||saved[key]==='Zechariah Kehat')saved[key]=seed[key];
+        }
+        saved.aliases=[...new Set([...(saved.aliases||[]),...(seed.aliases||[])])];
+        saved.unit=seed.unit;
+        state.savePerson(saved);
+      }
     }
     for(const seed of EXTENDED_PEOPLE){
       if(!seed.sharedProfileId)continue;
@@ -136,6 +152,22 @@ export function initializeExtendedKeha(state) {
     if(updateFamilyCorrection)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',familyCorrectionMigration,'done');
     if(updateTri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triMigration,'done');
     if(updateMerav)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',meravMigration,'done');
+    if(updateTriArchive){
+      // This original scan was uploaded through the family archive and is
+      // already linked to Zechariah and all ten children. Link the new mother
+      // profile to that same file, retaining its ID, caption and original bytes.
+      const documentId='993b035c6bdf42fdb37950489f291c92';
+      const row=state.rows('SELECT data FROM media WHERE id=?',documentId)[0];
+      if(row){
+        state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',triArchiveMigration+':document-backup',row.data);
+        const item=JSON.parse(row.data);
+        item.documentPeople=[...new Set([...(item.documentPeople||[]),'tri-yona'])];
+        state.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),documentId);
+        state.sql.exec('INSERT OR IGNORE INTO media_tags (media_id,person_id) VALUES (?,?)',documentId,'tri-yona');
+        state.savePerson(state.person('tri-yona'));
+      }
+      state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triArchiveMigration,'done');
+    }
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;

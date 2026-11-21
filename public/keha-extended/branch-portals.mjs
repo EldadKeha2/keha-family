@@ -14,7 +14,7 @@ const zechariahBranches=[
 // roots; its overview never turns them into a couple or invents common parents.
 export function createBranchPortal(original={},id){
   const portal=BRANCH_PORTALS[id];if(!portal)throw Error('Unknown branch portal');
-  const source=createExtendedFamily(original),allowed=new Set(Object.keys(source.people).filter(personId=>portal.branches.includes(source.branchIds.get(personId))));
+  const source=createExtendedFamily(original),allowed=new Set(Object.keys(source.people).filter(personId=>[source.branchIds.get(personId),...(source.people[personId].branches||[])].some(branch=>portal.branches.includes(branch))));
   const result={title:portal.name,root:portal.roots[0],people:{},units:{},branches:[],branchIds:new Map(),identities:{}};
   for(const personId of allowed)result.people[personId]=structuredClone(source.people[personId]);
   for(const unit of Object.values(source.units))if(unit.people.length&&unit.people.every(personId=>allowed.has(personId)))result.units[unit.id]=structuredClone(unit);

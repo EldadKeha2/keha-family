@@ -10,7 +10,7 @@ export const EXTENDED_BRANCHES = Object.freeze([
   {id:'zechariah', unit:'u-keha-zechariah', label:'משפחת זכריה קהא הבן', shortLabel:'זכריה קהא הבן', titleEn:'Family of Zechariah Keha the Younger', color:'#875b79', mark:'❖'},
   {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'משפחת קהת — צדוק', shortLabel:'צדוק · זכריה', titleEn:'Kehat family — Tzadok', color:'#3f7e6f', mark:'❖'},
   {id:'kehat', unit:'u-kehat-aharon-elder', label:'משפחת קהת — אהרון', shortLabel:'אהרון · סעדיה', titleEn:'Kehat family — Aharon', color:'#3f7e6f', mark:'❖'},
-  {id:'yissachar', unit:'u-keha-yissachar', label:'ענף טרי · עשרת האחים', shortLabel:'עשרת האחים · טרי', titleEn:'Tri family · ten siblings', color:'#936e34', mark:'❖'},
+  {id:'yissachar', unit:'u-kehat-zechariah', label:'ענף טרי · עשרת האחים', shortLabel:'עשרת האחים · טרי', titleEn:'Tri family · ten siblings', color:'#936e34', mark:'❖'},
 ].map(Object.freeze));
 
 // The supplied family chart is the source for these names and marriages.
@@ -128,7 +128,7 @@ export function createExtendedFamily(original = {}) {
   result.branchIds.set('saadia-elder','zechariah');
   for(const seed of SAADIA_PEOPLE)result.branchIds.set(canonical(seed.id),'zechariah');
   for(const seed of EXTENDED_PEOPLE)if(seed.researchBranch)result.branchIds.set(canonical(seed.id),seed.researchBranch);
-  // Tri's ten siblings remain a separate group while their parents are researched.
+  // A person can appear in both the Kehat ancestry and the Tri shortcut.
   for(const person of Object.values(result.people))person.branches=[];
   for (const branch of EXTENDED_BRANCHES) {
     const todo=[branch.unit],seen=new Set();
