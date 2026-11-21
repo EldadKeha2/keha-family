@@ -20,7 +20,9 @@ export const KEHAT_RESEARCH_PEOPLE=[
 ];
 const p=(id,name,englishName,gender,unit,details={})=>({id,name,englishName,nameEn:englishName,gender,unit,...details});
 KEHAT_RESEARCH_PEOPLE.push(
-  p('kehat-shlomo','שלמה קהת','Shlomo Kehat','m','u-kehat-shlomo',{researchNotes:'נוסף בין ילדי הנישואים הראשונים של סעדיה בתרשים המשפחתי המאוחר. פרטי בת זוגו וילדיו טרם הוכרעו; אין לשייך אליו אוטומטית ילדים שנזכרו ללא אב ברור.'}),
+  p('kehat-shlomo','שלמה קהת','Shlomo Kehat','m','u-kehat-shlomo',{birthYear:1896,birthYearSource:'פנקס הבוחרים תש״ט · 1949',birthYearSourceEn:'1949 electoral register',researchNotes:'בנם של סעדיה (ג׳ידעאן) ושושנה מנישואיו הראשונים. אלדד אישר את הזיהוי עם שלמה קהת בן סעדיה בפנקס תש״ט, יליד 1896, מספר רישום 510907, בכתובת ״הגשר, קהת שלמה״. שרה קהת היא אשתו ואסתר בתם, לפי האישור המשפחתי. בתש״ב מופיע שלמה קהה בן סעדיה יליד 1903; פער השנים נשמר לבירור לצד שנת 1896 הרשומה בתש״ט. אין לשייך אליו ילדים נוספים ללא זיהוי מפורש.'}),
+  p('kehat-shlomo-sarah','שרה קהת','Sarah Kehat','f','u-kehat-shlomo',{birthYear:1900,birthYearSource:'פנקס הבוחרים תש״ט · 1949',birthYearSourceEn:'1949 electoral register',recordedParents:{father:'סעדיה'},researchNotes:'אשתו של שלמה קהת בן סעדיה ואמה של אסתר, לפי אישור אלדד. בפנקס תש״ט נרשמה שרה קהת בת סעדיה, ילידת 1900, מספר 510908, באותה כתובת של שלמה ואסתר: ״הגשר, קהת שלמה״. השם סעדיה של אביה אינו קובע שזהו סעדיה אביו של שלמה.'}),
+  p('kehat-esther','אסתר קהת','Esther Kehat','f','u-kehat-esther',{birthYear:1930,birthYearSource:'פנקס הבוחרים תש״ט · 1949',birthYearSourceEn:'1949 electoral register',researchNotes:'בתם של שלמה קהת ושרה, לפי אישור אלדד. בפנקס תש״ט רשומה אסתר קהת בת שלמה, ילידת 1930, מספר 510909, בכתובת ״הגשר, קהת שלמה״. שנת הלידה מופיעה ברשומה עצמה; אין להסיק ממנה יום וחודש לידה.'}),
   p('kehat-aharon-saida','סעידה מחדון קהא','Saida Madhun Keha','f','u-kehat-aharon',{aliases:['סעידה מחדון'],researchNotes:'בת זוגו של אהרון בן סעדיה לפי התרשים. במצבה המועמדת מופיעה סעידה בת יוסף ונכלה מחדון.'}),
   p('kehat-amna','אמנה קהא','Amna Keha','f','u-kehat-zechariah-ben-tzadok',{deceased:true,researchNotes:'אמם של צדוק ונעמי מנישואיו הראשונים של זכריה בן צדוק. בתעודת נישואי צדוק H57320 מ־7.1.1944 נרשמה אמנה ז״ל. בתעודת נעמי H77495 מ־21.6.1946 מופיעים שוב ההורים זכריה ואמנה. שיוכה הקודם כאם יהודית תוקן לפי אישור אלדד: אמה של יהודית היא ציונה. שם משפחתה של אמנה לפני הנישואין אינו ידוע.'}),
   p('kehat-tziona','ציונה קהא','Tziona Keha','f','u-kehat-zechariah-ben-tzadok',{aliases:['ציניה קהא'],researchNotes:'אשתו השנייה של זכריה בן צדוק ואמם הביולוגית של יהודית, שורי (סורי) ומרדכי, לפי התיקון שאישר אלדד. בתעודת נישואי יהודית H88579 מ־14.3.1947 נרשמה ציונה כאמה. במצבה המועמדת נכתב ציניה בת צדוק; אין להסיק שזה אותו צדוק שהיה אביו של זכריה.'}),
@@ -68,7 +70,8 @@ export function applyKehatResearchUnits(units){
     {people:['kehat-jidaan','kehat-first-wife'],children:first,relationship:'spouse',label:'נישואין ראשונים',labelEn:'First marriage'},
     {people:['kehat-jidaan','kehat-miriam'],children:second,relationship:'spouse',label:'נישואין שניים',labelEn:'Second marriage'},
   ]});
-  set('u-kehat-shlomo',['kehat-shlomo'],[],'u-keha-kehat');
+  set('u-kehat-shlomo',['kehat-shlomo','kehat-shlomo-sarah'],['u-kehat-esther'],'u-keha-kehat');
+  set('u-kehat-esther',['kehat-esther'],[],'u-kehat-shlomo');
   set('u-kehat-aharon',['kehat-aharon','kehat-aharon-saida'],[],'u-keha-kehat');
   set('u-kehat-yehudit',['kehat-yehudit']);
   set('u-kehat-unresolved-miriam',['kehat-yaakov-miriam']);

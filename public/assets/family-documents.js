@@ -4,7 +4,7 @@
   const I=window.FamilyI18n,$=id=>document.getElementById(id),t=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase().trim();
-  const state={view:null,items:[],people:[],query:'',kind:'all',person:'all',loaded:false,loading:false,saving:false};
+  const state={view:null,items:[],people:[],query:'',kind:'all',person:'all',loaded:false,loading:false,saving:false,deleting:false,deleteId:null};
   const emblem='<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 6h18l8 8v28H12ZM30 6v10h8M18 23h14M18 29h14M18 35h9"/><path d="m6 16-3 2v25h25"/></svg>';
   async function request(path,options={}){
     const response=await I.fetch(path,{cache:'no-store',...options});
@@ -16,9 +16,9 @@
     const query=normalize(state.query),items=state.items.filter(item=>(state.kind==='all'||(audio(item)?'audio':'document')===state.kind)&&(state.person==='all'||item.personIds?.includes(state.person)||item.tags?.some(p=>p.id===state.person))&&(!query||normalize([item.name,item.title,item.filename,item.caption,...(item.tags||[]).map(p=>p.name)].join(' ')).includes(query)));
     $('documentCount').textContent=t(`${items.length} פריטים`,`${items.length} records`);
     $('documentGrid').innerHTML=items.map(item=>{
-      const title=item.name||item.title||item.filename,recording=audio(item),image=item.mime?.startsWith('image/');
-      const preview=recording?`<div class="document-audio">${emblem}<span>${t('קול מן העבר','A voice from the past')}</span><audio controls preload="none" src="${safe(item.src)}"></audio></div>`:image?`<button type="button" class="document-preview" data-document-open="${item.id}" aria-label="${safe(t('פתיחת ','Open ')+title)}"><img src="${safe(item.src)}" alt="${safe(title)}" loading="lazy" decoding="async"></button>`:`<button type="button" class="document-preview document-paper" data-document-open="${item.id}" aria-label="${safe(t('פתיחת ','Open ')+title)}">${emblem}<span>${safe((item.filename?.split('.').at(-1)||'PDF').toUpperCase())}</span><small>${t('פתיחת המסמך','Open document')}</small></button>`;
-      return `<article class="document-card">${preview}<div class="document-card-body"><h3>${safe(title)}</h3>${item.caption?`<p class="document-description" dir="auto">${safe(item.caption)}</p>`:''}<div class="document-people">${(item.tags||[]).map(p=>`<a href="#person/${encodeURIComponent(p.id)}">${safe(I.personName(p))}</a>`).join('')}</div><a class="document-download" href="${safe(item.src)}${item.src.includes('?')?'&':'?'}download=1" download="${safe(item.filename||title)}">${t('הורדת המקור','Download original')}</a></div></article>`;
+      const title=item.name||item.title||item.filename,recording=audio(item),image=item.mime?.startsWith('image/')||item.documentPreview;
+      const preview=recording?`<div class="document-audio">${emblem}<span>${t('קול מן העבר','A voice from the past')}</span><audio controls preload="none" src="${safe(item.src)}"></audio></div>`:image?`<button type="button" class="document-preview" data-document-open="${item.id}" aria-label="${safe(t('פתיחת ','Open ')+title)}"><img src="${safe(item.documentPreview||item.src)}" alt="${safe(title)}" loading="lazy" decoding="async"></button>`:`<button type="button" class="document-preview document-paper" data-document-open="${item.id}" aria-label="${safe(t('פתיחת ','Open ')+title)}">${emblem}<span>${safe((item.filename?.split('.').at(-1)||'PDF').toUpperCase())}</span><small>${t('פתיחת המסמך','Open document')}</small></button>`;
+      return `<article class="document-card">${preview}<div class="document-card-body"><h3>${safe(title)}</h3>${item.caption?`<p class="document-description" dir="auto">${safe(item.caption)}</p>`:''}${item.sourceUrl?`<a class="document-source" href="${safe(item.sourceUrl)}" target="_blank" rel="noopener">${safe(item.sourceLabel||t('מקור היסטורי','Historical source'))}</a>`:''}<div class="document-people">${(item.tags||[]).map(p=>`<a href="#person/${encodeURIComponent(p.id)}">${safe(I.personName(p))}</a>`).join('')}</div><div class="document-actions"><a class="document-download" href="${safe(item.src)}${item.src.includes('?')?'&':'?'}download=1" download="${safe(item.filename||title)}">${t('הורדת המקור','Download original')}</a><button type="button" class="document-delete" data-document-delete="${safe(item.id)}" aria-label="${safe(t('מחיקת התיעוד: ','Delete record: ')+title)}">${t('מחיקה','Delete')}</button></div></div></article>`;
     }).join('');
     $('documentsEmpty').hidden=items.length>0||!state.loaded;
   }
@@ -36,6 +36,25 @@
     editor.innerHTML=`<form id="documentForm"><header><h2 id="documentEditorTitle">${t('הוספת תיעוד משפחתי','Add a family record')}</h2><button type="button" data-document-close aria-label="${t('סגירה','Close')}">×</button></header><label>${t('כותרת','Title')}<input id="documentTitle" maxlength="200" required dir="auto"></label><label>${t('הקובץ המקורי','Original file')}<input id="documentFile" type="file" accept=".pdf,.doc,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif,image/avif,audio/*" required></label><p class="document-file-hint">${t('מסמכים עד 10MB · תמונות עד 50MB · הקלטות עד 90MB','Documents up to 10MB · Images up to 50MB · Audio up to 90MB')}</p><fieldset><legend>${t('למי שייך התיעוד?','Who is this record about?')}</legend><input type="search" id="documentPeopleSearch" aria-label="${t('חיפוש אדם','Find a person')}" placeholder="${t('חיפוש שם…','Search names…')}"><div class="document-person-choices" id="documentPeople"></div></fieldset><label>${t('תיאור ומקור המסמך','Description and source')}<textarea id="documentCaption" maxlength="5000" rows="4" dir="auto"></textarea></label><p id="documentUploadStatus" role="status"></p><p id="documentError" role="alert"></p><button class="primary-button" type="submit" id="saveDocument">${t('שמירה והעלאה','Save and upload')}</button></form>`;
     document.body.append(editor);
     const viewer=document.createElement('dialog');viewer.id='documentViewer';viewer.className='document-dialog document-viewer';viewer.setAttribute('aria-labelledby','documentViewerTitle');viewer.innerHTML=`<header><h2 id="documentViewerTitle"></h2><button type="button" data-document-close aria-label="${t('סגירה','Close')}">×</button></header><div id="documentViewerBody"></div><a id="documentOriginal" target="_blank" rel="noopener">${t('פתיחת המקור בחלון נוסף','Open original in another tab')}</a>`;document.body.append(viewer);
+    const removal=document.createElement('dialog');removal.id='documentRemoval';removal.className='document-dialog document-removal';removal.setAttribute('aria-labelledby','documentRemovalTitle');
+    removal.innerHTML=`<form id="documentRemovalForm"><header><h2 id="documentRemovalTitle">${t('מחיקת תיעוד','Delete a record')}</h2><button type="button" data-document-cancel aria-label="${t('סגירה','Close')}">×</button></header><p id="documentRemovalName" dir="auto"></p><p>${t('כדי למחוק את התיעוד מכל המקומות שבהם הוא מופיע, הזינו את סיסמת המחיקה.','Enter the removal password to delete this record everywhere it appears.')}</p><label>${t('סיסמת מחיקה','Removal password')}<input id="documentRemovalPassword" type="password" autocomplete="current-password" required maxlength="128"></label><p id="documentRemovalError" role="alert"></p><div class="document-removal-actions"><button type="button" data-document-cancel>${t('ביטול','Cancel')}</button><button type="submit" class="document-delete" id="confirmDocumentRemoval">${t('מחיקת התיעוד','Delete record')}</button></div></form>`;document.body.append(removal);
+    const clearRemoval=()=>{$('documentRemovalPassword').value='';state.deleteId=null;};
+    for(const button of removal.querySelectorAll('[data-document-cancel]'))button.addEventListener('click',()=>{if(!state.deleting){clearRemoval();removal.close();}});
+    removal.addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();else clearRemoval();});
+    removal.addEventListener('close',clearRemoval);
+    $('documentRemovalForm').addEventListener('submit',async event=>{
+      event.preventDefault();if(state.deleting||!state.deleteId)return;
+      const id=state.deleteId,password=$('documentRemovalPassword').value;$('documentRemovalPassword').value='';
+      if(!password){$('documentRemovalError').textContent=t('הזינו את סיסמת המחיקה.','Enter the removal password.');return;}
+      state.deleting=true;$('confirmDocumentRemoval').disabled=true;$('documentRemovalError').textContent='';
+      try{
+        await request('api/documents/'+encodeURIComponent(id)+'/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
+        state.items=state.items.filter(item=>item.id!==id);render();removal.close();clearRemoval();
+        document.dispatchEvent(new CustomEvent('family-document-deleted',{detail:{id}}));
+        await refresh();$('documentsStatus').textContent=t('התיעוד נמחק.','The record was deleted.');
+      }catch(error){$('documentRemovalError').textContent=error.message;$('documentRemovalPassword').focus();}
+      finally{state.deleting=false;$('confirmDocumentRemoval').disabled=false;}
+    });
     $('newDocument').addEventListener('click',async()=>{
       if(!state.loaded)await refresh();if(!state.loaded)return;
       $('documentForm').reset();$('documentError').textContent='';$('documentUploadStatus').textContent='';
@@ -47,10 +66,15 @@
     $('documentPersonFilter').addEventListener('change',event=>{state.person=event.target.value;render();});
     section.addEventListener('click',event=>{
       const filter=event.target.closest('[data-document-kind]');if(filter){state.kind=filter.dataset.documentKind;for(const button of section.querySelectorAll('[data-document-kind]'))button.setAttribute('aria-pressed',String(button===filter));render();}
+      const remove=event.target.closest('[data-document-delete]');
+      if(remove){
+        const item=state.items.find(item=>item.id===remove.dataset.documentDelete);if(!item)return;
+        state.deleteId=item.id;$('documentRemovalName').textContent=item.name||item.title||item.filename;$('documentRemovalPassword').value='';$('documentRemovalError').textContent='';removal.showModal();$('documentRemovalPassword').focus();return;
+      }
       const button=event.target.closest('[data-document-open]');if(!button)return;
       const item=state.items.find(item=>item.id===button.dataset.documentOpen);if(!item)return;
       $('documentViewerTitle').textContent=item.name||item.title||item.filename;
-      $('documentViewerBody').innerHTML=item.mime?.startsWith('image/')?`<img src="${safe(item.src)}" alt="${safe(item.name||item.filename)}">`:item.mime==='application/pdf'?`<iframe src="${safe(item.src)}" title="${safe(item.name||item.filename)}"></iframe>`:`<p>${t('את הקובץ הזה אפשר לפתוח או להוריד בקישור למקור.','Open or download this file using the original link.')}</p>`;
+      $('documentViewerBody').innerHTML=item.mime?.startsWith('image/')?`<img src="${safe(item.src)}" alt="${safe(item.name||item.filename)}">`:item.mime==='application/pdf'?`<iframe src="${safe(item.src)}${item.src.includes('?')?'&':'?'}inline=1" title="${safe(item.name||item.filename)}"></iframe>`:`<p>${t('את הקובץ הזה אפשר לפתוח או להוריד בקישור למקור.','Open or download this file using the original link.')}</p>`;
       $('documentOriginal').href=item.src;viewer.showModal();
     });
     for(const dialog of [editor,viewer]){dialog.querySelector('[data-document-close]').addEventListener('click',()=>{if(!state.saving)dialog.close();});dialog.addEventListener('cancel',event=>{if(state.saving)event.preventDefault();});}

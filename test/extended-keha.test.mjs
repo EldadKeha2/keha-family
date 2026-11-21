@@ -20,6 +20,18 @@ const photo=await readFile(new URL('./fixtures/photo.jpg',import.meta.url));
 const manifest=JSON.parse(await readFile(new URL('../public/keha-extended/manifest.webmanifest',import.meta.url)));
 const site=path=>'/keha-extended/api/compat/api/'+path;
 const shlomoSite=path=>SHLOMO_HOME+'api/compat/api/'+path;
+
+test('the confirmed 1949 household joins Sarah and Esther to Shlomo without inventing exact birth dates',()=>{
+  const tree=createExtendedFamily(family);
+  assert.deepEqual(tree.units['u-kehat-shlomo'].people,['kehat-shlomo','kehat-shlomo-sarah']);
+  assert.deepEqual(tree.units['u-kehat-shlomo'].children,['u-kehat-esther']);
+  assert.equal(tree.units['u-kehat-esther'].parent,'u-kehat-shlomo');
+  for(const [id,year] of [['kehat-shlomo',1896],['kehat-shlomo-sarah',1900],['kehat-esther',1930]]){
+    assert.equal(tree.people[id].birthYear,year);assert.notEqual(tree.people[id].birthday,'1.1.'+year);
+  }
+  assert.match(tree.people['kehat-shlomo'].researchNotes,/1903/);
+  assert.equal(tree.units['u-kehat-shlomo'].parent,'u-keha-kehat');
+});
 function fixture(){
   const database=new DatabaseSync(':memory:');
   const storage={sql:{exec(query,...args){const statement=database.prepare(query);const rows=statement.columns().length?statement.all(...args):(statement.run(...args),[]);return {toArray:()=>rows};}},
@@ -720,7 +732,7 @@ test('each portal can edit profiles and upload documents/photos while the centra
       await f.json(path(branch,'people/'+id+'/about'),{method:'POST',body:{about:'סיפור משפחתי חדש',expectedAbout:before.person.about||'',language:'he'}});
       assert.equal((await f.json(site('people/'+id+'/page'))).person.about,'סיפור משפחתי חדש');
       await f.json(path(branch,'people/'+id+'/documents?filename=marriage.jpg'),{method:'POST',body:photo});
-      assert.equal((await f.json(site('people/'+id+'/page'))).albums.documents.total,1);
+      assert.equal((await f.json(site('people/'+id+'/page'))).albums.documents.total,before.albums.documents.total+1);
       await f.json(path(branch,'collections/gallery/upload?filename=family.jpg'),{method:'POST',body:photo});
       const gallery=await f.json(path(branch,'collections/gallery?size=all'));
       assert.equal(gallery.count,1);

@@ -396,7 +396,7 @@ export class FamilyState {
     const scope=this.mediaScope(item);
     const people=Object.fromEntries([...new Set(ids)].map(id=>[id,this.snapshot(this.person(id),this.personMedia(id))]));
     return {saved:true,operation,scope,item:this.mediaPublic(item),people,
-      ...(item.category==='personal'?{person:people[item.personId]}:item.category==='family-ai'?{}:{collection:this.collection(item.category)}),
+      ...(item.category==='personal'?{person:people[item.personId]}:['family-ai','attachment'].includes(item.category)?{}:{collection:this.collection(item.category)}),
       ...(item.category.startsWith('wedding:')?{wedding:this.wedding(item.category.slice(8))}:{})};
   }
   patchTags(id,changes){
@@ -996,8 +996,8 @@ export class FamilyState {
       case 'media.delete':{
         const item=this.media(p.id);
         if(this.mediaScope(item)!==p.scope)throw new HttpError(404,'הפריט לא נמצא באלבום הזה.');
-        if(item.category==='attachment')throw new HttpError(400,'מסמך זה הוא חלק מסיפור.');
-        if(item.category!=='personal')validCollection(item.category);
+        if(item.category==='attachment'&&!p.fromDocumentArchive)throw new HttpError(400,'מסמך זה הוא חלק מסיפור.');
+        if(!['personal','attachment'].includes(item.category))validCollection(item.category);
         const affected=this.relatedPeople(item),selected=affected.filter(id=>this.person(id).profileId===item.id);
         this.sql.exec('INSERT INTO media_trash(id,data,deleted_at,profile_selected) VALUES(?,?,?,?)',item.id,JSON.stringify({...item,_profilePeople:selected}),new Date().toISOString(),selected.includes(item.personId)?1:0);
         this.sql.exec('DELETE FROM media WHERE id=?',item.id);
@@ -1162,6 +1162,9 @@ export class FamilyState {
       const {action,...p}=await request.json();
       if(action?.startsWith('nakash.'))return json(await handleNakashState(this,action,p,RecycleAccess));
       if(action==='family-ai.removal.setup')return json(await new FamilyAiRemovalAccess(this).setup(p));
+      // Documents share the owner's existing private removal verifier and rate
+      // limits. Guard the underlying album route too, not only the archive UI.
+      if(action==='content.document.delete'||action==='media.delete'&&this.media(p.id).category!=='attachment'&&mediaKind(this.media(p.id))==='document')await new FamilyAiRemovalAccess(this).authorize(p);
       if(action==='family-ai.exclude'&&p.excluded!==false)await new FamilyAiRemovalAccess(this).authorize(p);
       if(action==='media.delete'&&(['family-ai','living-family'].includes(p.scope)||this.media(p.id).category==='family-ai')){
         await new FamilyAiRemovalAccess(this).authorize(p);

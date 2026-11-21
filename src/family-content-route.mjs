@@ -1,6 +1,11 @@
-import {HttpError,json,uid} from './http.mjs';
+import {HttpError,json,uid,readJSON} from './http.mjs';
 import {configured,putObject,deleteObject} from './hf.mjs';
 import {sniffAudio} from './memories.mjs';
+
+export async function deleteFamilyDocument(request,db,branch,id){
+  const {password}=await readJSON(request,2048);
+  return json(await db('content.document.delete',{branch,id,password,client:request.headers.get('CF-Connecting-IP')||'unknown'}));
+}
 
 export async function uploadFamilyDocument(request,env,db,ctx,options,branch='original'){
   if(!configured(env))throw new HttpError(503,'אחסון הקבצים אינו זמין כרגע.');

@@ -471,9 +471,11 @@ test('deleted photos from every album retain original bytes, tags, capture dates
 test('recycle video seeking, document downloads, filtering and old-item restoration remain private',async()=>{
  const f=fixture();try{
   await f.connect();const auth=await unlockTrash(f),items=[];
+  f.env.FAMILY_AI_REMOVAL_SETUP_DIGEST=await sha256(auth.key);
+  assert.equal((await f.call('/api/family-ai/removal/setup',{method:'POST',body:{setupKey:auth.key,password:auth.password}})).status,200);
   for(const [name,bytes,kind]of [['film.mp4',video,'video'],['record.pdf',new TextEncoder().encode('%PDF-1.7\nExample\n%%EOF'),'document']]){
    const response=await f.call('/api/nostalgia/upload?filename='+name,{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length)}});assert.equal(response.status,201);const item=(await response.json()).collection.items[0];items.push(item);
-   assert.equal((await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:item.scope}})).status,200);
+   assert.equal((await f.call('/api/media/'+item.id+'/delete',{method:'POST',body:{scope:item.scope,password:auth.password}})).status,200);
    f.database.prepare('UPDATE media_trash SET deleted_at=? WHERE id=?').run('2001-01-01T00:00:00.000Z',item.id);
    assert.equal((await f.call('/api/media/'+item.id+'/restore',{method:'POST',body:{scope:item.scope,fromRecycleBin:true}})).status,403);
    const filtered=await(await f.call('/api/trash?kind='+kind+'&q='+name,{headers:auth.headers})).json();assert.equal(filtered.count,1);assert.equal(filtered.items[0].id,item.id);

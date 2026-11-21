@@ -374,7 +374,17 @@
     if(!app()?.apiEnabled){app()?.toast(I18n.t('השמירה אינה זמינה כרגע. נסו לרענן.'));return;}
     const item=(albums.get(scope)||[]).find(item=>item.id===id)||(state.scope===scope&&current()?.id===id?current():null);if(!item)return;
     const isLinked=linked(item,scope),personName=isLinked?app().nameOf(scope.slice(9)):'';
-    state.pending={scope:scope.startsWith('personal:')?scope:item.scope,item,isLinked};$('deleteMediaName').textContent=item.name||item.filename;
+    const requiresPassword=item.kind==='document'&&!isLinked;
+    state.pending={scope:scope.startsWith('personal:')?scope:item.scope,item,isLinked,requiresPassword};$('deleteMediaName').textContent=item.name||item.filename;
+    let passwordField=$('deleteDocumentPasswordField');
+    if(requiresPassword&&!passwordField){
+      passwordField=document.createElement('label');passwordField.id='deleteDocumentPasswordField';passwordField.className='delete-document-password';
+      passwordField.textContent=I18n.t('סיסמת מחיקה');
+      const input=document.createElement('input');input.id='deleteDocumentPassword';input.type='password';input.autocomplete='current-password';input.maxLength=128;passwordField.append(input);
+      $('deleteMediaHint').after(passwordField);
+      input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();confirmDelete();}});
+    }
+    if(passwordField){passwordField.hidden=!requiresPassword;$('deleteDocumentPassword').value='';}
     $('deleteMediaTitle').textContent=isLinked?I18n.t('להסיר את הפריט מהאלבום של ')+personName+'?':I18n.t('האם אתה בטוח שאתה רוצה למחוק פריט זה?');
     $('deleteMediaHint').textContent=isLinked?I18n.t('התיוג של ')+personName+I18n.t(' יוסר. הפריט ימשיך להופיע באלבום המקורי ובאלבומים של שאר המתויגים.'):I18n.t('הפריט יוסר מכל האלבומים שבהם הוא מופיע. מיד לאחר המחיקה אפשר לבחור ״ביטול מחיקה״.');
     $('confirmMediaDelete').textContent=isLinked?I18n.t('כן, הסר מהאלבום'):I18n.t('כן, מחק');
@@ -404,10 +414,13 @@
   }
   async function confirmDelete(){
     if(!state.pending||state.deleting)return;
-    const {item,scope,isLinked}=state.pending;state.deleting=true;
+    const {item,scope,isLinked,requiresPassword}=state.pending,password=requiresPassword?$('deleteDocumentPassword').value:null;
+    if(requiresPassword&&!password){$('deleteMediaError').textContent=I18n.t('הזינו את סיסמת המחיקה.');$('deleteDocumentPassword').focus();return;}
+    if(requiresPassword)$('deleteDocumentPassword').value='';
+    state.deleting=true;
     $('confirmMediaDelete').disabled=true;$('cancelMediaDelete').disabled=true;
     try{
-      const result=await change(item,scope,isLinked?'untag':'delete');$('deleteMediaDialog').close();
+      const result=await change(item,scope,isLinked?'untag':'delete',requiresPassword?{password}:{});$('deleteMediaDialog').close();
       let restored=false;
       const undo=async()=>{if(restored)return;restored=true;try{await change(item,scope,isLinked?'retag':'restore',{restoreProfile:result.wasProfile===true});notify(I18n.t('הפריט הוחזר לאלבום ✓'));}catch(error){restored=false;notify(error.message,{label:I18n.t('ניסיון נוסף'),run:undo});}};
       notify(I18n.t('הפריט הוסר מהאלבום.'),{label:isLinked?I18n.t('ביטול ההסרה'):I18n.t('ביטול מחיקה'),run:undo});
@@ -636,7 +649,7 @@
     $('confirmMediaDelete').addEventListener('click',confirmDelete);
     $('cancelMediaDelete').addEventListener('click',()=>$('deleteMediaDialog').close());
     $('deleteMediaDialog').addEventListener('cancel',event=>{if(state.deleting)event.preventDefault();});
-    $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;});
+    $('deleteMediaDialog').addEventListener('close',()=>{state.pending=null;if($('deleteDocumentPassword'))$('deleteDocumentPassword').value='';});
     $('mediaViewer').addEventListener('close',()=>{hideSwipeHint();const returnPage=state.returnPage;state.returnPage=null;state.session++;state.navigation++;state.paging=false;state.pageTarget=null;state.pageRequest=null;state.photoLoading=false;state.photoTarget=null;state.fullscreen=false;$('mediaViewer').classList.toggle('photo-fullscreen',false);window.FamilyPhotoFullscreen?.closed();instagramPrepared={key:null,file:null};const url=new URL(location.href);if(url.searchParams.get('media')===state.activeId){url.searchParams.delete('media');if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(null,'',url.href);}clearStage();window.FamilyTags.clearInline($('mediaTagPanel'));restoreGridPage(returnPage);if(state.opener?.isConnected)state.opener.focus({preventScroll:true});});
     document.addEventListener('keydown',event=>{
       if(!$('mediaViewer').open||$('deleteMediaDialog').open||$('tagPeopleDialog').open||document.querySelector('#photoUploadEditor[open],#photoDateDialog[open],#photoEffectsEditor[open]')||event.target.closest('input,textarea,select'))return;

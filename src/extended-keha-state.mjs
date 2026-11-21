@@ -4,6 +4,7 @@ import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
 import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {uid} from './http.mjs';
 import {linkSharedProfile} from './nakash-shared.mjs';
+import {initializeKehatDocuments} from './kehat-documents.mjs';
 
 export function initializeExtendedKeha(state) {
   if(state.extendedKehaReady)return;
@@ -28,6 +29,8 @@ export function initializeExtendedKeha(state) {
     const updateMerav=!state.rows('SELECT id FROM meta WHERE id=?',meravMigration).length;
     const triArchiveMigration='extended-tri-childbirth-archive-1954-2026-11-21-v1';
     const updateTriArchive=!state.rows('SELECT id FROM meta WHERE id=?',triArchiveMigration).length;
+    const shlomoMigration='extended-kehat-shlomo-sarah-esther-2026-11-21-v1';
+    const updateShlomo=!state.rows('SELECT id FROM meta WHERE id=?',shlomoMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -35,6 +38,12 @@ export function initializeExtendedKeha(state) {
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
       // Never replace an existing date, biography, portrait or name on deploy.
       state.sql.exec('INSERT OR IGNORE INTO people (id,data) VALUES (?,?)',seed.id,JSON.stringify(person));
+      if(updateShlomo&&['kehat-shlomo','kehat-shlomo-sarah','kehat-esther'].includes(seed.id)){
+        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',shlomoMigration+':backup:'+seed.id,JSON.stringify(saved));
+        for(const key of ['researchNotes','birthYear','birthYearSource','birthYearSourceEn','recordedParents'])if(seed[key]!==undefined)saved[key]=structuredClone(seed[key]);
+        saved.unit=seed.unit;state.savePerson(saved);
+      }
       if(updateTri&&seed.triFamily){
         const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
         state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',triMigration+':backup:'+seed.id,JSON.stringify(saved));
@@ -188,6 +197,8 @@ export function initializeExtendedKeha(state) {
       }
       state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triArchiveMigration,'done');
     }
+    if(updateShlomo)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',shlomoMigration,'done');
+    initializeKehatDocuments(state);
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;

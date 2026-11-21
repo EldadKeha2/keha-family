@@ -155,6 +155,21 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
  };
 }
 
+test('document deletion in a personal album requires the owner password and clears it after errors and cancellation',async()=>{
+ const f=fixture(),scope='personal:shlomo',item={...f.photo('a'),kind:'document',mime:'application/pdf',scope};
+ try{
+  const sent=[];f.window.FamilyI18n.fetch=async(path,options)=>{sent.push({path,body:JSON.parse(options.body)});return Response.json({error:'Wrong password'},{status:401});};
+  f.window.FamilyMedia.register(scope,[item]);f.window.FamilyMedia.requestDelete(scope,item.id);
+  assert.equal(f.get('deleteMediaDialog').open,true);assert.equal(f.get('deleteDocumentPassword').type,'password');
+  f.get('confirmMediaDelete').click();await flush();assert.equal(sent.length,0);
+  f.get('deleteDocumentPassword').value='test-owner';f.get('confirmMediaDelete').click();await flush();
+  assert.equal(sent.length,1);assert.equal(sent[0].body.password,'test-owner');
+  assert.equal(f.get('deleteMediaDialog').open,true);assert.equal(f.get('deleteDocumentPassword').value,'');
+  f.get('deleteDocumentPassword').value='temporary';f.get('cancelMediaDelete').click();
+  assert.equal(f.get('deleteDocumentPassword').value,'');
+ }finally{f.close();}
+});
+
 test('production loads the native controller before the gallery binds gesture input',()=>{
  const f=fixture();for(const name of names)assert.ok(f.loaded.includes(name),name+' must be loaded by the production page');
  assert.ok(f.loaded.indexOf('gallery-input-settings.js')<f.loaded.indexOf('photo-native.js'));assert.ok(f.loaded.indexOf('photo-native.js')<f.loaded.indexOf('media.js'));assert.ok(f.loaded.indexOf('photo-swipe.js')<f.loaded.indexOf('media.js'));assert.equal(f.window.FamilyPhotoNative.supported(),true);assert.equal(f.window.FamilyPhotoNative.version,20,'The loaded implementation, not only its script URL, must be version twenty');

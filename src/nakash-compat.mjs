@@ -17,7 +17,7 @@ import {zipStream} from './zip.mjs';
 import {renderVideoRange, videoClipRoute, videoEditRoute} from './video-clip-route.mjs';
 import {VideoEdits} from './video-edits.mjs';
 import {restrictedOriginalPerson} from './family-content.mjs';
-import {uploadFamilyDocument} from './family-content-route.mjs';
+import {uploadFamilyDocument,deleteFamilyDocument} from './family-content-route.mjs';
 
 const route = /^\/nakash\/api\/compat\/(keha|haim|yehuda|medina)(\/api\/.*)$/;
 const absent = () => new HttpError(404, 'הפריט המבוקש לא נמצא.');
@@ -378,6 +378,8 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     if(path==='/api/collections/videos/categories')return json({categories:await categories()});
   }
   if(method==='POST'&&path==='/api/documents/upload')return uploadFamilyDocument(request,env,db,ctx,options,contentBranch);
+  const documentDelete=/^\/api\/documents\/([a-f0-9]{32})\/delete$/.exec(path);
+  if(method==='POST'&&documentDelete)return deleteFamilyDocument(request,db,contentBranch,documentDelete[1]);
   const storyMatch=/^\/api\/stories(?:\/([a-f0-9]{24}))?(?:\/(category))?$/.exec(path);
   if(method==='POST'&&storyMatch&&nativeRoute){
     const id=storyMatch[1],snapshot=await db('content.stories',{branch:contentBranch});

@@ -114,11 +114,11 @@ export function contentDocuments(state,branch){
     if(excluded(item)||!mediaInContext(item,context)&&!attachments.has(item.id))continue;
     const key=(item.filename||item.name||item.id)+'\u001f'+item.size;
     const old=merged.get(key),personIds=subjects(item);
-    if(old){old.personIds=[...new Set([...old.personIds,...personIds])];old.tags=old.personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}));continue;}
-    merged.set(key,{...state.mediaPublic(source),createdAt:source.createdAt,kind:source.mime?.startsWith('audio/')?'audio':'document',personIds,tags:personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}))});
+    if(old){old.sourceIds.push(source.id);old.personIds=[...new Set([...old.personIds,...personIds])];old.tags=old.personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}));continue;}
+    merged.set(key,{...state.mediaPublic(source),documentPreview:source.documentPreview||null,sourceUrl:source.sourceUrl||null,sourceLabel:source.sourceLabel||null,sourceIds:[source.id],createdAt:source.createdAt,kind:source.mime?.startsWith('audio/')?'audio':'document',personIds,tags:personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}))});
   }
   for(const item of state.run('recordings').recordings){
-    if(contentHasSubjects(item,context,true))merged.set('audio:'+item.id,{...item,kind:'audio',name:item.title,caption:item.body});
+    if(contentHasSubjects(item,context,true))merged.set('audio:'+item.id,{...item,recording:true,kind:'audio',name:item.title,caption:item.body});
   }
   const people=[...context.documentIds].filter(id=>context.tree.people[id]&&!context.tree.people[id].placeholder).map(id=>({id,name:context.tree.people[id].name}));
   return {items:[...merged.values()].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')),people};
@@ -128,6 +128,28 @@ export function handleFamilyContent(state,action,args){
   const {branch='original'}=args,context=stateContentContext(state,branch);
   if(action==='content.person')return contentPerson(state,args);
   if(action==='content.documents')return contentDocuments(state,branch);
+  if(action==='content.document.delete'){
+    const item=contentDocuments(state,branch).items.find(item=>item.id===args.id);
+    if(!item)throw new HttpError(404,'המסמך לא נמצא במשפחה הזאת.');
+    if(item.recording){
+      const original=state.run('recording.get',{id:item.id});
+      state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)','document-recording-trash:'+item.id,JSON.stringify(original));
+      state.sql.exec('DELETE FROM recordings WHERE id=?',item.id);state.recordings.touch();
+    }else{
+      const ids=new Set(item.sourceIds);
+      for(const row of state.rows('SELECT id,data FROM stories')){
+        const story=JSON.parse(row.data),attachments=story.attachments||[];
+        const retained=attachments.filter(file=>!ids.has(file.src?.split('/').at(-1)));
+        if(retained.length===attachments.length)continue;
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)','document-story-backup:'+item.id+':'+row.id,row.data);
+        story.attachments=retained;story.updatedAt=new Date().toISOString();
+        state.sql.exec('UPDATE stories SET data=? WHERE id=?',JSON.stringify(story),row.id);
+        state.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
+      }
+      for(const id of ids){const source=state.media(id);state.run('media.delete',{id,scope:state.mediaScope(source),fromDocumentArchive:true});}
+    }
+    return {deleted:true,id:item.id};
+  }
   if(action==='content.stories'){
     const result=state.run('stories');
     return {...result,stories:result.stories.filter(item=>storyInContext(item,context)),allowedPersonIds:branch==='original'?null:[...context.ids],revision:result.revision+':'+branch+':v1'};

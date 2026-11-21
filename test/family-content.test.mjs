@@ -8,6 +8,14 @@ import {extendedKehaHTML} from '../src/extended-keha.mjs';
 import {familyApp} from '../family-apps/worker.mjs';
 import {MISATTRIBUTED_YONA_DOCUMENT,contentContext,storyInContext} from '../src/family-content.mjs';
 import {parseHTML} from 'linkedom';
+import {KEHAT_DOCUMENTS} from '../src/kehat-documents.mjs';
+import {sha256} from '../src/http.mjs';
+const researchIds=new Set(KEHAT_DOCUMENTS.map(item=>item.id));
+const addedItems=result=>result.items.filter(item=>!researchIds.has(item.id));
+async function ownerPassword(f){
+  const setupKey='2'.repeat(64);f.state.env.FAMILY_AI_REMOVAL_SETUP_DIGEST=await sha256(setupKey);
+  await f.json('/api/family-ai/removal/setup',{method:'POST',body:{setupKey,password:'archive-owner-test'}});
+}
 
 const scope=(branch,path)=>['extended','shlomo','zechariah','zechariah-tzadok','kehat'].includes(branch)?'/keha-extended/'+(branch==='extended'?'':branch+'/')+'api/compat/api/'+path:'/nakash/api/compat/'+branch+'/api/'+path;
 function fixture(){
@@ -114,12 +122,68 @@ test('documents upload original PDF and audio bytes once and share their subject
     const upload=async(branch,filename,bytes,personIds)=>f.json(branch==='original'?'/api/documents/upload?filename='+filename:scope(branch,'documents/upload?filename='+filename),{method:'POST',body:bytes,headers:{'Content-Length':String(bytes.length),'X-Family-Document':encodeURIComponent(JSON.stringify({title:'תיעוד מהמשפחה',caption:'המקור ללא שינוי',personIds}))}});
     const pdf=new TextEncoder().encode('%PDF-1.4\nOriginal certificate\n%%EOF');
     await upload('original','certificate.pdf',pdf,['shlomo','yona']);
-    assert.equal((await f.json('/api/documents')).items.length,1);assert.equal((await f.json(scope('extended','documents'))).items.length,1);assert.equal((await f.json(scope('keha','documents'))).items.length,1);
+    assert.equal((await f.json('/api/documents')).items.length,1);assert.equal(addedItems(await f.json(scope('extended','documents'))).length,1);assert.equal((await f.json(scope('keha','documents'))).items.length,1);
     const mp3=new TextEncoder().encode('ID3\x04\0\0original audio');await upload('kehat','rare.mp3',mp3,['kehat-jidaan']);
     assert.ok((await f.json(scope('kehat','documents'))).items.some(item=>item.kind==='audio'));
     assert.ok((await f.json(scope('extended','documents'))).items.some(item=>item.kind==='audio'));
     assert.equal((await f.json('/api/documents')).items.length,1);
     assert.deepEqual([...f.objects.values()].map(v=>[...v]),[[...pdf],[...mp3]]);
+  }finally{f.close();}
+});
+
+test('password protection covers archive and album routes, and removed records stay removed after restart',async()=>{
+  const f=fixture();try{
+    await f.json(scope('kehat','documents'));await ownerPassword(f);
+    const record=f.media('kehat-esther',{type:'document',name:'A family record',tags:['kehat-shlomo','kehat-shlomo-sarah']});
+    for(const password of [undefined,'incorrect'])assert.equal((await f.call(scope('kehat','documents/'+record.id+'/delete'),{method:'POST',body:{password}})).status,401);
+    const scopeValue='personal:kehat-esther';
+    assert.equal((await f.call('/api/media/'+record.id+'/delete',{method:'POST',body:{scope:scopeValue}})).status,401);
+    assert.equal((await f.call(scope('kehat','media/'+record.id+'/delete'),{method:'POST',body:{scope:scopeValue}})).status,401);
+    assert.equal((await f.call(scope('haim','documents/'+record.id+'/delete'),{method:'POST',body:{password:'archive-owner-test'}})).status,404);
+    assert.equal((await f.json(scope('kehat','documents'))).items.some(item=>item.id===record.id),true);
+    await f.json(scope('kehat','documents/'+record.id+'/delete'),{method:'POST',body:{password:'archive-owner-test'}});
+    assert.equal((await f.call('/media/'+record.id)).status,404);
+    assert.equal((await f.json(scope('extended','people/kehat-esther/page'))).albums.documents.total,0);
+    f.restart();
+    assert.equal((await f.json(scope('kehat','documents'))).items.some(item=>item.id===record.id),false);
+    assert.ok(f.sql.prepare('SELECT id FROM media_trash WHERE id=?').get(record.id));
+  }finally{f.close();}
+});
+
+test('password-protected removal handles shared duplicate scans, story attachments and rare audio',async()=>{
+  const f=fixture();try{
+    await f.json(scope('kehat','documents'));await ownerPassword(f);
+    const first=f.media('shlomo',{type:'document',name:'Shared scan',filename:'shared.pdf'});
+    const second=f.media('yona',{type:'document',name:'Shared scan',filename:'shared.pdf'});
+    assert.equal((await f.json('/api/documents')).items.filter(item=>item.filename==='shared.pdf').length,1);
+    await f.json('/api/documents/'+first.id+'/delete',{method:'POST',body:{password:'archive-owner-test'}});
+    for(const id of [first.id,second.id])assert.ok(f.sql.prepare('SELECT id FROM media_trash WHERE id=?').get(id));
+    assert.equal((await f.json('/api/documents')).items.some(item=>item.filename==='shared.pdf'),false);
+    const attachment=f.media(null,{type:'document',name:'Attachment',category:'attachment'});
+    f.sql.prepare('INSERT INTO stories(id,data) VALUES(?,?)').run('9'.repeat(24),JSON.stringify({id:'9'.repeat(24),title:'An old story',body:'Memory',personIds:['kehat-jidaan'],attachments:[{src:'/media/'+attachment.id,name:'Old record'}]}));
+    await f.json(scope('kehat','documents/'+attachment.id+'/delete'),{method:'POST',body:{password:'archive-owner-test'}});
+    assert.deepEqual(JSON.parse(f.sql.prepare('SELECT data FROM stories WHERE id=?').get('9'.repeat(24)).data).attachments,[]);
+    const id='f'.repeat(32);
+    f.state.run('recording.add',{id,key:'recordings/'+id+'/original.mp3',size:25,mime:'audio/mpeg',filename:'original.mp3',fields:{title:'Rare recording',personIds:['kehat-jidaan']}});
+    assert.ok((await f.json(scope('kehat','documents'))).items.some(item=>item.id===id));
+    await f.json(scope('kehat','documents/'+id+'/delete'),{method:'POST',body:{password:'archive-owner-test'}});
+    assert.equal((await f.call('/api/voices/'+id+'/audio')).status,404);
+    assert.ok(!JSON.stringify(f.state.run('export')).includes('archive-owner-test'));
+  }finally{f.close();}
+});
+
+test('existing certificate uploads keep their original file and ID while gaining confirmed attribution',async()=>{
+  const f=fixture();try{
+    const seed=KEHAT_DOCUMENTS.find(item=>item.name.includes('יעקב'));
+    const id=seed.id;
+    const original={id,personId:'kehat-yaakov',category:'personal',kind:'document',mime:'application/pdf',key:'documents/original-wedding.pdf',file:'original-wedding.pdf',filename:'original-wedding.pdf',size:12345};
+    f.sql.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,original.category,original.personId,JSON.stringify(original));
+    const records=(await f.json(scope('kehat','documents'))).items;
+    assert.equal(records.length,1);assert.equal(records.filter(item=>item.id===id).length,1);
+    const updated=records.find(item=>item.id===id);
+    assert.equal(updated.sourceUrl,seed.sourceUrl);assert.deepEqual(updated.personIds,seed.documentPeople);
+    const stored=f.state.media(id);assert.equal(stored.key,original.key);assert.equal(stored.size,original.size);assert.equal(stored.mime,'application/pdf');
+    f.restart();assert.equal((await f.json(scope('kehat','documents'))).items.length,1);
   }finally{f.close();}
 });
 
