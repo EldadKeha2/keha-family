@@ -11,7 +11,7 @@
     kehat:(config.kehaKehatHome||'/keha-extended/kehat/')+'#home',
   };
   const corners=()=>[
-    {id:'shlomo',person:'shlomo',symbol:'ש',name:tr('משפחת שלמה קהא','Shlomo Keha family'),detail:tr('שלמה בן זכריה','Shlomo, son of Zechariah')},
+    {id:'shlomo',person:'shlomo',symbol:'ש',name:tr('משפחת קהא','Keha family'),detail:tr('שלמה בן זכריה','Shlomo, son of Zechariah')},
     {id:'zechariah',person:'keha-zechariah',symbol:'ז',name:tr('משפחת קהא','Keha family'),detail:tr('זכריה בן סעדיה','Zechariah, son of Saadia')},
     {id:'kehat',person:'kehat-jidaan',symbol:'ס',name:tr('משפחת קהת','Kehat family'),detail:tr('סעדיה (ג׳ידעאן) בן אהרון','Saadia (Jidaan), son of Aharon')},
     {id:'kehat-tzadok',person:'kehat-zechariah-ben-tzadok',symbol:'ז',name:tr('משפחת קהא','Keha family'),detail:tr('זכריה בן צדוק','Zechariah, son of Tzadok')},
