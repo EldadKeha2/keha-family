@@ -1,7 +1,7 @@
 import {createExtendedFamily,EXTENDED_BRANCHES} from './family-data.mjs';
 
 export const BRANCH_PORTALS=Object.freeze({
-  zechariah:Object.freeze({id:'zechariah',name:'משפחת קהא (זכריה בן סעדיה)',previousNames:['משפחת קהא (זכריה)'],nameEn:'Keha Family (Zechariah, son of Saadia)',shortName:'קהא · בן סעדיה',home:'/keha-extended/zechariah/',color:'#913951',roots:['u-keha-zechariah'],branches:['zechariah'],tagline:'המשפחה של זכריה (בן סעדיה) קהא',taglineEn:'The family of Zechariah Keha, son of Saadia'}),
+  zechariah:Object.freeze({id:'zechariah',name:'משפחת קהא (זכריה בן שלום)',previousNames:['משפחת קהא (זכריה)','משפחת קהא (זכריה בן סעדיה)'],nameEn:'Keha Family (Zechariah, son of Shalom)',shortName:'קהא · בן שלום',home:'/keha-extended/zechariah/',color:'#913951',roots:['u-keha-zechariah'],branches:['zechariah'],tagline:'המשפחה של זכריה (בן שלום) קהא',taglineEn:'The family of Zechariah Keha, son of Shalom'}),
   'zechariah-tzadok':Object.freeze({id:'zechariah-tzadok',name:'משפחת קהא (זכריה בן צדוק)',nameEn:'Keha Family (Zechariah, son of Tzadok)',shortName:'קהא · בן צדוק',home:'/keha-extended/zechariah-tzadok/',color:'#b4523b',roots:['u-kehat-tzadok-elder'],branches:['kehat-tzadok'],tagline:'המשפחה של זכריה (בן צדוק) קהא',taglineEn:'The family of Zechariah Keha, son of Tzadok'}),
   kehat:Object.freeze({id:'kehat',name:'משפחת קהת',nameEn:'Kehat Family',shortName:'משפחת קהת',home:'/keha-extended/kehat/',color:'#167d9a',roots:['u-kehat-aharon-elder'],branches:['kehat'],tagline:'המשפחה של סעדיה (ג׳ידעאן) קהא',taglineEn:'The family of Saadia (Jidaan) Keha, son of Aharon'}),
 });

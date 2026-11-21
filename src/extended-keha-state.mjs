@@ -4,7 +4,8 @@ import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
 import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {uid} from './http.mjs';
 import {linkSharedProfile} from './nakash-shared.mjs';
-import {initializeKehatDocuments} from './kehat-documents.mjs';
+import {initializeKehatDocuments,initializeRegistryDocuments} from './kehat-documents.mjs';
+import {REGISTRY_CORRECTION_IDS,REGISTRY_CORRECTION_FIELDS} from '../public/keha-extended/registry-evidence.mjs';
 
 export function initializeExtendedKeha(state) {
   if(state.extendedKehaReady)return;
@@ -37,6 +38,8 @@ export function initializeExtendedKeha(state) {
     const updateLifeYears=!state.rows('SELECT id FROM meta WHERE id=?',lifeYearsMigration).length;
     const saadiaNameMigration='extended-saadia-jidaan-keha-surname-2026-11-21-v1';
     const updateSaadiaName=!state.rows('SELECT id FROM meta WHERE id=?',saadiaNameMigration).length;
+    const registryMigration='extended-zechariah-ben-shalom-registry-2026-11-21-v1';
+    const updateRegistry=!state.rows('SELECT id FROM meta WHERE id=?',registryMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -200,6 +203,34 @@ export function initializeExtendedKeha(state) {
         state.savePerson(saved);
       }
     }
+    // Apply the owner's identity correction after the earlier migrations.
+    if(updateRegistry)for(const seed of EXTENDED_PEOPLE){
+      if(!REGISTRY_CORRECTION_IDS.includes(seed.id))continue;
+      const id=state.sharedNakashIdentities[seed.id]||seed.id;
+      const saved=state.person(id);
+      if(!saved)continue;
+      state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',registryMigration+':backup:'+id,JSON.stringify(saved));
+      for(const key of REGISTRY_CORRECTION_FIELDS)if(seed[key]!==undefined)saved[key]=structuredClone(seed[key]);
+      const oldNames={
+        'keha-zechariah':['זכריה קהא','זכריה קהא הבן','זכריה בן סעדיה קהא'],
+        'saadia-elder':['סעדיה קהא'],
+      };
+      if(oldNames[seed.id]?.includes(saved.name)){
+        saved.name=seed.name;delete saved.firstName;delete saved.lastName;
+        saved.nameEn=seed.nameEn;saved.englishName=seed.englishName;
+      }
+      // Replace the superseded genealogy, retaining family memories and media.
+      if(['keha-zechariah','saadia-elder','keha-zechariah-father','saadia-saadia'].includes(seed.id)&&
+        (!saved.about||/בנו של סעדיה|אחיו של סעדיה|סעדיה קהא הדוד|אביו של זכריה קהא הבן/.test(saved.about)))saved.about=seed.about;
+      if(seed.id==='keha-zechariah'){
+        if(saved.deathDate?.endsWith('.1979'))delete saved.deathDate;
+        saved.deathYear=1957;saved.deceased=true;
+        if(!saved.deathDate)saved.deathDate=seed.deathDate;
+      }
+      if(seed.id==='keha-yehudit'){saved.deathYear=1971;saved.deceased=true;}
+      saved.aliases=[...new Set([...(saved.aliases||[]).filter(alias=>seed.id!=='keha-zechariah'||!alias.includes('בן סעדיה')),...(seed.aliases||[])])];
+      state.savePerson(saved);
+    }
     for(const seed of EXTENDED_PEOPLE){
       if(!seed.sharedProfileId)continue;
       linkSharedProfile(state,state.sharedNakashIdentities,seed);
@@ -219,6 +250,7 @@ export function initializeExtendedKeha(state) {
     if(updateTriDeath)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triDeathMigration,'done');
     if(updateLifeYears)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',lifeYearsMigration,'done');
     if(updateSaadiaName)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',saadiaNameMigration,'done');
+    if(updateRegistry)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',registryMigration,'done');
     if(updateMerav)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',meravMigration,'done');
     if(updateTriArchive){
       // This original scan was uploaded through the family archive and is
@@ -238,6 +270,7 @@ export function initializeExtendedKeha(state) {
     }
     if(updateShlomo)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',shlomoMigration,'done');
     initializeKehatDocuments(state);
+    initializeRegistryDocuments(state);
     state.peopleRevision=uid();state.peopleCache=null;
   });
   state.extendedKehaReady=true;

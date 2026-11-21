@@ -3,13 +3,14 @@ import {KEHAT_RESEARCH_PEOPLE,applyKehatResearchUnits} from './kehat-research.mj
 import {TRI_RESEARCH_PEOPLE,applyTriUnits} from './tri-data.mjs';
 import {YISSACHAR_PEOPLE,applyYissacharUnits} from './yissachar-data.mjs';
 import {enrichHistoricalLifeEvidence} from './life-evidence.mjs';
+import {applyRegistryEvidence} from './registry-evidence.mjs';
 
 export const EXTENDED_NAME = 'משפחת קהא המורחבת';
 export const EXTENDED_COLOR = '#345d83';
 export const EXTENDED_HOME = '/keha-extended/';
 export const EXTENDED_BRANCHES = Object.freeze([
   {id:'shlomo', unit:'u-root', label:'משפחת שלמה קהא', shortLabel:'שלמה בן זכריה', titleEn:'Shlomo Keha Family', color:'#536641', mark:'❖'},
-  {id:'zechariah', unit:'u-keha-zechariah', label:'המשפחה של זכריה (בן סעדיה) קהא', shortLabel:'זכריה בן סעדיה', titleEn:'Keha family — Zechariah, son of Saadia', color:'#913951', mark:'❖'},
+  {id:'zechariah', unit:'u-keha-zechariah', label:'המשפחה של זכריה (בן שלום) קהא', shortLabel:'זכריה בן שלום', titleEn:'Keha family — Zechariah, son of Shalom', color:'#913951', mark:'❖'},
   {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'המשפחה של זכריה (בן צדוק) קהא', shortLabel:'זכריה בן צדוק', titleEn:'Keha family — Zechariah, son of Tzadok', color:'#b4523b', mark:'❖'},
   {id:'kehat', unit:'u-kehat-aharon-elder', label:'המשפחה של סעדיה (ג׳ידעאן) קהא', shortLabel:'סעדיה (ג׳ידעאן)', titleEn:'Kehat family — Saadia (Jidaan)', color:'#167d9a', mark:'❖'},
   {id:'yissachar', unit:'u-keha-yissachar', label:'משפחת יששכר · יוסף וצביה', shortLabel:'משפחת יששכר', titleEn:'Yissachar family · Yosef and Tzvia', color:'#6b645b', mark:'❖'},
@@ -19,9 +20,9 @@ export const EXTENDED_BRANCHES = Object.freeze([
 // The owner identified Jidaan as Saadia, son of Aharon. Tzadok and Aharon's
 // branches remain independent until their relationship is established.
 const people = [
-  ['keha-zechariah','זכריה קהא הבן','Zechariah Keha the Younger','m','u-keha-zechariah',['זכריה קהא'],{about:'בנו של סעדיה קהא ואחיינו של זכריה קהא האב. בן דודו של שלמה קהא, ולא בנו של זכריה קהא האב. נשוי ליהודית קהא.'}],
+  ['keha-zechariah','זכריה קהא בן שלום','Zechariah Keha, son of Shalom','m','u-keha-zechariah',['זכריה קהא','זכריה קהא הבן'],{deceased:true,about:'בנו של שלום קהא, בן דודו של שלמה קהא ובעלה של יהודית בת סעדיה. זוהה במשפחה עם רשומת הבוחרים מ־1949 ועם הקבר של זכריה בן שלום. הקשר לרשומת זכריה בן סעדיה מ־1936 טרם הוכרע.'}],
   ['keha-yehudit','יהודית קהא','Yehudit Keha','f','u-keha-zechariah'],
-  ['keha-zechariah-father','זכריה קהא האב','Zechariah Keha the Elder','m','u-keha-zechariah-father',[],{deceased:true,siblings:['saadia-elder'],about:'אביו של שלמה קהא ואחיו של סעדיה קהא. נפטר בתימן לפני העלייה ולא זכה לעלות ארצה. שם אשתו טרם ידוע. זכריה קהא הבן הוא אחיינו, בנו של סעדיה.'}],
+  ['keha-zechariah-father','זכריה קהא האב','Zechariah Keha the Elder','m','u-keha-zechariah-father',[],{deceased:true,siblings:['saadia-elder'],about:'אביו של שלמה קהא. לפי עדות המשפחה, זכריה בן שלום הוא אחיינו ובן דודו של שלמה. נפטר בתימן לפני העלייה ולא זכה לעלות ארצה. שם אשתו טרם ידוע.'}],
   ['kehat-tzadok-elder','צדוק קהא','Tzadok Keha','m','u-kehat-tzadok-elder'],
   ['kehat-zechariah-ben-tzadok','זכריה בן צדוק קהת','Zechariah Kehat, son of Tzadok','m','u-kehat-zechariah-ben-tzadok',['זכריה בן צדוק קהא']],
   ['kehat-aharon-elder','אהרון קהא','Aharon Keha','m','u-kehat-aharon-elder'],
@@ -50,9 +51,10 @@ const people = [
   ['kehat-lihi','ליהי קהת','Lihi Kehat','f','u-kehat-lihi'],
 ];
 const seedPeople=new Map([...people.map(([id,name,englishName,gender,unit,aliases=[],details={}]) =>
-  ({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE].map(p=>[p.id,p]));
+  ({id,name,englishName,nameEn:englishName,gender,unit,aliases,...details})),...SAADIA_PEOPLE].map(p=>[p.id,{...p}]));
 for(const update of [...KEHAT_RESEARCH_PEOPLE,...TRI_RESEARCH_PEOPLE,...YISSACHAR_PEOPLE]){const before=seedPeople.get(update.id)||{};seedPeople.set(update.id,{...before,...update,aliases:[...new Set([...(before.aliases||[]),...(update.aliases||[])])]});}
 enrichHistoricalLifeEvidence(seedPeople);
+applyRegistryEvidence(seedPeople);
 export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(Object.freeze));
 
 const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);

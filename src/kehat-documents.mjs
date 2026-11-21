@@ -129,3 +129,21 @@ export function initializeKehatDocuments(state){
   }
   state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',migration,'done');
 }
+
+// Link the existing Tri photograph to everyone named on it. The portrait and
+// original image bytes remain unchanged; the Menachem identification is open.
+export function initializeRegistryDocuments(state){
+  const migration='keha-registry-gravestone-links-2026-11-21-v1';
+  if(state.rows('SELECT id FROM meta WHERE id=?',migration).length)return;
+  for(const record of [
+    {id:'fd96143985f742a1a640ef95c246ca16',documentPeople:['kehat-zechariah','tri-yona','tri-menachem']},
+  ]){
+    const row=state.rows('SELECT data FROM media WHERE id=?',record.id)[0];if(!row)continue;
+    const item=JSON.parse(row.data);
+    state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',migration+':backup:'+item.id,row.data);
+    item.documentPeople=[...new Set([...(item.documentPeople||[]),...record.documentPeople])];
+    for(const id of record.documentPeople)state.sql.exec('INSERT OR IGNORE INTO media_tags(media_id,person_id) VALUES(?,?)',item.id,id);
+    state.touchMedia(item,item.documentPeople);
+  }
+  state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',migration,'done');
+}

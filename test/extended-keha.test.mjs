@@ -34,6 +34,34 @@ test('the confirmed 1949 household joins Sarah and Esther to Shlomo without inve
   assert.match(tree.people['kehat-shlomo'].researchNotes,/1903/);
   assert.equal(tree.units['u-kehat-shlomo'].parent,'u-keha-kehat');
 });
+test('the 1949 couple and the Tri household keep separate fathers, wives and conflicting source years',()=>{
+  const tree=createExtendedFamily(family),z=tree.people['keha-zechariah'],j=tree.people['keha-yehudit'];
+  assert.equal(z.recordedParents.father,'שלום');assert.equal(z.birthYear,1888);
+  assert.equal(z.deathDate,'23.11.1957');assert.equal(j.birthYear,1893);assert.equal(j.deathYear,1971);
+  assert.equal(z.registryRecords[0].registration,'505026');assert.equal(j.registryRecords[0].registration,'505027');
+  assert.equal(tree.people['saadia-elder'].name,'שלום קהא');
+  assert.equal(tree.people['saadia-saadia'].birthYear,1918);
+  assert.equal(tree.people['saadia-saadia'].registryRecords[0].birthYear,1910);
+  assert.deepEqual(tree.units['u-kehat-zechariah'].people,['kehat-zechariah','tri-yona']);
+  assert.match(tree.people['saadia-kadya'].researchNotes,/מועמדת/);
+  assert.match(j.researchNotes,/1936/);
+  assert.match(BRANCH_PORTALS.zechariah.name,/בן שלום/);
+});
+test('the registry identity migration reaches saved profiles once, backs them up and preserves portraits and memories',async()=>{
+  const f=fixture();try{
+    const before={id:'keha-zechariah',name:'זכריה קהא הבן',birthday:'1.1.1111',about:'זיכרון אישי',profileId:'our-portrait',deathDate:'2.7.1979'};
+    f.database.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(before.id,JSON.stringify(before));
+    const first=(await f.json(site('people/'+before.id+'/page'))).person;
+    assert.equal(first.name,'זכריה קהא בן שלום');assert.equal(first.deathDate,'23.11.1957');
+    assert.equal(first.about,before.about);assert.equal(first.profileId,before.profileId);
+    const backup='extended-zechariah-ben-shalom-registry-2026-11-21-v1:backup:'+before.id;
+    assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(backup).value).deathDate,'2.7.1979');
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(before.id).data);
+    saved.researchNotes='תיקון משפחתי מאוחר';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),before.id);
+    f.restart();assert.equal((await f.json(site('people/'+before.id+'/page'))).person.researchNotes,saved.researchNotes);
+    assert.equal(f.database.prepare('SELECT COUNT(*) AS n FROM meta WHERE id=?').get(backup).n,1);
+  }finally{f.close();}
+});
 function fixture(){
   const database=new DatabaseSync(':memory:');
   const storage={sql:{exec(query,...args){const statement=database.prepare(query);const rows=statement.columns().length?statement.all(...args):(statement.run(...args),[]);return {toArray:()=>rows};}},
@@ -416,10 +444,11 @@ test('Saadia’s chart retains five subbranches, correct generations and the exp
   assert.deepEqual(relatives('shlomo').parents,['keha-zechariah-father']);
   assert.deepEqual(relatives('yona').parents,[],'Yona does not inherit Shlomo’s father');
   assert.deepEqual(relatives('keha-zechariah').parents,['saadia-elder']);
-  assert.equal(data.people['keha-zechariah'].name,'זכריה קהא הבן');
+  assert.equal(data.people['keha-zechariah'].name,'זכריה קהא בן שלום');
   for(const id of ['keha-zechariah-father','saadia-elder']){
     assert.equal(data.people[id].deceased,true);
-    assert.match(data.people[id].about,/נפטר בתימן/);
+    if(id==='keha-zechariah-father')assert.match(data.people[id].about,/נפטר בתימן/);
+    else assert.equal(data.people[id].name,'שלום קהא');
     assert.deepEqual(relatives(id).partners,[],'Unknown wives are not invented');
   }
   assert.equal(data.units['u-keha-zechariah'].children.length,5);
@@ -485,7 +514,7 @@ test('the chart rename preserves the existing Zechariah ID, portrait, biography 
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'זכריה קהא',nameEn:'Zechariah Keha',about:'זיכרון קיים',birthday:'3.4.1900',extra:true,profileId:null}));
     await f.call('/keha-extended/site-data.js');
     const initial=await f.json(site('people/'+id+'/page'));
-    assert.equal(initial.person.name,'זכריה קהא הבן');
+    assert.equal(initial.person.name,'זכריה קהא בן שלום');
     assert.equal(initial.person.about,'זיכרון קיים');
     assert.equal(initial.person.birthday,'3.4.1900');
     const portrait=await f.json(site('people/'+id+'/photos?filename=zechariah.jpg'),{method:'POST',body:photo});

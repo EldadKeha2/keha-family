@@ -13,10 +13,12 @@ function unit(key,members,children=[],parent=null,details={}) {
   return id;
 }
 const dead={deceased:true};
-const elder=person('elder','סעדיה קהא','Saadia Keha','m',{...dead,siblings:['keha-zechariah-father'],about:'אחיו של זכריה קהא האב ודודו של שלמה קהא. אביו של זכריה קהא הבן. נפטר בתימן לפני העלייה ולא זכה לעלות ארצה. שם אשתו טרם ידוע.'});
+// The legacy ID is retained for existing portraits and tags. The father's name
+// is Shalom in both the 1941–1942 and 1949 records, correcting the old label.
+const elder=person('elder','שלום קהא','Shalom Keha','m',{...dead,siblings:['keha-zechariah-father'],about:'אביו של זכריה קהא בן שלום, לפי פנקסי תש״ב ותש״ט. הקשר כקרוב משפחתו של שלמה נשען על עדות המשפחה. שם אשתו, שנות חייו ומקום פטירתו טרם ידועים.'});
 unit('elder',[elder],[],null,{children:['u-keha-zechariah'],generation:0});
 
-const kadya=person('kadya','קדיה מזרחי','Kadya Mizrahi','f');
+const kadya=person('kadya','קדיה מזרחי','Kadya Mizrahi','f',{aliases:['קדימה מזרחי','קדיה קהא']});
 unit('kadya',[kadya],['yair','yaira','zaki']);
 unit('yair',[person('yair','יאיר מזרחי','Yair Mizrahi','m',dead),person('carmela','כרמלה','Carmela','f')],['ofer','yehudit'],'kadya');
 unit('ofer',[person('ofer','עופר מזרחי','Ofer Mizrahi','m',{occupation:'גיטריסט'})],[],'yair');
@@ -44,7 +46,7 @@ unit('oded',[person('oded','עודד וגנר','Oded Wagner','m'),person('daria'
 unit('inbar',[person('inbar','ענבר','Inbar')],[],'oded');
 unit('maor',[person('maor','מאור','Maor')],[],'oded');
 
-unit('saadia',[person('saadia','סעדיה קהא','Saadia Keha','m',{birthYear:1918,birthYearSource:'אישור בתו אביבה',birthYearSourceEn:'Confirmed by his daughter Aviva',researchNotes:'שנת 1918 אושרה בידי בתו אביבה ונמסרה בידי אלדד. בפנקס תש״ב מופיעה 1920; הפער נשמר לבירור. יום וחודש הלידה אינם ידועים.',about:'אביהם של אביבה, טוני ורמי. בנו של זכריה קהא הבן ונכדו של סעדיה קהא הדוד. מופיע בפנקס הבוחר בשעריים משנת 1937, שורה 790: קהא, סעדיה, זכריה, שערים. נישא לסעידה ב־21.2.1945, לפי תעודה H 69399.'}),person('saida','סעידה קהא','Saida Keha','f',{sharedProfileId:'extra-b3318c4c12cc4e83886ee902',parents:['saadia-saida-father','saadia-saida-mother'],about:'נישאה לסעדיה קהא ב־21.2.1945, לפי תעודת הנישואין H 69399. בתעודה נרשמו הוריה יוסף ושרה; פענוח שם המשפחה טרם הושלם.'})],['aviva','toni','rami'],null,{weddingYear:1945,weddingDate:'21.2.1945'});
+unit('saadia',[person('saadia','סעדיה קהא','Saadia Keha','m',{birthYear:1918,birthYearSource:'אישור בתו אביבה',birthYearSourceEn:'Confirmed by his daughter Aviva',researchNotes:'שנת 1918 אושרה בידי בתו אביבה. בפנקס תש״ב מופיעה 1920 ובתש״ט 1910; שנות המקור נשמרות בנפרד. יום וחודש הלידה אינם ידועים.',about:'אביהם של אביבה, טוני ורמי. בנו של זכריה קהא בן שלום ושל יהודית. נישא לסעידה ב־21.2.1945, לפי תעודה H 69399. זיהויו עם רשומות הבוחרים נבדק לצד פערי השנים ושמות האבות.'}),person('saida','סעידה קהא','Saida Keha','f',{sharedProfileId:'extra-b3318c4c12cc4e83886ee902',parents:['saadia-saida-father','saadia-saida-mother'],about:'נישאה לסעדיה קהא ב־21.2.1945, לפי תעודת הנישואין H 69399. בתעודה נרשמו הוריה יוסף ושרה; פענוח שם המשפחה טרם הושלם.'})],['aviva','toni','rami'],null,{weddingYear:1945,weddingDate:'21.2.1945'});
 unit('aviva',[person('aviva','אביבה ארצי','Aviva Arzi','f',{aliases:['אביבה קהא']}),person('alon','אלון ארצי','Alon Arzi','m')],['moshe-arzi','erez','oren'],'saadia');
 unit('moshe-arzi',[person('moshe-arzi','תומר ארצי','Tomer Arzi','m'),person('orit','אורית','Orit','f')],[],'aviva');
 unit('erez',[person('erez','ארז ארצי','Erez Arzi','m')],[],'aviva');
