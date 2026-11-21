@@ -9,7 +9,7 @@ const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const base='https://keha-family.eldadkeha.workers.dev/share-story/';
 
 test('each questionnaire presents the right people and the global form leaves its final people field optional',()=>{
-  const cases=[['','grandparents',['shlomo','yona','margalit','yahia']],['yehuda/','yehuda',['zehor','yehuda']],['haim/','haim',['haim','shoshana']],['medina/','medina',['ruma','yosef']]];
+  const cases=[['','grandparents',['shlomo','yona','margalit','yahia']],['yehuda/','yehuda',['zehor','yehuda','margalit','yahia']],['haim/','haim',['haim','shoshana','margalit','yahia']],['medina/','medina',['ruma','yosef','margalit','yahia']]];
   for(const [path,scope,people] of cases){
     const {document}=parseHTML(read('public/share-story/'+path+'index.html')),form=document.querySelector('#story-form');
     assert.equal(form.dataset.scope,scope);assert.deepEqual([...form.querySelectorAll('[name="person"]')].map(input=>input.value),people);assert.equal(form.querySelectorAll('[type="checkbox"]').length,people.length);
