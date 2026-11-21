@@ -11,7 +11,8 @@ function fixture(){
   const uploads=[],removals=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
   const window={FamilyI18n:{isEnglish:false,error:v=>v,personName:p=>p.name,fetch:async(path,options)=>{
     if(options?.method==='POST'){
-      const body=JSON.parse(options.body);removals.push({path,body});
+      if(options.headers?.['X-Family-Token']!=='test-token')return Response.json({error:'יש לרענן את הדף לפני שמירת השינוי.'},{status:403});
+      const body=JSON.parse(options.body);removals.push({path,body,headers:options.headers});
       if(body.password!=='owner-test')return Response.json({error:'הסיסמה אינה נכונה.'},{status:401});
       items.splice(items.findIndex(item=>path.includes(item.id)),1);return Response.json({deleted:true});
     }
@@ -53,6 +54,7 @@ test('each record has a password dialog; a rejected deletion keeps the record an
   const submit=()=>f.document.getElementById('documentRemovalForm').dispatchEvent(new f.dom.Event('submit',{bubbles:true,cancelable:true}));
   submit();await tick();assert.equal(f.removals.length,0);
   f.document.getElementById('documentRemovalPassword').value='incorrect';submit();await tick();
+  assert.equal(f.removals.length,1);assert.equal(f.removals[0].headers['X-Family-Token'],'test-token');
   assert.equal(f.document.querySelectorAll('.document-card').length,2);
   assert.match(f.document.getElementById('documentRemovalError').textContent,/הסיסמה אינה נכונה/);
   assert.equal(f.document.getElementById('documentRemovalPassword').value,'');

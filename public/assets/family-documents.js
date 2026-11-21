@@ -7,7 +7,7 @@
   const state={view:null,items:[],people:[],query:'',kind:'all',person:'all',loaded:false,loading:false,saving:false,deleting:false,deleteId:null};
   const emblem='<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 6h18l8 8v28H12ZM30 6v10h8M18 23h14M18 29h14M18 35h9"/><path d="m6 16-3 2v25h25"/></svg>';
   async function request(path,options={}){
-    const response=await I.fetch(path,{cache:'no-store',...options});
+    const response=await I.fetch(path,{cache:'no-store',...options,headers:{...(options.body?{'X-Family-Token':window.FAMILY_API_TOKEN}:{}),...options.headers}});
     let data;try{data=await response.json();}catch{throw Error(t('לא התקבלה תשובה מהשרת. נסו שוב.','The server did not respond. Please try again.'));}
     if(!response.ok)throw Error(I.error(data.error)||t('השינוי לא נשמר.','Your changes could not be saved.'));return data;
   }
