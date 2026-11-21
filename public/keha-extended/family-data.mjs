@@ -89,6 +89,15 @@ const units = [
   ['u-keha-yissachar',['yissachar-yosef','yissachar-tzvia'],[],null],
 ];
 
+export function applySavedWeddingDates(units,weddings=[]){
+  for(const wedding of weddings){
+    const unit=units[wedding.id];if(!unit||unit.hasWedding===false)continue;
+    unit.weddingDate=wedding.date;
+    const year=/(?:^|\.)(\d{4})$/.exec(wedding.date||'');
+    if(year)unit.weddingYear=Number(year[1]);else delete unit.weddingYear;
+  }
+}
+
 export function createExtendedFamily(original = {}) {
   const roster = original.sharedPeople || {};
   const result = {title:EXTENDED_NAME, root:'u-root', people:{}, units:{}, branches:EXTENDED_BRANCHES, branchIds:new Map(), identities:{}};
@@ -120,6 +129,9 @@ export function createExtendedFamily(original = {}) {
     unit.children.forEach(child=>copy(child,id));
   }
   copy('u-root');
+  // Reuse saved wedding dates for the same canonical couples. An explicit
+  // cleared date takes precedence over the original fallback year.
+  applySavedWeddingDates(result.units,original.sharedWeddings);
   // Only the owner's confirmed paternal connection is added. Reorder this root
   // in the extended projection so Yona does not inherit Shlomo's father.
   if(result.units['u-root']){

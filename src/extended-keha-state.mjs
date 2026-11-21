@@ -31,6 +31,8 @@ export function initializeExtendedKeha(state) {
     const updateTriArchive=!state.rows('SELECT id FROM meta WHERE id=?',triArchiveMigration).length;
     const shlomoMigration='extended-kehat-shlomo-sarah-esther-2026-11-21-v1';
     const updateShlomo=!state.rows('SELECT id FROM meta WHERE id=?',shlomoMigration).length;
+    const triDeathMigration='extended-tri-confirmed-death-dates-2026-11-21-v1';
+    const updateTriDeath=!state.rows('SELECT id FROM meta WHERE id=?',triDeathMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
     const familyCorrectionNotes=new Set([...parentageNotes,'kehat-shori','kehat-mordechai','kehat-varda']);
     for(const seed of EXTENDED_PEOPLE){
@@ -163,6 +165,13 @@ export function initializeExtendedKeha(state) {
         saved.unit=seed.unit;
         state.savePerson(saved);
       }
+      if(updateTriDeath&&['keha-yosef-yissachar','tri-yissachar'].includes(seed.id)&&seed.deathDate){
+        const saved=state.person(seed.id);
+        if(!saved.deathDate){
+          state.sql.exec('INSERT OR IGNORE INTO meta (id,value) VALUES (?,?)',triDeathMigration+':backup:'+seed.id,JSON.stringify(saved));
+          saved.deathDate=seed.deathDate;saved.deceased=true;state.savePerson(saved);
+        }
+      }
     }
     for(const seed of EXTENDED_PEOPLE){
       if(!seed.sharedProfileId)continue;
@@ -180,6 +189,7 @@ export function initializeExtendedKeha(state) {
     if(updateFamilyCorrection)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',familyCorrectionMigration,'done');
     if(updateTri)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triMigration,'done');
     if(updateTriParentage)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triParentageMigration,'done');
+    if(updateTriDeath)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triDeathMigration,'done');
     if(updateMerav)state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',meravMigration,'done');
     if(updateTriArchive){
       // This original scan was uploaded through the family archive and is

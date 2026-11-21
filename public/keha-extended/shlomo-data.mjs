@@ -1,3 +1,5 @@
+import {applySavedWeddingDates} from './family-data.mjs';
+
 export const SHLOMO_NAME='משפחת שלמה קהא';
 export const SHLOMO_HOME='/keha-extended/shlomo/';
 export const SHLOMO_COLOR='#536641';
@@ -18,6 +20,7 @@ export function createShlomoFamily(original={}) {
     unit.children.forEach(child=>visit(child,id));
   }
   visit(result.root);
+  applySavedWeddingDates(result.units,original.sharedWeddings);
   result.branches=(original.branches || []).filter(branch=>result.units[branch.unit]).map(branch=>({
     ...branch,label:branch.label || branch.title,shortLabel:branch.shortLabel || branch.short,mark:branch.mark || branch.emblem,
   }));

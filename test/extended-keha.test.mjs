@@ -189,7 +189,7 @@ test('desktop and mobile show the ten children under Zechariah inside Kehat',asy
     assert.ok(document.querySelector('#treeNodes [data-person="tri-shifra"]'));
     assert.ok(document.querySelector('#treeNodes [data-person="tri-hezi"]'));
     assert.ok(!document.getElementById('treeNodes').textContent.includes('undefined'));
-    assert.match(document.getElementById('treeNodes').textContent,/נישואים לפי עדות אורה/);
+    assert.doesNotMatch(document.getElementById('treeNodes').textContent,/נישואים לפי עדות אורה/);
     assert.match(document.getElementById('treeBreadcrumb').textContent,/סעדיה/);
     window.FamilyApp.setView('directory');
     assert.equal(document.querySelector('#directoryGrid [data-person="tri-siblings-group"]'),null);
@@ -881,4 +881,94 @@ test('the eight family sites have distinct palettes and each branch keeps its ow
     assert.equal(manifest.theme_color,portal.color);assert.equal(manifest.background_color,portal.color);
     assert.equal(manifest.scope,portal.home);assert.equal(manifest.id,portal.home);
   }
+});
+
+test('public Keha trees keep life years concise in both languages and omit younger couples’ wedding years',async()=>{
+  const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8'),dates=await readFile(new URL('../public/assets/dates.js',import.meta.url),'utf8');
+  for(const phone of [false,true])for(const english of [false,true]){
+    const {document,window:dom}=parseHTML(branchPortalHTML(originalHTML,'kehat'));
+    const data=toOriginalFamilyData(createBranchPortal(family,'kehat'));
+    data.units['u-tri-binyamin'].weddingYear=1968;
+    const esther=data.people['tri-esther'];esther.birthday='17.3.1980';
+    data.people['test-young-partner']={id:'test-young-partner',name:'בת זוג לדוגמה',englishName:'Example partner',birthday:'1.1.1981',gender:'f',unit:'u-tri-esther',branch:'kehat'};
+    Object.assign(data.units['u-tri-esther'],{people:['tri-esther','test-young-partner'],relationship:'spouse',weddingYear:2010});
+    data.people['tri-hana'].deathYear=2020;data.people['tri-hana'].deceased=true;
+    const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){}};
+    window.FamilyI18n={isEnglish:english,locale:english?'en-GB':'he-IL',t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?(p.englishName||p.name):p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};
+    const context=vm.createContext({window,document,navigator:{userAgent:'Windows'},location:{hash:'#tree/kehat'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    context.Date=class extends Date{constructor(...args){super(...(args.length?args:[2026,10,21]));}};
+    vm.runInContext(dates,context);vm.runInContext(app,context);
+    const card=id=>document.querySelector('#treeNodes [data-person-card="'+id+'"]');
+    assert.equal(card('tri-esther').querySelector('[data-tree-birth-year]').textContent,(english?'Born: ':'לידה: ')+'1980');
+    assert.equal(card('tri-esther').querySelector('.person-partnership'),null);
+    assert.equal(card('test-young-partner').querySelector('.person-partnership'),null);
+    assert.equal(card('tri-shifra').querySelector('.person-partnership').textContent,(english?'Married: ':'נישואין: ')+'1968');
+    assert.equal(card('tri-hana').querySelector('[data-tree-death-year]').textContent,(english?'Died: ':'פטירה: ')+'2020');
+    assert.doesNotMatch(document.getElementById('treeNodes').textContent,/שאלון|פרס ילודה|Calculated age|Would be|Moved to Israel|\d{1,2}\.\d{1,2}\.\d{4}/);
+    window.FamilyApp.updatePerson('tri-esther',{birthday:'8.9.1979'});
+    assert.equal(card('tri-esther').querySelector('[data-tree-birth-year]').textContent,(english?'Born: ':'לידה: ')+'1979');
+    assert.match(window.FamilyApp.birthdayHTML('tri-esther'),/8\.9\.1979/,'The profile keeps the full date');
+  }
+});
+
+test('known Tri death dates populate existing profiles once and preserve family corrections',async()=>{
+  const f=fixture();try{
+    const id='keha-yosef-yissachar';
+    f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'יוסף טרי (קהא)',birthday:'1.1.1111',about:'זיכרון משפחתי',profileId:'portrait-to-preserve'}));
+    const first=await f.json(site('people/'+id+'/page'));
+    assert.equal(first.person.deathDate,'15.7.1985');assert.equal(first.person.about,'זיכרון משפחתי');
+    assert.equal((await f.json(site('people/tri-yissachar/page'))).person.deathDate,'13.4.1996');
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    assert.equal(saved.profileId,'portrait-to-preserve');saved.deathDate='16.7.1985';
+    f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
+    f.restart();assert.equal((await f.json(site('people/'+id+'/page'))).person.deathDate,'16.7.1985');
+  }finally{f.close();}
+});
+
+test('concise life and marriage years reach both independent Kehat families and the other public Keha trees',async()=>{
+  const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8'),dates=await readFile(new URL('../public/assets/dates.js',import.meta.url),'utf8');
+  for(const portal of ['kehat','zechariah-tzadok','zechariah','shlomo'])for(const phone of [false,true])for(const english of [false,true]){
+    const {document,window:dom}=parseHTML(portal==='shlomo'?shlomoKehaHTML(originalHTML):branchPortalHTML(originalHTML,portal));
+    const data=toOriginalFamilyData(portal==='shlomo'?createShlomoFamily(family):createBranchPortal(family,portal));
+    const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){}};
+    window.FamilyI18n={isEnglish:english,locale:english?'en-GB':'he-IL',t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?(p.englishName||p.name):p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};
+    const context=vm.createContext({window,document,navigator:{userAgent:'Windows'},location:{hash:'#tree'},history:{pushState(){}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    context.Date=class extends Date{constructor(...args){super(...(args.length?args:[2026,10,21]));}};
+    vm.runInContext(dates,context);vm.runInContext(app,context);document.getElementById('fullTreeButton').click();
+    const card=id=>document.querySelector('#treeNodes [data-person-card="'+id+'"]');
+    const born=(id,year)=>assert.equal(card(id).querySelector('[data-tree-birth-year]').textContent,(english?'Born: ':'לידה: ')+year);
+    const died=(id,year)=>assert.equal(card(id).querySelector('[data-tree-death-year]').textContent,(english?'Died: ':'פטירה: ')+year);
+    const married=year=>assert.ok([...document.querySelectorAll('#treeNodes .person-partnership')].some(e=>e.textContent===(english?'Married: ':'נישואין: ')+year),portal+': '+year);
+    if(portal==='kehat'){
+      born('kehat-zechariah',1902);born('tri-yona',1912);born('tri-esther',1934);
+      died('kehat-hadassah',2015);died('keha-yosef-yissachar',1985);died('tri-yissachar',1996);married(1947);
+      assert.equal(card('tri-binyamin').querySelector('[data-tree-death-year]'),null,'Burial is not a death date');
+    }else if(portal==='zechariah-tzadok'){
+      born('kehat-tzadok',1917);born('kehat-yaakov-yehudit','1923–1924');
+      for(const year of [1944,1946,1947])married(year);
+      for(const id of ['kehat-amna','kehat-naomi'])assert.equal(card(id).querySelector('[data-tree-death-year]'),null,'Bounds and possible grave matches stay in the profile');
+    }else if(portal==='zechariah'){
+      born('saadia-shalom',1923);born('saadia-saadia',1918);married(1949);married(1945);
+    }else{
+      born('shlomo',1907);born('yona',1921);died('shlomo',1996);died('yona',2010);married(1938);
+    }
+    assert.doesNotMatch(document.getElementById('treeNodes').textContent,/שאלון|פרס ילודה|פנקס|גיל מחושב|בחיים היום|Calculated age|Would be|Moved to Israel|\d{1,2}\.\d{1,2}\.\d{4}/);
+  }
+});
+
+test('the public tree reuses saved wedding years and respects a deliberately cleared date',async()=>{
+  const f=fixture();try{
+    const path='/keha-extended/shlomo/site-data.js';
+    await f.call(path);
+    const change=(id,date)=>{
+      const record=JSON.parse(f.database.prepare('SELECT data FROM weddings WHERE id=?').get(id).data);record.date=date;
+      f.database.prepare('UPDATE weddings SET data=? WHERE id=?').run(JSON.stringify(record),id);
+    };
+    change('u-fish','9.9.1980');change('u-root','');
+    const window={};vm.runInNewContext(await (await f.call(path)).text(),{window});
+    assert.equal(window.FAMILY_DATA.units['u-fish'].weddingYear,1980);
+    assert.equal(window.FAMILY_DATA.units['u-fish'].weddingDate,'9.9.1980');
+    assert.equal(window.FAMILY_DATA.units['u-root'].weddingYear,undefined);
+    assert.equal(window.FAMILY_DATA.units['u-root'].weddingDate,'');
+  }finally{f.close();}
 });
