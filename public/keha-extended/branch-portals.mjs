@@ -2,7 +2,7 @@ import {createExtendedFamily,EXTENDED_BRANCHES} from './family-data.mjs';
 
 export const BRANCH_PORTALS=Object.freeze({
   zechariah:Object.freeze({id:'zechariah',name:'משפחת קהא (זכריה)',nameEn:'Keha Family (Zechariah)',shortName:'קהא · זכריה',home:'/keha-extended/zechariah/',color:'#875b79',roots:['u-keha-zechariah'],branches:['zechariah'],tagline:'זכריה ויהודית קהא וצאצאיהם'}),
-  kehat:Object.freeze({id:'kehat',name:'משפחת קהת',nameEn:'Kehat Family',shortName:'משפחת קהת',home:'/keha-extended/kehat/',color:'#3f7e6f',roots:['u-kehat-tzadok-elder','u-kehat-aharon-elder'],branches:['kehat-tzadok','kehat'],tagline:'ענפי צדוק ואהרון · תיעוד המשפחה שלנו'}),
+  kehat:Object.freeze({id:'kehat',name:'משפחת קהת',nameEn:'Kehat Family',shortName:'משפחת קהת',home:'/keha-extended/kehat/',color:'#3f7e6f',roots:['u-kehat-tzadok-elder','u-kehat-aharon-elder'],branches:['kehat-tzadok','kehat'],tagline:"משפחות זכריה (בן צדוק) וסעדיה (ג'ידעאן) קהא"}),
 });
 const zechariahBranches=[
   ['kadya','קדיה מזרחי','Kadya Mizrahi'],['shalom','שלום ורחל קהא','Shalom & Rachel Keha'],

@@ -34,8 +34,8 @@ html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] :
 .extended-kehat-circles { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:24px; }
 .extended-kehat-item { display:grid;justify-items:center;align-content:start;gap:10px;min-width:0; }
 .extended-kehat-item>.extended-branch-note { color:var(--family-ink);unicode-bidi:plaintext; }
-.extended-kehat-small { position:relative;inset:auto;flex:none;width:112px;height:112px;max-width:100%;padding:10px; }
-.extended-kehat-small strong { font-size:calc(18px * var(--a11y-text-scale,1)); }
+.extended-kehat-small { position:relative;inset:auto;flex:none;width:120px;height:120px;max-width:100%;padding:10px; }
+.extended-kehat-small strong { font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.2; }
 .extended-kehat-small .extended-branch-portrait { width:26px;height:26px; }
 .extended-kehat-group>p { margin:0;padding:4px 8px;background:var(--paper);border-radius:12px;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);color:var(--muted); }
 .extended-yissachar-group { --corner-accent:#936e34;--corner-tint:#f5e9d3;display:grid;justify-items:center;gap:10px;width:112px;flex:none;padding-top:calc(var(--lower-heading-height) + 12px);text-align:center; }
@@ -82,11 +82,11 @@ html[data-extended-keha] .tree-partnerships path { stroke:var(--family-accent); 
   .extended-zechariah { left:calc(22% - 54px); }
   .extended-zechariah .extended-branch-portrait>span { display:flex;align-items:center;justify-content:center;width:100%;height:100%;font:600 14px/1 var(--sans);white-space:nowrap;letter-spacing:0; }
   .extended-lower-branches { --lower-heading-height:calc(22px * var(--a11y-text-scale,1));inset:auto 3% 36px;gap:16px; }
-  .extended-kehat-group { flex:1;width:auto;max-width:190px;gap:8px; }
+  .extended-kehat-group { flex:1;width:auto;max-width:210px;gap:8px; }
   .extended-kehat-group h3 { font-size:calc(16px * var(--a11y-text-scale,1)); }
   .extended-kehat-circles { gap:12px; }
   .extended-kehat-item { gap:6px; }
-  .extended-kehat-small { width:min(64px,100%);height:auto;aspect-ratio:1;max-width:100%;padding:6px; }
+  .extended-kehat-small { width:min(96px,100%);height:auto;aspect-ratio:1;max-width:100%;padding:5px; }
   .extended-kehat-small .extended-branch-portrait { width:24px;height:24px; }
   .extended-kehat-group>p { display:none; }
   .extended-yissachar-group { width:68px;padding-top:calc(var(--lower-heading-height) + 8px);gap:6px; }
@@ -96,6 +96,7 @@ html[data-extended-keha] .tree-partnerships path { stroke:var(--family-accent); 
   .extended-yissachar-group>.extended-branch-note { display:none; }
   .extended-lower-branches .extended-branch-note { font-size:calc(14px * var(--a11y-text-scale,1)); }
   .extended-branch-circle strong { font-size:calc(15px * var(--a11y-text-scale,1)); }
+  .extended-kehat-small.extended-branch-circle strong { font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.15; }
   .extended-branch-portrait { width:28px;height:28px;font-size:18px; }
   .extended-branch-note { font-size:calc(13px * var(--a11y-text-scale,1)); }
   .extended-hub-caption,.extended-research-note,.extended-tree-seal { display:none; }

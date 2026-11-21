@@ -178,7 +178,7 @@ test('desktop and mobile show the ten children under Zechariah inside Kehat',asy
     assert.ok(document.querySelector('#treeNodes [data-person="tri-hezi"]'));
     assert.ok(!document.getElementById('treeNodes').textContent.includes('undefined'));
     assert.match(document.getElementById('treeNodes').textContent,/נישואים לפי עדות אורה/);
-    assert.match(document.getElementById('treeBreadcrumb').textContent,/אהרון/);
+    assert.match(document.getElementById('treeBreadcrumb').textContent,/סעדיה/);
     window.FamilyApp.setView('directory');
     assert.equal(document.querySelector('#directoryGrid [data-person="tri-siblings-group"]'),null);
   }
@@ -710,13 +710,13 @@ test('the new portals retain independent identities and add stories and document
     const context=vm.createContext({window,document:page,location:{hash:'#home'},history:{pushState(){}},matchMedia:()=>({matches:false}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8'),context);
     window.FamilyApp.setView('tree');
-    assert.equal(page.getElementById('workspaceSubtitle').textContent,portal.id==='zechariah'?'זכריה ויהודית קהא וצאצאיהם':'ענפי צדוק ואהרון · הקשר ביניהם בבירור');
+    assert.equal(page.getElementById('workspaceSubtitle').textContent,portal.id==='zechariah'?'זכריה ויהודית קהא וצאצאיהם':"משפחות זכריה (בן צדוק) וסעדיה (ג'ידעאן) קהא");
     window.FamilyApp.getView=()=>'tree';
     context.clearTimeout=()=>{};context.setTimeout=()=>{};
     vm.runInContext(await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8'),context);
     page.dispatchEvent(new dom.Event('DOMContentLoaded'));
     assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,6);
-    if(portal.id==='kehat')assert.match(page.querySelector('#homeTiles .home-tile-tree').textContent,/ענפי צדוק ואהרון/);
+    if(portal.id==='kehat')assert.match(page.querySelector('#homeTiles .home-tile-tree').textContent,/משפחות זכריה וסעדיה/);
   }
 });
 

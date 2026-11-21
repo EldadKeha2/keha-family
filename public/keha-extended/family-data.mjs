@@ -9,8 +9,8 @@ export const EXTENDED_HOME = '/keha-extended/';
 export const EXTENDED_BRANCHES = Object.freeze([
   {id:'shlomo', unit:'u-root', label:'משפחת שלמה קהא', shortLabel:'שלמה קהא', titleEn:'Shlomo Keha Family', color:EXTENDED_COLOR, mark:'❖'},
   {id:'zechariah', unit:'u-keha-zechariah', label:'משפחת זכריה קהא הבן', shortLabel:'זכריה קהא הבן', titleEn:'Family of Zechariah Keha the Younger', color:'#875b79', mark:'❖'},
-  {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'משפחת קהת — צדוק', shortLabel:'צדוק · זכריה', titleEn:'Kehat family — Tzadok', color:'#3f7e6f', mark:'❖'},
-  {id:'kehat', unit:'u-kehat-aharon-elder', label:'משפחת קהת — אהרון', shortLabel:'אהרון · סעדיה', titleEn:'Kehat family — Aharon', color:'#3f7e6f', mark:'❖'},
+  {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'המשפחה של זכריה (בן צדוק) קהא', shortLabel:'המשפחה של זכריה (בן צדוק) קהא', titleEn:'Family of Zechariah (son of Tzadok) Keha', color:'#3f7e6f', mark:'❖'},
+  {id:'kehat', unit:'u-kehat-aharon-elder', label:"המשפחה של סעדיה (ג'ידעאן) קהא", shortLabel:"המשפחה של סעדיה (ג'ידעאן) קהא", titleEn:'Family of Saadia (Jidaan) Keha', color:'#3f7e6f', mark:'❖'},
   {id:'yissachar', unit:'u-keha-yissachar', label:'משפחת יששכר', shortLabel:'משפחת יששכר', titleEn:'Yissachar Family', color:'#936e34', mark:'❖'},
 ].map(Object.freeze));
 

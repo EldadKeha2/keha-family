@@ -24,13 +24,11 @@
         `<button type="button" class="extended-branch-circle extended-${id}" data-branch="${id}" aria-pressed="${branch===id}">${inner}</button>`;
     };
     const circles=['shlomo','zechariah'].map(circle).join('');
-    const kehatCircle=(id,personId,name,son)=>{
-      const person=window.FamilyApp?.getPersonSummary(personId);
-      const portrait=person?.profile?`<span class="extended-branch-portrait"><img src="${safe(person.profile)}" alt="" decoding="async"></span>`:'';
-      const shortSon=id==='kehat-tzadok'?tr('זכריה','Zechariah'):tr('סעדיה (ג׳ידעאן)','Saadia (Jidaan)');
-      return `<div class="extended-kehat-item"><a class="extended-branch-circle extended-kehat-small" href="${safe(kehatHome)}" aria-label="${safe(name+' · '+son)}">${portrait}<strong>${safe(name)}</strong></a><span class="extended-branch-note"><span class="extended-desktop-only">${safe(son)}</span><span class="extended-phone-only">${safe(shortSon)}</span></span></div>`;
+    const kehatCircle=id=>{
+      const label=I.branchName(data.branches.find(branch=>branch.id===id));
+      return `<div class="extended-kehat-item"><a class="extended-branch-circle extended-kehat-small" href="${safe(kehatHome)}" aria-label="${safe(label)}"><strong>${safe(label)}</strong></a></div>`;
     };
-    const kehatGroup=`<section class="extended-kehat-group" aria-label="${tr('שני ענפי משפחת קהת','The two Kehat family branches')}"><h3>${names.kehat()}</h3><div class="extended-kehat-circles">${kehatCircle('kehat-tzadok','kehat-tzadok-elder',tr('צדוק','Tzadok'),tr('זכריה בן צדוק קהת','Zechariah Kehat, son of Tzadok'))}${kehatCircle('kehat','kehat-aharon-elder',tr('אהרון','Aharon'),tr('סעדיה (ג׳ידעאן) בן אהרון קהת','Saadia (Jidaan) Kehat, son of Aharon'))}</div><p>${tr('נישואי יעקב ויהודית מחברים בין הענפים','The relationship between these two branches is not yet known')}</p></section>`;
+    const kehatGroup=`<section class="extended-kehat-group" aria-label="${tr('שני ענפי משפחת קהת','The two Kehat family branches')}"><h3>${names.kehat()}</h3><div class="extended-kehat-circles">${kehatCircle('kehat-tzadok')}${kehatCircle('kehat')}</div><p>${tr('נישואי יעקב ויהודית מחברים בין הענפים','The relationship between these two branches is not yet known')}</p></section>`;
     const lowerBranches=`<div class="extended-lower-branches">${kehatGroup}<div class="extended-yissachar-group">${circle('yissachar')}<span class="extended-branch-note">${safe(notes.yissachar)}</span></div></div>`;
     const ancestor=(id,side,name,description,phoneDescription=description)=>`<a class="extended-ancestor extended-ancestor-${side}" href="#person/${id}" data-person="${id}"><strong>${name}</strong><span>${phoneDescription===description?description:`<span class="extended-desktop-only">${description}</span><span class="extended-phone-only">${phoneDescription}</span>`}</span></a><span class="extended-parent-line extended-parent-line-${side}" aria-hidden="true"></span>`;
     const ancestry=ancestor('keha-zechariah-father','shlomo',tr('זכריה קהא האב','Zechariah Keha the Elder'),tr('אביו של שלמה','Shlomo’s father'))+ancestor('saadia-elder','zechariah',tr('סעדיה קהא','Saadia Keha'),tr('אביו של זכריה הבן','Zechariah’s father'),tr('אבי זכריה הבן','Zechariah’s father'));
