@@ -50,3 +50,8 @@
   .pdf-reader-tools label{font-size:1rem}.pdf-page-scroll{min-height:100px}.pdf-attachment{width:min(100%,300px);margin-inline:0}
   #mediaStage.is-document:has(>.pdf-reader){height:67dvh;min-height:350px;padding:.25rem}
 }
+@media(max-height:500px){
+  .pdf-document-dialog{overflow:auto}
+  .pdf-document-dialog>.pdf-dialog-body{flex:none;height:500px;min-height:500px}
+  .pdf-document-dialog>header{position:sticky;top:0;z-index:2;background:#fafbf8;padding-block:.3rem}
+}
