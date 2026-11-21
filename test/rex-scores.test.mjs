@@ -2,13 +2,15 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import worker,{FamilyState,PUBLIC_WRITE_TOKEN} from '../src/worker.mjs';
+import {familyApp} from '../family-apps/worker.mjs';
+import {NAKASH_WRITE_TOKEN} from '../src/nakash-shell.mjs';
 
 function fixture(){
   const db=new DatabaseSync(':memory:');
   const storage={sql:{exec(query,...args){const stmt=db.prepare(query),rows=stmt.columns().length?stmt.all(...args):(stmt.run(...args),[]);return {toArray:()=>rows};}},transactionSync(fn){db.exec('BEGIN');try{const result=fn();db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}}};
   let state=new FamilyState({storage},{});const env={FAMILY_STATE:{idFromName:n=>n,get:()=>state}};
   const call=(body,headers={},path='rex')=>worker.fetch(new Request('https://family.example/api/games/'+path+'/scores',{method:body===undefined?'GET':'POST',headers:{Origin:'https://family.example','X-Family-Token':PUBLIC_WRITE_TOKEN,'Content-Type':'application/json',...headers},body:body===undefined?undefined:JSON.stringify(body)}),env,{waitUntil(){}});
-  return {db,call,restart(){state=new FamilyState({storage},env);},close(){db.close();}};
+  return {db,call,serve:request=>worker.fetch(request,env,{waitUntil(){}}),restart(){state=new FamilyState({storage},env);},close(){db.close();}};
 }
 const entry=(n,count=1)=>({requestId:n.toString(16).padStart(32,'0'),name:'Player '+n,score:count*4,headId:'yona',basket:{jachnun:count,lahoh:0,kubaneh:0,malawach:0}});
 test('Rex records retain weighted baskets and heads, rank across visitors, survive restart and stay separate from Jachnun',async()=>{
@@ -39,4 +41,47 @@ test('invalid and unweighted baskets, impossible totals and bad write credential
 
 test('endless runs save totals beyond the former five-minute food cap and preserve mixed food values',async()=>{
   const f=fixture();try{const body={...entry(100,1500),basket:{jachnun:1500,lahoh:750,kubaneh:500,malawach:250},score:9500};const response=await f.call(body);assert.equal(response.status,200);const data=await response.json();assert.equal(data.scores[0].score,9500);assert.deepEqual(data.scores[0].basket,body.basket);f.restart();assert.equal((await (await f.call()).json()).scores[0].score,9500);assert.equal((await f.call({...entry(101),basket:body.basket,score:9501})).status,400);}finally{f.close();}
+});
+
+test('the full site and dedicated family portals share both score tables and existing results',async()=>{
+  const f=fixture();
+  try {
+    const portals = {
+      keha:'/nakash/api/compat/keha', haim:'/nakash/api/compat/haim',
+      yehuda:'/nakash/api/compat/yehuda', medina:'/nakash/api/compat/medina',
+      extended:'/keha-extended/api/compat', shlomo:'/keha-extended/shlomo/api/compat',
+      zechariah:'/keha-extended/zechariah/api/compat',
+      'zechariah-tzadok':'/keha-extended/zechariah-tzadok/api/compat',
+      kehat:'/keha-extended/kehat/api/compat',
+    };
+    const portalRequest=(branch,game,body,token=NAKASH_WRITE_TOKEN)=>{
+      const origin='https://'+branch+'.example';
+      const request=new Request(origin+portals[branch]+'/api/games/'+game+'/scores', {
+        method:body?'POST':'GET',
+        headers:{Origin:origin,'X-Family-Token':token,'Content-Type':'application/json'},
+        body:body && JSON.stringify(body),
+      });
+      return familyApp(branch,f.serve).fetch(request);
+    };
+    for(const game of ['rex','jachnun']){
+      const original=entry(1);
+      assert.equal((await f.call(original,{},game)).status,200);
+      const shared={...entry(2,10),headId:game==='rex'?'fez-dino':'fez-snake'};
+      const writer=game==='rex'?'shlomo':'haim';
+      assert.equal((await portalRequest(writer,game,shared,'wrong')).status,403);
+      assert.equal((await portalRequest(writer,game,{...shared,headId:game==='rex'?'fez-snake':'fez-dino'})).status,400);
+      const saved=await portalRequest(writer,game,shared);
+      assert.equal(saved.status,200);
+      const expected=(await saved.json()).scores;
+      assert.deepEqual(expected.map(row=>row.headId),[shared.headId,original.headId]);
+      for(const branch of Object.keys(portals)){
+        const response=await portalRequest(branch,game);
+        assert.equal(response.status,200,branch);
+        assert.match(response.headers.get('Cache-Control'),/no-store/);
+        assert.deepEqual((await response.json()).scores,expected,branch);
+      }
+      assert.deepEqual((await (await portalRequest('yehuda',game,shared)).json()).scores,expected);
+      assert.deepEqual((await (await f.call(undefined,{},game)).json()).scores,expected);
+    }
+  } finally {f.close();}
 });

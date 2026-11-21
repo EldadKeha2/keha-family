@@ -6,7 +6,7 @@ import {appleLaunchImages, launchAssets, themedFamilies} from './nakash-launch.m
 import {restrictedOriginalPerson} from './family-content.mjs';
 
 export const NAKASH_WRITE_TOKEN = 'nakash-public-v1';
-const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'stories', 'documents', 'person', 'search'];
+const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'stories', 'documents', 'games', 'person', 'search'];
 const branchMap = new Map(BRANCHES.map(branch => [branch.id, branch]));
 const mediaBranch = 'keha';
 const familyName = 'משפחת נקאש';
@@ -39,7 +39,7 @@ const layoutStyles = `<style>
 const standaloneScripts = new Set([
   'family-fallback.js', 'family-data.js', 'screensaver.js', 'family-ai.js',
   'living-family.js', 'updates.js', 'archive.js', 'calendar.js',
-  'family-timeline.js', 'memorial.js', 'nursery.js', 'games.js', 'founder-trees.js',
+  'family-timeline.js', 'memorial.js', 'nursery.js', 'founder-trees.js',
   'cloud.js', 'recycle-bin.js',
 ]);
 
@@ -107,6 +107,7 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
       start + children.replace(/<button\b[^>]*data-view="([^"]+)"[^>]*>.*?<\/button>/gs,
         (button, view) => NAKASH_VIEWS.includes(view) ? button : '') + back + end)
     .replace(/<a[^>]*class="[^"]*original-family-tab[^"]*"[^>]*>.*?<\/a>/gs,'')
+    .replaceAll('משחקי משפחה', 'משחקים תימנים ונהנים')
     .replace('תעודות מסמכים ותיעודים נדירים','מסמכים ותיעודים')
     .replace('<footer class="site-footer">', '<footer class="site-footer"><nav class="branch-bar" aria-label="ענפי המשפחה">'+navigation+back+'</nav>');
   if (!themed) return html;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import * as engine from '../public/assets/jachnun.mjs';
+import {FEZ_SNAKE,mascotPortrait} from '../public/assets/game-mascots.mjs';
 import {PREPARED_HEADS} from '../public/assets/jachnun-heads.mjs';
 import {webcrypto} from 'node:crypto';
 const source=(await readFile(new URL('../public/assets/jachnun.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'').replace(/export function /g,'function ');
@@ -15,10 +16,10 @@ function fixture({english=false,fail=false,manualImages=false,requestStatus=200,
   const people={yona:{id:'yona',name:'יונה נקאש',nameEn:'Yona Nakash'},eldad:{id:'eldad',name:'אלדד קהא',nameEn:'Eldad Keha'}};
   const window={location:{origin:'https://family.test'},FAMILY_DATA:{people},FamilyApp:{getPersonSummary:id=>({...people[id],profile:'/cached/'+id})},FamilyI18n:{isEnglish:english,language:english?'en':'he',locale:english?'en-US':'he-IL',personName:p=>english?p.nameEn:p.name,error:String,fetch:async (path,options)=>{requests.push(path);if(options?.method==='POST'){const body=JSON.parse(options.body);writes.push(body);if(path.endsWith('/scores'))return Response.json(scoreStatus===200?{saved:true,id:body.requestId,rank:1,scores:[{id:body.requestId,name:body.name,score:body.score,headId:body.headId}],limit:20}:{error:'failed'},{status:scoreStatus});return Response.json(requestStatus===200?{sent:true}:{error:'failed'},{status:requestStatus});}if(fail)throw Error('Offline');if(path.endsWith('/scores'))return Response.json({scores,limit:20});return Response.json({people:{yona:{profile:'/media/yona'},eldad:{profile:'/media/eldad'}}});}}};
   class Image{constructor(){this.naturalWidth=414;this.naturalHeight=444;images.push(this);}set src(value){this.url=value;if(!manualImages)queueMicrotask(()=>this.onload());}}
-  vm.runInNewContext(source+'\nwindow.test={mountJachnun,pauseJachnun};',{...engine,PREPARED_HEADS,crypto:webcrypto,turnSnake(state,direction){turns.push(direction);return engine.turnSnake(state,direction);},window,document,Image,Response,AbortController,URL,navigator:{clipboard:{async writeText(v){copied.push(v);}}},setTimeout(fn){const id=++timerId;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}});
+  vm.runInNewContext(source+'\nwindow.test={mountJachnun,pauseJachnun};',{...engine,FEZ_SNAKE,mascotPortrait,watchGameScores(){},PREPARED_HEADS,crypto:webcrypto,turnSnake(state,direction){turns.push(direction);return engine.turnSnake(state,direction);},window,document,Image,Response,AbortController,URL,navigator:{clipboard:{async writeText(v){copied.push(v);}}},setTimeout(fn){const id=++timerId;timers.set(id,fn);return id;},clearTimeout(id){timers.delete(id);}});
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const click=async(selector,dataset={})=>{events.get('click')({target:{closest:s=>s===selector?{dataset}:null}});await flush();};
-  return {root,nodes,images,timers,requests,copied,turns,writes,document,events,window,flush,get html(){return root.innerHTML;},get backs(){return backs;},mount(){window.test.mountJachnun(root,()=>{backs++;});},click,load(index=images.length-1){images[index].onload();},tick(){const entry=timers.entries().next().value;if(entry){timers.delete(entry[0]);entry[1]();}},async select(id){events.get('change')({target:{id:'jachnunCharacter',value:id}});await flush();},key(key,code=''){let prevented=false;events.get('keydown')({key,code,target:{matches:()=>false},preventDefault(){prevented=true;}});return prevented;}};
+  return {root,nodes,images,timers,requests,copied,turns,writes,document,events,window,flush,get html(){return root.innerHTML;},get backs(){return backs;},mount(options){window.test.mountJachnun(root,()=>{backs++;},options);},click,load(index=images.length-1){images[index].onload();},tick(){const entry=timers.entries().next().value;if(entry){timers.delete(entry[0]);entry[1]();}},async select(id){events.get('change')({target:{id:'jachnunCharacter',value:id}});await flush();},key(key,code=''){let prevented=false;events.get('keydown')({key,code,target:{matches:()=>false},preventDefault(){prevented=true;}});return prevented;}};
 }
 test('both languages select Grandma Yona by default, use her real portrait, and wait for the head before playing',async()=>{
   for(const english of [false,true]){
@@ -116,4 +117,22 @@ test('leaderboards show escaped player names and fixed character portraits witho
   const table=f.nodes.get('[data-jachnun-leaderboard]').innerHTML;
   assert.match(table,/&lt;img src=x onerror=alert\(1\)&gt;/);assert.doesNotMatch(table,/<img src=x/);assert.match(table,/assets\/games\/heads\/yona.png/);
   assert.deepEqual(f.requests,['api/games/jachnun/scores']);assert.equal(f.writes.length,0);
+});
+
+test('branch snakes grow a tail, save a fez-snake record, and share the game on the current branch',async()=>{
+  const f=fixture({scores:[{id:'1',name:'שחקן',score:4,headId:'yona'}]});
+  f.window.FAMILY_DATA={people:{}};
+  f.window.location.pathname='/nakash/haim/';
+  f.mount({mascot:true});await f.flush();
+  assert.match(f.html,/נחש עם תרבוש/);
+  assert.doesNotMatch(f.html,/jachnunCharacter|סבתא יונה|data-jachnun-crop|data-jachnun-request-form/);
+  const table=f.nodes.get('[data-jachnun-leaderboard]').innerHTML;
+  assert.match(table,/שחקן/);assert.doesNotMatch(table,/games\/heads/);
+  assert.equal(f.images.length,0);
+  await finishGame(f);
+  f.events.get('input')({target:{id:'jachnunScoreName',value:'Snake'}});submitScore(f);await f.flush();
+  assert.equal(f.writes.length,1);assert.equal(f.writes[0].headId,'fez-snake');
+  assert.match(f.nodes.get('[data-jachnun-leaderboard]').innerHTML,/נחש עם תרבוש/);
+  await f.click('[data-jachnun-share]');
+  assert.match(f.copied[0],/\/nakash\/haim\/\?lang=he#games\/jachnun$/);
 });

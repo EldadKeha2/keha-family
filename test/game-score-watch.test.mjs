@@ -1,0 +1,30 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {watchGameScores} from '../public/assets/game-score-watch.mjs';
+
+test('open score tables refresh periodically and on return, then stop when hidden or unmounted', t=>{
+  const document=new EventTarget(),window=new EventTarget();
+  document.visibilityState='visible';
+  Object.assign(globalThis,{document,window});
+  t.after(()=>{delete globalThis.document;delete globalThis.window;});
+  t.mock.timers.enable({apis:['setInterval']});
+  let reads=0;
+  const controller=new AbortController();
+  watchGameScores(()=>reads++,controller.signal);
+  t.mock.timers.tick(15000);
+  assert.equal(reads,1);
+  document.visibilityState='hidden';
+  document.dispatchEvent(new Event('visibilitychange'));
+  t.mock.timers.tick(60000);
+  window.dispatchEvent(new Event('focus'));
+  assert.equal(reads,1);
+  document.visibilityState='visible';
+  document.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(reads,2);
+  window.dispatchEvent(new Event('focus'));
+  assert.equal(reads,3);
+  controller.abort();
+  t.mock.timers.tick(60000);
+  window.dispatchEvent(new Event('focus'));
+  assert.equal(reads,3);
+});

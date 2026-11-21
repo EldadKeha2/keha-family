@@ -159,3 +159,9 @@
  body[data-active-view=games] .family-workspace::after{right:4px}
  html[data-a11y-clean] body[data-active-view=games] .family-workspace::before,html[data-a11y-clean] body[data-active-view=games] .family-workspace::after{display:none}
 }
+
+.branch-game-choices{grid-template-columns:repeat(2,minmax(0,1fr))}
+.branch-game-choices .family-game-choice{min-height:0}
+.branch-game-choices canvas{display:block;width:clamp(70px,15vw,116px);height:auto;aspect-ratio:1}
+.branch-game-choices .game-choice-rex{background:linear-gradient(145deg,#eff3df,#e2ecd8)}
+.branch-game-choices .game-choice-jachnun{background:linear-gradient(145deg,#fff3db,#f4dfc7)}

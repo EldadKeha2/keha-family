@@ -541,7 +541,7 @@ test('Shlomo’s portal keeps its family and adds the scoped stories and documen
   assert.equal(document.documentElement.dataset.nakashHome,SHLOMO_HOME);
   assert.equal(document.documentElement.dataset.nakashEntryView,'home');
   assert.equal(document.documentElement.dataset.nakashOrigin,'https://shlomo.example');
-  assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','documents']);
+  assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','games','documents']);
   assert.ok(!document.getElementById('extendedKehaHub'));
   assert.ok(!document.querySelector('a.branch-chip[href*="/nakash/"]'));
   assert.equal(document.querySelector('link[rel=manifest]').getAttribute('href'),SHLOMO_HOME+'manifest.webmanifest');
@@ -740,7 +740,7 @@ test('the new portals retain independent identities and add stories and document
     assert.equal(document.documentElement.dataset.nakashHome,portal.home);
     assert.equal(document.documentElement.dataset.nakashEntryView,'home');
     assert.equal(document.documentElement.dataset.nakashOrigin,'https://'+portal.id+'.example');
-    assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','documents']);
+    assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','games','documents']);
     assert.ok(document.getElementById('homeTiles'));
     assert.equal(document.querySelector('meta[name="theme-color"]').getAttribute('content'),portal.color);
     assert.ok(document.querySelector('a.branch-chip[href="https://family-extended.eldadkeha.workers.dev/keha-extended/#tree"]'));
@@ -762,7 +762,10 @@ test('the new portals retain independent identities and add stories and document
     context.clearTimeout=()=>{};context.setTimeout=()=>{};
     vm.runInContext(await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8'),context);
     page.dispatchEvent(new dom.Event('DOMContentLoaded'));
-    assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,6);
+    assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,7);
+    for (const menu of ['#homeTiles', '#mobileMenuTiles']) {
+      assert.equal(page.querySelector(menu+' [data-view=games] strong').textContent,'משחקים תימנים ונהנים');
+    }
     if(portal.id==='kehat')assert.match(page.querySelector('#homeTiles .home-tile-tree').textContent,/סעדיה/);
   }
 });

@@ -1,8 +1,9 @@
 import {HttpError,text} from './http.mjs';
 import {PREPARED_HEADS} from '../public/assets/jachnun-heads.mjs';
+import {FEZ_SNAKE} from '../public/assets/game-mascots.mjs';
 
 export const JACHNUN_SCORE_LIMIT=20;
-const heads=new Set(PREPARED_HEADS.map(head=>head.id));
+const heads=new Set([FEZ_SNAKE.id,...PREPARED_HEADS.map(head=>head.id)]);
 // Each of the three lives can grow from three cells to the full 18 × 18 board.
 const maximumScore=3*(18*18-3);
 

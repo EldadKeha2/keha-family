@@ -46,7 +46,9 @@ test('Nakash branch pages retain the original components and limit top-level nav
     assert.equal(document.querySelector('link[rel="manifest"]').getAttribute('href'), '/nakash/' + branch + '/manifest.webmanifest');
     assert.equal(document.querySelector('#homeLink img').getAttribute('src'), '/nakash/brand-' + branch + '.svg');
     assert.deepEqual([...document.querySelectorAll('#mainNav button')].map(button => button.dataset.view),
-      ['tree', 'directory', 'videos', 'gallery', 'stories', 'documents']);
+      ['tree', 'directory', 'videos', 'gallery', 'stories', 'games', 'documents']);
+    assert.equal(document.querySelector('#mainNav [data-view=games]').textContent, 'משחקים תימנים ונהנים');
+    assert.ok(document.querySelector('script[type=module][src^="/assets/games.js"]'));
     assert.equal(document.querySelector('link[rel="stylesheet"]').getAttribute('href'),
       '/' + original.querySelector('link[rel="stylesheet"]').getAttribute('href'));
     for (const id of ['treeViewport', 'directoryGrid', 'galleryHeaderUpload', 'videoHeaderUpload', 'personView', 'mediaViewer']) {

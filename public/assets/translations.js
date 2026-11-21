@@ -1,5 +1,7 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "משחקים תימנים ונהנים":"Yemeni Games and Fun",
+  "תימנירקס ותפוס תג׳חנון":"Yemeanite Rex and Catch the Jachnun",
   "העץ של סבא שלמה":"Grandpa Shlomo’s family tree",
   "העץ של סבתא יונה":"Grandma Yona’s family tree",
   "תעודות מסמכים ותיעודים נדירים":"Certificates, documents and rare recordings",

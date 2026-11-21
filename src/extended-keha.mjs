@@ -10,8 +10,7 @@ import {restrictedOriginalPerson} from './family-content.mjs';
 
 function branchHomeHTML(original) {
   return nakashHTML(original,'keha')
-    .replace(/<section class="family-slideshow"[^>]*>.*?<\/section>\s*/s,'')
-    .replace(/(src="\/assets\/home\.js)(?:\?[^"]*)?"/,'$1?v=branch-home-no-slideshow-v1"');
+    .replace(/<section class="family-slideshow"[^>]*>.*?<\/section>\s*/s,'');
 }
 
 export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portalOrigins={}) {

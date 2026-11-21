@@ -1,9 +1,9 @@
 (() => {
   'use strict';
   const key='familyNavigation';
-  const gameIds=['photos','kinship','missing','trivia','chick','differences','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
-  const views=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const site=globalThis.document?.documentElement?.dataset;
+  const gameIds=site?.nakashHome ? ['rex','jachnun'] : ['photos','kinship','missing','trivia','chick','differences','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
+  const views=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const root=()=>site?.nakashEntryView?'#'+site.nakashEntryView:matchMedia('(max-width:700px)').matches?'#home':'#tree';
   const scopedViews=site?.nakashViews?.split(' ');
   const path=url=>url.pathname+url.search+url.hash;
@@ -18,6 +18,7 @@
     if(scopedViews){
       const [view,id]=url.hash.slice(1).split('/');
       if(view==='photos'||view==='photo')url.hash='#gallery';
+      else if(view==='games' && id && !gameIds.includes(id))url.hash='#games';
       else if(view==='video')url.hash='#videos';
       else if(view==='people')url.hash='#directory';
       else if(view==='profile'&&id)url.hash='#person/'+id;

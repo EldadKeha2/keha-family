@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
-function fixture(href,{phone=false}={}){
+function fixture(href,{phone=false,site}={}){
   const browser=browserHistory(href);
   const window={location:browser.location,addEventListener:browser.addEventListener};
-  const context=vm.createContext({window,location:browser.location,history:browser.history,URL,matchMedia:()=>({matches:phone})});
+  const context=vm.createContext({window,document:{documentElement:{dataset:site}},location:browser.location,history:browser.history,URL,matchMedia:()=>({matches:phone})});
   const reload=()=>vm.runInContext(navigationSource,context);
   reload();return {...browser,window,reload,nav:window.FamilyNavigation};
 }
@@ -37,6 +37,20 @@ test('all direct game links have a lobby parent on desktop and in a phone app, i
     f.history.back();await f.flush();assert.equal(f.location.hash,phone?'#home':'#tree');
     f.history.forward();await f.flush();assert.equal(f.location.hash,'#games');
     f.history.forward();await f.flush();assert.equal(f.location.hash,'#games/'+id);
+  }
+});
+
+test('branch game links stay within the current family, including Back and legacy links', async () => {
+  const home='/keha-extended/shlomo/';
+  const site={nakashHome:home,nakashEntryView:'home',nakashViews:'home tree games'};
+  for (const url of ['#games/rex','?game=jachnun#games','#games/trivia']) {
+    const f=fixture('https://family.test'+home+url,{site});
+    assert.deepEqual([...f.nav.gameIds],['rex','jachnun']);
+    assert.equal(f.location.hash,url.includes('trivia')?'#games':url.includes('rex')?'#games/rex':'#games/jachnun');
+    if (f.location.hash!=='#games') {
+      f.history.back();await f.flush();assert.equal(f.location.hash,'#games');
+    }
+    f.history.back();await f.flush();assert.equal(f.location.pathname,home);assert.equal(f.location.hash,'#home');
   }
 });
 

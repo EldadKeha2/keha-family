@@ -90,6 +90,10 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   }
   if (path==='/api/health' && method==='GET') return json({available:true,mediaConfigured:configured(env)});
   if (path==='/api/setup' && method==='GET') return json({mediaConfigured:configured(env)});
+  // All family portals play against the same two score tables as the original site.
+  if (path==='/api/games/rex/scores' || path==='/api/games/jachnun/scores') {
+    return options.nativeRoute(request,path);
+  }
   const original = await projection();
   const nativeRoute = original.sharedPeople && options.nativeRoute ? async (source,path) => {
     const mediaId=/^\/api\/media\/([a-f0-9]{32})\//.exec(path)?.[1];
