@@ -1,5 +1,5 @@
-// The owner identified this family with Zechariah, son of Saadia. The 1954
-// childbirth-prize questionnaire names both parents and all ten children.
+// The owner confirmed Zechariah, son of Saadia (Jidaan), son of Aharon.
+// The 1954 questionnaire names both parents and ten children; Yissachar is separate.
 const grave=id=>'https://billiongraves.com/grave/'+id;
 const land='https://apps.land.gov.il/IturTabotData/nispachim/merkaz/4023136/20.pdf';
 const source=(label,labelEn,url)=>({label,labelEn,url});
@@ -9,7 +9,7 @@ export const TRI_BIRTH_YEARS=Object.freeze({'tri-menachem':1932,'tri-esther':193
 export const TRI_SIBLINGS=Object.freeze(Object.keys(TRI_BIRTH_YEARS));
 const unitId=id=>id==='keha-yosef-yissachar'?'u-tri-yosef':'u-'+id;
 const person=(id,name,englishName,gender,details={})=>({id,name,englishName,nameEn:englishName,gender,unit:unitId(id),triFamily:true,...details});
-const siblingNote='אחד מעשרת ילדיהם של זכריה ויונה קהא טירי, לפי שאלון פרס הילודה מ־1954 (ארכיון המדינה, ג־405/156, עמ׳ 9) והצלבת עדות אורה. אלדד זיהה את האב כזכריה בן סעדיה מנישואיו הראשונים.';
+const siblingNote='אחד מעשרת ילדיהם של זכריה ויונה קהא טירי, לפי שאלון פרס הילודה מ־1954 (ארכיון המדינה, ג־405/156, עמ׳ 9) והצלבת עדות אורה. אלדד זיהה את האב כזכריה בן סעדיה בן אהרון, מנישואיו הראשונים של סעדיה.';
 const sister=(id,name,en,candidate)=>person(id,name,en,'f',{
   researchNotes:'בתם של זכריה ויונה קהא טירי, ואחת מחמש האחיות בעדות אורה. שמה ושנת לידתה מופיעים בשאלון פרס הילודה מ־1954. בטבלת הקרקע הרשמית מופיע השם ״'+candidate+'״ כמועמדת לזיהוי שם הנישואים; השם המאוחר עדיין להשוואה.',
   researchSources:[source('טבלת הקצאה ואיזון · עמ׳ 15–16 · התאמה לבדיקה','Official land register · pages 15–16 · candidate match',land)],
@@ -31,11 +31,11 @@ export const TRI_RESEARCH_PEOPLE=Object.freeze([
   person('tri-hezi','חזי קהתי','Hezi Kehati','m',{occupation:'ספר',researchNotes:'לפי אורה הוא בנה של שפרה, שהייתה נשואה לבנימין. נמצא רישום ציבורי של חזי קהתי כמעצב שיער, המתאים לרמז המקצועי. אבהותו של בנימין לא אושרה בנפרד ולכן אינה מוצגת כהורות מאומתת.',researchSources:[source('חזי קהתי · מעצב שיער · הצלבת העיסוק','Hezi Kehati · hairdresser · occupation match','https://www.d.co.il/19325400/30540/')]}),
   {id:'kehat-zechariah',triFamily:true,researchNotes:'בנו של סעדיה (ג׳ידעאן), ונפרד מזכריה בן צדוק שבענף השני. השם נמסר בתרשים המוקדם ונזכר בין בני ג׳מעאן בתעתיק המכתב מ־1944. זכריה קהא טרי בן סעדיה, שבמצבה המשולשת, הוא מועמד לחיבור ענף עשרת האחים מעדות אורה: יוסף, יששכר ובנימין מופיעים במקורות עם אב בשם זכריה; אצל בנימין נרשמה גם האם חממה. הזיהוי המדויק ושיוך כל העשרה אליו עדיין בבירור, ובפרט סתירת גילו של מנחם. עשרת האחים מוצגים בקבוצה נפרדת עד להשלמת ההורות.',researchSources:[triple,source('ענף טרי · עשרת האחים · ההורות בבירור','Tri family · ten siblings · parentage under research','https://family-extended.eldadkeha.workers.dev/keha-extended/#tree/yissachar')]},
 ].map(p=>{
-  if(p.id==='kehat-zechariah')p={...p,name:'זכריה קהא טירי',englishName:'Zechariah Keha Tiri',nameEn:'Zechariah Keha Tiri',unit:'u-kehat-zechariah',aliases:['זכריה קהת','זכריה קהא טרי','זכריה טירי קהא','זכריה טורי קהא'],birthYear:1902,aliyahYear:1933,occupation:'חקלאי',archiveBirthEvidence:true,birthYearSource:'שאלון פרס ילודה, 1954',birthYearSourceEn:'1954 childbirth-prize questionnaire',researchNotes:'בנו של סעדיה (ג׳ידעאן) ואשתו הראשונה שושנה, לפי זיהוי אלדד והתרשים המשפחתי. נפרד מזכריה בן צדוק ומזכריה קהא הבן שבענף המקביל. בשאלון פרס הילודה מ־1954 נרשם לצד אשתו יונה קהא טירי ועשרת ילדיהם: יליד 1902, תימן, חקלאי, שנת עלייה 1933, שעריים, רחוב רבי עקיבא 38. התיק מאשר את חיבור עשרת האחים מעדות אורה לענף זה. שנת 1932 של מנחם בשאלון סותרת את הגיל 72 שיוחס לו בקריאת המצבה המועמדת; אין לחשב את לידתו מחדש מהגיל במצבה.',researchSources:[TRI_ARCHIVE_SOURCE,triple]};
+  if(p.id==='kehat-zechariah')p={...p,name:'זכריה קהא טירי',englishName:'Zechariah Keha Tiri',nameEn:'Zechariah Keha Tiri',unit:'u-kehat-zechariah',aliases:['זכריה בן סעדיה בן אהרון','זכריה קהת','זכריה קהא טרי','זכריה טירי קהא','זכריה טורי קהא'],birthYear:1902,aliyahYear:1933,occupation:'חקלאי',archiveBirthEvidence:true,birthYearSource:'שאלון פרס ילודה, 1954',birthYearSourceEn:'1954 childbirth-prize questionnaire',researchNotes:'בנו של סעדיה (ג׳ידעאן) בן אהרון ואשתו הראשונה שושנה, לפי זיהוי אלדד והתרשים המשפחתי. נפרד מזכריה בן צדוק ומזכריה קהא הבן שבענף המקביל. בשאלון פרס הילודה מ־1954 נרשם לצד אשתו יונה קהא טירי ועשרת ילדיהם: יליד 1902, תימן, חקלאי, שנת עלייה 1933, שעריים, רחוב רבי עקיבא 38. התיק מאשר את חיבור עשרת האחים מעדות אורה לענף זה. שנת 1932 של מנחם בשאלון סותרת את הגיל 72 שיוחס לו בקריאת המצבה המועמדת; אין לחשב את לידתו מחדש מהגיל במצבה.',researchSources:[TRI_ARCHIVE_SOURCE,triple]};
   if(TRI_BIRTH_YEARS[p.id]){
     const notes={
       'tri-menachem':'בשאלון נרשם יליד 1932, תימן — עדן, חקלאי ורווק. לפי אורה היה הבכור ולא נישא. שנת 1932 אינה מתיישבת עם גיל 72 בקריאה הקודמת של מצבת מנחם; גיל האב 77 ב־1979 ופרטי המצבה נשמרים כמקור נפרד לבירור.',
-      'keha-yosef-yissachar':'בשאלון נרשמה שנת 1937. לפי אורה וגליה, יוסי נהרג בהתהפכות טרקטור בכרם. במצבת יוסף טרי (קהא) בן זכריה: 15.7.1985, בן 47. הפער האפשרי בין הגיל במצבה לשנת השאלון נשמר במקורות. יוסף ויששכר הם שני אחים נפרדים.',
+      'keha-yosef-yissachar':'בשאלון נרשמה שנת 1937. לפי אורה וגליה, יוסי נהרג בהתהפכות טרקטור בכרם. במצבת יוסף טרי (קהא) בן זכריה: 15.7.1985, בן 47. הפער האפשרי בין הגיל במצבה לשנת השאלון נשמר במקורות. יוסף ויששכר הם שני אחים נפרדים; משפחת יששכר של יוסף וצביה היא ענף עצמאי ונפרד מהם.',
       'tri-binyamin':'בשאלון נרשמה שנת 1941. לפי אורה היה נשוי לשפרה. בחברה קדישא רחובות נרשם בן זכריה וחממה, קבורה ב־2.4.2014 בגיל 73. זהו תאריך קבורה; אבהותו לחזי לא אושרה בנפרד.',
       'tri-yissachar':'בשאלון נרשמה שנת 1943. במצבת יששכר טרי בן זכריה: 13.4.1996, בן 52. יששכר נפרד מאחיו יוסף.',
       'tri-david':'בשאלון נרשמה שנת 1949. לפי גליה עזר ליוסי בכרם. השם טורי דוד בטבלת הקרקע הוא מקור להשוואה, ולא מקור נוסף לשנת הלידה.',
@@ -51,8 +51,6 @@ export function applyTriUnits(units){
   const children=TRI_SIBLINGS.map(unitId);
   const parents=['kehat-zechariah','tri-yona'];
   units['u-kehat-zechariah']={id:'u-kehat-zechariah',people:parents,children,parent:'u-keha-kehat',relationship:'spouse'};
-  // Retain older direct links; the people and kinship use the canonical unit.
-  units['u-keha-yissachar']={...units['u-kehat-zechariah'],id:'u-keha-yissachar',canonicalUnit:'u-kehat-zechariah',mirrorOf:'u-kehat-zechariah'};
   for(const id of TRI_SIBLINGS){const u=unitId(id);units[u]={id:u,people:[id],children:[],parent:'u-kehat-zechariah',relationship:'single'};}
   units['u-tri-binyamin']={id:'u-tri-binyamin',people:['tri-binyamin','tri-shifra'],children:['u-tri-hezi'],parent:'u-kehat-zechariah',relationship:'spouse',relationships:[
     {people:['tri-binyamin','tri-shifra'],children:[],relationship:'spouse',label:'נישואים לפי עדות אורה',labelEn:'Marriage reported by Ora'},

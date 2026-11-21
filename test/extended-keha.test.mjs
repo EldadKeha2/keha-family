@@ -45,7 +45,7 @@ function fixture(){
   return {call,json,objects,database,restart(){state=new FamilyState({storage},env);},close(){globalThis.fetch=originalFetch;database.close();}};
 }
 
-test('the Tri shortcut joins Saadia’s Kehat ancestry while the two older roots remain independent',()=>{
+test('Tri follows Saadia’s Kehat ancestry while Yissachar and the older roots stay independent',()=>{
   const tree=createExtendedFamily(family),data=toOriginalFamilyData(tree);
   assert.equal(data.title,EXTENDED_NAME);
   assert.equal(data.branches.length,5);
@@ -57,10 +57,10 @@ test('the Tri shortcut joins Saadia’s Kehat ancestry while the two older roots
   assert.equal(data.people['margalit-nakash'],undefined);
   assert.deepEqual(data.units['u-keha-zechariah'].people,['keha-zechariah','keha-yehudit']);
   assert.equal(data.units['u-keha-kehat'].children.length,8);
-  assert.equal(data.units['u-keha-yissachar'].children.length,10);
-  assert.equal(data.units['u-kehat-zechariah'].parent,'u-keha-kehat');
-  assert.deepEqual(data.units['u-kehat-zechariah'].people,['kehat-zechariah','tri-yona']);
-  assert.equal(data.units['u-keha-yissachar'].canonicalUnit,'u-kehat-zechariah');
+  assert.equal(data.units['u-keha-yissachar'].children.length,5);
+  assert.equal(data.units['u-kehat-zechariah'].children.length,10);
+  assert.equal(data.units['u-keha-yissachar'].siblingGroup,undefined);
+  assert.deepEqual(data.units['u-keha-yissachar'].people,['yissachar-yosef','yissachar-tzvia']);
   assert.ok(data.people['kehat-hadassah'].aliases.includes('הדוס'));
   assert.notEqual(data.people['kehat-miriam'].id,data.people['kehat-yaakov-miriam'].id);
   assert.equal(data.people.ora.id,family.people.ora.id);
@@ -72,7 +72,7 @@ test('the 1954 questionnaire connects Ora’s ten siblings to their parents in b
   const data=toOriginalFamilyData(createExtendedFamily(family)),window={};
   vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
   const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
-  const ids=data.units['u-keha-yissachar'].children.map(unit=>data.units[unit].people[0]);
+  const ids=data.units['u-kehat-zechariah'].children.map(unit=>data.units[unit].people[0]);
   assert.deepEqual(ids.map(id=>data.people[id].name),['מנחם','אסתר','יוסף טרי (קהא)','בנימין קהתי','יששכר טרי','רחל','רונית','דוד','מרים','חנה']);
   assert.equal(new Set(ids).size,10);
   assert.equal(ids.filter(id=>data.people[id].gender==='m').length,5);
@@ -92,6 +92,14 @@ test('the 1954 questionnaire connects Ora’s ten siblings to their parents in b
   const portal=toOriginalFamilyData(createBranchPortal(family,'kehat'));
   for(const id of [...ids,'tri-yona','kehat-zechariah'])assert.ok(portal.people[id],id);
   assert.equal(portal.people['tri-yona'].branch,'kehat');
+  assert.deepEqual(relatives('kehat-zechariah').parents,['kehat-jidaan','kehat-first-wife']);
+  assert.deepEqual(relatives('kehat-jidaan').parents,['kehat-aharon-elder']);
+  assert.equal(data.units['u-keha-yissachar'].parent,null);
+  assert.deepEqual(relatives('yissachar-yosef').children.map(id=>data.people[id].name),['דודי','ממי','אביחי','דרורי','אורי']);
+  assert.deepEqual(relatives('yissachar-yosef').partners,['yissachar-tzvia']);
+  assert.deepEqual(relatives('yissachar-yosef').parents,[]);
+  assert.equal(data.people['yissachar-yosef'].branch,'yissachar');
+  assert.ok(!portal.people['yissachar-yosef']);
   assert.equal(data.people['tri-menachem'].maritalStatus,'unmarried');
   assert.match(data.people['tri-menachem'].researchNotes,/72/);
   assert.match(data.people['tri-menachem'].researchNotes,/77/);
@@ -130,17 +138,27 @@ test('correcting Yosef’s combined label retains his profile, family edits and 
     assert.equal(saved.profileId,before.profileId);
     const backup=JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get('extended-tri-ten-siblings-2026-11-21-v1:backup:'+id).value);
     assert.equal(backup.name,before.name);
+    const restored=(await f.json(site('people/yissachar-yosef/page'))).person;
+    assert.equal(restored.name,'יוסף יששכר');assert.equal(restored.about,before.about);assert.equal(restored.birthday,before.birthday);
     const uploaded=await f.json(site('people/'+id+'/photos?filename=yosef.jpg'),{method:'POST',body:photo});
     const mediaId=uploaded.albums.photos.items[0].id;
     f.restart();
     const page=await f.json(site('people/'+id+'/page'));
     assert.equal(page.person.id,id);assert.equal(page.albums.photos.items[0].id,mediaId);
     assert.deepEqual(new Uint8Array(await (await f.call('/media/'+mediaId)).arrayBuffer()),new Uint8Array(photo));
+    // Simulate upgrading a site where the parallel archival migration ran first.
+    f.database.prepare('DELETE FROM meta WHERE id=?').run('extended-tri-confirmed-parentage-yissachar-2026-11-21-v2');
+    f.restart();
+    const upgraded=await f.json(site('people/'+id+'/page'));
+    assert.equal(upgraded.person.birthYear,1937);
+    assert.equal(upgraded.person.birthday,before.birthday);
+    assert.match(upgraded.person.researchNotes,/2\.3\.1938/);
+    assert.equal(upgraded.albums.photos.items[0].id,mediaId);
     assert.equal(f.database.prepare('SELECT COUNT(*) AS n FROM people WHERE id=?').get('tri-siblings-group').n,0,'The group header must never become a person record');
   }finally{f.close();}
 });
 
-test('desktop and mobile show both documented parents and all ten children through the existing Tri link',async()=>{
+test('desktop and mobile show the ten children under Zechariah inside Kehat',async()=>{
   const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   for(const phone of [false,true]){
     const {document,window:dom}=parseHTML(extendedKehaHTML(originalHTML));
@@ -148,19 +166,19 @@ test('desktop and mobile show both documented parents and all ten children throu
     const window={FAMILY_DATA:data,addEventListener(){},dispatchEvent(){},scrollTo(){}};
     window.FamilyI18n={isEnglish:false,t:value=>value,html:(parts,...values)=>parts.reduce((output,part,index)=>output+part+(values[index]??''),''),personName:person=>person.name,branchName:branch=>branch?.title,searchNames:person=>person.name,date:value=>value};
     window.FamilyDates={age:()=>null,parse:()=>null};
-    const context=vm.createContext({window,document,location:{hash:'#tree/yissachar'},history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+    const context=vm.createContext({window,document,location:{hash:'#tree/kehat'},history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(source,context);
     assert.equal(document.querySelector('.tree-sibling-group'),null);
     for(const id of ['kehat-zechariah','tri-yona'])assert.ok(document.querySelector('#treeNodes [data-person="'+id+'"]'));
     assert.match(document.getElementById('treeNodes').textContent,/1932/);
     assert.match(document.getElementById('treeNodes').textContent,/1954/);
     assert.equal(document.querySelector('#treeNodes [data-person="tri-siblings-group"]'),null);
-    for(const unit of data.units['u-keha-yissachar'].children)assert.ok(document.querySelector('#treeNodes [data-person="'+data.units[unit].people[0]+'"]'));
+    for(const unit of data.units['u-kehat-zechariah'].children)assert.ok(document.querySelector('#treeNodes [data-person="'+data.units[unit].people[0]+'"]'));
     assert.ok(document.querySelector('#treeNodes [data-person="tri-shifra"]'));
     assert.ok(document.querySelector('#treeNodes [data-person="tri-hezi"]'));
     assert.ok(!document.getElementById('treeNodes').textContent.includes('undefined'));
     assert.match(document.getElementById('treeNodes').textContent,/נישואים לפי עדות אורה/);
-    assert.match(document.getElementById('treeBreadcrumb').textContent,/ענף טרי/);
+    assert.match(document.getElementById('treeBreadcrumb').textContent,/אהרון/);
     window.FamilyApp.setView('directory');
     assert.equal(document.querySelector('#directoryGrid [data-person="tri-siblings-group"]'),null);
   }
@@ -619,6 +637,7 @@ test('the extended installation launches its own hub and never uses the root Keh
   const app=familyApp('extended',async request=>{requested=request.url;return Response.json(manifest);});
   const home=await app.fetch(new Request('https://extended.example/'));
   assert.equal(new URL(home.headers.get('Location')).pathname,'/keha-extended/');
+  assert.equal(new URL(home.headers.get('Location')).hash,'#tree');
   const response=await app.fetch(new Request('https://extended.example/manifest.webmanifest'));
   const installed=await response.json();
   assert.equal(new URL(requested).pathname,'/keha-extended/manifest.webmanifest');
@@ -638,6 +657,8 @@ test('desktop and mobile open dedicated Zechariah and Kehat portals from the ext
     const context=vm.createContext({window,document,location,history:{pushState(){}},matchMedia:query=>({matches:phone&&query.includes('700px')}),requestAnimationFrame(){},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
     vm.runInContext(hubSource,context);vm.runInContext(appSource,context);
     assert.equal(document.querySelectorAll('#extendedKehaHub .extended-branch-circle').length,5);
+    assert.equal(document.getElementById('workspaceTitle').textContent,'האילן המשפחתי של קהא המורחבת');
+    assert.equal(document.getElementById('workspaceSubtitle').textContent,'');
     assert.equal(document.querySelectorAll('#extendedKehaHub .extended-kehat-small').length,2);
     assert.match(document.querySelector('#extendedKehaHub .extended-kehat-group').textContent,/נישואי יעקב ויהודית מחברים בין הענפים/);
     assert.equal(document.querySelectorAll('#extendedKehaHub .extended-ancestor').length,2);
@@ -646,7 +667,7 @@ test('desktop and mobile open dedicated Zechariah and Kehat portals from the ext
     assert.ok(document.querySelector('#extendedKehaHub a[href="/keha-extended/shlomo/#home"]'));
     assert.ok(document.querySelector('#extendedKehaHub a[href="/keha-extended/zechariah/#home"]'));
     assert.equal(document.querySelectorAll('#extendedKehaHub a[href="/keha-extended/kehat/#home"]').length,2);
-    for(const [branch,person] of [['yissachar','keha-yosef-yissachar']]){
+    for(const [branch,person] of [['yissachar','yissachar-yosef']]){
       document.querySelector('#extendedKehaHub [data-branch="'+branch+'"]').click();
       assert.ok(document.querySelector('#treeNodes [data-person="'+person+'"]'),branch);
       assert.ok(document.getElementById('treeBreadcrumb').textContent.startsWith(EXTENDED_NAME+' › '));
@@ -657,7 +678,7 @@ test('desktop and mobile open dedicated Zechariah and Kehat portals from the ext
     window.FamilyApp.setView('home');
     document.querySelector('#extendedKehaHomeHub [data-branch="yissachar"]').click();
     assert.equal(window.FamilyApp.getView(),'tree');
-    assert.ok(document.querySelector('#treeNodes [data-person="keha-yosef-yissachar"]'));
+    assert.ok(document.querySelector('#treeNodes [data-person="yissachar-yosef"]'));
   }
 });
 

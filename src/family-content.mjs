@@ -6,7 +6,7 @@ import {HttpError,text,uid} from './http.mjs';
 export const ORIGINAL_PHOTO_PEOPLE=new Set(['shlomo','yona','ruti','becker-parent','yehiel','avigail','ora','shosh']);
 const originalPeople=new Set(Object.keys(original.people));
 const paternalScopes=new Set(['extended','zechariah','kehat']);
-const founderUnits=['u-root','u-keha-zechariah-father','u-saadia-elder','u-keha-zechariah','u-kehat-tzadok-elder','u-kehat-zechariah-ben-tzadok','u-kehat-aharon-elder','u-keha-kehat','u-keha-yissachar'];
+const founderUnits=['u-root','u-keha-zechariah-father','u-saadia-elder','u-keha-zechariah','u-kehat-tzadok-elder','u-kehat-zechariah-ben-tzadok','u-kehat-aharon-elder','u-keha-kehat','u-kehat-zechariah','u-keha-yissachar'];
 export const MISATTRIBUTED_YONA_DOCUMENT='57537c6f78904f8fa31c876e8b4461d2';
 const validScopes=new Set(['original','nakash','keha','haim','yehuda','medina','extended','shlomo','zechariah','kehat']);
 const kind=item=>item.kind||(item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document');

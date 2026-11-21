@@ -12,7 +12,7 @@ export function familyApp(branch, upstreamFetch = fetch) {
       const incoming = new URL(request.url);
       if (incoming.pathname === '/' || incoming.pathname === '/index.html') {
         incoming.pathname = home;
-        if (!incoming.hash) incoming.hash = 'home';
+        if (!incoming.hash) incoming.hash = branch==='extended'?'tree':'home';
         return Response.redirect(incoming.href, 302);
       }
       const origin = request.headers.get('Origin');
