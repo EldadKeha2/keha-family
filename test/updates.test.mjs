@@ -257,6 +257,22 @@ test('story form emails the storyteller, person and full text privately, without
   }
 });
 
+test('family questionnaires email the selected people for each family, including Margalit and her father Yahia',async()=>{
+  for(const provider of ['brevo','resend']){
+    const f=fixture(provider),cases=[['grandparents',['margalit','yahia'],['סבתא מרגלית','סבא יחיא (אבא של מרגלית)']],['yehuda',['zehor','yehuda'],['זהור','דוד יהודה נקאש']],['haim',['haim','shoshana'],['חיים נקאש','שושנה']],['medina',['ruma','yosef'],['רומה מדינה','יוסף מדינה']]];
+    try{
+      for(let index=0;index<cases.length;index++){
+        const [scope,personIds,names]=cases[index],body={name:'Test Person',scope,personIds,story:'בדיקת סיפור משפחתי',requestId:(100+index).toString(16).padStart(32,'0')};
+        const response=await f.call('/api/story-submissions',body,{'X-Family-Token':''});assert.equal(response.status,200,await response.clone().text());
+        const mail=f.messages.at(-1).body,text=mail.textContent||mail.text;for(const name of names){assert.ok(mail.subject.includes(name));assert.ok(text.includes(name));}
+        const before=f.messages.length;assert.equal((await f.call('/api/story-submissions',body)).status,200);assert.equal(f.messages.length,before);
+        const stored=f.db.exec('SELECT data FROM story_submissions WHERE id=?','story-submission/'+body.requestId).toArray()[0];assert.deepEqual((await f.updates.decrypt(stored.data)).personIds,personIds);
+      }
+      for(const body of [{scope:'grandparents',personIds:[]},{scope:'grandparents',personIds:['unknown']},{scope:'haim',personIds:['yehuda']},{scope:'medina',personIds:['margalit']},{scope:'yehuda',personIds:['zehor','yehuda','zehor']}])assert.equal((await f.call('/api/story-submissions',{name:'Test Person',story:'A memory',requestId:'ab'.repeat(16),...body})).status,400);
+    }finally{f.close();}
+  }
+});
+
 test('extended family stories accept optional free-text people and include them in private email and encrypted storage',async()=>{
   for(const provider of ['brevo','resend']){
     const f=fixture(provider),path='/api/story-submissions',body={name:'Test Person',scope:'extended',story:'זיכרון מקהא המורחבת',requestId:'f'.repeat(32)};

@@ -4,6 +4,7 @@ import {escapeHTML} from './http.mjs';
 import {familyAppOrigins} from './family-app-origins.mjs';
 import {appleLaunchImages, launchAssets, themedFamilies} from './nakash-launch.mjs';
 import {restrictedOriginalPerson} from './family-content.mjs';
+import {withStoryFormLink} from './story-submissions.mjs';
 
 export const NAKASH_WRITE_TOKEN = 'nakash-public-v1';
 const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'stories', 'documents', 'games', 'person', 'search'];
@@ -89,7 +90,7 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
     '/nakash/media-adapter.js',
     '/nakash/api/site-data.js',
   ].map(src => '  <script src="' + src + '" defer></script>').join('\n');
-  const html = original
+  const html = withStoryFormLink(original,section)
     .replace('<html ', '<html' + config + ' ')
     .replace(/<title>[^<]*<\/title>/, '<title>' + name + '</title>')
     .replace(/(name="(?:description|application-name|apple-mobile-web-app-title)" content=")[^"]+/g, '$1' + name)

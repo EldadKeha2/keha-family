@@ -7,6 +7,7 @@ import {createShlomoFamily,SHLOMO_HOME,SHLOMO_NAME,SHLOMO_COLOR} from '../public
 import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {appleLaunchImages} from './nakash-launch.mjs';
 import {restrictedOriginalPerson} from './family-content.mjs';
+import {withStoryFormLink} from './story-submissions.mjs';
 
 function branchHomeHTML(original) {
   return nakashHTML(original,'keha')
@@ -14,7 +15,7 @@ function branchHomeHTML(original) {
 }
 
 export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portalOrigins={}) {
-  return nakashHTML(original,'keha')
+  return withStoryFormLink(nakashHTML(original,'keha'),'extended')
     .replace('<html ', '<html data-extended-keha="true" data-keha-shlomo-home="'+shlomoOrigin+SHLOMO_HOME+'" '+Object.values(BRANCH_PORTALS).map(portal=>'data-keha-'+portal.id+'-home="'+(portalOrigins[portal.id]||'')+portal.home+'"').join(' ')+' ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="extended" data-nakash-entry-view="tree"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')
@@ -63,7 +64,7 @@ export function shlomoKehaHTML(original,appOrigin=''){
 export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev'){
   const portal=BRANCH_PORTALS[id];
   const startup=appleLaunchImages(id).map(({href,media})=>'<link rel="apple-touch-startup-image" href="'+href+'" media="'+media+'">').join('\n');
-  let html=branchHomeHTML(original)
+  let html=withStoryFormLink(branchHomeHTML(original),id)
     .replace('<html ','<html data-branch-portal="'+id+'" data-branch-name-en="'+portal.nameEn+'" data-branch-tagline="'+portal.tagline+'" data-branch-tagline-en="'+portal.taglineEn+'" data-keha-extended-home="'+extendedOrigin+EXTENDED_HOME+'" data-keha-api-prefix="'+portal.home+'api/compat" ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="'+id+'" data-nakash-entry-view="home"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')

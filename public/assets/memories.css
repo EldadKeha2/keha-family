@@ -1,4 +1,6 @@
 /* A family storybook: parchment, silverwork geometry, warm gold and living pages. */
+.story-questionnaire{display:flex;justify-content:center;margin:0 0 18px}
+.story-questionnaire .secondary-button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;text-align:center;text-decoration:none;border:2px solid var(--family-accent,#536641);font-weight:700}
 .memories-view,.voices-view{--memory-gold:#a38246;--memory-ink:#5c654b;--memory-line:#d2bf98;--memory-paper:#fffaf0}
 .memory-world{position:relative;isolation:isolate;width:100%;height:650px;max-width:1040px;margin:2px auto 22px;overflow:hidden;border-radius:36px;background:radial-gradient(ellipse at 50% 48%,#f6df9b55 0,transparent 42%),radial-gradient(ellipse at 50% 54%,#fffdf6 0,#faf3e3 65%,#f3ead5 100%);border:1px solid #d8cba9;box-shadow:inset 0 0 60px #e8d2a738,0 10px 35px #6c54220a;color:var(--memory-ink)}
 .memory-world-frame{position:absolute;inset:13px;border:1px solid #c2aa724d;border-radius:26px;pointer-events:none}

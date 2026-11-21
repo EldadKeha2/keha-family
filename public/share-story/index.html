@@ -5,29 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#183e4b">
   <meta name="robots" content="noindex,nofollow">
-  <title>סיפור על סבא שלמה וסבתא יונה | משפחת קהא</title>
-  <meta name="description" content="משתפים סיפור או זיכרון מסבא שלמה וסבתא יונה. כותבים שם, סיפור ושולחים לאלדד.">
-  <meta property="og:title" content="זיכרונות מסבא שלמה וסבתא יונה">
+  <title>סיפורים וזיכרונות מהמשפחה שלנו | משפחת קהא</title>
+  <meta name="description" content="משתפים זיכרונות מסבא שלמה, סבתא יונה, סבתא מרגלית וסבא יחיא. כותבים שם וסיפור ושולחים לאלדד.">
+  <meta property="og:title" content="סיפורים וזיכרונות מהמשפחה שלנו">
   <meta property="og:description" content="סיפור קטן, זיכרון גדול. כותבים שם וסיפור ושולחים לאלדד.">
   <link rel="stylesheet" href="/share-story/form.css">
+  <link rel="stylesheet" href="/share-story/people.css">
   <script src="/share-story/form.js" defer></script>
 </head>
 <body>
   <main>
     <header>
       <p class="family">משפחת קהא</p>
-      <h1>זיכרונות מסבא שלמה<br>וסבתא יונה</h1>
+      <h1>סיפורים וזיכרונות<br>מהמשפחה שלנו</h1>
       <p class="intro">סיפור מצחיק, רגע מרגש או זיכרון קטן.<br>נשמח לשמור אותם יחד.</p>
     </header>
-    <form id="story-form">
+    <form id="story-form" data-scope="grandparents">
       <label for="name">שם פרטי ושם משפחה</label>
       <input id="name" name="name" autocomplete="name" maxlength="100" required enterkeyhint="next" placeholder="איך קוראים לך?">
       <fieldset>
-        <legend>על מי הסיפור?</legend>
+        <legend>על מי הסיפור? אפשר לסמן כמה</legend>
         <div class="people">
-          <label><input type="radio" name="person" value="shlomo"><span>סבא שלמה</span></label>
-          <label><input type="radio" name="person" value="yona"><span>סבתא יונה</span></label>
-          <label><input type="radio" name="person" value="both" checked><span>שניהם</span></label>
+          <label><input type="checkbox" name="person" value="shlomo"><span>סבא שלמה</span></label>
+          <label><input type="checkbox" name="person" value="yona"><span>סבתא יונה</span></label>
+          <label><input type="checkbox" name="person" value="margalit"><span>סבתא מרגלית</span></label>
+          <label><input type="checkbox" name="person" value="yahia"><span>סבא יחיא<small>אבא של מרגלית</small></span></label>
         </div>
       </fieldset>
       <label for="story">הסיפור שלך</label>
