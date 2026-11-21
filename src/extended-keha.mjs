@@ -8,6 +8,12 @@ import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-
 import {appleLaunchImages} from './nakash-launch.mjs';
 import {restrictedOriginalPerson} from './family-content.mjs';
 
+function branchHomeHTML(original) {
+  return nakashHTML(original,'keha')
+    .replace(/<section class="family-slideshow"[^>]*>.*?<\/section>\s*/s,'')
+    .replace(/(src="\/assets\/home\.js)(?:\?[^"]*)?"/,'$1?v=branch-home-no-slideshow-v1"');
+}
+
 export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portalOrigins={}) {
   return nakashHTML(original,'keha')
     .replace('<html ', '<html data-extended-keha="true" data-keha-original-home="https://keha-family.eldadkeha.workers.dev/" data-keha-shlomo-home="'+shlomoOrigin+SHLOMO_HOME+'" '+Object.values(BRANCH_PORTALS).map(portal=>'data-keha-'+portal.id+'-home="'+(portalOrigins[portal.id]||'')+portal.home+'"').join(' ')+' ')
@@ -33,7 +39,7 @@ export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portal
 }
 
 export function shlomoKehaHTML(original,appOrigin=''){
-  return nakashHTML(original,'keha')
+  return branchHomeHTML(original)
     .replace('<html ','<html data-shlomo-keha="true" data-keha-api-prefix="'+SHLOMO_HOME+'api/compat" ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="shlomo" data-nakash-entry-view="home"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')
@@ -55,7 +61,7 @@ export function shlomoKehaHTML(original,appOrigin=''){
 export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev'){
   const portal=BRANCH_PORTALS[id];
   const startup=appleLaunchImages(id).map(({href,media})=>'<link rel="apple-touch-startup-image" href="'+href+'" media="'+media+'">').join('\n');
-  let html=nakashHTML(original,'keha')
+  let html=branchHomeHTML(original)
     .replace('<html ','<html data-branch-portal="'+id+'" data-branch-name-en="'+portal.nameEn+'" data-branch-tagline="'+portal.tagline+'" data-branch-tagline-en="'+portal.taglineEn+'" data-keha-extended-home="'+extendedOrigin+EXTENDED_HOME+'" data-keha-api-prefix="'+portal.home+'api/compat" ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="'+id+'" data-nakash-entry-view="home"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')

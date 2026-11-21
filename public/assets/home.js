@@ -252,12 +252,13 @@
     window.addEventListener('resize',()=>{if(!desktopCarouselQuery.matches)close();});
   }
   function init(){
-    state.ready=true;updatePauseControl();$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
+    state.ready=Boolean($('homeSlideOpen'));updatePauseControl();$('homeTiles').innerHTML=tiles();$('mobileMenuTiles').innerHTML=tiles();
     const menu=$('mobileNavDialog'),menuButton=$('mobileMenuToggle');
     menuButton.addEventListener('click',()=>{if(!menu.open)menu.showModal();menuButton.setAttribute('aria-expanded','true');});
     menu.addEventListener('close',()=>menuButton.setAttribute('aria-expanded','false'));
     $('closeMobileMenu').addEventListener('click',()=>menu.close());
     setupDesktopMenu();
+    if(!state.ready){activate(app().getView());return;}
     $('homeSlidePrevious').addEventListener('click',()=>slide(state.target-1,-1));$('homeSlideNext').addEventListener('click',()=>slide(state.target+1,1));$('homeSlidePause').addEventListener('click',togglePause);
     const stage=$('homeSlideStage');if(stage)window.FamilyPhotoSwipe?.bind(stage,{enabled:()=>state.view==='home'&&state.items.length>1&&!$('mediaViewer')?.open,mouse:desktopDevice,photoButtons:true,claim:()=>{stopAdvance();return 'manual';},move:stopAdvance,cancel:scheduleAdvance,step:direction=>slide(state.target+direction,direction)});
     $('homeSlideOpen').addEventListener('click',()=>{const index=state.items.findIndex(item=>item.id===state.current?.id);if(index<0)return;stopAdvance();window.FamilyMedia.open(state.items,index,viewerScope);});
