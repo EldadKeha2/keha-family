@@ -6,6 +6,7 @@ import {HttpError,text,uid} from './http.mjs';
 
 export const ORIGINAL_PHOTO_PEOPLE=new Set(['shlomo','yona','ruti','becker-parent','yehiel','avigail','ora','shosh']);
 const originalPeople=new Set(Object.keys(original.people));
+const youngerOriginalPeople=new Set(Object.values(original.people).filter(person=>person.generation>=3).map(person=>person.id));
 const paternalScopes=new Set(['extended','zechariah','zechariah-tzadok','kehat']);
 const founderUnits=['u-root','u-keha-zechariah-father','u-saadia-elder','u-keha-zechariah','u-kehat-tzadok-elder','u-kehat-zechariah-ben-tzadok','u-kehat-aharon-elder','u-keha-kehat','u-kehat-zechariah','u-keha-yissachar'];
 export const MISATTRIBUTED_YONA_DOCUMENT='57537c6f78904f8fa31c876e8b4461d2';
@@ -78,6 +79,9 @@ export function mediaInContext(item,context){
   return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.familyScopes?.includes(context.branch)||item.category==='nakash:'+context.branch||context.branch==='extended'&&['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:zechariah-tzadok','nakash:kehat'].includes(item.category);
 }
 function collectionInContext(item,context){
+  // A founder tag or an explicit shared-album assignment must never bring a
+  // photo of Yona and Shlomo's younger generations into the extended gallery.
+  if(context.branch==='extended'&&kind(item)==='photo'&&subjects(item).some(id=>youngerOriginalPeople.has(context.canonical(id))))return false;
   if(!mediaInContext(item,context))return false;
   if(context.branch==='shlomo'&&kind(item)!=='document')return (item.people||[]).some(id=>['shlomo','yona'].includes(context.canonical(id)));
   if(['haim','yehuda','medina','zechariah','zechariah-tzadok','kehat'].includes(context.branch)&&kind(item)!=='document')return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.category==='nakash:'+context.branch||item.familyScopes?.includes(context.branch);
