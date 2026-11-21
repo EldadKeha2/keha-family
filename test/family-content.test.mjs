@@ -6,7 +6,7 @@ import worker,{FamilyState,PUBLIC_WRITE_TOKEN} from '../src/worker.mjs';
 import {NAKASH_WRITE_TOKEN,nakashHTML} from '../src/nakash-shell.mjs';
 import {extendedKehaHTML} from '../src/extended-keha.mjs';
 import {familyApp} from '../family-apps/worker.mjs';
-import {MISATTRIBUTED_YONA_DOCUMENT,contentContext,storyInContext} from '../src/family-content.mjs';
+import {MISATTRIBUTED_YONA_DOCUMENT,UNVERIFIED_YONA_MARRIAGE_DOCUMENT,contentContext,storyInContext} from '../src/family-content.mjs';
 import {parseHTML} from 'linkedom';
 import {KEHAT_DOCUMENTS} from '../src/kehat-documents.mjs';
 import {sha256} from '../src/http.mjs';
@@ -269,6 +269,49 @@ test('the mistaken inheritance attribution is removed once without deleting its 
     assert.equal((await f.json('/api/documents')).items.length,0);
     const saved=JSON.parse(f.sql.prepare('SELECT data FROM media WHERE id=?').get(item.id).data);assert.equal(saved.key,item.key);assert.equal(saved.personId,undefined);assert.equal(saved.archiveExcluded,true);
     const backup=f.sql.prepare('SELECT value FROM meta WHERE id=?').get('family-content-attribution-2026-11-21-v1:backup').value;assert.equal(JSON.parse(backup).personId,'yona');f.restart();assert.equal(f.sql.prepare('SELECT value FROM meta WHERE id=?').get('family-content-attribution-2026-11-21-v1:backup').value,backup);
+    assert.equal(f.objects.size,0);
+  }finally{f.close();}
+});
+
+test('H72727 loses its unverified Shlomo attribution in existing deployments while the scan and confirmed records survive',async()=>{
+  const f=fixture();try{
+    await f.json(scope('extended','tag-people'));
+    const confirmed=f.media('kehat-shlomo',{type:'document',name:'שלמה, שרה ואסתר · פנקס 1949'});
+    const tri=f.media('tri-yona',{type:'document',name:'יונה וזכריה · פרס ילודה'});
+    const grandma=f.media('yona',{type:'document',name:'תעודת העלייה של יונה נקאש קהא'});
+    const item={id:UNVERIFIED_YONA_MARRIAGE_DOCUMENT,category:'personal',personId:'kehat-shlomo',documentPeople:['kehat-shlomo'],familyScopes:['kehat'],kind:'document',mime:'image/jpeg',key:'documents/original-H72727.jpg',filename:'Yona_bat_Shlomo_and_Sarah_marriage_1945_H72727.jpeg',name:'נישואי יונה קהא, בת שלמה ושרה — 5.3.1945',caption:'Original certificate description',createdAt:'2026-11-21T03:56:14.158Z',size:73049};
+    f.sql.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(item.id,item.category,item.personId,JSON.stringify(item));
+    f.sql.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(item.id,'kehat-shlomo');
+    f.sql.prepare('INSERT INTO media_collections(media_id,collection,added_at) VALUES(?,?,?)').run(item.id,'nakash:kehat',item.createdAt);
+    const migration='family-content-yona-h72727-unattributed-2026-11-21-v1';
+    // The old inheritance correction has already run on the live deployment.
+    assert.ok(f.sql.prepare('SELECT id FROM meta WHERE id=?').get('family-content-attribution-2026-11-21-v1'));
+    f.sql.prepare('DELETE FROM meta WHERE id=?').run(migration);f.restart();
+    for(const branch of ['kehat','extended','zechariah','zechariah-tzadok','shlomo']){
+      assert.equal((await f.json(scope(branch,'documents'))).items.some(d=>d.id===item.id),false,branch);
+    }
+    assert.equal((await f.json('/api/documents')).items.some(d=>d.id===item.id),false);
+    for(const path of ['/api/people/kehat-shlomo/page',scope('kehat','people/kehat-shlomo/page'),scope('extended','people/kehat-shlomo/page')]){
+      const page=await f.json(path);assert.equal(page.albums.documents.total,1,path);assert.equal(page.person.documentCount,1,path);
+    }
+    assert.ok((await f.json(scope('kehat','documents'))).items.some(d=>d.id===confirmed.id));
+    assert.ok((await f.json(scope('kehat','documents'))).items.some(d=>d.id===tri.id));
+    assert.ok((await f.json('/api/documents')).items.some(d=>d.id===grandma.id));
+    const saved=f.state.media(item.id);
+    for(const key of ['id','key','filename','mime','size','caption'])assert.equal(saved[key],item[key],key);
+    assert.equal(saved.category,'research:unattributed');assert.equal(saved.archiveExcluded,true);
+    for(const key of ['personId','people','personIds','documentPeople','familyScopes'])assert.equal(saved[key],undefined,key);
+    assert.deepEqual(f.state.tagIds(item.id),[]);
+    assert.equal(f.sql.prepare('SELECT person_id FROM media WHERE id=?').get(item.id).person_id,null);
+    assert.equal(f.sql.prepare('SELECT count(*) AS n FROM media_collections WHERE media_id=?').get(item.id).n,0);
+    assert.equal(f.sql.prepare('SELECT count(*) AS n FROM media_trash WHERE id=?').get(item.id).n,0);
+    const backup=f.sql.prepare('SELECT value FROM meta WHERE id=?').get(migration+':backup').value;
+    assert.deepEqual(JSON.parse(backup),item);
+    assert.deepEqual(JSON.parse(f.sql.prepare('SELECT value FROM meta WHERE id=?').get(migration+':tags').value),['kehat-shlomo']);
+    assert.equal(JSON.parse(f.sql.prepare('SELECT value FROM meta WHERE id=?').get(migration+':collections').value)[0].collection,'nakash:kehat');
+    f.restart();await f.json(scope('kehat','documents'));
+    assert.equal(f.sql.prepare('SELECT value FROM meta WHERE id=?').get(migration+':backup').value,backup);
+    assert.equal(f.state.media(item.id).modifiedAt,saved.modifiedAt);
     assert.equal(f.objects.size,0);
   }finally{f.close();}
 });

@@ -11,11 +11,12 @@ const youngerOriginalPeople=new Set(Object.values(original.people).filter(person
 const paternalScopes=new Set(['extended','zechariah','zechariah-tzadok','kehat']);
 const founderUnits=['u-root','u-keha-zechariah-father','u-saadia-elder','u-keha-zechariah','u-kehat-tzadok-elder','u-kehat-zechariah-ben-tzadok','u-kehat-aharon-elder','u-keha-kehat','u-kehat-zechariah','u-keha-yissachar'];
 export const MISATTRIBUTED_YONA_DOCUMENT='57537c6f78904f8fa31c876e8b4461d2';
+export const UNVERIFIED_YONA_MARRIAGE_DOCUMENT='2b4dfc4ec6d443dd940f310d0141527f';
 const validScopes=new Set(['original','nakash','keha','haim','yehuda','medina','extended','shlomo','zechariah','zechariah-tzadok','kehat']);
 const kind=item=>item.kind||(item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document');
 const subjects=item=>[...new Set([item.personId,...(item.personIds||[]),...(item.people||[]),...(item.documentPeople||[])].filter(Boolean))];
 const caption=item=>[item.title,item.name,item.filename,item.caption].filter(Boolean).join(' ');
-const excluded=item=>item.archiveExcluded||item.id===MISATTRIBUTED_YONA_DOCUMENT||/מודע[הת]\s+(?:אבל|אזכרה)|obituary|memorial notice/i.test(caption(item));
+const excluded=item=>item.archiveExcluded||item.id===MISATTRIBUTED_YONA_DOCUMENT||item.id===UNVERIFIED_YONA_MARRIAGE_DOCUMENT||/מודע[הת]\s+(?:אבל|אזכרה)|obituary|memorial notice/i.test(caption(item));
 
 export function contentContext(branch,sharedPeople={},identities={}){
   if(!validScopes.has(branch))throw new HttpError(400,'המשפחה אינה מוכרת.');
@@ -88,7 +89,33 @@ function collectionInContext(item,context,generation='first'){
   return true;
 }
 
+function unattributeYonaMarriage(state){
+  const migration='family-content-yona-h72727-unattributed-2026-11-21-v1';
+  if(state.rows('SELECT id FROM meta WHERE id=?',migration).length)return;
+  const row=state.rows('SELECT data FROM media WHERE id=?',UNVERIFIED_YONA_MARRIAGE_DOCUMENT)[0];
+  if(row){
+    const item=JSON.parse(row.data),tags=state.tagIds(item.id);
+    const collections=state.rows('SELECT collection,added_at FROM media_collections WHERE media_id=?',item.id);
+    const affected=[...new Set([...subjects(item),...tags])].filter(id=>state.rows('SELECT id FROM people WHERE id=?',id).length);
+    state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',migration+':backup',row.data);
+    state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',migration+':tags',JSON.stringify(tags));
+    state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',migration+':collections',JSON.stringify(collections));
+    // H72727 names Yona's parents as Shlomo and Sarah, but does not identify
+    // her father as Shlomo son of Saadia. Preserve the scan without a family link.
+    delete item.personId;
+    item.category='research:unattributed';item.archiveExcluded=true;
+    for(const key of ['people','personIds','documentPeople','familyScopes'])delete item[key];
+    item.attributionNote='תעודת H72727: יונה בת שלמה ושרה, שנישאה לשלום ב־5.3.1945. אין ראיה שאביה הוא שלמה בן סעדיה (ג׳ידעאן). השיוך המשפחתי הוסר; הסריקה נשמרה כחומר מחקר לא משויך. זו אינה יונה נקאש קהא אשת שלמה או יונה קהא טירי אשת זכריה.';
+    state.sql.exec('UPDATE media SET category=?,person_id=NULL,data=? WHERE id=?',item.category,JSON.stringify(item),item.id);
+    state.sql.exec('DELETE FROM media_tags WHERE media_id=?',item.id);
+    state.sql.exec('DELETE FROM media_collections WHERE media_id=?',item.id);
+    state.touchMedia(item,affected);
+  }
+  state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',migration,'done');
+}
+
 export function initializeFamilyContent(state){
+  unattributeYonaMarriage(state);
   const migration='family-content-attribution-2026-11-21-v1';
   if(state.rows('SELECT id FROM meta WHERE id=?',migration).length)return;
   const row=state.rows('SELECT data FROM media WHERE id=?',MISATTRIBUTED_YONA_DOCUMENT)[0];
