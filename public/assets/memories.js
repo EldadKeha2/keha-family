@@ -12,7 +12,7 @@
     {id:'funny',title:t('סיפורים מצחיקים','Family laughter'),hint:t('עד היום אנחנו צוחקים','Still making us smile'),intro:t('התקריות הקטנות והסיפורים שאף פעם לא נמאס לספר.','The little mishaps and stories we never tire of telling.'),icon:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM7 9h.01M17 9h.01M7 14c2 5 8 5 10 0Z'}
   ];
   const category=id=>categories.find(c=>c.id===id)||categories[2];
-  const state={view:null,query:'',category:'all',stories:[],recordings:[],revisions:{},loading:{},loaded:{},story:null,recording:null,uploadId:null,savingStory:false,savingVoice:false,flipTimer:null};
+  const state={allowedPersonIds:null,view:null,query:'',category:'all',stories:[],recordings:[],revisions:{},loading:{},loaded:{},story:null,recording:null,uploadId:null,savingStory:false,savingVoice:false,flipTimer:null};
   const categorySaves=new Map(),categoryNotes=new Map();let storyEdits=0;
   const reduced=()=>window.FamilyAccessibility?.isReducedMotion?.()??matchMedia('(prefers-reduced-motion: reduce)').matches;
   async function request(path,options={}){
@@ -62,7 +62,7 @@
       const serial=++this.serial;this.status.textContent=t('טוען שמות…','Loading names…');
       try{
         const people=await window.FamilyTags.findPeople(this.input.value);if(serial!==this.serial)return;
-        this.results=people.filter(p=>!this.selected.has(p.id)).slice(0,20);this.active=this.results.length?0:-1;this.status.textContent='';
+        this.results=people.filter(p=>!this.selected.has(p.id)&&(this!==storyPicker||!state.allowedPersonIds||state.allowedPersonIds.includes(p.id))).slice(0,20);this.active=this.results.length?0:-1;this.status.textContent='';
         this.list.innerHTML=this.results.map((p,i)=>`<button type="button" id="${this.host.id}Option${i}" role="option" aria-selected="${i===0}" data-memory-person="${safe(p.id)}"><strong>${safe(I.personName(p))}</strong><small>${safe(p.context||'')}</small></button>`).join('');
         this.list.hidden=!this.results.length;this.input.setAttribute('aria-expanded',String(!this.list.hidden));this.highlight();
         if(!this.results.length)this.status.textContent=t('לא נמצאו שמות נוספים. נסו איות אחר.','No more matching names. Try another spelling.');
@@ -146,7 +146,7 @@
   async function refresh(kind,force=false){
     if(!window.FamilyApp?.apiEnabled||state.loading[kind])return;state.loading[kind]=true;const startedEdit=storyEdits,status=$(kind==='stories'?'memoryStatus':'voicesStatus');
     if(!state.loaded[kind])status.textContent=t('פותחים את האלבום…','Opening the album…');
-    try{const data=await request('api/'+(kind==='stories'?'stories':'voices'),{headers:!force&&state.revisions[kind]?{'If-None-Match':'"'+state.revisions[kind]+'"'}:{}});if(data){if(kind==='stories'&&(categorySaves.size||startedEdit!==storyEdits))return;state[kind==='stories'?'stories':'recordings']=data[kind==='stories'?'stories':'recordings'];state.revisions[kind]=data.revision;state.loaded[kind]=true;if(kind==='stories')renderStories();else renderVoices({background:!force});}status.textContent='';}
+    try{const data=await request('api/'+(kind==='stories'?'stories':'voices'),{headers:!force&&state.revisions[kind]?{'If-None-Match':'"'+state.revisions[kind]+'"'}:{}});if(data){if(kind==='stories'&&(categorySaves.size||startedEdit!==storyEdits))return;if(kind==='stories')state.allowedPersonIds=data.allowedPersonIds||null;state[kind==='stories'?'stories':'recordings']=data[kind==='stories'?'stories':'recordings'];state.revisions[kind]=data.revision;state.loaded[kind]=true;if(kind==='stories')renderStories();else renderVoices({background:!force});}status.textContent='';}
     catch(error){status.textContent=error.message;}finally{state.loading[kind]=false;}
   }
   function openStory(id){

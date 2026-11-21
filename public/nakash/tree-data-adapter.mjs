@@ -19,7 +19,7 @@ export function toOriginalFamilyData(family) {
   for (const id of Object.keys(family.units)) if (!units[id]) visit(id, family.units[id].generation ?? 1);
   const people = Object.fromEntries(Object.values(family.people).map(person => {
     const [firstName, ...rest] = person.name.split(' ');
-    return [person.id, {...person, firstName:person.firstName || firstName, lastName:person.lastName ?? rest.join(' '), nameEn:person.englishName,
+    return [person.id, {...person,...(person.profile?.startsWith('/media/')?{profile:person.profile+(person.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(person.id)}:{}), firstName:person.firstName || firstName, lastName:person.lastName ?? rest.join(' '), nameEn:person.englishName,
       branch:branchForPerson(family, person.id), generation:units[person.unit].generation, birthday:person.birthday || '1.1.1111'}];
   }));
   return {title:family.title || 'משפחת נקאש', people, units, root:family.root, branches, identities:family.identities || {}};

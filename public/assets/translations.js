@@ -1,5 +1,9 @@
 // Authored interface strings only. User content is never translated.
 window.FAMILY_TRANSLATIONS={
+  "המשפחה המורחבת של סבא שלמה":"Grandpa Shlomo’s extended family",
+  "המשפחה המורחבת של סבתא יונה":"Grandma Yona’s extended family",
+  "תעודות מסמכים ותיעודים נדירים":"Certificates, documents and rare recordings",
+  "מסמכים ותיעודים":"Documents and recordings",
   "סדר לפי סרטונים":"Sort videos by",
   "סדר מקורי":"Original order",
   "אורך הסרטון: קצר לארוך":"Video length: shortest first",

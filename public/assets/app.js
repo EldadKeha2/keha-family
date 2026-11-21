@@ -7,7 +7,7 @@
   const media = new Map();
   const phoneQuery=matchMedia('(max-width:700px)'),isPhone=()=>phoneQuery.matches;
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
-  const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
+  const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const scopedViews=document.documentElement?.dataset?.nakashViews;
   if(scopedViews)for(const view of validViews)if(!scopedViews.split(' ').includes(view))validViews.delete(view);
   const searchBranch=document.documentElement?.dataset?.nakashSearchBranch;
@@ -134,6 +134,7 @@
     $('directoryView').hidden = !isDirectory;
     $('branchBar').hidden = global||(isDirectory&&state.directoryGroup!=='main');
     const titles = {search:[I18n.isEnglish?'Family search':'חיפוש משפחתי',I18n.isEnglish?'People, memories and moments from across our home':'אנשים, זיכרונות ורגעים מכל הבית שלנו'],voices:[I18n.t('בקולם'),I18n.t('הקולות והסיפורים של המשפחה שלנו')],'family-ai':[I18n.t('בינה משפחתית'),I18n.t('רגעים של פעם מתעוררים לחיים')],screensaver:[I18n.t('שומר מסך משפחתי'),I18n.t('כל המשפחה, זיכרון אחרי זיכרון')],timeline:[I18n.t('ציר זמן משפחתי'),I18n.t('דורות של אנשים ורגעים, עשור אחר עשור')],nursery:[I18n.t('התינוקייה'),I18n.t('ההתחלה של כולנו')],games:[I18n.isEnglish?'Family Games':'משחקי משפחה',I18n.isEnglish?'The faces that make us a family':'מכירים את הפנים שמרכיבות את המשפחה'],memorial:[I18n.t('לזכרם'),I18n.t('הזיכרונות נשארים איתנו')],person:[I18n.t('עמוד אישי'),I18n.t('סיפור חיים, תמונות וזיכרונות')],updates:[I18n.t('הרשמה לעדכונים'),I18n.t('תזכורות משפחתיות, ישר למייל')],home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה המשפחתית'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('השנה המשפחתית שלנו')],tree:[I18n.t('האילן המשפחתי'),(scopedViews?(document.documentElement?.dataset?.shlomoKeha==='true'?(I18n.isEnglish?'The family of Shlomo and Yona Keha':'המשפחה של שלמה ויונה קהא'):(I18n.isEnglish?'Four branches from shared roots':'משורש משותף, ארבעה ענפים')):I18n.t('משורש משותף, שישה ענפים של אהבה'))],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
+    titles.documents=[I18n.isEnglish?'Documents and rare recordings':(scopedViews?'מסמכים ותיעודים':'תעודות מסמכים ותיעודים נדירים'),I18n.isEnglish?'Original records, certificates and voices from our past':'תעודות, מסמכים היסטוריים והקלטות ששומרים לדורות'];
     const [title,subtitle] = titles[state.view] || titles.tree;
     $('workspaceTitle').textContent = title;
     $('mobileViewTitle').textContent=title;
@@ -147,6 +148,7 @@
     window.FamilySiteSearch?.activate(state.view);
     window.FamilyPortal?.activate(state.view,{preserveGalleryState});
     window.FamilyMemories?.activate(state.view);
+    window.FamilyDocuments?.activate(state.view);
     window.FamilyArchive?.activate(state.view);
     window.FamilyCalendar?.activate(state.view);
     window.FamilyTimeline?.activate(state.view);
@@ -516,7 +518,7 @@
   function showSearch() {
     const query=normalize(state.query);
     if(state.view==='person'){$('searchResults').hidden=true;window.FamilyPeople?.search(state.query);return;}
-    if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyMemories?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);window.FamilyTimeline?.search(state.query);window.FamilyNursery?.search(state.query);window.FamilyAI?.search(state.query);$('searchResults').hidden=true;return;}
+    if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyMemories?.search(state.query);window.FamilyDocuments?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);window.FamilyTimeline?.search(state.query);window.FamilyNursery?.search(state.query);window.FamilyAI?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory')renderDirectory();
     if(!query&&state.view!=='directory'){$('searchResults').hidden=true;return;}
     const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)).sort(searchFamilyOrder);

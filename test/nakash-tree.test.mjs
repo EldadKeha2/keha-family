@@ -27,14 +27,14 @@ test('only deployed, valid family origins are supplied to installation and branc
   assert.equal(parseHTML(await response.text()).document.documentElement.dataset.nakashOrigin,'https://yehuda.example');
 });
 
-test('live family origins persist across builds and family switching returns to the existing Keha app', async () => {
+test('live family origins persist across builds and family switching opens the limited Shlomo family app', async () => {
   const origins = familyAppOrigins();
   for (const family of ['medina', 'yehuda', 'haim']) {
     assert.equal(origins[family], 'https://family-' + family + '.eldadkeha.workers.dev');
     const response = await nakashShell(new Request(origin + '/nakash/' + family + '/'), {ASSETS:{fetch:() => new Response(html)}}, projection);
     const {document} = parseHTML(await response.text());
     assert.equal(document.documentElement.dataset.nakashOrigin, origins[family]);
-    assert.ok(document.querySelector('a.branch-chip[href="https://keha-family.eldadkeha.workers.dev/#home"]'));
+    assert.ok(document.querySelector('a.branch-chip[href="https://family-shlomo.eldadkeha.workers.dev/keha-extended/shlomo/#home"]'));
   }
 });
 
@@ -46,7 +46,7 @@ test('Nakash branch pages retain the original components and limit top-level nav
     assert.equal(document.querySelector('link[rel="manifest"]').getAttribute('href'), '/nakash/' + branch + '/manifest.webmanifest');
     assert.equal(document.querySelector('#homeLink img').getAttribute('src'), '/nakash/brand-' + branch + '.svg');
     assert.deepEqual([...document.querySelectorAll('#mainNav button')].map(button => button.dataset.view),
-      ['tree', 'directory', 'videos', 'gallery']);
+      ['tree', 'directory', 'videos', 'gallery', 'stories', 'documents']);
     assert.equal(document.querySelector('link[rel="stylesheet"]').getAttribute('href'),
       '/' + original.querySelector('link[rel="stylesheet"]').getAttribute('href'));
     for (const id of ['treeViewport', 'directoryGrid', 'galleryHeaderUpload', 'videoHeaderUpload', 'personView', 'mediaViewer']) {
@@ -60,7 +60,7 @@ test('Nakash branch pages retain the original components and limit top-level nav
   }
 });
 
-test('Only the internal entry from the Keha site has a return link', async () => {
+test('The Nakash tree has no return link to the full original site, including from an internal entry', async () => {
   const env = {ASSETS:{fetch:async request => {
     assert.equal(new URL(request.url).pathname, '/');
     return new Response(html);
@@ -71,7 +71,7 @@ test('Only the internal entry from the Keha site has a return link', async () =>
   }
   const response = await nakashShell(new Request(origin + '/nakash/inside/', {headers:{Referer:origin + '/'}}), env, projection);
   const {document} = parseHTML(await response.text());
-  assert.ok(document.querySelector('a[href="/#home"]'));
+  assert.equal(document.querySelector('a[href="/#home"]'),null);
   assert.equal(document.documentElement.dataset.nakashHome, '/nakash/');
 });
 

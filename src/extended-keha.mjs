@@ -6,6 +6,7 @@ import {createExtendedFamily,EXTENDED_HOME,EXTENDED_NAME,EXTENDED_COLOR} from '.
 import {createShlomoFamily,SHLOMO_HOME,SHLOMO_NAME,SHLOMO_COLOR} from '../public/keha-extended/shlomo-data.mjs';
 import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {appleLaunchImages} from './nakash-launch.mjs';
+import {restrictedOriginalPerson} from './family-content.mjs';
 
 export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portalOrigins={}) {
   return nakashHTML(original,'keha')
@@ -100,6 +101,7 @@ export async function extendedKehaRoute(request,env,db,ctx,options) {
     let available=true,original;
     try{original=await projection();}catch{available=false;original=options.family;}
     const data=toOriginalFamilyData(createFamily(original));
+    for(const p of Object.values(data.people))if(restrictedOriginalPerson(p.id))Object.assign(p,{photoCount:0,videoCount:0,documentCount:0,mediaCount:0});
     const script='window.FAMILY_DATA='+JSON.stringify(data)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(NAKASH_WRITE_TOKEN)+';\nwindow.FAMILY_DATA_AVAILABLE='+available+';\n';
     return new Response(request.method==='HEAD'?null:script,{headers:{'Content-Type':'application/javascript; charset=utf-8'}});
   }

@@ -32,6 +32,7 @@
     if (!apiPath.startsWith('/api/')) return null;
 
     url.pathname = prefix + apiPath;
+    if(document.documentElement.dataset.familyContentScope==='nakash'&&/^\/api\/(stories|documents)(?:\/|$)/.test(apiPath))url.searchParams.set('familyScope','nakash');
     return url.href;
   }
 

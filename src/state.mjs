@@ -1,5 +1,6 @@
 import {photoFrame,validatePhotoFrame} from './photo-framing.mjs';
 import family from './family.mjs';
+import {initializeFamilyContent,handleFamilyContent} from './family-content.mjs';
 import {searchSite} from './site-search.mjs';
 import {RecordingLibrary,memoryCategory,memoryYear,memoryPeople,publicStory} from './memories.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
@@ -159,6 +160,7 @@ export class FamilyState {
       }
       this.correctStoredNames();
       this.nostalgiaLibrary.initialize();
+      initializeFamilyContent(this);
     });
   }
   correctStoredNames(){
@@ -451,6 +453,7 @@ export class FamilyState {
     if(!type)throw new HttpError(400,'בחרו אלבום תקין.');
     let where="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?) AND COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(m.data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)=?";
     const args=[id,id,type],{refinement,labels}=config;
+    if(options.contentIds){where+=' AND m.id IN (SELECT value FROM json_each(?))';args.push(JSON.stringify(options.contentIds));}
     if(refinement.people.length&&this.rows('SELECT id FROM people WHERE id IN (SELECT value FROM json_each(?))',JSON.stringify(refinement.people)).length!==refinement.people.length)throw new HttpError(400,'בחרו אדם מהרשימה.');
     if(refinement.members.length){where+=' AND EXISTS (SELECT 1 FROM media_tags f WHERE f.media_id=m.id AND f.person_id IN (SELECT value FROM json_each(?)))';args.push(JSON.stringify(refinement.members));}
     if(labels.length){where+=" AND EXISTS (SELECT 1 FROM json_each(m.data,'$.labels') label WHERE label.value IN (SELECT value FROM json_each(?)))";args.push(JSON.stringify(labels));}
@@ -463,14 +466,15 @@ export class FamilyState {
     return {ids:this.rows('SELECT m.id FROM media m WHERE '+where+' ORDER BY m.rowid DESC',...args).map(row=>row.id)};
   }
   personPage(id,options={}){
-    const person=this.person(id),owner="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?)";
+    const person=this.person(id),baseOwner="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?)";
+    const owner=baseOwner+(options.contentIds?' AND m.id IN (SELECT value FROM json_each(?))':''),ownerArgs=[id,id,...(options.contentIds?[JSON.stringify(options.contentIds)]:[])];
     const kind="COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(m.data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)";
     const focus=options.focus||null;
     if(focus&&(typeof focus!=='string'||!/^[a-f0-9]{32}$/.test(focus)))throw new HttpError(400,'בחרו פריט תקין לפתיחה באלבום.');
     // Locate a profile/deep-linked item without materializing its whole album.
     // The same ownership filter and row order are used for rank and page reads.
-    const focused=focus?this.rows('SELECT m.id,m.rowid AS position,'+kind+' AS kind FROM media m WHERE m.id=? AND '+owner,focus,id,id)[0]:null;
-    const counts=Object.fromEntries(this.rows('SELECT '+kind+' AS kind,count(*) AS n FROM media m WHERE '+owner+' GROUP BY '+kind,id,id).map(row=>[row.kind,row.n]));
+    const focused=focus?this.rows('SELECT m.id,m.rowid AS position,'+kind+' AS kind FROM media m WHERE m.id=? AND '+owner,focus,...ownerArgs)[0]:null;
+    const counts=Object.fromEntries(this.rows('SELECT '+kind+' AS kind,count(*) AS n FROM media m WHERE '+owner+' GROUP BY '+kind,...ownerArgs).map(row=>[row.kind,row.n]));
     const albums={};
     for(const [key,type]of [['photos','photo'],['videos','video'],['documents','document']]){
       const query=this.personAlbumQuery(id,key,options),{where,args,order,refinement,labels}=query;
@@ -481,7 +485,7 @@ export class FamilyState {
       const items=this.mediaPublicMany(this.rows('SELECT m.data FROM media m WHERE '+where+' ORDER BY '+order.sql+' LIMIT ? OFFSET ?',...args,...order.args,size,(page-1)*size).map(row=>JSON.parse(row.data)));
       albums[key]={items,page,pages,total,size,...(query.all?{all:true}:{}),sort:order.sort,seed:order.seed,person:refinement.person,unit:refinement.unit,labels:labels.join(',')};
     }
-    const row=this.rows('SELECT m.data FROM media m WHERE '+owner+" AND "+kind+"='photo' ORDER BY CASE WHEN m.id=? THEN 0 WHEN m.category='personal' AND m.person_id=? THEN 1 ELSE 2 END,m.rowid LIMIT 1",id,id,person.profileId||'',id)[0];
+    const row=this.rows('SELECT m.data FROM media m WHERE '+baseOwner+" AND "+kind+"='photo' ORDER BY CASE WHEN m.id=? THEN 0 WHEN m.category='personal' AND m.person_id=? THEN 1 ELSE 2 END,m.rowid LIMIT 1",id,id,person.profileId||'',id)[0];
     const candidate=row?JSON.parse(row.data):null,profile=person.profileCleared&&candidate?.id!==person.profileId?null:candidate;
     return {person:{...person,about:person.about||'',profile:profile?photoSource(profile):null,profileFile:profile?.file||null,profileFraming:profile?photoFrame(profile.framing):null,profileMediaId:profile?.id||null,profileIsManual:Boolean(profile&&profile.id===person.profileId),photoCount:counts.photo||0,videoCount:counts.video||0,documentCount:counts.document||0,mediaCount:Object.values(counts).reduce((n,v)=>n+v,0)},albums,...(focused?{focusId:focused.id}:{})};
   }
@@ -572,6 +576,7 @@ export class FamilyState {
     return {...cycle,count:row.n,lit};
   }
   run(action,p){
+    if(action.startsWith('content.'))return handleFamilyContent(this,action,p||{});
     if(p?.id && (action.startsWith('person') || ['profile','birthday','death.date'].includes(action)))p={...p,id:this.person(p.id).id};
     switch(action){
       case 'site.search':return searchSite(this,p);
@@ -1118,7 +1123,7 @@ export class FamilyState {
         if(attachments.length>10)throw new HttpError(400,'אפשר לצרף עד עשרה מסמכים לסיפור.');
         if(!body&&!attachments.length)throw new HttpError(400,'כתבו את הסיפור או צרפו מסמך.');
         const now=new Date(Math.max(Date.now(),previous?Date.parse(previous.updatedAt)+1:0)).toISOString();
-        const item={id:p.id||uid().slice(0,24),category,personIds,year,title,author,body,attachments,createdAt:previous?.createdAt||now,updatedAt:now};
+        const item={id:p.id||uid().slice(0,24),category,personIds,year,title,author,body,attachments,createdAt:previous?.createdAt||now,updatedAt:now,...((fields.familyScopes||previous?.familyScopes)?{familyScopes:fields.familyScopes||previous.familyScopes}:{})};
         for(const file of p.files||[])this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,NULL,?)',file.id,'attachment',JSON.stringify(file));
         this.sql.exec('INSERT INTO stories(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data',item.id,JSON.stringify(item));
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());

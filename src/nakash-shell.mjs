@@ -3,9 +3,10 @@ import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {escapeHTML} from './http.mjs';
 import {familyAppOrigins} from './family-app-origins.mjs';
 import {appleLaunchImages, launchAssets, themedFamilies} from './nakash-launch.mjs';
+import {restrictedOriginalPerson} from './family-content.mjs';
 
 export const NAKASH_WRITE_TOKEN = 'nakash-public-v1';
-const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'person', 'search'];
+const NAKASH_VIEWS = ['home', 'tree', 'directory', 'gallery', 'videos', 'stories', 'documents', 'person', 'search'];
 const branchMap = new Map(BRANCHES.map(branch => [branch.id, branch]));
 const mediaBranch = 'keha';
 const familyName = 'משפחת נקאש';
@@ -37,7 +38,7 @@ const layoutStyles = `<style>
 </style>`;
 const standaloneScripts = new Set([
   'family-fallback.js', 'family-data.js', 'screensaver.js', 'family-ai.js',
-  'living-family.js', 'memories.js', 'updates.js', 'archive.js', 'calendar.js',
+  'living-family.js', 'updates.js', 'archive.js', 'calendar.js',
   'family-timeline.js', 'memorial.js', 'nursery.js', 'games.js', 'founder-trees.js',
   'cloud.js', 'recycle-bin.js',
 ]);
@@ -68,17 +69,18 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
   const appleIcon = themed ? launchAssets(section) + '/icon-180.png' : logo + '-192.png';
   const navigation = BRANCHES.map(({id, label}) =>
     '<a class="branch-chip" href="' + escapeHTML(id === 'keha'
-      ? 'https://keha-family.eldadkeha.workers.dev/#home'
+      ? 'https://family-shlomo.eldadkeha.workers.dev/keha-extended/shlomo/#home'
       : (appOrigins[id] || '') + '/nakash/' + id + '/') + '"'+
     (id === section ? ' aria-current="page"' : '') + '>' + escapeHTML(label) + '</a>'
   ).join('');
-  const back = isInternal ? '<a class="nav-link" href="/#home" data-i18n-skip>חזרה לבית משפחת קהא</a>' : '';
+  const back = '';
   const config = [
     ['nakash-branch', branch?.id || mediaBranch],
     ['nakash-home', homePath],
     ['nakash-manifest', manifest],
     ['nakash-name', name],
     ['nakash-views', NAKASH_VIEWS.join(' ')],
+    ...(!branch?[['family-content-scope','nakash']]:[]),
     ...(branch && appOrigins[branch.id] ? [['nakash-origin', escapeHTML(appOrigins[branch.id])]] : []),
     ...(section === 'inside' ? [['nakash-entry-view', 'tree']] : []),
     ...(branch ? [['nakash-search-branch', branch.id]] : []),
@@ -104,6 +106,8 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
     .replace(/(<nav [^>]*id="mainNav"[^>]*>)(.*?)(<\/nav>)/s, (_, start, children, end) =>
       start + children.replace(/<button\b[^>]*data-view="([^"]+)"[^>]*>.*?<\/button>/gs,
         (button, view) => NAKASH_VIEWS.includes(view) ? button : '') + back + end)
+    .replace(/<a[^>]*class="[^"]*original-family-tab[^"]*"[^>]*>.*?<\/a>/gs,'')
+    .replace('תעודות מסמכים ותיעודים נדירים','מסמכים ותיעודים')
     .replace('<footer class="site-footer">', '<footer class="site-footer"><nav class="branch-bar" aria-label="ענפי המשפחה">'+navigation+back+'</nav>');
   if (!themed) return html;
   const startupLinks = appleLaunchImages(section).map(({href, media}) =>
@@ -119,6 +123,7 @@ export async function nakashShell(request, env, projection) {
   const url = new URL(request.url);
   if (url.pathname === '/nakash/api/site-data.js') {
     const data = toOriginalFamilyData(createFamily(await projection()));
+    for(const p of Object.values(data.people))if(restrictedOriginalPerson(p.id))Object.assign(p,{photoCount:0,videoCount:0,documentCount:0,mediaCount:0});
     const script = 'window.FAMILY_DATA='+JSON.stringify(data)+';\nwindow.LOCAL_FAMILY_SERVER=true;\n'+
       'window.FAMILY_API_TOKEN='+JSON.stringify(NAKASH_WRITE_TOKEN)+';\nwindow.FAMILY_DATA_AVAILABLE=true;\n';
     return new Response(request.method === 'HEAD' ? null : script, {headers:{'Content-Type':'application/javascript; charset=utf-8'}});

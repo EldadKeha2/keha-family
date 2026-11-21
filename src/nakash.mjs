@@ -184,6 +184,7 @@ export async function nakashRoute(request, env, db, ctx, options) {
   if (path.startsWith(galleryPath + '/') && ['GET', 'HEAD'].includes(method)) {
     const id = path.slice(galleryPath.length + 1);
     if (!/^[a-f0-9]{32}$/.test(id)) throw notFound();
+    const scope=request.headers.get('X-Family-Content-Scope');if(scope)await db('content.media.authorize',{branch:scope,id,portrait:url.searchParams.get('portrait')});
     const {item} = await db('nakash.get', {id});
     if(item.deletedAt)throw notFound();
     const version=url.searchParams.get('version');

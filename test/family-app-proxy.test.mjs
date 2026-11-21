@@ -28,10 +28,11 @@ test('same backend serves profiles, media ranges and streamed uploads', async ()
     received = request;
     return new Response('saved', {status: 201, headers: {'X-Saved': 'true'}});
   });
-  const response = await app.fetch(new Request('https://yehuda.example/api/media?branch=yehuda', {
+  const response = await app.fetch(new Request('https://yehuda.example/nakash/api/compat/yehuda/api/collections/gallery/upload', {
     method: 'POST', body: 'a shared profile upload', headers: {Origin: 'https://yehuda.example', Referer: 'https://yehuda.example/nakash/yehuda/#gallery', 'Content-Type': 'image/jpeg', 'X-Family-Token': 'existing-token'},
   }));
-  assert.equal(received.url, UPSTREAM + '/api/media?branch=yehuda');
+  assert.equal(received.url, UPSTREAM + '/nakash/api/compat/yehuda/api/collections/gallery/upload');
+  assert.equal(received.headers.get('X-Family-Content-Scope'),'yehuda');
   assert.equal(received.headers.get('Origin'), UPSTREAM);
   assert.equal(received.headers.get('Referer'), UPSTREAM + '/nakash/yehuda/');
   assert.equal(received.headers.get('X-Family-Token'), 'existing-token');

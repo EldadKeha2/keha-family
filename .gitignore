@@ -13,3 +13,6 @@ desktop/dist/
 desktop/build/
 desktop/native/bin/
 desktop/native/obj/
+
+# Generated from the authored styles before validation and deployment.
+/public/assets/site-styles-*.css

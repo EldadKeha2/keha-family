@@ -2,7 +2,7 @@
   'use strict';
   const key='familyNavigation';
   const gameIds=['photos','kinship','missing','trivia','chick','differences','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
-  const views=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
+  const views=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const site=globalThis.document?.documentElement?.dataset;
   const root=()=>site?.nakashEntryView?'#'+site.nakashEntryView:matchMedia('(max-width:700px)').matches?'#home':'#tree';
   const scopedViews=site?.nakashViews?.split(' ');

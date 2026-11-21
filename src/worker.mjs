@@ -1,5 +1,6 @@
 import family from './family.mjs';
 import {uploadRecording} from './voices-route.mjs';
+import {uploadFamilyDocument} from './family-content-route.mjs';
 import {nakashProjection,nakashRoute} from './nakash.mjs';
 import {NAKASH_WRITE_TOKEN,nakashShell} from './nakash-shell.mjs';
 import {extendedKehaRoute} from './extended-keha.mjs';
@@ -250,7 +251,7 @@ const worker = {
       const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
       if(!['GET','HEAD','POST'].includes(request.method))throw new HttpError(405,'הפעולה אינה נתמכת.');
       if(path==='/keha-extended'||path.startsWith('/keha-extended/')){
-        const result=await extendedKehaRoute(request,env,db,ctx,{family,sniff,archiveFormat,streamUpload,saveThumbnail,editPhoto,limits:LIMITS,recycleRoute,
+        const result=await extendedKehaRoute(request,env,db,ctx,{family,sniff,archiveFormat,streamUpload,saveThumbnail,editPhoto,story,limits:LIMITS,recycleRoute,
           nativeRoute:async(source,path)=>{
             const target=new URL(source.url);target.pathname=path;
             const headers=new Headers(source.headers);headers.set('X-Family-Token',PUBLIC_WRITE_TOKEN);
@@ -259,7 +260,7 @@ const worker = {
         if(result)return secure(result);
       }
       if(path==='/nakash'||path.startsWith('/nakash/')){
-        const options={family,sniff,archiveFormat,streamUpload,saveThumbnail,editPhoto,limits:LIMITS,recycleRoute,nakashToken:NAKASH_WRITE_TOKEN,
+        const options={family,sniff,archiveFormat,streamUpload,saveThumbnail,editPhoto,story,limits:LIMITS,recycleRoute,nakashToken:NAKASH_WRITE_TOKEN,
           nativeRoute:async(source,path)=>{
             const target=new URL(source.url);target.pathname=path;
             const headers=new Headers(source.headers);headers.set('X-Family-Token',PUBLIC_WRITE_TOKEN);
@@ -383,9 +384,12 @@ const worker = {
         }
         return snapshot(request,await db('collection',{kind,page,size,paged,query,filter,person,unit,labels,sort,seed}));
       }
-      if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('stories'));
+      if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('content.stories',{branch:'original'}));
+      if(path==='/api/documents'&&request.method==='GET')return json(await db('content.documents',{branch:'original'}));
+      if(path==='/api/documents/upload'&&request.method==='POST')return uploadFamilyDocument(request,env,db,ctx,{streamUpload,archiveFormat},'original');
       if(path==='/api/voices'&&request.method==='GET')return snapshot(request,await db('recordings'));
       if((match=/^\/api\/voices\/([a-f0-9]{32})\/audio$/.exec(path))&&['GET','HEAD'].includes(request.method)){
+        const scope=request.headers.get('X-Family-Content-Scope');if(scope)await db('content.voice.authorize',{branch:scope,id:match[1]});
         const item=await db('recording.get',{id:match[1]}),response=await getObject(env,item,request);
         if(!url.searchParams.has('download'))return response;
         const headers=new Headers(response.headers);headers.set('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(item.filename));return new Response(response.body,{status:response.status,headers});
@@ -394,6 +398,8 @@ const worker = {
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1]),paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia',paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
+        const scope=request.headers.get('X-Family-Content-Scope');
+        if(scope)await db('content.media.authorize',{branch:scope,id:match[1],portrait:url.searchParams.get('portrait')});
         let item=url.searchParams.has('version')?await db('photo.version',{id:match[1],versionId:url.searchParams.get('version')}):await db('media.get',{id:match[1]}),derived=false;
         const variant=url.searchParams.get('thumbnail')==='1'?'thumbnail':url.searchParams.get('preview')==='1'?'preview':null;
         if(variant&&!url.searchParams.has('version')&&item[variant]?.revision===(item.photoRevision||'original')){item={...item,...item[variant]};derived=true;}

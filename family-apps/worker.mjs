@@ -20,6 +20,11 @@ export function familyApp(branch, upstreamFetch = fetch) {
         return new Response('לא ניתן לשמור שינוי ממקור חיצוני.', {status: 403});
       }
       const headers = new Headers(request.headers);
+      headers.set('X-Family-Content-Scope',branch);
+      // Family applications expose their scoped APIs. A copied original API
+      // URL must not turn a branch app into the full original family album.
+      if(incoming.pathname.startsWith('/api/')&&!incoming.pathname.startsWith('/api/voices/'))return new Response('הפריט לא נמצא.',{status:404});
+      if(incoming.pathname==='/family-data.js')return new Response('הפריט לא נמצא.',{status:404});
       // The upstream uses same-origin checks. Validate first, then translate
       // only this app's origin; never turn an unrelated origin into a trusted one.
       if (origin === incoming.origin) headers.set('Origin', UPSTREAM);

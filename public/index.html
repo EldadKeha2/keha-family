@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-3e3b63fbcb8689ac.css">
+  <link rel="stylesheet" href="assets/site-styles-828c6c4fffd1693a.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
@@ -88,6 +88,7 @@
   <script src="assets/site-search.js?v=shared-families-v1" type="module"></script>
   <script src="assets/cloud.js" defer></script>
   <script src="assets/recycle-bin.js?v=private-bin-v1" defer></script>
+  <script src="assets/family-documents.js?v=1" defer></script>
 </head>
 <body>
   <a class="a11y-skip" id="skipToContent" href="#mainContent" data-i18n-skip>דילוג לתוכן הראשי</a>
@@ -104,7 +105,7 @@
       </div>
       <div class="phone-navigation"><button class="phone-home-button" data-view="home" aria-label="מסך הבית">⌂ הבית</button><button id="mobileMenuToggle" aria-controls="mobileNavDialog" aria-expanded="false" aria-haspopup="dialog" aria-label="פתיחת תפריט העמודים"><span id="mobileViewTitle">הבית שלנו</span><span class="phone-menu-label">תפריט</span><span aria-hidden="true">☰</span></button></div>
     </header>
-    <nav class="main-nav" id="mainNav" aria-label="תצוגה"><button class="nav-link active" data-view="tree" aria-pressed="true">אילן היוחסין</button><button class="nav-link" data-view="timeline" aria-pressed="false">ציר זמן משפחתי</button><button class="nav-link" data-view="directory" aria-pressed="false">בני המשפחה</button><button class="nav-link" data-view="videos" aria-pressed="false">סרטונים</button><button class="nav-link" data-view="gallery" aria-pressed="false">הגלריה המשפחתית</button><button class="nav-link" data-view="screensaver" aria-pressed="false">שומר מסך משפחתי</button><button class="nav-link" data-view="calendar" aria-pressed="false">לוח שנה משפחתי</button><button class="nav-link" data-view="photos" aria-pressed="false">תמונות משפחתיות</button><button class="nav-link" data-view="stories" aria-pressed="false">הסיפורים שלנו</button><button class="nav-link" data-view="voices" aria-pressed="false">בקולם</button><button class="nav-link" data-view="weddings" aria-pressed="false">חתונות</button><button class="nav-link" data-view="family-ai" aria-pressed="false">בינה משפחתית</button><button class="nav-link" data-view="nostalgia" aria-pressed="false">פינת הנוסטלגיה</button><button class="nav-link" data-view="updates" aria-pressed="false">הרשמה לעדכונים</button><button class="nav-link" data-view="games" aria-pressed="false">משחקי משפחה</button><button class="nav-link" data-view="nursery" aria-pressed="false">התינוקייה</button><button class="nav-link" data-view="memorial" aria-pressed="false">לזכרם</button></nav>
+    <nav class="main-nav" id="mainNav" aria-label="תצוגה"><button class="nav-link active" data-view="tree" aria-pressed="true">אילן היוחסין</button><button class="nav-link" data-view="timeline" aria-pressed="false">ציר זמן משפחתי</button><button class="nav-link" data-view="directory" aria-pressed="false">בני המשפחה</button><button class="nav-link" data-view="videos" aria-pressed="false">סרטונים</button><button class="nav-link" data-view="gallery" aria-pressed="false">הגלריה המשפחתית</button><button class="nav-link" data-view="screensaver" aria-pressed="false">שומר מסך משפחתי</button><button class="nav-link" data-view="calendar" aria-pressed="false">לוח שנה משפחתי</button><button class="nav-link" data-view="photos" aria-pressed="false">תמונות משפחתיות</button><button class="nav-link" data-view="stories" aria-pressed="false">הסיפורים שלנו</button><button class="nav-link" data-view="voices" aria-pressed="false">בקולם</button><button class="nav-link" data-view="weddings" aria-pressed="false">חתונות</button><button class="nav-link" data-view="family-ai" aria-pressed="false">בינה משפחתית</button><button class="nav-link" data-view="nostalgia" aria-pressed="false">פינת הנוסטלגיה</button><button class="nav-link" data-view="updates" aria-pressed="false">הרשמה לעדכונים</button><button class="nav-link" data-view="games" aria-pressed="false">משחקי משפחה</button><button class="nav-link" data-view="nursery" aria-pressed="false">התינוקייה</button><button class="nav-link" data-view="memorial" aria-pressed="false">לזכרם</button><a class="nav-link original-family-tab" href="https://family-extended.eldadkeha.workers.dev/keha-extended/#tree"><img src="/nakash/api/profile-photo/shlomo" alt="" width="32" height="36">המשפחה המורחבת של סבא שלמה</a><a class="nav-link original-family-tab" href="/nakash/inside/#tree"><img src="/nakash/api/profile-photo/yona" alt="" width="32" height="36">המשפחה המורחבת של סבתא יונה</a><button class="nav-link" data-view="documents" aria-pressed="false">תעודות מסמכים ותיעודים נדירים</button></nav>
 
     <main id="mainContent" tabindex="-1">
       <section class="family-workspace" aria-label="עץ המשפחה">
@@ -214,6 +215,7 @@
             <div id="storiesEmpty" class="memory-empty" hidden><span aria-hidden="true">✧</span><h4>איזה זיכרון נפתח יחד?</h4><p id="memoryEmptyText">סיפור קטן, רגע גדול, או משהו שרק אתם זוכרים.</p><button type="button" class="secondary-button" data-new-story>כותבים זיכרון</button></div>
           </section>
         </section>
+        <section id="documentsView" class="portal-view documents-view" aria-label="מסמכים ותיעודים" data-i18n-skip hidden></section>
         <section id="voicesView" class="portal-view voices-view" aria-label="בקולם" hidden>
           <header class="voices-intro"><div class="voice-emblem" aria-hidden="true"><svg viewBox="0 0 100 100"><path d="M50 9 61 22 78 22 78 39 91 50 78 61 78 78 61 78 50 91 39 78 22 78 22 61 9 50 22 39 22 22 39 22Z"/><circle cx="50" cy="50" r="28"/><path d="M29 46v8m8-17v26m9-35v44m9-39v34m9-26v18m8-11v4"/></svg></div><div><span class="small-eyebrow">שומעים. נזכרים. שומרים.</span><h3>ההקלטות בקולם של בני המשפחה</h3><p>הסיפורים, השירים והצחוק — בקולות של המשפחה שלנו.</p></div><button type="button" class="primary-button" id="newRecording">＋ העלאת הקלטה</button></header>
           <div class="memory-filters"><label>מי בהקלטה?<select id="voicePersonFilter"><option value="all">כל האנשים</option></select></label><span id="voicesCount" role="status"></span></div>

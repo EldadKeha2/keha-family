@@ -448,7 +448,7 @@ test('the chart rename preserves the existing Zechariah ID, portrait, biography 
   }finally{f.close();}
 });
 
-test('Shlomo’s portal contains only Yona, Shlomo and their descendants, with the four familiar tabs',()=>{
+test('Shlomo’s portal keeps its family and adds the scoped stories and documents tabs',()=>{
   const tree=toOriginalFamilyData(createShlomoFamily(family));
   assert.equal(tree.title,SHLOMO_NAME);
   assert.equal(tree.units['u-root'].parent,null);
@@ -460,7 +460,7 @@ test('Shlomo’s portal contains only Yona, Shlomo and their descendants, with t
   assert.equal(document.documentElement.dataset.nakashHome,SHLOMO_HOME);
   assert.equal(document.documentElement.dataset.nakashEntryView,'home');
   assert.equal(document.documentElement.dataset.nakashOrigin,'https://shlomo.example');
-  assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery']);
+  assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','documents']);
   assert.ok(!document.getElementById('extendedKehaHub'));
   assert.ok(!document.querySelector('a.branch-chip[href*="/nakash/"]'));
   assert.equal(document.querySelector('link[rel=manifest]').getAttribute('href'),SHLOMO_HOME+'manifest.webmanifest');
@@ -503,7 +503,7 @@ test('Shlomo’s installation has its own family name and launch URL',async()=>{
   assert.equal(installed.related_applications[0].id,'https://shlomo.example'+SHLOMO_HOME);
 });
 
-test('the Shlomo portal includes original untagged family movies without importing other families’ uploads',async()=>{
+test('the Shlomo portal shares original movies only when a founder or their child is identified',async()=>{
   const f=fixture();try{
     const before=(await f.json(shlomoSite('collections/videos'))).count;
     for(const [id,category] of [['c'.repeat(32),'nostalgia'],['d'.repeat(32),'nakash:yehuda']]){
@@ -511,9 +511,12 @@ test('the Shlomo portal includes original untagged family movies without importi
       f.database.prepare('INSERT INTO media (id,category,person_id,data) VALUES (?,?,?,?)').run(id,category,null,JSON.stringify(item));
     }
     const videos=await f.json(shlomoSite('collections/videos'));
-    assert.equal(videos.count,before+1);
-    assert.ok(videos.items.some(item=>item.id==='c'.repeat(32)));
+    assert.equal(videos.count,before);
+    assert.ok(!videos.items.some(item=>item.id==='c'.repeat(32)));
     assert.ok(!videos.items.some(item=>item.id==='d'.repeat(32)));
+    assert.equal((await f.json(site('collections/videos'))).count,before);
+    f.database.prepare('INSERT INTO media_tags (media_id,person_id) VALUES (?,?)').run('c'.repeat(32),'ora');
+    assert.equal((await f.json(shlomoSite('collections/videos'))).count,before+1);
     assert.equal((await f.json(site('collections/videos'))).count,before+1);
   }finally{f.close();}
 });
@@ -641,7 +644,7 @@ test('desktop and mobile open dedicated Zechariah and Kehat portals from the ext
   }
 });
 
-test('the new portals have independent identities, palettes, manifests and the four original home tiles',async()=>{
+test('the new portals retain independent identities and add stories and documents to their navigation',async()=>{
   for(const portal of Object.values(BRANCH_PORTALS)){
     const data=toOriginalFamilyData(createBranchPortal(family,portal.id));
     assert.equal(data.title,portal.name);
@@ -652,7 +655,7 @@ test('the new portals have independent identities, palettes, manifests and the f
     assert.equal(document.documentElement.dataset.nakashHome,portal.home);
     assert.equal(document.documentElement.dataset.nakashEntryView,'home');
     assert.equal(document.documentElement.dataset.nakashOrigin,'https://'+portal.id+'.example');
-    assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery']);
+    assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','documents']);
     assert.ok(document.getElementById('homeTiles'));
     assert.equal(document.querySelector('meta[name="theme-color"]').getAttribute('content'),portal.color);
     assert.ok(document.querySelector('a.branch-chip[href="https://family-extended.eldadkeha.workers.dev/keha-extended/#tree"]'));
@@ -674,7 +677,7 @@ test('the new portals have independent identities, palettes, manifests and the f
     context.clearTimeout=()=>{};context.setTimeout=()=>{};
     vm.runInContext(await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8'),context);
     page.dispatchEvent(new dom.Event('DOMContentLoaded'));
-    assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,4);
+    assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,6);
     if(portal.id==='kehat')assert.match(page.querySelector('#homeTiles .home-tile-tree').textContent,/ענפי צדוק ואהרון/);
   }
 });
