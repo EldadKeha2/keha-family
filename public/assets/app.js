@@ -292,7 +292,8 @@
     if(window.FamilyExtendedKeha?.renderTree(state))return;
     window.FamilyTreeGuide?.hide();
     const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
-    const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(viewport.clientWidth/2-camera.x)/(camera.width*camera.scale),y:(viewport.clientHeight/2-camera.y)/(camera.height*camera.scale)}:null;
+    const priorArea=treeViewportArea();
+    const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(priorArea.cx-camera.x)/(camera.width*camera.scale),y:(priorArea.cy-camera.y)/(camera.height*camera.scale)}:null;
     const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview';
     const rootId=state.branch==='all'?data.root:branchFor(state.branch).unit;
     const rootHistorySpace=!compactTreeYears&&!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
@@ -433,8 +434,9 @@
     $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בין הענפים'):'';
     requestAnimationFrame(()=>{
       if(state.view!=='tree'||renderVersion!==treeRenderVersion)return;
+      const area=treeViewportArea();
       if(previous){
-        camera.scale=previous.scale;camera.x=viewport.clientWidth/2-previous.x*width*camera.scale;camera.y=viewport.clientHeight/2-previous.y*height*camera.scale;clampCamera();
+        camera.scale=previous.scale;camera.x=area.cx-previous.x*width*camera.scale;camera.y=area.cy-previous.y*height*camera.scale;clampCamera();
       }else if(scopedViews){
         let focus=positions.find(item=>item.id===rootId);
         // Retain older single ancestors above the founding parents, while
@@ -445,33 +447,47 @@
         }
         const element=world.querySelector(`[data-unit="${treeUnitKey(focus.id)}"]`);
         const focusHeight=element.offsetHeight||(phone?150:278)*textScale;
-        camera.scale=Math.max(.035,Math.min(1.06,(viewport.clientWidth-32)/focus.width,(viewport.clientHeight-80)/focusHeight));
-        camera.x=viewport.clientWidth/2-focus.x*camera.scale;
-        camera.y=viewport.clientHeight/2-(focus.y+focusHeight/2)*camera.scale;
+        camera.scale=Math.max(.035,Math.min(1.06,(viewport.clientWidth-32)/focus.width,(phone?area.height:viewport.clientHeight-80)/focusHeight));
+        camera.x=area.cx-focus.x*camera.scale;
+        camera.y=area.cy-(focus.y+focusHeight/2)*camera.scale;
       }else{
-        const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);
-        camera.scale=phone?Math.max(.035,fit*textScale):desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?Math.max(12,(viewport.clientHeight-60-height*camera.scale)/2):desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;
+        const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(phone?area.height:viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);
+        camera.scale=phone?Math.max(.035,fit*textScale):desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?area.top+(area.height-height*camera.scale)/2:desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;
       }
       treeCameraApplied=true;applyCamera();window.FamilyTreeGuide?.show();
     });
   }
+  function treeViewportArea(){
+    const viewport=$('treeViewport'),width=viewport.clientWidth,height=viewport.clientHeight;
+    if(!isPhone())return {width,height,top:0,cx:width/2,cy:height/2};
+    const controls=viewport.querySelector('.zoom-controls')?.offsetHeight||44,full=viewport.classList.contains('tree-is-fullscreen');
+    const top=full?($('treeFullscreenExit')?.offsetHeight||44)+24:controls+24;
+    const bottom=full?controls+24:($('canvasHint')?.offsetHeight||20)+20;
+    const available=Math.max(1,height-top-bottom);
+    return {width,height:available,top,cx:width/2,cy:top+available/2};
+  }
   function applyCamera(){
     $('treeWorld').style.transform=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
-    $('zoomValue').textContent=Math.round(camera.scale*100)+'%';
+    const value=Math.round(camera.scale*100)+'%';if($('zoomValue').textContent!==value)$('zoomValue').textContent=value;
   }
   function stopTreeMotion(){if(motionFrame)cancelAnimationFrame(motionFrame);motionFrame=0;}
   window.addEventListener('family-accessibility-changed',()=>{if(reducedMotion())stopTreeMotion();const next=treeTextScale();if(next!==observedTextScale){observedTextScale=next;if(state.view==='tree')renderTree(true);}});
   function clampCamera(){
-    if(!isPhone())return;const viewport=$('treeViewport'),w=camera.width*camera.scale,h=camera.height*camera.scale;
+    if(!isPhone())return;const area=treeViewportArea(),w=camera.width*camera.scale,h=camera.height*camera.scale;
     // Leave room at every edge so a small overview can also move in both axes.
-    camera.x=Math.max(viewport.clientWidth/2-w,Math.min(viewport.clientWidth/2,camera.x));
-    camera.y=Math.max(viewport.clientHeight/2-h,Math.min(viewport.clientHeight/2,camera.y));
+    camera.x=Math.max(area.cx-w,Math.min(area.cx,camera.x));
+    camera.y=Math.max(area.cy-h,Math.min(area.cy,camera.y));
   }
   function zoom(factor,cx,cy){
-    stopTreeMotion();const viewport=$('treeViewport');cx=cx??viewport.clientWidth/2;cy=cy??viewport.clientHeight/2;
+    stopTreeMotion();const area=treeViewportArea();cx=cx??area.cx;cy=cy??area.cy;
     const old=camera.scale;camera.scale=Math.max(isPhone() ? .035 : .08,Math.min(isPhone()?3.5:2.4,old*factor));camera.x=cx-(cx-camera.x)*camera.scale/old;camera.y=cy-(cy-camera.y)*camera.scale/old;clampCamera();applyCamera();
   }
-  function fitTree(){stopTreeMotion();const viewport=$('treeViewport'),desktopOverview=!isPhone()&&state.branch==='all'&&state.mode==='overview',fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/camera.width,(viewport.clientHeight-(desktopOverview?24:75))/camera.height,desktopOverview?1:1.1);camera.scale=isPhone()?Math.max(.035,fit):fit;camera.x=(viewport.clientWidth-camera.width*camera.scale)/2;camera.y=desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-camera.height*camera.scale)/2)):Math.max(12,(viewport.clientHeight-55-camera.height*camera.scale)/2);applyCamera();}
+  function fitTree(){
+    stopTreeMotion();const viewport=$('treeViewport'),phone=isPhone(),area=treeViewportArea(),desktopOverview=!phone&&state.branch==='all'&&state.mode==='overview';
+    const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/camera.width,(phone?area.height:viewport.clientHeight-(desktopOverview?24:75))/camera.height,desktopOverview?1:1.1);
+    camera.scale=phone?Math.max(.035,fit):fit;camera.x=area.cx-camera.width*camera.scale/2;
+    camera.y=phone?area.top+(area.height-camera.height*camera.scale)/2:desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-camera.height*camera.scale)/2)):Math.max(12,(viewport.clientHeight-55-camera.height*camera.scale)/2);applyCamera();
+  }
 
   const apiEnabled = window.LOCAL_FAMILY_SERVER === true;
   const drafts = new Map();

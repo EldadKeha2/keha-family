@@ -45,13 +45,13 @@ function fixture(site,{phone=false,text=100,hash='#tree',viewportHeight}={}){
     const [,x,y,scale]=/^translate\(([-\d.]+)px,([-\d.]+)px\) scale\(([-\d.]+)\)$/.exec(document.getElementById('treeWorld').style.transform).map(Number);
     return {x:x+(parseFloat(node.style.left)+parseFloat(node.style.width)/2)*scale,y:y+(parseFloat(node.style.top)+node.offsetHeight/2)*scale,width:parseFloat(node.style.width)*scale,height:node.offsetHeight*scale,scale};
   };
-  return {document,window,data,flush,bounds,width,height};
+  return {document,window,data,flush,bounds,width,height,phone};
 }
 
 function assertCentred(f,id){
   const bounds=f.bounds(id);
   assert.ok(Math.abs(bounds.x-f.width/2)<0.001,'The parents are horizontally centred');
-  assert.ok(Math.abs(bounds.y-f.height/2)<0.001,'The parents are vertically centred');
+  assert.ok(Math.abs(bounds.y-(f.height/2+(f.phone?14:0)))<0.001,'The parents are centred between the controls and the canvas hint');
   return bounds;
 }
 
@@ -104,7 +104,7 @@ test('zooming a phone tree keeps its founding parents in the centre without snap
   }
 });
 
-test('the original family site retains its existing opening camera and overview',()=>{
+test('the original family site retains its family overview and uses the shared header controls',()=>{
   for(const phone of [false,true]){
     const f=fixture('original',{phone}),bounds=f.bounds('u-root');
     assert.equal(f.document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,'all');
@@ -169,5 +169,13 @@ test('a short phone canvas keeps a positive scale when opening or fitting the tr
     assert.ok(cameraPosition(f)[2]>0,'A short viewport never flips the tree');
     f.document.getElementById('fitButton').click();
     assert.ok(cameraPosition(f)[2]>0,'Fit remains usable in a short viewport');
+  }
+});
+
+test('phone founding parents fit below the toolbar in a short viewport, including enlarged text',()=>{
+  for(const site of ['haim','shlomo','zechariah','zechariah-tzadok','kehat'])for(const text of [100,160]){
+    const f=fixture(site,{phone:true,viewportHeight:240,text}),card=f.bounds(parents[site]);
+    assert.ok(card.y-card.height/2>=56,'The toolbar does not cover the founding parents');
+    assert.ok(card.y+card.height/2<=f.height-20,'The complete founding cards remain visible');
   }
 });
