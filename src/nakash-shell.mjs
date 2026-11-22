@@ -29,7 +29,7 @@ const layoutStyles = `<style>
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles)>.home-tile{grid-column:auto}
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree .home-tile-arrow{display:none}
   @media(max-width:700px){
-    ${nakashTreeSelector} body[data-active-view=tree] .workspace-header{flex-wrap:nowrap;align-items:center;gap:6px;padding:12px 10px}
+    ${nakashTreeSelector} body[data-active-view=tree] .workspace-header{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:6px;padding:12px 10px}
     ${nakashTreeSelector} body[data-active-view=tree] .workspace-title{min-width:0;gap:5px}
     ${nakashTreeSelector} body[data-active-view=tree] .workspace-title h2{font-size:calc(clamp(16px,4.4vw,20px) * var(--a11y-text-scale,1));white-space:nowrap}
     ${nakashTreeSelector} body[data-active-view=tree] .workspace-title .section-diamond{font-size:20px}
@@ -111,7 +111,7 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
     .replace(/(href|src)="assets\/medallion\.svg"/g, '$1="' + logo + '.svg"')
     .replace(/((?:href|src)=")assets\//g, '$1/assets/')
     .replace(/(src="\/assets\/app\.js)(?:\?[^\"]*)?"/, '$1?v=nakash-tree-header-v2"')
-    .replace(/(src="\/assets\/tree-fullscreen\.js)(?:\?[^\"]*)?"/, '$1?v=2"')
+    .replace(/(src="\/assets\/tree-fullscreen\.js)(?:\?[^\"]*)?"/, '$1?v=3"')
     .replace(/  <script src="(?:\/assets\/)?([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>\n/g,
       (tag, script) => standaloneScripts.has(script) ? '' : tag)
     .replace(/<button\b[^>]*id="homeMoreHint"[^>]*>.*?<\/button>\s*/s, '')

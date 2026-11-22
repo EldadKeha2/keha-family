@@ -27,6 +27,7 @@
     if(!active)return;
     active=false;hadNative=false;
     viewport.classList.remove('tree-is-fullscreen');document.documentElement.classList.remove('tree-fullscreen-active');
+    viewport.scrollTop=0;viewport.scrollLeft=0;
     leaveNative();refresh();fit();
     if(restoreFocus)button.focus({preventScroll:true});
   }
@@ -34,6 +35,7 @@
     if(active)return;
     active=true;hadNative=false;
     viewport.classList.add('tree-is-fullscreen');document.documentElement.classList.add('tree-fullscreen-active');
+    viewport.scrollTop=0;viewport.scrollLeft=0;
     window.FamilyTreeGuide?.hide();refresh();fit();button.focus({preventScroll:true});
     // The fixed viewport also fills the screen on browsers without this API.
     try{Promise.resolve(viewport.requestFullscreen?.()).then(()=>{if(!active)leaveNative();}).catch(()=>{});}catch{}

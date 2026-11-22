@@ -12,7 +12,7 @@ html.tree-fullscreen-active,html.tree-fullscreen-active body{overflow:hidden}
 #treeViewport.tree-is-fullscreen .zoom-controls button{width:44px;height:44px;min-width:44px;min-height:44px}
 #treeViewport.tree-is-fullscreen .canvas-hint{display:none}
 #treeViewport.tree-is-fullscreen #treeFullscreenButton{width:auto;min-width:0}
-#treeFullscreenExit{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));left:calc(12px + env(safe-area-inset-left,0px));z-index:12;display:inline-flex;align-items:center;gap:7px;min-height:44px;max-width:calc(100% - 24px);padding:8px 12px;border:1px solid var(--family-accent,#a89c7b);border-radius:9px;background:var(--paper,#fffdf7);color:var(--family-ink,var(--olive,#59664d));box-shadow:0 3px 12px #30291820;font:600 calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);cursor:pointer}
+#treeFullscreenExit{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:calc(12px + env(safe-area-inset-left,0px));z-index:12;display:inline-flex;align-items:center;gap:7px;min-height:44px;max-width:calc(100% - 24px);padding:8px 12px;border:1px solid var(--family-accent,#a89c7b);border-radius:9px;background:var(--paper,#fffdf7);color:var(--family-ink,var(--olive,#59664d));box-shadow:0 3px 12px #30291820;font:600 calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans);cursor:pointer}
 #treeFullscreenExit svg{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 #treeFullscreenExit[hidden]{display:none}
 #treeFullscreenExit:focus-visible{outline:3px solid var(--family-accent,#59664d);outline-offset:3px}
