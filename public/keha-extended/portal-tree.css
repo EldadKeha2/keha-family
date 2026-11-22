@@ -1,5 +1,4 @@
-.family-extended-access{display:flex;justify-content:center;margin:10px 16px 0;font-family:var(--sans)}
-#treeView>.family-extended-access{margin:12px 16px 16px}
+.site-footer>.family-extended-access{box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;margin:0 auto 20px;padding:0 12px;font-family:var(--sans)}
 .family-extended-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;max-width:100%;padding:8px 20px;border:1px solid var(--family-accent);border-radius:14px;background:linear-gradient(135deg,var(--paper),var(--family-tint));color:var(--family-ink);box-shadow:0 3px 0 var(--family-line),0 5px 16px #30291812;font:600 calc(16px * var(--a11y-text-scale,1))/1.45 var(--sans);cursor:pointer}
 .family-extended-button img,#mainNav [data-extended-open] img{display:block;width:32px;height:32px;flex:0 0 32px}
 .family-extended-button:hover{background:var(--family-tint);border-color:var(--family-ink)}
@@ -22,7 +21,7 @@
 .family-extended-choices small{display:block;margin-top:4px;font:calc(14px * var(--a11y-text-scale,1))/1.6 var(--sans)}
 .family-extended-choice-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border:1px solid var(--family-line);border-radius:12px;background:var(--paper);color:var(--family-accent)}
 .family-extended-choice-icon svg{display:block;width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-@media(max-width:700px){.family-extended-access{margin:8px 12px 2px}.family-extended-button{padding:7px 16px;font-size:calc(15px * var(--a11y-text-scale,1))}.family-extended-dialog{padding:24px 16px 20px}.family-extended-choices a{gap:11px;padding:14px 12px}}
+@media(max-width:700px){.family-extended-button{padding:7px 16px;font-size:calc(15px * var(--a11y-text-scale,1))}.family-extended-dialog{padding:24px 16px 20px}.family-extended-choices a{gap:11px;padding:14px 12px}}
 
 /* Compact navigation belongs only to these three branch portals. */
 html[data-branch-portal] .family-extended-button{min-height:44px;gap:8px;padding:5px 14px;border-radius:11px;font-size:calc(15px * var(--a11y-text-scale,1))}
@@ -36,7 +35,6 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
 html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon{width:34px;height:38px;flex-basis:34px;border-radius:10px}
 html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon :is(svg,img){width:29px;height:29px}
 @media(max-width:700px){
-  html[data-branch-portal] .family-extended-access{margin:6px 12px 0}
   html[data-branch-portal] .family-extended-button{font-size:calc(14px * var(--a11y-text-scale,1))}
   html[data-branch-portal] .family-extended-button img{width:24px;height:24px;flex-basis:24px}
   html[data-branch-portal] .phone-home-intro{gap:6px;padding:12px 0}

@@ -775,13 +775,14 @@ test('the new portals retain independent identities and add stories and document
     assert.equal(document.documentElement.dataset.nakashHome,portal.home);
     assert.equal(document.documentElement.dataset.nakashEntryView,'home');
     assert.equal(document.documentElement.dataset.nakashOrigin,'https://'+portal.id+'.example');
-    assert.ok(document.querySelector('#treeView>.family-extended-access'));
-    assert.equal(document.querySelector('.family-extended-access').previousElementSibling.id,'treeViewport');
+    assert.ok(document.querySelector('.site-footer>.family-extended-access .family-extended-button'));
+    assert.equal(document.querySelector('#treeView .family-extended-access'),null);
     assert.equal(document.querySelector('.page-shell>.family-extended-access'),null);
     assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','games','documents']);
     assert.ok(document.getElementById('homeTiles'));
     assert.equal(document.querySelector('meta[name="theme-color"]').getAttribute('content'),portal.color);
-    assert.ok(document.querySelector('a.branch-chip[href="https://family-extended.eldadkeha.workers.dev/keha-extended/#tree"]'));
+    assert.equal(document.querySelector('.site-footer .branch-chip'),null);
+    assert.equal(document.querySelector('[data-extended-tree-link]').getAttribute('href'),'https://family-extended.eldadkeha.workers.dev/keha-extended/#tree');
     const ownManifest=JSON.parse(await readFile(new URL('../public'+portal.home+'manifest.webmanifest',import.meta.url)));
     const app=familyApp(portal.id,()=>Response.json(ownManifest));
     const response=await app.fetch(new Request('https://'+portal.id+'.example/manifest.webmanifest'));

@@ -51,6 +51,7 @@ const layoutStyles = `<style>
   @media(max-width:370px){${treeHeaderSelector} body[data-active-view=tree] .workspace-title .section-diamond{display:none}${treeHeaderSelector} .tree-header-mode button{padding-inline:4px}}
   ${treeHeaderSelector}[data-a11y-text] body[data-active-view=tree] .workspace-header{flex-wrap:wrap}
   ${extendedTreeSelector} body[data-active-view=tree] #treeBreadcrumb{display:none}
+  ${extendedTreeSelector} #treeViewport:not(.tree-is-fullscreen) .zoom-controls{top:12px;bottom:auto;left:50%;transform:translateX(-50%);width:max-content}
   @media(min-width:701px){${extendedTreeSelector} body[data-active-view=tree] .workspace-title h2{font-size:calc(23px * var(--a11y-text-scale,1));line-height:1.3}}
   @media(max-width:700px){${extendedTreeSelector} body[data-active-view=tree] :is(#workspaceSubtitle,.tree-topline){display:none}}
 </style>`;

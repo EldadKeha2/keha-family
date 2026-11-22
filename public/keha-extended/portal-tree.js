@@ -1,14 +1,14 @@
 (() => {
   'use strict';
   const config=document.documentElement.dataset;
-  if(!config.branchPortal)return;
+  if(!config.branchPortal&&!config.shlomoKeha)return;
   const I=window.FamilyI18n;
   const name=()=>I.isEnglish?config.branchNameEn:config.nakashName;
   const tr=(he,en)=>I.isEnglish?en:he;
   const dialog=document.getElementById('extendedKehaDialog');
   let returnFocus=null;
   for(const trigger of document.querySelectorAll('[data-extended-open]')){
-    trigger.querySelector('[data-extended-label]').textContent=trigger.dataset.extendedOpen==='tree'
+    trigger.querySelector('[data-extended-label]').textContent=trigger.dataset.extendedOpen==='footer'
       ?tr('לאתר קהא המורחבת','Visit extended Keha')
       :tr('לאתר משפחת קהא המורחבת','The extended Keha family site');
   }
@@ -56,6 +56,7 @@
       }
     });
   }
+  if(!config.branchPortal)return;
   window.FamilyExtendedKeha={
     title:name,
     renderTree(state){
