@@ -39,6 +39,8 @@ export function initializeExtendedKeha(state) {
     const updateLifeYears=!state.rows('SELECT id FROM meta WHERE id=?',lifeYearsMigration).length;
     const saadiaNameMigration='extended-saadia-jidaan-keha-surname-2026-11-21-v1';
     const updateSaadiaName=!state.rows('SELECT id FROM meta WHERE id=?',saadiaNameMigration).length;
+    const coupleSurnameMigration='extended-mordechai-dvora-keha-2026-11-22';
+    const updateCoupleSurname=!state.rows('SELECT id FROM meta WHERE id=?',coupleSurnameMigration).length;
     const registryMigration='extended-zechariah-ben-shalom-registry-2026-11-21-v1';
     const updateRegistry=!state.rows('SELECT id FROM meta WHERE id=?',registryMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
@@ -203,6 +205,20 @@ export function initializeExtendedKeha(state) {
         saved.aliases=[...new Set([...(saved.aliases||[]).filter(alias=>!/קהת|Kehat/i.test(alias)),...(seed.aliases||[])])];
         state.savePerson(saved);
       }
+    }
+    if(updateCoupleSurname){
+      for(const id of ['kehat-mordechai','kehat-varda']){
+        const saved=state.person(id);
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',coupleSurnameMigration+':backup:'+id,JSON.stringify(saved));
+        saved.name=saved.name.replace(/ קהת$/u,' קהא');
+        if(saved.lastName==='קהת')saved.lastName='קהא';
+        for(const key of ['nameEn','englishName']){
+          if(saved[key])saved[key]=saved[key].replace(/ Kehat$/i,' Keha');
+        }
+        if(saved.researchNotes)saved.researchNotes=saved.researchNotes.replaceAll('מרדכי קהת','מרדכי קהא');
+        state.savePerson(saved);
+      }
+      state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',coupleSurnameMigration,'done');
     }
     // Apply the owner's identity correction after the earlier migrations.
     if(updateRegistry)for(const seed of EXTENDED_PEOPLE){
