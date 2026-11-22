@@ -54,6 +54,33 @@ function galleryModel(source,run){
   return {api:window.FamilyNostalgia,window,location,openedVideos,node:id=>nodes.get(id),collection,render,changeSort,goEvent(id){location.hash=id?'#nostalgia/event/'+id:'#nostalgia';render();},click:data=>{const target=button(data);emit(documentListeners,'click',{target});return target;},activate:(id,type='click',event={})=>emit(nodes.get(id).listeners,type,{preventDefault(){},stopPropagation(){},...event}),hover:id=>emit(documentListeners,'pointerover',{target:button({nostalgiaCategory:id})}),leave:()=>{location.hash='#tree';nodes.get('nostalgiaView').hidden=true;emit(windowListeners,'hashchange');},flush(){for(let count=0;timers.size;count++){if(count>30)throw Error('Timer loop');const pending=[...timers];timers.clear();for(const[,fn]of pending)fn();}}};
 }
 
+test('the upload event prompt offers every folder category and returns the saved event to the wizard without opening its folder',async()=>{
+ const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
+ gallery.collection.library.categories.push({id:'everyday-life',name:'החיים עצמם'},{id:'new-category',name:'טיולים בחו״ל'});
+ const form=gallery.node('nostalgiaEventForm'),dialog=gallery.node('nostalgiaEventDialog'),field=gallery.node('nostalgiaEventCategory');
+ const button={},close={};form.querySelector=selector=>selector==='[type=submit]'?button:close;
+ const saved={id:'trip',name:'טיול אוגוסט',categoryId:'new-category'},requests=[],chosen=[];
+ gallery.window.FamilyArchive.nostalgiaAction=async(action,payload)=>{
+  requests.push({action,payload});if(requests.length===1)throw Error('Temporary issue');return {event:saved};
+ };
+ gallery.api.createUploadEvent(null,event=>chosen.push(event.id));
+ assert.equal(dialog.open,true);assert.equal(gallery.node('nostalgiaEventName').focused,true);
+ assert.equal(gallery.node('nostalgiaEventFormTitle').textContent,'הוספת אירוע חדש');
+ assert.equal(form.classList.contains('is-upload-event'),true);
+ assert.equal(field.value,'');assert.match(field.innerHTML,/מסיבות גיוס ושחרור/);assert.match(field.innerHTML,/חגים ומועדים/);assert.match(field.innerHTML,/טיולים בחו״ל/);
+ assert.doesNotMatch(field.innerHTML,/החיים עצמם|יום העצמאות 1996/);
+ field.value='new-category';gallery.node('nostalgiaEventName').value=saved.name;
+ gallery.activate('nostalgiaEventForm','submit',{currentTarget:form});await new Promise(setImmediate);
+ assert.equal(dialog.open,true);assert.equal(gallery.node('nostalgiaEventError').textContent,'Temporary issue');assert.equal(button.disabled,false);
+ gallery.activate('nostalgiaEventForm','submit',{currentTarget:form});await new Promise(setImmediate);
+ assert.equal(requests.length,2);assert.equal(requests[1].action,'event');
+ assert.deepEqual({...requests[1].payload},{categoryId:'new-category',name:saved.name,reuseExisting:true});
+ assert.deepEqual(chosen,['trip']);assert.equal(dialog.open,false);assert.equal(gallery.location.hash,'#nostalgia');
+ assert.equal(gallery.api.uploadEventLabel(saved),'טיול אוגוסט · טיולים בחו״ל');
+ gallery.api.createUploadEvent('ora',event=>chosen.push(event.id));assert.equal(field.value,'military');
+ dialog.close();gallery.activate('nostalgiaEventDialog','close');assert.deepEqual(chosen,['trip']);
+});
+
 test('event folder sorting updates the displayed sequence for all six options and survives refreshes',()=>{
  const gallery=galleryModel(source,(code,context)=>vm.runInNewContext(code,context));
  gallery.collection.items=[{id:'one',name:'קטע 1',kind:'video',nostalgiaEventIds:['ora'],duration:165,caption:'בנימין',tags:[{id:'a'}]},{id:'two',name:'קטע 2',kind:'video',nostalgiaEventIds:['ora'],duration:4,caption:'אורה',tags:[]},{id:'three',name:'קטע 3',kind:'video',nostalgiaEventIds:['ora'],duration:63,caption:'גבי',tags:[{id:'a'},{id:'b'}]},{id:'other',kind:'video',nostalgiaEventIds:['independence'],duration:1}];
