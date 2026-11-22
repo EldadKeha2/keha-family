@@ -53,19 +53,19 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
 @media(max-width:700px){
   html[data-branch-portal=zechariah] body[data-active-view=tree] .workspace-header{padding-block:7px}
   html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar{
-    display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px 5px;
-    padding:0 8px 7px;margin:0;
+    display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;
+    padding:0 3px 6px;margin:0;
   }
   html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]{
-    grid-column:span 2;min-height:40px;padding:3px 4px;gap:4px;border-radius:8px;
-    font:600 calc(clamp(.81rem,3.55vw,.91rem) * var(--a11y-text-scale,1))/1.14 var(--sans);
+    grid-column:span 4;min-height:40px;padding:3px 1px;gap:2px;border-radius:8px;
+    font:500 calc(clamp(.75rem,3.35vw,.9rem) * var(--a11y-text-scale,1))/1.18 var(--sans);
     text-wrap:balance;overflow-wrap:break-word;
   }
-  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]:nth-last-child(2){grid-column:2 / span 2}
-  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]:last-child{grid-column:4 / span 2}
+  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]:nth-last-child(2){grid-column:2 / span 5}
+  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]:last-child{grid-column:7 / span 5}
   html[data-branch-portal=zechariah] #branchBar [data-tree-unit] .chip-dot{display:none}
   html[data-branch-portal=zechariah] #branchBar [data-tree-unit]::after{
-    content:'';flex:0 0 auto;width:5px;height:5px;border:solid currentColor;border-width:1.5px 1.5px 0 0;
+    content:'';box-sizing:border-box;flex:0 0 auto;width:5px;height:5px;border:solid currentColor;border-width:1.5px 1.5px 0 0;
     transform:rotate(45deg);
   }
   html[dir=rtl][data-branch-portal=zechariah] #branchBar [data-tree-unit]::after{transform:rotate(-135deg)}
