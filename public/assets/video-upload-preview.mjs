@@ -214,6 +214,13 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
     void useCopy(file, task);
   });
 
+  function suspend() {
+    cancelJob(); clearWatch();
+    record = null; pendingTime = null;
+    player.onloadedmetadata = null; player.pause(); player.removeAttribute('src'); player.load();
+    if (ownedUrl) urls.revokeObjectURL(ownedUrl);
+    ownedUrl = null; url = null; pick.value = ''; note();
+  }
   return {
     displayFile, playbackError,
     displayUrl() { return record && !record.useLight ? record.remoteUrl : null; },
@@ -241,13 +248,10 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
       button(); load();
       return true;
     },
+    suspend,
     clear() {
-      cancelJob(); clearWatch();
-      record = null; records = new WeakMap(); pendingTime = null;
-      player.onloadedmetadata = null; player.pause(); player.removeAttribute('src'); player.load();
-      if (ownedUrl) urls.revokeObjectURL(ownedUrl);
-      ownedUrl = null;
-      url = null; pick.value = ''; note();
+      suspend();
+      records = new WeakMap();
     }
   };
 }
