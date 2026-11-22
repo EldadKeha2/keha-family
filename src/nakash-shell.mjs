@@ -41,7 +41,7 @@ const standaloneScripts = new Set([
   'family-fallback.js', 'family-data.js', 'screensaver.js', 'family-ai.js',
   'living-family.js', 'updates.js', 'archive.js', 'calendar.js',
   'family-timeline.js', 'memorial.js', 'nursery.js', 'founder-trees.js',
-  'cloud.js', 'recycle-bin.js',
+  'cloud.js', 'recycle-bin.js', 'home-scroll.js',
 ]);
 
 function cameFromKeha(request) {
@@ -100,6 +100,7 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
     .replace(/((?:href|src)=")assets\//g, '$1/assets/')
     .replace(/  <script src="(?:\/assets\/)?([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>\n/g,
       (tag, script) => standaloneScripts.has(script) ? '' : tag)
+    .replace(/<button\b[^>]*id="homeMoreHint"[^>]*>.*?<\/button>\s*/s, '')
     .replace('<head>', '<head>\n  <meta name="robots" content="noindex,nofollow">\n' + scripts + '\n' + relationshipStyles + '\n' + layoutStyles)
     .replace('<span>בית משפחת קהא</span>', '<span>' + name + '</span>')
     .replace('משורש משותף, שישה ענפים של אהבה', 'משורש משותף, ארבעה ענפים')
