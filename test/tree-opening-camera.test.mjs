@@ -64,6 +64,11 @@ test('each additional family tree opens on its founding parents at a readable si
       assert.equal(f.document.getElementById('treeBreadcrumb').textContent,f.data.branches.find(branch=>branch.id===site).title);
       assert.ok(f.document.getElementById('overviewButton').closest('.workspace-header'));
     }
+    if(['shlomo','zechariah','zechariah-tzadok','kehat'].includes(site)){
+      assert.ok(f.document.getElementById('overviewButton').closest('.workspace-header'));
+      assert.equal(f.document.getElementById('treeGuideButton'),null);
+      assert.equal(f.document.getElementById('workspaceTitle').textContent,'האילן המשפחתי');
+    }
   }
 });
 

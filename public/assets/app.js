@@ -10,11 +10,12 @@
   const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const scopedViews=document.documentElement?.dataset?.nakashViews;
   const nakashTree=String(document.documentElement?.dataset?.nakashHome||'').startsWith('/nakash/');
-  if(nakashTree){
+  const compactTreeYears=Boolean(document.documentElement?.dataset?.extendedKeha||document.documentElement?.dataset?.branchPortal||document.documentElement?.dataset?.shlomoKeha==='true');
+  if(nakashTree||compactTreeYears){
     const modes=document.querySelector('#treeView .tree-mode'),header=document.querySelector('.workspace-header');
     if(modes&&header){modes.classList.add('tree-header-mode');header.append(modes);}
   }
-  const compactTreeYears=Boolean(document.documentElement?.dataset?.extendedKeha||document.documentElement?.dataset?.branchPortal||document.documentElement?.dataset?.shlomoKeha==='true');
+  if(compactTreeYears)$('treeGuideButton')?.remove();
   const adaptiveTreeLayout=Boolean(document.documentElement?.dataset?.branchPortal);
   if(scopedViews)for(const view of validViews)if(!scopedViews.split(' ').includes(view))validViews.delete(view);
   const searchBranch=document.documentElement?.dataset?.nakashSearchBranch;

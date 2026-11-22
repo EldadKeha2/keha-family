@@ -35,7 +35,7 @@
       document.body.dataset.extendedBranch=state.branch;
       if(hub)hub.innerHTML=state.branch==='all'?markup():back();
       if(state.branch!=='all')return false;
-      document.getElementById('workspaceTitle').textContent=tr('האילן המשפחתי של קהא המורחבת','The extended Keha family tree');
+      document.getElementById('workspaceTitle').textContent=tr('האילן המשפחתי','Family tree');
       document.getElementById('mobileViewTitle').textContent=tr('קהא המורחבת','The extended Keha family');
       document.getElementById('workspaceSubtitle').textContent='';
       document.getElementById('workspaceDetail').hidden=true;

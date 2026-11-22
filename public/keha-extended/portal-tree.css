@@ -1,4 +1,5 @@
 .family-extended-access{display:flex;justify-content:center;margin:10px 16px 0;font-family:var(--sans)}
+#treeView>.family-extended-access{margin:12px 16px 16px}
 .family-extended-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;max-width:100%;padding:8px 20px;border:1px solid var(--family-accent);border-radius:14px;background:linear-gradient(135deg,var(--paper),var(--family-tint));color:var(--family-ink);box-shadow:0 3px 0 var(--family-line),0 5px 16px #30291812;font:600 calc(16px * var(--a11y-text-scale,1))/1.45 var(--sans);cursor:pointer}
 .family-extended-button img,#mainNav [data-extended-open] img{display:block;width:32px;height:32px;flex:0 0 32px}
 .family-extended-button:hover{background:var(--family-tint);border-color:var(--family-ink)}

@@ -8,7 +8,7 @@
   const dialog=document.getElementById('extendedKehaDialog');
   let returnFocus=null;
   for(const trigger of document.querySelectorAll('[data-extended-open]')){
-    trigger.querySelector('[data-extended-label]').textContent=trigger.dataset.extendedOpen==='header'
+    trigger.querySelector('[data-extended-label]').textContent=trigger.dataset.extendedOpen==='tree'
       ?tr('לאתר קהא המורחבת','Visit extended Keha')
       :tr('לאתר משפחת קהא המורחבת','The extended Keha family site');
   }
@@ -61,7 +61,7 @@
     renderTree(state){
       // Each single-family portal opens its full tree directly.
       if(window.FAMILY_DATA.branches.length===1&&state.branch==='all')state.mode='full';
-      document.getElementById('workspaceTitle').textContent=(I.isEnglish?'The family tree of ':'האילן המשפחתי של ')+name();
+      document.getElementById('workspaceTitle').textContent=tr('האילן המשפחתי','Family tree');
       document.getElementById('mobileViewTitle').textContent=name();
       return false;
     },

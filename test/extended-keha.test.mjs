@@ -775,6 +775,9 @@ test('the new portals retain independent identities and add stories and document
     assert.equal(document.documentElement.dataset.nakashHome,portal.home);
     assert.equal(document.documentElement.dataset.nakashEntryView,'home');
     assert.equal(document.documentElement.dataset.nakashOrigin,'https://'+portal.id+'.example');
+    assert.ok(document.querySelector('#treeView>.family-extended-access'));
+    assert.equal(document.querySelector('.family-extended-access').previousElementSibling.id,'treeViewport');
+    assert.equal(document.querySelector('.page-shell>.family-extended-access'),null);
     assert.deepEqual([...document.querySelectorAll('#mainNav [data-view]')].map(node=>node.dataset.view),['tree','directory','videos','gallery','stories','games','documents']);
     assert.ok(document.getElementById('homeTiles'));
     assert.equal(document.querySelector('meta[name="theme-color"]').getAttribute('content'),portal.color);
