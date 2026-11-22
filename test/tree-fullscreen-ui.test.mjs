@@ -9,8 +9,8 @@ import {extendedKehaHTML,shlomoKehaHTML,branchPortalHTML} from '../src/extended-
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/tree-fullscreen.js',import.meta.url),'utf8');
 
-function harness({native=true,english=false,phoneFamilies=false}={}){
-  const {document,window:dom}=parseHTML(html),window=new EventTarget();
+function harness({native=true,english=false,phoneFamilies=false,page=html}={}){
+  const {document,window:dom}=parseHTML(page),window=new EventTarget();
   const viewport=document.getElementById('treeViewport'),button=document.getElementById('treeFullscreenButton');
   document.body.dataset.activeView='tree';
   window.FamilyI18n={isEnglish:english};
@@ -47,6 +47,19 @@ test('the same family buttons stay above the phone tree in fullscreen and return
     h.click();
     assert.equal(bar.parentNode,parent);assert.equal(bar.nextSibling,next);
     assert.equal(h.document.querySelectorAll('#branchBar').length,1);
+  }
+});
+
+test('the link to the other family stays available in fullscreen and returns above each tree',()=>{
+  for(const portal of ['kehat','zechariah-tzadok'])for(const native of [false,true]){
+    const h=harness({native,page:branchPortalHTML(html,portal)});
+    const link=h.document.querySelector('#relatedFamilyTrees a');
+    assert.equal(link.parentNode.nextElementSibling,h.viewport);
+    h.click();
+    assert.equal(h.viewport.querySelector('#relatedFamilyTrees a'),link);
+    h.click();
+    assert.equal(link.parentNode.nextElementSibling,h.viewport);
+    assert.equal(h.document.querySelectorAll('#relatedFamilyTrees a').length,1);
   }
 });
 

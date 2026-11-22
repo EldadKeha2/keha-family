@@ -42,6 +42,11 @@
   }
   function setLanguage(next){if(!languages.has(next)||next===language)return;try{localStorage.setItem('keha-family-language',next);}catch{}const url=new URL(location.href);url.searchParams.set('lang',next);location.assign(url.href);}
   document.documentElement.lang=language;document.documentElement.dir=isEnglish?'ltr':'rtl';
+  for(const link of document.querySelectorAll('a[data-family-language-link]')){
+    const destination=new URL(link.getAttribute('href'),location.href);
+    destination.searchParams.set('lang',language);
+    link.href=destination.href;
+  }
   window.FamilyI18n={language,locale,isEnglish,t,html,word:(n,one,many)=>n===1?one:many,personName,searchNames,branchName,mediaName,date,error,fetch:localizedFetch,setLanguage};
   // This one-time pass localizes only the authored HTML, before any family content is rendered.
   if(isEnglish){

@@ -9,6 +9,23 @@ import {appleLaunchImages} from './nakash-launch.mjs';
 import {restrictedOriginalPerson} from './family-content.mjs';
 import {withStoryFormLink} from './story-submissions.mjs';
 
+const relatedTrees={
+  kehat:{to:'zechariah-tzadok',label:'לעץ של זכריה בן צדוק'},
+  'zechariah-tzadok':{to:'kehat',label:'לעץ של ג׳ימעאן בן אהרון'},
+};
+
+function relatedTreeNavigation(fromIds,origins){
+  const links=[];
+  for(const from of fromIds){
+    const other=relatedTrees[from];
+    if(!other)continue;
+    const href=(origins[other.to]||'')+BRANCH_PORTALS[other.to].home+'#tree';
+    const id='related-tree-'+from;
+    links.push(`<a data-related-from="${BRANCH_PORTALS[from].branches[0]}" data-family-language-link href="${href}" aria-labelledby="${id}-label" aria-describedby="${id}-kinship"><strong id="${id}-label">${other.label}</strong><small id="${id}-kinship">יעקב בן ג׳ימעאן נישא ליהודית בת זכריה בן צדוק</small></a>`);
+  }
+  return links.length?'<div id="relatedFamilyTrees">'+links.join('')+'</div>':'';
+}
+
 function withNameOrigin(html, home) {
   const href=home+'name-origin/';
   const link='<a class="nav-link" id="nameOriginTab" href="'+href+'">מקור השם קהא</a>';
@@ -44,9 +61,10 @@ export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portal
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'')
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+EXTENDED_COLOR)
     .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+EXTENDED_COLOR+'}:root{--family-accent:'+EXTENDED_COLOR+'}')
-    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"><link rel="stylesheet" href="/keha-extended/hub.css?v=gallery-generations-v1"></head>')
+    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=related-trees-1"><link rel="stylesheet" href="/keha-extended/hub.css?v=gallery-generations-v1"></head>')
     .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/hub.js?v=jimaan-family-v1" defer></script>\n$1')
     .replace('<div id="treeView">','<div id="treeView"><section id="extendedKehaHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
+    .replace('<div class="tree-viewport"',relatedTreeNavigation(Object.keys(relatedTrees),portalOrigins)+'<div class="tree-viewport"')
     .replace(/(<header class="phone-home-intro">.*?<\/header>)/s,'$1<section id="extendedKehaHomeHub" aria-label="ענפי משפחת קהא המורחבת" data-i18n-skip></section>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+EXTENDED_NAME+'</h2>')
     .replace('חמישה דורות, סיפור אחד','ענפי המשפחה, סיפור שנבנה יחד');
@@ -89,7 +107,7 @@ function withExtendedAccess(html,extendedOrigin='https://family-extended.eldadke
     .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=family-top-tabs-v2" defer></script>\n$1');
 }
 
-export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev'){
+export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev',portalOrigins={}){
   const portal=BRANCH_PORTALS[id];
   const startup=appleLaunchImages(id).map(({href,media})=>'<link rel="apple-touch-startup-image" href="'+href+'" media="'+media+'">').join('\n');
   const html=withStoryFormLink(branchHomeHTML(original),id)
@@ -107,7 +125,8 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
     .replace(/(<meta name="theme-color" content=")[^"]+/,'$1'+portal.color)
     .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+portal.color+'}:root{--family-accent:'+portal.color+'}')
     .replace(/<link rel="icon"[^>]*>/g,'<link rel="icon" type="image/svg+xml" href="'+portal.home+'brand.svg">')
-    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1">'+startup+'</head>')
+    .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=related-trees-1">'+startup+'</head>')
+    .replace('<div class="tree-viewport"',relatedTreeNavigation([id],portalOrigins)+'<div class="tree-viewport"')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+portal.name+'</h2>')
     .replace('חמישה דורות, סיפור אחד',portal.tagline);
   return withNameOrigin(withExtendedAccess(html,extendedOrigin),portal.home);
@@ -147,7 +166,7 @@ export async function extendedKehaRoute(request,env,db,ctx,options) {
     if(!response.ok)return response;
     const origins=familyAppOrigins(env);
     const source=await response.text();
-    const html=portal?branchPortalHTML(source,portal.id,origins[portal.id],origins.extended):shlomo?shlomoKehaHTML(source,origins.shlomo):extendedKehaHTML(source,origins.extended,origins.shlomo,origins);
+    const html=portal?branchPortalHTML(source,portal.id,origins[portal.id],origins.extended,origins):shlomo?shlomoKehaHTML(source,origins.shlomo):extendedKehaHTML(source,origins.extended,origins.shlomo,origins);
     return new Response(request.method==='HEAD'?null:html,{headers:{'Content-Type':'text/html; charset=utf-8'}});
   }
   if(path.startsWith(home+'assets/'))return env.ASSETS.fetch(new Request(new URL(path.slice(home.length-1)+url.search,url),request));

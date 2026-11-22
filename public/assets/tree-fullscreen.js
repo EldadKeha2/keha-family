@@ -2,6 +2,7 @@
   'use strict';
   const viewport=document.getElementById('treeViewport'),button=document.getElementById('treeFullscreenButton');
   if(!viewport||!button)return;
+  const relatedTrees=document.getElementById('relatedFamilyTrees');
   const caption=document.createElement('span');caption.className='tree-fullscreen-label';button.append(caption);
   const exitButton=document.createElement('button');exitButton.type='button';exitButton.id='treeFullscreenExit';exitButton.hidden=true;
   exitButton.setAttribute('aria-controls',viewport.id);
@@ -39,6 +40,7 @@
     if(!active)return;
     active=false;hadNative=false;
     viewport.classList.remove('tree-is-fullscreen');document.documentElement.classList.remove('tree-fullscreen-active');
+    if(relatedTrees)viewport.before(relatedTrees);
     viewport.scrollTop=0;viewport.scrollLeft=0;
     placeFamilyTabs();leaveNative();refresh();fit();
     if(restoreFocus)button.focus({preventScroll:true});
@@ -47,6 +49,7 @@
     if(active)return;
     active=true;hadNative=false;
     viewport.classList.add('tree-is-fullscreen');document.documentElement.classList.add('tree-fullscreen-active');
+    if(relatedTrees)viewport.append(relatedTrees);
     viewport.scrollTop=0;viewport.scrollLeft=0;
     window.FamilyTreeGuide?.hide();refresh();placeFamilyTabs();fit();button.focus({preventScroll:true});
     // The fixed viewport also fills the screen on browsers without this API.

@@ -80,11 +80,11 @@ test('the registry identity migration reaches saved profiles once, backs them up
     assert.equal(f.database.prepare('SELECT COUNT(*) AS n FROM meta WHERE id=?').get(backup).n,1);
   }finally{f.close();}
 });
-function fixture(){
+function fixture(extraEnv={}){
   const database=new DatabaseSync(':memory:');
   const storage={sql:{exec(query,...args){const statement=database.prepare(query);const rows=statement.columns().length?statement.all(...args):(statement.run(...args),[]);return {toArray:()=>rows};}},
     transactionSync(fn){database.exec('BEGIN');try{const result=fn();database.exec('COMMIT');return result;}catch(error){database.exec('ROLLBACK');throw error;}}};
-  const env={HF_NAMESPACE:'fixture',HF_BUCKET:'fixture',HF_ACCESS_KEY_ID:'test',HF_SECRET_ACCESS_KEY:'test'};
+  const env={HF_NAMESPACE:'fixture',HF_BUCKET:'fixture',HF_ACCESS_KEY_ID:'test',HF_SECRET_ACCESS_KEY:'test',...extraEnv};
   let state=new FamilyState({storage},env);
   env.FAMILY_STATE={idFromName:name=>name,get:()=>state};
   const objects=new Map(),originalFetch=globalThis.fetch;
@@ -902,6 +902,43 @@ test('the separated Kehat and Tzadok portals render their complete trees on desk
     assert.equal(document.querySelectorAll('#treeNodes [data-person="kehat-yaakov"]').length,1);
     assert.equal(document.querySelectorAll('#treeNodes [data-person="kehat-yaakov-yehudit"]').length,1);
     assert.ok(document.querySelector('[data-extended-install-link]').getAttribute('href').endsWith('/keha-extended/?install=1#home'));
+  }
+});
+
+test('Jimaan and Tzadok link directly to each other’s tree on the configured family sites',async t=>{
+  const origins={kehat:'https://jimaan.example','zechariah-tzadok':'https://tzadok.example'};
+  const f=fixture({FAMILY_APP_ORIGINS:origins,ASSETS:{fetch:()=>new Response(originalHTML)}});
+  t.after(()=>f.close());
+  const i18n=await readFile(new URL('../public/assets/i18n.js',import.meta.url),'utf8');
+  const translations=await readFile(new URL('../public/assets/translations.js',import.meta.url),'utf8');
+  const bases=[
+    ['kehat','zechariah-tzadok','לעץ של זכריה בן צדוק','Tree of Zechariah, son of Tzadok'],
+    ['zechariah-tzadok','kehat','לעץ של ג׳ימעאן בן אהרון','Tree of Jimaan, son of Aharon'],
+  ];
+  for(const [from,to,label,english] of bases){
+    const page=await f.call(BRANCH_PORTALS[from].home);
+    assert.equal(page.status,200);
+    const {document}=parseHTML(await page.text());
+    const links=document.querySelectorAll('#treeView #relatedFamilyTrees a');
+    assert.equal(links.length,1);
+    const link=links[0];
+    assert.equal(document.getElementById(link.getAttribute('aria-labelledby')).textContent,label);
+    assert.equal(document.getElementById(link.getAttribute('aria-describedby')).textContent,'יעקב בן ג׳ימעאן נישא ליהודית בת זכריה בן צדוק');
+    assert.equal(link.getAttribute('href'),origins[to]+BRANCH_PORTALS[to].home+'#tree');
+    assert.equal(link.hasAttribute('target'),false);
+    const fallback=parseHTML(branchPortalHTML(originalHTML,from)).document;
+    assert.equal(fallback.querySelector('#relatedFamilyTrees a').getAttribute('href'),BRANCH_PORTALS[to].home+'#tree');
+    const context=vm.createContext({window:{},document,URL,URLSearchParams,NodeFilter:{SHOW_TEXT:4},location:new URL(origins[from]+BRANCH_PORTALS[from].home+'?lang=en-GB#tree')});
+    vm.runInContext(translations,context);
+    vm.runInContext(i18n,context);
+    assert.equal(link.querySelector('strong').textContent,english);
+    assert.match(link.querySelector('small').textContent,/Yaakov, son of Jimaan, married Yehudit/);
+    assert.equal(link.href,origins[to]+BRANCH_PORTALS[to].home+'?lang=en-GB#tree');
+  }
+  const hub=parseHTML(extendedKehaHTML(originalHTML,'','',origins)).document;
+  assert.deepEqual([...hub.querySelectorAll('#relatedFamilyTrees a')].map(a=>a.getAttribute('href')),bases.map(([,to])=>origins[to]+BRANCH_PORTALS[to].home+'#tree'));
+  for(const html of [originalHTML,shlomoKehaHTML(originalHTML),branchPortalHTML(originalHTML,'zechariah')]){
+    assert.equal(parseHTML(html).document.getElementById('relatedFamilyTrees'),null);
   }
 });
 
