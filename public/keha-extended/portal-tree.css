@@ -22,3 +22,31 @@
 .family-extended-choice-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border:1px solid var(--family-line);border-radius:12px;background:var(--paper);color:var(--family-accent)}
 .family-extended-choice-icon svg{display:block;width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 @media(max-width:700px){.family-extended-access{margin:8px 12px 2px}.family-extended-button{padding:7px 16px;font-size:calc(15px * var(--a11y-text-scale,1))}.family-extended-dialog{padding:24px 16px 20px}.family-extended-choices a{gap:11px;padding:14px 12px}}
+
+/* Compact navigation belongs only to these three branch portals. */
+html[data-branch-portal] .family-extended-button{min-height:44px;gap:8px;padding:5px 14px;border-radius:11px;font-size:calc(15px * var(--a11y-text-scale,1))}
+html[data-branch-portal] .family-extended-button img,html[data-branch-portal] #mainNav [data-extended-open] img{width:26px;height:26px;flex-basis:26px}
+html[data-branch-portal] .phone-home-intro{gap:8px;padding:12px 0 14px}
+html[data-branch-portal] .phone-home-intro>div{min-width:0}
+html[data-branch-portal] .phone-home-intro h2{margin:0;white-space:nowrap;font-size:calc(clamp(20px,2.1vw,27px) * var(--a11y-text-scale,1));line-height:1.25;color:var(--family-ink)}
+html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles){gap:9px;grid-auto-rows:auto}
+html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile{min-height:82px;padding:10px 12px;gap:10px;border-radius:12px}
+html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile strong{font-size:calc(18px * var(--a11y-text-scale,1));line-height:1.3;overflow-wrap:normal;word-break:normal;text-wrap:balance}
+html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon{width:34px;height:38px;flex-basis:34px;border-radius:10px}
+html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon :is(svg,img){width:29px;height:29px}
+@media(max-width:700px){
+  html[data-branch-portal] .family-extended-access{margin:6px 12px 0}
+  html[data-branch-portal] .family-extended-button{font-size:calc(14px * var(--a11y-text-scale,1))}
+  html[data-branch-portal] .family-extended-button img{width:24px;height:24px;flex-basis:24px}
+  html[data-branch-portal] .phone-home-intro{gap:6px;padding:12px 0}
+  html[data-branch-portal] .phone-home-intro h2{font-size:calc(clamp(16px,4.8vw,21px) * var(--a11y-text-scale,1))}
+  html[data-branch-portal][lang^=en] .phone-home-intro h2{font-size:calc(clamp(14px,4.3vw,18px) * var(--a11y-text-scale,1))}
+  html[data-branch-portal] .phone-home-intro img{width:26px;height:26px;flex:0 0 26px}
+  html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles){gap:8px}
+  html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:104px;padding:10px 8px;text-align:center}
+  html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile>span:nth-child(2){display:block;flex:0 1 auto;width:100%}
+  html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile strong{font-size:calc(16px * var(--a11y-text-scale,1));line-height:1.3}
+  html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile small{display:none}
+  html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon{width:34px;height:34px;flex:0 0 34px}
+  html[data-branch-portal][data-a11y-text] .phone-home-intro h2{white-space:normal;text-wrap:balance}
+}

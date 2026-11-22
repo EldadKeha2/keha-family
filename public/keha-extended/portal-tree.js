@@ -51,7 +51,7 @@
         const tree=document.querySelector('#'+id+' .home-tile-tree');if(!tree)continue;
         const tile=document.createElement('button');tile.type='button';tile.className='home-tile home-tile-extended';
         tile.dataset.extendedOpen='menu';tile.setAttribute('aria-haspopup','dialog');tile.setAttribute('aria-controls',dialog.id);
-        tile.innerHTML='<span class="home-tile-icon" aria-hidden="true"><img src="/keha-extended/brand.svg" alt="" width="48" height="48"></span><span><strong>'+tr('לאתר משפחת קהא המורחבת','The extended Keha family site')+'</strong><small>'+tr('מעבר לאתר או התקנה במסך הבית','Visit the site or add it to your home screen')+'</small></span>';
+        tile.innerHTML='<span class="home-tile-icon" aria-hidden="true"><img src="/keha-extended/brand.svg" alt="" width="32" height="32"></span><span><strong>'+tr('לאתר משפ׳ קהא המורחבת','Extended Keha family')+'</strong><small>'+tr('מעבר לאתר או התקנה במסך הבית','Visit the site or add it to your home screen')+'</small></span>';
         tree.after(tile);
       }
     });

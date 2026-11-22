@@ -93,8 +93,8 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
     .replace('חמישה דורות, סיפור אחד',portal.tagline)
     .replace(/(<button\b[^>]*data-view="tree"[^>]*>.*?<\/button>)/,'$1'+extendedTrigger('nav'))
     .replace('<main id="mainContent"','<nav class="family-extended-access" aria-label="קהא המורחבת" data-i18n-skip>'+extendedTrigger('header')+'</nav>'+extendedDialog+'<main id="mainContent"');
-  html=html.replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=extended-choice-v3"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=extended-choice-v2" defer></script>\n$1');
+  html=html.replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=compact-portals-v4"></head>')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=compact-portals-v3" defer></script>\n$1');
   return html;
 }
 
