@@ -153,3 +153,82 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 #videoClipEditor #videoClipProgressBar::-moz-progress-bar{border-radius:8px;background:#bd382b}
 #videoClipEditor .video-clip-elapsed{display:flex;justify-content:flex-end;align-items:center;gap:7px;color:#947568;font:12px/1.4 var(--sans);font-variant-numeric:tabular-nums}
 @media(prefers-reduced-motion:reduce){#videoClipEditor #videoClipProgressBar::-webkit-progress-value{transition:none}}
+
+/* Single-source upload. Every segment keeps its color when revisited. */
+#videoUploadEditIcon {display:inline-flex}
+#videoUploadWizard .video-upload-toolbar:has(#videoUploadSplit:not([hidden])) > button span {font:inherit;font-size:clamp(16px,1.8vw,22px);line-height:1.2}
+#videoUploadDone {margin-inline-start:auto}
+#videoUploadWizard.is-splitting {
+  --segment-accent:hsl(var(--segment-hue) 49% 32%);
+  --segment-ink:hsl(var(--segment-hue) 52% 23%);
+  --segment-line:hsl(var(--segment-hue) 28% 72%);
+  --segment-panel:hsl(var(--segment-hue) 38% 94%);
+  --segment-page:hsl(var(--segment-hue) 32% 98%);
+  background:var(--segment-page);border-color:var(--segment-line);accent-color:var(--segment-accent);
+}
+#videoUploadWizard.is-splitting :is(h2,.photo-edit-emblem,.photo-edit-pager strong,.photo-edit-date-label,.photo-edit-caption-label,.photo-edit-tags summary,#videoUploadRange,.video-upload-details label) {color:var(--segment-ink)}
+#videoUploadWizard.is-splitting .photo-edit-emblem {color:var(--segment-accent)}
+#videoUploadWizard.is-splitting :is(.video-upload-metadata,.photo-edit-copy-date,.photo-edit-close,.secondary-button,#videoUploadSaveCurrent,.video-upload-person,.video-upload-results button) {
+  color:var(--segment-ink);border-color:var(--segment-line);background:var(--segment-panel);
+}
+#videoUploadWizard.is-splitting :is(.photo-edit-pager button,#videoUploadSaveAll,#videoUploadSplit) {
+  background:var(--segment-accent);border-color:var(--segment-accent);color:white;
+}
+#videoUploadWizard.is-splitting :is(input:not([type=range]),textarea,select) {background:var(--segment-page);border-color:var(--segment-line)}
+#videoUploadWizard.is-splitting :is(.photo-edit-tags,.photo-edit-footer) {border-color:var(--segment-line)}
+#videoUploadWizard.is-splitting .photo-edit-footer {background:var(--segment-page)}
+#videoUploadWizard.is-splitting :is(button,input,textarea,select):focus-visible {outline:2px solid var(--segment-accent);outline-offset:2px}
+#videoUploadWizard.is-splitting .photo-edit-pager {grid-template-columns:minmax(78px,auto) minmax(0,1fr) minmax(78px,auto)}
+#videoUploadWizard.is-splitting .photo-edit-pager button {width:auto}
+#videoUploadWizard .upload-segments {display:grid;gap:3px;padding:8px 10px;margin:0 0 9px;background:var(--segment-panel);border:1px solid var(--segment-line);border-radius:8px}
+#videoUploadWizard .upload-segment-track {position:relative;height:var(--track-height,17px);margin:1px 0 3px;isolation:isolate;cursor:crosshair;background:color-mix(in srgb,var(--segment-line) 48%,white);border-radius:5px}
+#videoUploadMarks button {
+  position:absolute;display:block;box-sizing:border-box;min-width:2px;min-height:0;height:8px;margin:0;padding:0;
+  border:0;border-radius:3px;background:hsl(var(--mark-hue) 50% 39%);cursor:pointer;
+}
+#videoUploadMarks button[aria-current=true] {outline:1px solid var(--segment-ink);outline-offset:1px}
+#videoUploadPlayhead {position:absolute;top:0;bottom:0;width:2px;left:0;z-index:1;pointer-events:none;background:#222;box-shadow:0 0 0 1px white}
+#videoUploadPlayhead::before {content:'';position:absolute;top:-2px;left:-3px;border-inline:4px solid transparent;border-top:5px solid #222}
+#videoUploadWizard .upload-segment-boundary {display:grid;grid-template-columns:3.2em minmax(32px,1fr) 6.8em auto;align-items:center;gap:9px;color:var(--segment-ink);font:14px/1.2 var(--sans)}
+#videoUploadWizard .upload-segment-boundary input[type=range] {width:100%;min-width:0;height:32px;margin:0;padding:0;border:0;accent-color:var(--segment-accent);cursor:pointer;touch-action:pan-y}
+#videoUploadWizard .upload-segment-boundary input[type=text] {box-sizing:border-box;width:100%;min-width:0;height:32px;margin:0;padding:3px 5px;border:1px solid var(--segment-line);border-radius:5px;color:var(--segment-ink);font:inherit;font-variant-numeric:tabular-nums;text-align:center}
+#videoUploadWizard .upload-segment-boundary input[aria-invalid=true] {border-color:#a53725}
+#videoUploadWizard .upload-segment-boundary button {min-width:0;min-height:32px;padding:3px 9px;white-space:normal;font:inherit}
+#videoUploadWizard .upload-segment-list {display:flex;align-items:center;gap:6px;overflow-x:auto;overscroll-behavior-inline:contain;padding:3px}
+#videoUploadWizard .upload-segment-list button {
+  display:inline-flex;align-items:center;gap:5px;flex:none;min-height:28px;padding:3px 9px;
+  border:1px solid hsl(var(--mark-hue) 32% 73%);border-radius:20px;background:hsl(var(--mark-hue) 36% 97%);
+  color:hsl(var(--mark-hue) 50% 24%);font:13px/1.2 var(--sans);cursor:pointer;
+}
+#videoUploadWizard .upload-segment-list button::before {content:'';width:8px;height:8px;border-radius:50%;background:hsl(var(--mark-hue) 49% 34%)}
+#videoUploadWizard .upload-segment-list button[aria-current=true] {font-weight:700;border-color:var(--segment-accent);box-shadow:inset 0 0 0 1px var(--segment-accent)}
+@media(max-width:700px){
+  #videoUploadWizard .video-upload-toolbar>button {flex:1 1 auto;min-width:0;white-space:normal}
+  #videoUploadWizard.is-splitting .photo-edit-pager button {padding-inline:5px}
+  #videoUploadWizard .upload-segments {padding:7px;gap:2px}
+  #videoUploadWizard .upload-segment-boundary {grid-template-columns:2.7em minmax(20px,1fr) 6.1em auto;gap:5px;font-size:13px}
+  #videoUploadWizard .upload-segment-boundary button {padding-inline:6px}
+}
+@media(pointer:coarse){
+  #videoUploadWizard .upload-segment-boundary :is(input,button) {min-height:40px}
+  #videoUploadWizard .upload-segment-list button {min-height:34px}
+}
+@media(max-width:700px){
+  #videoUploadWizard .video-upload-toolbar:has(#videoUploadSplit:not([hidden])) {
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;
+  }
+  #videoUploadWizard .video-upload-toolbar:has(#videoUploadSplit:not([hidden])) > button {
+    flex-direction:column;gap:3px;padding:5px 3px;min-height:44px;line-height:1.2;text-align:center;
+  }
+  #videoUploadWizard .video-upload-toolbar:has(#videoUploadSplit:not([hidden])) > button span {font:inherit}
+  #videoUploadWizard .video-upload-toolbar:has(#videoUploadSplit:not([hidden])) #videoUploadRange {grid-column:1/-1}
+  #videoUploadWizard.is-splitting .photo-edit-footer :is(#videoUploadSaveAll,#videoUploadSaveCurrent) {
+    white-space:normal;overflow-wrap:anywhere;line-height:1.3;text-align:center;
+  }
+}
+#videoUploadWizard .upload-segment-batch {margin:2px 0 0;border:0;color:var(--segment-ink);font:13px/1.35 var(--sans)}
+#videoUploadWizard .upload-segment-batch summary {width:fit-content;cursor:pointer}
+#videoUploadWizard .upload-segment-batch > div {display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:5px}
+#videoUploadWizard .upload-segment-batch input {box-sizing:border-box;width:7em;min-width:0;padding:4px 6px;text-align:center;font:inherit;font-variant-numeric:tabular-nums}
+#videoUploadWizard .upload-segment-batch :is(input,button) {min-height:34px;border:1px solid var(--segment-line);border-radius:5px}
+#videoUploadWizard .upload-segment-batch button {padding:4px 8px;font:inherit}
