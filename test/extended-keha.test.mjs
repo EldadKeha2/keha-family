@@ -846,7 +846,12 @@ test('the new portals retain independent identities and add stories and document
     context.clearTimeout=()=>{};context.setTimeout=()=>{};
     vm.runInContext(await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8'),context);
     page.dispatchEvent(new dom.Event('DOMContentLoaded'));
-    assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,7);
+    assert.equal(page.querySelectorAll('#homeTiles .home-tile').length,8);
+    for(const menu of ['#homeTiles','#mobileMenuTiles','#desktopMenuTiles']){
+      const tab=page.querySelector(menu+' .home-tile-name-origin');
+      assert.equal(tab.querySelector('strong').textContent,'מקור השם קהא');
+      assert.equal(tab.getAttribute('href'),portal.home+'name-origin/');
+    }
     for (const menu of ['#homeTiles', '#mobileMenuTiles']) {
       assert.equal(page.querySelector(menu+' [data-view=games] strong').textContent,'משחקים תימנים ונהנים');
     }

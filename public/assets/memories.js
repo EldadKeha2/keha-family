@@ -117,6 +117,8 @@
     finally{categorySaves.delete(id);storyEdits++;renderStories();}
   }
   function renderStories(){
+    const originSource=$('storyNameOriginSource');
+    if(originSource)originSource.hidden=state.category!=='all'&&state.category!=='roots';
     const selected=state.category==='all'?null:category(state.category),all=state.stories.filter(item=>!selected||category(item.category).id===selected.id);
     $('memoryCollectionTitle').textContent=selected?.title||t('כל הזיכרונות שלנו','All our memories');
     $('memoryCollectionIntro').textContent=selected?.intro||t('כל אחד זוכר משהו אחר. ביחד, הסיפור שלנו מתמלא.','We each remember something different. Together, our story grows.');

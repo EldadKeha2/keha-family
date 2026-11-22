@@ -9,13 +9,24 @@ import {appleLaunchImages} from './nakash-launch.mjs';
 import {restrictedOriginalPerson} from './family-content.mjs';
 import {withStoryFormLink} from './story-submissions.mjs';
 
+function withNameOrigin(html, home) {
+  const href=home+'name-origin/';
+  const link='<a class="nav-link" id="nameOriginTab" href="'+href+'">מקור השם קהא</a>';
+  html=html.replace(/(<button\b[^>]*data-view="stories"[^>]*>.*?<\/button>)/,'$1'+link);
+  if(home===SHLOMO_HOME){
+    const source='<aside id="storyNameOriginSource" class="story-questionnaire" hidden><a class="secondary-button" href="'+href+'#stories">מקורות לסיפורי השורשים של סבא שלמה · מקור השם קהא</a></aside>';
+    html=html.replace('<p id="memoryStatus"',source+'<p id="memoryStatus"');
+  }
+  return html.replace(/(src="\/assets\/(?:home|memories)\.js)(?:\?[^"]*)?"/g,'$1?v=keha-name-origin-1"');
+}
+
 function branchHomeHTML(original) {
   return nakashHTML(original,'keha')
     .replace(/<section class="family-slideshow"[^>]*>.*?<\/section>\s*/s,'');
 }
 
 export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portalOrigins={}) {
-  return withStoryFormLink(nakashHTML(original,'keha'),'extended')
+  return withNameOrigin(withStoryFormLink(nakashHTML(original,'keha'),'extended'),EXTENDED_HOME)
     .replace('<html ', '<html data-extended-keha="true" data-keha-shlomo-home="'+shlomoOrigin+SHLOMO_HOME+'" '+Object.values(BRANCH_PORTALS).map(portal=>'data-keha-'+portal.id+'-home="'+(portalOrigins[portal.id]||'')+portal.home+'"').join(' ')+' ')
     .replace('data-nakash-branch="keha"','data-nakash-branch="extended" data-nakash-entry-view="tree"'+(appOrigin?' data-nakash-origin="'+appOrigin+'"':''))
     .replace(' data-nakash-search-branch="keha"','')
@@ -58,7 +69,7 @@ export function shlomoKehaHTML(original,appOrigin=''){
     .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+SHLOMO_COLOR+'}:root{--family-accent:'+SHLOMO_COLOR+'}')
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1"></head>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+SHLOMO_NAME+'</h2>');
-  return withExtendedAccess(html);
+  return withNameOrigin(withExtendedAccess(html),SHLOMO_HOME);
 }
 
 function withExtendedAccess(html,extendedOrigin='https://family-extended.eldadkeha.workers.dev'){
@@ -99,7 +110,7 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1">'+startup+'</head>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+portal.name+'</h2>')
     .replace('חמישה דורות, סיפור אחד',portal.tagline);
-  return withExtendedAccess(html,extendedOrigin);
+  return withNameOrigin(withExtendedAccess(html,extendedOrigin),portal.home);
 }
 
 export async function extendedKehaRoute(request,env,db,ctx,options) {

@@ -1,4 +1,4 @@
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,copyFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {join,basename} from 'node:path';
 import sharp from 'sharp';
@@ -19,6 +19,11 @@ for(const portal of [...Object.values(BRANCH_PORTALS),...existingApps]){
   const existing=existingApps.includes(portal),iconHome=portal.icons||portal.home;
   const output=join(publicRoot,iconHome),launch=join(publicRoot,launchAssets(portal.id));
   await mkdir(output,{recursive:true});await mkdir(launch,{recursive:true});
+  if(portal.home.startsWith(EXTENDED_HOME) && portal.home !== EXTENDED_HOME){
+    const article=join(output,'name-origin');
+    await mkdir(article,{recursive:true});
+    await copyFile(join(publicRoot,EXTENDED_HOME,'name-origin/index.html'),join(article,'index.html'));
+  }
   if(!existing)await writeFile(join(output,'brand.svg'),medallion.replaceAll('#536641',portal.color).replaceAll('#79806c',portal.color));
   const emblem=Buffer.from(appIcon.replaceAll('#f7f3e9',portal.color).replaceAll('#eef0e2','#fbf8ef').replaceAll('#87632f',portal.color).replaceAll('#52684c',portal.color).replaceAll('#c4b17f',portal.color));
   const icon=size=>sharp(emblem,{density:144}).resize(size,size).png();

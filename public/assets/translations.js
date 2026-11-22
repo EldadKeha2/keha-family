@@ -743,7 +743,7 @@ window.FAMILY_TRANSLATIONS={
   "בחרו מסמך או צילום תעודה.": "Choose a document or a certificate scan."
 };
 
-Object.assign(window.FAMILY_TRANSLATIONS,{"לזכרם":"In memory","מדליקים נר לזכרם":"Lighting a candle in their memory","הזיכרונות נשארים איתנו":"We carry their memories with us"});
+Object.assign(window.FAMILY_TRANSLATIONS,{"מקור השם קהא":"Origin of the Keha surname","מקורות לסיפורי השורשים של סבא שלמה · מקור השם קהא":"Sources for Grandpa Shlomo’s family stories · Origin of the Keha surname","לזכרם":"In memory","מדליקים נר לזכרם":"Lighting a candle in their memory","הזיכרונות נשארים איתנו":"We carry their memories with us"});
 Object.assign(window.FAMILY_TRANSLATIONS,{
   "פרטי האודות אינם תקינים.":"The biography details are invalid.",
   "יש להזין שנה תקינה שאינה בעתיד.":"Enter a valid year that is not in the future.",

@@ -142,7 +142,15 @@
     if(moving)carousel.trimTimer=setTimeout(trim,TRANSITION_MS+100);else trim();startFilm();
   }
   const familyTiles=()=>scopedViews?'':[['shlomo','https://family-extended.eldadkeha.workers.dev/keha-extended/#tree',I18n.isEnglish?"Grandpa Shlomo’s family tree":'העץ של סבא שלמה'],['yona','/nakash/inside/#tree',I18n.isEnglish?"Grandma Yona’s family tree":'העץ של סבתא יונה']].map(([id,href,label])=>`<a class="home-tile founder-family-tile" href="${href}"><span class="home-tile-icon"><img src="/nakash/api/profile-photo/${id}" alt="" width="48" height="56"></span><span><strong>${label}</strong></span></a>`).join('');
-  const tiles=()=>destinations.filter(([view])=>!scopedViews||scopedViews.split(' ').includes(view)).map(([view,title,description],index)=>`<button class="home-tile home-tile-${view}" data-view="${view}" style="--tile-delay:${index*35}ms"><span class="home-tile-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><use href="assets/home-icons.svg?v=voices-v2#${view}"></use></svg></span><span><strong>${title}</strong><small>${description}</small></span><span class="home-tile-arrow" aria-hidden="true">←</span></button>`+(view==='tree'?familyTiles():'')).join('');
+  function surnameTile(){
+    if(!scopedViews)return '';
+    const tab=$('nameOriginTab');
+    if(!tab)return '';
+    const label=I18n.isEnglish?'Origin of the Keha surname':'מקור השם קהא';
+    const description=I18n.isEnglish?'The name in Yemen and the family’s records':'השם בתימן והתעודות המשפחתיות';
+    return `<a class="home-tile home-tile-name-origin" href="${safe(tab.getAttribute('href'))}"><span class="home-tile-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><use href="/assets/home-icons.svg#documents"></use></svg></span><span><strong>${label}</strong><small>${description}</small></span><span class="home-tile-arrow" aria-hidden="true">←</span></a>`;
+  }
+  const tiles=()=>destinations.filter(([view])=>!scopedViews||scopedViews.split(' ').includes(view)).map(([view,title,description],index)=>`<button class="home-tile home-tile-${view}" data-view="${view}" style="--tile-delay:${index*35}ms"><span class="home-tile-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><use href="assets/home-icons.svg?v=voices-v2#${view}"></use></svg></span><span><strong>${title}</strong><small>${description}</small></span><span class="home-tile-arrow" aria-hidden="true">←</span></button>`+(view==='tree'?familyTiles():view==='stories'?surnameTile():'')).join('');
   const canAdvance=()=>state.view==='home'&&!state.paused&&!reducedMotion()&&state.items.length>1&&document.visibilityState==='visible'&&!$('mediaViewer')?.open;
   function stopAdvance(){clearTimeout(state.advanceTimer);state.advanceTimer=null;stopFilm();}
   function scheduleAdvance(){
