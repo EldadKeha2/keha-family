@@ -412,7 +412,7 @@ test('the family corrections retain Shori, Dvora and Merav’s saved profiles an
     for(const [id,name,nameEn] of [['kehat-shori','שורי קהת','Shori Kehat'],['kehat-varda','ורדה קהת','Varda Kehat'],['kehat-merav','מרב','Merav']]){
       f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name,nameEn,englishName:nameEn,birthday:'2.3.1930',about:'סיפור משפחתי שמור',profileId:'portrait-'+id,extra:true}));
     }
-    for(const [id,name,nameEn] of [['kehat-shori','שורי קהת','Shori Kehat'],['kehat-varda','דבורה קהת','Dvora Kehat'],['kehat-merav','מירב','Merav']]){
+    for(const [id,name,nameEn] of [['kehat-shori','שורי קהת','Shori Kehat'],['kehat-varda','דבורה קהא','Dvora Keha'],['kehat-merav','מירב','Merav']]){
       const page=await f.json('/keha-extended/zechariah-tzadok/api/compat/api/people/'+id+'/page');
       assert.equal(page.person.name,name);assert.equal(page.person.nameEn,nameEn);
       assert.equal(page.person.birthday,'2.3.1930');assert.equal(page.person.about,'סיפור משפחתי שמור');
@@ -422,9 +422,34 @@ test('the family corrections retain Shori, Dvora and Merav’s saved profiles an
       assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(backupMigration+':backup:'+id).value).profileId,saved.profileId);
     }
     const father=(await f.json('/keha-extended/zechariah-tzadok/api/compat/api/people/kehat-mordechai/page')).person;
-    assert.equal(father.name,'מרדכי קהת');
+    assert.equal(father.name,'מרדכי קהא');
     f.restart();
-    assert.equal((await f.json('/keha-extended/zechariah-tzadok/api/compat/api/people/kehat-varda/page')).person.name,'דבורה קהת');
+    assert.equal((await f.json('/keha-extended/zechariah-tzadok/api/compat/api/people/kehat-varda/page')).person.name,'דבורה קהא');
+  }finally{f.close();}
+});
+
+test('the couple surname updates already-migrated stored profiles without changing the other members of the household',async()=>{
+  const f=fixture();
+  try{
+    const branch='/keha-extended/zechariah-tzadok/api/compat/api/people/';
+    await f.json(branch+'kehat-mordechai/page');
+    f.database.prepare('DELETE FROM meta WHERE id=?').run('extended-mordechai-dvora-keha-2026-11-22');
+    for(const [id,first,english] of [['kehat-mordechai','מרדכי','Mordechai'],['kehat-varda','דבורה','Dvora']]){
+      const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+      Object.assign(saved,{name:first+' קהת',firstName:first,lastName:'קהת',nameEn:english+' Kehat',englishName:english+' Kehat',about:'personal biography'});
+      f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
+    }
+    f.restart();
+    for(const [id,first,english] of [['kehat-mordechai','מרדכי','Mordechai'],['kehat-varda','דבורה','Dvora']]){
+      const profile=(await f.json(branch+id+'/page')).person;
+      assert.equal(profile.name,first+' קהא');
+      assert.equal(profile.nameEn,english+' Keha');
+      assert.equal(profile.about,'personal biography');
+      const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+      assert.equal(saved.lastName,'קהא');
+      assert.equal(saved.englishName,english+' Keha');
+    }
+    assert.equal((await f.json(branch+'kehat-shori/page')).person.name,'שורי קהת');
   }finally{f.close();}
 });
 
