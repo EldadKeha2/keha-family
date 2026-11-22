@@ -45,15 +45,22 @@ test('original and every family portal expose the same fullscreen control beside
 
 test('fullscreen fills the existing tree, retains its controls, refits it and exits through the same button',async()=>{
   const h=harness(),world=h.document.getElementById('treeWorld');
+  assert.equal(h.button.querySelector('.tree-fullscreen-label').textContent,'מסך מלא');
+  assert.equal(h.document.getElementById('treeFullscreenExit').hidden,true);
   h.click();assert.equal(h.requests(),1);assert.ok(h.document.fullscreenElement===h.viewport);
   assert.ok(h.viewport.classList.contains('tree-is-fullscreen'));assert.ok(h.document.documentElement.classList.contains('tree-fullscreen-active'));
   assert.equal(h.button.getAttribute('aria-pressed'),'true');assert.equal(h.button.title,'יציאה ממסך מלא');assert.equal(h.fits(),1);
+  assert.equal(h.document.getElementById('treeFullscreenExit').hidden,false);
+  assert.equal(h.document.getElementById('treeFullscreenExit').textContent,'יציאה ממסך מלא');
   assert.ok(h.document.getElementById('treeWorld')===world);
   for(const id of ['zoomIn','zoomOut','fitButton'])assert.ok(h.viewport.contains(h.document.getElementById(id)));
   h.click();await Promise.resolve();
   assert.equal(h.exits(),1);assert.equal(h.document.fullscreenElement,null);assert.equal(h.button.getAttribute('aria-pressed'),'false');
   assert.equal(h.viewport.classList.contains('tree-is-fullscreen'),false);assert.equal(h.document.documentElement.classList.contains('tree-fullscreen-active'),false);
   assert.equal(h.fits(),2);assert.ok(h.focused()===h.button);
+  assert.equal(h.document.getElementById('treeFullscreenExit').hidden,true);
+  h.click();h.document.getElementById('treeFullscreenExit').click();h.flush();
+  assert.equal(h.button.getAttribute('aria-pressed'),'false');
 });
 
 test('unsupported or denied native fullscreen retains the full-window tree and a working Escape exit',async()=>{

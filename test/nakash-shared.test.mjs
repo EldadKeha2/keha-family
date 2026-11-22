@@ -40,6 +40,7 @@ for (const [id, oldName, oldNameEn, name, nameEn, branch, unit, members] of [
   ['avrahumi-medina', 'אברהומי מדינה', 'Avrahumi Medina', 'אברהם מדינה', 'Avraham Medina', 'medina', 'u-nakash-avrahumi', ['avrahumi-medina']],
   ['aharon-gueta', 'אהרון גואטה', 'Aharon Gueta', 'אריק גואטה', 'Arik Gueta', 'medina', 'u-nakash-yoni', ['yoni-gueta', 'aharon-gueta']],
   ['hen-pazarkar', 'חן פזרקר', 'Hen Pazarkar', 'בן-חן פזרקר', 'Ben-Chen Pazarkar', 'haim', 'u-nakash-mor', ['mor-pazarkar', 'hen-pazarkar']],
+  ['zecharia-nakash', 'זכריה נקאש', 'Zecharia Nakash', 'זכריה (יחיא) נקאש', 'Zecharia (Yihya) Nakash', 'yehuda', 'u-nakash-root', ['margalit-nakash', 'zecharia-nakash']],
 ]) test(nameEn+' replaces the retired name on the same shared profile without losing its details or portrait',async()=>{
   const f=fixture();try{
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:oldName,nameEn:oldNameEn,firstName:oldName.split(' ')[0],lastName:oldName.split(' ').slice(1).join(' '),placeholder:true,extra:true,birthday:'2.3.1970',about:'פרטים קיימים',profileId:null,revision:'old-placeholder'}));
@@ -51,6 +52,7 @@ for (const [id, oldName, oldNameEn, name, nameEn, branch, unit, members] of [
     assert.equal(page.person.nameEn,nameEn);
     assert.equal(page.person.firstName,name.split(' ')[0]);
     assert.equal(page.person.lastName,name.split(' ').slice(1).join(' '));
+    if(id==='zecharia-nakash')for(const query of ['יחיא נקאש','זכריה נקאש','Yihya Nakash'])assert.equal(suggestPeople([page.person],query)[0]?.id,id);
     assert.notEqual(page.person.placeholder,true);
     assert.equal(page.person.birthday,'2.3.1970');
     assert.equal(page.person.about,'פרטים קיימים');

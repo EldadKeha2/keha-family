@@ -9,6 +9,11 @@
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
   const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const scopedViews=document.documentElement?.dataset?.nakashViews;
+  const nakashTree=String(document.documentElement?.dataset?.nakashHome||'').startsWith('/nakash/');
+  if(nakashTree){
+    const modes=document.querySelector('#treeView .tree-mode'),header=document.querySelector('.workspace-header');
+    if(modes&&header){modes.classList.add('tree-header-mode');header.append(modes);}
+  }
   const compactTreeYears=Boolean(document.documentElement?.dataset?.extendedKeha||document.documentElement?.dataset?.branchPortal||document.documentElement?.dataset?.shlomoKeha==='true');
   const adaptiveTreeLayout=Boolean(document.documentElement?.dataset?.branchPortal);
   if(scopedViews)for(const view of validViews)if(!scopedViews.split(' ').includes(view))validViews.delete(view);
@@ -422,7 +427,7 @@
 
     const roots=scopedViews?(window.FamilyExtendedKeha?.title?.()||data.units[data.root].people.map(id=>nameOf(data.people[id])).join(' · ')):I18n.t('יונה ושלמה');
     const branchesLabel=scopedViews?(I18n.isEnglish?'All the family · '+data.branches.length+' branches':'כל המשפחה · '+data.branches.length+' ענפים'):I18n.t('כל המשפחה · ששת הענפים');
-    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?branchesLabel:I18n.t('כל המשפחה · כל הדורות')):roots+' › '+I18n.branchName(branchFor(state.branch));
+    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?branchesLabel:I18n.t('כל המשפחה · כל הדורות')):(nakashTree?'':roots+' › ')+I18n.branchName(branchFor(state.branch));
     for(const [id,selected]of [['overviewButton',overview],['fullTreeButton',!overview]]){$(id).classList.toggle('selected',selected);$(id).setAttribute('aria-pressed',String(selected));}
     const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     $('treeHelpInline').textContent=phone?'':guidance;

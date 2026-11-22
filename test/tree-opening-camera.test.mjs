@@ -59,7 +59,11 @@ test('each additional family tree opens on its founding parents at a readable si
     assert.ok(bounds.width<=f.width-31,'Every founding partner fits across the viewport');
     assert.ok(bounds.height<=f.height-79,'Their complete cards stay visible');
     assert.ok(bounds.scale>0.4,'Large descendant trees do not shrink the opening to a miniature');
-    if(['haim','yehuda','medina','keha'].includes(site))assert.equal(f.document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,site);
+    if(['haim','yehuda','medina','keha'].includes(site)){
+      assert.equal(f.document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,site);
+      assert.equal(f.document.getElementById('treeBreadcrumb').textContent,f.data.branches.find(branch=>branch.id===site).title);
+      assert.ok(f.document.getElementById('overviewButton').closest('.workspace-header'));
+    }
   }
 });
 
@@ -98,6 +102,7 @@ test('the original family site retains its existing opening camera and overview'
     const f=fixture('original',{phone}),bounds=f.bounds('u-root');
     assert.equal(f.document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,'all');
     assert.equal(f.document.querySelectorAll('#treeNodes [data-open-branch]').length,6);
+    assert.ok(f.document.getElementById('overviewButton').closest('.tree-topline'));
     assert.ok(bounds.y<f.height/2,'The original founding parents stay above the overview branches');
     if(!phone)assert.equal(bounds.scale,0.7);
   }

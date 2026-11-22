@@ -2,10 +2,19 @@
   'use strict';
   const viewport=document.getElementById('treeViewport'),button=document.getElementById('treeFullscreenButton');
   if(!viewport||!button)return;
+  const caption=document.createElement('span');caption.className='tree-fullscreen-label';button.append(caption);
+  const exitButton=document.createElement('button');exitButton.type='button';exitButton.id='treeFullscreenExit';exitButton.hidden=true;
+  exitButton.setAttribute('aria-controls',viewport.id);
+  exitButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5"/></svg><span></span>';
+  viewport.append(exitButton);
   let active=false,hadNative=false,frame=null;
   const label=()=>window.FamilyI18n?.isEnglish?(active?'Exit fullscreen':'Fullscreen'):(active?'יציאה ממסך מלא':'מסך מלא');
   function refresh(){
     button.setAttribute('aria-label',label());button.title=label();button.setAttribute('aria-pressed',String(active));
+    caption.textContent=window.FamilyI18n?.isEnglish?(active?'Exit':'Fullscreen'):(active?'יציאה':'מסך מלא');
+    exitButton.hidden=!active;
+    const exitLabel=window.FamilyI18n?.isEnglish?'Exit fullscreen':'יציאה ממסך מלא';
+    exitButton.querySelector('span').textContent=exitLabel;exitButton.setAttribute('aria-label',exitLabel);
   }
   function fit(){
     if(frame!==null)cancelAnimationFrame(frame);
@@ -30,6 +39,7 @@
     try{Promise.resolve(viewport.requestFullscreen?.()).then(()=>{if(!active)leaveNative();}).catch(()=>{});}catch{}
   }
   button.addEventListener('click',()=>active?exit():enter());
+  exitButton.addEventListener('click',()=>exit());
   document.addEventListener('fullscreenchange',()=>{
     if(document.fullscreenElement===viewport){hadNative=true;fit();}
     else if(hadNative)exit();

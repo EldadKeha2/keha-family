@@ -20,11 +20,21 @@ const relationshipStyles = `<style>
   .person-partnership[data-partnership="former"]{color:#786d69}
   @media(max-width:700px){.tree-unit .tree-partnerships{top:calc(31px * var(--a11y-tree-scale,1))}}
 </style>`;
+const nakashTreeSelector = 'html[data-nakash-home]:not([data-extended-keha],[data-shlomo-keha],[data-branch-portal])';
 const layoutStyles = `<style>
+  ${nakashTreeSelector} .tree-header-mode{display:none}
+  ${nakashTreeSelector} body[data-active-view=tree] .tree-header-mode{display:flex;flex:0 0 auto}
+  ${nakashTreeSelector} body[data-active-view=tree] #workspaceSubtitle{display:none}
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles){grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr}
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles)>.home-tile{grid-column:auto}
   html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree .home-tile-arrow{display:none}
   @media(max-width:700px){
+    ${nakashTreeSelector} body[data-active-view=tree] .workspace-header{flex-wrap:nowrap;align-items:center;gap:6px;padding:12px 10px}
+    ${nakashTreeSelector} body[data-active-view=tree] .workspace-title{min-width:0;gap:5px}
+    ${nakashTreeSelector} body[data-active-view=tree] .workspace-title h2{font-size:calc(clamp(16px,4.4vw,20px) * var(--a11y-text-scale,1));white-space:nowrap}
+    ${nakashTreeSelector} body[data-active-view=tree] .workspace-title .section-diamond{font-size:20px}
+    ${nakashTreeSelector} .tree-header-mode{gap:1px;padding:2px;align-self:center}
+    ${nakashTreeSelector} .tree-header-mode button{min-height:36px;padding:5px 6px;font-size:calc(14px * var(--a11y-text-scale,1));white-space:nowrap}
     html[data-nakash-home] body[data-active-view=home] .page-shell>.site-header{grid-template-columns:28px 88px minmax(0,1fr) clamp(70px,21vw,88px);grid-template-areas:"menu preferences shortcuts brand";grid-template-rows:auto;row-gap:0}
     html[data-nakash-home] body[data-active-view=home] .site-header #homeLink{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;width:100%;max-width:100%;min-height:44px;gap:3px}
     html[data-nakash-home] body[data-active-view=home] .site-header #homeLink>span{display:block;min-width:0;width:100%;max-width:100%;text-align:center;white-space:normal}
@@ -36,6 +46,8 @@ const layoutStyles = `<style>
     html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree .home-tile-icon{width:42px;height:48px;flex-basis:42px}
     html[data-nakash-home] :is(#homeTiles,#mobileMenuTiles) .home-tile-tree .home-tile-icon svg{width:35px;height:35px}
   }
+  @media(max-width:370px){${nakashTreeSelector} body[data-active-view=tree] .workspace-title .section-diamond{display:none}${nakashTreeSelector} .tree-header-mode button{padding-inline:4px}}
+  ${nakashTreeSelector}[data-a11y-text] body[data-active-view=tree] .workspace-header{flex-wrap:wrap}
 </style>`;
 const standaloneScripts = new Set([
   'family-fallback.js', 'family-data.js', 'screensaver.js', 'family-ai.js',
@@ -98,6 +110,8 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
     .replace(/(<link rel="apple-touch-icon"[^>]+href=")[^"]+/, '$1' + appleIcon)
     .replace(/(href|src)="assets\/medallion\.svg"/g, '$1="' + logo + '.svg"')
     .replace(/((?:href|src)=")assets\//g, '$1/assets/')
+    .replace(/(src="\/assets\/app\.js)(?:\?[^\"]*)?"/, '$1?v=nakash-tree-header-v2"')
+    .replace(/(src="\/assets\/tree-fullscreen\.js)(?:\?[^\"]*)?"/, '$1?v=2"')
     .replace(/  <script src="(?:\/assets\/)?([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>\n/g,
       (tag, script) => standaloneScripts.has(script) ? '' : tag)
     .replace(/<button\b[^>]*id="homeMoreHint"[^>]*>.*?<\/button>\s*/s, '')

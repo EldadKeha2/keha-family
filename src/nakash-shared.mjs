@@ -4,6 +4,7 @@ import {normalizeSearch, searchNames} from '../public/assets/site-search-core.mj
 import {uid} from './http.mjs';
 
 const diagramCorrectionKey = 'nakash-confirmed-names-2026-11-21-v5';
+const fatherNameKey = 'nakash-zecharia-yihya-name-2026-11-22-v1';
 const diagramRetiredNames = {
   'doron-nir': ['דורון ניר', 'דורון נקאש', 'Doron Nir', 'Doron Nakash'],
   'alona-shai': ['אלונה', 'אלונה שי', 'אלונה נקאש', 'Alona', 'Alona Shai', 'Alona Nakash'],
@@ -87,6 +88,7 @@ export function initializeSharedNakash(state) {
     const identities = Object.fromEntries(state.rows('SELECT person_id, canonical_id FROM nakash_identities').map(row => [row.person_id, row.canonical_id]));
     const tree = createFamily(family);
     const correctDiagramNames = !state.rows('SELECT id FROM meta WHERE id=?', diagramCorrectionKey).length;
+    const updateFatherName = !state.rows('SELECT id FROM meta WHERE id=?', fatherNameKey).length;
     // Include historical free-name tags before resolving tree identities.
     for (const row of state.rows('SELECT person_id,data FROM nakash_profiles')) {
       const saved=JSON.parse(row.data);
@@ -130,6 +132,15 @@ export function initializeSharedNakash(state) {
         person.nameEn = p.englishName;
         nameChanged = true;
       }
+      if (updateFatherName && p.id === 'zecharia-nakash') {
+        if (person.name === 'זכריה נקאש') {
+          person.name = p.name;
+          const [firstName, ...rest] = p.name.split(' ');
+          Object.assign(person, {firstName, lastName:rest.join(' ')});
+          nameChanged = true;
+        }
+        if (person.nameEn === 'Zecharia Nakash') {person.nameEn = p.englishName;nameChanged = true;}
+      }
       if (nameChanged && !p.placeholder) delete person.placeholder;
       const aliases = [...new Set([...(person.aliases || []), p.name, p.englishName, ...(p.aliases || [])].filter(name => name && !retiredNames.includes(name)))];
       const nakashBranch = branchForPerson(tree, p.id);
@@ -161,6 +172,7 @@ export function initializeSharedNakash(state) {
       state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', migration, 'done');
     }
     if (correctDiagramNames) state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', diagramCorrectionKey, 'done');
+    if (updateFatherName) state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', fatherNameKey, 'done');
     state.peopleRevision = uid();
     state.peopleCache = null;
   });
