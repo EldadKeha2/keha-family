@@ -192,6 +192,8 @@
     toastTimer = setTimeout(() => {$('toast').hidden = true;}, action?20000:6000);
   }
   function renderBranches() {
+    const count=data.branches.length;
+    $('branchBar').style.setProperty('--branch-columns',String(count>3?Math.ceil(count/2):Math.max(1,count)));
     $('branchBar').innerHTML = I18n.html`<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + (searchBranch ? [...data.branches].sort((a,b) => Number(b.id===searchBranch)-Number(a.id===searchBranch)) : data.branches).map(b => `<button class="branch-chip${state.branch===b.id?' active':''}" data-branch="${b.id}" style="--branch-color:${b.color}" aria-pressed="${state.branch===b.id}"><span class="chip-dot"></span>${safe(I18n.branchName(b))}</button>`).join('');
   }
   function selectBranch(id) {
@@ -294,7 +296,7 @@
     const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
     const priorArea=treeViewportArea();
     const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(priorArea.cx-camera.x)/(camera.width*camera.scale),y:(priorArea.cy-camera.y)/(camera.height*camera.scale)}:null;
-    const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview';
+    const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview',sideOverview=phone&&overview&&data.branches.length>1;
     const rootId=state.branch==='all'?data.root:branchFor(state.branch).unit;
     const rootHistorySpace=!compactTreeYears&&!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
     const desktopOverview=!phone&&overview;
@@ -351,9 +353,15 @@
       }
     }
     let width,height;
-    if(phone&&overview&&!adaptiveTreeLayout){
-      width=520*textScale;height=(scopedViews&&data.branches.length<=4?570:740)*textScale;const root=data.units[data.root];positions.push({id:root.id,unit:root,x:260*textScale,y:45*textScale,width:174*textScale,depth:0});lines.push(`<path d="M${260*textScale} ${158*textScale}V${(scopedViews&&data.branches.length<=4?360:530)*textScale}"/>`);
-      data.branches.forEach((branch,index)=>{const x=(index%2===0?380:140)*textScale,y=(220+Math.floor(index/2)*170)*textScale,unit=data.units[branch.unit];positions.push({id:unit.id,unit,x,y,width:174*textScale,depth:1});lines.push(`<path d="M${260*textScale} ${y-30*textScale}H${x}V${y-10*textScale}"/>`);});
+    if(sideOverview){
+      // The shared phone overview alternates family units on either side of
+      // the parents: six branches make 3 + 3, five make 3 + 2, four make 2 + 2.
+      const columnWidth=Math.max(...data.branches.map(branch=>nodeWidth(data.units[branch.unit]))),centreGap=66*textScale,root=data.units[data.root];
+      width=2*columnWidth+centreGap+2*pad;height=740*textScale;
+      positions.push({id:root.id,unit:root,x:width/2,y:45*textScale,width:nodeWidth(root),depth:0});
+      data.branches.forEach((branch,index)=>{const unit=data.units[branch.unit],side=(index%2===0?1:-1)*(I18n.isEnglish?-1:1);
+        positions.push({id:unit.id,unit,x:width/2+side*(columnWidth+centreGap)/2,y:(220+Math.floor(index/2)*170)*textScale,width:nodeWidth(unit),depth:1});
+      });
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);height=Math.max(...positions.map(item=>item.y))+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
     camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.setProperty('--a11y-tree-scale',String(textScale));world.style.width=width+'px';world.style.height=height+'px';
     $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(unit.parentage==='adopted')label=`<span class="branch-label">${I18n.isEnglish?'Adopted son':'בן מאומץ'}</span>`;if(unit.parentage==='grandchild')label=`<span class="branch-label">${I18n.isEnglish?'Grandson · father under research':'נכד · האב בבירור'}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>inBranch(person,unit.branch)&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
@@ -371,7 +379,7 @@
         }
       }
     }
-    if(compactTreeYears){
+    if(compactTreeYears&&!sideOverview){
       // Text wrapping and browser font enlargement can make a generation taller
       // than its nominal row. Measure the rendered cards before drawing lines.
       const depths=[...new Set(positions.map(item=>item.depth))].sort((a,b)=>a-b);
@@ -388,17 +396,29 @@
       for(const connection of connections)connection.y=positions.find(item=>item.id===connection.id).y;
       height=Math.max(height,previousBottom+48*textScale);camera.height=height;world.style.height=height+'px';
     }
-    if(desktopOverview){
+    if(desktopOverview||sideOverview){
       const buttons=[...world.querySelectorAll('.branch-open')];
       if(buttons.length){
         // Keep every branch button below the tallest card, including memorial dates.
-        const captionTop=Math.max(...buttons.map(button=>button.offsetTop),...buttons.flatMap(button=>[...button.parentElement.querySelectorAll('.person-card')].map(card=>card.offsetHeight+14*textScale)));
+        const captionTop=Math.max(...buttons.map(button=>button.offsetTop||(phone?124:228)*textScale),...buttons.flatMap(button=>[...button.parentElement.querySelectorAll('.person-card')].map(card=>(card.offsetHeight||0)+14*textScale)));
         for(const button of buttons){
           button.style.top=captionTop+'px';
-          height=Math.max(height,button.parentElement.offsetTop+captionTop+button.offsetHeight+24*textScale);
+          height=Math.max(height,(button.parentElement.offsetTop||0)+captionTop+(button.offsetHeight||0)+24*textScale);
         }
         camera.height=height;world.style.height=height+'px';
       }
+    }
+    if(sideOverview){
+      // Reserve actual card and button heights before placing the next pair.
+      // Long names and enlarged text must not overlap the following row.
+      const bottom=item=>{const node=world.querySelector(`[data-unit="${treeUnitKey(item.id)}"]`),button=node.querySelector('.branch-open');return item.y+Math.max(node.offsetHeight||0,button?(parseFloat(button.style.top)||0)+(button.offsetHeight||0):0);};
+      let rowTop=Math.max(220*textScale,bottom(positions[0])+72*textScale);
+      for(let index=1;index<positions.length;index+=2){
+        const row=positions.slice(index,index+2);
+        for(const item of row){item.y=rowTop;world.querySelector(`[data-unit="${treeUnitKey(item.id)}"]`).style.top=rowTop+'px';}
+        rowTop=Math.max(...row.map(bottom))+72*textScale;
+      }
+      height=Math.max(...positions.map(bottom))+48*textScale;camera.height=height;world.style.height=height+'px';
     }
     const incomingAnchor=childId=>{
       const child=data.units[childId],position=positions.find(item=>item.id===childId);
@@ -409,6 +429,14 @@
       const display=child.displayPeople||child.people,slot=(display.indexOf(child.people[0])+.5)/display.length-.5;
       return position.x+(I18n.isEnglish?1:-1)*slot*position.width;
     };
+    if(sideOverview){
+      const root=positions[0],rootNode=world.querySelector(`[data-unit="${treeUnitKey(root.id)}"]`),start=root.y+(rootNode.offsetHeight||115*textScale)+12*textScale;
+      lines.push(`<path d="M${root.x} ${start}V${positions.at(-1).y-60*textScale}"/>`);
+      for(const item of positions.slice(1)){
+        const target=incomingAnchor(item.id),joint=item.y-60*textScale;
+        lines.push(`<path class="descendant-connector" data-child-unit="${safe(item.id)}" data-child-person="${safe(item.unit.people[0])}"${item.unit.parentage==='adopted'?' stroke-dasharray="6 5"':''} d="M${root.x} ${joint}H${target}V${item.y-7*textScale}"/>`);
+      }
+    }
     for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,parentRelationship,childUnits,depthStep=1,lane=0} of connections){
       const targets=childUnits.map(childId=>({unit:childId,person:data.units[childId].people[0],x:incomingAnchor(childId),y:positions.find(item=>item.id===childId).y}));
       const childCenters=targets.map(target=>target.x);

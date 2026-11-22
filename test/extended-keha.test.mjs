@@ -680,7 +680,10 @@ test('Shlomo’s mobile and desktop tree keep all six descendant branches, inclu
     assert.equal(document.querySelectorAll('#treeNodes [data-open-branch]').length,6);
     assert.equal(document.querySelector('#treeNodes [data-person="yehuda-nakash"]'),null);
     assert.ok(document.querySelector('#treeNodes [data-person="shlomo"]'));
-    if(phone)assert.equal(document.getElementById('treeWorld').style.height,'740px');
+    if(phone){
+      const lastRow=Math.max(...[...document.querySelectorAll('#treeNodes .tree-unit')].map(node=>parseFloat(node.style.top)));
+      assert.ok(parseFloat(document.getElementById('treeWorld').style.height)>lastRow+48,'The canvas includes the complete final row');
+    }
   }
 });
 

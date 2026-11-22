@@ -115,6 +115,34 @@ test('the original family site retains its family overview and uses the shared h
   }
 });
 
+test('phone family overviews balance six, five and four branches on the two sides without clipping later rows',()=>{
+  for(const [site,count,columns] of [['original',6,3],['shlomo',6,3],['zechariah',5,3],['nakash',4,2]])for(const text of [100,160]){
+    const f=fixture(site,{phone:true,text});
+    assert.equal(f.data.branches.length,count);
+    assert.equal(f.document.getElementById('branchBar').style.getPropertyValue('--branch-columns'),String(columns));
+    const root=f.bounds(f.data.root),sides={right:[],left:[]};
+    for(const branch of f.data.branches){
+      const bounds=f.bounds(branch.unit);
+      sides[bounds.x>root.x?'right':'left'].push(bounds);
+      assert.equal(f.document.querySelector('#treeConnectors [data-child-unit="'+branch.unit+'"]').dataset.childPerson,f.data.units[branch.unit].people[0]);
+    }
+    assert.equal(sides.right.length,Math.ceil(count/2));assert.equal(sides.left.length,Math.floor(count/2));
+    for(const side of Object.values(sides))for(let index=1;index<side.length;index++){
+      assert.ok(side[index].y-side[index].height/2>side[index-1].y+side[index-1].height/2,'Rows leave room below the previous family');
+    }
+    const worldHeight=parseFloat(f.document.getElementById('treeWorld').style.height);
+    for(const node of f.document.querySelectorAll('#treeNodes .tree-unit'))assert.ok(parseFloat(node.style.top)+node.offsetHeight<worldHeight,'Every family fits inside the pannable canvas');
+    if(site==='zechariah')assert.equal(f.document.querySelectorAll('#treeNodes [data-unit="u-saadia-kadya"] .person-card').length,1,'Kadya has no invented husband');
+    for(const branch of f.data.branches){
+      f.document.querySelector('#branchBar [data-branch="'+branch.id+'"]').click();f.flush();
+      assert.equal(f.document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,branch.id);
+      assert.equal(f.document.getElementById('treeViewport').dataset.overview,'false');
+      f.document.getElementById('overviewButton').click();f.flush();
+      assert.equal(f.document.querySelectorAll('#treeNodes [data-open-branch]').length,count,'The header restores all branches');
+    }
+  }
+});
+
 function cameraPosition(f){
   return /^translate\(([-\d.]+)px,([-\d.]+)px\) scale\(([-\d.]+)\)$/.exec(f.document.getElementById('treeWorld').style.transform).slice(1).map(Number);
 }
