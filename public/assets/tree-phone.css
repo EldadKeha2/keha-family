@@ -1,0 +1,33 @@
+/* Phone trees occupy one screen; only the family canvas moves under a gesture. */
+.tree-header-mode{display:none}
+body[data-active-view=tree] .workspace-header>.tree-header-mode{display:flex;flex:0 0 auto}
+html:not([data-nakash-home]) body[data-active-view=tree] #treeBreadcrumb{display:none}
+@media(max-width:700px){
+  body[data-active-view=tree]{position:fixed;inset:0;box-sizing:border-box;width:100%;height:100vh;height:100dvh;min-height:0;overflow:hidden;overscroll-behavior:none}
+  body[data-active-view=tree] .page-shell{box-sizing:border-box;display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
+  body[data-active-view=tree] .site-header{position:relative;flex:0 0 auto}
+  body[data-active-view=tree] #mainContent{display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow:hidden;padding-top:8px}
+  body[data-active-view=tree] .family-workspace{display:flex;flex-direction:column;flex:1 1 0;min-height:0;margin:0;overflow:hidden}
+  body[data-active-view=tree] .workspace-header{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:6px;padding:12px 10px}
+  body[data-active-view=tree] .workspace-title{min-width:0;gap:5px}
+  body[data-active-view=tree] .workspace-title h2{font-size:calc(clamp(16px,4.4vw,20px) * var(--a11y-text-scale,1));white-space:nowrap}
+  body[data-active-view=tree] .workspace-title .section-diamond{font-size:20px}
+  body[data-active-view=tree] .tree-header-mode{gap:1px;padding:2px;align-self:center}
+  body[data-active-view=tree] .tree-header-mode button{min-height:36px;padding:5px 6px;font-size:calc(14px * var(--a11y-text-scale,1));white-space:nowrap}
+  body[data-active-view=tree] :is(#workspaceSubtitle,.tree-topline){display:none}
+  body[data-active-view=tree] #branchBar{flex:0 0 auto;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;touch-action:pan-x}
+  body[data-active-view=tree] #branchBar .branch-chip{flex:0 0 auto}
+  body[data-active-view=tree] #treeView:not([hidden]){display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow:hidden}
+  body[data-active-view=tree] :is(.tree-topline,.tree-mobile-person-hint,#extendedKehaHub){flex-shrink:0}
+  body[data-active-view=tree] #treeViewport:not(.tree-is-fullscreen){flex:1 1 0;height:auto;min-height:0;max-height:none;overflow:hidden;touch-action:none;overscroll-behavior:none}
+  body[data-active-view=tree] .workspace-footer{display:none}
+  body[data-active-view=tree] .site-footer{flex:0 0 auto;padding:8px 0}
+  body[data-active-view=tree] .site-footer>:not(nav){display:none}
+  body[data-active-view=tree] .site-footer:not(:has(nav)){display:none}
+  body[data-active-view=tree] .site-footer>.family-extended-access{margin:0 auto;padding:0 4px}
+  body[data-active-view=tree] .site-footer>.branch-bar{flex-wrap:nowrap;margin:0;padding:0;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;touch-action:pan-x}
+  body[data-active-view=tree] .site-footer>.branch-bar .branch-chip{flex:0 0 auto}
+  html[data-extended-keha] body[data-active-view=tree][data-extended-branch=all] #extendedKehaHub{flex:1 1 0;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y}
+  html[data-a11y-text] body[data-active-view=tree] .workspace-header{flex-wrap:wrap}
+}
+@media(max-width:370px){body[data-active-view=tree] .workspace-title .section-diamond{display:none}body[data-active-view=tree] .tree-header-mode button{padding-inline:4px}}

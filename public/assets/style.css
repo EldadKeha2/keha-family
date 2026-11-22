@@ -95,6 +95,6 @@ html[dir=rtl] .tree-guide-countdown{transform-origin:right}
 .tree-unit[data-unit="u-root"] .person-age{order:4}
 
 @media(max-width:700px){
-  .tree-viewport[data-overview=true]{touch-action:pan-y;overscroll-behavior-y:auto}
+  .tree-viewport[data-overview=true]{touch-action:none;overscroll-behavior:contain}
   html[lang^=en] .tree-viewport .memorial-inline{display:none}
 }

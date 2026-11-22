@@ -16,14 +16,16 @@ const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'
 const portalSource=await readFile(new URL('../public/keha-extended/portal-tree.js',import.meta.url),'utf8');
 const parents={haim:'u-nakash-haim',yehuda:'u-nakash-yehuda',medina:'u-nakash-medina',keha:'u-root',nakash:'u-nakash-root',shlomo:'u-root',zechariah:'u-keha-zechariah','zechariah-tzadok':'u-kehat-zechariah-ben-tzadok',kehat:'u-keha-kehat'};
 
-function fixture(site,{phone=false,text=100,hash='#tree'}={}){
+function fixture(site,{phone=false,text=100,hash='#tree',viewportHeight}={}){
   const portal=['zechariah','zechariah-tzadok','kehat'].includes(site);
   const original=site==='original';
   const data=original?structuredClone(family):toOriginalFamilyData(portal?createBranchPortal(family,site):site==='shlomo'?createShlomoFamily(family):createFamily(family));
   const page=original?html:portal?branchPortalHTML(html,site):site==='shlomo'?shlomoKehaHTML(html):nakashHTML(html,site==='nakash'?'':site);
   const {document,window:dom}=parseHTML(page);
-  const viewport=document.getElementById('treeViewport'),width=phone?358:1100,height=phone?560:720;
+  const viewport=document.getElementById('treeViewport'),width=phone?358:1100,height=viewportHeight??(phone?560:720);
   Object.defineProperties(viewport,{clientWidth:{value:width},clientHeight:{value:height}});
+  viewport.setPointerCapture=()=>{};
+  viewport.getBoundingClientRect=()=>({left:0,top:0,width,height,right:width,bottom:height});
   Object.defineProperty(dom.HTMLElement.prototype,'offsetHeight',{configurable:true,get(){return this.classList?.contains('tree-unit')?(phone?180:300)*text/100:0;}});
   Object.defineProperty(dom.HTMLElement.prototype,'offsetTop',{configurable:true,get(){return parseFloat(this.style.top)||0;}});
   const listeners=new Map(),frames=[];
@@ -107,8 +109,65 @@ test('the original family site retains its existing opening camera and overview'
     const f=fixture('original',{phone}),bounds=f.bounds('u-root');
     assert.equal(f.document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,'all');
     assert.equal(f.document.querySelectorAll('#treeNodes [data-open-branch]').length,6);
-    assert.ok(f.document.getElementById('overviewButton').closest('.tree-topline'));
+    assert.ok(f.document.getElementById('overviewButton').closest('.workspace-header'));
     assert.ok(bounds.y<f.height/2,'The original founding parents stay above the overview branches');
     if(!phone)assert.equal(bounds.scale,0.7);
+  }
+});
+
+function cameraPosition(f){
+  return /^translate\(([-\d.]+)px,([-\d.]+)px\) scale\(([-\d.]+)\)$/.exec(f.document.getElementById('treeWorld').style.transform).slice(1).map(Number);
+}
+function pointer(f,type,{id=1,x=120,y=160,time=100}={}){
+  const event=new f.document.defaultView.Event(type,{bubbles:true,cancelable:true});
+  for(const [key,value]of Object.entries({pointerId:id,pointerType:'touch',button:0,clientX:x,clientY:y,timeStamp:time}))Object.defineProperty(event,key,{value});
+  f.document.getElementById('treeViewport').dispatchEvent(event);
+}
+
+test('phone swipes pan the original and public trees in both axes in overview and full-tree modes',()=>{
+  for(const site of ['original',...Object.keys(parents)])for(const mode of ['overviewButton','fullTreeButton']){
+    const f=fixture(site,{phone:true});f.document.getElementById(mode).click();f.flush();
+    const before=cameraPosition(f);
+    pointer(f,'pointerdown');pointer(f,'pointermove',{x:140,y:190,time:116});
+    const after=cameraPosition(f);
+    assert.ok(after[0]>before[0]+5,site+' pans horizontally in '+mode);
+    assert.ok(after[1]>before[1]+5,site+' pans vertically in '+mode);
+    assert.equal(after[2],before[2],'One-finger panning retains the scale');
+    pointer(f,'pointercancel');
+  }
+});
+
+test('a pinch can continue as a vertical one-finger drag in the phone overview',()=>{
+  for(const site of ['original','nakash','zechariah']){
+    const f=fixture(site,{phone:true}),before=cameraPosition(f);
+    pointer(f,'pointerdown',{x:100,y:160});pointer(f,'pointerdown',{id:2,x:180,y:160,time:108});
+    pointer(f,'pointermove',{id:2,x:210,y:160,time:124});
+    assert.ok(cameraPosition(f)[2]>before[2]);
+    pointer(f,'pointerup',{id:2,x:210,y:160,time:140});
+    const pinched=cameraPosition(f);
+    pointer(f,'pointermove',{x:100,y:190,time:156});
+    assert.ok(cameraPosition(f)[1]>pinched[1]+5,'The remaining finger keeps moving the tree vertically');
+    pointer(f,'pointercancel');
+  }
+});
+
+test('phone wheel scrolling moves the canvas and consumes the scroll while desktop scrolling stays native',()=>{
+  for(const phone of [true,false]){
+    const f=fixture('haim',{phone}),before=cameraPosition(f),event=new f.document.defaultView.Event('wheel',{cancelable:true});
+    Object.assign(event,{deltaX:15,deltaY:30,deltaMode:0});
+    f.document.getElementById('treeViewport').dispatchEvent(event);
+    const after=cameraPosition(f);
+    assert.equal(event.defaultPrevented,phone);
+    if(phone){assert.ok(after[0]<before[0]);assert.ok(after[1]<before[1]);}
+    else assert.deepEqual(after,before);
+  }
+});
+
+test('a short phone canvas keeps a positive scale when opening or fitting the tree',()=>{
+  for(const site of ['original','haim','zechariah']){
+    const f=fixture(site,{phone:true,viewportHeight:60});
+    assert.ok(cameraPosition(f)[2]>0,'A short viewport never flips the tree');
+    f.document.getElementById('fitButton').click();
+    assert.ok(cameraPosition(f)[2]>0,'Fit remains usable in a short viewport');
   }
 });
