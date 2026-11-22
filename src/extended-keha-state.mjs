@@ -41,6 +41,8 @@ export function initializeExtendedKeha(state) {
     const updateSaadiaName=!state.rows('SELECT id FROM meta WHERE id=?',saadiaNameMigration).length;
     const coupleSurnameMigration='extended-mordechai-dvora-keha-2026-11-22';
     const updateCoupleSurname=!state.rows('SELECT id FROM meta WHERE id=?',coupleSurnameMigration).length;
+    const aharonNameMigration='extended-aharon-hovshi-keha-2026-11-22';
+    const updateAharonName=!state.rows('SELECT id FROM meta WHERE id=?',aharonNameMigration).length;
     const registryMigration='extended-zechariah-ben-shalom-registry-2026-11-21-v1';
     const updateRegistry=!state.rows('SELECT id FROM meta WHERE id=?',registryMigration).length;
     const parentageNotes=new Set(['kehat-yaakov','kehat-yehudit','kehat-zechariah-ben-tzadok','kehat-amna','kehat-tziona','kehat-yaakov-yehudit']);
@@ -50,6 +52,14 @@ export function initializeExtendedKeha(state) {
       const person={...seed,birthday:'1.1.1111',extra:true,extendedKeha:true,profileId:null,revision:uid()};
       // Never replace an existing date, biography, portrait or name on deploy.
       state.sql.exec('INSERT OR IGNORE INTO people (id,data) VALUES (?,?)',seed.id,JSON.stringify(person));
+      if(updateAharonName&&seed.id==='saadia-aharon'){
+        const saved=state.person(state.sharedNakashIdentities[seed.id]||seed.id);
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',aharonNameMigration+':backup:'+saved.id,JSON.stringify(saved));
+        saved.aliases=[...new Set([...(saved.aliases||[]),saved.name,saved.nameEn,...seed.aliases].filter(alias=>alias&&alias!==seed.name&&alias!==seed.englishName))];
+        Object.assign(saved,{name:seed.name,firstName:'אהרון',lastName:'חובשי קהא',nameEn:seed.englishName,englishName:seed.englishName});
+        state.savePerson(saved);
+        state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',aharonNameMigration,'done');
+      }
       if(updateShlomo&&['kehat-shlomo','kehat-shlomo-sarah','kehat-esther'].includes(seed.id)){
         const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
         state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',shlomoMigration+':backup:'+seed.id,JSON.stringify(saved));

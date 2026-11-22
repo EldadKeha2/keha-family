@@ -47,6 +47,23 @@ test('the 1949 couple and the Tri household keep separate fathers, wives and con
   assert.match(j.researchNotes,/1936/);
   assert.match(BRANCH_PORTALS.zechariah.name,/בן שלום/);
 });
+test('Aharon Hovshi Keha keeps his existing profile, aliases and adoption when the saved name is updated',async()=>{
+  const f=fixture();
+  try{
+    const id='saadia-aharon',url='/keha-extended/zechariah/api/compat/api/people/'+id+'/page';
+    const before={id,name:'אהרון חובשי',lastName:'חובשי',nameEn:'Aharon Hovshi',aliases:['חובשי'],birthday:'1.1.1111',profileId:'family-portrait'};
+    f.database.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(id,JSON.stringify(before));
+    const person=(await f.json(url)).person;
+    assert.equal(person.name,'אהרון חובשי קהא');assert.equal(person.nameEn,'Aharon Hovshi Keha');
+    assert.equal(person.lastName,'חובשי קהא');assert.equal(person.profileId,before.profileId);
+    assert.ok(person.aliases.includes(before.name)&&person.aliases.includes('חובשי'));
+    const tree=createBranchPortal(family,'zechariah');
+    assert.equal(tree.units['u-saadia-aharon'].parentage,'adopted');
+    const saved=JSON.parse(f.database.prepare('SELECT data FROM people WHERE id=?').get(id).data);
+    saved.name='שם מאוחר';f.database.prepare('UPDATE people SET data=? WHERE id=?').run(JSON.stringify(saved),id);
+    f.restart();assert.equal((await f.json(url)).person.name,saved.name);
+  }finally{f.close();}
+});
 test('the registry identity migration reaches saved profiles once, backs them up and preserves portraits and memories',async()=>{
   const f=fixture();try{
     const before={id:'keha-zechariah',name:'זכריה קהא הבן',birthday:'1.1.1111',about:'זיכרון אישי',profileId:'our-portrait',deathDate:'2.7.1979'};

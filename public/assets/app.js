@@ -14,13 +14,14 @@
   const modes=document.querySelector('#treeView .tree-mode'),header=document.querySelector('.workspace-header');
   if(modes&&header){modes.classList.add('tree-header-mode');header.append(modes);}
   if(compactTreeYears)$('treeGuideButton')?.remove();
+  const phoneFamilies=window.FamilyExtendedKeha?.phoneFamilies;
   const adaptiveTreeLayout=Boolean(document.documentElement?.dataset?.branchPortal);
   if(scopedViews)for(const view of validViews)if(!scopedViews.split(' ').includes(view))validViews.delete(view);
   const searchBranch=document.documentElement?.dataset?.nakashSearchBranch;
   const searchFamilyOrder=(a,b)=>Number(Boolean(searchBranch)&&b.branch===searchBranch)-Number(Boolean(searchBranch)&&a.branch===searchBranch);
   const requestedView=location.hash.slice(1).split('/')[0];
   const initialTreeBranch=scopedViews&&data.branches.some(branch=>branch.id===searchBranch)?searchBranch:'all';
-  const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:initialTreeBranch, mode:initialTreeBranch==='all'?'overview':'branch', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
+  const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:initialTreeBranch, treeUnit:null, mode:initialTreeBranch==='all'?'overview':'branch', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
   const camera = {x:0,y:0,scale:1,width:0,height:0};
   let motionFrame=0,suppressClickUntil=0,treeRenderVersion=0,treeCameraApplied=false;
   const treeTextScale=()=>Math.max(1,Math.min(2,(Number(window.FamilyAccessibility?.getSettings?.().text)||100)/100));
@@ -191,12 +192,17 @@
     if(action){const button=document.createElement('button');button.textContent=action.label;button.addEventListener('click',action.run);$('toast').append(button);}
     toastTimer = setTimeout(() => {$('toast').hidden = true;}, action?20000:6000);
   }
+  const selectedTreeFamily=()=>phoneFamilies?.branches.find(branch=>branch.unit===state.treeUnit);
   function renderBranches() {
-    const count=data.branches.length;
+    const familyChips=isPhone()&&state.view==='tree'&&phoneFamilies;
+    const branches=familyChips?phoneFamilies.branches:searchBranch?[...data.branches].sort((a,b)=>Number(b.id===searchBranch)-Number(a.id===searchBranch)):data.branches;
+    const count=branches.length;
+    const active=b=>familyChips?state.branch===b.id&&(state.treeUnit||branchFor(state.branch)?.unit)===b.unit:state.branch===b.id;
     $('branchBar').style.setProperty('--branch-columns',String(count>3?Math.ceil(count/2):Math.max(1,count)));
-    $('branchBar').innerHTML = I18n.html`<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + (searchBranch ? [...data.branches].sort((a,b) => Number(b.id===searchBranch)-Number(a.id===searchBranch)) : data.branches).map(b => `<button class="branch-chip${state.branch===b.id?' active':''}" data-branch="${b.id}" style="--branch-color:${b.color}" aria-pressed="${state.branch===b.id}"><span class="chip-dot"></span>${safe(I18n.branchName(b))}</button>`).join('');
+    $('branchBar').innerHTML = I18n.html`<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + branches.map(b => `<button class="branch-chip${active(b)?' active':''}" data-branch="${b.id}"${familyChips?' data-tree-unit="'+safe(b.unit)+'"':''} style="--branch-color:${b.color}" aria-pressed="${active(b)}"><span class="chip-dot"></span>${safe(I18n.branchName(b))}</button>`).join('');
   }
-  function selectBranch(id) {
+  function selectBranch(id,unitId) {
+    state.treeUnit=unitId&&data.units[unitId]?.branch===id?unitId:null;
     $('searchResults').hidden=true;
     state.branch = id;
     if (id !== 'all') state.mode = 'branch';
@@ -211,8 +217,8 @@
     if($('mobileNavDialog').open)$('mobileNavDialog').close();
     state.view = view;
     if(scopedViews&&view==='tree'&&previous!==view){
-      state.branch=initialTreeBranch;state.mode=initialTreeBranch==='all'?'overview':'branch';renderBranches();
-    }
+      state.branch=initialTreeBranch;state.treeUnit=null;state.mode=initialTreeBranch==='all'?'overview':'branch';renderBranches();
+    }else if(phoneFamilies&&previous==='tree'&&view!==previous){renderBranches();}
     if (previous !== view) {state.query='';$('searchInput').value='';}
     $('searchResults').hidden = true;
     renderView({preserveGalleryState:!syncRoute});
@@ -290,14 +296,8 @@
     return `<svg class="tree-partnerships" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">${links}</svg>`+cards;
   }
 
-  function renderTree(preserveCamera=false) {
-    if(window.FamilyExtendedKeha?.renderTree(state))return;
-    window.FamilyTreeGuide?.hide();
-    const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
-    const priorArea=treeViewportArea();
-    const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(priorArea.cx-camera.x)/(camera.width*camera.scale),y:(priorArea.cy-camera.y)/(camera.height*camera.scale)}:null;
-    const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview',sideOverview=phone&&overview&&data.branches.length>1;
-    const rootId=state.branch==='all'?data.root:branchFor(state.branch).unit;
+  function layoutTree(rootId,phone,overview,textScale) {
+    const sideOverview=phone&&overview&&data.branches.length>1;
     const rootHistorySpace=!compactTreeYears&&!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
     const desktopOverview=!phone&&overview;
     const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?223:desktopOverview?303:372)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
@@ -363,8 +363,8 @@
         positions.push({id:unit.id,unit,x:width/2+side*(columnWidth+centreGap)/2,y:(220+Math.floor(index/2)*170)*textScale,width:nodeWidth(unit),depth:1});
       });
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);height=Math.max(...positions.map(item=>item.y))+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
-    camera.width=width;camera.height=height;const world=$('treeWorld');$('treeViewport').dataset.overview=String(overview);world.style.setProperty('--a11y-tree-scale',String(textScale));world.style.width=width+'px';world.style.height=height+'px';
-    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(unit.parentage==='adopted')label=`<span class="branch-label">${I18n.isEnglish?'Adopted son':'בן מאומץ'}</span>`;if(unit.parentage==='grandchild')label=`<span class="branch-label">${I18n.isEnglish?'Grandson · father under research':'נכד · האב בבירור'}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>inBranch(person,unit.branch)&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
+    const world=$('treeWorld');world.style.width=width+'px';world.style.height=height+'px';
+    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=(unit.id===rootId&&selectedTreeFamily())||branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(unit.parentage==='adopted')label=`<span class="branch-label">${I18n.isEnglish?'Adopted son':'בן מאומץ'}</span>`;if(unit.parentage==='grandchild')label=`<span class="branch-label">${I18n.isEnglish?'Grandson · father under research':'נכד · האב בבירור'}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>inBranch(person,unit.branch)&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
     let rootSpacingAdjustment=0,rootContentHeight=0;
     if(!phone&&rootHistorySpace){
       const rootElement=world.querySelector(`[data-unit="${treeUnitKey(rootId)}"]`),firstChild=positions.find(item=>item.depth===1);
@@ -375,7 +375,7 @@
         if(rootSpacingAdjustment){
           for(const item of positions)if(item.depth>0){item.y+=rootSpacingAdjustment;world.querySelector(`[data-unit="${treeUnitKey(item.id)}"]`).style.top=item.y+'px';}
           for(const connection of connections)if(connection.depth>0)connection.y+=rootSpacingAdjustment;
-          height+=rootSpacingAdjustment;camera.height=height;world.style.height=height+'px';
+          height+=rootSpacingAdjustment;world.style.height=height+'px';
         }
       }
     }
@@ -394,7 +394,7 @@
         previousBottom=Math.max(...row.map(item=>item.y+(world.querySelector(`[data-unit="${treeUnitKey(item.id)}"]`).offsetHeight||0)));
       }
       for(const connection of connections)connection.y=positions.find(item=>item.id===connection.id).y;
-      height=Math.max(height,previousBottom+48*textScale);camera.height=height;world.style.height=height+'px';
+      height=Math.max(height,previousBottom+48*textScale);world.style.height=height+'px';
     }
     if(desktopOverview||sideOverview){
       const buttons=[...world.querySelectorAll('.branch-open')];
@@ -405,7 +405,7 @@
           button.style.top=captionTop+'px';
           height=Math.max(height,(button.parentElement.offsetTop||0)+captionTop+(button.offsetHeight||0)+24*textScale);
         }
-        camera.height=height;world.style.height=height+'px';
+        world.style.height=height+'px';
       }
     }
     if(sideOverview){
@@ -418,7 +418,7 @@
         for(const item of row){item.y=rowTop;world.querySelector(`[data-unit="${treeUnitKey(item.id)}"]`).style.top=rowTop+'px';}
         rowTop=Math.max(...row.map(bottom))+72*textScale;
       }
-      height=Math.max(...positions.map(bottom))+48*textScale;camera.height=height;world.style.height=height+'px';
+      height=Math.max(...positions.map(bottom))+48*textScale;world.style.height=height+'px';
     }
     const incomingAnchor=childId=>{
       const child=data.units[childId],position=positions.find(item=>item.id===childId);
@@ -453,9 +453,29 @@
     }
     $('treeConnectors').setAttribute('width',width);$('treeConnectors').setAttribute('height',height);$('treeConnectors').innerHTML=lines.join('');
 
+    return {width,height,positions};
+  }
+
+  function renderTree(preserveCamera=false) {
+    if(window.FamilyExtendedKeha?.renderTree(state))return;
+    window.FamilyTreeGuide?.hide();
+    const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
+    const priorArea=treeViewportArea();
+    const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(priorArea.cx-camera.x)/(camera.width*camera.scale),y:(priorArea.cy-camera.y)/(camera.height*camera.scale)}:null;
+    const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview',desktopOverview=!phone&&overview;
+    const rootId=state.branch==='all'?data.root:state.treeUnit||branchFor(state.branch).unit;
+    const diamonds=Boolean(phone&&overview&&phoneFamilies);
+    viewport.toggleAttribute('data-family-diamonds',diamonds);
+    viewport.dataset.overview=String(overview);
+    const world=$('treeWorld');
+    world.style.setProperty('--a11y-tree-scale',String(textScale));
+    const layout=diamonds?phoneFamilies.layout({world,nodes:$('treeNodes'),connectors:$('treeConnectors'),viewportWidth:viewport.clientWidth,textScale,
+      personCard:(id,unit)=>personCardHTML(data.people[id],null,unit)}):layoutTree(rootId,phone,overview,textScale);
+    const {width,height,positions}=layout;
+    camera.width=width;camera.height=height;
     const roots=scopedViews?(window.FamilyExtendedKeha?.title?.()||data.units[data.root].people.map(id=>nameOf(data.people[id])).join(' · ')):I18n.t('יונה ושלמה');
     const branchesLabel=scopedViews?(I18n.isEnglish?'All the family · '+data.branches.length+' branches':'כל המשפחה · '+data.branches.length+' ענפים'):I18n.t('כל המשפחה · ששת הענפים');
-    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?branchesLabel:I18n.t('כל המשפחה · כל הדורות')):(nakashTree?'':roots+' › ')+I18n.branchName(branchFor(state.branch));
+    $('treeBreadcrumb').textContent=state.branch==='all'?(overview?branchesLabel:I18n.t('כל המשפחה · כל הדורות')):(nakashTree?'':roots+' › ')+I18n.branchName(selectedTreeFamily()||branchFor(state.branch));
     for(const [id,selected]of [['overviewButton',overview],['fullTreeButton',!overview]]){$(id).classList.toggle('selected',selected);$(id).setAttribute('aria-pressed',String(selected));}
     const guidance=overview?I18n.t('גררו ימינה ושמאלה בין הענפים'):I18n.t('גררו את העץ כדי לטייל בין הדורות · + להתקרבות');
     $('treeHelpInline').textContent=phone?'':guidance;
@@ -465,12 +485,14 @@
       const area=treeViewportArea();
       if(previous){
         camera.scale=previous.scale;camera.x=area.cx-previous.x*width*camera.scale;camera.y=area.cy-previous.y*height*camera.scale;clampCamera();
+      }else if(diamonds){
+        fitTree();
       }else if(scopedViews){
         let focus=positions.find(item=>item.id===rootId);
         // Retain older single ancestors above the founding parents, while
         // opening on the family itself even when its descendants are uneven.
-        while(focus.unit.people.length===1&&!focus.unit.siblingGroup&&children(focus.unit).length===1){
-          const next=positions.find(item=>item.id===children(focus.unit)[0]);
+        while(focus.unit.people.length===1&&!focus.unit.siblingGroup&&focus.unit.children.length===1){
+          const next=positions.find(item=>item.id===focus.unit.children[0]);
           if(!next)break;focus=next;
         }
         const element=world.querySelector(`[data-unit="${treeUnitKey(focus.id)}"]`);
@@ -512,7 +534,8 @@
   }
   function fitTree(){
     stopTreeMotion();const viewport=$('treeViewport'),phone=isPhone(),area=treeViewportArea(),desktopOverview=!phone&&state.branch==='all'&&state.mode==='overview';
-    const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/camera.width,(phone?area.height:viewport.clientHeight-(desktopOverview?24:75))/camera.height,desktopOverview?1:1.1);
+    const inset=viewport.hasAttribute('data-family-diamonds')?4:desktopOverview?28:30;
+    const fit=Math.min((viewport.clientWidth-inset)/camera.width,(phone?area.height:viewport.clientHeight-(desktopOverview?24:75))/camera.height,desktopOverview?1:1.1);
     camera.scale=phone?Math.max(.035,fit):fit;camera.x=area.cx-camera.width*camera.scale/2;
     camera.y=phone?area.top+(area.height-camera.height*camera.scale)/2:desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-camera.height*camera.scale)/2)):Math.max(12,(viewport.clientHeight-55-camera.height*camera.scale)/2);applyCamera();
   }
@@ -789,8 +812,8 @@
   document.addEventListener('click',event=>{
     const filter=event.target.closest('[data-person-media-filter]');if(filter){state.galleryFilter=filter.dataset.personMediaFilter;renderGallery(getMedia(data.people[state.currentPerson]));return;}
     const person=event.target.closest('[data-person]');if(person){openPerson(person.dataset.person);return;}
-    const branch=event.target.closest('[data-branch]');if(branch){selectBranch(branch.dataset.branch);return;}
-    const openBranch=event.target.closest('[data-open-branch]');if(openBranch){selectBranch(openBranch.dataset.openBranch);return;}
+    const branch=event.target.closest('[data-branch]');if(branch){selectBranch(branch.dataset.branch,branch.dataset.treeUnit);return;}
+    const openBranch=event.target.closest('[data-open-branch]');if(openBranch){selectBranch(openBranch.dataset.openBranch,openBranch.dataset.treeUnit);return;}
     const group=event.target.closest('[data-directory-group]');if(group){$('searchResults').hidden=true;state.directoryGroup=group.dataset.directoryGroup;state.query='';$('searchInput').value='';renderDirectory();return;}
     const view=event.target.closest('[data-view]');if(view){setView(view.dataset.view);return;}
     const search=event.target.closest('[data-search-person]');if(search){$('searchResults').hidden=true;$('searchInput').blur();openPerson(search.dataset.searchPerson);return;}
@@ -838,9 +861,12 @@
   window.visualViewport?.addEventListener('scroll',fitSearchResults);
   window.addEventListener('resize',fitSearchResults);
   $('searchInput').addEventListener('keydown',e=>{if(e.key==='Escape')$('searchResults').hidden=true;if(e.key==='Enter'){const first=$('searchResults').querySelector('[data-search-person]');if(first&&!$('searchResults').hidden)first.click();}});
-  $('homeLink').addEventListener('click',e=>{e.preventDefault();state.branch='all';state.mode='overview';state.query='';$('searchInput').value='';renderBranches();setView('home');});
-  $('overviewButton').addEventListener('click',()=>{state.branch='all';state.mode='overview';renderBranches();renderTree();});
-  $('fullTreeButton').addEventListener('click',()=>{state.mode=state.branch==='all'?'full':'branch';renderTree();});
+  $('homeLink').addEventListener('click',e=>{e.preventDefault();state.branch='all';state.treeUnit=null;state.mode='overview';state.query='';$('searchInput').value='';renderBranches();setView('home');});
+  $('overviewButton').addEventListener('click',()=>{state.branch='all';state.treeUnit=null;state.mode='overview';renderBranches();renderTree();});
+  $('fullTreeButton').addEventListener('click',()=>{
+    if(isPhone()&&phoneFamilies){state.branch='all';state.treeUnit=null;renderBranches();}
+    state.mode=state.branch==='all'?'full':'branch';renderTree();
+  });
   $('zoomIn').addEventListener('click',()=>zoom(1.2));$('zoomOut').addEventListener('click',()=>zoom(1/1.2));$('fitButton').addEventListener('click',fitTree);
   document.addEventListener('keydown',e=>{if($('lightbox').open){if(e.key==='ArrowRight')openPhoto(state.photoIndex+1);if(e.key==='ArrowLeft')openPhoto(state.photoIndex-1);}});
   $('personDialog').addEventListener('click',e=>{if(e.target===$('personDialog')){const r=$('personDialog').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('personDialog').close();}});
@@ -890,7 +916,7 @@
     if(e.key==='+'||e.key==='='){e.preventDefault();zoom(1.2);}else if(e.key==='-'){e.preventDefault();zoom(1/1.2);}else if(e.key==='0'){e.preventDefault();fitTree();}
     else if(e.key.startsWith('Arrow')){e.preventDefault();if(e.key==='ArrowLeft')camera.x+=50;if(e.key==='ArrowRight')camera.x-=50;if(e.key==='ArrowUp')camera.y+=50;if(e.key==='ArrowDown')camera.y-=50;applyCamera();}
   });
-  let resizeTimer,lastWidth=innerWidth,lastHeight=innerHeight;window.addEventListener('resize',()=>{if(innerWidth===lastWidth&&innerHeight===lastHeight)return;lastWidth=innerWidth;lastHeight=innerHeight;clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.view==='tree')renderTree();},120);});
+  let resizeTimer,lastWidth=innerWidth,lastHeight=innerHeight;window.addEventListener('resize',()=>{if(innerWidth===lastWidth&&innerHeight===lastHeight)return;lastWidth=innerWidth;lastHeight=innerHeight;clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.view==='tree'){if(phoneFamilies)renderBranches();renderTree();}},120);});
   window.addEventListener('family-media-changed',event=>{
     const result=event.detail,affected=result.people|| (result.person?{[result.person.id]:result.person}:{});
     if(result.affectedPersonIds){mediaDirty=true;for(const person of result.taggedPeople||[])if(person.extra&&!data.people[person.id])updatePersonUI(person.id,{...person,birthday:'1.1.1111'});}
@@ -904,7 +930,7 @@
   function simpleRoute(){const view=location.hash.slice(1).split('/')[0];if(['weddings','nostalgia'].includes(view))return;const target=validViews.has(view)?view:(!view?(isPhone()?'home':'tree'):null);if(target&&target!==state.view)setView(target,false);}
   window.addEventListener('hashchange',simpleRoute);window.addEventListener('popstate',simpleRoute);
   const routedBranch=()=>scopedViews&&location.hash.startsWith('#tree/')?location.hash.split('/')[1]:null;
-  const activateRoutedBranch=()=>{const branch=routedBranch();if(branchFor(branch)&&state.branch!==branch)selectBranch(branch);};
+  const activateRoutedBranch=()=>{const branch=routedBranch();const target=branchFor(branch);if(target&&(state.branch!==branch||(state.treeUnit&&state.treeUnit!==target.unit)))selectBranch(branch);};
   renderBranches();renderView();activateRoutedBranch();
   if(scopedViews){window.addEventListener('hashchange',activateRoutedBranch);window.addEventListener('popstate',activateRoutedBranch);}
   if(apiEnabled){

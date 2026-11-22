@@ -72,7 +72,7 @@ unit('yifat',[person('yifat','יפעת עופר','Yifat Ofer','f',{aliases:['י�
 unit('dagnit',[person('dagnit','דגנית קהא','Dagnit Keha','f',{...dead,about:'פסק הדין בתיק 1220-09 מציין את הלווייתה ברחובות ב־1.9.2008. זהו תאריך ההלוויה; תאריך הפטירה המדויק עדיין לא אומת.'})],[],'israel');
 unit('galit',[person('galit','גלית קהא','Galit Keha','f')],[],'israel');
 
-unit('aharon',[person('aharon','אהרון חובשי','Aharon Hovshi','m',{aliases:['אהרן חובשי','אהרון קהא'],about:'לפי המידע המשפחתי, התייתם ואומץ בידי זכריה קהא הבן. בהמשך חזר לשם המשפחה חובשי. הקשר לזכריה הוא קשר אימוץ; שמות הוריו הביולוגיים טרם נמסרו.'}),person('yona-hovshi','יונה חובשי','Yona Hovshi','f')],['shlomo-hovshi','tzvia','orly'],null,{parentage:'adopted'});
+unit('aharon',[person('aharon','אהרון חובשי קהא','Aharon Hovshi Keha','m',{aliases:['אהרון חובשי','אהרן חובשי','אהרון קהא','Aharon Hovshi'],about:'לפי המידע המשפחתי, התייתם ואומץ בידי זכריה קהא הבן. בהמשך חזר לשם המשפחה חובשי. הקשר לזכריה הוא קשר אימוץ; שמות הוריו הביולוגיים טרם נמסרו.'}),person('yona-hovshi','יונה חובשי','Yona Hovshi','f')],['shlomo-hovshi','tzvia','orly'],null,{parentage:'adopted'});
 for(const [key,name,en,gender] of [['shlomo-hovshi','שלמה חובשי','Shlomo Hovshi','m'],['tzvia','צביה חובשי','Tzvia Hovshi','f'],['orly','אורלי חובשי','Orly Hovshi','f']])unit(key,[person(key,name,en,gender)],[],'aharon');
 
 // Primary evidence: parents' column of marriage certificates H 100067 and

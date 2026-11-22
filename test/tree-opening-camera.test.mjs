@@ -16,13 +16,13 @@ const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'
 const portalSource=await readFile(new URL('../public/keha-extended/portal-tree.js',import.meta.url),'utf8');
 const parents={haim:'u-nakash-haim',yehuda:'u-nakash-yehuda',medina:'u-nakash-medina',keha:'u-root',nakash:'u-nakash-root',shlomo:'u-root',zechariah:'u-keha-zechariah','zechariah-tzadok':'u-kehat-zechariah-ben-tzadok',kehat:'u-keha-kehat'};
 
-function fixture(site,{phone=false,text=100,hash='#tree',viewportHeight}={}){
+function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportHeight,viewportWidth}={}){
   const portal=['zechariah','zechariah-tzadok','kehat'].includes(site);
   const original=site==='original';
   const data=original?structuredClone(family):toOriginalFamilyData(portal?createBranchPortal(family,site):site==='shlomo'?createShlomoFamily(family):createFamily(family));
   const page=original?html:portal?branchPortalHTML(html,site):site==='shlomo'?shlomoKehaHTML(html):nakashHTML(html,site==='nakash'?'':site);
   const {document,window:dom}=parseHTML(page);
-  const viewport=document.getElementById('treeViewport'),width=phone?358:1100,height=viewportHeight??(phone?560:720);
+  const viewport=document.getElementById('treeViewport'),width=viewportWidth??(phone?358:1100),height=viewportHeight??(phone?560:720);
   Object.defineProperties(viewport,{clientWidth:{value:width},clientHeight:{value:height}});
   viewport.setPointerCapture=()=>{};
   viewport.getBoundingClientRect=()=>({left:0,top:0,width,height,right:width,bottom:height});
@@ -30,7 +30,7 @@ function fixture(site,{phone=false,text=100,hash='#tree',viewportHeight}={}){
   Object.defineProperty(dom.HTMLElement.prototype,'offsetTop',{configurable:true,get(){return parseFloat(this.style.top)||0;}});
   const listeners=new Map(),frames=[];
   const window={FAMILY_DATA:data,addEventListener(type,listener){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push(listener);},dispatchEvent(){},scrollTo(){},FamilyAccessibility:{getSettings:()=>({text})}};
-  window.FamilyI18n={isEnglish:false,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>p.name,branchName:b=>b?.title,searchNames:p=>p.name,date:v=>v};
+  window.FamilyI18n={isEnglish:english,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?p.nameEn:p.name,branchName:b=>english?b?.titleEn:b?.title,searchNames:p=>p.name,date:v=>v};
   window.FamilyDates={age:()=>null,parse:()=>null};
   const location={hash};
   const context=vm.createContext({window,document,location,performance,history:{pushState(state,title,next){location.hash=next;}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(callback){frames.push(callback);return frames.length;},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
@@ -57,7 +57,10 @@ function assertCentred(f,id){
 
 test('each additional family tree opens on its founding parents at a readable size on desktop and phone',()=>{
   for(const [site,id] of Object.entries(parents))for(const phone of [false,true])for(const text of [100,160]){
-    const f=fixture(site,{phone,text}),bounds=assertCentred(f,id);
+    const f=fixture(site,{phone,text});
+    if(site==='zechariah'&&phone)f.document.getElementById('fullTreeButton').click();
+    f.flush();
+    const bounds=assertCentred(f,id);
     assert.ok(bounds.width<=f.width-31,'Every founding partner fits across the viewport');
     assert.ok(bounds.height<=f.height-79,'Their complete cards stay visible');
     assert.ok(bounds.scale>0.4,'Large descendant trees do not shrink the opening to a miniature');
@@ -115,8 +118,8 @@ test('the original family site retains its family overview and uses the shared h
   }
 });
 
-test('phone family overviews balance six, five and four branches on the two sides without clipping later rows',()=>{
-  for(const [site,count,columns] of [['original',6,3],['shlomo',6,3],['zechariah',5,3],['nakash',4,2]])for(const text of [100,160]){
+test('phone family overviews balance six and four branches on the two sides without clipping later rows',()=>{
+  for(const [site,count,columns] of [['original',6,3],['shlomo',6,3],['nakash',4,2]])for(const text of [100,160]){
     const f=fixture(site,{phone:true,text});
     assert.equal(f.data.branches.length,count);
     assert.equal(f.document.getElementById('branchBar').style.getPropertyValue('--branch-columns'),String(columns));
@@ -132,7 +135,6 @@ test('phone family overviews balance six, five and four branches on the two side
     }
     const worldHeight=parseFloat(f.document.getElementById('treeWorld').style.height);
     for(const node of f.document.querySelectorAll('#treeNodes .tree-unit'))assert.ok(parseFloat(node.style.top)+node.offsetHeight<worldHeight,'Every family fits inside the pannable canvas');
-    if(site==='zechariah')assert.equal(f.document.querySelectorAll('#treeNodes [data-unit="u-saadia-kadya"] .person-card').length,1,'Kadya has no invented husband');
     for(const branch of f.data.branches){
       f.document.querySelector('#branchBar [data-branch="'+branch.id+'"]').click();f.flush();
       assert.equal(f.document.querySelector('#branchBar [aria-pressed="true"]').dataset.branch,branch.id);
@@ -140,6 +142,57 @@ test('phone family overviews balance six, five and four branches on the two side
       f.document.getElementById('overviewButton').click();f.flush();
       assert.equal(f.document.querySelectorAll('#treeNodes [data-open-branch]').length,count,'The header restores all branches');
     }
+  }
+});
+
+test('Zechariah’s phone overview opens with five distinct family diamonds, each linked to its own household',()=>{
+  const expected=[
+    ['kadya',"מש' קדיה מזרחי",'Kadya Mizrahi family','right'],
+    ['boaz',"מש' בועז קהא",'Boaz Keha family','left'],
+    ['saadia',"מש' סעדיה קהא",'Saadia Keha family','right'],
+    ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','left'],
+    ['shalom',"מש' שלום קהא",'Shalom Keha family','right'],
+  ];
+  for(const [viewportWidth,viewportHeight,text,english] of [[300,390,100,false],[358,560,100,false],[400,620,160,true]]){
+    const f=fixture('zechariah',{phone:true,viewportWidth,viewportHeight,text,english});
+    const nodes=f.document.getElementById('treeNodes');
+    const overview=()=>{f.document.getElementById('overviewButton').click();f.flush();};
+    const buttons=()=>[...nodes.querySelectorAll('.family-diamond')];
+    assert.deepEqual(buttons().map(b=>b.textContent),expected.map(row=>row[english?2:1]));
+    assert.equal(new Set(buttons().map(b=>b.parentElement.style.getPropertyValue('--branch-color'))).size,5);
+    assert.equal(nodes.querySelectorAll('[data-unit="u-saadia-kadya"] [data-person]').length,1);
+    assert.equal(nodes.querySelectorAll('[data-unit="u-saadia-aharon"] [data-person]').length,1);
+    const previous={};
+    for(const [key,he,en,side] of expected){
+      const id='u-saadia-'+key,card=f.bounds(id);
+      assert.equal(card.x>f.width/2?'right':'left',side);
+      assert.ok(card.x-card.width/2>=0&&card.x+card.width/2<=f.width);
+      assert.ok(card.y-card.height/2>=68&&card.y+card.height/2<=f.height-40);
+      assert.ok(!previous[side]||previous[side]<card.y-card.height/2);
+      previous[side]=card.y+card.height/2;
+      const path=f.document.querySelector('#treeConnectors [data-child-unit="'+id+'"]');
+      assert.equal(path.dataset.parentUnit,f.data.units[id].parent);
+      assert.equal(path.getAttribute('stroke-dasharray')!==null,key==='aharon');
+      nodes.querySelector('[data-tree-unit="'+id+'"]').click();f.flush();
+      const selected=f.document.querySelector('#branchBar [aria-pressed="true"]');
+      assert.equal(selected.dataset.treeUnit,id);
+      assert.equal(selected.textContent,english?en:he);
+      assertCentred(f,id);
+      for(const child of f.data.units[id].children)assert.ok(nodes.querySelector('[data-unit="'+child+'"]'));
+      if(key==='boaz'){
+        assert.equal(nodes.querySelector('[data-unit="u-saadia-dalia"]'),null);
+        assert.equal(nodes.querySelector('[data-unit="'+id+'"] .branch-label').textContent,english?en:he);
+        f.document.getElementById('fullTreeButton').click();f.flush();
+        assert.ok(nodes.querySelector('[data-unit="u-saadia-israel"]'));
+      }
+      if(key==='aharon')assert.ok(nodes.querySelector('[data-person="saadia-yona-hovshi"]'));
+      overview();
+    }
+    f.document.getElementById('fullTreeButton').click();f.flush();
+    assert.ok(nodes.querySelector('[data-unit="u-saadia-israel"]'));
+    assert.ok(nodes.querySelector('[data-unit="u-saadia-boaz"]'));
+    f.window.FamilyApp.setView('home');f.window.FamilyApp.setView('tree');f.flush();
+    assert.equal(buttons().length,5);
   }
 });
 

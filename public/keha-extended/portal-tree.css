@@ -49,3 +49,45 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
   html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon{width:34px;height:34px;flex:0 0 34px}
   html[data-branch-portal][data-a11y-text] .phone-home-intro h2{white-space:normal;text-wrap:balance}
 }
+
+@media(max-width:700px){
+  html[data-branch-portal=zechariah] body[data-active-view=tree]:has(#treeViewport[data-family-diamonds]) #branchBar{display:none}
+  #treeViewport[data-family-diamonds] .phone-family-card{
+    display:grid;grid-template-columns:repeat(var(--family-members),minmax(0,1fr));
+    align-items:start;justify-items:center;gap:2px 3px;
+  }
+  #treeViewport[data-family-diamonds] #treeNodes .person-card{width:100%;min-width:0;padding:0}
+  #treeViewport[data-family-diamonds] #treeNodes .person-card>:not(.person-open){display:none}
+  #treeViewport[data-family-diamonds] .person-open{width:100%;min-height:44px;gap:0;padding:0;align-items:center}
+  #treeViewport[data-family-diamonds] .portrait{
+    width:35px;height:39px;min-width:0;margin:2px 0 3px;padding:2px;
+    border-radius:20px 20px 5px 5px;box-shadow:0 0 0 1px var(--family-line);
+  }
+  #treeViewport[data-family-diamonds] .portrait .profile-photo{inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:inherit}
+  #treeViewport[data-family-diamonds] .portrait .silhouette{width:24px;height:28px;bottom:3px}
+  #treeViewport[data-family-diamonds] .portrait .portrait-letter{font-size:8px;bottom:3px}
+  #treeViewport[data-family-diamonds] .person-name{
+    max-width:100%;min-height:0;font:600 calc(.85rem * var(--a11y-text-scale,1))/1.16 var(--sans);
+    text-align:center;text-wrap:balance;
+  }
+  #treeViewport[data-family-diamonds] .memorial-inline{display:none}
+  #treeViewport[data-family-diamonds] .tree-unit[data-unit=u-root] .portrait{width:41px;height:45px}
+  #treeViewport[data-family-diamonds] .tree-unit[data-unit=u-root] .person-name{font-family:var(--serif);font-size:calc(.98rem * var(--a11y-text-scale,1))}
+  .family-diamond{
+    position:relative;isolation:isolate;grid-column:1/-1;display:grid;place-items:center;
+    width:100%;min-height:44px;padding:0 12%;border:0;background:transparent;
+    color:var(--branch-color);font:600 calc(.86rem * var(--a11y-text-scale,1))/1.15 var(--sans);
+    text-align:center;text-wrap:balance;
+  }
+  .family-diamond::before,.family-diamond::after{
+    content:'';position:absolute;inset:0;z-index:-1;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+    background:var(--branch-color);
+  }
+  .family-diamond::after{inset:1px 3px;background:color-mix(in srgb,var(--branch-color) 14%,#fffcf6)}
+  .family-diamond:hover::after,.family-diamond:focus-visible::after{background:color-mix(in srgb,var(--branch-color) 23%,#fffcf6)}
+  .family-diamond:focus-visible{outline:2px solid currentColor;outline-offset:1px}
+  html[lang^=en] .family-diamond,html[data-a11y-text] .family-diamond{min-height:3.8em;padding-inline:18%}
+  html[data-a11y-contrast] .family-diamond{color:CanvasText}
+  html[data-a11y-contrast] .family-diamond::before{background:CanvasText}
+  html[data-a11y-contrast] .family-diamond::after{background:Canvas}
+}
