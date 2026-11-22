@@ -77,14 +77,41 @@ function rebuildTrack(track,selections,movieDuration,movieTimescale,baseOffset,r
  const stbl=mp4Box('stbl',...tableBoxes),minf=mp4Box('minf',...track.minfs.map(b=>b.type==='stbl'?stbl:b.raw)),mdia=mp4Box('mdia',...track.mdias.map(b=>b.type==='minf'?minf:b.type==='mdhd'?setDuration(b,decodeDuration):b.raw));
  const output=track.children.filter(b=>b.type!=='edts').map(b=>b.type==='mdia'?mdia:b.type==='tkhd'?setDuration(b,movieDuration,true):b.raw);output.splice(1,0,mp4Box('edts',mp4Box('elst',elst)));return mp4Box('trak',...output);
 }
-export async function planMp4Clip(readRange,size,{start,end,remove=false}){
- if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end-start<.1-1e-9)throw new HttpError(400,'סמנו התחלה וסיום תקינים לקטע, באורך עשירית שנייה לפחות.');
+async function readMovie(readRange,size){
  let position=0,moov=null,ftyp=null;for(let i=0;i<64&&position<size;i++){
   const head=await readRange(position,Math.min(position+15,size-1));if(head.length<8)throw error();const v=view(head),small=v.getUint32(0),length=small===1?uint64(v,8):small||size-position,type=decoder.decode(head.subarray(4,8));if(length<8||position+length>size)throw error();
   if(type==='moov'||type==='ftyp'){if(length>MAX_METADATA)throw error();const raw=await readRange(position,position+length-1);if(raw.length!==length)throw error();if(type==='moov')moov=boxes(raw)[0];else ftyp=raw;}
   if(type==='moof')throw error();position+=length;if(moov&&ftyp)break;
  }
- if(!moov)throw error();const movie=boxes(moov.data);if(movie.some(b=>b.type==='mvex'))throw error();const mvhd=child(movie,'mvhd'),info=headerInfo(mvhd),duration=info.duration/info.timescale;
+ if(!moov)throw error();const movie=boxes(moov.data);if(movie.some(b=>b.type==='mvex'))throw error();const mvhd=child(movie,'mvhd'),info=headerInfo(mvhd);
+ return {movie,ftyp,mvhd,info};
+}
+
+// The upload wizard can inspect AVC sample headers using the same offsets as
+// the clip editor, including in movies whose index follows the media data.
+export async function mp4AvcSampleTables(readRange,size){
+ const {movie,info}=await readMovie(readRange,size);
+ const tracks=[];
+ for(const trak of movie.filter(box=>box.type==='trak')){
+  const mdia=child(boxes(trak.data),'mdia');
+  const handler=child(boxes(mdia.data),'hdlr');
+  if(decoder.decode(handler.data.subarray(8,12))!=='vide')continue;
+  const track=parseTrack(trak,info.timescale);
+  const stsd=child(track.tables,'stsd');
+  const entry=boxes(stsd.data.subarray(8))[track.description-1];
+  if(!entry||!['avc1','avc3'].includes(entry.type))continue;
+  const config=child(boxes(entry.data.subarray(78)),'avcC').data;
+  if(config.length<7||config[0]!==1)throw error();
+  const lengthBytes=1+(config[4]&3);
+  if(lengthBytes===3)throw error();
+  tracks.push({offsets:track.offsets,sizes:track.sizes,lengthBytes});
+ }
+ return tracks;
+}
+export async function planMp4Clip(readRange,size,{start,end,remove=false}){
+ if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end-start<.1-1e-9)throw new HttpError(400,'סמנו התחלה וסיום תקינים לקטע, באורך עשירית שנייה לפחות.');
+ let {movie,ftyp,mvhd,info}=await readMovie(readRange,size);
+ const duration=info.duration/info.timescale;
  if(!info.timescale||!Number.isFinite(duration)||end>duration+.05||start>=duration)throw new HttpError(400,'הקטע המסומן חורג ממשך הסרטון.');end=Math.min(end,duration);
  const tracks=movie.filter(b=>b.type==='trak').map(t=>parseTrack(t,info.timescale)).filter(Boolean);if(!tracks.some(t=>t.kind==='vide'))throw error();
  const retained=remove?[...(start>0?[{start:0,end:start}]:[]),...(end<duration?[{start:end,end:duration}]:[])]:[{start,end}];
