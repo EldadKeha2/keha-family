@@ -5,34 +5,35 @@ import {randomUUID} from 'node:crypto';
 import vm from 'node:vm';
 import {bindSegmentTimeline, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from '../public/assets/video-upload-segments.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
+import {bindUploadPreview} from '../public/assets/video-upload-preview.mjs';
 import {filenamePhotoDate} from '../public/assets/photo-upload-metadata.mjs';
 
 const source=(await readFile(new URL('../public/assets/video-upload-wizard.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function deferred(){let resolve,reject;const promise=new Promise((done,failed)=>{resolve=done;reject=failed;});return {promise,resolve,reject};}
-function fixture({finalize,categories,cut=prepareSegmentFile}={}){
- const nodes=new Map(),listeners=new Map(),events=new Map(),uploads=[],saves=[],changed=[],toasts=[];
+function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker}={}){
+ const nodes=new Map(),listeners=new Map(),events=new Map(),uploads=[],saves=[],changed=[],toasts=[],probes=[],urls=[],revoked=[];
  class Element{
-  constructor(tag='div'){this.tag=tag;this.tagName=tag.toUpperCase();this.dataset={};this.currentTime=0;this.style={setProperty(name,value){this[name]=value;}};this.value='';this.validity={};this.disabled=false;this.hidden=false;this.open=false;this.listeners=new Map();this.attributes=new Map();this.classes=new Set();this.captures=[];this.clientWidth=360;this.loadCount=0;this.classList={toggle:(name,on)=>on?this.classes.add(name):this.classes.delete(name),add:name=>this.classes.add(name),remove:name=>this.classes.delete(name)};}
+  constructor(tag='div'){this.tag=tag;this.tagName=tag.toUpperCase();this.dataset={};this.currentTime=0;this.style={setProperty(name,value){this[name]=value;}};this.value='';this.validity={};this.disabled=false;this.hidden=false;this.open=false;this.listeners=new Map();this.attributes=new Map();this.classes=new Set();this.captures=[];this.clientWidth=360;this.loadCount=0;this.paused=true;this.pauseCount=0;this.classList={toggle:(name,on)=>on?this.classes.add(name):this.classes.delete(name),add:name=>this.classes.add(name),remove:name=>this.classes.delete(name)};}
   set innerHTML(value){this.html=value;for(const [,tag,attrs,id]of value.matchAll(/<(\w+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)){const child=new Element(tag);child.id=id;child.parent=this;child.field=attrs.includes('data-video-draft-field');child.boundary=attrs.includes('data-video-boundary');nodes.set(id,child);}}
   get innerHTML(){return this.html||'';}
   setAttribute(name,value){this.attributes.set(name,value);}
   removeAttribute(name){this.attributes.delete(name);}
-  addEventListener(type,fn){this.listeners.set(type,fn);}
+  addEventListener(type,fn){const previous=this.listeners.get(type);this.listeners.set(type,previous?event=>{previous(event);return fn(event);}:fn);}
   closest(selector){return selector.split(',').some(part=>part===this.tag||this.tag==='button'&&part.startsWith('button'))?this:null;}
   getBoundingClientRect(){return {left:0,top:0,right:360,bottom:240,width:360,height:240};}
   setPointerCapture(id){this.captures.push(id);}
   querySelectorAll(selector){return [...nodes.values()].filter(node=>node.parent===this&&(selector==='[data-video-draft-field]'?node.field:selector==='[data-video-boundary]'?node.boundary:['input','textarea','select','button'].includes(node.tag)));}
   showModal(){this.open=true;}
   close(){this.open=false;this.listeners.get('close')?.();}
-  pause(){} load(){this.loadCount++;} replaceChildren(){} blur(){} focus(){this.focused=true;}
+  canPlayType(){return 'probably';} play(){this.paused=false;this.listeners.get('play')?.();return Promise.resolve();} pause(){this.paused=true;this.pauseCount++;this.listeners.get('pause')?.();} load(){this.loadCount++;} replaceChildren(){} blur(){} focus(){this.focused=true;}
   click(){assert.equal(this.disabled,false,'clicked control is enabled');return this.listeners.get('click')?.();}
  }
- const document={getElementById:id=>nodes.get(id),createElement:tag=>new Element(tag),addEventListener:(name,fn)=>events.set(name,fn),body:{append(node){nodes.set(node.id,node);}}};
+ const document={getElementById:id=>nodes.get(id),createElement:tag=>{const node=new Element(tag);if(tag==='video')probes.push(node);return node;},addEventListener:(name,fn)=>events.set(name,fn),body:{append(node){nodes.set(node.id,node);}}};
  const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String,seconds:text=>String(text).trim()?String(text).split(':').reduce((v,part)=>v*60+Number(part),0):NaN},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
  window.FamilyNostalgia.uploadEventLabel=event=>event.name;
- const context=vm.createContext({window,document,videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:()=>'/local-preview',revokeObjectURL(){}},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
+ const context=vm.createContext({window,document,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
  vm.runInContext(swipeSource,context);vm.runInContext(source,context);
  const upload=(file,progress,target)=>{const pending=deferred();uploads.push({file,progress,target,...pending});return pending.promise;};
  const prepare=(names=['first.mp4','second.mp4'],options={})=>window.FamilyVideoUpload.prepare(names.map(name=>typeof name==='string'?{name,type:'video/mp4',size:500}:name),{scope:'nostalgia',eventId:'original-event',upload,...options});
@@ -49,7 +50,7 @@ function fixture({finalize,categories,cut=prepareSegmentFile}={}){
   if(stream!=='pointer')touch('touchend',160+dx,y+2);
  };
  const clip=new Element('dialog');nodes.set('videoClipEditor',clip);
- return {get,prepare,uploads,saves,changed,toasts,listeners,result,window,document,Element,events,pointer,touch,stroke,clip};
+ return {get,prepare,uploads,saves,changed,toasts,probes,urls,revoked,listeners,result,window,document,Element,events,pointer,touch,stroke,clip};
 }
 
 test('closing a saving wizard keeps the entire batch running with the original destination and a reopenable progress control',async()=>{
@@ -281,4 +282,68 @@ test('upload through a time selects complete segments by their end on the source
  const rest=f.get('SaveAll').click();await waitForUpload(f,3);f.uploads[2].resolve(f.result(2));await rest;
  assert.equal(f.saves[2].data.metadata.name,'Part 1');assert.equal(f.get('Done').hidden,false);
  f.get('Done').click();await done;
+});
+
+test('late metadata keeps a playing segment at its playhead; changing segments deliberately seeks', async () => {
+ const f=fixture(), done=f.prepare(['tape.mp4']);
+ openSegments(f); boundary(f,'EndTime','5');
+ const player=f.get('Player');
+ await player.play(); player.currentTime=2.5;
+ const pauses=player.pauseCount;
+ await player.onloadedmetadata();
+ assert.equal(player.currentTime,2.5); assert.equal(player.pauseCount,pauses);
+ f.get('Next').click();
+ assert.equal(player.paused,true); assert.equal(player.currentTime,5);
+ f.get('Close').click(); await done;
+});
+
+test('a lightweight copy keeps original time, tags and source for both segment export and the full upload', async () => {
+ const original=new File(['high quality'],'source.mp4',{type:'video/mp4'});
+ const light=new File(['light'],'preview.webm',{type:'video/webm'});
+ const cuts=[];
+ const worker={postMessage(message){this.input=message.file;},terminate(){this.stopped=true;}};
+ const f=fixture({previewWorker:()=>worker,cut:async options=>{cuts.push(options);return new File(['export'],'segment.mp4');}});
+ const done=f.prepare([original]); openSegments(f); boundary(f,'StartTime','1');boundary(f,'EndTime','4');
+ f.get('Caption').value='Birthday';tagName(f,'Grandmother');
+ f.get('PreviewMode').click();
+ assert.equal(worker.input,original);
+ worker.onmessage({data:{percent:30}});assert.equal(f.get('PreviewProgress').value,30);
+ f.get('Player').currentTime=2.75;
+ worker.onmessage({data:{file:light}});
+ const probe=f.probes.at(-1);probe.duration=8.05;probe.videoWidth=240;probe.onloadedmetadata();await tick();
+ assert.equal(worker.stopped,true);assert.equal(f.urls.at(-1),light);
+ const player=f.get('Player');player.duration=8.05;player.currentTime=0;await player.onloadedmetadata();
+ assert.equal(player.currentTime,2.75);assert.equal(f.get('EndSlider').max,8);
+ f.get('Next').click();f.get('Previous').click();
+ assert.equal(f.get('Caption').value,'Birthday');assert.equal(f.urls.at(-1),light);
+ const part=f.get('SaveCurrent').click();await waitForUpload(f,1);
+ assert.equal(cuts[0].file,original);assert.deepEqual({...cuts[0].range},{start:1,end:4});
+ assert.deepEqual(f.uploads[0].file.name,'segment.mp4');
+ f.uploads[0].resolve(f.result(0));await part;
+ assert.deepEqual(f.saves[0].data.metadata.people,[{name:'Grandmother'}]);
+ f.get('Split').click();const full=f.get('SaveCurrent').click();await waitForUpload(f,2);
+ assert.equal(f.uploads[1].file,original);f.uploads[1].resolve(f.result(1));await full;await done;
+ assert.equal(f.revoked.length,f.urls.length);
+});
+
+test('a manual preview must match the source, and a canceled conversion cannot replace the next video', async () => {
+ const worker={postMessage(){},terminate(){this.stopped=true;}};
+ const f=fixture({previewWorker:()=>worker}),done=f.prepare(['a.mp4','b.mp4']);
+ const player=f.get('Player'),field=f.get('PreviewFile');
+ player.duration=90;await player.onloadedmetadata();
+ const originalUrl=player.src;
+ function choose(duration) {
+  field.files=[new File(['copy'],'copy.mp4',{type:'video/mp4'})];field.listeners.get('change')();
+  const probe=f.probes.at(-1);probe.videoWidth=320;probe.duration=duration;probe.onloadedmetadata();
+ }
+ choose(83);await tick();
+ assert.equal(player.src,originalUrl);assert.match(f.get('PreviewStatus').textContent,/משך העותק שונה/);
+ choose(90.04);await tick();assert.notEqual(player.src,originalUrl);
+ assert.equal(f.get('PreviewMode').attributes.get('aria-pressed'),'true');
+ f.get('PreviewMode').click(); assert.equal(f.get('PreviewMode').attributes.get('aria-pressed'),'false');
+ f.get('Next').click();f.get('PreviewMode').click();f.get('Previous').click();
+ assert.equal(worker.stopped,true);const active=player.src;
+ worker.onmessage({data:{file:new File(['stale'],'stale.mp4')}});await tick();
+ assert.equal(player.src,active);
+ f.get('Close').click();await done;assert.equal(f.revoked.length,f.urls.length);
 });

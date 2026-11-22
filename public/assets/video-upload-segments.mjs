@@ -54,7 +54,7 @@ export function segmentControlsHTML(tr) {
   </section>`;
 }
 
-export function bindSegmentTimeline({get, tr, editor, select, changed, saving}) {
+export function bindSegmentTimeline({get, tr, editor, select, changed, saving, seekTo, playbackError}) {
   const player = get('Player');
   const clock = time => editor.clock(Math.round(time * 100) / 100);
   const axes = [['Start','start'], ['End','end']];
@@ -64,7 +64,8 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving}) 
     if (!Number.isFinite(time)) return;
     preview = null;
     player.pause();
-    player.currentTime = Math.max(0,Math.min(drafts[index]?.duration ?? time,time));
+    const target = Math.max(0,Math.min(drafts[index]?.duration ?? time,time));
+    if (seekTo) seekTo(target); else player.currentTime = target;
   }
 
   function updatePlayhead() {
@@ -74,9 +75,6 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving}) 
     if (preview && player.currentTime >= preview.end) seek(preview.end);
   }
   player.addEventListener('timeupdate',updatePlayhead);
-  player.addEventListener('play',() => {
-    if (preview && Math.abs(player.currentTime - preview.start) > .12) preview = null;
-  });
   player.addEventListener('seeking',() => {
     if (preview && (player.currentTime < preview.start - .05 || player.currentTime > preview.end + .05)) preview = null;
   });
@@ -165,7 +163,8 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving}) 
 
   return {
     show(items, activeIndex) {
-      drafts = items; index = activeIndex; preview = null;
+      if (drafts[index] !== items[activeIndex]) preview = null;
+      drafts = items; index = activeIndex;
       get('Segments').hidden = !items.length;
       if (!items.length) return;
       get('SegmentList').innerHTML = items.map((draft,i) =>
@@ -177,7 +176,10 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving}) 
       const range = markedRange(drafts[index]);
       if (!range) return;
       seek(range.start); preview = range;
-      player.play()?.catch(() => { preview = null; });
+      player.play()?.catch(error => {
+        if (preview !== range) return;
+        preview = null; playbackError?.(error);
+      });
     }
   };
 }

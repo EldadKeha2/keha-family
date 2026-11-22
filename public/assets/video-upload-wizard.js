@@ -1,11 +1,12 @@
-import {bindSegmentTimeline, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs';
+import {bindSegmentTimeline, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=playback-1';
+import {bindUploadPreview} from './video-upload-preview.mjs';
 import {videoUploadMetadata} from './video-upload-metadata.mjs?v=categories-v1';
 import {filenamePhotoDate} from './photo-upload-metadata.mjs?v=4';
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
 const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isVideo=file=>/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name),queue=[];
 const uuid=()=>crypto.randomUUID().replaceAll('-','');
-let session=null,dialog=null,background=null,url=null,previewFile=null,searchSerial=0,swipe=null,timeline=null;
+let session=null,dialog=null,background=null,preview=null,renderedDraft=null,searchSerial=0,swipe=null,timeline=null;
 const get=id=>document.getElementById('videoUpload'+id),draft=()=>session?.drafts[session.index];
 function destinations(){return window.FamilyNostalgia?.uploadEvents?.()||[];}
 function collect(){const d=draft();if(!d||d.saved||d.frozen)return;d.metadata.name=get('Name').value;d.metadata.caption=get('Caption').value;d.metadata.date=Object.fromEntries(['day','month','year'].map(part=>[part,get('Date'+part).validity?.badInput?NaN:get('Date'+part).value===''?null:Number(get('Date'+part).value)]));if(session.options.scope==='videos')d.metadata.group=get('Target').value;}
@@ -46,7 +47,6 @@ function assignEvent(id,event){
  renderEventChoice();
  get('EventTrigger').focus();
 }
-function release(){previewFile=null;const player=get('Player');if(player){player.pause();player.removeAttribute('src');player.load();}if(url){URL.revokeObjectURL(url);url=null;}}
 function updateBackground(){
  if(!background)return;background.hidden=!session||dialog.open;if(!session)return;
  const marked=session.split?session.drafts.filter(markedRange):session.drafts;
@@ -126,27 +126,11 @@ function render(){
   get('Target').value=d.metadata.group||'family';
  }
  get('Search').value='';get('Results').replaceChildren();get('Error').textContent='';get('Status').textContent=d.saved?(split?tr('המקטע הועלה ✓','Segment uploaded ✓'):tr('הסרטון נשמר ✓','Video saved ✓')):d.uploaded?tr('הסרטון התקבל. אפשר לנסות שוב את שמירת הפרטים.','The video was received. You can retry saving its details.') :'';renderPeople();rangeText();
- const player=get('Player'),owner=session;
- const sameFile=previewFile===d.file;
- if(!sameFile){release();url=URL.createObjectURL(d.file);previewFile=d.file;player.src=url;}
- else player.pause();
- player.setAttribute('aria-label',tr('תצוגה מקדימה של הסרטון לפני ההעלאה','Video preview before upload'));
+ const changedFile=preview.open(d.file,d.duration),changedDraft=renderedDraft!==d;
+ renderedDraft=d;
  timeline.show(split?session.drafts:[],session.index);
- if(split&&sameFile)timeline.seekStart();
+ if(split&&changedDraft&&!changedFile)timeline.seekStart();
  get('Progress').hidden=true;locks();
- player.onloadedmetadata=async()=>{
-  const file=d.file;let duration=player.duration;
-  if(!Number.isFinite(duration)&&owner.singleVideo){
-   try{
-    const {segmentSourceDuration}=await import('./video-segment-file.mjs');
-    duration=await segmentSourceDuration(file);
-   }catch{return;}
-  }
-  if(session!==owner||previewFile!==file||!(Number.isFinite(duration)&&duration>0))return;
-  draft().duration=duration;if(owner.original)owner.original.duration=duration;
-  if(owner.split){timeline.show(owner.drafts,owner.index);timeline.seekStart();}
-  locks();
- };
  get('SaveAll').textContent=split?tr('העלאת כל המקטעים שסומנו','Upload all marked segments'):tr('שמירה והעלאה של הכול','Save and upload all');
  get('SaveCurrent').textContent=split?tr('שמירה והעלאת המקטע','Save and upload this segment'):tr('שמירה והעלאת סרטון זה','Save and upload this video');
 }
@@ -189,7 +173,7 @@ function navigate(direction){
  }
  goTo(index);
 }
-function finish(cancelled=false){const owner=session;timeline.show([],0);searchSerial++;release();dialog.close();session=null;updateBackground();owner.resolve(cancelled?[]:owner.rest);void next();}
+function finish(cancelled=false){const owner=session;timeline.show([],0);searchSerial++;preview.clear();renderedDraft=null;dialog.close();session=null;updateBackground();owner.resolve(cancelled?[]:owner.rest);void next();}
 function cancel(){
  if(!session)return;
  if(session.saving){minimize();return;}
@@ -202,8 +186,9 @@ function mount(){
  dialog.innerHTML=`<header class="photo-edit-header"><div class="photo-edit-heading"><span class="section-diamond photo-edit-emblem" aria-hidden="true">◇</span><h2 id="videoUploadTitle" aria-live="polite">${tr('אשף העלאת הסרטונים','Video Upload Wizard')}</h2></div><button type="button" id="videoUploadClose" class="photo-edit-close" aria-label="${tr('סגירת אשף העלאת הסרטונים','Close video upload wizard')}"><svg class="photo-edit-close-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 16 16M20 4 4 20"/></svg></button></header>
  <nav class="photo-edit-pager" aria-label="${tr('הסרטונים שנבחרו להעלאה','Videos selected for upload')}"><button type="button" id="videoUploadPrevious" class="secondary-button">${tr('הקודם','Previous')}</button><div><strong id="videoUploadCounter" aria-live="polite"></strong><span id="videoUploadFilename" dir="auto"></span></div><button type="button" id="videoUploadNext" class="secondary-button">${tr('הבא','Next')}</button></nav>
  <section class="photo-edit-metadata video-upload-metadata"><div class="photo-edit-date"><span class="photo-edit-date-label">${tr('תאריך צילום','Recording date')}</span><div class="photo-edit-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1910,new Date().getFullYear()]].map(([part,label,min,max])=>`<label>${label}<input id="videoUploadDate${part}" type="number" inputmode="numeric" min="${min}" max="${max}" placeholder="—" data-video-draft-field></label>`).join('')}<button type="button" id="videoUploadCopyDate" class="photo-edit-copy-date" aria-label="${tr('העתקת התאריך מהסרטון הקודם','Copy date from previous video')}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7 2v4m10-4v4M3 9h18m-10 4-3 3 3 3m-3-3h5a3 3 0 0 1 3 3"/></svg></button></div></div><label class="photo-edit-caption"><span id="videoUploadCaptionLabel" class="photo-edit-caption-label">${tr('תיאור הסרטון','Video description')}</span><textarea id="videoUploadCaption" dir="auto" rows="2" maxlength="5000" placeholder="${tr('לחצו כאן להקלדת תיאור...','Tap here to enter a description...')}" data-video-draft-field></textarea></label></section>
- <div id="videoUploadViewport" class="photo-edit-viewport video-upload-viewport"><video id="videoUploadPlayer" controls playsinline preload="metadata"></video></div>
+ <div id="videoUploadViewport" class="photo-edit-viewport video-upload-viewport"><video id="videoUploadPlayer" controls playsinline preload="auto" aria-label="${tr('תצוגה מקדימה של הסרטון לפני ההעלאה','Video preview before upload')}"></video></div>
  <div class="photo-edit-toolbar video-upload-toolbar"><button type="button" class="secondary-button" id="videoUploadEdit"><span id="videoUploadEditIcon"></span><span id="videoUploadEditLabel">${tr('עריכת הסרטון','Edit video')}</span></button><button type="button" class="secondary-button" id="videoUploadReset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6M12 8v4l3 2"/></svg><span>${tr('איפוס הקטע','Reset selection')}</span></button><button type="button" class="secondary-button" id="videoUploadSplit" aria-pressed="false" aria-controls="videoUploadSegments" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8.5 7.5 12 11M8.5 16.5 20.5 5"/></svg><span id="videoUploadSplitLabel"></span></button><span id="videoUploadRange" dir="auto"></span></div>
+ <div class="video-preview-tools"><button type="button" id="videoUploadPreviewMode" class="secondary-button" aria-pressed="false"></button><button type="button" id="videoUploadPreviewPick" class="video-preview-pick">${tr('בחירת עותק קל מהמכשיר','Choose a lightweight copy')}</button><input type="file" id="videoUploadPreviewFile" accept="video/*,.mp4,.m4v,.mov,.webm" hidden><progress id="videoUploadPreviewProgress" max="100" value="0" hidden aria-label="${tr('הכנת תצוגה קלה','Preparing lightweight preview')}"></progress><span id="videoUploadPreviewStatus" role="status" hidden></span></div>
  ${segmentControlsHTML(tr)}
  <div class="video-upload-details"><label><span id="videoUploadNameLabel"></span><input id="videoUploadName" maxlength="140" data-video-draft-field></label><label id="videoUploadTargetRow">${tr('תיקיית היעד','Destination folder')}<select id="videoUploadTarget" data-video-draft-field></select></label>
  <div id="videoUploadEventRow" hidden><label id="videoUploadEventLabel" for="videoUploadEventTrigger">${tr('שיוך לאירוע','Event assignment')}</label>
@@ -217,7 +202,15 @@ function mount(){
  <p id="videoUploadError" class="photo-edit-error" role="alert"></p><p id="videoUploadStatus" class="photo-edit-upload-status" role="status" aria-live="polite"></p><progress id="videoUploadProgress" max="100" value="0" hidden aria-label="${tr('התקדמות העלאת הסרטון','Video upload progress')}"></progress>
  <footer class="photo-edit-footer"><button type="button" id="videoUploadSaveCurrent" class="secondary-button"></button><button type="button" id="videoUploadSaveAll" class="primary-button"></button><button type="button" id="videoUploadRemove" class="photo-edit-remove">${tr('הסרת הסרטון מההעלאה','Remove video from upload')}</button><button type="button" id="videoUploadDone" class="secondary-button" hidden>${tr('סיום','Done')}</button></footer>`;
  document.body.append(dialog);
- timeline=bindSegmentTimeline({get,tr,editor:window.FamilyVideoEditor,select:goTo,saving:()=>Boolean(session?.saving),
+ preview=bindUploadPreview({get,tr,urls:URL,createProbe:()=>document.createElement('video'),
+  canResume:()=>dialog.open&&!session?.saving&&!document.getElementById('videoClipEditor')?.open,
+  onDuration:(file,duration)=>{
+   const d=draft();if(d?.file!==file)return;
+   d.duration=duration;if(session.original)session.original.duration=duration;
+   if(session.split)timeline.show(session.drafts,session.index);
+   locks();
+  }});
+ timeline=bindSegmentTimeline({get,tr,editor:window.FamilyVideoEditor,select:goTo,seekTo:preview.seek,playbackError:preview.playbackError,saving:()=>Boolean(session?.saving),
   changed:()=>{if(!session?.split)return;session.error=null;get('Error').textContent='';rangeText();locks();}});
  get('Split').addEventListener('click',toggleSplit);
  get('CutoffTime').addEventListener('input',locks);
@@ -236,9 +229,9 @@ function mount(){
   right:()=>{if(!get('Next').disabled)navigate(1);},left:()=>{if(!get('Previous').disabled)navigate(-1);}
  });
  get('CopyDate').addEventListener('click',()=>{collect();draft().metadata.date={...session.drafts[session.index-1].metadata.date};for(const part of ['day','month','year'])get('Date'+part).value=draft().metadata.date[part]||'';});
- get('Edit').addEventListener('click',async()=>{if(session.split){timeline.play();return;}collect();const d=draft(),owner=session;get('Player').pause();const selection=await window.FamilyVideoEditor.select(d.file,{scope:owner.options.scope,duration:d.duration,range:d.metadata.range,name:d.metadata.name});if(session!==owner||draft()!==d||!selection)return;d.metadata.range={start:selection.start,end:selection.end,...(selection.remove?{remove:true}:{})};d.metadata.name=selection.name;get('Name').value=selection.name;rangeText();});
+ get('Edit').addEventListener('click',async()=>{if(session.split){timeline.play();return;}collect();const d=draft(),owner=session;get('Player').pause();const selection=await window.FamilyVideoEditor.select(d.file,{previewFile:preview.displayFile(),scope:owner.options.scope,duration:d.duration,range:d.metadata.range,name:d.metadata.name});if(session!==owner||draft()!==d||!selection)return;d.metadata.range={start:selection.start,end:selection.end,...(selection.remove?{remove:true}:{})};d.metadata.name=selection.name;get('Name').value=selection.name;rangeText();});
  get('Reset').addEventListener('click',()=>{
-  if(session.split){collect();const segment=draft().segment;Object.assign(segment,{start:0,end:null,startText:null,endText:null});render();}
+  if(session.split){collect();const segment=draft().segment;Object.assign(segment,{start:0,end:null,startText:null,endText:null});render();timeline.seekStart();}
   else{draft().metadata.range=null;rangeText();}
  });get('SaveCurrent').addEventListener('click',()=>save(false));get('SaveAll').addEventListener('click',()=>save(true));
  get('Remove').addEventListener('click',()=>{if(session.saving)return;collect();session.drafts.splice(session.index,1);
@@ -290,6 +283,7 @@ async function save(all,cutoff){
    videoUploadMetadata(d.frozen?.metadata||d.metadata);
    if(!split&&d.file.size>maxMB*1024*1024)throw Error(tr('הסרטון גדול מהמגבלה: ','Video exceeds the limit: ')+maxMB+'MB');
   }
+  get('Player').pause();
   for(const index of indices){
    activeIndex=index;owner.index=index;owner.percent=0;owner.error=null;render();
    const d=draft();busy(true);get('Progress').value=0;
