@@ -261,3 +261,9 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 @media(pointer:coarse){
   #videoUploadEventTrigger,#videoUploadEventChoices button {min-height:44px}
 }
+
+#videoUploadWizard .video-preview-tools{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-block:0 5px;color:var(--ink,#453e33);font:13px/1.4 var(--sans)}
+#videoUploadWizard .video-preview-tools button{min-height:32px;padding:3px 9px;font:inherit}
+#videoUploadWizard .video-preview-pick{color:inherit;border:0;background:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+#videoUploadPreviewProgress{width:80px;accent-color:var(--green,#66734f)}
+#videoUploadWizard .video-preview-tools [hidden]{display:none}
