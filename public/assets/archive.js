@@ -258,7 +258,7 @@
       if(!files?.length)return;
     }
     if(files.some(file=>/^video\//i.test(file.type)||/\.(mp4|mov|webm|m4v)$/i.test(file.name))&&window.FamilyVideoUpload){
-      try{files=await window.FamilyVideoUpload.prepare(files,{scope:key,eventId,upload:(file,progress,target)=>sendFile(key,file,progress,target.eventId,target.uploadId),onSaved:result=>applyUploaded(key,result)});}catch(error){toast(error.message||I18n.t('אשף העלאת הסרטונים לא נטען.'));return;}
+      try{files=await window.FamilyVideoUpload.prepare(files,{scope:key,stageSources:window.FAMILY_CLOUD===true,eventId,upload:(file,progress,target)=>sendFile(key,file,progress,target.eventId,target.uploadId),onSaved:result=>applyUploaded(key,result)});}catch(error){toast(error.message||I18n.t('אשף העלאת הסרטונים לא נטען.'));return;}
       if(!files?.length)return;
     }
     const item=uploadStates.get(key);

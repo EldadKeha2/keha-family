@@ -6,6 +6,7 @@ import {NAKASH_WRITE_TOKEN,nakashShell} from './nakash-shell.mjs';
 import {extendedKehaRoute} from './extended-keha.mjs';
 import {HttpError,json,fail,text,uid,readJSON,boundedBody,checkOrigin,equal,stateFailure,sha256} from './http.mjs';
 import {configured,putObject,getObject,deleteObject} from './hf.mjs';
+import {videoSourceRoute,expireVideoSources} from './video-source-route.mjs';
 import {multipartVideo} from './video-multipart.mjs';
 import {videoClipRoute,videoEditRoute,videoUploadFinalize} from './video-clip-route.mjs';
 import {recycleRoute} from './recycle-route.mjs';
@@ -402,6 +403,7 @@ const worker = {
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1]),paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia',paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
+      if((match=/^\/api\/video-sources\/([a-f0-9]{64})\/play$/.exec(path))&&['GET','HEAD'].includes(request.method))return await videoSourceRoute(request,env,db,ctx,'play',sniff,match[1]);
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
         const scope=request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope');
         const access=scope?await db('content.media.authorize',{branch:scope,id:match[1],portrait:url.searchParams.get('portrait')}):null;
@@ -414,6 +416,7 @@ const worker = {
         return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/video-sources\/(start|part|status|complete|save|discard)$/.exec(path)))return await videoSourceRoute(request,env,db,ctx,match[1],sniff);
         if(path==='/api/voices/upload')return await uploadRecording(request,env,db,ctx,streamUpload);
         if((match=/^\/api\/voices\/([a-f0-9]{32})$/.exec(path)))return json(await db('recording.edit',{...await readJSON(request,40000),id:match[1]}));
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-assets\/(poster|faststart|low|medium)\/multipart\/(start|part|complete|abort)$/.exec(path)))return await multipartVideoAsset(request,env,db,ctx,{id:match[1],variant:match[2],action:match[3]});
@@ -493,6 +496,7 @@ const worker = {
     const db=client(env.FAMILY_STATE.get(env.FAMILY_STATE.idFromName('keha-family')));
     ctx.waitUntil(dispatchUpdates(env,db,controller.scheduledTime||Date.now()));
     ctx.waitUntil(familyAiTick(env,db,ctx));
+    ctx.waitUntil(expireVideoSources(env,db));
   }
 };
 export default worker;

@@ -217,7 +217,7 @@
       if(!approved?.length)return;
     }
     if(kind==='videos'&&window.FamilyVideoUpload){
-      try{approved=await window.FamilyVideoUpload.prepare(approved,{scope:kind,group,upload:(file,progress,target)=>uploadFile(kind,file,file.name,progress,target.group,target.uploadId),onSaved:result=>applyUploaded(kind,result)});}catch(error){notify(error.message||I18n.t('אשף העלאת הסרטונים לא נטען.'));return;}
+      try{approved=await window.FamilyVideoUpload.prepare(approved,{scope:kind,stageSources:window.FAMILY_CLOUD===true,group,upload:(file,progress,target)=>uploadFile(kind,file,file.name,progress,target.group,target.uploadId),onSaved:result=>applyUploaded(kind,result)});}catch(error){notify(error.message||I18n.t('אשף העלאת הסרטונים לא נטען.'));return;}
       if(!approved?.length)return;
     }
     // Only approved files enter the upload queue; saved media has no edit action.

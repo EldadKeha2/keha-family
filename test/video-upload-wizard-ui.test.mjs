@@ -33,7 +33,7 @@ function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker}={}){
  const document={getElementById:id=>nodes.get(id),createElement:tag=>{const node=new Element(tag);if(tag==='video')probes.push(node);return node;},addEventListener:(name,fn)=>events.set(name,fn),body:{append(node){nodes.set(node.id,node);}}};
  const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String,seconds:text=>String(text).trim()?String(text).split(':').reduce((v,part)=>v*60+Number(part),0):NaN},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
  window.FamilyNostalgia.uploadEventLabel=event=>event.name;
- const context=vm.createContext({window,document,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
+ const context=vm.createContext({window,document,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
  vm.runInContext(swipeSource,context);vm.runInContext(source,context);
  const upload=(file,progress,target)=>{const pending=deferred();uploads.push({file,progress,target,...pending});return pending.promise;};
  const prepare=(names=['first.mp4','second.mp4'],options={})=>window.FamilyVideoUpload.prepare(names.map(name=>typeof name==='string'?{name,type:'video/mp4',size:500}:name),{scope:'nostalgia',eventId:'original-event',upload,...options});
@@ -314,6 +314,7 @@ test('a lightweight copy keeps original time, tags and source for both segment e
  assert.equal(worker.stopped,true);assert.equal(f.urls.at(-1),light);
  const player=f.get('Player');player.duration=8.05;player.currentTime=0;await player.onloadedmetadata();
  assert.equal(player.currentTime,2.75);assert.equal(f.get('EndSlider').max,8);
+ f.get('PreviewPlay').click();assert.equal(player.paused,false);f.get('PreviewPlay').click();assert.equal(player.paused,true);
  f.get('Next').click();f.get('Previous').click();
  assert.equal(f.get('Caption').value,'Birthday');assert.equal(f.urls.at(-1),light);
  const part=f.get('SaveCurrent').click();await waitForUpload(f,1);
@@ -346,4 +347,28 @@ test('a manual preview must match the source, and a canceled conversion cannot r
  worker.onmessage({data:{file:new File(['stale'],'stale.mp4')}});await tick();
  assert.equal(player.src,active);
  f.get('Close').click();await done;assert.equal(f.revoked.length,f.urls.length);
+});
+
+test('the single original starts staging on selection, supplies remote playback and serves successive segment saves',async()=>{
+ const f=fixture(),original=new File(['original video'],'family.mp4',{type:'video/mp4'});
+ const transfer=deferred(),sources=[],publications=[];
+ function stage(file,{changed}){
+  const source={file,received:0,phase:'uploading',url:null,discard(){this.discarded=true;},
+   ensure(){return transfer.promise;},async save(record){publications.push(record);return {item:{id:record.mediaId}};}};
+  sources.push(source);source.refresh=()=>changed(source);return source;
+ }
+ const done=f.prepare([original],{stageSources:stage});
+ assert.equal(sources.length,1);assert.equal(f.get('SourcePanel').hidden,false);
+ const [source]=sources;
+ source.received=5;source.refresh();assert.match(f.get('SourceStatus').textContent,/התקבלו באתר/);
+ openSegments(f,8);boundary(f,'StartTime','1');boundary(f,'EndTime','3');
+ source.phase='ready';source.url='https://family.example/api/video-sources/test/play';transfer.resolve(source);source.refresh();
+ const player=f.get('Player');assert.equal(player.src,source.url);
+ f.get('SourcePlay').click();assert.equal(player.paused,false);
+ f.get('PreviewPlay').click();assert.equal(player.paused,true);
+ await f.get('SaveCurrent').click();
+ f.get('Next').click();boundary(f,'EndTime','6');await f.get('SaveCurrent').click();
+ assert.equal(publications.length,2);assert.deepEqual(publications.map(p=>({...p.metadata.range})),[{start:1,end:3},{start:3,end:6}]);
+ assert.equal(sources.length,1);assert.equal(f.uploads.length,0);
+ f.get('Done').click();await done;assert.equal(source.discarded,true);assert.ok(!f.revoked.includes(source.url));
 });

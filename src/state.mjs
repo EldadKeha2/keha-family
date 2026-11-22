@@ -12,6 +12,7 @@ import {VideoEdits,videoEditorPeople} from './video-edits.mjs';
 import {videoAssetsPublic,videoAssetsQueue,saveVideoAsset} from './video-assets-state.mjs';
 import {MEDIA_PUBLIC_BATCH_SIZE,mediaPublicMetadata} from './media-public-batch.mjs';
 import {collectionPage,collectionPageRevision} from './collection-pages.mjs';
+import {initVideoSources,videoSourceState} from './video-source-state.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection,weddingDate} from './weddings.mjs';
@@ -60,6 +61,7 @@ export class FamilyState {
     }
   }
   initialize(){
+    initVideoSources(this);
     this.sql.exec('CREATE TABLE IF NOT EXISTS people(id TEXT PRIMARY KEY,data TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS memorial_candles(person_id TEXT NOT NULL,period TEXT NOT NULL,visitor_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(person_id,period,visitor_id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS trivia_questions(id TEXT PRIMARY KEY,language TEXT NOT NULL,data TEXT NOT NULL,created_at TEXT NOT NULL)');
@@ -585,6 +587,7 @@ export class FamilyState {
     return {...cycle,count:row.n,lit};
   }
   run(action,p){
+    if(action.startsWith('video.source.'))return videoSourceState(this,action.slice(13),p);
     if(action.startsWith('content.'))return handleFamilyContent(this,action,p||{});
     if(p?.id && (action.startsWith('person') || ['profile','birthday','death.date'].includes(action)))p={...p,id:this.person(p.id).id};
     switch(action){

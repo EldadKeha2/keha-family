@@ -27,10 +27,33 @@ async function existingItem(db,session){
 const saved=async(db,session,status=201)=>json({saved:true,file:session.id+session.ext,collection:await db('collection',{kind:'nostalgia'})},status);
 async function objectExists(env,session,request){
   let response;
-  try{response=await getObject(env,mediaItem(session),new Request(request.url,{method:'HEAD'}));}
+  try{response=await getObject(env,{key:session.key,mime:session.mime,kind:'video'},new Request(request.url,{method:'HEAD'}));}
   catch(error){if(error.status===404)return false;throw error;}
   if(Number(response.headers.get('Content-Length'))!==session.size)throw new HttpError(502,'גודל הסרטון שנשמר אינו תואם למקור. נסו שוב.','VIDEO_SIZE_MISMATCH');
   return true;
+}
+
+export async function writeVideoPart(request,env,session,sniff){
+    const raw=request.headers.get('X-Upload-Part'),number=Number(raw),count=Math.ceil(session.size/VIDEO_PART_SIZE);
+    if(!/^[1-9][0-9]*$/.test(raw||'')||!Number.isInteger(number)||number>count)throw new HttpError(400,'מספר החלק אינו תקין.');
+    const expected=Math.min(VIDEO_PART_SIZE,session.size-(number-1)*VIDEO_PART_SIZE);
+    if(Number(request.headers.get('Content-Length'))!==expected)throw new HttpError(400,'גודל החלק אינו מתאים לסרטון.');
+    const bytes=await boundedBody(request,VIDEO_PART_SIZE);
+    if(bytes.byteLength!==expected)throw new HttpError(400,'החלק לא התקבל במלואו. נסו שוב.');
+    if(number===1){const format=sniff(new Uint8Array(bytes).subarray(0,128),true);if(format.ext!==session.ext||format.mime!==session.mime)throw new HttpError(415,'תחילת הקובץ אינה תואמת לסרטון שנבחר.');}
+    const etag=await uploadMultipartPart(env,session.key,session.uploadId,number,bytes);
+    return json({saved:true,part:number,etag});
+}
+
+export async function completeVideoObject(env,session,request){
+  // HEAD also recovers a successful storage completion whose database write or
+  // HTTP acknowledgement was interrupted; the same upload can be retried.
+  if(!await objectExists(env,session,request)){
+    const parts=(await listMultipartParts(env,session.key,session.uploadId)).sort((a,b)=>a.number-b.number),count=Math.ceil(session.size/VIDEO_PART_SIZE);
+    if(parts.length!==count||parts.some((part,index)=>part.number!==index+1||part.size!==Math.min(VIDEO_PART_SIZE,session.size-index*VIDEO_PART_SIZE)||typeof part.etag!=='string'||!part.etag.length))throw new HttpError(409,'הסרטון עדיין לא התקבל במלואו. נסו שוב.','VIDEO_INCOMPLETE');
+    await completeMultipartUpload(env,session.key,session.uploadId,parts);
+    if(!await objectExists(env,session,request))throw new HttpError(502,'הסרטון עדיין אינו זמין באחסון. נסו שוב.');
+  }
 }
 
 // Only the existing nostalgia write route calls this handler, after the same
@@ -52,17 +75,7 @@ export async function multipartVideo(request,env,db,ctx,{action,sniff,limit}){
   }
   const body=action==='part'?null:await readJSON(request,14000);
   const session=await readSession(env,action==='part'?request.headers.get('X-Upload-Session'):body.session,limit);
-  if(action==='part'){
-    const raw=request.headers.get('X-Upload-Part'),number=Number(raw),count=Math.ceil(session.size/VIDEO_PART_SIZE);
-    if(!/^[1-9][0-9]*$/.test(raw||'')||!Number.isInteger(number)||number>count)throw new HttpError(400,'מספר החלק אינו תקין.');
-    const expected=Math.min(VIDEO_PART_SIZE,session.size-(number-1)*VIDEO_PART_SIZE);
-    if(Number(request.headers.get('Content-Length'))!==expected)throw new HttpError(400,'גודל החלק אינו מתאים לסרטון.');
-    const bytes=await boundedBody(request,VIDEO_PART_SIZE);
-    if(bytes.byteLength!==expected)throw new HttpError(400,'החלק לא התקבל במלואו. נסו שוב.');
-    if(number===1){const format=sniff(new Uint8Array(bytes).subarray(0,128),true);if(format.ext!==session.ext||format.mime!==session.mime)throw new HttpError(415,'תחילת הקובץ אינה תואמת לסרטון שנבחר.');}
-    const etag=await uploadMultipartPart(env,session.key,session.uploadId,number,bytes);
-    return json({saved:true,part:number,etag});
-  }
+  if(action==='part')return writeVideoPart(request,env,session,sniff);
   const existing=await existingItem(db,session);
   if(action==='abort'){
     if(!existing)await abortMultipartUpload(env,session.key,session.uploadId);
@@ -70,14 +83,7 @@ export async function multipartVideo(request,env,db,ctx,{action,sniff,limit}){
   }
   if(action!=='complete')throw new HttpError(404,'הפעולה לא נמצאה.');
   if(existing)return saved(db,session,200);
-  // HEAD also recovers a successful storage completion whose database write or
-  // HTTP acknowledgement was interrupted; the same upload can be retried.
-  if(!await objectExists(env,session,request)){
-    const parts=(await listMultipartParts(env,session.key,session.uploadId)).sort((a,b)=>a.number-b.number),count=Math.ceil(session.size/VIDEO_PART_SIZE);
-    if(parts.length!==count||parts.some((part,index)=>part.number!==index+1||part.size!==Math.min(VIDEO_PART_SIZE,session.size-index*VIDEO_PART_SIZE)||typeof part.etag!=='string'||!part.etag.length))throw new HttpError(409,'הסרטון עדיין לא התקבל במלואו. נסו שוב.','VIDEO_INCOMPLETE');
-    await completeMultipartUpload(env,session.key,session.uploadId,parts);
-    if(!await objectExists(env,session,request))throw new HttpError(502,'הסרטון עדיין אינו זמין באחסון. נסו שוב.');
-  }
+  await completeVideoObject(env,session,request);
   try{await db('media.add',{item:mediaItem(session)});}
   catch(error){
     // Retain completed bytes after an uncertain state-service result. Another

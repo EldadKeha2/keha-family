@@ -1,5 +1,7 @@
 import {bindSegmentTimeline, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=playback-1';
-import {bindUploadPreview} from './video-upload-preview.mjs';
+import {bindUploadPreview} from './video-upload-preview.mjs?v=server-source-1';
+import {createVideoSource} from './video-source-upload.mjs';
+import {MAX_VIDEO_SOURCE_BYTES} from './video-source-limits.mjs';
 import {videoUploadMetadata} from './video-upload-metadata.mjs?v=categories-v1';
 import {filenamePhotoDate} from './photo-upload-metadata.mjs?v=4';
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
@@ -47,13 +49,46 @@ function assignEvent(id,event){
  renderEventChoice();
  get('EventTrigger').focus();
 }
+function sourceProgress(source) {
+ const mb=n=>Math.round(n/1024/1024).toLocaleString(I.isEnglish?'en-US':'he-IL');
+ const total=mb(source.file.size),received=mb(source.received);
+ if(source.phase==='failed')return tr('העלאת המקור נעצרה. ','Original upload stopped. ')+source.error;
+ if(source.phase==='ready')return tr('המקור התקבל באתר','Original received by the site')+' · '+total+' MiB';
+ if(source.phase==='assembling')return tr('כל החלקים התקבלו. מאחד את הסרטון באתר…','All parts received. Joining the video on the site…');
+ if(source.phase==='starting')return tr('מתחיל להעלות את קובץ המקור…','Starting the original upload…');
+ return tr('התקבלו באתר ','Received by the site ')+received+' / '+total+' MiB · '+Math.min(99,Math.floor(100*source.received/source.file.size))+'%';
+}
+function showSource(source) {
+ get('SourcePanel').hidden=!source;
+ if(!source)return;
+ const done=source.phase==='ready',active=!done&&source.phase!=='failed';
+ get('SourceStatus').textContent=sourceProgress(source);
+ get('SourceProgress').hidden=!active;get('SourceProgress').value=source.received/source.file.size*100;
+ get('SourceRetry').hidden=source.phase!=='failed';get('SourceMinimize').hidden=!active||session.saving;
+ get('SourcePlay').hidden=!done;
+ if(done)preview.provideRemote(source.file,source.url);
+ if(session.saving&&active){get('Progress').value=get('SourceProgress').value;session.percent=get('Progress').value;}
+ updateBackground();
+}
+function stageFor(owner,file) {
+ if(!owner.options.stageSources)return null;
+ let source=owner.sources.get(file);
+ if(source)return source;
+ const factory=typeof owner.options.stageSources==='function'?owner.options.stageSources:createVideoSource;
+ source=factory(file,{scope:owner.options.scope,request:(...args)=>I.fetch(...args),writeToken:window.FAMILY_API_TOKEN,tr,
+   changed:item=>{if(session===owner&&draft()?.file===item.file)showSource(item);}});
+ owner.sources.set(file,source);
+ void source.ensure().catch(()=>{});
+ return source;
+}
 function updateBackground(){
  if(!background)return;background.hidden=!session||dialog.open;if(!session)return;
  const marked=session.split?session.drafts.filter(markedRange):session.drafts;
  const completed=marked.filter(d=>d.saved).length,total=marked.length||1;
  const label=session.split?segmentLabel(draft()):tr('סרטון ','Video ')+(session.index+1)+tr(' מתוך ',' of ')+total;
- const status=session.error?tr('ההעלאה נעצרה — לחצו לניסיון נוסף','Upload paused — click to retry'):session.saving?label+' · '+(session.percent||0)+'%':session.split?tr('חזרה למקטעים','Return to segments'):tr('סרטונים ממתינים לשמירה','Videos waiting to be saved');
- get('BackgroundStatus').textContent=status;get('BackgroundProgress').value=(completed+(session.saving&&!draft().saved?(session.percent||0)/100:0))/total*100;
+ const stage=session.sources?.get(draft()?.file);
+ const status=!session.saving&&stage&&stage.phase!=='ready'?sourceProgress(stage):session.error?tr('ההעלאה נעצרה — לחצו לניסיון נוסף','Upload paused — click to retry'):session.saving?label+' · '+(session.percent||0)+'%':session.split?tr('חזרה למקטעים','Return to segments'):tr('סרטונים ממתינים לשמירה','Videos waiting to be saved');
+ get('BackgroundStatus').textContent=status;get('BackgroundProgress').value=stage&&!session.saving&&stage.phase!=='ready'?100*stage.received/stage.file.size:(completed+(session.saving&&!draft().saved?(session.percent||0)/100:0))/total*100;
  background.classList.toggle('has-error',Boolean(session.error));
 }
 function minimize(){if(!session)return;get('Player').pause();dialog.close();updateBackground();}
@@ -127,7 +162,7 @@ function render(){
  }
  get('Search').value='';get('Results').replaceChildren();get('Error').textContent='';get('Status').textContent=d.saved?(split?tr('המקטע הועלה ✓','Segment uploaded ✓'):tr('הסרטון נשמר ✓','Video saved ✓')):d.uploaded?tr('הסרטון התקבל. אפשר לנסות שוב את שמירת הפרטים.','The video was received. You can retry saving its details.') :'';renderPeople();rangeText();
  const changedFile=preview.open(d.file,d.duration),changedDraft=renderedDraft!==d;
- renderedDraft=d;
+ renderedDraft=d;showSource(stageFor(session,d.file));
  timeline.show(split?session.drafts:[],session.index);
  if(split&&changedDraft&&!changedFile)timeline.seekStart();
  get('Progress').hidden=true;locks();
@@ -173,7 +208,7 @@ function navigate(direction){
  }
  goTo(index);
 }
-function finish(cancelled=false){const owner=session;timeline.show([],0);searchSerial++;preview.clear();renderedDraft=null;dialog.close();session=null;updateBackground();owner.resolve(cancelled?[]:owner.rest);void next();}
+function finish(cancelled=false){const owner=session;timeline.show([],0);searchSerial++;for(const source of owner.sources.values())source.discard();preview.clear();renderedDraft=null;dialog.close();session=null;updateBackground();owner.resolve(cancelled?[]:owner.rest);void next();}
 function cancel(){
  if(!session)return;
  if(session.saving){minimize();return;}
@@ -188,7 +223,8 @@ function mount(){
  <section class="photo-edit-metadata video-upload-metadata"><div class="photo-edit-date"><span class="photo-edit-date-label">${tr('תאריך צילום','Recording date')}</span><div class="photo-edit-date-fields">${[['day',tr('יום','Day'),1,31],['month',tr('חודש','Month'),1,12],['year',tr('שנה','Year'),1910,new Date().getFullYear()]].map(([part,label,min,max])=>`<label>${label}<input id="videoUploadDate${part}" type="number" inputmode="numeric" min="${min}" max="${max}" placeholder="—" data-video-draft-field></label>`).join('')}<button type="button" id="videoUploadCopyDate" class="photo-edit-copy-date" aria-label="${tr('העתקת התאריך מהסרטון הקודם','Copy date from previous video')}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7 2v4m10-4v4M3 9h18m-10 4-3 3 3 3m-3-3h5a3 3 0 0 1 3 3"/></svg></button></div></div><label class="photo-edit-caption"><span id="videoUploadCaptionLabel" class="photo-edit-caption-label">${tr('תיאור הסרטון','Video description')}</span><textarea id="videoUploadCaption" dir="auto" rows="2" maxlength="5000" placeholder="${tr('לחצו כאן להקלדת תיאור...','Tap here to enter a description...')}" data-video-draft-field></textarea></label></section>
  <div id="videoUploadViewport" class="photo-edit-viewport video-upload-viewport"><video id="videoUploadPlayer" controls playsinline preload="auto" aria-label="${tr('תצוגה מקדימה של הסרטון לפני ההעלאה','Video preview before upload')}"></video></div>
  <div class="photo-edit-toolbar video-upload-toolbar"><button type="button" class="secondary-button" id="videoUploadEdit"><span id="videoUploadEditIcon"></span><span id="videoUploadEditLabel">${tr('עריכת הסרטון','Edit video')}</span></button><button type="button" class="secondary-button" id="videoUploadReset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6M12 8v4l3 2"/></svg><span>${tr('איפוס הקטע','Reset selection')}</span></button><button type="button" class="secondary-button" id="videoUploadSplit" aria-pressed="false" aria-controls="videoUploadSegments" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="m8.5 7.5 12 11M8.5 16.5 20.5 5"/></svg><span id="videoUploadSplitLabel"></span></button><span id="videoUploadRange" dir="auto"></span></div>
- <div class="video-preview-tools"><button type="button" id="videoUploadPreviewMode" class="secondary-button" aria-pressed="false"></button><button type="button" id="videoUploadPreviewPick" class="video-preview-pick">${tr('בחירת עותק קל מהמכשיר','Choose a lightweight copy')}</button><input type="file" id="videoUploadPreviewFile" accept="video/*,.mp4,.m4v,.mov,.webm" hidden><progress id="videoUploadPreviewProgress" max="100" value="0" hidden aria-label="${tr('הכנת תצוגה קלה','Preparing lightweight preview')}"></progress><span id="videoUploadPreviewStatus" role="status" hidden></span></div>
+ <div id="videoUploadSourcePanel" class="video-preview-tools" hidden><span id="videoUploadSourceStatus" role="status"></span><progress id="videoUploadSourceProgress" max="100" value="0" aria-label="${tr('העלאת המקור לאתר','Original upload to site')}"></progress><button type="button" id="videoUploadSourcePlay" class="secondary-button" hidden>${tr('ניגון מהאתר','Play from site')}</button><button type="button" id="videoUploadSourceRetry" class="secondary-button" hidden>${tr('המשך העלאה','Resume upload')}</button><button type="button" id="videoUploadSourceMinimize" class="video-preview-pick" hidden>${tr('המשך ברקע','Continue in background')}</button></div>
+ <div class="video-preview-tools"><button type="button" id="videoUploadPreviewPlay" class="secondary-button">${tr('▶ ניגון','▶ Play')}</button><button type="button" id="videoUploadPreviewMode" class="secondary-button" aria-pressed="false"></button><button type="button" id="videoUploadPreviewPick" class="video-preview-pick">${tr('בחירת עותק קל מהמכשיר','Choose a lightweight copy')}</button><input type="file" id="videoUploadPreviewFile" accept="video/*,.mp4,.m4v,.mov,.webm" hidden><progress id="videoUploadPreviewProgress" max="100" value="0" hidden aria-label="${tr('הכנת תצוגה קלה','Preparing lightweight preview')}"></progress><span id="videoUploadPreviewStatus" role="status" hidden></span></div>
  ${segmentControlsHTML(tr)}
  <div class="video-upload-details"><label><span id="videoUploadNameLabel"></span><input id="videoUploadName" maxlength="140" data-video-draft-field></label><label id="videoUploadTargetRow">${tr('תיקיית היעד','Destination folder')}<select id="videoUploadTarget" data-video-draft-field></select></label>
  <div id="videoUploadEventRow" hidden><label id="videoUploadEventLabel" for="videoUploadEventTrigger">${tr('שיוך לאירוע','Event assignment')}</label>
@@ -212,6 +248,9 @@ function mount(){
   }});
  timeline=bindSegmentTimeline({get,tr,editor:window.FamilyVideoEditor,select:goTo,seekTo:preview.seek,playbackError:preview.playbackError,saving:()=>Boolean(session?.saving),
   changed:()=>{if(!session?.split)return;session.error=null;get('Error').textContent='';rangeText();locks();}});
+ get('SourcePlay').addEventListener('click',()=>preview.playRemote());
+ get('SourceRetry').addEventListener('click',()=>{const source=stageFor(session,draft().file);void source?.ensure().catch(()=>{});});
+ get('SourceMinimize').addEventListener('click',minimize);
  get('Split').addEventListener('click',toggleSplit);
  get('CutoffTime').addEventListener('input',locks);
  get('CutoffHere').addEventListener('click',()=>{
@@ -229,12 +268,13 @@ function mount(){
   right:()=>{if(!get('Next').disabled)navigate(1);},left:()=>{if(!get('Previous').disabled)navigate(-1);}
  });
  get('CopyDate').addEventListener('click',()=>{collect();draft().metadata.date={...session.drafts[session.index-1].metadata.date};for(const part of ['day','month','year'])get('Date'+part).value=draft().metadata.date[part]||'';});
- get('Edit').addEventListener('click',async()=>{if(session.split){timeline.play();return;}collect();const d=draft(),owner=session;get('Player').pause();const selection=await window.FamilyVideoEditor.select(d.file,{previewFile:preview.displayFile(),scope:owner.options.scope,duration:d.duration,range:d.metadata.range,name:d.metadata.name});if(session!==owner||draft()!==d||!selection)return;d.metadata.range={start:selection.start,end:selection.end,...(selection.remove?{remove:true}:{})};d.metadata.name=selection.name;get('Name').value=selection.name;rangeText();});
+ get('Edit').addEventListener('click',async()=>{if(session.split){timeline.play();return;}collect();const d=draft(),owner=session;get('Player').pause();const selection=await window.FamilyVideoEditor.select(d.file,{previewUrl:preview.displayUrl(),previewFile:preview.displayFile(),scope:owner.options.scope,duration:d.duration,range:d.metadata.range,name:d.metadata.name});if(session!==owner||draft()!==d||!selection)return;d.metadata.range={start:selection.start,end:selection.end,...(selection.remove?{remove:true}:{})};d.metadata.name=selection.name;get('Name').value=selection.name;rangeText();});
  get('Reset').addEventListener('click',()=>{
   if(session.split){collect();const segment=draft().segment;Object.assign(segment,{start:0,end:null,startText:null,endText:null});render();timeline.seekStart();}
   else{draft().metadata.range=null;rangeText();}
  });get('SaveCurrent').addEventListener('click',()=>save(false));get('SaveAll').addEventListener('click',()=>save(true));
- get('Remove').addEventListener('click',()=>{if(session.saving)return;collect();session.drafts.splice(session.index,1);
+ get('Remove').addEventListener('click',()=>{if(session.saving)return;collect();const removed=draft();session.drafts.splice(session.index,1);
+  if(!session.split&&!session.drafts.some(d=>d.file===removed.file)){session.sources.get(removed.file)?.discard();session.sources.delete(removed.file);}
   if(session.split&&!session.drafts.length){session.drafts=[session.original];session.split=false;session.index=session.segmentIndex=0;session.nextNumber=1;render();return;}
   if(!session.drafts.length||(!session.split&&session.drafts.every(d=>d.saved))){finish();return;}session.index=Math.min(session.index,session.drafts.length-1);render();});
  get('Target').addEventListener('change',()=>{
@@ -267,26 +307,25 @@ function mount(){
  get('Search').addEventListener('input',async()=>{const query=get('Search').value.trim(),serial=++searchSerial;if(!query){get('Results').replaceChildren();return;}const people=await window.FamilyTags.findPeople(query);if(!session||serial!==searchSerial||get('Search').value.trim()!==query||session.saving||draft().saved||draft().frozen)return;session.matches=people.slice(0,12);get('Results').innerHTML=session.matches.map((p,index)=>`<button type="button" data-video-add-person="${index}">${safe(I.personName(p))}</button>`).join('')+(people.length?'':`<button type="button" data-video-add-name>${tr('הוספת ','Add ')}${safe(query)}</button>`);});
  dialog.addEventListener('click',event=>{if(!session||session.saving||draft().saved||draft().frozen)return;const add=event.target.closest?.('[data-video-add-person],[data-video-add-name]'),remove=event.target.closest?.('[data-video-remove-person]');if(add){const p=add.hasAttribute('data-video-add-name')?{name:get('Search').value.trim()}:{personId:session.matches[Number(add.dataset.videoAddPerson)].id,label:I.personName(session.matches[Number(add.dataset.videoAddPerson)])};const d=draft();if(!d.metadata.people.some(v=>(v.personId||v.name)===(p.personId||p.name)))d.metadata.people.push(p);get('Search').value='';get('Results').replaceChildren();renderPeople();}if(remove){draft().metadata.people.splice(Number(remove.dataset.videoRemovePerson),1);renderPeople();}});
 }
-async function save(all,cutoff){
- if(!session||session.saving)return;
- collect();
- const owner=session,split=owner.split,maxMB=owner.options.scope==='nostalgia'?500:90;
- const pending=d=>!d.saved&&(!split||markedBy(d,cutoff));
- const indices=all?owner.drafts.map((_,i)=>i).filter(i=>pending(owner.drafts[i])):pending(draft())?[owner.index]:[];
- if(!indices.length)return;
- const startingIndex=owner.index;
- let activeIndex=startingIndex;
- try{
-  for(const index of indices){
-   activeIndex=index;
-   const d=owner.drafts[index];
-   videoUploadMetadata(d.frozen?.metadata||d.metadata);
-   if(!split&&d.file.size>maxMB*1024*1024)throw Error(tr('הסרטון גדול מהמגבלה: ','Video exceeds the limit: ')+maxMB+'MB');
-  }
-  get('Player').pause();
-  for(const index of indices){
-   activeIndex=index;owner.index=index;owner.percent=0;owner.error=null;render();
-   const d=draft();busy(true);get('Progress').value=0;
+async function saveFromSource(d,owner,source,split){
+ d.frozen ||= {operationId:uuid(),metadata:videoUploadMetadata(d.metadata)};
+ const range=split?markedRange(d):d.frozen.metadata.range;
+ const payload={mediaId:d.uploadId,operationId:d.frozen.operationId,metadata:{...d.frozen.metadata,...(range?{range}:{})}};
+ get('Status').textContent=source.phase==='ready'?tr('שומר מהמקור שבאתר…','Saving from the uploaded original…'):tr('ממתין להשלמת העלאת המקור…','Waiting for the original upload…');
+ await source.ensure();
+ get('Status').textContent=range?tr('שומר את המקטע מהמקור…','Saving the segment from the original…'):tr('שומר את הסרטון…','Saving the video…');
+ if(!d.derivedSource){
+  try{return await source.save(payload);}
+  catch(error){if(error.code!=='VIDEO_CLIP_FORMAT'||!range||range.remove)throw error;}
+  const clip=await prepareSegmentFile({file:d.file,name:d.frozen.metadata.name,range,maxBytes:MAX_VIDEO_SOURCE_BYTES},fraction=>{
+   get('Progress').value=fraction*100;get('Status').textContent=tr('מכין את המקטע…','Preparing the segment…')+' '+Math.round(fraction*100)+'%';
+  });
+  d.derivedSource=stageFor(owner,clip);
+ }
+ const {range:applied,...metadata}=payload.metadata;
+ return d.derivedSource.save({...payload,metadata});
+}
+async function saveLocal(d,owner,split,maxMB){
    if(split&&!d.uploaded&&!d.preparedFile){
     const prepLabel=tr('מכין את ','Preparing ')+segmentLabel(d);
     get('Status').textContent=prepLabel+'…';
@@ -321,6 +360,30 @@ async function save(all,cutoff){
    });
    let result;try{result=await response.json();}catch{throw Error(tr('לא התקבל אישור שמירה. נסו שוב.','No save confirmation was received. Please retry.'));}
    if(!response.ok)throw Object.assign(Error(I.error(result.error)),{status:response.status});
+ return result;
+}
+async function save(all,cutoff){
+ if(!session||session.saving)return;
+ collect();
+ const owner=session,split=owner.split,maxMB=owner.options.scope==='nostalgia'?500:90;
+ const pending=d=>!d.saved&&(!split||markedBy(d,cutoff));
+ const indices=all?owner.drafts.map((_,i)=>i).filter(i=>pending(owner.drafts[i])):pending(draft())?[owner.index]:[];
+ if(!indices.length)return;
+ const startingIndex=owner.index;
+ let activeIndex=startingIndex;
+ try{
+  for(const index of indices){
+   activeIndex=index;
+   const d=owner.drafts[index];
+   videoUploadMetadata(d.frozen?.metadata||d.metadata);
+   if(!owner.options.stageSources&&!split&&d.file.size>maxMB*1024*1024)throw Error(tr('הסרטון גדול מהמגבלה: ','Video exceeds the limit: ')+maxMB+'MB');
+  }
+  get('Player').pause();
+  for(const index of indices){
+   activeIndex=index;owner.index=index;owner.percent=0;owner.error=null;render();
+   const d=draft();busy(true);get('Progress').value=0;
+   const source=stageFor(owner,d.file);
+   const result=source?await saveFromSource(d,owner,source,split):await saveLocal(d,owner,split,maxMB);
    d.saved=true;d.preparedFile=null;owner.options.onSaved?.(result);window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));busy(false);
   }
   if(split){
@@ -332,12 +395,12 @@ async function save(all,cutoff){
   owner.index=owner.drafts.findIndex((d,i)=>!d.saved&&i>owner.index);if(owner.index<0)owner.index=owner.drafts.findIndex(d=>!d.saved);render();
  }catch(error){
   owner.index=activeIndex;const d=draft();
-  if(error.status>=400&&error.status<500&&error.status!==409){d.frozen=null;if(!d.uploaded)d.preparedFile=null;}
+  if(error.status>=400&&error.status<500&&error.status!==409){d.frozen=null;if(!d.uploaded)d.preparedFile=null;if(d.derivedSource){d.derivedSource.discard();owner.sources.delete(d.derivedSource.file);d.derivedSource=null;}}
   render();owner.error=error.name==='RangeError'?tr('בדקו את תאריך הצילום, השם או הקטע שסומן.','Check the recording date, name or selected range.'):error.message||tr('הסרטון לא נשמר. נסו שוב.','The video was not saved. Please retry.');
   get('Error').textContent=owner.error;
  }finally{if(session===owner)busy(false);}
 }
-async function next(){if(session||!queue.length)return;mount();get('CutoffTime').value='';get('BatchOptions').open=false;const job=queue.shift(),videos=job.files.filter(isVideo);session={...job,index:0,saving:false,matches:[],singleVideo:videos.length===1,split:false,segments:[],segmentIndex:0,nextNumber:1,drafts:videos.map(file=>{const metadata={name:file.name.replace(/\.[^.]*$/,'').slice(0,140),caption:'',date:filenamePhotoDate(file.name).date,people:[]};if(job.options.scope==='nostalgia'){metadata.eventId=job.options.eventId||'';const event=destinations().find(e=>e.id===metadata.eventId);if(event?.date&&!Object.values(metadata.date).some(Boolean))metadata.date={...event.date};}if(job.options.scope==='videos')metadata.group=job.options.group||'family';return {file,metadata,uploadId:uuid(),uploaded:null,saved:false,duration:null,frozen:null};}),rest:job.files.filter(file=>!isVideo(file))};render();dialog.showModal();}
+async function next(){if(session||!queue.length)return;mount();get('CutoffTime').value='';get('BatchOptions').open=false;const job=queue.shift(),videos=job.files.filter(isVideo);session={...job,sources:new Map(),index:0,saving:false,matches:[],singleVideo:videos.length===1,split:false,segments:[],segmentIndex:0,nextNumber:1,drafts:videos.map(file=>{const metadata={name:file.name.replace(/\.[^.]*$/,'').slice(0,140),caption:'',date:filenamePhotoDate(file.name).date,people:[]};if(job.options.scope==='nostalgia'){metadata.eventId=job.options.eventId||'';const event=destinations().find(e=>e.id===metadata.eventId);if(event?.date&&!Object.values(metadata.date).some(Boolean))metadata.date={...event.date};}if(job.options.scope==='videos')metadata.group=job.options.group||'family';return {file,metadata,uploadId:uuid(),uploaded:null,saved:false,duration:null,frozen:null};}),rest:job.files.filter(file=>!isVideo(file))};render();dialog.showModal();}
 function prepare(files,options){const list=Array.from(files);if(!list.some(isVideo))return Promise.resolve(list);return new Promise(resolve=>{queue.push({files:list,options,resolve});void next();});}
 window.FamilyVideoUpload={prepare,isVideo,metadata:videoUploadMetadata};
 window.addEventListener('beforeunload',event=>{if(session||queue.length){event.preventDefault();event.returnValue='';}});

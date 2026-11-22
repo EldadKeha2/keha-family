@@ -267,3 +267,6 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 #videoUploadWizard .video-preview-pick{color:inherit;border:0;background:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 #videoUploadPreviewProgress{width:80px;accent-color:var(--green,#66734f)}
 #videoUploadWizard .video-preview-tools [hidden]{display:none}
+
+#videoUploadWizard #videoUploadSourcePanel[hidden]{display:none}
+#videoUploadSourceProgress{width:90px;accent-color:var(--green,#66734f)}

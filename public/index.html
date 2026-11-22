@@ -15,11 +15,11 @@
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="stylesheet" href="assets/site-styles-a5de2caba8838292.css">
+  <link rel="stylesheet" href="assets/site-styles-4505f140ed6f1911.css">
   <script src="assets/maintenance.js?v=upload-safe-v2" defer></script>
   <script src="assets/family-fallback.js?v=yona-nakash-keha-v3" defer></script>
   <script src="family-data.js" defer></script>
-  <script src="assets/translations.js?v=family-games-20261121" defer></script>
+  <script src="assets/translations.js?v=video-source-1" defer></script>
   <script src="assets/i18n.js?v=person-aliases-v2" defer></script>
   <script src="assets/people-roster.js?v=shared-families-v1" defer></script>
   <script src="assets/collection-transport.js?v=internal-pages-v1" defer></script>
@@ -53,9 +53,9 @@
   <script src="assets/video-album-input.js?v=desktop-pad-surface-v15" defer></script>
   <script src="assets/pdf-documents.js?v=rotation-v3" defer></script>
   <script src="assets/media.js?v=pdf-viewer-v1" defer></script>
-  <script src="assets/video-editor.js?v=local-playback-1" defer></script>
+  <script src="assets/video-editor.js?v=staged-original-1" defer></script>
   <script src="assets/video-presentation.js?v=desktop-inline-date-v4" defer></script>
-  <script src="assets/video-upload-wizard.js?v=local-playback-1" type="module"></script>
+  <script src="assets/video-upload-wizard.js?v=staged-original-1" type="module"></script>
   <script src="assets/photo-viewer-layout.js?v=icon-check-badges-v12" defer></script>
   <script src="assets/personal-photo-layout.js?v=compact-details-v17" defer></script>
   <script src="assets/photo-fullscreen-faces.js?v=infant-months-v4" defer></script>
@@ -67,7 +67,7 @@
   <script src="assets/video-filter.js?v=duration-description-v1" type="module"></script>
   <script src="assets/voice-player.js?v=heirloom-v1" defer></script>
   <script src="assets/memories.js?v=heirloom-voices-v1" defer></script>
-  <script src="assets/portal.js?v=shared-families-v1" defer></script>
+  <script src="assets/portal.js?v=staged-original-1" defer></script>
   <script src="assets/gallery-filter.js?v=long-press-v3" type="module"></script>
   <script src="assets/media-selection.js?v=person-gallery-v1" type="module"></script>
   <script src="assets/updates.js" defer></script>
@@ -76,7 +76,7 @@
   <script src="assets/people.js?v=historical-life-years-v3" defer></script>
   <script src="assets/biography.js" type="module"></script>
   <script src="assets/nostalgia-library.js?v=upload-event-picker-1" defer></script>
-  <script src="assets/archive.js?v=performance-20261115-v2" defer></script>
+  <script src="assets/archive.js?v=staged-original-1" defer></script>
   <script src="assets/calendar.js" defer></script>
   <script src="assets/family-timeline.js?v=fullscreen-v9" type="module"></script>
   <script src="assets/home.js?v=family-games-20261121" defer></script>
@@ -201,7 +201,7 @@
           </section>
           <div class="shared-media-grid video-grid" id="videosGrid"></div>
           <div class="portal-empty" id="videosEmpty"><span class="empty-emblem" aria-hidden="true">▷</span><h3>עוד רגע, זיכרון בתנועה</h3><p>סרט מהחתונה, ברכה לסבתא או רגע קטן מהיום־יום.<br>הסרטון הראשון שלכם יתחיל את הגלריה.</p></div>
-          <div class="collection-upload" id="videosDropzone"><div><span class="small-eyebrow">מוסיפים רגע לאלבום</span><h3>יש לכם סרטון משפחתי?</h3><p>בחרו מהטלפון או מהמחשב, או גררו לכאן סרטון.<br>עד 90MB לסרטון · MP4, WebM, MOV, M4V</p></div><div class="upload-buttons"><label class="video-upload-category">לאיזו קטגוריה להוסיף?<select id="videoUploadCategory"><option value="family">סרטונים משפחתיים</option><option value="special-birthdays">ימי הולדת עגולים</option><option value="__create_category__">＋ הוסף קטגוריה</option></select></label><button class="primary-button" data-upload-collection="videos">＋ העלאת סרטונים</button><button class="secondary-button mobile-camera" data-camera-collection="videos">צילום סרטון</button></div><div class="collection-upload-state" id="videosUploadState" role="status"></div><progress id="videosProgress" max="100" value="0" hidden aria-label="התקדמות העלאת הסרטונים"></progress></div>
+          <div class="collection-upload" id="videosDropzone"><div><span class="small-eyebrow">מוסיפים רגע לאלבום</span><h3>יש לכם סרטון משפחתי?</h3><p>בחרו מהטלפון או מהמחשב, או גררו לכאן סרטון.<br>עד 4 GiB לסרטון · MP4, WebM, MOV, M4V</p></div><div class="upload-buttons"><label class="video-upload-category">לאיזו קטגוריה להוסיף?<select id="videoUploadCategory"><option value="family">סרטונים משפחתיים</option><option value="special-birthdays">ימי הולדת עגולים</option><option value="__create_category__">＋ הוסף קטגוריה</option></select></label><button class="primary-button" data-upload-collection="videos">＋ העלאת סרטונים</button><button class="secondary-button mobile-camera" data-camera-collection="videos">צילום סרטון</button></div><div class="collection-upload-state" id="videosUploadState" role="status"></div><progress id="videosProgress" max="100" value="0" hidden aria-label="התקדמות העלאת הסרטונים"></progress></div>
         </section>
         <section id="photosView" class="portal-view compact-gallery-view" aria-label="תמונות משפחתיות" hidden>
           <div class="collection-heading"><span class="collection-count" id="photosCount">אלבום משותף לכל המשפחה</span><span class="collection-kicker">יחד בתמונה</span></div>
@@ -239,7 +239,7 @@
             <section class="wedding-album" aria-labelledby="weddingAlbumTitle"><div class="archive-section-heading"><div><span class="small-eyebrow">כל רגע, זיכרון משותף</span><h4 id="weddingAlbumTitle">האלבום של החתונה</h4></div><span id="weddingMediaCount"></span></div>
               <div class="archive-filters" id="weddingMediaFilters" aria-label="סינון אלבום החתונה"><button data-archive-filter="all" aria-pressed="true">הכול</button><button data-archive-filter="photo" aria-pressed="false">תמונות</button><button data-archive-filter="video" aria-pressed="false">סרטונים</button><button data-archive-filter="document" aria-pressed="false">ברכות ומסמכים</button></div>
               <div class="shared-media-grid mixed-media-grid" id="weddingMediaGrid"></div><div class="archive-empty" id="weddingMediaEmpty"><span aria-hidden="true">✧</span><h4>האלבום מחכה לרגע הראשון</h4><p>הוסיפו תמונות וסרטונים מהחתונה, או ברכה ששמרתם במגירה.</p></div>
-              <div class="collection-upload archive-dropzone" id="weddingDropzone"><div><span class="small-eyebrow">מוסיפים לאלבום של הזוג</span><h3>הייתם שם? שתפו זיכרון</h3><p>תמונות עד 50MB · סרטונים עד 90MB · מסמכים עד 10MB<br>אפשר לבחור כמה קבצים יחד או לגרור לכאן.</p></div><div class="upload-buttons"><button class="primary-button" data-archive-upload="wedding">＋ העלאת תמונות, סרטונים וברכות</button></div><div class="collection-upload-state" id="weddingUploadState" role="status"></div><progress id="weddingProgress" max="100" value="0" hidden aria-label="התקדמות ההעלאה לאלבום החתונה"></progress></div>
+              <div class="collection-upload archive-dropzone" id="weddingDropzone"><div><span class="small-eyebrow">מוסיפים לאלבום של הזוג</span><h3>הייתם שם? שתפו זיכרון</h3><p>תמונות עד 50MB · סרטונים באשף עד 4 GiB · מסמכים עד 10MB<br>אפשר לבחור כמה קבצים יחד או לגרור לכאן.</p></div><div class="upload-buttons"><button class="primary-button" data-archive-upload="wedding">＋ העלאת תמונות, סרטונים וברכות</button></div><div class="collection-upload-state" id="weddingUploadState" role="status"></div><progress id="weddingProgress" max="100" value="0" hidden aria-label="התקדמות ההעלאה לאלבום החתונה"></progress></div>
             </section>
             <section class="wedding-greetings" aria-labelledby="weddingGreetingsTitle"><div class="archive-section-heading"><div><span class="small-eyebrow">הרגעים שנשארו איתנו</span><h4 id="weddingGreetingsTitle">זיכרונות וברכות מהחתונה</h4></div><span id="weddingGreetingsCount"></span></div><div class="greetings-layout"><form id="weddingGreetingForm" class="greeting-form"><h5>מה אתם זוכרים מהחתונה?</h5><p>רגע מצחיק, מפגש מרגש או סיפור קטן. גם משפט אחד הוא זיכרון ששווה לשמור.</p><label>מי משתף?<input name="author" id="greetingAuthor" maxlength="100" autocomplete="name" placeholder="השם שלכם, אם תרצו"></label><label>הזיכרון או הברכה שלכם<textarea dir="auto" name="body" id="greetingBody" rows="4" maxlength="10000" placeholder="ספרו על רגע מהחתונה, אפילו במשפט אחד. אפשר גם להשאיר ברכה לזוג." required></textarea></label><p class="form-error" id="greetingError" role="alert"></p><button class="primary-button" id="saveWeddingGreeting" type="submit">הוספת זיכרון או ברכה</button></form><div id="weddingGreetingList" class="greeting-list"></div></div></section>
           </article>
@@ -252,7 +252,7 @@
           <div class="archive-toolbar"><span id="nostalgiaCount" role="status"></span><div class="archive-filters" id="nostalgiaFilters" aria-label="סינון זיכרונות"><button data-archive-filter="all" aria-pressed="true">כל הזיכרונות</button><button data-archive-filter="photo" aria-pressed="false">תמונות</button><button data-archive-filter="video" aria-pressed="false">סרטונים</button><button data-archive-filter="document" aria-pressed="false">מסמכים</button></div></div>
           <div class="nostalgia-sort-toolbar"><label class="nostalgia-sort-field" for="nostalgiaSort"><span>סדר לפי</span><select id="nostalgiaSort" aria-label="סדר לפי סרטונים"><option value="sequence">סדר מקורי</option><option value="duration-asc">אורך הסרטון: קצר לארוך</option><option value="duration-desc">אורך הסרטון: ארוך לקצר</option><option value="tags-desc">מספר המתויגים: הרבה למעט</option><option value="tags-asc">מספר המתויגים: מעט להרבה</option><option value="description-asc">תיאור הסרטון: א–ת</option><option value="description-desc">תיאור הסרטון: ת–א</option></select></label></div>
           <div class="shared-media-grid mixed-media-grid" id="nostalgiaGrid"></div><div class="archive-empty" id="nostalgiaEmpty"><span aria-hidden="true">▧</span><h4>לכל זיכרון יש מקום כאן</h4><p>יש לכם צילום ישן, סרט מהילדות או מסמך משפחתי?<br>העלו אותו והוסיפו כמה מילים על מי, מתי ואיפה.</p></div>
-          <div class="collection-upload archive-dropzone" id="nostalgiaDropzone"><div><span class="small-eyebrow">מוסיפים לאלבום המשפחתי</span><h3>מה נשמר אצלכם?</h3><p>תמונות עד 50MB · סרטונים עד 500MB · מסמכים עד 10MB<br>מסמכים: PDF, Word, TXT או Markdown · אפשר לגרור קבצים לכאן.</p></div><div class="upload-buttons"><button type="button" class="primary-button" data-archive-upload="nostalgia" data-archive-kind="photo">＋ העלאת תמונות</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="video">＋ העלאת סרטונים</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="document">＋ העלאת מסמכים</button></div><div class="collection-upload-state" id="nostalgiaUploadState" role="status"></div><progress id="nostalgiaProgress" max="100" value="0" hidden aria-label="התקדמות העלאת הזיכרונות"></progress></div>
+          <div class="collection-upload archive-dropzone" id="nostalgiaDropzone"><div><span class="small-eyebrow">מוסיפים לאלבום המשפחתי</span><h3>מה נשמר אצלכם?</h3><p>תמונות עד 50MB · סרטונים באשף עד 4 GiB · מסמכים עד 10MB<br>מסמכים: PDF, Word, TXT או Markdown · אפשר לגרור קבצים לכאן.</p></div><div class="upload-buttons"><button type="button" class="primary-button" data-archive-upload="nostalgia" data-archive-kind="photo">＋ העלאת תמונות</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="video">＋ העלאת סרטונים</button><button type="button" class="secondary-button" data-archive-upload="nostalgia" data-archive-kind="document">＋ העלאת מסמכים</button></div><div class="collection-upload-state" id="nostalgiaUploadState" role="status"></div><progress id="nostalgiaProgress" max="100" value="0" hidden aria-label="התקדמות העלאת הזיכרונות"></progress></div>
         </section>
         <div class="workspace-footer"><span><i class="mini-diamond"></i> חמישה דורות, סיפור אחד</span></div>
       </section>
