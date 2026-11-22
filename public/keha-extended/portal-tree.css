@@ -53,11 +53,11 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
 @media(max-width:700px){
   html[data-branch-portal=zechariah] body[data-active-view=tree] .workspace-header{padding-block:7px}
   html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar{
-    display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;
-    padding:0 3px 6px;margin:0;
+    display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px 3px;
+    padding:0 2px 6px;margin:0;
   }
   html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]{
-    grid-column:span 4;min-height:40px;padding:3px 1px;gap:2px;border-radius:8px;
+    grid-column:span 4;min-height:40px;padding:3px 0;gap:2px;border-radius:8px;
     font:500 calc(clamp(.75rem,3.35vw,.9rem) * var(--a11y-text-scale,1))/1.18 var(--sans);
     text-wrap:balance;overflow-wrap:break-word;
   }
@@ -103,4 +103,8 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
   #treeViewport[data-household-overview] .memorial-inline{display:none}
   #treeViewport[data-household-overview] .tree-unit[data-unit=u-root] .portrait{width:41px;height:45px}
   #treeViewport[data-household-overview] .tree-unit[data-unit=u-root] .person-name{font-family:var(--serif);font-size:calc(.98rem * var(--a11y-text-scale,1))}
+}
+@media(max-width:350px){
+  html[data-branch-portal=zechariah] #treeViewport .zoom-controls{gap:1px}
+  html[data-branch-portal=zechariah] #treeViewport .zoom-controls .control-divider{display:none}
 }
