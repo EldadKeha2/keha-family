@@ -85,8 +85,8 @@ function withExtendedAccess(html,extendedOrigin='https://family-extended.eldadke
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'<nav class="family-extended-access" aria-label="קהא המורחבת" data-i18n-skip>'+extendedTrigger('footer')+'</nav>')
     .replace(/(<button\b[^>]*data-view="tree"[^>]*>.*?<\/button>)/,'$1'+extendedTrigger('nav'))
     .replace('<main id="mainContent"',extendedDialog+'<main id="mainContent"')
-    .replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=family-top-tabs-v3"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=family-top-tabs-v1" defer></script>\n$1');
+    .replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=family-top-tabs-v4"></head>')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=family-top-tabs-v2" defer></script>\n$1');
 }
 
 export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev'){

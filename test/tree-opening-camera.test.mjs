@@ -149,8 +149,8 @@ test('Zechariah’s five top buttons switch households directly while the phone 
   const expected=[
     ['kadya',"מש' קדיה מזרחי",'Kadya Mizrahi family','right'],
     ['saadia',"מש' סעדיה קהא",'Saadia Keha family','right'],
-    ['shalom',"מש' שלום קהא",'Shalom Keha family','right'],
-    ['boaz',"מש' בועז קהא",'Boaz Keha family','left'],
+    ['shalom',"מש' שלום קהא",'Shalom Keha family','left'],
+    ['boaz',"מש' בועז קהא",'Boaz Keha family','right'],
     ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','left'],
   ];
   for(const [viewportWidth,viewportHeight,text,english] of [[300,390,100,false],[358,560,100,false],[400,620,160,true]]){
@@ -165,7 +165,12 @@ test('Zechariah’s five top buttons switch households directly while the phone 
     assert.ok(buttons().every(button=>button.getAttribute('aria-controls')==='treeViewport'));
     assert.equal(nodes.querySelectorAll('[data-open-branch],.family-diamond').length,0);
     assert.equal(nodes.querySelectorAll('[data-unit="u-saadia-kadya"] [data-person]').length,1);
-    assert.equal(nodes.querySelectorAll('[data-unit="u-saadia-aharon"] [data-person]').length,1);
+    assert.equal(nodes.querySelectorAll('[data-unit="u-saadia-aharon"] [data-person]').length,2);
+    const parentLink=f.document.querySelector('#treeConnectors [data-partner-unit="'+f.data.root+'"]');
+    assert.ok(parentLink,'Zechariah and Yehudit have a visible couple connection');
+    const trunk=f.document.querySelector('#treeConnectors .phone-family-trunk');
+    const [,trunkX,trunkY]=/^M([\d.]+) ([\d.]+)/.exec(trunk.getAttribute('d'));
+    assert.equal(trunkY,/^M[\d.]+ ([\d.]+)/.exec(parentLink.getAttribute('d'))[1],'The trunk starts at the parents’ couple connection');
     const previous={};
     for(const [key,,,side] of expected){
       const id='u-saadia-'+key,card=f.bounds(id);
@@ -176,6 +181,16 @@ test('Zechariah’s five top buttons switch households directly while the phone 
       previous[side]=card.y+card.height/2;
       const path=f.document.querySelector('#treeConnectors [data-child-unit="'+id+'"]');
       assert.equal(path.dataset.parentUnit,f.data.units[id].parent);
+      assert.equal(path.dataset.overviewRoot,f.data.root);
+      const [,startX,endX,endY]=/^M([\d.]+) [\d.]+H([\d.]+)V([\d.]+)$/.exec(path.getAttribute('d'));
+      assert.equal(startX,trunkX,'Each household branches directly from the common trunk');
+      const unit=nodes.querySelector('[data-unit="'+id+'"]');
+      assert.equal(Number(endY),parseFloat(unit.style.top)-1);
+      if(f.data.units[id].people.length>1){
+        const center=parseFloat(unit.style.left)+parseFloat(unit.style.width)/2;
+        assert.ok(side==='right'?Number(endX)<center:Number(endX)>center,'The branch reaches the child beside the trunk, with their spouse outside');
+        assert.ok(f.document.querySelector('#treeConnectors [data-partner-unit="'+id+'"]'),'Each known spouse has a short couple connection');
+      }
       assert.equal(path.getAttribute('stroke-dasharray')!==null,key==='aharon');
     }
     // No return to the overview is needed between the five selections.

@@ -65,7 +65,7 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
   html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]:last-child{grid-column:7 / span 5}
   html[data-branch-portal=zechariah] #branchBar [data-tree-unit] .chip-dot{display:none}
   html[data-branch-portal=zechariah] #branchBar [data-tree-unit]::after{
-    content:'';box-sizing:border-box;flex:0 0 auto;width:5px;height:5px;border:solid currentColor;border-width:1.5px 1.5px 0 0;
+    content:'';box-sizing:border-box;flex:0 0 auto;width:6px;height:6px;margin-inline:2px;border:1.5px solid currentColor;
     transform:rotate(45deg);
   }
   html[dir=rtl][data-branch-portal=zechariah] #branchBar [data-tree-unit]::after{transform:rotate(-135deg)}
@@ -84,7 +84,7 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
   html[dir=rtl][data-branch-portal=zechariah] #treeViewport.tree-is-fullscreen>#branchBar{direction:rtl}
   #treeViewport[data-household-overview] .phone-family-card{
     display:grid;grid-template-columns:repeat(var(--family-members),minmax(0,1fr));
-    align-items:start;justify-items:center;gap:2px 3px;
+    align-items:start;justify-items:center;gap:2px calc(10px * var(--a11y-tree-scale,1));
   }
   #treeViewport[data-household-overview] #treeNodes .person-card{width:100%;min-width:0;padding:0}
   #treeViewport[data-household-overview] #treeNodes .person-card>:not(.person-open){display:none}

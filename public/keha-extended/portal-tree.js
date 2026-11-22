@@ -60,23 +60,19 @@
 
   function zechariahPhoneFamilies(){
     const data=window.FAMILY_DATA;
-    // The first three top buttons match the right-hand column of the tree.
-    // Boaz's household opens independently and remains connected to his parents.
-    const columns={
-      right:[
-        ['kadya',"מש' קדיה מזרחי",'Kadya Mizrahi family','#8c5728'],
-        ['saadia',"מש' סעדיה קהא",'Saadia Keha family','#266e63'],
-        ['shalom',"מש' שלום קהא",'Shalom Keha family','#365f88'],
-      ],
-      left:[
-        ['boaz',"מש' בועז קהא",'Boaz Keha family','#795486'],
-        ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','#99485b'],
-      ],
-    };
-    const branches=Object.entries(columns).flatMap(([side,items])=>items.map(([key,title,titleEn,color],row)=>{
+    // Keep the top tabs in their existing order; the overview positions are
+    // independent of tab order and of the complete genealogical tree.
+    const households=[
+      ['kadya',"מש' קדיה מזרחי",'Kadya Mizrahi family','#8c5728','right',0],
+      ['saadia',"מש' סעדיה קהא",'Saadia Keha family','#266e63','right',1],
+      ['shalom',"מש' שלום קהא",'Shalom Keha family','#365f88','left',0],
+      ['boaz',"מש' בועז קהא",'Boaz Keha family','#795486','right',2],
+      ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','#99485b','left',1],
+    ];
+    const branches=households.map(([key,title,titleEn,color,side,row])=>{
       const unit='u-saadia-'+key;
-      return {unit,id:data.units[unit].branch,title,titleEn,color,side,row,solo:key==='aharon'};
-    }));
+      return {unit,id:data.units[unit].branch,title,titleEn,color,side,row};
+    });
     document.getElementById('branchBar').setAttribute('role','group');
 
     function layout({world,nodes,connectors,viewportWidth,textScale,personCard}){
@@ -89,16 +85,20 @@
         const card=document.createElement('div');
         card.className='tree-unit phone-family-card';
         card.dataset.unit=branch?unit.id:'u-root';
-        const members=branch?.solo?unit.people.slice(0,1):unit.people;
+        const members=unit.people;
         const cardWidth=branch?column:Math.min(width,208*textScale);
         const left=branch?(branch.side==='right'?middle+gutter/2:inset):middle-cardWidth/2;
         card.style.width=cardWidth+'px';card.style.left=left+'px';
         card.style.setProperty('--family-members',members.length);
+        const firstOnLeft=branch?branch.side==='right':I.isEnglish;
+        // The child sits beside the central trunk, with their spouse outside.
+        card.style.direction=firstOnLeft?'ltr':'rtl';
         card.innerHTML=members.map(id=>personCard(id,unit)).join('');
         fragment.append(card);
         const center=left+cardWidth/2;
-        const personX=members.length===1?center:center+(I.isEnglish?-1:1)*(cardWidth+3)/4;
-        const item={card,center,personX};
+        const gap=10*textScale,cellWidth=(cardWidth-gap*(members.length-1))/members.length;
+        const peopleX=members.map((id,index)=>left+(firstOnLeft?index:members.length-1-index)*(cellWidth+gap)+cellWidth/2);
+        const item={card,center,personX:peopleX[0],peopleX,members,unit};
         cards.set(unit.id,item);
         if(branch)(rows[branch.row]??=[]).push(item);
       }
@@ -126,17 +126,25 @@
         line.setAttribute('d',d);connectors.append(line);
         return line;
       }
-      const junction=item=>item.top-10*textScale;
-      const direct=branches.filter(branch=>data.units[branch.unit].parent===data.root);
-      path('M'+middle+' '+start+'V'+Math.max(...direct.map(branch=>junction(cards.get(branch.unit)))));
+      // Draw each couple explicitly, including the founding parents. The
+      // overview's five household branches all leave their shared junction.
+      for(const item of cards.values()){
+        if(item.members.length<2)continue;
+        const portrait=item.card.querySelector('.portrait');
+        const portraitY=item.top+2+(portrait?.offsetHeight||(item.unit.id===data.root?45:39))/2;
+        const line=path('M'+Math.min(...item.peopleX)+' '+portraitY+'H'+Math.max(...item.peopleX));
+        line.classList.add('phone-partner-connector');
+        line.dataset.partnerUnit=item.unit.id;
+        if(item.unit.id===data.root)item.unionY=portraitY;
+      }
+      const root=cards.get(data.root),junction=item=>item.top-10*textScale;
+      const trunk=path('M'+middle+' '+root.unionY+'V'+Math.max(...branches.map(branch=>junction(cards.get(branch.unit)))));
+      trunk.classList.add('phone-family-trunk');
       for(const branch of branches){
-        const unit=data.units[branch.unit],item=cards.get(unit.id),parent=cards.get(unit.parent);
-        if(!parent)continue;
-        const joint=junction(item),lane=middle+(branch.side==='left'?-1:1)*gutter/3;
-        const from=unit.parent===data.root?'M'+middle+' '+joint:
-          'M'+parent.center+' '+parent.bottom+'v'+7*textScale+'H'+lane+'V'+joint;
-        const line=path(from+'H'+item.personX+'V'+(item.top-1));
+        const unit=data.units[branch.unit],item=cards.get(unit.id);
+        const line=path('M'+middle+' '+junction(item)+'H'+item.personX+'V'+(item.top-1));
         line.setAttribute('stroke',branch.color);
+        line.dataset.overviewRoot=data.root;
         line.dataset.parentUnit=unit.parent;line.dataset.childUnit=unit.id;
         line.dataset.childPerson=unit.people[0];
         if(unit.parentage==='adopted')line.setAttribute('stroke-dasharray','3 3');
