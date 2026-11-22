@@ -1049,8 +1049,9 @@ test('concise life and marriage years reach both independent Kehat families and 
       born('kehat-zechariah',1902);born('tri-yona',1912);born('tri-esther',1934);
       born('kehat-jidaan','1870–1877');died('kehat-jidaan',1962);born('kehat-miriam',1912);
       born('kehat-shlomo','1896–1903');died('kehat-zechariah',1979);
-      born('kehat-aharon','1904–1906');died('kehat-aharon','1977?');
-      assert.ok(card('kehat-aharon').querySelector('[data-tree-death-year][data-year-candidate] abbr[title]'));
+      born('kehat-aharon','1904–1906');died('kehat-aharon','1977');
+      assert.ok(card('kehat-aharon').querySelector('[data-tree-death-year][data-year-candidate][title]'));
+      assert.equal(document.querySelector('#treeNodes .tree-year-uncertain'),null);
       assert.equal(card('kehat-jidaan').querySelector('[data-year-candidate]'),null);
       assert.match(window.FamilyApp.birthdayHTML('kehat-zechariah'),english?/Died in <bdi dir="ltr">1979/:/נפטר ב־<bdi dir="ltr">1979/);
       died('kehat-hadassah',2015);died('keha-yosef-yissachar',1985);died('tri-yissachar',1996);married(1947);
@@ -1059,8 +1060,8 @@ test('concise life and marriage years reach both independent Kehat families and 
       born('kehat-tzadok','1915–1917');born('kehat-yaakov-yehudit','1923–1924');
       for(const year of [1944,1946,1947])married(year);
       assert.equal(card('kehat-amna').querySelector('[data-tree-death-year]'),null,'A death bound is not an exact death year');
-      died('kehat-naomi','1982?');died('kehat-israel-mizrahi','1990?');
-      born('kehat-zechariah-ben-tzadok','1891–1892?');died('kehat-zechariah-ben-tzadok','1947?');
+      died('kehat-naomi','1982');died('kehat-israel-mizrahi','1990');
+      born('kehat-zechariah-ben-tzadok','1891–1892');died('kehat-zechariah-ben-tzadok','1947');
       assert.ok(card('kehat-naomi').querySelector('[data-tree-death-year][data-year-candidate]'));
     }else if(portal==='zechariah'){
       born('saadia-shalom',1923);born('saadia-saadia',1918);married(1949);married(1945);

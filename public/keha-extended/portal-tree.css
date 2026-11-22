@@ -1,5 +1,24 @@
-.family-extended-access{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px 20px;margin:8px 16px 0;font:calc(14px * var(--a11y-text-scale,1))/1.4 var(--sans)}
-.family-extended-access a{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:5px 12px;border:1px solid var(--family-line);border-radius:20px;background:var(--paper);color:var(--family-ink);text-decoration:none}
-.family-extended-access a:hover{background:var(--family-tint);border-color:var(--family-accent)}
-.family-extended-access a:focus-visible{outline:3px solid var(--family-accent);outline-offset:3px}
-@media(max-width:700px){.family-extended-access{gap:6px;margin:6px 8px 0}.family-extended-access a{padding:5px 10px}}
+.family-extended-access{display:flex;justify-content:center;margin:10px 16px 0;font-family:var(--sans)}
+.family-extended-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;max-width:100%;padding:8px 20px;border:1px solid var(--family-accent);border-radius:14px;background:linear-gradient(135deg,var(--paper),var(--family-tint));color:var(--family-ink);box-shadow:0 3px 0 var(--family-line),0 5px 16px #30291812;font:600 calc(16px * var(--a11y-text-scale,1))/1.45 var(--sans);cursor:pointer}
+.family-extended-button img,#mainNav [data-extended-open] img{display:block;width:32px;height:32px;flex:0 0 32px}
+.family-extended-button:hover{background:var(--family-tint);border-color:var(--family-ink)}
+[data-extended-open]:focus-visible,.family-extended-dialog :is(a,button):focus-visible{outline:3px solid var(--family-accent);outline-offset:3px}
+#mainNav [data-extended-open]{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:normal}
+.home-tile-extended .home-tile-icon img{display:block;max-width:100%;height:auto}
+.family-extended-dialog{box-sizing:border-box;width:calc(100% - 28px);max-width:460px;max-height:calc(100dvh - 32px);margin:auto;padding:28px 22px 24px;border:1px solid var(--family-accent);border-radius:20px;background:var(--paper);color:var(--family-ink);text-align:center;overflow:auto;overscroll-behavior:contain;box-shadow:0 18px 70px #30291840}
+.family-extended-dialog:not([open]){display:none}
+.family-extended-dialog::backdrop{background:#302b236b}
+.family-extended-dialog>img{display:block;width:64px;height:64px;margin:2px auto 12px}
+.family-extended-dialog h2{margin:0 20px 8px;font:700 calc(27px * var(--a11y-text-scale,1))/1.4 var(--serif);color:var(--family-accent)}
+.family-extended-dialog>p{margin:0 0 22px;font:calc(16px * var(--a11y-text-scale,1))/1.6 var(--sans)}
+.family-extended-close{position:absolute;inset-inline-end:8px;top:8px;display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--family-ink);font:30px/1 var(--sans);cursor:pointer}
+.family-extended-close:hover{background:var(--family-tint)}
+.family-extended-choices{display:grid;gap:12px}
+.family-extended-choices a{box-sizing:border-box;display:flex;align-items:center;gap:14px;min-height:92px;min-width:0;padding:16px 14px;border:1px solid var(--family-line);border-radius:14px;background:var(--family-tint);color:var(--family-ink);text-align:start;text-decoration:none}
+.family-extended-choices a:hover{border-color:var(--family-accent);box-shadow:0 3px 12px #30291812}
+.family-extended-choices a>span:last-child{min-width:0;overflow-wrap:anywhere}
+.family-extended-choices strong{display:block;font:700 calc(17px * var(--a11y-text-scale,1))/1.5 var(--sans)}
+.family-extended-choices small{display:block;margin-top:4px;font:calc(14px * var(--a11y-text-scale,1))/1.6 var(--sans)}
+.family-extended-choice-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border:1px solid var(--family-line);border-radius:12px;background:var(--paper);color:var(--family-accent)}
+.family-extended-choice-icon svg{display:block;width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:700px){.family-extended-access{margin:8px 12px 2px}.family-extended-button{padding:7px 16px;font-size:calc(15px * var(--a11y-text-scale,1))}.family-extended-dialog{padding:24px 16px 20px}.family-extended-choices a{gap:11px;padding:14px 12px}}

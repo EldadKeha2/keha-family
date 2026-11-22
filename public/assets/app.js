@@ -46,7 +46,7 @@
     const person={...p,...getMedia(p)},placeholder=person.gender==='f'?femaleSilhouette:silhouette.replace('<svg ','<svg data-placeholder-gender="'+(person.gender==='m'?'m':'unknown')+'" ');
     return `<span class="portrait" aria-hidden="true">${placeholder}<span class="portrait-letter">${safe(initials(p))}</span>${src ? `<img class="profile-photo" ${window.FamilyPhotoFraming?.profile(person)||''} src="${safe(src)}" alt="" loading="lazy">` : ''}</span>`;
   }
-  function birthdayHTML(input, editable = true, birthOnly = false) {
+  function birthdayHTML(input, editable = true, birthOnly = false, forTree = false) {
     const p={...input,...getMedia(input)};
     const aliyah=p.aliyahMonth?new Intl.DateTimeFormat(I18n.locale,{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(Date.UTC(p.aliyahYear,p.aliyahMonth-1,1))):p.aliyahYear;
     const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5L9 20l-6 1 1-6ZM14 5l5 5"/></svg>';
@@ -61,9 +61,9 @@
     const firstYear=p.birthYear??p.birthYearMin??candidate?.birthYearMin,lastYear=p.birthYear??p.birthYearMax??candidate?.birthYearMax;
     const yearOnly=unknown&&Number.isInteger(firstYear)&&Number.isInteger(lastYear)&&firstYear>1111&&lastYear>=firstYear&&lastYear<=new Date().getFullYear();
     const yearSource=candidateBirth?(I18n.isEnglish?'Gravestone match under research':'לפי מצבה שהשיוך שלה בבדיקה'):I18n.isEnglish?p.birthYearSourceEn:p.birthYearSource;
-    const unknownLabel=yearOnly?`${firstYear===lastYear?firstYear:'\u2066'+firstYear+'–'+lastYear+'\u2069'}${candidateBirth?'?':''}${yearSource?' · '+yearSource:''}`:(I18n.isEnglish?'Not added yet':I18n.t('טרם הוזן'));
+    const unknownLabel=yearOnly?`${firstYear===lastYear?firstYear:'\u2066'+firstYear+'–'+lastYear+'\u2069'}${candidateBirth&&!forTree?'?':''}${yearSource?' · '+yearSource:''}`:(I18n.isEnglish?'Not added yet':I18n.t('טרם הוזן'));
     const deathEvidence=treeDeathEvidence(p);
-    const deathValueHTML=death?`<span class="person-death-date">${I18n.isEnglish?'Died on ':p.gender==='f'?'נפטרה ב־':'נפטר ב־'}<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:deathEvidence.year?`<span class="person-death-date" title="${safe(deathEvidence.source||'')}">${deathEvidence.candidate?(I18n.isEnglish?'Death · gravestone match under research: ':'פטירה · שיוך המצבה בבדיקה: '):(I18n.isEnglish?'Died in ':p.gender==='f'?'נפטרה ב־':'נפטר ב־')}<bdi dir="ltr">${deathEvidence.year}${deathEvidence.candidate?'?':''}</bdi></span>`:'';
+    const deathValueHTML=death?`<span class="person-death-date">${I18n.isEnglish?'Died on ':p.gender==='f'?'נפטרה ב־':'נפטר ב־'}<bdi>${safe(I18n.date(p.deathDate))}</bdi></span>`:deathEvidence.year?`<span class="person-death-date" title="${safe(deathEvidence.source||'')}">${deathEvidence.candidate?(I18n.isEnglish?'Death · gravestone match under research: ':'פטירה · שיוך המצבה בבדיקה: '):(I18n.isEnglish?'Died in ':p.gender==='f'?'נפטרה ב־':'נפטר ב־')}<bdi dir="ltr">${deathEvidence.year}${deathEvidence.candidate&&!forTree?'?':''}</bdi></span>`:'';
     const deathHTML=deathValueHTML?deathValueHTML.replace(/^(<span[^>]*>)/,`$1${deathEdit}<span class="life-date-value">`).replace(/<\/span>$/, '</span></span>'):'';
     const rangeLabel=range=>range?(range.min===range.max?String(range.min):range.min+'–'+range.max):'';
     const currentRange=!invalid&&yearOnly?rangeLabel(window.FamilyDates.ageRange?.(firstYear,lastYear)):!invalid&&p.deceased&&p.researchNotes&&!unknown?String(window.FamilyDates.age(value)??''):'';
@@ -124,12 +124,11 @@
     const person={...p,...getMedia(p)},years=treeBirthYears(p),death=treeDeathEvidence(person);
     const candidateBirth=years&&!(!person.invalidBirthday&&treeDateYear(birthdayOf(p)))&&!(person.birthYear??person.birthYearMin)&&Boolean(candidateLifeRecord(person));
     const uncertainty=I18n.isEnglish?'The gravestone identity is under research. Open the profile for sources.':'שיוך המצבה לאדם בבדיקה; המקורות בעמוד האישי.';
-    const mark=source=>`<abbr class="tree-year-uncertain" title="${safe(source||uncertainty)}" aria-label="${safe(uncertainty)}">?</abbr>`;
     const canEdit=editable&&scopedViews&&apiEnabled&&!isPlaceholder(p);
     const pencil='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5L9 20l-6 1 1-6ZM14 5l5 5"/></svg>';
     const edit=(kind,label)=>canEdit?`<button type="button" class="birthday-edit" data-edit-${kind}="${safe(p.id)}" aria-label="${safe(label)}">${pencil}</button>`:'';
-    const birth=years?`<span class="tree-date-value" data-tree-birth-year${candidateBirth?' data-year-candidate':''}><span>${I18n.isEnglish?'Born:':'לידה:'}</span> <bdi dir="ltr">${years[0]===years[1]?years[0]:years[0]+'–'+years[1]}${candidateBirth?mark():''}</bdi></span>`:'';
-    return `<span class="birthday-line">${edit('birthday',I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה')}${birth}</span>`+(death.year?`<span class="person-death-date" data-tree-death-year${death.candidate?' data-year-candidate':''}>${death.candidate?'':edit('death',I18n.isEnglish?'Edit date of death':'עריכת תאריך פטירה')}<span class="tree-date-value"><span>${I18n.isEnglish?'Died:':'פטירה:'}</span> <bdi dir="ltr">${death.year}${death.candidate?mark(death.source):''}</bdi></span></span>`:'');
+    const birth=years?`<span class="tree-date-value" data-tree-birth-year${candidateBirth?' data-year-candidate title="'+safe(uncertainty)+'"':''}><span>${I18n.isEnglish?'Born:':'לידה:'}</span> <bdi dir="ltr">${years[0]===years[1]?years[0]:years[0]+'–'+years[1]}</bdi></span>`:'';
+    return `<span class="birthday-line">${edit('birthday',I18n.isEnglish?'Edit date of birth':'עריכת תאריך לידה')}${birth}</span>`+(death.year?`<span class="person-death-date" data-tree-death-year${death.candidate?' data-year-candidate title="'+safe(death.source||uncertainty)+'"':''}>${death.candidate?'':edit('death',I18n.isEnglish?'Edit date of death':'עריכת תאריך פטירה')}<span class="tree-date-value"><span>${I18n.isEnglish?'Died:':'פטירה:'}</span> <bdi dir="ltr">${death.year}</bdi></span></span>`:'');
   }
   function treePartnershipLabel(p,partnership,unit){
     if(!compactTreeYears)return partnership?(I18n.isEnglish?partnership.labelEn:partnership.label):'';
@@ -179,9 +178,9 @@
     if(rootPerson&&!isPhone()){
       const memorial=!scopedViews||p.deceased;
       const label=I18n.t('פתיחת העמוד האישי של ')+nameOf(p);
-      return I18n.html`<article class="person-card${memorial?' memorial':''} root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${memorial?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button>${roleHTML}<div class="person-birthday root-person-birth${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,false):birthdayHTML(p,false,true)}</div>${partnershipHTML}</div><div class="root-person-details" data-root-history="${p.id}">${compactTreeYears?'':rootHistoryHTML(p)}</div>${founderLink}</article>`;
+      return I18n.html`<article class="person-card${memorial?' memorial':''} root-person-card" data-person-card="${p.id}"><div class="root-person-identity"><button class="person-open root-person-portrait" data-person="${p.id}" aria-label="${safe(label)}">${portraitHTML(p)}<span class="person-name">${safe(nameOf(p))}${memorial?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button>${roleHTML}<div class="person-birthday root-person-birth${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}" data-birthday-readonly data-birthday-only${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,false):birthdayHTML(p,false,true,true)}</div>${partnershipHTML}</div><div class="root-person-details" data-root-history="${p.id}">${compactTreeYears?'':rootHistoryHTML(p)}</div>${founderLink}</article>`;
     }
-    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button>${roleHTML}<div class="person-birthday${unset?' birthday-unset':''}${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,!rootPerson):birthdayHTML(p,!rootPerson)}</div>${partnershipHTML}${founderLink}</article>`;
+    return I18n.html`<article class="person-card${p.deceased?' memorial':''}${isPlaceholder(p)?' placeholder-person':''}" data-person-card="${p.id}"><button class="person-open" data-person="${p.id}" aria-label="פתיחת העמוד האישי של ${safe(nameOf(p))}">${portraitHTML(p)}<span class="person-name${nameOf(p).length>17?' long-name':''}">${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</span></button>${roleHTML}<div class="person-birthday${unset?' birthday-unset':''}${compactTreeYears?' tree-life-years':''}" data-birthday-for="${p.id}"${rootPerson?' data-birthday-readonly':''}${compactTreeYears?' data-tree-years':''}>${compactTreeYears?treeLifeYearsHTML(p,!rootPerson):birthdayHTML(p,!rootPerson,false,true)}</div>${partnershipHTML}${founderLink}</article>`;
   }
   function toast(message,action) {
     clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -511,7 +510,7 @@
       if (strong) strong.innerHTML = safe(nameOf(p)) + (p.deceased ? I18n.t(' <span class="memorial-inline">ז״ל</span>') : '');
       const birthday = node.closest('[data-person-card]')?.querySelector('[data-birthday-for]');
       const person={...p,...getMedia(p)},signature=[birthdayOf(p),person.invalidBirthday,person.deceased,person.deathDate,person.deathYear,person.birthYear,person.birthYearMin,person.birthYearMax,JSON.stringify(person.lifeRecords),new Date().toDateString()].join('|');
-      if (birthday && birthday.dataset.dateSignature !== signature) {birthday.innerHTML=birthday.hasAttribute('data-tree-years')?treeLifeYearsHTML(p,!birthday.hasAttribute('data-birthday-readonly')):birthdayHTML(p,!birthday.hasAttribute('data-birthday-readonly'),birthday.hasAttribute('data-birthday-only'));birthday.dataset.dateSignature=signature;}
+      if (birthday && birthday.dataset.dateSignature !== signature) {birthday.innerHTML=birthday.hasAttribute('data-tree-years')?treeLifeYearsHTML(p,!birthday.hasAttribute('data-birthday-readonly')):birthdayHTML(p,!birthday.hasAttribute('data-birthday-readonly'),birthday.hasAttribute('data-birthday-only'),Boolean(birthday.closest('#treeNodes')));birthday.dataset.dateSignature=signature;}
       const history=node.closest('.root-person-card')?.querySelector('[data-root-history]');if(history)history.innerHTML=compactTreeYears?'':rootHistoryHTML(p);
       node.setAttribute('aria-label', I18n.t('פתיחת העמוד האישי של ') + nameOf(p));
     }
@@ -815,7 +814,7 @@
       touches.set(event.pointerId,{x:event.clientX,y:event.clientY});
       if(touches.size===2){const [a,b]=[...touches.values()],rect=viewport.getBoundingClientRect();pinch={distance:Math.hypot(a.x-b.x,a.y-b.y),scale:camera.scale,x:(a.x+b.x)/2-rect.left,y:(a.y+b.y)/2-rect.top,cameraX:camera.x,cameraY:camera.y};drag=null;for(const id of touches.keys())viewport.setPointerCapture(id);suppressClickUntil=performance.now()+500;return;}
     }else if(event.target.closest('button,a'))return;
-    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:camera.x,y:camera.y,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,vx:0,vy:0,started:false,touch:event.pointerType==='touch',nativeScroll:event.pointerType==='touch'&&isPhone()&&viewport.dataset.overview==='true'};
+    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:camera.x,y:camera.y,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,vx:0,vy:0,started:false,touch:event.pointerType==='touch',nativeScroll:event.pointerType==='touch'&&isPhone()&&viewport.dataset.overview==='true'&&!viewport.classList.contains('tree-is-fullscreen')};
   });
   viewport.addEventListener('pointermove',event=>{
     if(touches.has(event.pointerId))touches.set(event.pointerId,{x:event.clientX,y:event.clientY});
@@ -836,7 +835,7 @@
   }
   function endDrag(event){
     const ended=drag;touches.delete(event.pointerId);pinch=null;drag=null;viewport.classList.remove('dragging');
-    if(touches.size===1){const [id,point]=[...touches][0];drag={id,startX:point.x,startY:point.y,x:camera.x,y:camera.y,lastX:point.x,lastY:point.y,time:event.timeStamp,vx:0,vy:0,started:true,touch:true,nativeScroll:isPhone()&&viewport.dataset.overview==='true'};}
+    if(touches.size===1){const [id,point]=[...touches][0];drag={id,startX:point.x,startY:point.y,x:camera.x,y:camera.y,lastX:point.x,lastY:point.y,time:event.timeStamp,vx:0,vy:0,started:true,touch:true,nativeScroll:isPhone()&&viewport.dataset.overview==='true'&&!viewport.classList.contains('tree-is-fullscreen')};}
     else if(ended?.started&&ended.touch){suppressClickUntil=performance.now()+400;if(event.timeStamp-ended.time<90)momentum(Math.max(-3,Math.min(3,ended.vx)),ended.nativeScroll?0:Math.max(-3,Math.min(3,ended.vy)));}
   }
   viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointercancel',event=>{touches.clear();pinch=null;drag=null;viewport.classList.remove('dragging');stopTreeMotion();});

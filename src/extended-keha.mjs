@@ -63,6 +63,14 @@ export function shlomoKehaHTML(original,appOrigin=''){
 
 export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev'){
   const portal=BRANCH_PORTALS[id];
+  const extendedHome=extendedOrigin+EXTENDED_HOME;
+  const extendedLogo='<img src="/keha-extended/brand.svg" alt="" width="32" height="32">';
+  const extendedTrigger=placement=>'<button type="button" class="'+(placement==='header'?'family-extended-button':'nav-link')+'" data-extended-open="'+placement+'" aria-haspopup="dialog" aria-controls="extendedKehaDialog" data-i18n-skip>'+extendedLogo+'<span data-extended-label>'+(placement==='header'?'לאתר קהא המורחבת':'לאתר משפחת קהא המורחבת')+'</span></button>';
+  const extendedDialog='<dialog id="extendedKehaDialog" class="family-extended-dialog" aria-labelledby="extendedKehaTitle" data-i18n-skip>'+
+    '<button type="button" class="family-extended-close" data-extended-close aria-label="סגירה">×</button>'+extendedLogo+
+    '<h2 id="extendedKehaTitle">קהא המורחבת</h2><p data-extended-intro>איך תרצו לפתוח את אתר המשפחה?</p>'+
+    '<div class="family-extended-choices"><a data-extended-install-link href="'+extendedHome+'?install=1#home"><span class="family-extended-choice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="12" height="20" rx="2"/><path d="M8 18h4M19 5v8m-4-4h8"/></svg></span><span><strong data-extended-install-title>התקנת האתר במסך הבית</strong><small data-extended-install-note>קיצור ישיר לאתר קהא המורחבת</small></span></a>'+
+    '<a data-extended-tree-link href="'+extendedHome+'#tree"><span class="family-extended-choice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg></span><span><strong data-extended-visit-title>מעבר לאתר</strong><small data-extended-visit-note>לכל ענפי משפחת קהא המורחבת</small></span></a></div></dialog>';
   const startup=appleLaunchImages(id).map(({href,media})=>'<link rel="apple-touch-startup-image" href="'+href+'" media="'+media+'">').join('\n');
   let html=withStoryFormLink(branchHomeHTML(original),id)
     .replace('<html ','<html data-branch-portal="'+id+'" data-branch-name-en="'+portal.nameEn+'" data-branch-tagline="'+portal.tagline+'" data-branch-tagline-en="'+portal.taglineEn+'" data-keha-extended-home="'+extendedOrigin+EXTENDED_HOME+'" data-keha-api-prefix="'+portal.home+'api/compat" ')
@@ -83,9 +91,10 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=1">'+startup+'</head>')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+portal.name+'</h2>')
     .replace('חמישה דורות, סיפור אחד',portal.tagline)
-    .replace('<main id="mainContent"','<nav class="family-extended-access" aria-label="קהא המורחבת" data-i18n-skip><a data-extended-tree-link href="'+extendedOrigin+EXTENDED_HOME+'#tree">קהא המורחבת</a><a data-extended-install-link href="'+extendedOrigin+EXTENDED_HOME+'?install=1#home">התקנת קהא המורחבת</a></nav><main id="mainContent"');
-  html=html.replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=2"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=single-family-v1" defer></script>\n$1');
+    .replace(/(<button\b[^>]*data-view="tree"[^>]*>.*?<\/button>)/,'$1'+extendedTrigger('nav'))
+    .replace('<main id="mainContent"','<nav class="family-extended-access" aria-label="קהא המורחבת" data-i18n-skip>'+extendedTrigger('header')+'</nav>'+extendedDialog+'<main id="mainContent"');
+  html=html.replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=extended-choice-v3"></head>')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=extended-choice-v2" defer></script>\n$1');
   return html;
 }
 

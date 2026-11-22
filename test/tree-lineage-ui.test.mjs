@@ -89,7 +89,9 @@ test('Hebrew life dates keep each pencil before its own label and retain histori
     const candidate=f.card('tri-yona').querySelector('[data-tree-death-year]');
     assert.ok(candidate.hasAttribute('data-year-candidate'));
     assert.equal(candidate.querySelector('[data-edit-death]'),null,'Unconfirmed evidence is not silently promoted to an editable confirmed date');
-    assert.match(candidate.textContent,/1985\?/);
+    assert.match(candidate.textContent,/1985/);
+    assert.doesNotMatch(candidate.textContent,/\?/);
+    assert.ok(candidate.getAttribute('title'));
   }
 });
 

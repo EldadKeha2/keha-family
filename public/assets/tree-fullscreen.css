@@ -1,0 +1,12 @@
+#treeFullscreenButton{display:grid;place-items:center}
+#treeFullscreenButton svg{display:block;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#treeFullscreenButton .tree-fullscreen-collapse{display:none}
+.tree-is-fullscreen #treeFullscreenButton .tree-fullscreen-expand{display:none}
+.tree-is-fullscreen #treeFullscreenButton .tree-fullscreen-collapse{display:initial}
+html.tree-fullscreen-active,html.tree-fullscreen-active body{overflow:hidden}
+#treeViewport.tree-is-fullscreen{position:fixed;inset:0;z-index:10000;box-sizing:border-box;width:100%;height:100vh;height:100dvh;min-height:0;max-width:none;max-height:none;margin:0;border:0;border-radius:0;background-color:var(--paper,#fffdf7);touch-action:none;overscroll-behavior:contain}
+#treeViewport.tree-is-fullscreen::backdrop{background:var(--paper,#fffdf7)}
+#treeViewport.tree-is-fullscreen .zoom-controls{left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 24px);height:auto;min-height:44px;padding:3px;flex-wrap:wrap}
+#treeViewport.tree-is-fullscreen .zoom-controls button{width:44px;height:44px;min-width:44px;min-height:44px}
+#treeViewport.tree-is-fullscreen .canvas-hint{display:none}
+@media(max-width:700px){body[data-active-view=tree] .workspace-header .workspace-actions{display:none}}
