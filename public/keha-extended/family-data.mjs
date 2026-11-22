@@ -12,12 +12,12 @@ export const EXTENDED_BRANCHES = Object.freeze([
   {id:'shlomo', unit:'u-root', label:'משפחת שלמה קהא', shortLabel:'שלמה בן זכריה', titleEn:'Shlomo Keha Family', color:'#536641', mark:'❖'},
   {id:'zechariah', unit:'u-keha-zechariah', label:'המשפחה של זכריה (בן שלום) קהא', shortLabel:'זכריה בן שלום', titleEn:'Keha family — Zechariah, son of Shalom', color:'#913951', mark:'❖'},
   {id:'kehat-tzadok', unit:'u-kehat-tzadok-elder', label:'המשפחה של זכריה (בן צדוק) קהא', shortLabel:'זכריה בן צדוק', titleEn:'Keha family — Zechariah, son of Tzadok', color:'#b4523b', mark:'❖'},
-  {id:'kehat', unit:'u-kehat-aharon-elder', label:'המשפחה של סעדיה (ג׳ידעאן) קהא', shortLabel:'סעדיה (ג׳ידעאן)', titleEn:'Kehat family — Saadia (Jidaan)', color:'#167d9a', mark:'❖'},
+  {id:'kehat', unit:'u-kehat-aharon-elder', label:'המשפחה של סעדיה (ג׳ימעאן) קהא', shortLabel:'סעדיה (ג׳ימעאן)', titleEn:'Kehat family — Saadia (Jimaan)', color:'#167d9a', mark:'❖'},
   {id:'yissachar', unit:'u-keha-yissachar', label:'משפחת יששכר · יוסף וצביה', shortLabel:'משפחת יששכר', titleEn:'Yissachar family · Yosef and Tzvia', color:'#6b645b', mark:'❖'},
 ].map(Object.freeze));
 
 // The supplied family chart is the source for these names and marriages.
-// The owner identified Jidaan as Saadia, son of Aharon. Tzadok and Aharon's
+// The owner identified Jimaan as Saadia, son of Aharon. Tzadok and Aharon's
 // branches remain independent until their relationship is established.
 const people = [
   ['keha-zechariah','זכריה קהא בן שלום','Zechariah Keha, son of Shalom','m','u-keha-zechariah',['זכריה קהא','זכריה קהא הבן'],{deceased:true,about:'בנו של שלום קהא, בן דודו של שלמה קהא ובעלה של יהודית בת סעדיה. זוהה במשפחה עם רשומת הבוחרים מ־1949 ועם הקבר של זכריה בן שלום. הקשר לרשומת זכריה בן סעדיה מ־1936 טרם הוכרע.'}],
@@ -26,7 +26,7 @@ const people = [
   ['kehat-tzadok-elder','צדוק קהא','Tzadok Keha','m','u-kehat-tzadok-elder'],
   ['kehat-zechariah-ben-tzadok','זכריה בן צדוק קהת','Zechariah Kehat, son of Tzadok','m','u-kehat-zechariah-ben-tzadok',['זכריה בן צדוק קהא']],
   ['kehat-aharon-elder','אהרון קהא','Aharon Keha','m','u-kehat-aharon-elder'],
-  ['kehat-jidaan','סעדיה (ג׳ידעאן) בן אהרון קהא','Saadia (Jidaan) Keha, son of Aharon','m','u-keha-kehat',['ג׳ידעאן קהא','ג׳ימען קהא','גימען קהא','גידעאן קהא','סעדיה בן אהרון קהא']],
+  ['kehat-jidaan','סעדיה (ג׳ימעאן) בן אהרון קהא','Saadia (Jimaan) Keha, son of Aharon','m','u-keha-kehat',['ג׳ימעאן קהא','סעדיה בן אהרון קהא']],
   ['kehat-first-wife','שם האישה הראשונה טרם נמסר','First wife — name not yet known','f','u-keha-kehat',[],{placeholder:true}],
   ['kehat-miriam','מרים קהת','Miriam Kehat','f','u-keha-kehat'],
   ['kehat-yaakov','יעקב קהת','Yaakov Kehat','m','u-kehat-yaakov'],
@@ -57,7 +57,7 @@ enrichHistoricalLifeEvidence(seedPeople);
 applyRegistryEvidence(seedPeople);
 export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(Object.freeze));
 
-const firstChildren = ['yaakov','zechariah','aharon','yehudit'].map(id=>'u-kehat-'+id);
+const firstChildren = ['zechariah','aharon','yehudit','yaakov'].map(id=>'u-kehat-'+id);
 // The owner confirmed all four children of Saadia and Miriam, in this order.
 const secondChildren = ['tzion','shula','tzvia','hadassah'].map(id=>'u-kehat-'+id);
 const units = [

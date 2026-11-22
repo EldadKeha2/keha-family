@@ -31,8 +31,6 @@ export function initializeExtendedKeha(state) {
     const updateMerav=!state.rows('SELECT id FROM meta WHERE id=?',meravMigration).length;
     const triArchiveMigration='extended-tri-childbirth-archive-1954-2026-11-21-v1';
     const updateTriArchive=!state.rows('SELECT id FROM meta WHERE id=?',triArchiveMigration).length;
-    const shlomoMigration='extended-kehat-shlomo-sarah-esther-2026-11-21-v1';
-    const updateShlomo=!state.rows('SELECT id FROM meta WHERE id=?',shlomoMigration).length;
     const triDeathMigration='extended-tri-confirmed-death-dates-2026-11-21-v1';
     const updateTriDeath=!state.rows('SELECT id FROM meta WHERE id=?',triDeathMigration).length;
     const lifeYearsMigration='extended-historical-life-years-2026-11-21-v1';
@@ -59,12 +57,6 @@ export function initializeExtendedKeha(state) {
         Object.assign(saved,{name:seed.name,firstName:'אהרון',lastName:'חובשי קהא',nameEn:seed.englishName,englishName:seed.englishName});
         state.savePerson(saved);
         state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',aharonNameMigration,'done');
-      }
-      if(updateShlomo&&['kehat-shlomo','kehat-shlomo-sarah','kehat-esther'].includes(seed.id)){
-        const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
-        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',shlomoMigration+':backup:'+seed.id,JSON.stringify(saved));
-        for(const key of ['researchNotes','birthYear','birthYearSource','birthYearSourceEn','recordedParents'])if(seed[key]!==undefined)saved[key]=structuredClone(seed[key]);
-        saved.unit=seed.unit;state.savePerson(saved);
       }
       if(updateTri&&seed.triFamily){
         const saved=JSON.parse(state.rows('SELECT data FROM people WHERE id=?',seed.id)[0].data);
@@ -295,7 +287,6 @@ export function initializeExtendedKeha(state) {
       }
       state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triArchiveMigration,'done');
     }
-    if(updateShlomo)state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',shlomoMigration,'done');
     initializeKehatDocuments(state);
     initializeRegistryDocuments(state);
     state.peopleRevision=uid();state.peopleCache=null;

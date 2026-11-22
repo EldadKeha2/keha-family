@@ -21,11 +21,22 @@ export function correctPersonName(value){
     .replace(/(?<![\p{L}\p{N}])Suri(?![\p{L}\p{N}])/giu,'Shori');
 }
 
+export function correctJimaanName(value){
+  return value.replace(/(?<![\p{L}\p{N}])([ובכלמשה]{0,3})ג[׳'’]?(?:יד|ימ|מ)עא?ן(?![\p{L}\p{N}])/gu,'$1ג׳ימעאן')
+    .replace(/(?<![\p{L}\p{N}])([ובכלמשה]{0,3})ג[׳'’]ומעאן(?![\p{L}\p{N}])/gu,'$1ג׳ימעאן')
+    .replace(/(?<![\p{L}\p{N}/-])Jidaan(?![\p{L}\p{N}/-])/giu,'Jimaan');
+}
+
 const displayFields=new Set(['name','nameEn','englishName','firstName','lastName','researchNotes','researchNotesEn','caption','title','titleEn','body','bodyEn','author','about','aboutEn','description','descriptionEn','text','textEn','notes','notesEn','message','filename','label','labelEn','occupation','occupationEn','employer','role','question','options','answers','explanation','hint']);
+const researchTextFields=new Set(['aliases','attributionNote','note','sourceLabel']);
 // Only display text changes. Storage keys, URLs, IDs and photo edit metadata stay intact.
-export function correctNamedContent(value,field=''){
-  if(typeof value==='string')return displayFields.has(field)?correctPersonName(value):value;
-  if(Array.isArray(value))return value.map(item=>correctNamedContent(item,field));
-  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,correctNamedContent(item,key)]));
+export function correctNamedContent(value,field='',correct=correctPersonName){
+  if(field==='uploadFields')return value;
+  if(typeof value==='string'){
+    const editable=displayFields.has(field)||(correct===correctJimaanName&&researchTextFields.has(field));
+    return editable?correct(value):value;
+  }
+  if(Array.isArray(value))return value.map(item=>correctNamedContent(item,field,correct));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,correctNamedContent(item,key,correct)]));
   return value;
 }

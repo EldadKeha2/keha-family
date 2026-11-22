@@ -21,18 +21,19 @@ const manifest=JSON.parse(await readFile(new URL('../public/keha-extended/manife
 const site=path=>'/keha-extended/api/compat/api/'+path;
 const shlomoSite=path=>SHLOMO_HOME+'api/compat/api/'+path;
 
-test('the confirmed 1949 household joins Sarah and Esther to Shlomo without inventing exact birth dates',()=>{
-  const tree=createExtendedFamily(family);
-  assert.deepEqual(tree.units['u-kehat-shlomo'].people,['kehat-shlomo','kehat-shlomo-sarah']);
-  assert.deepEqual(tree.units['u-kehat-shlomo'].children,['u-kehat-esther']);
-  assert.equal(tree.units['u-kehat-esther'].parent,'u-kehat-shlomo');
-  for(const [id,year] of [['kehat-shlomo-sarah',1900],['kehat-esther',1930]]){
-    assert.equal(tree.people[id].birthYear,year);assert.notEqual(tree.people[id].birthday,'1.1.'+year);
+test('Jimaan and Shoshana’s four children stay distinct from the Tzadok family and the 1949 register household',()=>{
+  const first=['u-kehat-zechariah','u-kehat-aharon','u-kehat-yehudit','u-kehat-yaakov'];
+  for(const tree of [createExtendedFamily(family),createBranchPortal(family,'kehat')]){
+    const couple=tree.units['u-keha-kehat'];
+    assert.deepEqual(couple.relationships[0].children,first);
+    assert.deepEqual(couple.children,[...first,...couple.relationships[1].children]);
+    for(const id of first)assert.equal(tree.units[id].parent,couple.id);
+    for(const id of ['kehat-shlomo','kehat-shlomo-sarah','kehat-esther'])assert.equal(tree.people[id],undefined);
+    for(const id of ['u-kehat-shlomo','u-kehat-esther'])assert.equal(tree.units[id],undefined);
+    assert.ok(tree.people['kehat-shlomo-afjin']&&tree.people['tri-esther']);
+    assert.deepEqual(tree.units['u-kehat-yehudit'].people,['kehat-yehudit']);
+    assert.deepEqual(tree.units['u-kehat-yaakov'].people,['kehat-yaakov','kehat-yaakov-yehudit']);
   }
-  assert.equal(tree.people['kehat-shlomo'].birthYearMin,1896);assert.equal(tree.people['kehat-shlomo'].birthYearMax,1903);
-  assert.equal(tree.people['kehat-shlomo'].birthYear,null);
-  assert.match(tree.people['kehat-shlomo'].researchNotes,/1903/);
-  assert.equal(tree.units['u-kehat-shlomo'].parent,'u-keha-kehat');
 });
 test('the 1949 couple and the Tri household keep separate fathers, wives and conflicting source years',()=>{
   const tree=createExtendedFamily(family),z=tree.people['keha-zechariah'],j=tree.people['keha-yehudit'];
@@ -258,15 +259,15 @@ test('Tzadok and Aharon have separate sons and no invented kinship between their
   }
   assert.equal(data.people['kehat-zechariah-ben-tzadok'].branch,'kehat-tzadok');
   assert.equal(data.people['kehat-jidaan'].branch,'kehat');
-  assert.equal(data.people['kehat-jidaan'].name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
-  assert.deepEqual(relatives('kehat-jidaan').children,['kehat-yaakov','kehat-zechariah','kehat-aharon','kehat-shlomo','kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah']);
+  assert.equal(data.people['kehat-jidaan'].name,'סעדיה (ג׳ימעאן) בן אהרון קהא');
+  assert.deepEqual(relatives('kehat-jidaan').children,['kehat-zechariah','kehat-aharon','kehat-yehudit','kehat-yaakov','kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah']);
   const secondChildren=['kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah'];
   assert.deepEqual(relatives('kehat-miriam').children,secondChildren);
   for(const id of secondChildren){
     assert.deepEqual(relatives(id).parents,['kehat-jidaan','kehat-miriam']);
     assert.equal(data.people[id].branch,'kehat');
   }
-  assert.deepEqual(relatives('kehat-first-wife').children,['kehat-yaakov','kehat-zechariah','kehat-aharon','kehat-shlomo']);
+  assert.deepEqual(relatives('kehat-first-wife').children,['kehat-zechariah','kehat-aharon','kehat-yehudit','kehat-yaakov']);
   assert.notEqual(data.people['kehat-zechariah'].id,data.people['kehat-zechariah-ben-tzadok'].id);
   assert.ok(!relatives('kehat-jidaan').children.includes('kehat-zechariah-ben-tzadok'));
 });
@@ -310,7 +311,8 @@ test('the marriage bridge uses one set of people and keeps both spouses’ own p
   assert.deepEqual(rel('kehat-mordechai').children.map(id=>data.people[id].name),['מירב','שרון','עדי','טל']);
   assert.deepEqual(rel('kehat-shori').partners,[]);
   assert.deepEqual(rel('kehat-yaakov-miriam').partners,[]);
-  assert.deepEqual(rel('kehat-yehudit').parents,[]);
+  assert.deepEqual(rel('kehat-yehudit').parents,['kehat-jidaan','kehat-first-wife']);
+  assert.deepEqual(rel('kehat-yehudit').partners,[]);
   for(const [parent,children] of [['kehat-jidaan',['kehat-yaakov']],['kehat-zechariah-ben-tzadok',['kehat-yaakov-yehudit']],['kehat-yaakov',['kehat-havazelet','kehat-ari','kehat-gila']],['kehat-yaakov-yehudit',['kehat-havazelet','kehat-ari','kehat-gila']]])for(const child of children)assert.ok(rel(parent).children.includes(child));
   assert.equal(data.people['kehat-yaakov'].branch,'kehat');
   assert.equal(data.people['kehat-yaakov-yehudit'].branch,'kehat-tzadok');
@@ -488,12 +490,12 @@ test('confirmed death dates migrate once while candidate gravestones never repla
   }finally{f.close();}
 });
 
-test('identifying Jidaan as Saadia preserves his shared profile, albums and subsequent name edits',async()=>{
+test('identifying Jimaan as Saadia preserves his shared profile, albums and subsequent name edits',async()=>{
   const f=fixture();try{
     const id='kehat-jidaan';
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:'ג׳ידעאן קהת',nameEn:'Jidaan Kehat',about:'סיפור שכבר נכתב',birthday:'2.3.1900',extra:true,profileId:null}));
     const first=await f.json(site('people/'+id+'/page'));
-    assert.equal(first.person.name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
+    assert.equal(first.person.name,'סעדיה (ג׳ימעאן) בן אהרון קהא');
     assert.equal(first.person.birthday,'2.3.1900');
     assert.equal(first.person.about,'סיפור שכבר נכתב');
     const portrait=await f.json(site('people/'+id+'/photos?filename=saadia.jpg'),{method:'POST',body:photo});
@@ -903,7 +905,7 @@ test('the separated Kehat and Tzadok portals render their complete trees on desk
   }
 });
 
-test('Jidaan stays below Aharon with each marriage’s descendants on its own side',async()=>{
+test('Jimaan stays below Aharon with each marriage’s descendants on its own side',async()=>{
   const app=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
   for(const portal of [false,true])for(const phone of [false,true])for(const english of [false,true])for(const text of [100,160]){
     const {document,window:dom}=parseHTML(portal?branchPortalHTML(originalHTML,'kehat'):extendedKehaHTML(originalHTML));
@@ -919,7 +921,7 @@ test('Jidaan stays below Aharon with each marriage’s descendants on its own si
       return {left,right:left+width,center:left+width/2};
     };
     const main=bounds('u-keha-kehat'),ancestor=bounds('u-kehat-aharon-elder');
-    assert.ok(Math.abs(ancestor.center-main.center)<0.001,'The ancestor connects straight down to Jidaan');
+    assert.ok(Math.abs(ancestor.center-main.center)<0.001,'The ancestor connects straight down to Jimaan');
     const cards=[...document.querySelectorAll('[data-unit="u-keha-kehat"] [data-person-card]')].map(node=>node.dataset.personCard);
     assert.deepEqual(cards,['kehat-first-wife','kehat-jidaan','kehat-miriam']);
     const [first,second]=data.units['u-keha-kehat'].relationships;
@@ -934,8 +936,11 @@ test('Jidaan stays below Aharon with each marriage’s descendants on its own si
       assert.equal(connector.dataset.childUnits,relation.children.join(' '));
     }
     assert.deepEqual(second.children,['u-kehat-tzion','u-kehat-shula','u-kehat-tzvia','u-kehat-hadassah']);
-    const centers=second.children.map(id=>bounds(id).center);
-    assert.ok(centers.every((center,index)=>index===0||(english?center>centers[index-1]:center<centers[index-1])),'The four second-marriage branches follow the confirmed order');
+    assert.deepEqual(first.children,['u-kehat-zechariah','u-kehat-aharon','u-kehat-yehudit','u-kehat-yaakov']);
+    for(const marriage of [first,second]){
+      const centers=marriage.children.map(id=>bounds(id).center);
+      assert.ok(centers.every((center,index)=>index===0||(english?center>centers[index-1]:center<centers[index-1])),'Children appear in birth order on their mother’s side');
+    }
     assert.equal(document.querySelectorAll('[data-unit="u-keha-kehat"] .tree-partnerships path').length,2);
   }
 });
@@ -1102,7 +1107,7 @@ test('concise life and marriage years reach both independent Kehat families and 
     if(portal==='kehat'){
       born('kehat-zechariah',1902);born('tri-yona',1912);born('tri-esther',1934);
       born('kehat-jidaan','1870–1877');died('kehat-jidaan',1962);born('kehat-miriam',1912);
-      born('kehat-shlomo','1896–1903');died('kehat-zechariah',1979);
+      assert.equal(card('kehat-shlomo'),null);died('kehat-zechariah',1979);
       born('kehat-aharon','1904–1906');died('kehat-aharon','1977');
       assert.ok(card('kehat-aharon').querySelector('[data-tree-death-year][data-year-candidate][title]'));
       assert.equal(document.querySelector('#treeNodes .tree-year-uncertain'),null);
@@ -1154,8 +1159,8 @@ test('Saadia remains Keha after the children’s surname changes and an already 
     f.database.prepare('DELETE FROM meta WHERE id=? OR id=?').run(migration,migration+':backup:'+id);
     f.restart();
     const corrected=(await f.json(path)).person;
-    assert.equal(corrected.id,id);assert.equal(corrected.name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
-    assert.equal(corrected.nameEn,'Saadia (Jidaan) Keha, son of Aharon');
+    assert.equal(corrected.id,id);assert.equal(corrected.name,'סעדיה (ג׳ימעאן) בן אהרון קהא');
+    assert.equal(corrected.nameEn,'Saadia (Jimaan) Keha, son of Aharon');
     assert.equal(corrected.firstName,undefined);assert.equal(corrected.lastName,undefined);
     assert.equal(corrected.birthYearMin,1870);assert.equal(corrected.birthYearMax,1877);
     assert.equal(corrected.deathDate,'9.12.1962');assert.equal(corrected.about,saved.about);
@@ -1164,9 +1169,9 @@ test('Saadia remains Keha after the children’s surname changes and an already 
     assert.equal(stored.profileId,'existing-saadia-portrait');
     assert.match((await f.json(site('people/kehat-yaakov/page'))).person.name,/קהת/);
     const tree=createExtendedFamily(family);
-    assert.equal(tree.people['kehat-jidaan'].name,'סעדיה (ג׳ידעאן) בן אהרון קהא');
+    assert.equal(tree.people['kehat-jidaan'].name,'סעדיה (ג׳ימעאן) בן אהרון קהא');
     assert.equal(tree.people['kehat-yaakov'].name,'יעקב קהת');
-    assert.equal(tree.people['kehat-shlomo'].name,'שלמה קהת');
+    assert.equal(tree.people['kehat-shlomo'],undefined);
     const backup=migration+':backup:'+id;
     assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(backup).value).profileId,'existing-saadia-portrait');
     f.restart();assert.equal((await f.json(path)).person.name,corrected.name);

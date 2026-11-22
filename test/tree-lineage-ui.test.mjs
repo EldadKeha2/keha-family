@@ -36,13 +36,13 @@ function fixture(portal,{phone=false,english=false,text=100,unitHeight=0,overvie
 test('each parent branch reaches its own child and labels the spouse on either side of an RTL or English tree',()=>{
   for(const phone of [false,true])for(const english of [false,true])for(const text of [100,160]){
     const f=fixture('kehat',{phone,english,text});
-    assert.equal(f.role('kehat-shlomo').textContent,english?'Son of Saadia':'בן של סעדיה');
-    assert.equal(f.role('kehat-shlomo-sarah').textContent,english?'Wife of Shlomo':'אשתו של שלמה');
-    assert.equal(f.role('kehat-shlomo-sarah').dataset.treeRole,'partner');
-    assert.equal(f.role('kehat-shlomo').dataset.rolePerson,'kehat-jidaan');
-    const child=f.incoming('kehat-shlomo');
-    assert.ok(english?child.x<child.middle:child.x>child.middle,'The line ends over Shlomo’s portrait, away from the couple’s midpoint');
-    assert.equal(f.document.querySelector('#treeConnectors [data-child-person="kehat-shlomo-sarah"]'),null,'Sarah never acquires Saadia as a parent');
+    assert.equal(f.role('kehat-aharon').textContent,english?'Son of Saadia':'בן של סעדיה');
+    assert.equal(f.role('kehat-aharon-saida').textContent,english?'Wife of Aharon':'אשתו של אהרון');
+    assert.equal(f.role('kehat-aharon-saida').dataset.treeRole,'partner');
+    assert.equal(f.role('kehat-aharon').dataset.rolePerson,'kehat-jidaan');
+    const child=f.incoming('kehat-aharon');
+    assert.ok(english?child.x<child.middle:child.x>child.middle,'The line ends over Aharon’s portrait, away from the couple’s midpoint');
+    assert.equal(f.document.querySelector('#treeConnectors [data-child-person="kehat-aharon-saida"]'),null,'Saida never acquires Saadia as a parent');
     assert.equal(f.role('kehat-hadassah').textContent,english?'Daughter of Saadia':'בת של סעדיה');
     const t=fixture('zechariah-tzadok',{phone,english,text});
     assert.equal(t.role('kehat-yaakov-yehudit').textContent,english?'Daughter of Zechariah':'בת של זכריה');
@@ -57,17 +57,17 @@ test('each parent branch reaches its own child and labels the spouse on either s
 test('female silhouettes follow the recorded gender, actual portraits survive updates, and unknown gender stays neutral',()=>{
   for(const phone of [false,true]){
     const f=fixture('kehat',{phone});
-    assert.ok(f.card('kehat-shlomo-sarah').querySelector('svg.silhouette-female[data-placeholder-gender=f]'));
-    assert.ok(f.card('kehat-shlomo').querySelector('svg[data-placeholder-gender=m]'));
-    assert.equal(f.card('kehat-shlomo-sarah').querySelector('.profile-photo'),null);
-    f.window.FamilyApp.updatePerson('kehat-shlomo-sarah',{profile:'/media/original-family-portrait.jpg'});
-    assert.equal(f.card('kehat-shlomo-sarah').querySelector('.profile-photo').getAttribute('src'),'/media/original-family-portrait.jpg');
-    f.window.FamilyApp.updatePerson('kehat-shlomo-sarah',{profile:null});
-    assert.equal(f.card('kehat-shlomo-sarah').querySelector('.profile-photo'),null);
-    assert.ok(f.card('kehat-shlomo-sarah').querySelector('svg.silhouette-female'));
-    const neutral=fixture('kehat',{phone,overrides:{'kehat-shlomo-sarah':{gender:''}}});
-    assert.ok(neutral.card('kehat-shlomo-sarah').querySelector('svg[data-placeholder-gender=unknown]'),'A name does not determine gender');
-    assert.equal(neutral.role('kehat-shlomo-sarah').textContent,'בן/בת זוג של שלמה');
+    assert.ok(f.card('kehat-aharon-saida').querySelector('svg.silhouette-female[data-placeholder-gender=f]'));
+    assert.ok(f.card('kehat-aharon').querySelector('svg[data-placeholder-gender=m]'));
+    assert.equal(f.card('kehat-aharon-saida').querySelector('.profile-photo'),null);
+    f.window.FamilyApp.updatePerson('kehat-aharon-saida',{profile:'/media/original-family-portrait.jpg'});
+    assert.equal(f.card('kehat-aharon-saida').querySelector('.profile-photo').getAttribute('src'),'/media/original-family-portrait.jpg');
+    f.window.FamilyApp.updatePerson('kehat-aharon-saida',{profile:null});
+    assert.equal(f.card('kehat-aharon-saida').querySelector('.profile-photo'),null);
+    assert.ok(f.card('kehat-aharon-saida').querySelector('svg.silhouette-female'));
+    const neutral=fixture('kehat',{phone,overrides:{'kehat-aharon-saida':{gender:''}}});
+    assert.ok(neutral.card('kehat-aharon-saida').querySelector('svg[data-placeholder-gender=unknown]'),'A name does not determine gender');
+    assert.equal(neutral.role('kehat-aharon-saida').textContent,'בן/בת זוג של אהרון');
   }
 });
 

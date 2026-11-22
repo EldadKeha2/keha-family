@@ -6,7 +6,7 @@ import worker,{FamilyState,PUBLIC_WRITE_TOKEN} from '../src/worker.mjs';
 import {NAKASH_WRITE_TOKEN,nakashHTML} from '../src/nakash-shell.mjs';
 import {extendedKehaHTML} from '../src/extended-keha.mjs';
 import {familyApp} from '../family-apps/worker.mjs';
-import {MISATTRIBUTED_YONA_DOCUMENT,UNVERIFIED_YONA_MARRIAGE_DOCUMENT,contentContext,storyInContext} from '../src/family-content.mjs';
+import {MISATTRIBUTED_YONA_DOCUMENT,UNVERIFIED_YONA_MARRIAGE_DOCUMENT,UNATTRIBUTED_KEHAT_REGISTER,contentContext,storyInContext} from '../src/family-content.mjs';
 import {parseHTML} from 'linkedom';
 import {KEHAT_DOCUMENTS} from '../src/kehat-documents.mjs';
 import {sha256} from '../src/http.mjs';
@@ -34,7 +34,7 @@ function fixture(){
   const json=async(path,options)=>{const response=await call(path,options),data=await response.json();assert.ok(response.ok,JSON.stringify({path,status:response.status,data}));return data;};
   let serial=1;
   function media(personId,{type='photo',name='record',filename=name+'.jpg',tags=[],...more}={}){
-    const id=(serial++).toString(16).padStart(32,'0');
+    const id=more.id||(serial++).toString(16).padStart(32,'0');
     const item={id,category:'personal',personId,file:id+'.jpg',filename,name,key:'fixture/'+id,mime:type==='photo'?'image/jpeg':'application/pdf',kind:type,size:100,createdAt:'2026-11-01T00:00:00Z',...more};
     sql.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(id,item.category,personId,JSON.stringify(item));
     for(const p of tags)sql.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(id,p);
@@ -273,10 +273,54 @@ test('the mistaken inheritance attribution is removed once without deleting its 
   }finally{f.close();}
 });
 
+test('the deployed Jimaan family drops the register household and fixes stored captions without losing scans or portraits',async()=>{
+  const f=fixture();
+  try{
+    await f.json(scope('kehat','documents'));
+    const retired=['kehat-shlomo','kehat-shlomo-sarah','kehat-esther'];
+    const names=['שלמה קהת','שרה קהת','אסתר קהת'];
+    for(const [index,id] of retired.entries()){
+      const person={id,name:names[index],extra:true,extendedKeha:true,familyApps:['kehat'],unit:'u-kehat-shlomo'};
+      f.sql.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(id,JSON.stringify(person));
+    }
+    const scan=f.media(retired[0],{id:UNATTRIBUTED_KEHAT_REGISTER,type:'document',name:'שלמה, שרה ואסתר קהת',documentPeople:retired,familyScopes:['kehat'],tags:retired});
+    const father=f.state.person('kehat-jidaan'),daughter=f.state.person('kehat-yehudit');
+    Object.assign(father,{name:'סעדיה (ג׳ידעאן) בן אהרון קהא',nameEn:'Saadia (Jidaan) Keha',aliases:["ג'ידען קהא",'גידעאן קהא'],researchNotes:'בנו של אהרון ואביהם של שלמה, יעקב, זכריה ואהרון מנישואיו הראשונים לשושנה.',profileId:'our-portrait'});
+    f.state.savePerson(father);
+    daughter.researchNotes='השם יהודית הופיע בין ילדי סעדיה בתרשים המוקדם, אך לא אושר בתרשים המאוחר.';f.state.savePerson(daughter);
+    const other=f.media(father.id,{type:'document',name:'תעודה על ג׳ידעאן',caption:"על ג'ידען ושושנה",tags:[father.id]});
+    f.sql.prepare('DELETE FROM meta WHERE id IN (?,?,?)').run('names-jimaan-2026-11-22-v1','kehat-jimaan-children-2026-11-22-v1','family-content-kehat-register-unattributed-2026-11-22-v1');
+    f.restart();
+    for(const branch of ['kehat','extended']){
+      const {people}=await f.json(scope(branch,'tag-people'));
+      assert.ok(retired.every(id=>!people.some(p=>p.id===id)));
+      const current=people.find(p=>p.id===father.id);
+      assert.match(current.name,/ג׳ימעאן/);assert.match(current.nameEn,/Jimaan/);
+      assert.match(current.researchNotes,/זכריה \(הבכור\), אהרון, יהודית ויעקב/);
+      assert.ok(current.aliases.every(alias=>!alias.includes('ידע')));
+      assert.match(people.find(p=>p.id===daughter.id).researchNotes,/גיסתה יהודית בת זכריה בן צדוק/);
+      const docs=(await f.json(scope(branch,'documents'))).items;
+      assert.ok(!docs.some(d=>d.id===scan.id));
+      assert.equal(docs.find(d=>d.id===other.id).caption,'על ג׳ימעאן ושושנה');
+      assert.equal((await f.call(scope(branch,'people/kehat-shlomo/page'))).status,404);
+    }
+    assert.equal((await f.call('/api/people/kehat-shlomo/page')).status,404);
+    const search=await f.json('/api/search?q='+encodeURIComponent('שלמה קהת'));
+    assert.ok(!search.items.some(item=>retired.includes(item.id)||item.id===scan.id));
+    const filed=f.state.media(scan.id);
+    assert.equal(filed.category,'research:unattributed');assert.equal(filed.key,scan.key);
+    assert.deepEqual(f.state.tagIds(scan.id),[]);assert.equal(filed.documentPeople,undefined);
+    assert.equal(f.state.person(father.id).profileId,'our-portrait');
+    const corrected=f.state.person(daughter.id);corrected.about='זיכרון משפחתי';f.state.savePerson(corrected);
+    f.restart();assert.equal(f.state.media(scan.id).modifiedAt,filed.modifiedAt);
+    assert.equal(f.state.person(daughter.id).about,corrected.about);
+  }finally{f.close();}
+});
+
 test('H72727 loses its unverified Shlomo attribution in existing deployments while the scan and confirmed records survive',async()=>{
   const f=fixture();try{
     await f.json(scope('extended','tag-people'));
-    const confirmed=f.media('kehat-shlomo',{type:'document',name:'שלמה, שרה ואסתר · פנקס 1949'});
+    const confirmed=f.media('kehat-yaakov',{type:'document',name:'תעודת הנישואין של יעקב'});
     const tri=f.media('tri-yona',{type:'document',name:'יונה וזכריה · פרס ילודה'});
     const grandma=f.media('yona',{type:'document',name:'תעודת העלייה של יונה נקאש קהא'});
     const item={id:UNVERIFIED_YONA_MARRIAGE_DOCUMENT,category:'personal',personId:'kehat-shlomo',documentPeople:['kehat-shlomo'],familyScopes:['kehat'],kind:'document',mime:'image/jpeg',key:'documents/original-H72727.jpg',filename:'Yona_bat_Shlomo_and_Sarah_marriage_1945_H72727.jpeg',name:'נישואי יונה קהא, בת שלמה ושרה — 5.3.1945',caption:'Original certificate description',createdAt:'2026-11-21T03:56:14.158Z',size:73049};
@@ -291,7 +335,7 @@ test('H72727 loses its unverified Shlomo attribution in existing deployments whi
       assert.equal((await f.json(scope(branch,'documents'))).items.some(d=>d.id===item.id),false,branch);
     }
     assert.equal((await f.json('/api/documents')).items.some(d=>d.id===item.id),false);
-    for(const path of ['/api/people/kehat-shlomo/page',scope('kehat','people/kehat-shlomo/page'),scope('extended','people/kehat-shlomo/page')]){
+    for(const path of ['/api/people/kehat-yaakov/page',scope('kehat','people/kehat-yaakov/page'),scope('extended','people/kehat-yaakov/page')]){
       const page=await f.json(path);assert.equal(page.albums.documents.total,1,path);assert.equal(page.person.documentCount,1,path);
     }
     assert.ok((await f.json(scope('kehat','documents'))).items.some(d=>d.id===confirmed.id));
@@ -333,16 +377,16 @@ test('documents upload original PDF and audio bytes once and share their subject
 test('password protection covers archive and album routes, and removed records stay removed after restart',async()=>{
   const f=fixture();try{
     await f.json(scope('kehat','documents'));await ownerPassword(f);
-    const record=f.media('kehat-esther',{type:'document',name:'A family record',tags:['kehat-shlomo','kehat-shlomo-sarah']});
+    const record=f.media('kehat-havazelet',{type:'document',name:'A family record',tags:['kehat-yaakov','kehat-yaakov-yehudit']});
     for(const password of [undefined,'incorrect'])assert.equal((await f.call(scope('kehat','documents/'+record.id+'/delete'),{method:'POST',body:{password}})).status,401);
-    const scopeValue='personal:kehat-esther';
+    const scopeValue='personal:kehat-havazelet';
     assert.equal((await f.call('/api/media/'+record.id+'/delete',{method:'POST',body:{scope:scopeValue}})).status,401);
     assert.equal((await f.call(scope('kehat','media/'+record.id+'/delete'),{method:'POST',body:{scope:scopeValue}})).status,401);
     assert.equal((await f.call(scope('haim','documents/'+record.id+'/delete'),{method:'POST',body:{password:'archive-owner-test'}})).status,404);
     assert.equal((await f.json(scope('kehat','documents'))).items.some(item=>item.id===record.id),true);
     await f.json(scope('kehat','documents/'+record.id+'/delete'),{method:'POST',body:{password:'archive-owner-test'}});
     assert.equal((await f.call('/media/'+record.id)).status,404);
-    assert.equal((await f.json(scope('extended','people/kehat-esther/page'))).albums.documents.total,0);
+    assert.equal((await f.json(scope('extended','people/kehat-havazelet/page'))).albums.documents.total,0);
     f.restart();
     assert.equal((await f.json(scope('kehat','documents'))).items.some(item=>item.id===record.id),false);
     assert.ok(f.sql.prepare('SELECT id FROM media_trash WHERE id=?').get(record.id));

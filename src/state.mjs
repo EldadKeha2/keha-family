@@ -37,7 +37,7 @@ import {aliasPersonIds,galleryRefinement,galleryRevision,galleryLabels,galleryOr
 import {personAlbumOptions} from './person-albums.mjs';
 import {MAX_PHOTO_LABELS,normalizePhotoLabel,photoLabelKey,photoLabelOptions,photoLabels} from '../public/assets/photo-labels-catalog.mjs';
 import {photoDate} from '../public/assets/photo-date.mjs';
-import {nameCorrectionKey,normalizedName,matchingPeople,correctPersonName,correctNamedContent} from './name-corrections.mjs';
+import {nameCorrectionKey,normalizedName,matchingPeople,correctPersonName,correctJimaanName,correctNamedContent} from './name-corrections.mjs';
 const mediaKind=item=>item.kind||(item.mime.startsWith('image/')?'photo':item.mime.startsWith('video/')?'video':'document');
 
 // One SQLite-backed object serializes updates for this family. Binary files live in HF.
@@ -169,33 +169,36 @@ export class FamilyState {
         const collections=new Set(['gallery','photos','videos','nostalgia',...couples.map(pair=>weddingCollection(pair.id)),...this.rows("SELECT id FROM meta WHERE id LIKE 'collection:%'").map(row=>row.id.slice(11))]);
         for(const kind of collections)this.touch(kind);
       }
-      this.correctStoredNames();
+      this.correctStoredNames(nameCorrectionKey,['%חריזי%','%Harizi%','%נקאש%','%Nakash%','%סורי%','%Suri%'],correctPersonName);
+      this.correctStoredNames('names-jimaan-2026-11-22-v1',['%ידעאן%','%ידען%','%מעאן%','%מען%','%Jidaan%'],correctJimaanName);
       this.nostalgiaLibrary.initialize();
       initializeFamilyContent(this);
     });
   }
-  correctStoredNames(){
-    if(this.rows('SELECT value FROM meta WHERE id=?',nameCorrectionKey).length)return;
+  correctStoredNames(migration,patterns,correct){
+    if(this.rows('SELECT value FROM meta WHERE id=?',migration).length)return;
+    const matches=field=>patterns.map(()=>field+' LIKE ?').join(' OR ');
     // This one-time pass updates authored text, including deleted photos and history,
     // without retagging, copying or rewriting any binary photo.
-    for(const table of ['people','media','media_trash','photo_versions','stories','weddings','greetings','trivia_questions']){
-      for(const row of this.rows('SELECT rowid AS row_id,data FROM '+table+' WHERE data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ? OR data LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%','%סורי%','%Suri%')){
-        const previous=JSON.parse(row.data),item=correctNamedContent(previous);
+    for(const table of ['people','media','media_trash','photo_versions','stories','recordings','weddings','greetings','trivia_questions']){
+      for(const row of this.rows('SELECT rowid AS row_id,data FROM '+table+' WHERE '+matches('data'),...patterns)){
+        const previous=JSON.parse(row.data),item=correctNamedContent(previous,'',correct);
         if(JSON.stringify(item)===JSON.stringify(previous))continue;
         if(table==='people'){this.savePerson(item);continue;}
-        if(table==='stories')item.updatedAt=new Date(Math.max(Date.now(),Date.parse(item.updatedAt)||0)+1).toISOString();
+        if(table==='stories'||table==='recordings')item.updatedAt=new Date(Math.max(Date.now(),Date.parse(item.updatedAt)||0)+1).toISOString();
         if(table==='weddings')item.revision=uid();
         this.sql.exec('UPDATE '+table+' SET data=? WHERE rowid=?',JSON.stringify(item),row.row_id);
         if(table==='media')this.touchMedia(item);
+        if(table==='recordings')this.recordings.touch();
         if(table==='stories')this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
       }
     }
     for(const table of ['jachnun_scores','rex_scores','neto_tetris_scores','ruti_house_scores','quiz_scores']){
-      for(const row of this.rows('SELECT id,name FROM '+table+' WHERE name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ? OR name LIKE ?','%חריזי%','%Harizi%','%נקאש%','%Nakash%','%סורי%','%Suri%')){
-        const name=correctPersonName(row.name);if(name!==row.name)this.sql.exec('UPDATE '+table+' SET name=? WHERE id=?',name,row.id);
+      for(const row of this.rows('SELECT id,name FROM '+table+' WHERE '+matches('name'),...patterns)){
+        const name=correct(row.name);if(name!==row.name)this.sql.exec('UPDATE '+table+' SET name=? WHERE id=?',name,row.id);
       }
     }
-    this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',nameCorrectionKey,'applied');
+    this.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',migration,'applied');
   }
   quizRun(game,data){
     if(data.questions.length!==10)return {...data,runId:null};
@@ -207,6 +210,14 @@ export class FamilyState {
   }
   rows(query,...args){return this.sql.exec(query,...args).toArray();}
   person(id){const row=this.rows('SELECT data FROM people WHERE id=?',id)[0];if(!row)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');const person=JSON.parse(row.data);return person.mergedInto?this.person(person.mergedInto):person;}
+  listedPeople(){
+    return this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)).filter(person=>!person.mergedInto&&!person.archiveOnly);
+  }
+  activePerson(id){
+    const person=this.person(id);
+    if(person.archiveOnly)throw new HttpError(404,'האדם לא נמצא באילן המשפחה.');
+    return person;
+  }
   savePerson(item){item.revision=uid();this.sql.exec('UPDATE people SET data=? WHERE id=?',JSON.stringify(item),item.id);this.peopleRevision=uid();this.peopleCache=null;}
   media(id){const row=this.rows('SELECT data FROM media WHERE id=?',id)[0];if(!row)throw new HttpError(404,'הקובץ לא נמצא.');return JSON.parse(row.data);}
   photo(id){const item=this.media(id);if(mediaKind(item)!=='photo'||item.provider)throw new HttpError(400,'אפשר לערוך תמונות בלבד.');return item;}
@@ -418,12 +429,12 @@ export class FamilyState {
     for(const change of changes){
       if(!change||typeof change.tagged!=='boolean'||Boolean(change.personId)===Boolean(change.name))throw new HttpError(400,'יש לבחור אדם אחד לתיוג או להסרת תיוג.');
       let person;
-      if(change.personId){if(typeof change.personId!=='string')throw new HttpError(400,'האדם לא נמצא.');person=this.person(change.personId);}
+      if(change.personId){if(typeof change.personId!=='string')throw new HttpError(400,'האדם לא נמצא.');person=change.tagged?this.activePerson(change.personId):this.person(change.personId);}
       else{
         if(!change.tagged)throw new HttpError(400,'יש לבחור את האדם שאת התיוג שלו רוצים להסיר.');
         const name=text(change.name,'שם',120,true).replace(/\s+/g,' '),key=normalizedName(name);
         if(!key)throw new HttpError(400,'יש להזין שם מלא.');
-        roster??=this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)).filter(person=>!person.mergedInto);
+        roster??=this.listedPeople();
         const matches=matchingPeople(roster,name);
         if(matches.length>1)throw new HttpError(409,'יש כמה אנשים בשם '+name+'. בחרו את האדם המתאים מהרשימה.');
         person=matches[0];
@@ -471,13 +482,13 @@ export class FamilyState {
     return {...config,where,args};
   }
   personSelection(id,options={}){
-    this.person(id);
+    this.activePerson(id);
     if(!['photos','videos'].includes(options.kind))throw new HttpError(400,'בחרו אלבום תקין.');
     const {where,args}=this.personAlbumQuery(id,options.kind,options);
     return {ids:this.rows('SELECT m.id FROM media m WHERE '+where+' ORDER BY m.rowid DESC',...args).map(row=>row.id)};
   }
   personPage(id,options={}){
-    const person=this.person(id),baseOwner="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?)";
+    const person=this.activePerson(id),baseOwner="m.id IN (SELECT id FROM media WHERE category='personal' AND person_id=? UNION SELECT t.media_id FROM media_tags t JOIN media live ON live.id=t.media_id WHERE t.person_id=?)";
     const owner=baseOwner+(options.contentIds?' AND m.id IN (SELECT value FROM json_each(?))':''),ownerArgs=[id,id,...(options.contentIds?[JSON.stringify(options.contentIds)]:[])];
     const kind="COALESCE(json_extract(m.data,'$.kind'),CASE WHEN json_extract(m.data,'$.mime') LIKE 'image/%' THEN 'photo' WHEN json_extract(m.data,'$.mime') LIKE 'video/%' THEN 'video' ELSE 'document' END)";
     const focus=options.focus||null;
@@ -589,7 +600,7 @@ export class FamilyState {
   run(action,p){
     if(action.startsWith('video.source.'))return videoSourceState(this,action.slice(13),p);
     if(action.startsWith('content.'))return handleFamilyContent(this,action,p||{});
-    if(p?.id && (action.startsWith('person') || ['profile','birthday','death.date'].includes(action)))p={...p,id:this.person(p.id).id};
+    if(p?.id && (action.startsWith('person') || ['profile','birthday','death.date'].includes(action)))p={...p,id:this.activePerson(p.id).id};
     switch(action){
       case 'site.search':return searchSite(this,p);
       case 'family-ai.list':return this.familyAi.list(p);
@@ -698,7 +709,7 @@ export class FamilyState {
       case 'game.missing':
       case 'game.quiz':{
         const missing=action==='game.missing';
-        const roster=Object.fromEntries(this.rows('SELECT id,data FROM people').map(row=>[row.id,{...family.people[row.id],...JSON.parse(row.data)}]));
+        const roster=Object.fromEntries(this.listedPeople().map(person=>[person.id,{...family.people[person.id],...person}]));
         const tagged=missing?'(SELECT count(*) FROM media_tags t WHERE t.media_id=m.id)>4':'EXISTS (SELECT 1 FROM media_tags t WHERE t.media_id=m.id)';
         const rows=this.rows("SELECT m.data FROM media m WHERE m.category='gallery' AND COALESCE(json_extract(m.data,'$.kind'),'photo')='photo' AND "+tagged+" ORDER BY random() LIMIT 60");
         const tags=new Map();
@@ -716,7 +727,7 @@ export class FamilyState {
             if(!byPerson.has(id))byPerson.set(id,new Map());byPerson.get(id).set(item.id,item);
           }
         }
-        const people=Object.fromEntries(this.rows('SELECT id,data FROM people').filter(row=>!JSON.parse(row.data).mergedInto).map(row=>[row.id,this.snapshot(JSON.parse(row.data),[...(byPerson.get(row.id)?.values()||[])],false)]));
+        const people=Object.fromEntries(this.listedPeople().map(person=>[person.id,this.snapshot(person,[...(byPerson.get(person.id)?.values()||[])],false)]));
         return this.peopleCache={people,revision:this.peopleRevision};
       }
       case 'people.revision':return {revision:this.peopleRevision};
@@ -967,8 +978,8 @@ export class FamilyState {
         if(p.expectedRevision!==this.tagsRevision(item.id))throw new HttpError(409,'התיוגים עודכנו בינתיים. פתחו שוב את התיוגים לפני השמירה.');
         if(!Array.isArray(p.personIds)||!Array.isArray(p.newNames)||p.personIds.length+p.newNames.length>150||p.newNames.length>50)throw new HttpError(400,'אפשר לתייג עד 150 אנשים בפריט.');
         const ids=new Set();
-        for(const id of p.personIds){if(typeof id!=='string')throw new HttpError(400,'יש לבחור אנשים מהרשימה.');ids.add(this.person(id).id);}
-        const roster=p.newNames.length?this.rows('SELECT data FROM people').map(row=>JSON.parse(row.data)).filter(person=>!person.mergedInto):[];
+        for(const id of p.personIds){if(typeof id!=='string')throw new HttpError(400,'יש לבחור אנשים מהרשימה.');ids.add(this.activePerson(id).id);}
+        const roster=p.newNames.length?this.listedPeople():[];
         for(const value of p.newNames){
           const name=text(value,'שם',120,true).replace(/\s+/g,' '),normalized=normalizedName(name);
           if(!normalized)throw new HttpError(400,'יש להזין שם מלא.');

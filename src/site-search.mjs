@@ -48,7 +48,7 @@ export function searchSite(state,options={}){
     }
     for(const row of state.rows("SELECT data FROM media WHERE category!='attachment'")){
       const item=JSON.parse(row.data),kind=item.kind||(item.mime?.startsWith('image/')?'photo':item.mime?.startsWith('video/')?'video':'document');
-      if(!['photo','video','document'].includes(kind))continue;
+      if(item.archiveExcluded||!['photo','video','document'].includes(kind))continue;
       const albums=[...new Set([item.category,...(collections.get(item.id)||[])])],eventItems=list(item.nostalgiaEventIds).map(id=>eventById.get(id)).filter(Boolean);
       const albumPeople=albums.flatMap(album=>album.startsWith('wedding:')?family.units[album.slice(8)]?.people||[]:album.startsWith('nursery:')?[album.slice(8)]:[]);
       const ids=[...(tags.get(item.id)||[]),...(item.category==='personal'?[item.personId]:[]),...albumPeople],labels=photoLabels(item.labels);

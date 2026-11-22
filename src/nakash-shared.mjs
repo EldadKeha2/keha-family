@@ -95,7 +95,7 @@ export function initializeSharedNakash(state) {
       if(saved.extra)state.sql.exec('INSERT OR IGNORE INTO people (id,data) VALUES (?,?)',row.person_id,JSON.stringify({...saved,id:row.person_id,nakashBranch:saved.branch || null,profileId:null}));
     }
     for (const person of Object.values(tree.people)) linkSharedProfile(state, identities, person);
-    const roster = state.rows('SELECT data FROM people').map(row => JSON.parse(row.data)).filter(person => !person.mergedInto);
+    const roster = state.listedPeople();
     const claimed=new Set(Object.values(identities)),aliasOwners=new Map();
     for(const p of Object.values(tree.people))for(const name of searchNames({...p,nameEn:p.englishName}).map(normalizeSearch)){
       if(!aliasOwners.has(name))aliasOwners.set(name,new Set());
