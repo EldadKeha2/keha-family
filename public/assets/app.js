@@ -199,7 +199,7 @@
     const count=branches.length;
     const active=b=>familyChips?state.branch===b.id&&(state.treeUnit||branchFor(state.branch)?.unit)===b.unit:state.branch===b.id;
     $('branchBar').style.setProperty('--branch-columns',String(count>3?Math.ceil(count/2):Math.max(1,count)));
-    $('branchBar').innerHTML = I18n.html`<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + branches.map(b => `<button class="branch-chip${active(b)?' active':''}" data-branch="${b.id}"${familyChips?' data-tree-unit="'+safe(b.unit)+'"':''} style="--branch-color:${b.color}" aria-pressed="${active(b)}"><span class="chip-dot"></span>${safe(I18n.branchName(b))}</button>`).join('');
+    $('branchBar').innerHTML = I18n.html`<button class="branch-chip all-chip${state.branch==='all'?' active':''}" data-branch="all" aria-pressed="${state.branch==='all'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6M5 15V9h14v6M12 9v6"/><circle cx="5" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg> כל המשפחה</button>` + branches.map(b => `<button class="branch-chip${active(b)?' active':''}" data-branch="${b.id}"${familyChips?' data-tree-unit="'+safe(b.unit)+'" aria-controls="treeViewport"':''} style="--branch-color:${b.color}" aria-pressed="${active(b)}"><span class="chip-dot"></span>${safe(I18n.branchName(b))}</button>`).join('');
   }
   function selectBranch(id,unitId) {
     state.treeUnit=unitId&&data.units[unitId]?.branch===id?unitId:null;
@@ -464,12 +464,12 @@
     const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(priorArea.cx-camera.x)/(camera.width*camera.scale),y:(priorArea.cy-camera.y)/(camera.height*camera.scale)}:null;
     const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview',desktopOverview=!phone&&overview;
     const rootId=state.branch==='all'?data.root:state.treeUnit||branchFor(state.branch).unit;
-    const diamonds=Boolean(phone&&overview&&phoneFamilies);
-    viewport.toggleAttribute('data-family-diamonds',diamonds);
+    const householdOverview=Boolean(phone&&overview&&phoneFamilies);
+    viewport.toggleAttribute('data-household-overview',householdOverview);
     viewport.dataset.overview=String(overview);
     const world=$('treeWorld');
     world.style.setProperty('--a11y-tree-scale',String(textScale));
-    const layout=diamonds?phoneFamilies.layout({world,nodes:$('treeNodes'),connectors:$('treeConnectors'),viewportWidth:viewport.clientWidth,textScale,
+    const layout=householdOverview?phoneFamilies.layout({world,nodes:$('treeNodes'),connectors:$('treeConnectors'),viewportWidth:viewport.clientWidth,textScale,
       personCard:(id,unit)=>personCardHTML(data.people[id],null,unit)}):layoutTree(rootId,phone,overview,textScale);
     const {width,height,positions}=layout;
     camera.width=width;camera.height=height;
@@ -485,7 +485,7 @@
       const area=treeViewportArea();
       if(previous){
         camera.scale=previous.scale;camera.x=area.cx-previous.x*width*camera.scale;camera.y=area.cy-previous.y*height*camera.scale;clampCamera();
-      }else if(diamonds){
+      }else if(householdOverview){
         fitTree();
       }else if(scopedViews){
         let focus=positions.find(item=>item.id===rootId);
@@ -511,7 +511,8 @@
     const viewport=$('treeViewport'),width=viewport.clientWidth,height=viewport.clientHeight;
     if(!isPhone())return {width,height,top:0,cx:width/2,cy:height/2};
     const controls=viewport.querySelector('.zoom-controls')?.offsetHeight||44,full=viewport.classList.contains('tree-is-fullscreen');
-    const top=full?($('treeFullscreenExit')?.offsetHeight||44)+24:controls+24;
+    const familyBar=full?viewport.querySelector('#branchBar'):null;
+    const top=familyBar?familyBar.offsetTop+familyBar.offsetHeight+8:full?($('treeFullscreenExit')?.offsetHeight||44)+24:controls+24;
     const bottom=full?controls+24:($('canvasHint')?.offsetHeight||20)+20;
     const available=Math.max(1,height-top-bottom);
     return {width,height:available,top,cx:width/2,cy:top+available/2};
@@ -534,7 +535,7 @@
   }
   function fitTree(){
     stopTreeMotion();const viewport=$('treeViewport'),phone=isPhone(),area=treeViewportArea(),desktopOverview=!phone&&state.branch==='all'&&state.mode==='overview';
-    const inset=viewport.hasAttribute('data-family-diamonds')?4:desktopOverview?28:30;
+    const inset=viewport.hasAttribute('data-household-overview')?4:desktopOverview?28:30;
     const fit=Math.min((viewport.clientWidth-inset)/camera.width,(phone?area.height:viewport.clientHeight-(desktopOverview?24:75))/camera.height,desktopOverview?1:1.1);
     camera.scale=phone?Math.max(.035,fit):fit;camera.x=area.cx-camera.width*camera.scale/2;
     camera.y=phone?area.top+(area.height-camera.height*camera.scale)/2:desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-camera.height*camera.scale)/2)):Math.max(12,(viewport.clientHeight-55-camera.height*camera.scale)/2);applyCamera();
@@ -812,8 +813,13 @@
   document.addEventListener('click',event=>{
     const filter=event.target.closest('[data-person-media-filter]');if(filter){state.galleryFilter=filter.dataset.personMediaFilter;renderGallery(getMedia(data.people[state.currentPerson]));return;}
     const person=event.target.closest('[data-person]');if(person){openPerson(person.dataset.person);return;}
-    const branch=event.target.closest('[data-branch]');if(branch){selectBranch(branch.dataset.branch,branch.dataset.treeUnit);return;}
-    const openBranch=event.target.closest('[data-open-branch]');if(openBranch){selectBranch(openBranch.dataset.openBranch,openBranch.dataset.treeUnit);return;}
+    const branch=event.target.closest('[data-branch]');if(branch){
+      const keepFocus=branch.dataset.treeUnit&&document.activeElement===branch;
+      selectBranch(branch.dataset.branch,branch.dataset.treeUnit);
+      if(keepFocus)$('branchBar').querySelector('[aria-pressed="true"]')?.focus({preventScroll:true});
+      return;
+    }
+    const openBranch=event.target.closest('[data-open-branch]');if(openBranch){selectBranch(openBranch.dataset.openBranch);return;}
     const group=event.target.closest('[data-directory-group]');if(group){$('searchResults').hidden=true;state.directoryGroup=group.dataset.directoryGroup;state.query='';$('searchInput').value='';renderDirectory();return;}
     const view=event.target.closest('[data-view]');if(view){setView(view.dataset.view);return;}
     const search=event.target.closest('[data-search-person]');if(search){$('searchResults').hidden=true;$('searchInput').blur();openPerson(search.dataset.searchPerson);return;}

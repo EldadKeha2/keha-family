@@ -4,9 +4,15 @@
   let installPrompt=null,installed=false,relatedInstalled=false,installationCheck=null,busy=false,dialogKind=null,dialogReturnFocus=null,feedbackTimer,invitationOffered=false;
   let installState='idle',attemptActive=false,installWaitTimer=null,successConfirmedByUser=false,modernDesktopInstallFailed=false;
   let changingOrigin=false,waitingForPrompt=false,preparationExpired=false,preparationTimer=null;
+  let browserHandoffTimer=null,browserHandoffFailed=false;
+  let installEvidenceVersion=0;
   // Keep the browser's one-use event until the visitor explicitly asks to install.
   window.addEventListener('beforeinstallprompt',event=>{
     event.preventDefault();installPrompt=event;clearTimeout(preparationTimer);preparationExpired=false;
+    clearBrowserHandoff();browserHandoffFailed=false;
+    // A fresh offer is stronger evidence than a previous app session or an
+    // installed-app lookup that began before Chrome offered installation.
+    if(simpleFamilyInstall){installed=false;relatedInstalled=false;currentLaunchHome=null;installEvidenceVersion++;status.textContent='';}
     const resume=waitingForPrompt&&navigator.userActivation?.isActive;waitingForPrompt=false;
     if(dialogKind==='invite'&&android&&siteHome&&!attemptActive){
       const inline=dialog.querySelector('[data-home-install-invite-status]');
@@ -31,12 +37,15 @@
   const simpleFamilyInstall=android&&appHome.startsWith('/keha-extended/');
   const manifestURL=new URL(nakash?.nakashManifest||'/manifest.webmanifest',appOrigin).href,appID=new URL(appHome,appOrigin).href;
   const runningAppKey='family-running-app';
-  let runningAppHome=null;
+  let runningAppHome=null,currentLaunchHome=null;
   try{runningAppHome=window.sessionStorage?.getItem(runningAppKey)||null;}catch{}
   function rememberRunningApp(home){runningAppHome=home;try{window.sessionStorage?.setItem(runningAppKey,home);}catch{}}
   if(!needsFamilyOrigin&&(standaloneQuery.matches||navigator.standalone===true)){
     const launch=new URLSearchParams(location.search),family=launch.get('familyApp');
-    if(launch.get('source')==='homescreen'&&['nakash','haim','yehuda','medina','keha','extended','shlomo','zechariah','zechariah-tzadok','kehat'].includes(family))rememberRunningApp(['shlomo','zechariah','zechariah-tzadok','kehat'].includes(family)?'/keha-extended/'+family+'/':family==='extended'?'/keha-extended/':family==='nakash'?'/nakash/':'/nakash/'+family+'/');
+    if(launch.get('source')==='homescreen'&&['nakash','haim','yehuda','medina','keha','extended','shlomo','zechariah','zechariah-tzadok','kehat'].includes(family)){
+      currentLaunchHome=['shlomo','zechariah','zechariah-tzadok','kehat'].includes(family)?'/keha-extended/'+family+'/':family==='extended'?'/keha-extended/':family==='nakash'?'/nakash/':'/nakash/'+family+'/';
+      rememberRunningApp(currentLaunchHome);
+    }
     else if(!runningAppHome&&!siteHome&&location.pathname==='/')rememberRunningApp('/');
   }
   const url=new URL(siteHome||'/',appOrigin),language=window.FamilyI18n?.language;
@@ -46,14 +55,37 @@
   const installationInvitation=new URLSearchParams(location.search).get('install')==='1';
   const chromeInstallArrival=new URLSearchParams(location.search).get('installBrowser')==='chrome';
   const fullChromeInstallArrival=new URLSearchParams(location.search).get('installBrowser')==='chrome-full';
-  function openChromeInstallation(){
+  browserHandoffFailed=simpleFamilyInstall&&new URLSearchParams(location.search).get('installFallback')==='1';
+  function chromeInstallationURL(){
     const target=new URL(invitationURL.href);target.searchParams.set('installBrowser',simpleFamilyInstall?'chrome-full':'chrome');
     // Match AndroidX CustomTabsIntent.setAlwaysUseBrowserUI: both the new-task
     // flag and explicit opt-out are needed to leave an enclosing custom tab.
     const browserUI=simpleFamilyInstall?'launchFlags=0x10000000;b.android.support.customtabs.extra.user_opt_out=true;':'';
-    const fallback=new URL(target.href);if(simpleFamilyInstall)fallback.searchParams.delete('installBrowser');
-    const intent='intent://'+target.host+target.pathname+target.search+'#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;'+browserUI+'S.browser_fallback_url='+encodeURIComponent(fallback.href)+';end';
-    waitingForPrompt=false;clearTimeout(preparationTimer);location.assign(intent);
+    const fallback=new URL(target.href);if(simpleFamilyInstall){fallback.searchParams.delete('installBrowser');fallback.searchParams.set('installFallback','1');}
+    // A normal HTTPS intent can be handled as another navigation in the
+    // enclosing custom tab. Chrome's own navigation scheme launches its browser
+    // activity. It takes the literal HTTPS URL after ?url=, not an encoded URL.
+    const destination=simpleFamilyInstall?'navigate?url='+target.origin+target.pathname+target.search:target.host+target.pathname+target.search;
+    return 'intent://'+destination+'#Intent;scheme='+(simpleFamilyInstall?'googlechrome':'https')+';package=com.android.chrome;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;'+browserUI+'S.browser_fallback_url='+encodeURIComponent(fallback.href)+';end';
+  }
+  function clearBrowserHandoff(){clearTimeout(browserHandoffTimer);browserHandoffTimer=null;}
+  function openChromeInstallation(nativeLink=false){
+    waitingForPrompt=false;clearTimeout(preparationTimer);
+    if(simpleFamilyInstall){
+      changingOrigin=false;browserHandoffFailed=false;clearBrowserHandoff();
+      if(!dialog.open||dialogKind!=='invite')openInvitation(button);
+      announce(status,tr('פותחים את ההתקנה ב־Chrome…','Opening installation in Chrome…'));
+      update();
+      // Some Android app windows ignore external navigation without an error.
+      // Report that outcome and offer the browser's own escape hatch; do not
+      // repeatedly launch activities from timers or claim installation succeeded.
+      browserHandoffTimer=setTimeout(()=>{
+        browserHandoffTimer=null;
+        if(document.visibilityState==='hidden'||installPrompt||hasInstalledShortcut()||busy||!dialog.open||dialogKind!=='invite')return;
+        browserHandoffFailed=true;update();
+      },1800);
+    }
+    if(!nativeLink)location.assign(chromeInstallationURL());
   }
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const appIcon=siteHome?document.querySelector('link[rel=apple-touch-icon]')?.getAttribute('href')||'assets/app-icons/icon-192.png':'assets/app-icons/icon-192.png';
@@ -91,7 +123,7 @@
   window.addEventListener('resize',positionInstalledFeedback);
   window.addEventListener('scroll',positionInstalledFeedback,{passive:true});
   function closeDialog(){
-    waitingForPrompt=false;clearTimeout(preparationTimer);
+    waitingForPrompt=false;clearTimeout(preparationTimer);clearBrowserHandoff();
     if(typeof dialog.close==='function')dialog.close();
     else{dialog.open=false;dialog.removeAttribute('open');dialog.dispatchEvent(new Event('close'));}
   }
@@ -132,6 +164,7 @@
   function progressControl(){return '<div class="home-install-progress" data-home-install-progress role="progressbar" aria-label="'+tr('ממתינים להתקנה בטלפון','Waiting for installation on your phone')+'" hidden><span aria-hidden="true"></span></div>';}
   function iconConfirmation(hidden=false){return '<button type="button" class="home-install-invite-browse home-install-check-icon" data-home-install-check-icon'+(hidden?' hidden':'')+'>'+tr('האייקון מופיע במסך הבית','The icon is on my home screen')+'</button>';}
   function installMessage(){
+    if(simpleFamilyInstall&&browserHandoffFailed)return tr('חלון ההתקנה לא נפתח מתוך האפליקציה.','The installation window did not open from this app.');
     if(simpleFamilyInstall&&waitingForPrompt)return preparationExpired?tr('ההתקנה לא נפתחה. לחצו ״התקן״ כדי לנסות מחדש ב־Chrome.','Installation did not open. Tap “Install” to retry in Chrome.'):tr('טוענים את ההתקנה…','Loading installation…');
     if(simpleFamilyInstall)return installState==='requesting'?tr('פותחים את ההתקנה…','Opening installation…'):installState==='pending'?tr('Chrome משלים את ההתקנה…','Chrome is finishing installation…'):installState==='unknown'?tr('Chrome לא דיווח על סיום ההתקנה. אפשר לנסות שוב.','Chrome has not reported installation complete. You can try again.'):'';
     return installState==='requesting'?tr('ממתינים לאישור בטלפון…','Waiting for your phone’s approval…'):installState==='pending'?tr('הבקשה אושרה. ממתינים לסיום ההתקנה בטלפון…','Request approved. Waiting for your phone to finish installing…'):installState==='unknown'?tr('הטלפון לא שלח אישור סיום. בדקו אם האייקון מופיע במסך הבית.','Your phone did not confirm completion. Check whether the icon is on your home screen.'):'';
@@ -147,6 +180,7 @@
     },20000);
   }
   function completeInstallation(byUser=false){
+    clearBrowserHandoff();browserHandoffFailed=false;
     const installDialog=dialog.open&&['invite','install','success'].includes(dialogKind),showSuccess=installDialog&&!simpleFamilyInstall,returnFocus=dialogReturnFocus||button;
     installed=true;attemptActive=false;installState='done';successConfirmedByUser=byUser;installPrompt=null;clearInstallWait();clearTimeout(feedbackTimer);
     status.textContent=tr('ההתקנה הושלמה','Installation complete');
@@ -165,7 +199,7 @@
     const page=new URL(location.pathname+location.search+location.hash,appOrigin),language=window.FamilyI18n?.language;
     if(siteHome)page.pathname=siteHome;
     page.searchParams.delete('install');
-    page.searchParams.delete('source');page.searchParams.delete('familyApp');page.searchParams.delete('installBrowser');
+    page.searchParams.delete('source');page.searchParams.delete('familyApp');page.searchParams.delete('installBrowser');page.searchParams.delete('installFallback');
     if(page.hash.startsWith('#updates/manage/'))page.hash='#updates';
     if(['he','en-US','en-GB'].includes(language))page.searchParams.set('lang',language);
     const person=location.hash.startsWith('#person/')?document.getElementById('personPageContent')?.querySelector('.person-page-hero h2')?.textContent.trim():'';
@@ -208,13 +242,15 @@
     if(mobileDevice||phoneQuery.matches)openShareChoices();else void sharePayload(websiteSharePayload());
   });
 
-  function hasInstalledShortcut(){return !needsFamilyOrigin&&(nativeDesktop||installed||relatedInstalled||(standaloneQuery.matches||navigator.standalone===true)&&runningAppHome===appHome);}
+  function hasInstalledShortcut(){return !needsFamilyOrigin&&!(simpleFamilyInstall&&installPrompt)&&(nativeDesktop||installed||relatedInstalled||(standaloneQuery.matches||navigator.standalone===true)&&runningAppHome===appHome&&(!simpleFamilyInstall||currentLaunchHome===appHome));}
   function familyWebInstall(){return Boolean(siteHome)&&!ios&&!modernDesktopInstallFailed&&typeof navigator.install==='function';}
   function installThisApp(){return siteHome&&(!simpleFamilyInstall||needsFamilyOrigin)?navigator.install({manifest:manifestURL,manifestId:appID}):navigator.install();}
   function checkInstalledShortcut(){
     if(needsFamilyOrigin||window.top!==window||typeof navigator.getInstalledRelatedApps!=='function')return Promise.resolve();
     if(installationCheck)return installationCheck;
+    const evidenceVersion=installEvidenceVersion;
     installationCheck=Promise.resolve().then(()=>navigator.getInstalledRelatedApps()).then(apps=>{
+        if(simpleFamilyInstall&&(evidenceVersion!==installEvidenceVersion||installPrompt))return;
         const absolute=value=>{try{return new URL(value,location.origin).href;}catch{return '';}};
         relatedInstalled=apps.some(app=>app.platform==='webapp'&&(app.id?absolute(app.id)===appID:absolute(app.url)===manifestURL));
         if(relatedInstalled)installPrompt=null;
@@ -243,7 +279,9 @@
       if(isInstalled&&!dialog.querySelector('[data-home-install-invite-installed]'))openInvitation();
       const action=dialog.querySelector('[data-home-install-invite-start]');
       const ready=Boolean(installPrompt)||familyWebInstall();
-      if(action){action.disabled=busy||installState==='pending';action.textContent=android&&siteHome&&!simpleFamilyInstall&&!ready&&!chromeInstallArrival?tr('התקן ב־Chrome','Install in Chrome'):tr('התקן','Install');if(simpleFamilyInstall)action.hidden=false;}
+      if(action){action.disabled=busy||installState==='pending';action.setAttribute('aria-disabled',String(action.disabled));action.textContent=android&&siteHome&&!simpleFamilyInstall&&!ready&&!chromeInstallArrival?tr('התקן ב־Chrome','Install in Chrome'):tr('התקן','Install');if(simpleFamilyInstall){action.hidden=false;action.setAttribute('href',chromeInstallationURL());}}
+      const browserHelp=dialog.querySelector('[data-home-install-browser-help]');
+      if(browserHelp)browserHelp.hidden=!browserHandoffFailed;
       if(!simpleFamilyInstall&&android&&siteHome&&!isInstalled&&!ready){
         const inline=dialog.querySelector('[data-home-install-invite-status]');
         if(inline)inline.textContent=preparationExpired?tr('להתקנה, פתחו את תפריט Chrome ובחרו ״התקנת אפליקציה״.','To install, open the Chrome menu and choose “Install app”.'):chromeInstallArrival?tr('לחצו ״התקן״ לפתיחת חלון ההתקנה.','Tap “Install” to open the installation dialog.'):tr('לחצו ״התקן ב־Chrome״ לפתיחת המשפחה בדפדפן ולהמשך ההתקנה.','Tap “Install in Chrome” to open this family in the browser and continue installation.');
@@ -344,13 +382,23 @@
       const browserNote=embedded?'<p class="home-install-browser-note">'+tr('אם ״הוספה למסך הבית״ אינה זמינה כאן, בתפריט האפליקציה בחרו ״פתיחה בדפדפן״.','If “Add to Home Screen” is missing here, use this app’s menu and choose “Open in browser”.')+'</p>':'';
       content=welcomeArt()+browserNote+appleHelp();
     }else{
-      content='<p class="home-install-dialog-intro">'+(simpleFamilyInstall?tr('הוסיפו את סמל המשפחה למסך הבית.','Add the family icon to your home screen.'):tr('לחצו ״התקן״ ואשרו בחלון של הטלפון.','Tap “Install” and confirm in your phone’s dialog.'))+'</p>'+welcomeArt()+'<button type="button" class="home-install-invite-primary" data-home-install-invite-start>'+tr('התקן','Install')+'</button>'+(android?'':platformLogos())+progressControl()+'<p class="home-install-invite-status" data-home-install-invite-status role="status" aria-live="polite"></p>'+(simpleFamilyInstall?'':iconConfirmation(true)+(android&&siteHome?'<button type="button" class="home-install-invite-browse" data-home-install-troubleshoot>'+tr('ההתקנה לא נפתחה','Installation did not open')+'</button>':''));
+      const installAction=simpleFamilyInstall?'<a class="home-install-invite-primary" data-home-install-invite-start href="'+escape(chromeInstallationURL())+'">'+tr('התקן','Install')+'</a>':'<button type="button" class="home-install-invite-primary" data-home-install-invite-start>'+tr('התקן','Install')+'</button>';
+      const browserHelp=simpleFamilyInstall?'<p class="home-install-browser-note" data-home-install-browser-help hidden>'+tr('בתפריט ⋮ שבראש המסך בחרו <strong>פתיחה ב־Chrome</strong> או <strong>פתיחה בדפדפן</strong>, ואז לחצו <strong>התקן</strong>.','In the ⋮ menu at the top of the screen, choose <strong>Open in Chrome</strong> or <strong>Open in browser</strong>, then tap <strong>Install</strong>.')+'</p>':'';
+      content='<p class="home-install-dialog-intro">'+(simpleFamilyInstall?tr('הוסיפו את סמל המשפחה למסך הבית.','Add the family icon to your home screen.'):tr('לחצו ״התקן״ ואשרו בחלון של הטלפון.','Tap “Install” and confirm in your phone’s dialog.'))+'</p>'+welcomeArt()+installAction+(android?'':platformLogos())+progressControl()+'<p class="home-install-invite-status" data-home-install-invite-status role="status" aria-live="polite"></p>'+browserHelp+(simpleFamilyInstall?'':iconConfirmation(true)+(android&&siteHome?'<button type="button" class="home-install-invite-browse" data-home-install-troubleshoot>'+tr('ההתקנה לא נפתחה','Installation did not open')+'</button>':''));
     }
     if(android&&siteHome&&!simpleFamilyInstall&&(standaloneQuery.matches||navigator.standalone===true)&&runningAppHome!==appHome)content+='<p><a class="home-install-invite-primary" data-family-install-browser href="'+escape(invitationURL.href)+'" target="_blank" rel="noopener external">'+tr('פתיחת ','Open ')+escape(siteName())+tr(' ב־Chrome להתקנה',' in Chrome to install')+'</a></p>';
     const heading=alreadyInstalled?tr('הבית שלנו כבר אצלכם','Our home is already with you'):ios?tr('מוסיפים למסך הבית','Add to your Home Screen'):siteHome?escape(siteName()):tr('התקנת בית משפחת קהא','Install Keha Family Home');
     const browse=ios&&!alreadyInstalled?'':'<button type="button" class="home-install-invite-browse" data-home-install-invite-browse>'+tr('להמשיך לאתר','Continue to the website')+'</button>';
     dialog.innerHTML='<button type="button" class="home-install-close" data-home-install-close aria-label="'+tr('סגירת ההזמנה','Close invitation')+'">×</button>'+languageControl()+'<img class="home-install-dialog-icon" src="'+escape(appIcon)+'" width="64" height="64" alt=""><h2 id="homeInstallTitle">'+heading+'</h2>'+content+browse;
-    dialog.querySelector('[data-home-install-invite-start]')?.addEventListener('click',()=>requestInstallation(true));
+    dialog.querySelector('[data-home-install-invite-start]')?.addEventListener('click',event=>{
+      const needsChrome=needsFamilyOrigin||!installPrompt&&!familyWebInstall()&&(!fullChromeInstallArrival||preparationExpired);
+      if(simpleFamilyInstall&&!busy&&!(attemptActive&&['pending','requesting'].includes(installState))&&!hasInstalledShortcut()&&needsChrome){
+        // Let the real anchor navigation run in this exact user gesture.
+        // Replacing it with an asynchronous redirect loses Android's app launch.
+        openChromeInstallation(true);return;
+      }
+      event.preventDefault();void requestInstallation(true);
+    });
     dialog.querySelector('[data-home-install-troubleshoot]')?.addEventListener('click',()=>{waitingForPrompt=false;clearTimeout(preparationTimer);openHelp(button);});
     dialog.querySelector('[data-home-install-invite-browse]')?.addEventListener('click',continueToSite);
     showDialog('invite',returnFocus);update();
@@ -369,7 +417,10 @@
     if(mobileDevice)openInvitation();else if(siteHome)openDesktopHelp();
   }
   async function requestInstallation(fromInvitation=false){
-    if(changingOrigin||busy||(!fromInvitation&&button.hidden))return;
+    if((changingOrigin&&!simpleFamilyInstall)||busy||(!fromInvitation&&button.hidden))return;
+    // If the automatic preparation did not leave this document, a deliberate
+    // tap must still be able to open the independent app's browser installer.
+    if(simpleFamilyInstall)changingOrigin=false;
     if(needsFamilyOrigin&&(simpleFamilyInstall||!familyWebInstall())){if(android)openChromeInstallation();else location.assign(invitationURL.href);return;}
     if(hasInstalledShortcut()){
       announceInstalledShortcut();if(siteHome&&!simpleFamilyInstall)openInvitation(button);
@@ -380,10 +431,6 @@
     const modern=(needsFamilyOrigin||!installPrompt)&&familyWebInstall();
     if(!installPrompt&&!modern){
       if(simpleFamilyInstall){
-        // A branch opened from the installed hub has no installation invitation.
-        // Use the same HTTPS entry as a shared install link, so a suppressed
-        // external-browser intent cannot leave the header tap without a result.
-        if(!fromInvitation&&!installationInvitation&&!fullChromeInstallArrival){location.assign(invitationURL.href);return;}
         // An old URL marker is not proof that Android left the custom tab.
         // Keep the actual Install action while Chrome prepares a native offer.
         if(!fullChromeInstallArrival||preparationExpired){openChromeInstallation();return;}
@@ -421,9 +468,12 @@
       }
       else{attemptActive=false;installState='idle';clearInstallWait();announce(status,tr('לחצו שוב להנחיות ההוספה.','Tap again for installation instructions.'));}
     }catch(error){if(installState!=='done'){
-      if(modern&&error?.name!=='AbortError')modernDesktopInstallFailed=true;
+      if(modern&&(simpleFamilyInstall||error?.name!=='AbortError'))modernDesktopInstallFailed=true;
       attemptActive=false;installState='idle';clearInstallWait();
-      if(modern&&error?.name==='AbortError'){status.textContent='';closeDialog();}else openHelp();
+      // AbortError can also mean this Android/PWA context cannot install. Do
+      // not swallow the tap as if the visitor necessarily canceled a dialog.
+      if(simpleFamilyInstall&&modern){openInvitation(button);announce(status,tr('ההתקנה לא הושלמה. לחצו ״התקן״ כדי לנסות ב־Chrome.','Installation did not complete. Tap “Install” to try in Chrome.'));}
+      else if(modern&&error?.name==='AbortError'){status.textContent='';closeDialog();}else openHelp();
     }}
     finally{busy=false;button.disabled=false;update();}
   }
@@ -434,12 +484,13 @@
     const rect=dialog.getBoundingClientRect();
     if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeDialog();
   });
-  dialog.addEventListener('close',()=>{waitingForPrompt=false;clearTimeout(preparationTimer);const focus=dialogReturnFocus||shareButton;if(!card.hidden)(focus.hidden?shareButton:focus).focus();dialogKind=null;});
+  dialog.addEventListener('close',()=>{waitingForPrompt=false;clearTimeout(preparationTimer);clearBrowserHandoff();const focus=dialogReturnFocus||shareButton;if(!card.hidden)(focus.hidden?shareButton:focus).focus();dialogKind=null;});
   phoneQuery.addEventListener?.('change',update);
-  standaloneQuery.addEventListener?.('change',()=>{if(standaloneQuery.matches&&attemptActive)rememberRunningApp(appHome);update();});
+  standaloneQuery.addEventListener?.('change',()=>{if(standaloneQuery.matches&&attemptActive){currentLaunchHome=appHome;rememberRunningApp(appHome);}update();});
   window.addEventListener('pageshow',()=>{update();void checkInstalledShortcut();});
   window.addEventListener('focus',()=>{update();void checkInstalledShortcut();});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void checkInstalledShortcut();});
+  window.addEventListener('pagehide',clearBrowserHandoff);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void checkInstalledShortcut();else clearBrowserHandoff();});
   update();void checkInstalledShortcut();
   if(document.readyState==='loading'||document.readyState==='interactive')document.addEventListener('DOMContentLoaded',offerInvitation,{once:true});else offerInvitation();
 })();

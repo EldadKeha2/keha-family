@@ -60,66 +60,64 @@
 
   function zechariahPhoneFamilies(){
     const data=window.FAMILY_DATA;
-    // Each row is ordered physically right, then left. Shortcuts can open a
-    // descendant's household without making that household a child of the root.
-    const branches=[
-      ['kadya',"מש' קדיה מזרחי",'Kadya Mizrahi family','#8c5728'],
-      ['boaz',"מש' בועז קהא",'Boaz Keha family','#795486'],
-      ['saadia',"מש' סעדיה קהא",'Saadia Keha family','#266e63'],
-      ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','#99485b'],
-      ['shalom',"מש' שלום קהא",'Shalom Keha family','#365f88'],
-    ].map(([key,title,titleEn,color])=>{
+    // The first three top buttons match the right-hand column of the tree.
+    // Boaz's household opens independently and remains connected to his parents.
+    const columns={
+      right:[
+        ['kadya',"מש' קדיה מזרחי",'Kadya Mizrahi family','#8c5728'],
+        ['saadia',"מש' סעדיה קהא",'Saadia Keha family','#266e63'],
+        ['shalom',"מש' שלום קהא",'Shalom Keha family','#365f88'],
+      ],
+      left:[
+        ['boaz',"מש' בועז קהא",'Boaz Keha family','#795486'],
+        ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','#99485b'],
+      ],
+    };
+    const branches=Object.entries(columns).flatMap(([side,items])=>items.map(([key,title,titleEn,color],row)=>{
       const unit='u-saadia-'+key;
-      return {unit,id:data.units[unit].branch,title,titleEn,color,solo:key==='aharon'};
-    });
+      return {unit,id:data.units[unit].branch,title,titleEn,color,side,row,solo:key==='aharon'};
+    }));
+    document.getElementById('branchBar').setAttribute('role','group');
 
     function layout({world,nodes,connectors,viewportWidth,textScale,personCard}){
       const width=Math.max(280,Math.min(480,viewportWidth-4)),inset=4,gutter=26;
       const column=(width-2*inset-gutter)/2,middle=width/2;
       world.style.width=width+'px';
-      const fragment=document.createDocumentFragment(),cards=new Map();
+      const fragment=document.createDocumentFragment(),cards=new Map(),rows=[];
 
-      function addCard(unit,branch,side){
+      function addCard(unit,branch){
         const card=document.createElement('div');
         card.className='tree-unit phone-family-card';
         card.dataset.unit=branch?unit.id:'u-root';
         const members=branch?.solo?unit.people.slice(0,1):unit.people;
         const cardWidth=branch?column:Math.min(width,208*textScale);
-        const left=branch?(side==='right'?middle+gutter/2:inset):middle-cardWidth/2;
+        const left=branch?(branch.side==='right'?middle+gutter/2:inset):middle-cardWidth/2;
         card.style.width=cardWidth+'px';card.style.left=left+'px';
         card.style.setProperty('--family-members',members.length);
         card.innerHTML=members.map(id=>personCard(id,unit)).join('');
-        let button;
-        if(branch){
-          button=document.createElement('button');
-          button.type='button';button.className='family-diamond';
-          button.dataset.openBranch=branch.id;button.dataset.treeUnit=unit.id;
-          card.style.setProperty('--branch-color',branch.color);
-          const title=tr(branch.title,branch.titleEn);
-          button.setAttribute('aria-label',tr('פתיחת ','Open ')+title);
-          const label=document.createElement('span');label.textContent=title;
-          button.append(label);card.append(button);
-        }
         fragment.append(card);
-        cards.set(unit.id,{card,button,side,edge:side==='right'?left:left+cardWidth});
+        const center=left+cardWidth/2;
+        const personX=members.length===1?center:center+(I.isEnglish?-1:1)*(cardWidth+3)/4;
+        const item={card,center,personX};
+        cards.set(unit.id,item);
+        if(branch)(rows[branch.row]??=[]).push(item);
       }
-      addCard(data.units[data.root],null);
-      branches.forEach((branch,index)=>addCard(data.units[branch.unit],branch,index%2?'left':'right'));
+      addCard(data.units[data.root]);
+      for(const branch of branches)addCard(data.units[branch.unit],branch);
       nodes.replaceChildren(fragment);
 
       function place(item,y){
-        item.card.style.top=y+'px';
-        const h=item.card.offsetHeight||(item.button?100:60)*textScale;
-        item.joint=y+(item.button?.offsetHeight?item.button.offsetTop+item.button.offsetHeight/2:h*.75);
-        return y+h;
+        item.card.style.top=y+'px';item.top=y;
+        item.bottom=y+(item.card.offsetHeight||64*textScale);
+        return item.bottom;
       }
       const start=place(cards.get(data.root),2);
       let bottom=start;
-      for(let i=0;i<branches.length;i+=2){
-        const top=bottom+8*textScale;
-        bottom=Math.max(...branches.slice(i,i+2).map(branch=>place(cards.get(branch.unit),top)));
+      for(const row of rows){
+        const top=bottom+24*textScale;
+        bottom=Math.max(...row.map(item=>place(item,top)));
       }
-      const height=bottom+4;
+      const height=bottom+12*textScale;
       world.style.height=height+'px';
       connectors.setAttribute('width',width);connectors.setAttribute('height',height);
       connectors.replaceChildren();
@@ -128,14 +126,16 @@
         line.setAttribute('d',d);connectors.append(line);
         return line;
       }
+      const junction=item=>item.top-10*textScale;
       const direct=branches.filter(branch=>data.units[branch.unit].parent===data.root);
-      path('M'+middle+' '+start+'V'+Math.max(...direct.map(branch=>cards.get(branch.unit).joint)));
+      path('M'+middle+' '+start+'V'+Math.max(...direct.map(branch=>junction(cards.get(branch.unit)))));
       for(const branch of branches){
         const unit=data.units[branch.unit],item=cards.get(unit.id),parent=cards.get(unit.parent);
         if(!parent)continue;
-        const lane=middle+(item.side==='left'?-1:1)*gutter/4;
-        const from=unit.parent===data.root?'M'+middle+' '+item.joint:'M'+parent.edge+' '+parent.joint+'H'+lane+'V'+item.joint;
-        const line=path(from+'H'+item.edge);
+        const joint=junction(item),lane=middle+(branch.side==='left'?-1:1)*gutter/3;
+        const from=unit.parent===data.root?'M'+middle+' '+joint:
+          'M'+parent.center+' '+parent.bottom+'v'+7*textScale+'H'+lane+'V'+joint;
+        const line=path(from+'H'+item.personX+'V'+(item.top-1));
         line.setAttribute('stroke',branch.color);
         line.dataset.parentUnit=unit.parent;line.dataset.childUnit=unit.id;
         line.dataset.childPerson=unit.people[0];

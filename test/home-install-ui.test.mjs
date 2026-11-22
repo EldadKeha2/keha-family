@@ -5,6 +5,15 @@ import {readFile} from 'node:fs/promises';
 
 const source=await readFile(new URL('../public/assets/home-install.js',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const chromeDestination=intent=>{
+  const data=intent.split('#Intent;')[0];
+  // Chrome's native navigation scheme takes a literal HTTPS URL after ?url=.
+  return new URL(data.startsWith('intent://navigate?url=')?data.slice('intent://navigate?url='.length):data.replace('intent://','https://'));
+};
+const assertChromeDestination=(intent,site)=>{
+  assert.equal(chromeDestination(intent).origin,site.origin);
+  assert.equal(chromeDestination(intent).pathname,site.home);
+};
 const decodeHTML=value=>value.replace(/&(amp|lt|gt|quot|#39);/g,(_,entity)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[entity]));
 const assertNoInstallationCopy=dialog=>{
   assert.equal(dialog.querySelector('[data-home-install-copy]'),null);
@@ -106,7 +115,7 @@ function fixture({mobile=true,standalone=false,iosStandalone=false,english=false
   vm.runInContext(source,context);if(autoReady)ready();
   const button=()=>card.querySelector('[data-home-install-action]');
   return {window,document,card,dialog,queries,nodes,copied,shared,relatedCalls,button,ready,location,advanceTime,assignments,reloads,windowsLink,webInstallCalls,
-    click(element){const event=new Event('click',{cancelable:true});element.dispatchEvent(event);return event;},
+    click(element){const event=new Event('click',{cancelable:true});element.dispatchEvent(event);if(element.tagName.toLowerCase()==='a'&&!event.defaultPrevented&&element.getAttribute('href'))location.assign(element.getAttribute('href'));return event;},
     resize(value){const media=matchMedia('(max-width: 700px)');media.matches=value;media.dispatchEvent(new Event('change'));},
     standalone(value){const media=matchMedia('(display-mode: standalone)');media.matches=value;media.dispatchEvent(new Event('change'));},
     offer({outcome='dismissed',error=false,choicePending=false}={}){
@@ -940,11 +949,12 @@ test('Android Install uses the current family native browser offer in the first 
   }
 });
 
-test('an Android family prepares on its independent origin before a visitor taps Install, retaining the current profile and language',()=>{
+test('an Android family prepares its independent origin and a real tap can recover when automatic navigation stalled',()=>{
   const site={...eightApps.find(app=>app.branch==='kehat'),origin:'https://family-kehat.example'};
   const f=fixture({site,recordNavigation:true,entryUrl:'https://family.example'+site.home+'?lang=en-US#person/kehat-jidaan'});
   assert.deepEqual(f.assignments,[site.origin+site.home+'?lang=en-US#person/kehat-jidaan']);
-  f.click(f.button());assert.equal(f.assignments.length,1,'A pending navigation cannot start a second install');
+  f.click(f.button());assert.equal(f.assignments.length,2,'A deliberate tap can leave an automatic redirect that never completed');
+  assertChromeDestination(f.assignments[1],site);assert.equal(f.dialog.open,true);
 });
 
 test('the modern cross-origin API requests the actual family manifest directly during the click without a website confirmation',async()=>{
@@ -1016,11 +1026,11 @@ test('both additional Keha apps offer an active full-Chrome handoff instead of a
     assert.equal(f.dialog.querySelector('[data-home-install-troubleshoot]'),null);
     assert.equal(f.dialog.querySelector('[data-family-install-browser]'),null,'The single Install action opens Chrome');
     f.click(install);assert.equal(f.assignments.length,1,'The handoff starts inside the tap');
-    const intent=f.assignments[0];assert.ok(intent.startsWith('intent://'+new URL(site.origin).host+site.home));
+    const intent=f.assignments[0];assertChromeDestination(intent,site);
     assert.match(intent,/;package=com\.android\.chrome;/);
     assert.match(intent,/;launchFlags=0x10000000;/);
     assert.match(intent,/;b\.android\.support\.customtabs\.extra\.user_opt_out=true;/);
-    assert.match(intent,/installBrowser=chrome-full/);
+    assert.equal(chromeDestination(intent).searchParams.get('installBrowser'),'chrome-full');
     const fallback=new URL(decodeURIComponent(/;S\.browser_fallback_url=([^;]+);end$/.exec(intent)[1]));
     assert.equal(fallback.origin,site.origin);assert.equal(fallback.pathname,site.home);
     assert.equal(fallback.searchParams.get('install'),'1');assert.equal(fallback.searchParams.has('installBrowser'),false,'An HTTPS fallback cannot prove Chrome opened');assert.equal(fallback.hash,'#home');
@@ -1066,16 +1076,15 @@ test('all four extended Keha Android invitations use one Install action without 
   }
 });
 
-test('extended Keha installation leaves a different origin and opens the own-origin invitation from a regular header',async()=>{
+test('extended Keha installation leaves an enclosing app with a visible invitation and no cross-app installation permission',async()=>{
   for(const base of eightApps.filter(app=>app.home.startsWith('/keha-extended/'))){
     const origin='https://family-'+base.branch+'.example',site={...base,origin};
     for(const currentOrigin of ['https://family.example',origin]){
       const f=fixture({site,autoReady:false,standalone:true,sessionState:new Map([['family-running-app','/']]),webInstall:currentOrigin===origin?'missing':'works',entryUrl:currentOrigin+base.home+'#tree'});
       f.click(f.button());
-      assert.equal(f.dialog.open,false);assert.equal(f.webInstallCalls.length,0);
+      assert.equal(f.dialog.open,true);assert.equal(f.webInstallCalls.length,0);
       assert.equal(f.assignments.length,1);
-      if(currentOrigin!==origin)assert.ok(f.assignments[0].startsWith('intent://'+new URL(origin).host+base.home));
-      else assert.equal(f.assignments[0],origin+base.home+'?lang=he&install=1#home');
+      assertChromeDestination(f.assignments[0],site);
       assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
     }
   }
@@ -1095,22 +1104,23 @@ test('an early Android install event cannot reopen a family confirmation before 
 
 const androidKehaSites=[...eightApps.filter(app=>app.home.startsWith('/keha-extended/')),{branch:'shlomo',name:'משפחת שלמה קהא',home:'/keha-extended/shlomo/',icon:'/keha-extended/shlomo/icon-192.png'}];
 
-test('Android branches entered through the installed extended hub open their own working installation link',async()=>{
+test('Android branches entered through the installed extended hub open their own installer and keep a usable action if navigation is suppressed',async()=>{
   for(const base of androidKehaSites.filter(app=>app.branch!=='extended'))for(const standalone of [false,true])for(const english of [false,true]){
     const origin='https://family-'+base.branch+'.example',site={...base,origin};
     const sessionState=new Map([['family-running-app','/keha-extended/']]);
     const parentApp={platform:'webapp',id:'https://family-extended.example/keha-extended/'};
     const f=fixture({site,standalone,english,sessionState,installedRelated:[parentApp],entryUrl:origin+base.home+'#tree'});
     await tick();f.click(f.button());await tick();
-    assert.deepEqual(f.assignments,[origin+base.home+'?lang='+(english?'en-US':'he')+'&install=1#home']);
+    assert.equal(f.assignments.length,1);assertChromeDestination(f.assignments[0],site);
+    const fallback=new URL(decodeURIComponent(/;S\.browser_fallback_url=([^;]+);end$/.exec(f.assignments[0])[1]));
+    assert.equal(fallback.href,origin+base.home+'?lang='+(english?'en-US':'he')+'&install=1&installFallback=1#home');
     assert.equal(f.webInstallCalls.length,0);
     assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false','The installed hub is not the child app');
-    const arrival=fixture({site,english,entryUrl:f.assignments[0]});
-    const action=arrival.dialog.querySelector('[data-home-install-invite-start]');
-    assert.ok(action);assert.equal(arrival.dialog.open,true);assert.equal(action.hidden,false);
-    const offer=arrival.offer({outcome:'accepted'});arrival.click(action);assert.equal(offer.calls,1);
-    arrival.window.dispatchEvent(new Event('appinstalled'));await tick();
-    assert.equal(arrival.dialog.open,false);assert.equal(arrival.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+    const action=f.dialog.querySelector('[data-home-install-invite-start]');
+    assert.ok(action);assert.equal(f.dialog.open,true);assert.equal(action.hidden,false);
+    const offer=f.offer({outcome:'accepted'});f.click(action);assert.equal(offer.calls,1);
+    f.window.dispatchEvent(new Event('appinstalled'));await tick();
+    assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
   }
 });
 
@@ -1130,11 +1140,12 @@ test('the screenshot’s old Chrome marker never hides Install and the first tap
     const action=f.dialog.querySelector('[data-home-install-invite-start]');
     assert.ok(action);assert.equal(action.hidden,false);assert.equal(action.disabled,false);
     assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
-    assert.doesNotMatch(f.dialog.innerHTML,/<ol>|<li>|בתפריט|רשימת כל האפליקציות|לחיצה ארוכה/);
+    assert.doesNotMatch(f.dialog.innerHTML,/<ol>|<li>|רשימת כל האפליקציות|לחיצה ארוכה/);
+    assert.equal(f.dialog.querySelector('[data-home-install-browser-help]').hidden,true);
     f.click(action);assert.equal(f.assignments.length,1);
     const intent=f.assignments[0];
-    assert.ok(intent.startsWith('intent://'+new URL(origin).host+base.home));
-    assert.match(intent,/installBrowser=chrome-full/);
+    assertChromeDestination(intent,site);
+    assert.equal(chromeDestination(intent).searchParams.get('installBrowser'),'chrome-full');
     assert.match(intent,/;launchFlags=0x10000000;/,'AndroidX requires a new task');
     assert.match(intent,/;b\.android\.support\.customtabs\.extra\.user_opt_out=true;/,'AndroidX requires the explicit custom-tab opt-out too');
     const fallback=new URL(decodeURIComponent(/;S\.browser_fallback_url=([^;]+);end$/.exec(intent)[1]));
@@ -1165,4 +1176,131 @@ test('missing Android offers keep a retryable Install action without automatic n
   assert.deepEqual(f.assignments,[]);assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
   assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
   f.click(action);assert.equal(f.assignments.length,1,'Only the visitor’s retry reopens Chrome');
+});
+
+test('a stale standalone family session cannot swallow a fresh Android install offer',async()=>{
+  const base=androidKehaSites.find(app=>app.branch==='zechariah'),origin='https://family-zechariah.example',site={...base,origin};
+  const f=fixture({site,standalone:true,sessionState:new Map([['family-running-app',base.home]]),entryUrl:origin+base.home+'#home'});
+  const offer=f.offer({outcome:'accepted'});f.click(f.button());await tick();
+  assert.equal(offer.calls,1);assert.deepEqual(f.assignments,[]);
+});
+
+test('a delayed installed-app lookup cannot discard a newer native Android installation offer',async()=>{
+  const base=androidKehaSites.find(app=>app.branch==='zechariah'),origin='https://family-zechariah.example',site={...base,origin};
+  let resolveApps;const f=fixture({site,installedRelated:()=>new Promise(resolve=>{resolveApps=resolve;}),entryUrl:origin+base.home+'#home'});
+  await tick();const offer=f.offer({outcome:'accepted'});
+  resolveApps([{platform:'webapp',id:origin+base.home}]);await tick();f.click(f.button());await tick();
+  assert.equal(offer.calls,1);assert.deepEqual(f.assignments,[]);
+});
+
+test('a stalled automatic origin change never blocks a real Android Install tap',async()=>{
+  const base=androidKehaSites.find(app=>app.branch==='zechariah'),origin='https://family-zechariah.example',site={...base,origin};
+  const f=fixture({site,entryUrl:'https://family-extended.example'+base.home+'#home'});
+  assert.equal(f.assignments.length,1);f.click(f.button());await tick();
+  assert.equal(f.dialog.open,true,'The tap always has an immediate visible response');
+  assert.equal(f.assignments.length,2);assertChromeDestination(f.assignments[1],site);
+});
+
+test('an Android header tap retains a visible Install action when browser navigation is ignored',async()=>{
+  for(const base of androidKehaSites.filter(app=>app.branch!=='extended'))for(const staleSession of [false,true]){
+    const origin='https://family-'+base.branch+'.example',site={...base,origin};
+    const f=fixture({site,standalone:true,sessionState:new Map([['family-running-app',staleSession?base.home:'/keha-extended/']]),entryUrl:origin+base.home+'#home'});
+    f.click(f.button());await tick();
+    assert.equal(f.dialog.open,true);assert.ok(f.dialog.querySelector('[data-home-install-invite-start]'));
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+    assert.equal(f.assignments.length,1);assertChromeDestination(f.assignments[0],site);
+  }
+});
+
+test('an unsupported modern Android installation environment cannot silently close the header request',async()=>{
+  const base=androidKehaSites.find(app=>app.branch==='zechariah'),origin='https://family-zechariah.example',site={...base,origin};
+  const f=fixture({site,webInstall:'AbortError',entryUrl:origin+base.home+'#home'});
+  f.click(f.button());await tick();
+  assert.equal(f.dialog.open,true);const action=f.dialog.querySelector('[data-home-install-invite-start]');assert.ok(action);assert.equal(action.disabled,false);
+  f.click(action);await tick();
+  assert.equal(f.webInstallCalls.length,1,'An API that reported an unsupported or aborted context is not retried indefinitely');
+  assert.equal(f.assignments.length,1);assertChromeDestination(f.assignments[0],site);
+});
+
+test('Android family invitation follows a real Chrome navigation link in the original gesture',()=>{
+  for(const base of androidKehaSites)for(const english of [false,true]){
+    const site={...base,origin:'https://family-'+base.branch+'.example'};
+    const f=fixture({site,english,entryUrl:site.origin+site.home+'?install=1#home'});
+    const action=f.dialog.querySelector('[data-home-install-invite-start]');
+    assert.equal(action.tagName,'a');
+    const href=action.getAttribute('href');
+    assert.ok(href.startsWith('intent://navigate?url=https://'),'The intent targets Chrome’s navigation activity rather than an HTTPS navigation within the app');
+    assert.match(href,/#Intent;scheme=googlechrome;package=com\.android\.chrome;/);
+    assertChromeDestination(href,site);
+    assert.equal(chromeDestination(href).searchParams.get('install'),'1');
+    assert.equal(chromeDestination(href).searchParams.get('lang'),english?'en-US':'he');
+    const click=f.click(action);
+    assert.equal(click.defaultPrevented,false,'Android receives the anchor’s actual trusted navigation');
+    assert.deepEqual(f.assignments,[href],'One click performs one navigation');
+    assert.equal(f.dialog.querySelector('[data-home-install-browser-help]').hidden,true);
+  }
+});
+
+test('a custom tab that ignores the Chrome handoff receives visible recovery without automatic retries',async()=>{
+  for(const english of [false,true]){
+    const base=androidKehaSites.find(app=>app.branch==='zechariah'),site={...base,origin:'https://family-zechariah.example'};
+    const f=fixture({site,english,entryUrl:site.origin+site.home+'?install=1#home'});
+    f.click(f.dialog.querySelector('[data-home-install-invite-start]'));
+    await f.advanceTime(1800);
+    const help=f.dialog.querySelector('[data-home-install-browser-help]');
+    assert.equal(help.hidden,false);
+    assert.match(help.textContent,english?/Open in Chrome/:/פתיחה ב־Chrome/);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').disabled,false);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+    await f.advanceTime(10000);assert.equal(f.assignments.length,1,'A timer must never relaunch Chrome');
+    const offer=f.offer({outcome:'accepted',choicePending:true});
+    assert.equal(help.hidden,true);
+    const click=f.click(f.dialog.querySelector('[data-home-install-invite-start]'));
+    assert.equal(click.defaultPrevented,true,'A ready native prompt replaces external navigation');
+    assert.equal(offer.calls,1);assert.equal(f.assignments.length,1);
+    const duplicate=f.click(f.dialog.querySelector('[data-home-install-invite-start]'));
+    assert.equal(duplicate.defaultPrevented,true);assert.equal(offer.calls,1);
+    offer.choose();await tick();
+  }
+});
+
+test('a branch still enclosed by the hub follows its own Chrome link instead of the parent’s native offer or cross-app API',()=>{
+  const base=androidKehaSites.find(app=>app.branch==='zechariah'),site={...base,origin:'https://family-zechariah.example'};
+  const f=fixture({site,autoReady:false,webInstall:'works',entryUrl:'https://family-extended.example'+base.home+'#tree'});
+  const parentOffer=f.offer();f.click(f.button());
+  const action=f.dialog.querySelector('[data-home-install-invite-start]');
+  const click=f.click(action);
+  assert.equal(click.defaultPrevented,false);
+  assert.equal(f.assignments.length,2);assertChromeDestination(f.assignments[1],site);
+  assert.equal(parentOffer.calls,0);assert.equal(f.webInstallCalls.length,0);
+});
+
+test('leaving or closing the installation cancels the blocked-handoff message',async()=>{
+  const base=androidKehaSites.find(app=>app.branch==='zechariah'),site={...base,origin:'https://family-zechariah.example'};
+  for(const exit of ['hidden','pagehide','close']){
+    const f=fixture({site,entryUrl:site.origin+site.home+'?install=1#home'});
+    f.click(f.dialog.querySelector('[data-home-install-invite-start]'));
+    if(exit==='hidden'){f.document.visibilityState='hidden';f.document.dispatchEvent(new Event('visibilitychange'));}
+    else if(exit==='pagehide')f.window.dispatchEvent(new Event('pagehide'));
+    else f.click(f.dialog.querySelector('[data-home-install-close]'));
+    await f.advanceTime(5000);
+    assert.equal(f.dialog.querySelector('[data-home-install-browser-help]').hidden,true);
+    assert.equal(f.assignments.length,1);
+  }
+});
+
+test('the browser HTTPS fallback reports a blocked launch immediately and is removed from shared links',async()=>{
+  const base=androidKehaSites.find(app=>app.branch==='zechariah'),site={...base,origin:'https://family-zechariah.example'};
+  const f=fixture({site,share:'works',entryUrl:site.origin+site.home+'?install=1#home'});
+  const intent=f.dialog.querySelector('[data-home-install-invite-start]').getAttribute('href');
+  const fallback=new URL(decodeURIComponent(/;S\.browser_fallback_url=([^;]+);end$/.exec(intent)[1]));
+  assert.equal(fallback.searchParams.get('installFallback'),'1');
+  assert.equal(fallback.searchParams.has('installBrowser'),false);
+  const arrival=fixture({site,share:'works',entryUrl:fallback.href});
+  assert.equal(arrival.dialog.querySelector('[data-home-install-browser-help]').hidden,false);
+  assert.deepEqual(arrival.assignments,[],'The HTTPS fallback does not create an automatic launch loop');
+  arrival.click(arrival.dialog.querySelector('[data-home-install-close]'));
+  arrival.click(arrival.card.querySelector('[data-home-install-share]'));
+  arrival.click(arrival.dialog.querySelector('[data-home-share-page]'));await tick();
+  assert.equal(new URL(arrival.shared[0].url).searchParams.has('installFallback'),false);
 });

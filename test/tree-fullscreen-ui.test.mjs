@@ -9,11 +9,12 @@ import {extendedKehaHTML,shlomoKehaHTML,branchPortalHTML} from '../src/extended-
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/tree-fullscreen.js',import.meta.url),'utf8');
 
-function harness({native=true,english=false}={}){
+function harness({native=true,english=false,phoneFamilies=false}={}){
   const {document,window:dom}=parseHTML(html),window=new EventTarget();
   const viewport=document.getElementById('treeViewport'),button=document.getElementById('treeFullscreenButton');
   document.body.dataset.activeView='tree';
   window.FamilyI18n={isEnglish:english};
+  window.FamilyExtendedKeha={phoneFamilies};window.matchMedia=()=>({matches:true});
   let requests=0,exits=0,fits=0,focused=null,observer;
   const frames=new Map();let nextFrame=1;
   const changed=()=>document.dispatchEvent(new dom.Event('fullscreenchange'));
@@ -31,6 +32,23 @@ function harness({native=true,english=false}={}){
     key(value){const event=new dom.Event('keydown',{cancelable:true});event.key=value;document.dispatchEvent(event);flush();return event;},
   };
 }
+
+test('the same family buttons stay above the phone tree in fullscreen and return to the page header on exit',()=>{
+  for(const native of [false,true]){
+    const h=harness({native,phoneFamilies:true}),bar=h.document.getElementById('branchBar');
+    const parent=bar.parentNode,next=bar.nextSibling;
+    h.click();
+    assert.equal(bar.parentNode,h.viewport);
+    assert.equal(bar.previousElementSibling.id,'treeFullscreenExit');
+    h.window.matchMedia=()=>({matches:false});h.window.dispatchEvent(new Event('resize'));h.flush();
+    assert.equal(bar.parentNode,parent);
+    h.window.matchMedia=()=>({matches:true});h.window.dispatchEvent(new Event('resize'));h.flush();
+    assert.equal(bar.parentNode,h.viewport);
+    h.click();
+    assert.equal(bar.parentNode,parent);assert.equal(bar.nextSibling,next);
+    assert.equal(h.document.querySelectorAll('#branchBar').length,1);
+  }
+});
 
 test('original and every family portal expose the same fullscreen control beside zoom',()=>{
   const pages=[html,...['','inside','keha','haim','yehuda','medina'].map(id=>nakashHTML(html,id)),extendedKehaHTML(html),shlomoKehaHTML(html),...['kehat','zechariah','zechariah-tzadok'].map(id=>branchPortalHTML(html,id))];

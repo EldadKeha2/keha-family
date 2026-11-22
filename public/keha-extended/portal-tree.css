@@ -51,43 +51,60 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
 }
 
 @media(max-width:700px){
-  html[data-branch-portal=zechariah] body[data-active-view=tree]:has(#treeViewport[data-family-diamonds]) #branchBar{display:none}
-  #treeViewport[data-family-diamonds] .phone-family-card{
+  html[data-branch-portal=zechariah] body[data-active-view=tree] .workspace-header{padding-block:7px}
+  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar{
+    display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px 3px;
+    padding:0 2px 6px;margin:0;
+  }
+  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]{
+    grid-column:span 4;min-height:40px;padding:3px 0;gap:2px;border-radius:8px;
+    font:500 calc(clamp(.75rem,3.35vw,.9rem) * var(--a11y-text-scale,1))/1.18 var(--sans);
+    text-wrap:balance;overflow-wrap:break-word;
+  }
+  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]:nth-last-child(2){grid-column:2 / span 5}
+  html[data-branch-portal=zechariah] body[data-active-view=tree] #branchBar [data-tree-unit]:last-child{grid-column:7 / span 5}
+  html[data-branch-portal=zechariah] #branchBar [data-tree-unit] .chip-dot{display:none}
+  html[data-branch-portal=zechariah] #branchBar [data-tree-unit]::after{
+    content:'';box-sizing:border-box;flex:0 0 auto;width:5px;height:5px;border:solid currentColor;border-width:1.5px 1.5px 0 0;
+    transform:rotate(45deg);
+  }
+  html[dir=rtl][data-branch-portal=zechariah] #branchBar [data-tree-unit]::after{transform:rotate(-135deg)}
+  html[data-branch-portal=zechariah]:not([data-a11y-contrast]) #branchBar [data-tree-unit]{
+    color:var(--branch-color);background:color-mix(in srgb,var(--branch-color) 7%,#fffdf8);
+    border-color:color-mix(in srgb,var(--branch-color) 45%,#fffdf8);box-shadow:0 1px 0 #51391a24;
+  }
+  html[data-branch-portal=zechariah]:not([data-a11y-contrast]) #branchBar [aria-pressed=true][data-tree-unit]{
+    color:white;background:var(--branch-color);border-color:var(--branch-color);
+  }
+  html[data-branch-portal=zechariah] #branchBar [data-tree-unit]:focus-visible{outline:2px solid var(--family-ink);outline-offset:1px}
+  html[data-branch-portal=zechariah] #treeViewport.tree-is-fullscreen #treeFullscreenExit{
+    position:relative;inset:auto;display:flex;width:max-content;margin:calc(8px + env(safe-area-inset-top,0px)) auto 4px calc(12px + env(safe-area-inset-left,0px));
+  }
+  html[data-branch-portal=zechariah] #treeViewport.tree-is-fullscreen>#branchBar{position:relative;z-index:10}
+  html[dir=rtl][data-branch-portal=zechariah] #treeViewport.tree-is-fullscreen>#branchBar{direction:rtl}
+  #treeViewport[data-household-overview] .phone-family-card{
     display:grid;grid-template-columns:repeat(var(--family-members),minmax(0,1fr));
     align-items:start;justify-items:center;gap:2px 3px;
   }
-  #treeViewport[data-family-diamonds] #treeNodes .person-card{width:100%;min-width:0;padding:0}
-  #treeViewport[data-family-diamonds] #treeNodes .person-card>:not(.person-open){display:none}
-  #treeViewport[data-family-diamonds] .person-open{width:100%;min-height:44px;gap:0;padding:0;align-items:center}
-  #treeViewport[data-family-diamonds] .portrait{
+  #treeViewport[data-household-overview] #treeNodes .person-card{width:100%;min-width:0;padding:0}
+  #treeViewport[data-household-overview] #treeNodes .person-card>:not(.person-open){display:none}
+  #treeViewport[data-household-overview] .person-open{width:100%;min-height:44px;gap:0;padding:0;align-items:center}
+  #treeViewport[data-household-overview] .portrait{
     width:35px;height:39px;min-width:0;margin:2px 0 3px;padding:2px;
     border-radius:20px 20px 5px 5px;box-shadow:0 0 0 1px var(--family-line);
   }
-  #treeViewport[data-family-diamonds] .portrait .profile-photo{inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:inherit}
-  #treeViewport[data-family-diamonds] .portrait .silhouette{width:24px;height:28px;bottom:3px}
-  #treeViewport[data-family-diamonds] .portrait .portrait-letter{font-size:8px;bottom:3px}
-  #treeViewport[data-family-diamonds] .person-name{
+  #treeViewport[data-household-overview] .portrait .profile-photo{inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:inherit}
+  #treeViewport[data-household-overview] .portrait .silhouette{width:24px;height:28px;bottom:3px}
+  #treeViewport[data-household-overview] .portrait .portrait-letter{font-size:8px;bottom:3px}
+  #treeViewport[data-household-overview] .person-name{
     max-width:100%;min-height:0;font:600 calc(.85rem * var(--a11y-text-scale,1))/1.16 var(--sans);
     text-align:center;text-wrap:balance;
   }
-  #treeViewport[data-family-diamonds] .memorial-inline{display:none}
-  #treeViewport[data-family-diamonds] .tree-unit[data-unit=u-root] .portrait{width:41px;height:45px}
-  #treeViewport[data-family-diamonds] .tree-unit[data-unit=u-root] .person-name{font-family:var(--serif);font-size:calc(.98rem * var(--a11y-text-scale,1))}
-  .family-diamond{
-    position:relative;isolation:isolate;grid-column:1/-1;display:grid;place-items:center;
-    width:100%;min-height:44px;padding:0 12%;border:0;background:transparent;
-    color:var(--branch-color);font:600 calc(.86rem * var(--a11y-text-scale,1))/1.15 var(--sans);
-    text-align:center;text-wrap:balance;
-  }
-  .family-diamond::before,.family-diamond::after{
-    content:'';position:absolute;inset:0;z-index:-1;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
-    background:var(--branch-color);
-  }
-  .family-diamond::after{inset:1px 3px;background:color-mix(in srgb,var(--branch-color) 14%,#fffcf6)}
-  .family-diamond:hover::after,.family-diamond:focus-visible::after{background:color-mix(in srgb,var(--branch-color) 23%,#fffcf6)}
-  .family-diamond:focus-visible{outline:2px solid currentColor;outline-offset:1px}
-  html[lang^=en] .family-diamond,html[data-a11y-text] .family-diamond{min-height:3.8em;padding-inline:18%}
-  html[data-a11y-contrast] .family-diamond{color:CanvasText}
-  html[data-a11y-contrast] .family-diamond::before{background:CanvasText}
-  html[data-a11y-contrast] .family-diamond::after{background:Canvas}
+  #treeViewport[data-household-overview] .memorial-inline{display:none}
+  #treeViewport[data-household-overview] .tree-unit[data-unit=u-root] .portrait{width:41px;height:45px}
+  #treeViewport[data-household-overview] .tree-unit[data-unit=u-root] .person-name{font-family:var(--serif);font-size:calc(.98rem * var(--a11y-text-scale,1))}
+}
+@media(max-width:350px){
+  html[data-branch-portal=zechariah] #treeViewport .zoom-controls{gap:1px}
+  html[data-branch-portal=zechariah] #treeViewport .zoom-controls .control-divider{display:none}
 }
