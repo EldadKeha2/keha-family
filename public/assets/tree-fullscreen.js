@@ -7,7 +7,19 @@
   exitButton.setAttribute('aria-controls',viewport.id);
   exitButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5"/></svg><span></span>';
   viewport.append(exitButton);
-  let active=false,hadNative=false,frame=null;
+  let active=false,hadNative=false,frame=null,branchBarAnchor=null;
+  function placeFamilyTabs(){
+    if(!window.FamilyExtendedKeha?.phoneFamilies)return;
+    const bar=document.getElementById('branchBar');
+    if(active&&window.matchMedia('(max-width:700px)').matches){
+      if(!branchBarAnchor){
+        branchBarAnchor=document.createComment('family navigation');
+        bar.replaceWith(branchBarAnchor);exitButton.after(bar);
+      }
+    }else if(branchBarAnchor){
+      branchBarAnchor.replaceWith(bar);branchBarAnchor=null;
+    }
+  }
   const label=()=>window.FamilyI18n?.isEnglish?(active?'Exit fullscreen':'Fullscreen'):(active?'יציאה ממסך מלא':'מסך מלא');
   function refresh(){
     button.setAttribute('aria-label',label());button.title=label();button.setAttribute('aria-pressed',String(active));
@@ -28,7 +40,7 @@
     active=false;hadNative=false;
     viewport.classList.remove('tree-is-fullscreen');document.documentElement.classList.remove('tree-fullscreen-active');
     viewport.scrollTop=0;viewport.scrollLeft=0;
-    leaveNative();refresh();fit();
+    placeFamilyTabs();leaveNative();refresh();fit();
     if(restoreFocus)button.focus({preventScroll:true});
   }
   function enter(){
@@ -36,7 +48,7 @@
     active=true;hadNative=false;
     viewport.classList.add('tree-is-fullscreen');document.documentElement.classList.add('tree-fullscreen-active');
     viewport.scrollTop=0;viewport.scrollLeft=0;
-    window.FamilyTreeGuide?.hide();refresh();fit();button.focus({preventScroll:true});
+    window.FamilyTreeGuide?.hide();refresh();placeFamilyTabs();fit();button.focus({preventScroll:true});
     // The fixed viewport also fills the screen on browsers without this API.
     try{Promise.resolve(viewport.requestFullscreen?.()).then(()=>{if(!active)leaveNative();}).catch(()=>{});}catch{}
   }
@@ -60,7 +72,7 @@
   if(typeof MutationObserver==='function')new MutationObserver(()=>{
     if(active&&document.body.dataset.activeView!=='tree')exit({restoreFocus:false});
   }).observe(document.body,{attributes:true,attributeFilter:['data-active-view']});
-  window.addEventListener('resize',()=>{if(active)fit();});
+  window.addEventListener('resize',()=>{if(active){placeFamilyTabs();fit();}});
   window.addEventListener('pagehide',()=>exit({restoreFocus:false}));
   refresh();
 })();

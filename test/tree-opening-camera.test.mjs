@@ -145,25 +145,29 @@ test('phone family overviews balance six and four branches on the two sides with
   }
 });
 
-test('Zechariah’s phone overview opens with five distinct family diamonds, each linked to its own household',()=>{
+test('Zechariah’s five top buttons switch households directly while the phone canvas contains only profiles and family links',()=>{
   const expected=[
     ['kadya',"מש' קדיה מזרחי",'Kadya Mizrahi family','right'],
-    ['boaz',"מש' בועז קהא",'Boaz Keha family','left'],
     ['saadia',"מש' סעדיה קהא",'Saadia Keha family','right'],
-    ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','left'],
     ['shalom',"מש' שלום קהא",'Shalom Keha family','right'],
+    ['boaz',"מש' בועז קהא",'Boaz Keha family','left'],
+    ['aharon',"מש' אהרון חובשי",'Aharon Hovshi family','left'],
   ];
   for(const [viewportWidth,viewportHeight,text,english] of [[300,390,100,false],[358,560,100,false],[400,620,160,true]]){
     const f=fixture('zechariah',{phone:true,viewportWidth,viewportHeight,text,english});
-    const nodes=f.document.getElementById('treeNodes');
-    const overview=()=>{f.document.getElementById('overviewButton').click();f.flush();};
-    const buttons=()=>[...nodes.querySelectorAll('.family-diamond')];
+    const nodes=f.document.getElementById('treeNodes'),bar=f.document.getElementById('branchBar');
+    const buttons=()=>[...bar.querySelectorAll('button[data-tree-unit]')];
+    assert.equal(bar.hidden,false);
+    assert.equal(bar.previousElementSibling.classList.contains('workspace-header'),true);
+    assert.equal(bar.style.getPropertyValue('--branch-columns'),'3');
     assert.deepEqual(buttons().map(b=>b.textContent),expected.map(row=>row[english?2:1]));
-    assert.equal(new Set(buttons().map(b=>b.parentElement.style.getPropertyValue('--branch-color'))).size,5);
+    assert.equal(new Set(buttons().map(b=>b.style.getPropertyValue('--branch-color'))).size,5);
+    assert.ok(buttons().every(button=>button.getAttribute('aria-controls')==='treeViewport'));
+    assert.equal(nodes.querySelectorAll('[data-open-branch],.family-diamond').length,0);
     assert.equal(nodes.querySelectorAll('[data-unit="u-saadia-kadya"] [data-person]').length,1);
     assert.equal(nodes.querySelectorAll('[data-unit="u-saadia-aharon"] [data-person]').length,1);
     const previous={};
-    for(const [key,he,en,side] of expected){
+    for(const [key,,,side] of expected){
       const id='u-saadia-'+key,card=f.bounds(id);
       assert.equal(card.x>f.width/2?'right':'left',side);
       assert.ok(card.x-card.width/2>=0&&card.x+card.width/2<=f.width);
@@ -173,26 +177,30 @@ test('Zechariah’s phone overview opens with five distinct family diamonds, eac
       const path=f.document.querySelector('#treeConnectors [data-child-unit="'+id+'"]');
       assert.equal(path.dataset.parentUnit,f.data.units[id].parent);
       assert.equal(path.getAttribute('stroke-dasharray')!==null,key==='aharon');
-      nodes.querySelector('[data-tree-unit="'+id+'"]').click();f.flush();
-      const selected=f.document.querySelector('#branchBar [aria-pressed="true"]');
-      assert.equal(selected.dataset.treeUnit,id);
-      assert.equal(selected.textContent,english?en:he);
+    }
+    // No return to the overview is needed between the five selections.
+    for(const [key,he,en] of expected){
+      const id='u-saadia-'+key;
+      bar.querySelector('[data-tree-unit="'+id+'"]').click();f.flush();
+      const selected=bar.querySelector('[aria-pressed="true"]');
+      assert.equal(selected.dataset.treeUnit,id);assert.equal(selected.textContent,english?en:he);
+      assert.equal(bar.hidden,false);assert.equal(buttons().length,5);
       assertCentred(f,id);
       for(const child of f.data.units[id].children)assert.ok(nodes.querySelector('[data-unit="'+child+'"]'));
       if(key==='boaz'){
         assert.equal(nodes.querySelector('[data-unit="u-saadia-dalia"]'),null);
         assert.equal(nodes.querySelector('[data-unit="'+id+'"] .branch-label').textContent,english?en:he);
-        f.document.getElementById('fullTreeButton').click();f.flush();
-        assert.ok(nodes.querySelector('[data-unit="u-saadia-israel"]'));
       }
       if(key==='aharon')assert.ok(nodes.querySelector('[data-person="saadia-yona-hovshi"]'));
-      overview();
     }
     f.document.getElementById('fullTreeButton').click();f.flush();
+    assert.equal(bar.hidden,false);
     assert.ok(nodes.querySelector('[data-unit="u-saadia-israel"]'));
     assert.ok(nodes.querySelector('[data-unit="u-saadia-boaz"]'));
+    f.document.getElementById('overviewButton').click();f.flush();
+    assert.equal(nodes.querySelectorAll('.phone-family-card').length,6);
     f.window.FamilyApp.setView('home');f.window.FamilyApp.setView('tree');f.flush();
-    assert.equal(buttons().length,5);
+    assert.equal(buttons().length,5);assert.equal(bar.hidden,false);
   }
 });
 
