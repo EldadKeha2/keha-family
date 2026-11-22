@@ -4,7 +4,7 @@
   const tr=(he,en)=>english?en:he,safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase();
   const DIRECT_CATEGORY='everyday-life',DIRECT_DESTINATION='everyday-life-clips';
-  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',sort:'sequence',uploadChoice:'',assignId:null,newEventAssignId:null,hoverTimer:null,closeTimer:null,closing:false,deletingEvent:null,activeFolders:{},homeActive:false,stackSuppressUntil:0};
+  const state={collection:null,library:null,eventId:null,categoryId:null,query:'',sort:'sequence',uploadChoice:'',assignId:null,hoverTimer:null,closeTimer:null,closing:false,deletingEvent:null,activeFolders:{},homeActive:false,stackSuppressUntil:0};
   const SORTS=['sequence','duration-asc','duration-desc','tags-desc','tags-asc','description-asc','description-desc'];
   let durationTimer;
   const eventName=event=>english?(event.nameEn||event.name):event.name;
@@ -20,6 +20,10 @@
   const getEvent=id=>state.library?.events.find(event=>event.id===id);
   const getDirectCategory=id=>id===DIRECT_CATEGORY?state.library?.categories.find(category=>category.id===id):null;
   const uploadEvents=()=>state.library?.events.filter(event=>event.categoryId!==DIRECT_CATEGORY||event.id===DIRECT_DESTINATION)||[];
+  function uploadEventLabel(event){
+    const category=state.library?.categories.find(item=>item.id===event.categoryId);
+    return category&&category.id!==DIRECT_CATEGORY?eventName(event)+' · '+categoryName(category):eventName(event);
+  }
   const mediaSearch=item=>normalize([item.name,item.nameEn,item.caption,...(item.tags||[]).map(tag=>I.searchNames(tag))].join(' '));
   function sequence(item){const match=/(?:קטע|חלק|part|segment|seg)\s*(\d+)/i.exec(item.name||item.filename||'');return match?Number(match[1]):null;}
   function viewItems(collection,eventId){
@@ -162,16 +166,44 @@
       const message=I.error(error.message);if($('nostalgiaEventDialog').open&&$('nostalgiaEventForm').dataset.eventId===id)$('nostalgiaEventError').textContent=message;else window.FamilyApp?.toast(message);
     }finally{state.deletingEvent=null;button.disabled=false;}
   }
-  function categoryOptions(selected){return state.library.categories.filter(c=>c.id!==DIRECT_CATEGORY).map(c=>`<option value="${safe(c.id)}" ${c.id===selected?'selected':''}>${safe(categoryName(c))}</option>`).join('');}
-  function openEventForm(categoryId=null,eventId=null,assignId=null){
-    const event=eventId?getEvent(eventId):null;state.newEventAssignId=assignId;
+  let eventFormContext=null;
+  function fillEventCategories(selected,forUpload){
+    const categories=(state.library?.categories||[]).filter(c=>c.id!==DIRECT_CATEGORY);
+    const field=$('nostalgiaEventCategory');
+    field.innerHTML=(forUpload?`<option value="" disabled>${tr('בחירת קטגוריה','Choose a category')}</option>`:'')+
+      categories.map(c=>`<option value="${safe(c.id)}">${safe(categoryName(c))}</option>`).join('');
+    field.value=categories.some(c=>c.id===selected)?selected:forUpload?'':categories[0]?.id||'';
+  }
+  async function loadEventCategories(context,selected){
+    try{
+      const response=await I.fetch('api/nostalgia',{cache:'no-store'});
+      if(!response.ok)throw Error();
+      const {library}=await response.json();
+      if(!library?.categories?.length)throw Error();
+      if(context!==eventFormContext||!$('nostalgiaEventDialog').open)return;
+      state.library??=library;
+      fillEventCategories(selected,true);
+    }catch{
+      if(context===eventFormContext&&$('nostalgiaEventDialog').open)$('nostalgiaEventError').textContent=tr('טעינת הקטגוריות נכשלה. סגרו את החלון ונסו שוב.','Could not load the categories. Close this window and try again.');
+    }
+  }
+  function openEventForm(categoryId=null,eventId=null,assignId=null,onCreated=null){
+    const event=eventId?getEvent(eventId):null,forUpload=Boolean(onCreated);
+    const context=eventFormContext={assignId,onCreated,saving:false};
     const form=$('nostalgiaEventForm');form.reset();form.dataset.eventId=event?.id||'';form.dataset.revision=event?.revision||'';
-    $('nostalgiaEventFormTitle').textContent=event?tr('פרטי האירוע','Event details'):tr('פותחים ספרייה לאירוע','A folder for another occasion');
-    $('nostalgiaEventCategory').innerHTML=categoryOptions(event?.categoryId||categoryId||state.categoryId||state.library.categories[0].id);
+    form.classList.toggle('is-upload-event',forUpload);
+    $('nostalgiaEventFormTitle').textContent=forUpload?tr('הוספת אירוע חדש','Add a new event'):event?tr('פרטי האירוע','Event details'):tr('פותחים ספרייה לאירוע','A folder for another occasion');
+    $('nostalgiaEventCategoryLabel').textContent=forUpload?tr('קטגוריית האירוע','Event category'):tr('באיזה מדף?','Which shelf?');
+    const selected=event?.categoryId||categoryId||(forUpload?null:state.categoryId);
+    fillEventCategories(selected,forUpload);
     $('nostalgiaDeleteEvent').hidden=!event;$('nostalgiaDeleteEvent').dataset.nostalgiaDeleteEvent=event?.id||'';$('nostalgiaDeleteEvent').dataset.nostalgiaEventRevision=event?.revision||'';
     $('nostalgiaEventName').value=event?.name||'';$('nostalgiaEventLocation').value=event?.location||'';
     for(const part of ['day','month','year'])$('nostalgiaEvent'+part).value=event?.date?.[part]||'';
     $('nostalgiaEventError').textContent='';$('nostalgiaEventDialog').showModal();
+    if(forUpload){
+      $('nostalgiaEventName').focus();
+      if(!state.library)void loadEventCategories(context,selected);
+    }
   }
   function openAssign(id){
     const item=allItems().find(item=>item.id===id);if(!item)return;state.assignId=id;
@@ -199,7 +231,7 @@
     if(!$('nostalgiaLibraryHome'))return;
     $('nostalgiaLibraryHome').innerHTML=`<div class="nostalgia-shelves-tools"><span>${tr('התיקיות המשפחתיות שלנו','Our family folders')}</span><button type="button" class="quiet-button" data-nostalgia-new-category>${tr('＋ קטגוריה','＋ Category')}</button></div><div class="nostalgia-categories nostalgia-shelves" id="nostalgiaCategories"></div>`;
     createDialog('nostalgiaCategoryDialog',`<div class="nostalgia-category-panel"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close-category aria-label="${tr('סגירה','Close')}">×</button><header><span class="small-eyebrow">${tr('מן המדף אל הרגעים','From the shelf to the moments')}</span><h3 id="nostalgiaCategoryTitle"></h3><p id="nostalgiaCategoryDescription"></p></header><div class="nostalgia-rail-wrap"><button type="button" class="nostalgia-rail-arrow rail-right" data-nostalgia-scroll="1" aria-label="${tr('גלילה ימינה','Scroll right')}">›</button><div class="nostalgia-event-rail" id="nostalgiaEventRail" tabindex="0" aria-label="${tr('אירועים בקטגוריה','Events in this category')}"></div><button type="button" class="nostalgia-rail-arrow rail-left" data-nostalgia-scroll="-1" aria-label="${tr('גלילה שמאלה','Scroll left')}">‹</button></div><p class="nostalgia-rail-hint">${tr('אפשר להחליק, לגרור או להשתמש בחצים','Swipe, drag, or use the arrows')} <span aria-hidden="true">↔</span></p></div>`,'nostalgia-category-dialog');
-    createDialog('nostalgiaEventDialog',`<form id="nostalgiaEventForm"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close="nostalgiaEventDialog" aria-label="${tr('סגירה','Close')}">×</button><span class="small-eyebrow">${tr('עוד סיפור לאלבום שלנו','Another story for our album')}</span><h3 id="nostalgiaEventFormTitle"></h3><label>${tr('שם האירוע','Event name')}<input id="nostalgiaEventName" maxlength="140" required></label><label>${tr('באיזה מדף?','Which shelf?')}<select id="nostalgiaEventCategory" required></select></label><fieldset class="nostalgia-date-inputs"><legend>${tr('תאריך האירוע — אם ידוע','Event date — if known')}</legend><label>${tr('יום','Day')}<input id="nostalgiaEventday" inputmode="numeric" type="number" min="1" max="31"></label><label>${tr('חודש','Month')}<input id="nostalgiaEventmonth" inputmode="numeric" type="number" min="1" max="12"></label><label>${tr('שנה','Year')}<input id="nostalgiaEventyear" inputmode="numeric" type="number" min="1000" max="9999"></label></fieldset><label>${tr('איפה זה היה?','Where was it?')}<input id="nostalgiaEventLocation" maxlength="240"></label><p class="form-error" id="nostalgiaEventError" role="alert"></p><div class="nostalgia-event-form-actions"><button type="submit" class="primary-button">${tr('שמירת האירוע','Save event')}</button><button type="button" id="nostalgiaDeleteEvent" class="nostalgia-event-delete" data-nostalgia-delete-event hidden>${trashIcon}<span>${tr('מחיקת תיקייה','Delete folder')}</span></button></div></form>`);
+    createDialog('nostalgiaEventDialog',`<form id="nostalgiaEventForm"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close="nostalgiaEventDialog" aria-label="${tr('סגירה','Close')}">×</button><span class="small-eyebrow nostalgia-event-extra">${tr('עוד סיפור לאלבום שלנו','Another story for our album')}</span><h3 id="nostalgiaEventFormTitle"></h3><label>${tr('שם האירוע','Event name')}<input id="nostalgiaEventName" dir="auto" maxlength="140" required></label><label><span id="nostalgiaEventCategoryLabel"></span><select id="nostalgiaEventCategory" required></select></label><fieldset class="nostalgia-date-inputs nostalgia-event-extra"><legend>${tr('תאריך האירוע — אם ידוע','Event date — if known')}</legend><label>${tr('יום','Day')}<input id="nostalgiaEventday" inputmode="numeric" type="number" min="1" max="31"></label><label>${tr('חודש','Month')}<input id="nostalgiaEventmonth" inputmode="numeric" type="number" min="1" max="12"></label><label>${tr('שנה','Year')}<input id="nostalgiaEventyear" inputmode="numeric" type="number" min="1000" max="9999"></label></fieldset><label class="nostalgia-event-extra">${tr('איפה זה היה?','Where was it?')}<input id="nostalgiaEventLocation" maxlength="240"></label><p class="form-error" id="nostalgiaEventError" role="alert"></p><div class="nostalgia-event-form-actions"><button type="submit" class="primary-button">${tr('שמירת האירוע','Save event')}</button><button type="button" id="nostalgiaDeleteEvent" class="nostalgia-event-delete" data-nostalgia-delete-event hidden>${trashIcon}<span>${tr('מחיקת תיקייה','Delete folder')}</span></button></div></form>`);
     createDialog('nostalgiaNewCategoryDialog',`<form id="nostalgiaNewCategoryForm"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close="nostalgiaNewCategoryDialog" aria-label="${tr('סגירה','Close')}">×</button><span class="small-eyebrow">${tr('עוד מקום לזיכרונות','More room for memories')}</span><h3>${tr('מוסיפים מדף חדש','Add another shelf')}</h3><label>${tr('שם הקטגוריה','Category name')}<input id="nostalgiaNewCategoryName" maxlength="80" required></label><p class="form-error" id="nostalgiaNewCategoryError" role="alert"></p><button type="submit" class="primary-button">${tr('יצירת קטגוריה','Create category')}</button></form>`);
     createDialog('nostalgiaAssignDialog',`<form id="nostalgiaAssignForm"><button type="button" class="nostalgia-dialog-close" data-nostalgia-close="nostalgiaAssignDialog" aria-label="${tr('סגירה','Close')}">×</button><h3 id="nostalgiaAssignTitle"></h3><p>${tr('אפשר לבחור יותר מאירוע אחד. בלי סימון, הפריט יופיע באזור הלא מתויג.','Choose more than one event if needed. With none selected, the file stays unclassified.')}</p><div id="nostalgiaAssignChoices" class="nostalgia-assign-choices"></div><button type="button" class="quiet-button" data-nostalgia-new-event-for-item>${tr('＋ יצירת אירוע חדש','＋ Create a new event')}</button><p id="nostalgiaAssignError" class="form-error" role="alert"></p><button type="submit" class="primary-button">${tr('שמירת השיוך','Save selection')}</button></form>`);
     const deletion=createDialog('nostalgiaDeleteDialog',`<button type="button" id="nostalgiaDeleteClose" class="nostalgia-dialog-close" aria-label="${tr('סגירה','Close')}">×</button><div class="nostalgia-delete-ornament" aria-hidden="true"><span>◇</span><span>◆</span><span>◇</span></div><div class="nostalgia-delete-emblem" aria-hidden="true">${trashIcon}</div><h3 id="nostalgiaDeleteTitle">${tr('מחיקת תיקייה','Delete folder')}</h3><strong id="nostalgiaDeleteFolderName" dir="auto"></strong><p id="nostalgiaDeleteDescription">${tr('התוכן שבתיקייה יעבור לאזור הלא משויך.','This folder’s contents will move to the unclassified area.')}</p><p class="nostalgia-delete-reassurance">${tr('כל הקבצים יישמרו, ותוכלו לשייך אותם מחדש בכל עת.','All files will be kept, ready to assign again at any time.')}</p><div class="nostalgia-delete-actions"><button type="button" id="nostalgiaDeleteCancel">${tr('ביטול','Cancel')}</button><button type="button" id="nostalgiaDeleteConfirm">${tr('מחיקת התיקייה','Delete folder')}</button></div>`,'nostalgia-form-dialog nostalgia-delete-dialog');
@@ -254,11 +286,37 @@
     rail.addEventListener('pointermove',event=>{if(!drag)return;const dx=event.clientX-drag.x;if(Math.abs(dx)>6&&!drag.moved){drag.moved=true;rail.setPointerCapture(drag.id);rail.classList.add('is-dragging');}if(drag.moved){event.preventDefault();rail.scrollLeft=drag.scroll-dx;}});
     const endDrag=()=>{if(drag?.moved){rail.classList.remove('is-dragging');setTimeout(()=>{drag=null;},0);}else drag=null;};rail.addEventListener('pointerup',endDrag);rail.addEventListener('pointercancel',endDrag);rail.addEventListener('click',event=>{if(drag?.moved){event.preventDefault();event.stopPropagation();}},true);
     rail.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();rail.scrollBy({left:(event.key==='ArrowRight'?1:-1)*320,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});});
-    $('nostalgiaEventForm').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('[type=submit]');button.disabled=true;try{const date=Object.fromEntries(['day','month','year'].map(part=>[part,$('nostalgiaEvent'+part).value?Number($('nostalgiaEvent'+part).value):null]));const result=await action('event',{id:form.dataset.eventId||undefined,expectedRevision:form.dataset.revision||undefined,categoryId:$('nostalgiaEventCategory').value,name:$('nostalgiaEventName').value,location:$('nostalgiaEventLocation').value,date});$('nostalgiaEventDialog').close();if(state.newEventAssignId){await action('assign',{id:state.newEventAssignId,add:[result.event.id]});$('nostalgiaAssignDialog').close();state.newEventAssignId=null;}navigate(result.event.id);}catch(error){$('nostalgiaEventError').textContent=I.error(error.message);}finally{button.disabled=false;}});
+    const eventDialog=$('nostalgiaEventDialog');
+    eventDialog.setAttribute('aria-labelledby','nostalgiaEventFormTitle');
+    eventDialog.addEventListener('cancel',event=>{if(eventFormContext?.saving)event.preventDefault();});
+    eventDialog.addEventListener('close',()=>{if(!eventDialog.open)eventFormContext=null;});
+    $('nostalgiaEventForm').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const context=eventFormContext,form=event.currentTarget;
+      if(!context||context.saving)return;
+      const button=form.querySelector('[type=submit]'),close=form.querySelector('[data-nostalgia-close]');
+      context.saving=true;button.disabled=true;close.disabled=true;$('nostalgiaEventError').textContent='';
+      try{
+        const payload={categoryId:$('nostalgiaEventCategory').value,name:$('nostalgiaEventName').value.trim()};
+        if(context.onCreated)payload.reuseExisting=true;
+        else{
+          payload.id=form.dataset.eventId||undefined;
+          payload.expectedRevision=form.dataset.revision||undefined;
+          payload.location=$('nostalgiaEventLocation').value;
+          payload.date=Object.fromEntries(['day','month','year'].map(part=>[part,$('nostalgiaEvent'+part).value?Number($('nostalgiaEvent'+part).value):null]));
+        }
+        const {event:saved}=await action('event',payload);
+        eventDialog.close();
+        if(context.onCreated){context.onCreated(saved);return;}
+        if(context.assignId){await action('assign',{id:context.assignId,add:[saved.id]});$('nostalgiaAssignDialog').close();}
+        navigate(saved.id);
+      }catch(error){$('nostalgiaEventError').textContent=I.error(error.message);}
+      finally{context.saving=false;button.disabled=false;close.disabled=false;}
+    });
     $('nostalgiaNewCategoryForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type=submit]');button.disabled=true;try{const result=await action('category',{name:$('nostalgiaNewCategoryName').value});$('nostalgiaNewCategoryDialog').close();openCategory(result.category.id);}catch(error){$('nostalgiaNewCategoryError').textContent=I.error(error.message);}finally{button.disabled=false;}});
     $('nostalgiaAssignForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.currentTarget.querySelector('[type=submit]');button.disabled=true;try{const current=allItems().find(item=>item.id===state.assignId)?.nostalgiaEventIds||[],wanted=selectedAssignments(current,[...$('nostalgiaAssignChoices').querySelectorAll('input:checked')].map(input=>input.value));await action('assign',{id:state.assignId,add:wanted.filter(id=>!current.includes(id)),remove:current.filter(id=>!wanted.includes(id))});$('nostalgiaAssignDialog').close();}catch(error){$('nostalgiaAssignError').textContent=I.error(error.message);}finally{button.disabled=false;}});
     for(const event of ['hashchange','popstate'])window.addEventListener(event,()=>{if(/^#nostalgia(?:\/|$)/.test(location.hash))window.FamilyArchive?.renderNostalgia?.();else{state.homeActive=false;closeCategory(true);}});
   }
-  window.FamilyNostalgia={select,decorateCard,viewItems,viewCategoryItems,selectedAssignments,stackPose,acceptDrop,openAssign,isEvent:()=>{const event=getEvent(routeEvent());return Boolean(event&&event.categoryId!==DIRECT_CATEGORY);},uploadEvents,uploadEventId:()=>$('nostalgiaUploadEvent')?.value||null};
+  window.FamilyNostalgia={select,decorateCard,viewItems,viewCategoryItems,selectedAssignments,stackPose,acceptDrop,openAssign,isEvent:()=>{const event=getEvent(routeEvent());return Boolean(event&&event.categoryId!==DIRECT_CATEGORY);},uploadEvents,uploadEventLabel,directUploadId:DIRECT_DESTINATION,createUploadEvent:(previous,onCreated)=>openEventForm(getEvent(previous)?.categoryId,null,null,onCreated),uploadEventId:()=>$('nostalgiaUploadEvent')?.value||null};
   document.addEventListener('DOMContentLoaded',init);
 })();

@@ -26,11 +26,12 @@ function fixture({finalize,categories,cut=prepareSegmentFile}={}){
   querySelectorAll(selector){return [...nodes.values()].filter(node=>node.parent===this&&(selector==='[data-video-draft-field]'?node.field:selector==='[data-video-boundary]'?node.boundary:['input','textarea','select','button'].includes(node.tag)));}
   showModal(){this.open=true;}
   close(){this.open=false;this.listeners.get('close')?.();}
-  pause(){} load(){this.loadCount++;} replaceChildren(){} blur(){}
+  pause(){} load(){this.loadCount++;} replaceChildren(){} blur(){} focus(){this.focused=true;}
   click(){assert.equal(this.disabled,false,'clicked control is enabled');return this.listeners.get('click')?.();}
  }
  const document={getElementById:id=>nodes.get(id),createElement:tag=>new Element(tag),addEventListener:(name,fn)=>events.set(name,fn),body:{append(node){nodes.set(node.id,node);}}};
  const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String,seconds:text=>String(text).trim()?String(text).split(':').reduce((v,part)=>v*60+Number(part),0):NaN},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
+ window.FamilyNostalgia.uploadEventLabel=event=>event.name;
  const context=vm.createContext({window,document,videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:()=>'/local-preview',revokeObjectURL(){}},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
  vm.runInContext(swipeSource,context);vm.runInContext(source,context);
  const upload=(file,progress,target)=>{const pending=deferred();uploads.push({file,progress,target,...pending});return pending.promise;};
@@ -156,6 +157,43 @@ function tagName(f,name){
  const button={hasAttribute:attr=>attr==='data-video-add-name'};
  f.get('Wizard').listeners.get('click')({target:{closest:selector=>selector.includes('[data-video-add-name]')?button:null}});
 }
+
+test('creating an event closes the picker first, keeps the draft and carries only the chosen destination forward',async()=>{
+ const f=fixture({cut:async({name})=>new File(['clip'],name+'.mp4')});
+ const life='everyday-life-clips',party={id:'party',name:'יום הולדת לנעמה',categoryId:'birthdays'},holiday={id:'holiday',name:'פסח',categoryId:'holidays'};
+ let confirm,previous;
+ f.window.FamilyNostalgia={
+  directUploadId:life,uploadEvents:()=>[party,holiday],
+  uploadEventLabel:event=>event.name+' · '+(event.categoryId==='birthdays'?'ימי הולדת':'חגים ומועדים'),
+  createUploadEvent:(id,created)=>{assert.equal(f.get('EventChoices').hidden,true);previous=id;confirm=created;}
+ };
+ const done=f.prepare(['tape.mp4'],{eventId:null});openSegments(f);
+ const create=()=>{f.get('EventTrigger').click();assert.equal(f.get('EventChoices').hidden,false);f.get('EventNew').click();};
+ assert.equal(f.get('TargetRow').hidden,true);assert.equal(f.get('EventRow').hidden,false);
+ assert.equal(f.get('EventValue').textContent,'ללא שיוך');assert.equal(f.get('EventClear').hidden,true);
+ assert.doesNotMatch(f.get('Wizard').innerHTML,/יום הולדת לנעמה|פסח/);
+ f.get('Caption').value='לפני העוגה';f.get('Dateyear').value='1989';boundary(f,'EndTime','2');
+ create();assert.equal(previous,'');confirm(party);
+ f.get('Next').click();assert.equal(f.get('EventValue').textContent,'יום הולדת לנעמה · ימי הולדת');
+ boundary(f,'EndTime','4');f.get('Next').click();boundary(f,'EndTime','6');
+ create();assert.equal(previous,'party');confirm(holiday);
+ f.get('Next').click();assert.equal(f.get('EventValue').textContent,'פסח · חגים ומועדים');boundary(f,'EndTime','8');
+ for(let i=0;i<3;i++)f.get('Previous').click();
+ f.get('EventTrigger').click();f.get('EventLife').click();
+ assert.equal(f.get('EventValue').textContent,'החיים עצמם');assert.equal(f.get('Caption').value,'לפני העוגה');
+ f.get('Next').click();assert.equal(f.get('EventValue').textContent,'החיים עצמם');
+ f.get('Next').click();assert.equal(f.get('EventValue').textContent,'פסח · חגים ומועדים');
+ create();assert.equal(previous,'holiday'); // Dismiss the prompt without confirming.
+ assert.equal(f.get('EventValue').textContent,'פסח · חגים ומועדים');
+ const saving=f.get('SaveAll').click(),expected=[life,life,'holiday','holiday'];
+ for(const [i,id] of expected.entries()){
+  await waitForUpload(f,i+1);assert.equal(f.uploads[i].target.eventId,id);f.uploads[i].resolve(f.result(i));
+ }
+ await saving;
+ assert.deepEqual(f.saves.map(item=>item.data.metadata.eventId),expected);
+ assert.equal(f.saves[0].data.metadata.date.year,1989);
+ f.get('Done').click();await done;
+});
 
 test('split is available only for an originally single video, with an independent full-video draft',async()=>{
  const multi=fixture(),multiDone=multi.prepare();

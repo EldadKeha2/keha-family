@@ -78,7 +78,11 @@ export class NostalgiaLibrary{
     if(p.id===EVERYDAY_LIFE_DESTINATION||!old&&p.categoryId==='everyday-life')throw new HttpError(400,'החיים עצמם מציגה סרטונים ישירות, ללא תיקיות אירועים.');
     const name=text(p.name,'שם האירוע',140,true),location=text(p.location||'','מיקום',240);let date;
     try{date=photoDate(p.date);}catch{throw new HttpError(400,'תאריך האירוע אינו תקין.');}
-    if(library.events.some(e=>e.id!==p.id&&e.categoryId===p.categoryId&&normalized(e.name)===normalized(name)))throw new HttpError(409,'כבר קיים אירוע בשם הזה בקטגוריה.');
+    const existing=library.events.find(e=>e.id!==p.id&&e.categoryId===p.categoryId&&normalized(e.name)===normalized(name));
+    if(existing){
+      if(!old&&p.reuseExisting===true)return {saved:true,event:existing,collection:this.state.collection('nostalgia')};
+      throw new HttpError(409,'כבר קיים אירוע בשם הזה בקטגוריה.');
+    }
     if(!old&&library.events.length>=1500)throw new HttpError(400,'ספריית האירועים מלאה.');
     const event={...(old||{}),id:old?.id||uid(),categoryId:p.categoryId,name,nameEn:old?.name===name?old.nameEn:null,location,date,createdAt:old?.createdAt||new Date().toISOString(),revision:uid()};
     if(old)library.events[library.events.indexOf(old)]=event;else library.events.push(event);this.write(library);

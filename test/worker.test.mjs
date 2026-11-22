@@ -245,6 +245,21 @@ test('Life itself supports one direct video destination, preserves older assignm
   f.restart();catalog=await(await f.call('/api/nostalgia')).json();assert.equal(catalog.library.events.filter(event=>event.id==='everyday-life-clips').length,1);assert.deepEqual(catalog.items.find(item=>item.id===film.id).nostalgiaEventIds,['everyday-life-clips']);
  }finally{await f.close();}
 });
+test('creating an upload destination can reuse the same name in the same category without changing an existing event',async()=>{
+ const f=fixture();try{
+  await f.connect();
+  const post=body=>f.call('/api/nostalgia/event',{method:'POST',body});
+  const payload={name:'ליל הסדר',categoryId:'holidays',reuseExisting:true};
+  const first=(await(await post({...payload,date:{year:1989},location:'רחובות'})).json()).event;
+  const retry=await(await post({...payload,name:'  ליל הסדר  '})).json();
+  assert.deepEqual(retry.event,first);assert.equal(retry.collection.library.events.filter(e=>e.id===first.id).length,1);
+  assert.equal((await post({...payload,reuseExisting:false})).status,409);
+  const other=await(await post({...payload,categoryId:'other-events'})).json();
+  assert.notEqual(other.event.id,first.id);assert.equal(other.event.categoryId,'other-events');
+  assert.equal((await post({...payload,categoryId:'everyday-life'})).status,400);
+ }finally{await f.close();}
+});
+
 test('nostalgia event folders keep explicit uploads, partial dates, multiple event tags and unclassified uploads durable without duplicating bytes',async()=>{
  const f=fixture();try{
   await f.connect();let catalog=await(await f.call('/api/nostalgia')).json();assert.equal(catalog.library.categories.length,6);
