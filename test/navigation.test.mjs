@@ -27,6 +27,14 @@ test('both founder trees return directly to the family tree after sharing, reloa
     assert.equal(f.location.search,'?lang=en-GB');
   }
 });
+test('the recording archive is the parent of a shared interview on mobile and desktop',async()=>{
+  const hash='#voices/'+('b'.repeat(32));
+  for(const phone of [true,false]){
+    const f=fixture('https://family.test/?lang=en-GB'+hash,{phone});
+    f.history.back();await f.flush();assert.equal(f.location.hash,'#voices');
+    f.history.forward();await f.flush();assert.equal(f.location.hash,hash);assert.equal(f.location.search,'?lang=en-GB');
+  }
+});
 
 test('all direct game links have a lobby parent on desktop and in a phone app, including legacy links',async()=>{
   const ids=fixture('https://family.test/#games').nav.gameIds;

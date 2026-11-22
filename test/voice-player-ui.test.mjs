@@ -19,6 +19,7 @@ function fixture({count=1,supported=true,rejectPlay=false}={}){
     async resume(){this.state='running';}
     node(){const node={connect(to){this.connected=to;return to;},disconnect(){this.disconnected=true;},gain:{value:0,setTargetAtTime(value){this.value=value;}},frequency:{value:0,setTargetAtTime(value){this.value=value;}},Q:{value:0}};nodes.push(node);return node;}
     createBiquadFilter(){return this.node();}createGain(){return this.node();}
+    createDynamicsCompressor(){return Object.assign(this.node(),{threshold:{},knee:{},ratio:{},attack:{},release:{}});}
     createMediaElementSource(audio){assert.ok(!this.sources.includes(audio),'only one source per audio element');this.sources.push(audio);return this.node();}
   }
   window.FamilyI18n={isEnglish:false};window.AudioContext=supported?Context:undefined;window.webkitAudioContext=undefined;
@@ -53,8 +54,24 @@ test('equalizer settings reach the signal chain and reopening does not duplicate
 test('unsupported equalizers retain ordinary playback and volume',async()=>{
   const f=fixture({supported:false});f.click('.voice-tone-toggle');await f.tick();
   assert.equal(f.player().querySelector('[data-preset]').disabled,true);assert.equal(f.player().querySelector('.voice-tone-note').hidden,false);
+  assert.equal(f.player().querySelector('.voice-boost input').disabled,true);
   const volume=f.player().querySelector('.voice-volume input');volume.value='.35';volume.dispatchEvent(new f.window.Event('input'));assert.equal(f.audios[0].volume,.35);
   f.click('.voice-play');await f.tick();assert.equal(f.audios[0].paused,false);
+});
+test('boost amplifies only its recording and respects normal volume, mute and playback position',async()=>{
+  const f=fixture({count:2}),boost=f.player().querySelector('.voice-boost input'),volume=f.player().querySelector('.voice-volume input');
+  function input(control,value){control.value=value;control.dispatchEvent(new f.window.Event('input'));}
+  assert.equal(boost.value,'100');assert.equal(f.contexts.length,0);
+  f.click('.voice-play');await f.tick();f.audios[0].currentTime=24;
+  input(boost,'600');boost.dispatchEvent(new f.window.Event('change'));await f.tick();
+  const gain=f.nodes[4],limiter=gain.connected;
+  assert.equal(gain.gain.value,6);assert.equal(limiter.ratio.value,20);assert.equal(limiter.connected,f.contexts[0].destination);
+  assert.equal(f.audios[0].volume,1);assert.equal(f.audios[0].paused,false);assert.equal(f.audios[0].currentTime,24);
+  assert.equal(boost.getAttribute('aria-valuetext'),'600%');assert.equal(f.player(1).querySelector('.voice-boost output').textContent,'100%');
+  input(volume,'.5');assert.equal(gain.gain.value,3);
+  input(volume,'0');assert.equal(gain.gain.value,0);
+  input(volume,'1');input(boost,'100');await f.tick();assert.equal(gain.gain.value,1);assert.equal(limiter.ratio.value,1);
+  assert.deepEqual(f.contexts[0].sources,[f.audios[0]]);
 });
 test('a rejected play request leaves an actionable retry and truthful player state',async()=>{
   const f=fixture({rejectPlay:true});f.click('.voice-play');await f.tick();

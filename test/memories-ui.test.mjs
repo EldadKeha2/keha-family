@@ -12,13 +12,15 @@ const story={id:'a'.repeat(24),title:'הדרך הביתה',body:'סיפור מש
 const recording={id:'b'.repeat(32),title:'בקולה של סבתא',body:'זיכרון מוקלט',author:'משפחה',year:1985,personIds:['yona'],tags:[person],filename:'voice.mp3',src:'/api/voices/'+('b'.repeat(32))+'/audio',createdAt:'2026-11-01T00:00:00Z',updatedAt:'2026-11-01T00:00:00Z'};
 const tick=async()=>{for(let n=0;n<5;n++)await new Promise(resolve=>setImmediate(resolve));};
 
-function fixture({english=false,reduced=false,stories=[story],recordings=[recording],people=[person],fail=false,categoryError=0}={}){
+function fixture({english=false,reduced=false,stories=[story],recordings=[recording],people=[person],fail=false,categoryError=0,href='https://family.test/',navigator={}}={}){
   const {window,document}=parseHTML(html),requests=[],timers=new Map(),scrolls=[],uploads=[],notices=[];let timer=0;
+  const location=new URL(href);
   // Native browser methods, modeled only at the UI boundary.
   for(const dialog of document.querySelectorAll('dialog')){dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;};}
   window.HTMLElement.prototype.scrollIntoView=function(){scrolls.push(this.id);};
   window.HTMLElement.prototype.focus=function(){Object.defineProperty(document,'activeElement',{value:this,configurable:true});};
   window.HTMLElement.prototype.pause=function(){this.paused=true;};
+  window.HTMLInputElement.prototype.select=function(){this.selected=true;};
   Object.defineProperty(window.HTMLSelectElement.prototype,'value',{get(){return this._value??this.querySelector('option[selected]')?.value??this.querySelector('option')?.value??'';},set(value){this._value=String(value);},configurable:true});
   for(const input of document.querySelectorAll('input[type=file]'))input.files=[];
   for(const form of document.querySelectorAll('form'))form.reset=()=>{for(const input of form.querySelectorAll('input,textarea')){input.value='';if(input.type==='file')input.files=[];}};
@@ -37,17 +39,18 @@ function fixture({english=false,reduced=false,stories=[story],recordings=[record
   };
   Object.assign(window,{FAMILY_API_TOKEN:'public-marker',FamilyI18n:{isEnglish:english,locale:english?'en-US':'he-IL',error:String,personName:p=>english?p.nameEn:p.name,searchNames:p=>[p.name,p.nameEn].join(' '),fetch:api},FamilyApp:{apiEnabled:true,getView:()=> 'tree',toast:s=>notices.push(s)},FamilyTags:{findPeople:async q=>[person].filter(p=>!q||p.name.includes(q)||p.nameEn.toLowerCase().includes(q.toLowerCase()))},FamilyAccessibility:{isReducedMotion:()=>reduced}});
   window.FAMILY_DATA={people:Object.fromEntries(people.map(p=>[p.id,p]))};
+  window.FamilyI18n.language=english?'en-US':'he';
   window.FamilyApp.getPersonSummary=id=>people.find(p=>p.id===id);
   class XHR{
     constructor(){this.headers={};this.events={};this.upload={addEventListener:(name,fn)=>{this.progress=fn;}};}
     open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}addEventListener(name,fn){this.events[name]=fn;}
     send(file){this.file=file;uploads.push(this);queueMicrotask(()=>{this.progress?.({lengthComputable:true,loaded:file.size,total:file.size});this.status=201;this.responseText=JSON.stringify({recording});this.events.load();});}
   }
-  vm.runInNewContext(source,{window,document,FormData:Form,Response,TextEncoder,crypto:webcrypto,btoa,XMLHttpRequest:XHR,matchMedia:()=>({matches:reduced}),setInterval:()=>0,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id)});
+  vm.runInNewContext(source,{window,document,location,navigator,URL,FormData:Form,Response,TextEncoder,crypto:webcrypto,btoa,XMLHttpRequest:XHR,matchMedia:()=>({matches:reduced}),setInterval:()=>0,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id)});
   document.dispatchEvent(new window.Event('DOMContentLoaded'));
   const get=id=>document.getElementById(id),click=selector=>{const el=document.querySelector(selector);assert.ok(el,selector);el.dispatchEvent(new window.Event('click',{bubbles:true}));};
   const emit=(id,type,props={})=>{const event=new window.Event(type,{bubbles:true,cancelable:true});Object.assign(event,props);get(id).dispatchEvent(event);return event;};
-  return {window,document,get,click,emit,requests,uploads,timers,scrolls,notices,async activate(view){window.FamilyMemories.activate(view);await tick();},async flush(){await tick();},finishAnimation(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());}};
+  return {window,document,location,get,click,emit,requests,uploads,timers,scrolls,notices,async activate(view){window.FamilyMemories.activate(view);await tick();},async flush(){await tick();},finishAnimation(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());}};
 }
 
 test('the five category doors open from an ornamented book and each click turns its pages',async()=>{
@@ -113,6 +116,46 @@ test('voices use native seekable players, allow metadata editing and expose down
   f.get('voiceTitle').value='כותרת חדשה';f.emit('voiceForm','submit');await f.flush();const mutation=f.requests.find(r=>r.options.method==='POST');
   assert.equal(mutation.path,'api/voices/'+recording.id);assert.equal(JSON.parse(mutation.options.body).expectedUpdatedAt,recording.updatedAt);assert.equal(f.uploads.length,0);
   await f.activate('stories');assert.equal(f.get('voicesView').hidden,true);
+});
+test('each share destination receives the selected recording link, including the device sheet and clipboard',async()=>{
+  const sent=[],copied=[],navigator={share:async data=>sent.push(data),clipboard:{writeText:async url=>copied.push(url)}};
+  const second={...recording,id:'c'.repeat(32),title:'Grandpa & Grandma #1'};
+  const f=fixture({recordings:[recording,second],english:true,navigator,href:'https://family.test/?install=1&media=old#voices'});
+  await f.activate('voices');
+  const panels=[...f.document.querySelectorAll('.voice-sharing')];
+  assert.equal(panels.length,2);assert.equal(panels[1].previousElementSibling.localName,'audio');
+  const url='https://family.test/?lang=en-US#voices/'+second.id,panel=panels[1];
+  assert.equal(panel.querySelector('input').value,url);assert.notEqual(panels[0].querySelector('input').value,url);
+  const links=[...panel.querySelectorAll('.voice-share-options a')].map(a=>new URL(a.getAttribute('href')));
+  assert.equal(links[0].searchParams.get('text'),second.title+'\n'+url);
+  assert.equal(links[1].searchParams.get('u'),url);assert.equal(links[2].searchParams.get('url'),url);
+  assert.equal(links[3].searchParams.get('subject'),second.title);assert.equal(links[3].searchParams.get('body'),second.title+'\n'+url);
+  for(const action of ['device','copy','messenger','instagram']){
+    panel.querySelector('[data-voice-share="'+action+'"]').dispatchEvent(new f.window.Event('click',{bubbles:true}));
+    await f.flush();
+    if(['messenger','instagram'].includes(action))assert.equal(panel.querySelector('.voice-share-open').hidden,false);
+  }
+  assert.equal(sent.length,1);assert.equal(sent[0].title,second.title);assert.equal(sent[0].url,url);
+  assert.deepEqual(copied,[url,url,url]);
+  navigator.share=async()=>{throw new DOMException('Cancelled','AbortError');};
+  panel.querySelector('[data-voice-share="device"]').dispatchEvent(new f.window.Event('click',{bubbles:true}));await f.flush();
+  assert.equal(copied.length,3);assert.equal(panel.querySelector('.voice-share-status').textContent,'');
+});
+test('shared links open a single recording on load and history navigation, with manual copy when needed',async()=>{
+  const second={...recording,id:'c'.repeat(32),title:'ראיון שני',src:'/second.mp3'};
+  const f=fixture({recordings:[recording,second],href:'https://family.test/#voices/'+second.id});
+  await f.activate('voices');
+  assert.deepEqual([...f.get('voiceList').querySelectorAll('h4')].map(el=>el.textContent),[second.title]);
+  assert.equal(f.get('voiceList').querySelector('audio').getAttribute('src'),second.src);
+  assert.equal(f.get('voiceAllRecordings').hidden,false);assert.equal(f.get('voicePersonFilter').closest('label').hidden,true);
+  assert.equal(f.document.querySelector('[data-voice-share="device"]'),null);
+  f.click('[data-voice-share="copy"]');await f.flush();
+  const field=f.document.querySelector('.voice-share-url');
+  assert.equal(field.hidden,false);assert.equal(field.selected,true);assert.equal(field.value,f.location.href);
+  f.location.hash='#voices/'+('d'.repeat(32));f.window.dispatchEvent(new f.window.Event('hashchange'));
+  assert.equal(f.get('voiceSharedMissing').hidden,false);assert.equal(f.get('voiceList').children.length,0);
+  f.location.hash='#voices';f.window.dispatchEvent(new f.window.Event('popstate'));
+  assert.equal(f.get('voiceList').children.length,2);assert.equal(f.get('voiceSharedMissing').hidden,true);assert.equal(f.get('voiceAllRecordings').hidden,true);
 });
 test('each memory has five category choices at its bottom and saves only its category',async()=>{
   const f=fixture();await f.activate('stories');const id='storyCategory-'+story.id,select=f.get(id);

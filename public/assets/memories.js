@@ -138,17 +138,71 @@
     if(typeof src==='string'&&src.startsWith('/media/'))return `<span class="voice-card-seal voice-card-portrait"><img src="${safe(src+(src.includes('?')?'&':'?')+'thumbnail=1')}" alt="${safe(I.personName(person))}" loading="lazy" decoding="async" ${window.FamilyPhotoFraming?.profile(person)||''}></span>`;
     return '<span class="voice-card-seal" aria-hidden="true">♫</span>';
   }
+  const sharedVoiceId=()=>location.hash.startsWith('#voices/')?location.hash.slice('#voices/'.length):'';
+  const shareSymbol='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8.7 10.5 6.6-4m-6.6 7 6.6 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>';
+  function voiceShareHTML(item){
+    const site=document.documentElement.dataset,url=new URL(site.nakashHome||'.',site.nakashOrigin||location.href);
+    if(en)url.searchParams.set('lang',I.language);
+    url.hash='voices/'+item.id;
+    const encodedUrl=encodeURIComponent(url.href),title=encodeURIComponent(item.title),message=encodeURIComponent(item.title+'\n'+url.href);
+    const icon=name=>`<svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/share-icons.svg#${name}"></use></svg>`;
+    const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="#1688b5" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 18-7-4 18-6-6-3 3v-6l9-6-11 7Z"/></svg>';
+    const external='target="_blank" rel="noopener noreferrer"';
+    return `<details class="voice-sharing">
+      <summary aria-label="${t('שיתוף ההקלטה','Share recording')} · ${safe(item.title)}">${shareSymbol}${t('שיתוף ההקלטה','Share recording')}</summary>
+      <div class="voice-share-options">
+        <a href="https://wa.me/?text=${safe(message)}" ${external}>${icon('whatsapp')}WhatsApp</a>
+        <a href="https://www.facebook.com/sharer/sharer.php?u=${safe(encodedUrl)}" ${external}>${icon('facebook')}Facebook</a>
+        <button type="button" data-voice-share="messenger">${icon('messenger')}Messenger</button>
+        <button type="button" data-voice-share="instagram">${icon('instagram')}Instagram</button>
+        <a href="https://t.me/share/url?url=${safe(encodedUrl)}&amp;text=${safe(title)}" ${external}>${sendIcon}Telegram</a>
+        <a href="mailto:?subject=${safe(title)}&amp;body=${safe(message)}">${icon('email')}${t('מייל','Email')}</a>
+        <button type="button" data-voice-share="copy">${icon('link')}${t('העתקת קישור','Copy link')}</button>
+        ${typeof navigator.share==='function'?`<button type="button" data-voice-share="device">${shareSymbol}${t('שיתוף דרך המכשיר','Share via device')}</button>`:''}
+      </div>
+      <p class="voice-share-status" role="status"></p>
+      <input type="text" class="voice-share-url" dir="ltr" aria-label="${t('קישור להקלטה','Recording link')}" value="${safe(url.href)}" readonly hidden>
+      <a class="voice-share-open" ${external} hidden></a>
+    </details>`;
+  }
+  async function shareRecording(button){
+    const panel=button.closest('.voice-sharing'),field=panel.querySelector('input'),status=panel.querySelector('[role="status"]'),open=panel.querySelector('.voice-share-open');
+    const action=button.dataset.voiceShare,url=field.value;
+    field.hidden=true;open.hidden=true;status.textContent='';
+    if(action==='device'){
+      try{await navigator.share({title:panel.closest('.voice-card').querySelector('h4').textContent,url});return;}
+      catch(error){if(error?.name==='AbortError')return;}
+    }
+    const platform={messenger:'Messenger',instagram:'Instagram'}[action];
+    try{
+      await navigator.clipboard.writeText(url);
+      status.textContent=platform?t('הקישור הועתק. אפשר להדביק אותו בהודעה ב־','Link copied. Paste it into a message on ')+platform+'.':t('הקישור להקלטה הועתק','Recording link copied');
+    }catch{
+      field.hidden=false;field.focus();field.select();
+      status.textContent=t('אפשר להעתיק את הקישור מהשדה.','Select and copy the recording link.');
+    }
+    if(platform){
+      open.textContent=t('פתיחת ','Open ')+platform;
+      open.href=action==='instagram'?'https://www.instagram.com/direct/inbox/':'https://www.facebook.com/messages/';
+      open.hidden=false;
+    }
+  }
   function renderVoices({background=false}={}){
     if(background&&[...$('voiceList').querySelectorAll('audio')].some(a=>!a.paused))return;
     filterOptions($('voicePersonFilter'),peopleOptions(state.recordings),t('כל האנשים','Everyone'));
-    const person=$('voicePersonFilter').value,q=normalize(state.query),items=state.recordings.filter(item=>(person==='all'||item.tags?.some(p=>p.id===person))&&(!q||normalize([item.title,item.body,item.author,item.year,...(item.tags||[]).map(I.searchNames)].join(' ')).includes(q)));
+    const shared=sharedVoiceId(),person=$('voicePersonFilter').value,q=normalize(state.query);
+    const items=shared?state.recordings.filter(item=>item.id===shared):state.recordings.filter(item=>(person==='all'||item.tags?.some(p=>p.id===person))&&(!q||normalize([item.title,item.body,item.author,item.year,...(item.tags||[]).map(I.searchNames)].join(' ')).includes(q)));
+    $('voiceAllRecordings').hidden=!shared;
+    $('voicePersonFilter').closest('label').hidden=Boolean(shared);
+    $('voiceList').classList.toggle('shared-recording',Boolean(shared));
+    $('voiceSharedMissing').hidden=!shared||!state.loaded.voices||items.length>0;
     const signature=JSON.stringify(items);if($('voiceList').dataset.signature!==signature){
       window.FamilyVoicePlayer?.destroy($('voiceList'));$('voiceList').querySelectorAll('audio').forEach(audio=>audio.pause());$('voiceList').dataset.signature=signature;
-      $('voiceList').innerHTML=items.map(item=>`<article class="voice-card"><div class="voice-card-heading">${voiceSealHTML(item)}<div><h4>${safe(item.title)}</h4><p>${[item.year,item.author].filter(Boolean).map(safe).join(' · ')}</p></div><button type="button" class="voice-edit" data-edit-recording="${item.id}" aria-label="${t('עריכת ההקלטה ','Edit recording ')+safe(item.title)}">${t('עריכה','Edit')}</button></div><audio controls preload="none" src="${safe(item.src)}" aria-label="${safe(item.title)}"></audio>${item.body?`<p class="voice-description" dir="auto">${safe(item.body)}</p>`:''}<div class="voice-card-footer"><div class="memory-card-people">${tagsHTML(item,'voices')}</div><a href="${safe(item.src)}?download=1" download="${safe(item.filename)}">${t('הורדה','Download')} ↓</a></div></article>`).join('');
+      $('voiceList').innerHTML=items.map(item=>`<article class="voice-card"><div class="voice-card-heading">${voiceSealHTML(item)}<div><h4>${safe(item.title)}</h4><p>${[item.year,item.author].filter(Boolean).map(safe).join(' · ')}</p></div><button type="button" class="voice-edit" data-edit-recording="${item.id}" aria-label="${t('עריכת ההקלטה ','Edit recording ')+safe(item.title)}">${t('עריכה','Edit')}</button></div><audio controls preload="none" src="${safe(item.src)}" aria-label="${safe(item.title)}"></audio>${voiceShareHTML(item)}${item.body?`<p class="voice-description" dir="auto">${safe(item.body)}</p>`:''}<div class="voice-card-footer"><div class="memory-card-people">${tagsHTML(item,'voices')}</div><a href="${safe(item.src)}?download=1" download="${safe(item.filename)}">${t('הורדה','Download')} ↓</a></div></article>`).join('');
     }
     window.FamilyVoicePlayer?.mount($('voiceList'));
     $('voicesCount').textContent=state.loaded.voices?`${items.length} ${t(items.length===1?'הקלטה':'הקלטות',items.length===1?'recording':'recordings')}`:'';
-    $('voicesEmpty').hidden=!state.loaded.voices||items.length>0;
+    $('voicesEmpty').hidden=Boolean(shared)||!state.loaded.voices||items.length>0;
     $('voicesEmpty').querySelector('h4').textContent=state.recordings.length?t('לא נמצאו הקלטות בבחירה הזו','No recordings match your selection'):t('כאן שומרים את הקולות שלנו','A home for our family voices');
   }
   async function refresh(kind,force=false){
@@ -217,6 +271,11 @@
     if(view==='stories'){renderStories();refresh('stories');window.FamilyPeopleRoster?.load?.().then(refreshNarratorPortraits).catch(()=>{});}else if(view==='voices'){renderVoices();refresh('voices');}
   }
   function init(){
+    $('voiceAllRecordings').textContent=t('כל ההקלטות','All recordings');
+    $('voiceSharedMissing').textContent=t('ההקלטה שבקישור אינה זמינה.','The shared recording is unavailable.');
+    const syncVoiceRoute=()=>{if(state.view==='voices'&&location.hash.split('/')[0]==='#voices')renderVoices();};
+    window.addEventListener('hashchange',syncVoiceRoute);
+    window.addEventListener('popstate',syncVoiceRoute);
     const questionnaire=$('storyQuestionnaireLink');if(questionnaire)questionnaire.textContent=t('כתיבת סיפור','Write a story');
     window.FamilyPeopleRoster?.subscribe?.(refreshNarratorPortraits);
     window.addEventListener('family-profile-changed',refreshNarratorPortraits);
@@ -229,8 +288,17 @@
       const edit=event.target.closest('[data-edit-story]');if(edit){editStory(edit.dataset.editStory);return;}
       if(event.target.closest('#newStory,[data-new-story]')){editStory();return;}
       const voice=event.target.closest('[data-edit-recording]');if(voice){editRecording(voice.dataset.editRecording);return;}
+      const share=event.target.closest('[data-voice-share]');if(share){void shareRecording(share);return;}
+      if(event.target.closest('#voiceAllRecordings')&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){
+        state.query='';$('searchInput').value='';$('voicePersonFilter').value='all';
+        if(window.FamilyNavigation){
+          event.preventDefault();
+          if(!window.FamilyNavigation.returnTo('#voices'))renderVoices();
+        }
+        return;
+      }
       if(event.target.closest('#newRecording,[data-new-recording]')){editRecording();return;}
-      const person=event.target.closest('[data-memory-filter-person]');if(person){const voices=person.dataset.memoryKind==='voices',filter=$(voices?'voicePersonFilter':'storyPersonFilter');filter.value=person.dataset.memoryFilterPerson;if($('storyReader').open)$('storyReader').close();if(voices)renderVoices();else{$('storyYearFilter').value='all';renderStories();$('memoryCollection').scrollIntoView({block:'start',behavior:reduced()?'instant':'smooth'});}}
+      const person=event.target.closest('[data-memory-filter-person]');if(person){const voices=person.dataset.memoryKind==='voices',filter=$(voices?'voicePersonFilter':'storyPersonFilter');filter.value=person.dataset.memoryFilterPerson;if($('storyReader').open)$('storyReader').close();if(voices){if(sharedVoiceId())location.hash='voices';renderVoices();}else{$('storyYearFilter').value='all';renderStories();$('memoryCollection').scrollIntoView({block:'start',behavior:reduced()?'instant':'smooth'});}}
     });
     $('storyTimeline').addEventListener('change',event=>{if(event.target.matches('[data-story-category]'))assignCategory(event.target.dataset.storyCategory,event.target.value);});
     $('storyForm').addEventListener('submit',saveStory);$('voiceForm').addEventListener('submit',saveRecording);
