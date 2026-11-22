@@ -1066,14 +1066,16 @@ test('all four extended Keha Android invitations use one Install action without 
   }
 });
 
-test('extended Keha apps leave an enclosing app directly and never request cross-app installation permission',async()=>{
+test('extended Keha installation leaves a different origin and opens the own-origin invitation from a regular header',async()=>{
   for(const base of eightApps.filter(app=>app.home.startsWith('/keha-extended/'))){
     const origin='https://family-'+base.branch+'.example',site={...base,origin};
     for(const currentOrigin of ['https://family.example',origin]){
       const f=fixture({site,autoReady:false,standalone:true,sessionState:new Map([['family-running-app','/']]),webInstall:currentOrigin===origin?'missing':'works',entryUrl:currentOrigin+base.home+'#tree'});
       f.click(f.button());
       assert.equal(f.dialog.open,false);assert.equal(f.webInstallCalls.length,0);
-      assert.equal(f.assignments.length,1);assert.ok(f.assignments[0].startsWith('intent://'+new URL(origin).host+base.home));
+      assert.equal(f.assignments.length,1);
+      if(currentOrigin!==origin)assert.ok(f.assignments[0].startsWith('intent://'+new URL(origin).host+base.home));
+      else assert.equal(f.assignments[0],origin+base.home+'?lang=he&install=1#home');
       assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
     }
   }
@@ -1092,6 +1094,34 @@ test('an early Android install event cannot reopen a family confirmation before 
 });
 
 const androidKehaSites=[...eightApps.filter(app=>app.home.startsWith('/keha-extended/')),{branch:'shlomo',name:'משפחת שלמה קהא',home:'/keha-extended/shlomo/',icon:'/keha-extended/shlomo/icon-192.png'}];
+
+test('Android branches entered through the installed extended hub open their own working installation link',async()=>{
+  for(const base of androidKehaSites.filter(app=>app.branch!=='extended'))for(const standalone of [false,true])for(const english of [false,true]){
+    const origin='https://family-'+base.branch+'.example',site={...base,origin};
+    const sessionState=new Map([['family-running-app','/keha-extended/']]);
+    const parentApp={platform:'webapp',id:'https://family-extended.example/keha-extended/'};
+    const f=fixture({site,standalone,english,sessionState,installedRelated:[parentApp],entryUrl:origin+base.home+'#tree'});
+    await tick();f.click(f.button());await tick();
+    assert.deepEqual(f.assignments,[origin+base.home+'?lang='+(english?'en-US':'he')+'&install=1#home']);
+    assert.equal(f.webInstallCalls.length,0);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false','The installed hub is not the child app');
+    const arrival=fixture({site,english,entryUrl:f.assignments[0]});
+    const action=arrival.dialog.querySelector('[data-home-install-invite-start]');
+    assert.ok(action);assert.equal(arrival.dialog.open,true);assert.equal(action.hidden,false);
+    const offer=arrival.offer({outcome:'accepted'});arrival.click(action);assert.equal(offer.calls,1);
+    arrival.window.dispatchEvent(new Event('appinstalled'));await tick();
+    assert.equal(arrival.dialog.open,false);assert.equal(arrival.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+  }
+});
+
+test('a regular Android branch entry still installs immediately when a native offer is ready',async()=>{
+  for(const base of androidKehaSites.filter(app=>app.branch!=='extended')){
+    const origin='https://family-'+base.branch+'.example',site={...base,origin};
+    const f=fixture({site,standalone:true,sessionState:new Map([['family-running-app','/keha-extended/']]),entryUrl:origin+base.home+'#home'});
+    const offer=f.offer({outcome:'accepted'});f.click(f.button());assert.equal(offer.calls,1);
+    assert.deepEqual(f.assignments,[]);await tick();assert.equal(f.dialog.open,false);
+  }
+});
 
 test('the screenshot’s old Chrome marker never hides Install and the first tap explicitly leaves custom tabs',()=>{
   for(const base of androidKehaSites)for(const marker of ['', '&installBrowser=chrome'])for(const english of [false,true]){

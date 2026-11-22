@@ -380,6 +380,10 @@
     const modern=(needsFamilyOrigin||!installPrompt)&&familyWebInstall();
     if(!installPrompt&&!modern){
       if(simpleFamilyInstall){
+        // A branch opened from the installed hub has no installation invitation.
+        // Use the same HTTPS entry as a shared install link, so a suppressed
+        // external-browser intent cannot leave the header tap without a result.
+        if(!fromInvitation&&!installationInvitation&&!fullChromeInstallArrival){location.assign(invitationURL.href);return;}
         // An old URL marker is not proof that Android left the custom tab.
         // Keep the actual Install action while Chrome prepares a native offer.
         if(!fullChromeInstallArrival||preparationExpired){openChromeInstallation();return;}
