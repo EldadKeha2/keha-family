@@ -7,7 +7,7 @@ const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'
 function fixture({phone=false,english=false,hash='#directory',branch=null}={}){
  const nodes=new Map(),handlers=new Map(),opened=[];
  class Node extends EventTarget{
-  constructor(){super();this.dataset={};this.style={};this.hidden=false;this.value='';this.innerHTML='';this.open=false;this.classList={add(){},remove(){},toggle(){}};}
+  constructor(){super();this.dataset={};this.style={setProperty(key,value){this[key]=value;}};this.hidden=false;this.value='';this.innerHTML='';this.open=false;this.classList={add(){},remove(){},toggle(){}};}
   setAttribute(k,v){this[k]=v;}querySelector(){return null;}querySelectorAll(){return [];}getBoundingClientRect(){return{top:100,left:0,width:400,height:300};}blur(){}
  }
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};

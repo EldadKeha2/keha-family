@@ -15,8 +15,11 @@ html:not([data-nakash-home]) body[data-active-view=tree] #treeBreadcrumb{display
   body[data-active-view=tree] .tree-header-mode{gap:1px;padding:2px;align-self:center}
   body[data-active-view=tree] .tree-header-mode button{min-height:36px;padding:5px 6px;font-size:calc(14px * var(--a11y-text-scale,1));white-space:nowrap}
   body[data-active-view=tree] :is(#workspaceSubtitle,.tree-topline){display:none}
-  body[data-active-view=tree] #branchBar{flex:0 0 auto;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;touch-action:pan-x}
-  body[data-active-view=tree] #branchBar .branch-chip{flex:0 0 auto}
+  body[data-active-view=tree] #branchBar{display:grid;grid-template-columns:repeat(var(--branch-columns,3),minmax(0,1fr));flex:0 0 auto;gap:6px;padding:0 10px 10px;min-width:0;overflow:visible;touch-action:manipulation}
+  body[data-active-view=tree] #branchBar .branch-chip{min-width:0;min-height:44px;justify-content:center;gap:5px;padding:6px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.3;white-space:normal;overflow-wrap:anywhere;text-align:center}
+  body[data-active-view=tree] #branchBar .chip-dot{flex:0 0 5px;width:5px;height:5px}
+  /* The header's family overview button already opens all branches. */
+  body[data-active-view=tree] #branchBar .all-chip{display:none}
   body[data-active-view=tree] #treeView:not([hidden]){position:relative;display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow:hidden}
   body[data-active-view=tree] .tree-mobile-person-hint{position:absolute;inset-inline:12px;bottom:10px;z-index:5;margin:0;pointer-events:none}
   body[data-active-view=tree] :is(.tree-topline,.tree-mobile-person-hint,#extendedKehaHub){flex-shrink:0}

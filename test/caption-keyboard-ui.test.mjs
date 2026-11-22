@@ -9,7 +9,7 @@ const sources=Object.fromEntries(await Promise.all(['app','portal','archive'].ma
 function fixture(name,{phone=false}={}){
  const nodes=new Map(),handlers=new Map(),requests=[];
  class Node extends EventTarget{
-  constructor(){super();this.dataset={};this.style={};this.hidden=false;this.value='';this.innerHTML='';this.children=[];this.open=false;this.classList={add(){},remove(){},toggle(){}};}
+  constructor(){super();this.dataset={};this.style={setProperty(key,value){this[key]=value;}};this.hidden=false;this.value='';this.innerHTML='';this.children=[];this.open=false;this.classList={add(){},remove(){},toggle(){}};}
   setAttribute(key,value){this[key]=value;}querySelector(){return null;}querySelectorAll(){return [];}getBoundingClientRect(){return {top:100,left:0,width:400,height:300};}blur(){}contains(){return false;}insertAdjacentHTML(){}
  }
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
