@@ -1,6 +1,5 @@
-export class HttpError extends Error {
-  constructor(status,message,code=null){super(message);this.status=status;this.code=code;}
-}
+import {HttpError} from '../public/assets/http-error.mjs';
+export {HttpError};
 export const utf8=new TextEncoder();
 export const hex=bytes=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
 export const uid=()=>crypto.randomUUID().replaceAll('-','');
