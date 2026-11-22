@@ -916,8 +916,7 @@ test('all eight independent family origins ignore another installed family and r
       assert.equal(f.dialog.open,false,'Native installation does not require website confirmation');
       assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
       f.click(f.button());await tick();
-      f.click(f.dialog.querySelector('[data-home-install-missing-icon]'));
-      assert.match(f.dialog.innerHTML,/רשימת כל האפליקציות/);continue;
+      assert.equal(f.dialog.open,false,'An installed Android app only shows its status');continue;
     }
     assert.ok(f.dialog.querySelector('[data-home-install-success]'),base.branch+': '+f.dialog.textContent);
     assertSuccess(f);
@@ -961,15 +960,15 @@ test('the modern cross-origin API requests the actual family manifest directly d
 test('a delayed Android offer keeps the install button honest and resumes the first tap while browser user activation remains',async()=>{
   const base=eightApps.find(app=>app.branch==='kehat'),site={...base,origin:'https://family-kehat.example'};
   for(const userActivation of [false,true]){
-    const f=fixture({site,userActivation,entryUrl:site.origin+site.home});
+    const f=fixture({site,userActivation,entryUrl:site.origin+site.home+'?installBrowser=chrome-full'});
     f.click(f.button());await tick();
     assert.equal(f.dialog.open,true);
-    assert.equal(f.dialog.querySelector('[data-home-install-native-start]').hidden,true,'A real install action appears when Chrome supplies an offer');
-    assert.match(f.dialog.innerHTML,/הוספה למסך הבית/);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').hidden,false,'Install remains visible while Chrome prepares its offer');
+    assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
     assert.doesNotMatch(f.dialog.innerHTML,/אישור ההתקנה|המשפחה הזאת|iPhone|iPad|Safari/);
     const offer=f.offer({outcome:'accepted'});await tick();
     if(userActivation)assert.equal(offer.calls,1,'The original gesture still opens the browser prompt');
-    else{assert.equal(offer.calls,0);assert.equal(f.dialog.querySelector('[data-home-install-native-start]').hidden,false);f.click(f.dialog.querySelector('[data-home-install-native-start]'));await tick();assert.equal(offer.calls,1);}
+    else{assert.equal(offer.calls,0);assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').hidden,false);f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assert.equal(offer.calls,1);}
     assert.equal(f.dialog.open,false,'After acceptance only Chrome finishes the installation');
   }
 });
@@ -985,14 +984,14 @@ test('changing Android family origin removes another app launch markers without 
 
 test('closing Android preparation cancels a delayed automatic install even while browser activation remains',async()=>{
   const base=eightApps.find(app=>app.branch==='kehat'),site={...base,origin:'https://family-kehat.example'};
-  const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home});f.click(f.button());await tick();
+  const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home+'?installBrowser=chrome-full'});f.click(f.button());await tick();
   f.click(f.dialog.querySelector('[data-home-install-close]'));
   const offer=f.offer({outcome:'accepted'});await tick();assert.equal(offer.calls,0);assert.equal(f.dialog.open,false);
 });
 
 test('a slow Android package lookup cannot swallow the Install tap or delay the real browser offer',async()=>{
   const base=eightApps.find(app=>app.branch==='kehat'),site={...base,origin:'https://family-kehat.example'};
-  const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home,installedRelated:()=>new Promise(()=>{})});
+  const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home+'?installBrowser=chrome-full',installedRelated:()=>new Promise(()=>{})});
   f.click(f.button());assert.equal(f.dialog.open,true,'Feedback appears during the original click');
   const offer=f.offer({outcome:'accepted'});assert.equal(offer.calls,1,'Chrome installation does not wait for package-manager detection');
   await tick();assert.equal(f.dialog.open,false);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
@@ -1019,9 +1018,12 @@ test('both additional Keha apps offer an active full-Chrome handoff instead of a
     f.click(install);assert.equal(f.assignments.length,1,'The handoff starts inside the tap');
     const intent=f.assignments[0];assert.ok(intent.startsWith('intent://'+new URL(site.origin).host+site.home));
     assert.match(intent,/;package=com\.android\.chrome;/);
+    assert.match(intent,/;launchFlags=0x10000000;/);
+    assert.match(intent,/;b\.android\.support\.customtabs\.extra\.user_opt_out=true;/);
+    assert.match(intent,/installBrowser=chrome-full/);
     const fallback=new URL(decodeURIComponent(/;S\.browser_fallback_url=([^;]+);end$/.exec(intent)[1]));
     assert.equal(fallback.origin,site.origin);assert.equal(fallback.pathname,site.home);
-    assert.equal(fallback.searchParams.get('install'),'1');assert.equal(fallback.searchParams.get('installBrowser'),'chrome');assert.equal(fallback.hash,'#home');
+    assert.equal(fallback.searchParams.get('install'),'1');assert.equal(fallback.searchParams.has('installBrowser'),false,'An HTTPS fallback cannot prove Chrome opened');assert.equal(fallback.hash,'#home');
     assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
   }
 });
@@ -1029,9 +1031,9 @@ test('both additional Keha apps offer an active full-Chrome handoff instead of a
 test('arrival in full Chrome keeps Install tappable and uses its own offer without a handoff loop',async()=>{
   for(const branch of ['zechariah','zechariah-tzadok']){
     const base=eightApps.find(app=>app.branch===branch),site={...base,origin:'https://family-'+branch+'.example'};
-    const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home+'?install=1&installBrowser=chrome#home'});
-    const install=f.dialog.querySelector('[data-home-install-invite-start]');assert.equal(install.hidden,true,'Chrome menu help replaces an unavailable native action');assert.equal(install.textContent,'התקן');
-    assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,false);
+    const f=fixture({site,userActivation:true,entryUrl:site.origin+site.home+'?install=1&installBrowser=chrome-full#home'});
+    const install=f.dialog.querySelector('[data-home-install-invite-start]');assert.equal(install.hidden,false,'The Android action never turns into a menu guide');assert.equal(install.textContent,'התקן');
+    assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
     const native=f.offer({outcome:'accepted'});assert.equal(native.calls,0);assert.equal(install.hidden,false);f.click(install);assert.equal(native.calls,1);await tick();assert.equal(f.dialog.open,false);
     assert.deepEqual(f.assignments,[]);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
   }
@@ -1048,15 +1050,15 @@ test('all four extended Keha Android invitations use one Install action without 
   for(const base of eightApps.filter(app=>app.home.startsWith('/keha-extended/')))for(const english of [false,true]){
     const origin='https://family-'+base.branch+'.example',site={...base,origin};
     const f=fixture({site,english,standalone:true,sessionState:new Map([['family-running-app','/']]),entryUrl:origin+base.home+'?install=1&installBrowser=chrome#home'});
-    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').hidden,true);
-    assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,false);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').hidden,false);
+    assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
     assert.equal(f.dialog.querySelector('[data-home-install-troubleshoot]'),null);
     assert.equal(f.dialog.querySelector('[data-family-install-browser]'),null);
     assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);
     assert.doesNotMatch(f.dialog.innerHTML,/אישור ההתקנה|המשפחה הזאת|request installation of this family/);
     const offer=f.offer({outcome:'accepted',choicePending:true});
     const install=f.dialog.querySelector('[data-home-install-invite-start]');
-    assert.equal(install.hidden,false);assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,true);
+    assert.equal(install.hidden,false);assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
     f.click(install);assert.equal(offer.calls,1,'The click opens Chrome directly');
     assert.deepEqual(f.assignments,[]);
     offer.choose();await tick();assert.equal(f.dialog.open,false,'There is no second website confirmation after Chrome');
@@ -1087,4 +1089,50 @@ test('an early Android install event cannot reopen a family confirmation before 
     offer.choose();await tick();assert.equal(f.dialog.open,false);assert.equal(offer.calls,1);
     assert.equal(f.dialog.querySelector('[data-home-install-success]'),null,'Chrome completes installation without a website success gate');
   }
+});
+
+const androidKehaSites=[...eightApps.filter(app=>app.home.startsWith('/keha-extended/')),{branch:'shlomo',name:'משפחת שלמה קהא',home:'/keha-extended/shlomo/',icon:'/keha-extended/shlomo/icon-192.png'}];
+
+test('the screenshot’s old Chrome marker never hides Install and the first tap explicitly leaves custom tabs',()=>{
+  for(const base of androidKehaSites)for(const marker of ['', '&installBrowser=chrome'])for(const english of [false,true]){
+    const origin='https://family-'+base.branch+'.example',site={...base,origin};
+    const f=fixture({site,english,entryUrl:origin+base.home+'?install=1'+marker+'#home'});
+    const action=f.dialog.querySelector('[data-home-install-invite-start]');
+    assert.ok(action);assert.equal(action.hidden,false);assert.equal(action.disabled,false);
+    assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
+    assert.doesNotMatch(f.dialog.innerHTML,/<ol>|<li>|בתפריט|רשימת כל האפליקציות|לחיצה ארוכה/);
+    f.click(action);assert.equal(f.assignments.length,1);
+    const intent=f.assignments[0];
+    assert.ok(intent.startsWith('intent://'+new URL(origin).host+base.home));
+    assert.match(intent,/installBrowser=chrome-full/);
+    assert.match(intent,/;launchFlags=0x10000000;/,'AndroidX requires a new task');
+    assert.match(intent,/;b\.android\.support\.customtabs\.extra\.user_opt_out=true;/,'AndroidX requires the explicit custom-tab opt-out too');
+    const fallback=new URL(decodeURIComponent(/;S\.browser_fallback_url=([^;]+);end$/.exec(intent)[1]));
+    assert.equal(fallback.searchParams.has('installBrowser'),false,'An HTTPS fallback must never masquerade as a successful Chrome handoff');
+  }
+});
+
+test('a delayed full-Chrome offer continues the tap and appinstalled completes without package lookup or icon approval',async()=>{
+  for(const base of androidKehaSites){
+    const origin='https://family-'+base.branch+'.example',site={...base,origin};
+    const f=fixture({site,userActivation:true,entryUrl:origin+base.home+'?install=1&installBrowser=chrome-full#home'});
+    f.click(f.dialog.querySelector('[data-home-install-invite-start]'));
+    assert.deepEqual(f.assignments,[]);assertProgress(f,true);
+    const offer=f.offer({outcome:'accepted',choicePending:true});assert.equal(offer.calls,1);
+    f.window.dispatchEvent(new Event('appinstalled'));await tick();
+    assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+    assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);
+    offer.choose();await tick();f.click(f.button());assert.equal(f.dialog.open,false);assert.equal(offer.calls,1);
+  }
+});
+
+test('missing Android offers keep a retryable Install action without automatic navigation or a false completion',async()=>{
+  const base=androidKehaSites[0],origin='https://family-extended.example',site={...base,origin};
+  const f=fixture({site,entryUrl:origin+base.home+'?install=1&installBrowser=chrome-full#home'});
+  f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await f.advanceTime(4500);
+  const action=f.dialog.querySelector('[data-home-install-invite-start]');
+  assert.equal(action.hidden,false);assert.equal(action.disabled,false);assert.equal(action.textContent,'התקן');
+  assert.deepEqual(f.assignments,[]);assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
+  assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+  f.click(action);assert.equal(f.assignments.length,1,'Only the visitor’s retry reopens Chrome');
 });
