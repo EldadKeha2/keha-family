@@ -60,7 +60,10 @@ export async function putObject(env,key,body,size,mime,fetcher=fetch){
   if(!response.ok){await response.body?.cancel();throw new HttpError(502,'האחסון לא אישר את השמירה. בדקו את הגדרות החיבור ונסו שוב.');}
   await response.body?.cancel();
 }
-export async function deleteObject(env,key,fetcher=fetch){const response=await fetcher(await signedRequest(env,key,{method:'DELETE'}));await response.body?.cancel();}
+export async function deleteObject(env,key,fetcher=fetch,{verify=false}={}){
+  const response=await fetcher(await signedRequest(env,key,{method:'DELETE'}));await response.body?.cancel();
+  if(verify&&!response.ok&&response.status!==404)throw new HttpError(502,'האחסון לא אישר את הסרת הקובץ הזמני.');
+}
 export async function getObject(env,item,request,fetcher=fetch){
   const method=request.method==='HEAD'?'HEAD':'GET',headers={};
   // Only public photo responses use the browser's private cache. Trash previews

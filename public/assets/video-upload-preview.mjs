@@ -4,7 +4,7 @@ const readDuration = async file => (await import('./video-segment-file.mjs')).se
 
 export function bindUploadPreview({get, tr, onDuration, createProbe, canResume = () => true, urls = URL, worker = createWorker, sourceDuration = readDuration}) {
   const player = get('Player'), mode = get('PreviewMode'), pick = get('PreviewFile'), message = get('PreviewStatus');
-  let records = new WeakMap(), record = null, url = null, job = null, pendingTime = null, watchdog = null, stalled = false, resumePending = false;
+  let records = new WeakMap(), record = null, url = null, ownedUrl = null, job = null, pendingTime = null, watchdog = null, stalled = false, resumePending = false;
 
   function note(text = '') {
     message.textContent = text;
@@ -14,6 +14,10 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
     mode.textContent = job ? tr('ביטול הכנה', 'Cancel preparation') :
       record?.useLight ? tr('חזרה לתצוגת המקור', 'View original') : tr('תצוגה קלה', 'Lightweight preview');
     mode.setAttribute('aria-pressed', String(Boolean(record?.useLight)));
+  }
+  function playLabel() {
+    get('PreviewPlay').textContent = stalled ? tr('ניסיון ניגון נוסף','Retry playback') :
+      player.paused || player.ended ? tr('▶ ניגון','▶ Play') : tr('השהיה','Pause');
   }
   function clearWatch() {
     clearTimeout(watchdog);
@@ -26,7 +30,7 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
       watchdog = null;
       if (!record || player.paused || player.ended) return;
       if (Math.abs(player.currentTime - from) < .1) playbackError();
-      else if (stalled) { stalled = false; if (!job) note(); }
+      else if (stalled) { stalled = false; playLabel(); if (!job) note(); }
       watch();
     }, 4500);
   }
@@ -36,18 +40,27 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
       note(tr('לחצו על ▶ כדי להתחיל בניגון.', 'Press ▶ to start playback.'));
       return;
     }
-    stalled = true;
+    stalled = true; playLabel();
+    if (player.error?.code === 3 || player.error?.code === 4) {
+      note(record.useLight ? tr('הדפדפן לא הצליח לפענח את העותק הקל. אפשר לבחור ״ניגון מהאתר״ כשהמקור מוכן, או לבחור עותק אחר מהמכשיר.', 'The browser could not decode this preview. Play the uploaded original when ready, or choose another copy.') :
+        tr('הדפדפן לא הצליח לפענח את קובץ המקור. אפשר להכין תצוגה קלה או לבחור עותק קל מהמכשיר.', 'The browser could not decode the original. Prepare a lightweight preview or choose a lighter copy.'));
+      return;
+    }
+    if (record.remoteUrl && record.useLight) {
+      note(tr('העותק הקל מתקשה להתנגן. אפשר ללחוץ על ״ניגון מהאתר״ כדי לפתוח את המקור שהתקבל.', 'This copy is having trouble playing. Choose Play from site to open the uploaded original.'));
+      return;
+    }
     note(record.useLight ? tr('העותק הקל מתקשה להתנגן. אפשר לבחור עותק אחר של אותו סרטון.', 'This preview is having trouble playing. Choose another copy of the same video.') :
       tr('הניגון לא מתקדם. לחצו על ״תצוגה קלה״ או בחרו עותק קל של אותו סרטון.', 'Playback is stuck. Use Lightweight preview or choose a lighter copy of this video.'));
   }
-  player.addEventListener('play', watch);
+  player.addEventListener('play', () => { playLabel(); watch(); });
   player.addEventListener('waiting', watch);
-  player.addEventListener('pause', clearWatch);
-  player.addEventListener('ended', clearWatch);
+  player.addEventListener('pause', () => { clearWatch(); playLabel(); });
+  player.addEventListener('ended', () => { clearWatch(); playLabel(); });
   player.addEventListener('error', () => playbackError());
   player.addEventListener('playing', () => {
     if (stalled && !job) note();
-    stalled = false;
+    stalled = false; playLabel();
     watch();
   });
 
@@ -73,11 +86,13 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
   }
   function load(time = 0, resume = false) {
     clearWatch();
-    const owner = record, oldUrl = url, nextUrl = urls.createObjectURL(displayFile());
+    const owner = record, oldUrl = ownedUrl;
+    ownedUrl = !owner.useLight && owner.remoteUrl ? null : urls.createObjectURL(displayFile());
+    const nextUrl = ownedUrl || owner.remoteUrl;
     url = nextUrl;
     pendingTime = time;
     resumePending = resume;
-    stalled = false;
+    stalled = false; playLabel();
     player.onloadedmetadata = async () => {
       if (record !== owner || url !== nextUrl || (player.currentSrc && player.currentSrc !== nextUrl)) return;
       if (pendingTime !== null) {
@@ -101,7 +116,7 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
     record.useLight = useLight;
     load(time, resume);
     button();
-    note(useLight ? tr('תצוגה קלה פעילה. ההעלאה תשתמש בקובץ המקור.', 'Lightweight preview is on. Uploads use the original file.') : '');
+    note(useLight ? tr('העותק הקל מוכן לניגון. השמירה משתמשת בקובץ המקור.', 'The lightweight preview is ready to play. Saving uses the original file.') : '');
   }
 
   function inspect(file, signal) {
@@ -145,6 +160,20 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
     } catch { failed(task); }
   }
 
+  function playOnClick(reload) {
+    if (reload) load(pendingTime ?? player.currentTime);
+    // Keep play() in the user gesture, including after changing the source.
+    // Waiting for loadedmetadata can lose playback permission on mobile.
+    player.play()?.catch(playbackError);
+  }
+  get('PreviewPlay').addEventListener('click', () => {
+    if (!record) return;
+    if (stalled || player.error) {
+      if (record.remoteUrl) record.useLight = false;
+      button(); playOnClick(true);
+    } else if (!player.paused && !player.ended) player.pause();
+    else playOnClick(false);
+  });
   mode.addEventListener('click', () => {
     if (!record) return;
     if (job) { cancelJob(); note(); return; }
@@ -187,6 +216,18 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
 
   return {
     displayFile, playbackError,
+    displayUrl() { return record && !record.useLight ? record.remoteUrl : null; },
+    provideRemote(file, remoteUrl) {
+      const owner = records.get(file);
+      if (!owner || owner.remoteUrl === remoteUrl) return;
+      owner.remoteUrl = remoteUrl;
+      if (record === owner && ((!owner.useLight && player.paused) || stalled)) switchView(false);
+    },
+    playRemote() {
+      if (!record?.remoteUrl) return;
+      const reload = record.useLight || url !== record.remoteUrl || player.error || stalled;
+      record.useLight = false; button(); note(); playOnClick(reload);
+    },
     seek(time) {
       resumePending = false;
       if (pendingTime !== null) pendingTime = time;
@@ -204,7 +245,8 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
       cancelJob(); clearWatch();
       record = null; records = new WeakMap(); pendingTime = null;
       player.onloadedmetadata = null; player.pause(); player.removeAttribute('src'); player.load();
-      if (url) urls.revokeObjectURL(url);
+      if (ownedUrl) urls.revokeObjectURL(ownedUrl);
+      ownedUrl = null;
       url = null; pick.value = ''; note();
     }
   };

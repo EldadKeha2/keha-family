@@ -550,6 +550,8 @@ window.FAMILY_TRANSLATIONS={
   "קפיצה לשנה": "Jump to year",
   "סדר התצוגה": "Display order",
   "כל החתונות": "All weddings",
+  "עד 4 GiB לסרטון · MP4, WebM, MOV, M4V": "Up to 4 GiB per video · MP4, WebM, MOV, M4V",
+  "תמונות עד 50MB · סרטונים באשף עד 4 GiB · מסמכים עד 10MB": "Photos up to 50 MB · Videos up to 4 GiB in the wizard · Documents up to 10 MB",
   "סרטונים עד": "Videos up to",
   "הברכה שלכם": "Your greeting",
   "טקסט מקובץ": "Text from a file",
