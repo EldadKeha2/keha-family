@@ -16,7 +16,7 @@ html[data-marriage-tree] body[data-active-view=tree] .workspace-title .section-d
 .tree-marriage-filters button{--marriage-color:var(--marriage-first);display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:44px;padding:5px 6px;border:1px solid color-mix(in srgb,var(--marriage-color) 55%,white);border-radius:9px;background:color-mix(in srgb,var(--marriage-color) 9%,var(--surface));color:var(--marriage-color);font:600 calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans);text-align:center;text-wrap:balance}
 .tree-marriage-filters [data-marriage-index="1"]{--marriage-color:var(--marriage-second)}
 .tree-marriage-filters button:hover{border-color:var(--marriage-color);background:color-mix(in srgb,var(--marriage-color) 16%,var(--surface))}
-.tree-marriage-filters [aria-pressed=true]{border-color:var(--marriage-color);background:var(--marriage-color);color:white}
+.tree-marriage-filters button[aria-pressed=true]{border-color:var(--marriage-color);background:var(--marriage-color);color:white}
 .tree-marriage-filters button:focus-visible{outline:2px solid var(--marriage-color);outline-offset:2px}
 .tree-marriage-filters .marriage-diamond{flex:none;font-size:10px;line-height:1}
 #treeViewport.tree-is-fullscreen>#treeMarriageFilters{position:absolute;z-index:10;top:calc(64px + env(safe-area-inset-top,0px));inset-inline:6px;width:calc(100% - 12px);padding:4px;background:var(--paper);border-radius:10px}
