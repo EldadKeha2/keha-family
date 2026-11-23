@@ -116,7 +116,7 @@ export function nakashHTML(original, section, isInternal = false, appOrigins = {
     .replace(/(<link rel="apple-touch-icon"[^>]+href=")[^"]+/, '$1' + appleIcon)
     .replace(/(href|src)="assets\/medallion\.svg"/g, '$1="' + logo + '.svg"')
     .replace(/((?:href|src)=")assets\//g, '$1/assets/')
-    .replace(/(src="\/assets\/app\.js)(?:\?[^\"]*)?"/, '$1?v=tree-fit-pan-v1"')
+    .replace(/(src="\/assets\/app\.js)(?:\?[^\"]*)?"/, '$1?v=tree-fit-pan-v2"')
     .replace(/(src="\/assets\/tree-fullscreen\.js)(?:\?[^\"]*)?"/, '$1?v=4"')
     .replace(/  <script src="(?:\/assets\/)?([^"?]+)(?:\?[^"]*)?"[^>]*><\/script>\n/g,
       (tag, script) => standaloneScripts.has(script) ? '' : tag)

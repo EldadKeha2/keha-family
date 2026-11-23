@@ -534,22 +534,30 @@
   }
   function treeViewportArea(){
     const viewport=$('treeViewport'),width=viewport.clientWidth,height=viewport.clientHeight;
-    if(!isPhone()){
+    const phone=isPhone(),compact=phone&&(width<260||height<180);
+    viewport.toggleAttribute('data-compact-tree-controls',compact);
+    let top=0,bottom=0;
+    if(!phone){
       const rect=viewport.getBoundingClientRect();
-      let top=0,bottom=0;
       for(const control of viewport.querySelectorAll('.zoom-controls,#treeFullscreenExit,#treeMarriageFilters')){
         const box=control.getBoundingClientRect();
         if(!box.height)continue;
         if(box.top-rect.top<height/2)top=Math.max(top,box.bottom-rect.top+6);
         else bottom=Math.max(bottom,rect.bottom-box.top+6);
       }
-      const available=Math.max(1,height-top-bottom);
-      return {width,height:available,top,cx:width/2,cy:top+available/2};
+    }else{
+      const controls=viewport.querySelector('.zoom-controls')?.offsetHeight||(compact?30:44);
+      const full=viewport.classList.contains('tree-is-fullscreen');
+      const familyBar=full?viewport.querySelector('#branchBar, #treeMarriageFilters'):null;
+      top=familyBar?familyBar.offsetTop+familyBar.offsetHeight+8:full?($('treeFullscreenExit')?.offsetHeight||44)+24:controls+(compact?6:24);
+      bottom=full?controls+24:compact?2:($('canvasHint')?.offsetHeight||20)+20;
     }
-    const controls=viewport.querySelector('.zoom-controls')?.offsetHeight||44,full=viewport.classList.contains('tree-is-fullscreen');
-    const familyBar=full?viewport.querySelector('#branchBar, #treeMarriageFilters'):null;
-    const top=familyBar?familyBar.offsetTop+familyBar.offsetHeight+8:full?($('treeFullscreenExit')?.offsetHeight||44)+24:controls+24;
-    const bottom=full?controls+24:($('canvasHint')?.offsetHeight||20)+20;
+    // Keep the fitted frame on the canvas even when the viewport is shorter than its controls.
+    const reserved=top+bottom;
+    if(reserved>0){
+      const fraction=Math.min(1,Math.max(0,height-24)/reserved);
+      top*=fraction;bottom*=fraction;
+    }
     const available=Math.max(1,height-top-bottom);
     return {width,height:available,top,cx:width/2,cy:top+available/2};
   }
@@ -615,7 +623,7 @@
   function applyCamera(fit=false){
     const {bounds,area}=camera;
     if(bounds&&area?.width){
-      const minimum=fittedTreeScale(),fitted=fit||camera.scale<=minimum;
+      const minimum=fittedTreeScale(),fitted=fit||camera.scale<=minimum*(1+1e-10);
       if(fitted){
         camera.scale=minimum;
         camera.x=area.cx-(bounds.left+bounds.right)*minimum/2;
@@ -633,7 +641,8 @@
   function fittedTreeScale(){
     const {area,bounds}=camera;
     if(!bounds||!area?.width)return 0;
-    return Math.min(Math.max(1,area.width-16)/(bounds.right-bounds.left),Math.max(1,area.height-16)/(bounds.bottom-bounds.top));
+    const inset=Math.min(16,area.width/10,area.height/10);
+    return Math.min((area.width-inset)/(bounds.right-bounds.left),(area.height-inset)/(bounds.bottom-bounds.top));
   }
   function boundedZoom(scale,touch=isPhone()){
     const minimum=fittedTreeScale(),maximum=Math.max(1,minimum)*(touch?3.5:2.4);

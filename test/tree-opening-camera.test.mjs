@@ -476,12 +476,17 @@ test('a fitted tree follows viewport changes and can still zoom in when its fit 
   }
 });
 
-test('a short phone canvas keeps a positive scale when opening or fitting the tree',()=>{
+test('a short phone canvas keeps the fitted tree visible below a compact toolbar',()=>{
   for(const site of ['original','haim','zechariah']){
-    const f=fixture(site,{phone:true,viewportHeight:60});
-    assert.ok(cameraPosition(f)[2]>0,'A short viewport never flips the tree');
-    f.document.getElementById('fitButton').click();
-    assert.ok(cameraPosition(f)[2]>0,'Fit remains usable in a short viewport');
+    for(const [viewportWidth,viewportHeight] of [[358,60],[172,80]]){
+      const f=fixture(site,{phone:true,viewportWidth,viewportHeight});
+      assert.ok(f.document.getElementById('treeViewport').hasAttribute('data-compact-tree-controls'));
+      f.document.getElementById('fitButton').click();
+      const [x,y,scale]=cameraPosition(f),frame=frameBounds(f);
+      assert.ok(y+frame.top*scale>=30&&y+(frame.top+frame.height)*scale<=viewportHeight);
+      assert.ok(x+frame.left*scale>=0&&x+(frame.left+frame.width)*scale<=viewportWidth);
+      assert.ok(frame.height*scale>8,'The toolbar leaves room to display the generations');
+    }
   }
 });
 

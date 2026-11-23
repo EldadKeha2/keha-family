@@ -26,6 +26,11 @@ html:not([data-nakash-home]) body[data-active-view=tree] #treeBreadcrumb{display
   body[data-active-view=tree] #treeViewport:not(.tree-is-fullscreen){flex:1 1 0;height:auto;min-height:0;max-height:none;overflow:hidden;touch-action:none;overscroll-behavior:none}
   body[data-active-view=tree] #treeViewport:not(.tree-is-fullscreen)>.zoom-controls{top:12px;bottom:auto;left:50%;transform:translateX(-50%);width:max-content}
   body[data-active-view=tree] #canvasHint{bottom:10px}
+  body[data-active-view=tree] #treeViewport[data-compact-tree-controls]:not(.tree-is-fullscreen)>.zoom-controls{top:3px}
+  #treeViewport[data-compact-tree-controls] .zoom-controls{flex-wrap:nowrap;gap:0;max-width:calc(100% - 4px);min-height:30px;padding:0 2px}
+  #treeViewport[data-compact-tree-controls] .zoom-controls button{flex:0 1 30px;min-width:24px;width:30px;min-height:28px;height:28px;padding:0 2px;line-height:1}
+  #treeViewport[data-compact-tree-controls] .zoom-controls output{min-width:0;padding:0 2px;font-size:12px}
+  #treeViewport[data-compact-tree-controls] :is(.control-divider,.tree-fullscreen-label,#canvasHint){display:none}
   body[data-active-view=tree] .workspace-footer{display:none}
   body[data-active-view=tree] .site-footer{flex:0 0 auto;padding:8px 0}
   body[data-active-view=tree] .site-footer>:not(nav){display:none}
