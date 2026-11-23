@@ -13,7 +13,7 @@ const [{places,sources,scans},regions,locators]=await Promise.all(['places.json'
 test('the family atlas is a native tab on the extended home only',async()=>{
   const original=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
   const {document}=parseHTML(extendedKehaHTML(original));
-  assert.equal(document.querySelector('#mainNav [data-view="family-map"]').textContent,'מפת המשפחה');
+  assert.equal(document.querySelector('#mainNav [data-view="family-map"]').textContent,'מפת משפחת קהא');
   assert.ok(document.documentElement.dataset.nakashViews.split(' ').includes('family-map'));
   assert.ok(document.getElementById('familyMapView').hidden);
   for (const html of [original,shlomoKehaHTML(original),branchPortalHTML(original,'kehat'),nakashHTML(original,'keha')])
@@ -39,9 +39,12 @@ test('all map markers, geographic assets, public evidence and distance pairs res
     for (const photo of r.scans||[]) {assert.ok(sources[scans[photo].source]);await access(new URL(photo+'.webp',dir));}
   }
   for (const src of Object.values(sources)) if(src.url) assert.match(src.url,/^(https:\/\/(?!chatgpt\.com\/)|\/keha-extended\/)/);
-  assert.ok(places.aden.items.filter(row=>row.group==='family').length>=3);
-  assert.ok(places.sanaa.items.some(row=>row.group==='family') && places.sanaa.items.some(row=>row.group==='other'));
-  assert.ok(places.taiz.items.some(row=>row.kind==='ביקור בדרך למצרים'));
+  assert.ok(places.aden.items.some(row=>row.kind==='לידה'));
+  assert.ok(places.aden.items.some(row=>row.kind==='תחנת מעבר'));
+  assert.ok(places.sanaa.items.every(row=>row.group==='other'));
+  assert.deepEqual(regions.yemen.markers.find(m=>m.to==='sanaa').tags,['other']);
+  assert.ok(!regions.yemen.ids.includes('taiz'));
+  assert.doesNotMatch(JSON.stringify({places,sources,scans}),/נקאש|שבזי|עבודת השורשים של תמי/);
 });
 
 test('national overview tracks the exact pan and zoom in each region',()=>{

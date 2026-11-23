@@ -90,7 +90,7 @@ function mount({places, sources, scans}, regions, locators) {
       const image=scans[key];
       return `<figure><a href="${asset(key+'.webp')}" target="_blank" rel="noopener"><img loading="lazy" src="${asset(key+'.webp')}" alt="${esc(image.caption)}"></a><figcaption>${esc(image.caption)} ${source(image.source)}</figcaption></figure>`;
     }).join('');
-    detail.innerHTML=`<section class="atlas-ours"><h3>${symbol('family')}המשפחה שלנו</h3>${family||'<p class="atlas-no-evidence">במקורות שנאספו עד כה אין עדות הקושרת בן משפחה מסוים למקום הזה.</p>'}</section>${remaining}${images?`<details class="atlas-facsimiles"><summary>תצלומי התעודות (${r.scans.length})</summary>${images}</details>`:''}${r.georef?`<div class="atlas-georef">${source(r.georef)}</div>`:''}`;
+    detail.innerHTML=`<section class="atlas-ours"><h3>${symbol('family')}משפחת קהא שלנו</h3>${family||'<p class="atlas-no-evidence">במקורות שנאספו עד כה אין עדות הקושרת בן משפחה מסוים למקום הזה.</p>'}</section>${remaining}${images?`<details class="atlas-facsimiles"><summary>תצלומי התעודות (${r.scans.length})</summary>${images}</details>`:''}${r.georef?`<div class="atlas-georef">${source(r.georef)}</div>`:''}`;
     panel.scrollTop=0;
   }
   function show(id) {
@@ -163,8 +163,11 @@ function mount({places, sources, scans}, regions, locators) {
   }
   function route() {
     const [view,key,id]=location.hash.slice(1).split('/');
-    if (view!=='family-map'||!Object.hasOwn(regions,key)||!regions[key].ids.includes(id)) return false;
-    region=key;filter='all';q('#atlasFilter').value=filter;camera=frame();redraw(id);
+    if (view!=='family-map'||!Object.hasOwn(regions,key)) return false;
+    region=key;filter='all';q('#atlasFilter').value=filter;camera=frame();
+    const knownPlace=regions[key].ids.includes(id);
+    redraw(knownPlace?id:undefined);
+    if (!knownPlace) window.FamilyNavigation?.go('#family-map/'+key+'/'+selected,{replace:true});
     return true;
   }
   root.addEventListener('click', e=>{

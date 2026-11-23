@@ -87,10 +87,10 @@ export function extendedKehaHTML(original, appOrigin='', shlomoOrigin='', portal
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+EXTENDED_NAME+'</h2>')
     .replace('חמישה דורות, סיפור אחד','ענפי המשפחה, סיפור שנבנה יחד')
     .replace('data-nakash-views="','data-nakash-views="family-map ')
-    .replace('<a class="nav-link" id="nameOriginTab"', '<button class="nav-link" id="familyMapTab" data-view="family-map" aria-pressed="false">מפת המשפחה</button><a class="nav-link" id="nameOriginTab"')
-    .replace('<div id="treeView">','<section id="familyMapView" dir="rtl" lang="he" aria-label="מפת המשפחה" data-i18n-skip hidden><p role="status">המפה נטענת…</p></section><div id="treeView">')
+    .replace('<a class="nav-link" id="nameOriginTab"', '<button class="nav-link" id="familyMapTab" data-view="family-map" aria-pressed="false">מפת משפחת קהא</button><a class="nav-link" id="nameOriginTab"')
+    .replace('<div id="treeView">','<section id="familyMapView" dir="rtl" lang="he" aria-label="מפת משפחת קהא" data-i18n-skip hidden><p role="status">המפה נטענת…</p></section><div id="treeView">')
     .replace('</head>', '<link rel="stylesheet" href="/keha-extended/atlas/atlas.css"><script type="module" src="/keha-extended/atlas/atlas.mjs"></script></head>')
-    .replace(/(src="\/assets\/(?:app|home|navigation)\.js)([^"]*)"/g, '$1$2&amp;atlas=1"');
+    .replace(/(src="\/assets\/(?:app|home|navigation)\.js)([^"]*)"/g, '$1$2&amp;atlas=2"');
 }
 
 export function shlomoKehaHTML(original,appOrigin=''){

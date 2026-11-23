@@ -548,7 +548,6 @@
       "kham",
       "hila",
       "sanaa",
-      "taiz",
       "aden"
     ],
     "markers": [
@@ -597,7 +596,7 @@
         "id": "sanaa",
         "to": "sanaa",
         "label": "צנעא",
-        "cls": "family",
+        "cls": "other",
         "dx": 23,
         "dy": 12,
         "side": "R",
@@ -609,7 +608,6 @@
           44.20646
         ],
         "tags": [
-          "family",
           "other"
         ]
       },
@@ -660,24 +658,6 @@
         "tags": [
           "family"
         ]
-      },
-      {
-        "id": "taiz",
-        "to": "taiz",
-        "label": "תעז",
-        "cls": "family",
-        "dx": -17,
-        "dy": -1,
-        "side": "L",
-        "pos": [
-          13.57952,
-          44.02091
-        ],
-        "x": 469.67,
-        "y": 429.81,
-        "tags": [
-          "family"
-        ]
       }
     ],
     "labels": [
@@ -723,14 +703,6 @@
       ],
       [
         "sanaa",
-        "aden"
-      ],
-      [
-        "sanaa",
-        "taiz"
-      ],
-      [
-        "taiz",
         "aden"
       ]
     ]

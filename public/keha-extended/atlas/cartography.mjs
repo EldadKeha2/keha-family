@@ -31,7 +31,7 @@ export function airDistance([lat1, lon1], [lat2, lon2]) {
 }
 
 export const groups = {
-  family:'המשפחה שלנו', other:'נושאי קהא נוספים', maybe:'זיהוי מוצע', context:'הקשר גאוגרפי'
+  family:'משפחת קהא שלנו', other:'נושאי קהא נוספים', maybe:'זיהוי מוצע', context:'הקשר גאוגרפי'
 };
 
 export function escapeText(value) {
@@ -57,7 +57,7 @@ const phoneLabels = {
 export function marker(m, place, group, measure, compact=false) {
   const labelText = compact ? (phoneLabels[m.id] || m.label) : m.label;
   const label = escapeText(labelText);
-  const major = ['saada','sanaa','aden','taiz','shaar','khawlan','haydan','jer','eqron'].includes(m.id);
+  const major = ['saada','sanaa','aden','shaar','khawlan','haydan','jer','eqron'].includes(m.id);
   const attrs = `class="atlas-marker${major?' atlas-major':''}" data-place="${m.to}" data-group="${group}" role="button" tabindex="0" aria-label="${escapeText(m.label+' · '+place.level)}" aria-pressed="false" transform="translate(${m.x} ${m.y})"`;
   if (m.area) {
     const w = Math.ceil(measure(labelText,compact?24:16))+(compact?44:32);
