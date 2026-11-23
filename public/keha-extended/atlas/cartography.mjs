@@ -49,17 +49,24 @@ export function symbol(group) {
   return `<svg class="atlas-symbol" data-group="${group}" viewBox="-11 -11 22 22" aria-hidden="true">${glyph(group)}</svg>`;
 }
 
-export function marker(m, place, group, measure) {
-  const label = escapeText(m.label);
+// Short names leave room for legible labels on a phone. The accessible name and evidence keep the full wording.
+const phoneLabels = {
+  sharmat:'שרמאת · סחר', miq:'מקבאב · סחר', mah:'אזור מוהצר', khawlan:'כ׳ולאן', mer:'מרבגה',
+  modernSh:'שרמאת כיום', modernMiq:'מקבאב כיום', hila:'חילה · חאשד'
+};
+export function marker(m, place, group, measure, compact=false) {
+  const labelText = compact ? (phoneLabels[m.id] || m.label) : m.label;
+  const label = escapeText(labelText);
   const major = ['saada','sanaa','aden','taiz','shaar','khawlan','haydan','jer','eqron'].includes(m.id);
   const attrs = `class="atlas-marker${major?' atlas-major':''}" data-place="${m.to}" data-group="${group}" role="button" tabindex="0" aria-label="${escapeText(m.label+' · '+place.level)}" aria-pressed="false" transform="translate(${m.x} ${m.y})"`;
   if (m.area) {
-    const w = Math.ceil(measure(m.label))+32;
-    return `<g ${attrs}><rect class="atlas-area" x="${-w/2}" y="-15" width="${w}" height="30" rx="5"/>
-      <g transform="translate(${w/2-12} 0)">${glyph(group,4.5)}</g>
-      <text class="atlas-area-label" direction="rtl" text-anchor="middle" x="-6" y="5.2">${label}</text></g>`;
+    const w = Math.ceil(measure(labelText,compact?24:16))+(compact?44:32);
+    const h = compact?37:30;
+    return `<g ${attrs}><rect class="atlas-area" x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="5"/>
+      <g transform="translate(${w/2-(compact?15:12)} 0)">${glyph(group,compact?6:4.5)}</g>
+      <text class="atlas-area-label" direction="rtl" text-anchor="middle" x="-6" y="${compact?7.5:5.2}">${label}</text></g>`;
   }
-  const r = m.id==='saada'?10:major?8:6.5;
+  const r = (m.id==='saada'?10:major?8:6.5)*(compact?1.27:1);
   const line = Math.hypot(m.dx,m.dy)>18 ? `<path class="atlas-leader" d="M0 0L${m.dx} ${m.dy}"/>` : '';
   return `<g ${attrs}><circle r="17" class="atlas-hit"/>${line}
     <circle r="${r+6}" class="atlas-selection"/>${m.unc?`<circle r="${r+3.5}" class="atlas-uncertain"/>`:''}${glyph(group,r)}

@@ -120,7 +120,12 @@ body[data-active-view="family-map"] .workspace-footer { display:none }
   .atlas-regions { gap:4px; margin-block:3px 9px }
   .atlas-regions button { padding:5px 9px; font-size:.89em!important }
 }
+.atlas-plot[data-compact=true] .atlas-place-label { font-size:27px; stroke-width:5px }
+.atlas-plot[data-compact=true] .atlas-major .atlas-place-label { font-size:31px }
+.atlas-plot[data-compact=true] .atlas-area-label { font-size:23px }
 @media (max-width:500px) {
+  .atlas-regions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px }
+  .atlas-regions button { min-height:32px; font-size:.84em!important; line-height:1.2!important; padding:3px 2px }
   .atlas-tools { padding:6px 9px; gap:8px; flex-wrap:nowrap }
   .atlas-tools label { flex:1; display:grid; gap:1px }
   .atlas-tools select { width:100% }

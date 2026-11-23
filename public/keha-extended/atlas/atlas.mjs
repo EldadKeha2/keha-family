@@ -28,6 +28,7 @@ function mount({places, sources, scans}, regions, locators) {
   const q = selector => root.querySelector(selector);
   const coords = Object.fromEntries(Object.values(regions).flatMap(r=>r.markers.filter(m=>m.pos).map(m=>[m.id,m.pos])));
   const narrow = matchMedia('(max-width: 820px)');
+  const phone = matchMedia('(max-width: 500px)');
   const help = 'במחשב אפשר לעמוד על שם או סמל כדי לקרוא את העדויות. בטלפון מקישים על מקום.';
   root.innerHTML = `
     <nav class="atlas-regions" aria-label="בחירת אזור במפה">${Object.entries(regions).map(([id,r])=>`<button type="button" data-region="${id}">${esc(r.title)}</button>`).join('')}</nav>
@@ -65,7 +66,7 @@ function mount({places, sources, scans}, regions, locators) {
     <span class="visually-hidden" role="status" aria-live="polite" id="atlasStatus"></span>`;
   const plot=q('.atlas-plot'), panel=q('.atlas-evidence'), placeSelect=q('#atlasPlace'), overview=q('dialog');
   const canvas=document.createElement('canvas').getContext('2d');
-  const measure=text=>{canvas.font='bold 16px Arial';return canvas.measureText(text).width;};
+  const measure=(text,size)=>{canvas.font='bold '+size+'px Arial';return canvas.measureText(text).width;};
   const source = key => {
     const s=sources[key];
     return s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label)}</a>` : `<span>${esc(s.label)}</span>`;
@@ -149,7 +150,8 @@ function mount({places, sources, scans}, regions, locators) {
     q('#atlasRegion').textContent=r.title;
     placeSelect.innerHTML=ids.length?ids.map(id=>option(id,places[id].title)).join(''):option('','אין מקומות');
     placeSelect.disabled=!ids.length;
-    const label=(m)=>marker(m,places[m.to],filter==='all'?m.cls:filter,measure);
+    plot.dataset.compact=String(phone.matches);
+    const label=(m)=>marker(m,places[m.to],filter==='all'?m.cls:filter,measure,phone.matches);
     plot.innerHTML=`<image width="${WIDTH}" height="${HEIGHT}" href="${asset(region+'.webp')}"/><image width="${WIDTH}" height="${HEIGHT}" href="${asset(region+'-boundaries.svg')}"/>`+
       r.labels.map(([x,y,name,kind])=>`<text class="atlas-base ${esc(kind)}" x="${x}" y="${y}" direction="rtl" text-anchor="middle">${esc(name)}</text>`).join('')+
       visible.map(label).join('');
@@ -251,6 +253,7 @@ function mount({places, sources, scans}, regions, locators) {
   plot.addEventListener('pointerup',release);
   plot.addEventListener('pointercancel',release);
   plot.addEventListener('pointerleave',e=>{if(!plot.hasPointerCapture(e.pointerId))release(e);});
+  phone.addEventListener?.('change',()=>redraw(selected));
   window.addEventListener('hashchange',route);
   window.addEventListener('popstate',route);
   if (!route()) redraw();
