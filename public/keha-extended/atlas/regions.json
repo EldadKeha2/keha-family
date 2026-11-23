@@ -1,0 +1,916 @@
+{
+  "north": {
+    "title": "צעדא והכפרים",
+    "description": "מחוז צעדה והקהילות ההיסטוריות בסביבת העיר",
+    "projection": {
+      "west": 43.115,
+      "top": 17.37550894969054,
+      "span": 0.91
+    },
+    "pxkm": 9.489480089140322,
+    "ids": [
+      "saada",
+      "khawlan",
+      "sharmat",
+      "mah",
+      "shalil",
+      "miq",
+      "naz",
+      "mer",
+      "talh",
+      "akwan",
+      "haydan",
+      "sorm",
+      "saf1",
+      "saf2"
+    ],
+    "markers": [
+      {
+        "id": "saada",
+        "to": "saada",
+        "label": "צעדא",
+        "cls": "family",
+        "dx": 20,
+        "dy": 16,
+        "side": "R",
+        "unc": false,
+        "x": 656.06,
+        "y": 184.97,
+        "pos": [
+          16.94021,
+          43.76393
+        ],
+        "tags": [
+          "family",
+          "maybe",
+          "other"
+        ],
+        "multi": true
+      },
+      {
+        "id": "talh",
+        "to": "talh",
+        "label": "אלטלח",
+        "cls": "other",
+        "dx": -12,
+        "dy": -13,
+        "side": "L",
+        "unc": false,
+        "x": 573.17,
+        "y": 102.43,
+        "pos": [
+          17.01829,
+          43.68194
+        ],
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "akwan",
+        "to": "akwan",
+        "label": "עכואן",
+        "cls": "other",
+        "dx": 15,
+        "dy": -4,
+        "side": "R",
+        "unc": false,
+        "x": 689.81,
+        "y": 134.81,
+        "pos": [
+          16.98766,
+          43.79731
+        ],
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "shalil",
+        "to": "shalil",
+        "label": "שליל",
+        "cls": "other",
+        "dx": 11,
+        "dy": -27,
+        "side": "R",
+        "unc": true,
+        "x": 633.48,
+        "y": 110.47,
+        "pos": [
+          17.01069,
+          43.74159
+        ],
+        "tags": [
+          "other",
+          "context"
+        ]
+      },
+      {
+        "id": "naz",
+        "to": "naz",
+        "label": "נצ׳יר",
+        "cls": "other",
+        "dx": -13,
+        "dy": -10,
+        "side": "L",
+        "unc": true,
+        "x": 148.88,
+        "y": 217.78,
+        "pos": [
+          16.90916,
+          43.26226
+        ],
+        "tags": [
+          "other",
+          "context"
+        ]
+      },
+      {
+        "id": "haydan",
+        "to": "haydan",
+        "label": "חיידאן",
+        "cls": "context",
+        "dx": -21,
+        "dy": -7,
+        "side": "L",
+        "unc": false,
+        "x": 322.22,
+        "y": 355.28,
+        "pos": [
+          16.77899,
+          43.43372
+        ],
+        "tags": [
+          "family",
+          "context"
+        ]
+      },
+      {
+        "id": "saf1",
+        "to": "saf1",
+        "label": "צאפייה",
+        "cls": "context",
+        "dx": -23,
+        "dy": 3,
+        "side": "L",
+        "unc": true,
+        "x": 324.36,
+        "y": 384.86,
+        "pos": [
+          16.75097,
+          43.43583
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "sorm",
+        "to": "sorm",
+        "label": "סורמה",
+        "cls": "context",
+        "dx": 15,
+        "dy": 12,
+        "side": "R",
+        "unc": true,
+        "x": 347.55,
+        "y": 421.57,
+        "pos": [
+          16.7162,
+          43.45877
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "saf2",
+        "to": "saf2",
+        "label": "צאפייה",
+        "cls": "context",
+        "dx": -14,
+        "dy": 13,
+        "side": "L",
+        "unc": true,
+        "x": 238.1,
+        "y": 459.94,
+        "pos": [
+          16.67985,
+          43.35051
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "modernMiq",
+        "to": "miq",
+        "label": "מקבאב בת ימינו",
+        "cls": "maybe",
+        "dx": 20,
+        "dy": -7,
+        "side": "R",
+        "unc": true,
+        "x": 707.71,
+        "y": 305.59,
+        "pos": [
+          16.82604,
+          43.81502
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "modernSh",
+        "to": "sharmat",
+        "label": "שרמאת בת ימינו",
+        "cls": "maybe",
+        "dx": 21,
+        "dy": 19,
+        "side": "R",
+        "unc": true,
+        "x": 725.16,
+        "y": 337.01,
+        "pos": [
+          16.79629,
+          43.83228
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "sharmat",
+        "to": "sharmat",
+        "label": "שרמאת · סחר",
+        "cls": "other",
+        "x": 490,
+        "y": 174,
+        "areas": [
+          "YE2211"
+        ],
+        "area": true,
+        "tags": [
+          "other",
+          "maybe"
+        ]
+      },
+      {
+        "id": "miq",
+        "to": "miq",
+        "label": "מקבאב · סחר",
+        "cls": "other",
+        "x": 490,
+        "y": 227,
+        "areas": [
+          "YE2211"
+        ],
+        "area": true,
+        "tags": [
+          "other",
+          "maybe"
+        ]
+      },
+      {
+        "id": "mah",
+        "to": "mah",
+        "label": "מוהצר · אזור מהאד׳ר",
+        "cls": "other",
+        "x": 603,
+        "y": 278,
+        "areas": [
+          "YE2211"
+        ],
+        "area": true,
+        "tags": [
+          "other",
+          "maybe"
+        ]
+      },
+      {
+        "id": "khawlan",
+        "to": "khawlan",
+        "label": "כ׳ולאן · אזור חיידאן",
+        "cls": "family",
+        "x": 337,
+        "y": 465,
+        "areas": [
+          "YE2208"
+        ],
+        "area": true,
+        "tags": [
+          "family"
+        ]
+      },
+      {
+        "id": "mer",
+        "to": "mer",
+        "label": "מרבגה · שיוך משוער",
+        "cls": "other",
+        "x": 330,
+        "y": 518,
+        "areas": [
+          "YE2208"
+        ],
+        "area": true,
+        "tags": [
+          "other",
+          "context"
+        ]
+      }
+    ],
+    "labels": [
+      [
+        388.2,
+        32.9,
+        "מחוז צעדה",
+        "big"
+      ],
+      [
+        168.8,
+        147.1,
+        "נפת ראזח",
+        "dist"
+      ],
+      [
+        330.6,
+        257.0,
+        "נפת סאקין",
+        "dist"
+      ],
+      [
+        586.4,
+        38.2,
+        "נפת סחר",
+        "dist"
+      ],
+      [
+        801.7,
+        413.3,
+        "נפת א־צפרא",
+        "dist"
+      ],
+      [
+        261.8,
+        290.8,
+        "נפת חיידאן",
+        "dist"
+      ]
+    ],
+    "distances": [
+      [
+        "saada",
+        "haydan"
+      ],
+      [
+        "saada",
+        "shalil"
+      ],
+      [
+        "saada",
+        "talh"
+      ],
+      [
+        "saada",
+        "naz"
+      ]
+    ]
+  },
+  "haydan": {
+    "title": "סביב חיידאן",
+    "description": "כ׳ולאן ושמות הכפרים באיגרת משנת 1941",
+    "projection": {
+      "west": 43.257,
+      "top": 17.083958738112788,
+      "span": 0.34
+    },
+    "pxkm": 25.382797124655127,
+    "ids": [
+      "khawlan",
+      "haydan",
+      "sorm",
+      "saf1",
+      "saf2",
+      "mer"
+    ],
+    "markers": [
+      {
+        "id": "haydan",
+        "to": "haydan",
+        "label": "העיירה חיידאן",
+        "cls": "context",
+        "dx": 22,
+        "dy": -13,
+        "side": "R",
+        "unc": false,
+        "x": 478.18,
+        "y": 161.99,
+        "pos": [
+          16.77899,
+          43.43372
+        ],
+        "tags": [
+          "family",
+          "context"
+        ]
+      },
+      {
+        "id": "saf1",
+        "to": "saf1",
+        "label": "צאפייה הקרובה",
+        "cls": "context",
+        "dx": 23,
+        "dy": 10,
+        "side": "R",
+        "unc": true,
+        "x": 483.89,
+        "y": 241.18,
+        "pos": [
+          16.75097,
+          43.43583
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "sorm",
+        "to": "sorm",
+        "label": "סורמה",
+        "cls": "context",
+        "dx": 23,
+        "dy": 11,
+        "side": "R",
+        "unc": true,
+        "x": 545.97,
+        "y": 339.42,
+        "pos": [
+          16.7162,
+          43.45877
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "saf2",
+        "to": "saf2",
+        "label": "צאפייה הדרום־מערבית",
+        "cls": "context",
+        "dx": -10,
+        "dy": 34,
+        "side": "L",
+        "unc": true,
+        "x": 253.03,
+        "y": 442.11,
+        "pos": [
+          16.67985,
+          43.35051
+        ],
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "khawlan",
+        "to": "khawlan",
+        "label": "כ׳ולאן · אזור חיידאן",
+        "cls": "family",
+        "x": 237,
+        "y": 134,
+        "areas": [
+          "YE2208"
+        ],
+        "area": true,
+        "tags": [
+          "family"
+        ]
+      },
+      {
+        "id": "mer",
+        "to": "mer",
+        "label": "מרבגה · שיוך משוער",
+        "cls": "other",
+        "x": 220,
+        "y": 178,
+        "areas": [
+          "YE2208"
+        ],
+        "area": true,
+        "tags": [
+          "other",
+          "context"
+        ]
+      }
+    ],
+    "labels": [
+      [
+        779.3,
+        74.3,
+        "נפת סאקין",
+        "dist"
+      ],
+      [
+        608.8,
+        484.1,
+        "נפת חיידאן",
+        "big"
+      ]
+    ],
+    "distances": [
+      [
+        "haydan",
+        "saf1"
+      ],
+      [
+        "haydan",
+        "sorm"
+      ],
+      [
+        "haydan",
+        "saf2"
+      ]
+    ]
+  },
+  "yemen": {
+    "title": "מערב תימן",
+    "description": "צעדא, חאשד, צנעא ועדן",
+    "projection": {
+      "west": 39.605,
+      "top": 17.749588339767147,
+      "span": 8.65
+    },
+    "pxkm": 0.9890868798169765,
+    "ids": [
+      "saada",
+      "khawlan",
+      "kham",
+      "hila",
+      "sanaa",
+      "taiz",
+      "aden"
+    ],
+    "markers": [
+      {
+        "id": "saada",
+        "to": "saada",
+        "label": "צעדא",
+        "cls": "family",
+        "dx": 22,
+        "dy": -7,
+        "side": "R",
+        "unc": false,
+        "x": 442.34,
+        "y": 59.25,
+        "pos": [
+          16.94021,
+          43.76393
+        ],
+        "tags": [
+          "family",
+          "maybe",
+          "other"
+        ],
+        "multi": true
+      },
+      {
+        "id": "kham",
+        "to": "kham",
+        "label": "כ׳מיר",
+        "cls": "other",
+        "dx": 18,
+        "dy": -8,
+        "side": "R",
+        "unc": false,
+        "x": 462.51,
+        "y": 164.86,
+        "pos": [
+          15.98792,
+          43.95362
+        ],
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "sanaa",
+        "to": "sanaa",
+        "label": "צנעא",
+        "cls": "family",
+        "dx": 23,
+        "dy": 12,
+        "side": "R",
+        "unc": false,
+        "x": 489.4,
+        "y": 234.83,
+        "pos": [
+          15.35452,
+          44.20646
+        ],
+        "tags": [
+          "family",
+          "other"
+        ]
+      },
+      {
+        "id": "aden",
+        "to": "aden",
+        "label": "עדן",
+        "cls": "family",
+        "dx": 24,
+        "dy": 7,
+        "side": "R",
+        "unc": false,
+        "x": 577.9,
+        "y": 517.19,
+        "pos": [
+          12.77957,
+          45.03852
+        ],
+        "tags": [
+          "family"
+        ]
+      },
+      {
+        "id": "hila",
+        "to": "hila",
+        "label": "חילה · באזור חאשד",
+        "cls": "other",
+        "x": 665,
+        "y": 142,
+        "areas": [],
+        "area": true,
+        "tags": [
+          "other",
+          "context"
+        ]
+      },
+      {
+        "id": "khawlan",
+        "to": "khawlan",
+        "label": "כ׳ולאן · אזור חיידאן",
+        "cls": "family",
+        "x": 304,
+        "y": 91,
+        "areas": [
+          "YE2208"
+        ],
+        "area": true,
+        "tags": [
+          "family"
+        ]
+      },
+      {
+        "id": "taiz",
+        "to": "taiz",
+        "label": "תעז",
+        "cls": "family",
+        "dx": -17,
+        "dy": -1,
+        "side": "L",
+        "pos": [
+          13.57952,
+          44.02091
+        ],
+        "x": 469.67,
+        "y": 429.81,
+        "tags": [
+          "family"
+        ]
+      }
+    ],
+    "labels": [
+      [
+        223.9,
+        278.3,
+        "ים סוף",
+        "sea"
+      ],
+      [
+        700.4,
+        518.2,
+        "מפרץ עדן",
+        "sea"
+      ],
+      [
+        343.0,
+        28.1,
+        "ערב הסעודית",
+        "country"
+      ],
+      [
+        733.3,
+        247.5,
+        "תימן",
+        "big"
+      ],
+      [
+        505.7,
+        136.4,
+        "חאשד ההיסטורית",
+        "dist"
+      ]
+    ],
+    "distances": [
+      [
+        "saada",
+        "kham"
+      ],
+      [
+        "kham",
+        "sanaa"
+      ],
+      [
+        "sanaa",
+        "aden"
+      ],
+      [
+        "sanaa",
+        "taiz"
+      ],
+      [
+        "taiz",
+        "aden"
+      ]
+    ]
+  },
+  "israel": {
+    "title": "ארץ ישראל",
+    "description": "שעריים, עקיר, עתלית, בני ברק וירושלים",
+    "projection": {
+      "west": 33.771,
+      "top": 34.69995874723197,
+      "span": 2.16
+    },
+    "pxkm": 4.522089016616942,
+    "ids": [
+      "shaar",
+      "rehovot",
+      "eqron",
+      "atlit",
+      "bney",
+      "jer"
+    ],
+    "markers": [
+      {
+        "id": "rehovot",
+        "to": "rehovot",
+        "label": "רחובות · כרם סיניקין",
+        "cls": "family",
+        "dx": 40,
+        "dy": -32,
+        "side": "R",
+        "unc": false,
+        "x": 442.32,
+        "y": 433.72,
+        "pos": [
+          31.89415,
+          34.8095
+        ],
+        "tags": [
+          "family"
+        ]
+      },
+      {
+        "id": "shaar",
+        "to": "shaar",
+        "label": "שעריים, רחובות",
+        "cls": "family",
+        "dx": -33,
+        "dy": -18,
+        "side": "L",
+        "unc": false,
+        "x": 443.93,
+        "y": 436.86,
+        "pos": [
+          31.8879,
+          34.81328
+        ],
+        "tags": [
+          "family"
+        ]
+      },
+      {
+        "id": "eqron",
+        "to": "eqron",
+        "label": "עקיר",
+        "cls": "family",
+        "dx": 29,
+        "dy": 19,
+        "side": "R",
+        "unc": false,
+        "x": 447.97,
+        "y": 450.26,
+        "pos": [
+          31.86119,
+          34.82275
+        ],
+        "tags": [
+          "family"
+        ]
+      },
+      {
+        "id": "atlit",
+        "to": "atlit",
+        "label": "עתלית",
+        "cls": "maybe",
+        "dx": -17,
+        "dy": -8,
+        "side": "L",
+        "unc": false,
+        "x": 498.91,
+        "y": 33.29,
+        "pos": [
+          32.68889,
+          34.94236
+        ],
+        "tags": [
+          "maybe"
+        ]
+      },
+      {
+        "id": "jer",
+        "to": "jer",
+        "label": "ירושלים",
+        "cls": "other",
+        "dx": 22,
+        "dy": 17,
+        "side": "R",
+        "unc": false,
+        "x": 615.6,
+        "y": 496.44,
+        "pos": [
+          31.76904,
+          35.21633
+        ],
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "bney",
+        "to": "bney",
+        "label": "בני ברק",
+        "cls": "other",
+        "dx": 22,
+        "dy": -12,
+        "side": "R",
+        "unc": false,
+        "x": 452.67,
+        "y": 340.02,
+        "pos": [
+          32.08074,
+          34.8338
+        ],
+        "tags": [
+          "other"
+        ]
+      }
+    ],
+    "labels": [
+      [
+        204.0,
+        229.7,
+        "הים התיכון",
+        "sea"
+      ],
+      [
+        617.2,
+        290.1,
+        "הרי שומרון",
+        "dist"
+      ],
+      [
+        578.8,
+        445.8,
+        "הרי יהודה",
+        "dist"
+      ],
+      [
+        399.9,
+        480.9,
+        "השפלה",
+        "dist"
+      ]
+    ],
+    "distances": [
+      [
+        "shaar",
+        "eqron"
+      ],
+      [
+        "shaar",
+        "bney"
+      ],
+      [
+        "shaar",
+        "jer"
+      ],
+      [
+        "shaar",
+        "atlit"
+      ]
+    ]
+  }
+}

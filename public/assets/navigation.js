@@ -4,6 +4,7 @@
   const site=globalThis.document?.documentElement?.dataset;
   const gameIds=site?.nakashHome ? ['rex','jachnun'] : ['photos','kinship','missing','trivia','chick','differences','puzzle','jachnun','rex','soup','north','neto-tetris','ruti-house'];
   const views=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
+  if (site?.extendedKeha) views.add('family-map');
   const root=()=>site?.nakashEntryView?'#'+site.nakashEntryView:matchMedia('(max-width:700px)').matches?'#home':'#tree';
   const scopedViews=site?.nakashViews?.split(' ');
   const path=url=>url.pathname+url.search+url.hash;
@@ -36,6 +37,7 @@
     if(next.searchParams.has('media')){next.searchParams.delete('media');return next;}
     const [view,id]=next.hash.slice(1).split('/');
     if(view==='founder-tree')next.hash='#tree';
+    else if(site?.extendedKeha&&view==='family-map'&&id)next.hash='#family-map';
     else if(id&&['games','weddings','nursery','updates','memorial','nostalgia','voices'].includes(view))next.hash='#'+view;
     else if(view==='person'&&id)next.hash='#directory';
     else if(views.has(view)&&next.hash!==root()&&view!=='home'&&view!=='tree')next.hash=root();

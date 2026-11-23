@@ -9,6 +9,8 @@
   const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),reducedMotion=()=>window.FamilyAccessibility?.isReducedMotion()??motionQuery.matches;
   const validViews=new Set(['home','tree','founder-tree','timeline','directory','gallery','calendar','videos','photos','stories','documents','voices','weddings','nostalgia','updates','memorial','person','games','nursery','screensaver','family-ai','search']);
   const scopedViews=document.documentElement?.dataset?.nakashViews;
+  const familyMapView = document.documentElement?.dataset?.extendedKeha ? $('familyMapView') : null;
+  if (familyMapView) validViews.add('family-map');
   const nakashTree=String(document.documentElement?.dataset?.nakashHome||'').startsWith('/nakash/');
   const compactTreeYears=Boolean(document.documentElement?.dataset?.extendedKeha||document.documentElement?.dataset?.branchPortal||document.documentElement?.dataset?.shlomoKeha==='true');
   const modes=document.querySelector('#treeView .tree-mode'),header=document.querySelector('.workspace-header');
@@ -243,10 +245,15 @@
     const isTree = state.view === 'tree';
     const isDirectory = state.view === 'directory';
     const global = !isTree && !isDirectory;
+    if (familyMapView) {
+      familyMapView.hidden = state.view !== 'family-map';
+      if (!familyMapView.hidden) familyMapView.dispatchEvent(new Event('atlas-open'));
+    }
     $('treeView').hidden = !isTree;
     $('directoryView').hidden = !isDirectory;
     $('branchBar').hidden = global||(isDirectory&&state.directoryGroup!=='main');
     const titles = {search:[I18n.isEnglish?'Family search':'חיפוש משפחתי',I18n.isEnglish?'People, memories and moments from across our home':'אנשים, זיכרונות ורגעים מכל הבית שלנו'],voices:[I18n.t('בקולם'),I18n.t('הקולות והסיפורים של המשפחה שלנו')],'family-ai':[I18n.t('בינה משפחתית'),I18n.t('רגעים של פעם מתעוררים לחיים')],screensaver:[I18n.t('שומר מסך משפחתי'),I18n.t('כל המשפחה, זיכרון אחרי זיכרון')],timeline:[I18n.t('ציר זמן משפחתי'),I18n.t('דורות של אנשים ורגעים, עשור אחר עשור')],nursery:[I18n.t('התינוקייה'),I18n.t('ההתחלה של כולנו')],games:[I18n.isEnglish?'Family Games':'משחקי משפחה',I18n.isEnglish?'The faces that make us a family':'מכירים את הפנים שמרכיבות את המשפחה'],memorial:[I18n.t('לזכרם'),I18n.t('הזיכרונות נשארים איתנו')],person:[I18n.t('עמוד אישי'),I18n.t('סיפור חיים, תמונות וזיכרונות')],updates:[I18n.t('הרשמה לעדכונים'),I18n.t('תזכורות משפחתיות, ישר למייל')],home:[I18n.t('הבית שלנו'),I18n.t('כל המשפחה, במקום אחד')],gallery:[I18n.t('הגלריה המשפחתית'),I18n.t('תמונות, אנשים ורגעים ששומרים יחד')],calendar:[I18n.t('לוח שנה משפחתי'),I18n.t('השנה המשפחתית שלנו')],tree:[I18n.t('האילן המשפחתי'),(scopedViews?(document.documentElement?.dataset?.shlomoKeha==='true'?(I18n.isEnglish?'The family of Shlomo and Yona Keha':'המשפחה של שלמה ויונה קהא'):(I18n.isEnglish?'Four branches from shared roots':'משורש משותף, ארבעה ענפים')):I18n.t('משורש משותף, שישה ענפים של אהבה'))],directory:[I18n.t('כל בני המשפחה'),I18n.t('האלבומים וימי ההולדת של כולנו')],videos:[I18n.t('סרטוני המשפחה'),I18n.t('הקולות, הצחוק והרגעים שנשארים איתנו')],photos:[I18n.t('תמונות משפחתיות'),I18n.t('אלבום אחד, אינספור זיכרונות משותפים')],stories:[I18n.t('הסיפורים שלנו'),I18n.t('יומן משפחתי, מהעבר ועד היום')],weddings:[I18n.t('החתונות שלנו'),I18n.t('סיפורי האהבה, הברכות והרגעים מהיום המיוחד')],nostalgia:[I18n.t('פינת הנוסטלגיה'),I18n.t('תמונות, סרטים ומכתבים שמחזירים אותנו הביתה')]};
+    if (familyMapView) titles['family-map'] = I18n.isEnglish ? ['Family map', 'Places and records from Yemen and the Land of Israel'] : ['מפת המשפחה', 'מקומות ועדויות מתימן ומארץ ישראל'];
     if (scopedViews) titles.games = [I18n.t('משחקים תימנים ונהנים'), I18n.t('תימנירקס ותפוס תג׳חנון')];
     titles.documents=[I18n.isEnglish?'Documents and rare recordings':(scopedViews?'מסמכים ותיעודים':'תעודות מסמכים ותיעודים נדירים'),I18n.isEnglish?'Original records, certificates and voices from our past':'תעודות, מסמכים היסטוריים והקלטות ששומרים לדורות'];
     const [title,subtitle] = titles[state.view] || titles.tree;
