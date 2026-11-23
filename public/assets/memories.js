@@ -208,13 +208,21 @@
   async function refresh(kind,force=false){
     if(!window.FamilyApp?.apiEnabled||state.loading[kind])return;state.loading[kind]=true;const startedEdit=storyEdits,status=$(kind==='stories'?'memoryStatus':'voicesStatus');
     if(!state.loaded[kind])status.textContent=t('פותחים את האלבום…','Opening the album…');
-    try{const data=await request('api/'+(kind==='stories'?'stories':'voices'),{headers:!force&&state.revisions[kind]?{'If-None-Match':'"'+state.revisions[kind]+'"'}:{}});if(data){if(kind==='stories'&&(categorySaves.size||startedEdit!==storyEdits))return;if(kind==='stories')state.allowedPersonIds=data.allowedPersonIds||null;state[kind==='stories'?'stories':'recordings']=data[kind==='stories'?'stories':'recordings'];state.revisions[kind]=data.revision;state.loaded[kind]=true;if(kind==='stories')renderStories();else renderVoices({background:!force});}status.textContent='';}
+    try{const data=await request('api/'+(kind==='stories'?'stories':'voices'),{headers:!force&&state.revisions[kind]?{'If-None-Match':'"'+state.revisions[kind]+'"'}:{}});if(data){if(kind==='stories'&&(categorySaves.size||startedEdit!==storyEdits))return;if(kind==='stories')state.allowedPersonIds=data.allowedPersonIds||null;state[kind==='stories'?'stories':'recordings']=data[kind==='stories'?'stories':'recordings'];state.revisions[kind]=data.revision;state.loaded[kind]=true;if(kind==='stories'){renderStories();syncStoryRoute();}else renderVoices({background:!force});}status.textContent='';}
     catch(error){status.textContent=error.message;}finally{state.loading[kind]=false;}
   }
-  function openStory(id){
+  const storyRoute=()=>location.hash.startsWith('#stories/')?location.hash.slice('#stories/'.length):'';
+  function syncStoryRoute(){
+    const id=storyRoute(),reader=$('storyReader');
+    if(!id){if(reader.open)reader.close();return;}
+    if(state.view==='stories'&&(!reader.open||reader.dataset.storyId!==id))openStory(id,false);
+  }
+  function openStory(id,sync=true){
     const item=state.stories.find(item=>item.id===id);if(!item)return;
+    if(sync&&window.FamilyNavigation)window.FamilyNavigation.go('#stories/'+id);
     $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2><div class="story-reader-byline">${narratorHTML(item)}${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}</div><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
-    $('storyReader').showModal();
+    $('storyReader').dataset.storyId=id;
+    if(!$('storyReader').open)$('storyReader').showModal();
   }
   function canWrite(){if(window.FamilyApp?.apiEnabled)return true;window.FamilyApp?.toast(t('השמירה זמינה באתר המחובר.','Saving is available on the connected website.'));return false;}
   function editStory(id=null){
@@ -269,6 +277,7 @@
     if(view!=='voices')$('voiceList').querySelectorAll('audio').forEach(audio=>audio.pause());
     if(changed)state.query='';
     if(view==='stories'){renderStories();refresh('stories');window.FamilyPeopleRoster?.load?.().then(refreshNarratorPortraits).catch(()=>{});}else if(view==='voices'){renderVoices();refresh('voices');}
+    syncStoryRoute();
   }
   function init(){
     $('voiceAllRecordings').textContent=t('כל ההקלטות','All recordings');
@@ -276,6 +285,12 @@
     const syncVoiceRoute=()=>{if(state.view==='voices'&&location.hash.split('/')[0]==='#voices')renderVoices();};
     window.addEventListener('hashchange',syncVoiceRoute);
     window.addEventListener('popstate',syncVoiceRoute);
+    window.addEventListener('hashchange',syncStoryRoute);
+    window.addEventListener('popstate',syncStoryRoute);
+    $('storyReader').addEventListener('close',()=>{
+      if($('storyReader').open||storyRoute()!==$('storyReader').dataset.storyId)return;
+      window.FamilyNavigation?.returnTo('#stories');
+    });
     const questionnaire=$('storyQuestionnaireLink');if(questionnaire)questionnaire.textContent=t('כתיבת סיפור','Write a story');
     window.FamilyPeopleRoster?.subscribe?.(refreshNarratorPortraits);
     window.addEventListener('family-profile-changed',refreshNarratorPortraits);

@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {parseHTML} from 'linkedom';
 import {webcrypto} from 'node:crypto';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/memories.js',import.meta.url),'utf8');
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
@@ -12,11 +13,13 @@ const story={id:'a'.repeat(24),title:'הדרך הביתה',body:'סיפור מש
 const recording={id:'b'.repeat(32),title:'בקולה של סבתא',body:'זיכרון מוקלט',author:'משפחה',year:1985,personIds:['yona'],tags:[person],filename:'voice.mp3',src:'/api/voices/'+('b'.repeat(32))+'/audio',createdAt:'2026-11-01T00:00:00Z',updatedAt:'2026-11-01T00:00:00Z'};
 const tick=async()=>{for(let n=0;n<5;n++)await new Promise(resolve=>setImmediate(resolve));};
 
-function fixture({english=false,reduced=false,stories=[story],recordings=[recording],people=[person],fail=false,categoryError=0,href='https://family.test/',navigator={}}={}){
+function fixture({english=false,reduced=false,stories=[story],recordings=[recording],people=[person],fail=false,categoryError=0,href='https://family.test/',navigator={},historyNavigation=false,phone=false,site={}}={}){
   const {window,document}=parseHTML(html),requests=[],timers=new Map(),scrolls=[],uploads=[],notices=[];let timer=0;
-  const location=new URL(href);
+  Object.assign(document.documentElement.dataset,site);
+  const browser=historyNavigation?browserHistory(href):null,location=browser?.location||new URL(href);
+  if(browser)for(const type of ['popstate','hashchange'])browser.addEventListener(type,event=>window.dispatchEvent(Object.assign(new window.Event(type),event)));
   // Native browser methods, modeled only at the UI boundary.
-  for(const dialog of document.querySelectorAll('dialog')){dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;};}
+  for(const dialog of document.querySelectorAll('dialog')){dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;dialog.dispatchEvent(new window.Event('close'));};}
   window.HTMLElement.prototype.scrollIntoView=function(){scrolls.push(this.id);};
   window.HTMLElement.prototype.focus=function(){Object.defineProperty(document,'activeElement',{value:this,configurable:true});};
   window.HTMLElement.prototype.pause=function(){this.paused=true;};
@@ -46,11 +49,14 @@ function fixture({english=false,reduced=false,stories=[story],recordings=[record
     open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}addEventListener(name,fn){this.events[name]=fn;}
     send(file){this.file=file;uploads.push(this);queueMicrotask(()=>{this.progress?.({lengthComputable:true,loaded:file.size,total:file.size});this.status=201;this.responseText=JSON.stringify({recording});this.events.load();});}
   }
-  vm.runInNewContext(source,{window,document,location,navigator,URL,FormData:Form,Response,TextEncoder,crypto:webcrypto,btoa,XMLHttpRequest:XHR,matchMedia:()=>({matches:reduced}),setInterval:()=>0,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id)});
+  const context=vm.createContext({window,document,location,history:browser?.history,navigator,URL,FormData:Form,Response,TextEncoder,crypto:webcrypto,btoa,XMLHttpRequest:XHR,matchMedia:query=>({matches:query.includes('700px')?phone:reduced}),setInterval:()=>0,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id)});
+  if(browser)vm.runInContext(navigationSource,context);
+  vm.runInContext(source,context);
+  if(browser)window.addEventListener('popstate',()=>{window.FamilyMemories.activate(location.hash.slice(1).split('/')[0]);});
   document.dispatchEvent(new window.Event('DOMContentLoaded'));
   const get=id=>document.getElementById(id),click=selector=>{const el=document.querySelector(selector);assert.ok(el,selector);el.dispatchEvent(new window.Event('click',{bubbles:true}));};
   const emit=(id,type,props={})=>{const event=new window.Event(type,{bubbles:true,cancelable:true});Object.assign(event,props);get(id).dispatchEvent(event);return event;};
-  return {window,document,location,get,click,emit,requests,uploads,timers,scrolls,notices,async activate(view){window.FamilyMemories.activate(view);await tick();},async flush(){await tick();},finishAnimation(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());}};
+  return {window,document,location,browser,get,click,emit,requests,uploads,timers,scrolls,notices,async activate(view){if(browser)window.FamilyNavigation.go('#'+view);window.FamilyMemories.activate(view);await tick();},async flush(){await tick();},finishAnimation(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());}};
 }
 
 test('the five category doors open from an ornamented book and each click turns its pages',async()=>{
@@ -63,6 +69,29 @@ test('the five category doors open from an ornamented book and each click turns 
   assert.equal(f.scrolls.includes('memoryCollection'),false);f.finishAnimation();assert.equal(f.get('memoryWorld').classList.contains('is-turning'),false);assert.equal(f.scrolls.at(-1),'memoryCollection');
   f.click('[data-memory-category="funny"]');assert.equal(f.get('storyTimeline').children.length,0);assert.equal(f.get('storiesEmpty').hidden,false);
   f.click('#newStory');assert.equal(f.get('storyEditor').open,true);assert.equal(f.get('storyCategory').value,'funny');
+});
+
+test('phone Back closes a story before leaving its filtered list, Forward reopens it, and X consumes that same step',async()=>{
+  for(const home of ['/','/nakash/','/keha-extended/','/keha-extended/zechariah-tzadok/']){
+    const site=home==='/'?{}:{nakashHome:home,nakashEntryView:'home',nakashViews:'home tree stories documents search'};
+    const f=fixture({historyNavigation:true,phone:true,href:'https://family.test'+home+'?lang=en-GB#home',site});
+    await f.activate('stories');f.click('[data-memory-category="roots"]');f.finishAnimation();
+    f.get('storyPersonFilter').value='yona';f.emit('storyPersonFilter','change');
+    f.click('[data-open-story]');assert.equal(f.location.hash,'#stories/'+story.id);assert.equal(f.get('storyReader').open,true);
+    const length=f.browser.history.length;
+    f.browser.history.back();await f.flush();assert.equal(f.location.hash,'#stories');assert.equal(f.get('storyReader').open,false);
+    assert.equal(f.get('storyPersonFilter').value,'yona');assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי שורשים');
+    f.browser.history.forward();await f.flush();assert.equal(f.get('storyReader').open,true);assert.match(f.get('storyReaderBody').textContent,/סיפור משפחתי/);assert.equal(f.browser.history.length,length);
+    f.get('storyReader').close();await f.flush();assert.equal(f.location.hash,'#stories');
+    f.browser.history.back();await f.flush();assert.equal(f.location.hash,'#home');assert.equal(f.location.pathname,home);assert.equal(f.location.search,'?lang=en-GB');
+  }
+});
+
+test('a direct story link opens after its content loads and Back and Forward restore the list and reader',async()=>{
+  const f=fixture({historyNavigation:true,phone:true,href:'https://family.test/?lang=he#stories/'+story.id});
+  f.window.FamilyMemories.activate('stories');await f.flush();assert.equal(f.get('storyReader').open,true);
+  const length=f.browser.history.length;f.browser.history.back();await f.flush();assert.equal(f.location.hash,'#stories');assert.equal(f.get('storyReader').open,false);
+  f.browser.history.forward();await f.flush();assert.equal(f.get('storyReader').open,true);assert.equal(f.browser.history.length,length);
 });
 test('story cards and readers show the storyteller portrait rather than the tagged subject in either language',async()=>{
   const shosh={id:'shosh',name:'שוש בלום',nameEn:'Shosh Bloom',profile:'/media/'+'1'.repeat(32)},margalit={id:'margalit',name:'מרגלית נקאש',nameEn:'Margalit Nakash',profile:'/media/'+'2'.repeat(32)};

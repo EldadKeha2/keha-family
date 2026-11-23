@@ -30,7 +30,7 @@
     try{
       const data=await request('api/documents');state.items=data.items;state.people=data.people;state.loaded=true;
       $('documentPersonFilter').innerHTML=`<option value="all">${t('כל האנשים','Everyone')}</option>`+state.people.map(p=>`<option value="${safe(p.id)}">${safe(p.name)}</option>`).join('');
-      $('documentPersonFilter').value=state.person;render();$('documentsStatus').textContent='';
+      $('documentPersonFilter').value=state.person;render();syncDocumentRoute();$('documentsStatus').textContent='';
     }catch(error){$('documentsStatus').textContent=error.message;}finally{state.loading=false;}
   }
   function mount(){
@@ -79,7 +79,11 @@
     });
     $('documentCamera').addEventListener('change',()=>{const file=$('documentCamera').files[0];if(file)void openEditor(file);});
     editor.addEventListener('close',clearCapture);
-    viewer.addEventListener('close',()=>{for(const node of $('documentViewerBody').querySelectorAll('audio'))node.pause?.();$('documentViewerBody').replaceChildren();});
+    viewer.addEventListener('close',()=>{
+      if(viewer.open)return;
+      for(const node of $('documentViewerBody').querySelectorAll('audio'))node.pause?.();$('documentViewerBody').replaceChildren();
+      if(documentRoute()===viewer.dataset.documentId)window.FamilyNavigation?.returnTo('#documents');
+    });
     $('documentPeopleSearch').addEventListener('input',event=>{const query=normalize(event.target.value);for(const label of $('documentPeople').children)label.hidden=!normalize(label.textContent).includes(query);});
     $('documentFile').addEventListener('change',()=>{clearCapture();if(!$('documentTitle').value)$('documentTitle').value=$('documentFile').files[0]?.name.replace(/\.[^.]+$/,'')||'';});
     $('documentPersonFilter').addEventListener('change',event=>{state.person=event.target.value;render();});
@@ -92,10 +96,7 @@
       }
       const button=event.target.closest('[data-document-open]');if(!button)return;
       const item=state.items.find(item=>item.id===button.dataset.documentOpen);if(!item)return;
-      if(window.FamilyPDF?.isPDF(item)){window.FamilyPDF.open(item);return;}
-      $('documentViewerTitle').textContent=item.name||item.title||item.filename;
-      $('documentViewerBody').innerHTML=audio(item)?`<audio controls preload="metadata" src="${safe(item.src)}" aria-label="${safe(item.name||item.filename)}"></audio>`:item.mime?.startsWith('image/')?`<img src="${safe(item.src)}" alt="${safe(item.name||item.filename)}">`:item.mime==='application/pdf'?`<iframe src="${safe(item.src)}${item.src.includes('?')?'&':'?'}inline=1" title="${safe(item.name||item.filename)}"></iframe>`:`<p>${t('את הקובץ הזה אפשר לפתוח או להוריד בקישור למקור.','Open or download this file using the original link.')}</p>`;
-      $('documentOriginal').href=item.src;viewer.showModal();
+      openDocument(item);
     });
     for(const dialog of [editor,viewer]){dialog.querySelector('[data-document-close]').addEventListener('click',()=>{if(!state.saving)dialog.close();});dialog.addEventListener('cancel',event=>{if(state.saving)event.preventDefault();});}
     $('documentForm').addEventListener('submit',async event=>{
@@ -115,7 +116,27 @@
       }catch(error){$('documentError').textContent=error.message;}finally{state.saving=false;$('saveDocument').disabled=false;}
     });
   }
+  const documentRoute=()=>location.hash.startsWith('#documents/')?location.hash.slice('#documents/'.length):'';
+  function openDocument(item,sync=true){
+    if(window.FamilyPDF?.isPDF(item)){
+      if(!sync&&window.FamilyNavigation){window.FamilyNavigation.go('#documents',{replace:true});window.FamilyPDF.open(item,{replace:true});}
+      else window.FamilyPDF.open(item);
+      return;
+    }
+    const viewer=$('documentViewer');
+    if(sync&&window.FamilyNavigation)window.FamilyNavigation.go('#documents/'+item.id);
+    viewer.dataset.documentId=item.id;$('documentViewerTitle').textContent=item.name||item.title||item.filename;
+    $('documentViewerBody').innerHTML=audio(item)?`<audio controls preload="metadata" src="${safe(item.src)}" aria-label="${safe(item.name||item.filename)}"></audio>`:item.mime?.startsWith('image/')?`<img src="${safe(item.src)}" alt="${safe(item.name||item.filename)}">`:item.mime==='application/pdf'?`<iframe src="${safe(item.src)}${item.src.includes('?')?'&':'?'}inline=1" title="${safe(item.name||item.filename)}"></iframe>`:`<p>${t('את הקובץ הזה אפשר לפתוח או להוריד בקישור למקור.','Open or download this file using the original link.')}</p>`;
+    $('documentOriginal').href=item.src;if(!viewer.open)viewer.showModal();
+  }
+  function syncDocumentRoute(){
+    const id=documentRoute(),viewer=$('documentViewer');
+    if(!id){if(viewer.open)viewer.close();return;}
+    if(state.view!=='documents'||viewer.open&&viewer.dataset.documentId===id)return;
+    const item=state.items.find(item=>item.id===id);if(item)openDocument(item,false);
+  }
   mount();
-  window.FamilyDocuments={activate(view){if(state.view!==view)state.query='';state.view=view;section.hidden=view!=='documents';if(view==='documents'){render();refresh();}},search(query){state.query=query;if(state.view==='documents')render();}};
+  window.addEventListener?.('popstate',syncDocumentRoute);window.addEventListener?.('hashchange',syncDocumentRoute);
+  window.FamilyDocuments={activate(view){if(state.view!==view)state.query='';state.view=view;section.hidden=view!=='documents';if(view==='documents'){render();refresh();}syncDocumentRoute();},search(query){state.query=query;if(state.view==='documents')render();}};
   if(document.body.dataset.activeView==='documents')window.FamilyDocuments.activate('documents');
 })();

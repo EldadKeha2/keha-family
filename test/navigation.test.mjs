@@ -126,3 +126,24 @@ test('direct Artificial Family links retain a home parent and selected language'
   assert.equal(f.location.search,'?lang=en-GB');
  }
 });
+
+test('shared stories and records return to their list in every family without growing history',async()=>{
+  for(const phone of [true,false])for(const home of ['/','/nakash/','/keha-extended/','/keha-extended/zechariah-tzadok/'])for(const view of ['stories','documents']){
+    const site=home==='/'?{}:{nakashHome:home,nakashEntryView:'home',nakashViews:'home tree stories documents search'};
+    const f=fixture('https://family.test'+home+'?lang=en-GB#'+view+'/record',{phone,site}),length=f.history.length;
+    f.reload();assert.equal(f.history.length,length);
+    f.history.back();await f.flush();assert.equal(f.location.hash,'#'+view);
+    f.history.back();await f.flush();assert.equal(f.location.hash,home==='/'&&!phone?'#tree':'#home');
+    f.history.forward();await f.flush();f.history.forward();await f.flush();
+    assert.equal(f.location.hash,'#'+view+'/record');assert.equal(f.location.pathname,home);assert.equal(f.location.search,'?lang=en-GB');assert.equal(f.history.length,length);
+  }
+});
+
+test('nested PDF and search readers have separate parents and leaving them clears only reader parameters',async()=>{
+  const url='https://family.test/?lang=en-US&content=story%3Aid&pdf=%2Frecord.pdf&pdfName=record.pdf&pdfTitle=Record#search/q=roots';
+  const f=fixture(url,{phone:true}),length=f.history.length;
+  f.history.back();await f.flush();assert.equal(f.location.search,'?lang=en-US&content=story%3Aid');
+  f.history.back();await f.flush();assert.equal(f.location.href,'https://family.test/?lang=en-US#search/q=roots');
+  f.history.forward();await f.flush();f.history.forward();await f.flush();assert.equal(f.location.href,url);assert.equal(f.history.length,length);
+  f.nav.go('#gallery');assert.equal(f.location.href,'https://family.test/?lang=en-US#gallery');
+});

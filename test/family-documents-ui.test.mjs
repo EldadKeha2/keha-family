@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {parseHTML} from 'linkedom';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/family-documents.js',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-function fixture(){
+function fixture({historyNavigation=false,href='https://family.test/#home'}={}){
   const {document,window:dom}=parseHTML('<html><body data-active-view="tree"><section id="documentsView" hidden></section></body></html>');
+  const browser=historyNavigation?browserHistory(href):null,location=browser?.location||new URL(href);
   const uploads=[],removals=[],previews=[],revoked=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
   const window={FamilyI18n:{isEnglish:false,error:v=>v,personName:p=>p.name,fetch:async(path,options)=>{
     if(options?.method==='POST'){
@@ -20,13 +22,17 @@ function fixture(){
   }},FAMILY_API_TOKEN:'test-token'};
   class XHR{constructor(){this.upload={};this.headers={};}open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}send(file){uploads.push({file,url:this.url,headers:this.headers});this.status=201;this.responseText='{"saved":true}';queueMicrotask(()=>this.onload());}}
   const objectURL={createObjectURL(file){previews.push(file);return 'blob:captured-'+previews.length;},revokeObjectURL(url){revoked.push(url);}};
-  vm.runInNewContext(source,{window,document,XMLHttpRequest:XHR,Response,CustomEvent:dom.CustomEvent,URL:objectURL});
+  window.addEventListener=browser?.addEventListener;
+  const context=vm.createContext({window,document,location,history:browser?.history,matchMedia:()=>({matches:true}),XMLHttpRequest:XHR,Response,CustomEvent:dom.CustomEvent,URL:Object.assign(class extends URL{},objectURL)});
+  if(browser)vm.runInContext(navigationSource,context);
+  vm.runInContext(source,context);
+  if(browser)window.addEventListener('popstate',()=>window.FamilyDocuments.activate(location.hash.slice(1).split('/')[0]));
   for(const node of document.querySelectorAll('select'))Object.defineProperty(node,'value',{writable:true,value:'all'});
   for(const node of document.querySelectorAll('dialog')){node.showModal=function(){this.open=true;};node.close=function(){this.open=false;this.dispatchEvent(new dom.Event('close'));};}
   document.getElementById('documentForm').reset=()=>{};
   Object.defineProperty(document.getElementById('documentFile'),'files',{configurable:true,value:[]});
   Object.defineProperty(document.getElementById('documentCamera'),'files',{configurable:true,value:[]});
-  return {document,dom,window,uploads,removals,items,previews,revoked};
+  return {document,dom,window,browser,location,uploads,removals,items,previews,revoked};
 }
 test('the archive filters real documents and audio, searches descriptions, and opens the original image',async()=>{
   const f=fixture();f.window.FamilyDocuments.activate('documents');await tick();
@@ -35,6 +41,19 @@ test('the archive filters real documents and audio, searches descriptions, and o
   f.document.querySelector('[data-document-kind=all]').click();f.window.FamilyDocuments.search('הסריקה המקורית');assert.equal(f.document.querySelectorAll('.document-card').length,1);
   f.document.querySelector('[data-document-open]').click();assert.equal(f.document.getElementById('documentViewer').open,true);assert.equal(f.document.querySelector('#documentViewerBody img').getAttribute('src'),'/media/a');
   f.window.FamilyDocuments.activate('tree');assert.equal(f.document.getElementById('documentsView').hidden,true);
+});
+
+test('Back closes scanned records and audio before leaving the archive and Forward restores their contents',async()=>{
+  for(const kind of ['document','audio']){
+    const f=fixture({historyNavigation:true});f.window.FamilyNavigation.go('#documents');f.window.FamilyDocuments.activate('documents');await tick();
+    f.document.querySelector('[data-document-kind='+kind+']').click();f.document.querySelector('[data-document-open]').click();
+    const item=f.items.find(item=>item.kind===kind),length=f.browser.history.length;
+    assert.equal(f.location.hash,'#documents/'+item.id);assert.equal(f.document.getElementById('documentViewer').open,true);
+    f.browser.history.back();await tick();assert.equal(f.location.hash,'#documents');assert.equal(f.document.getElementById('documentViewer').open,false);assert.equal(f.document.querySelectorAll('.document-card').length,1);
+    f.browser.history.forward();await tick();assert.equal(f.document.getElementById('documentViewer').open,true);assert.equal(f.document.getElementById('documentViewerTitle').textContent,item.name);assert.equal(f.browser.history.length,length);
+    f.document.querySelector('#documentViewer [data-document-close]').click();await tick();assert.equal(f.location.hash,'#documents');
+    f.browser.history.back();await tick();assert.equal(f.location.hash,'#home');
+  }
 });
 test('adding a record requires a subject and sends the unmodified file with its title and attribution',async()=>{
   const f=fixture();f.window.FamilyDocuments.activate('documents');await tick();f.document.getElementById('newDocument').click();

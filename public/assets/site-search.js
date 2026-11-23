@@ -170,18 +170,32 @@ async function load(){
   try{
     const response=await I.fetch('api/search?'+key,{signal:controller.signal,cache:'no-store'}),data=await response.json();if(current!==epoch)return;
     if(!response.ok)throw Error(I.error(data.error)||tr('החיפוש לא הושלם. נסו שוב.','Search could not finish. Please try again.'));
-    render(data);
+    render(data);syncContentRoute();
   }catch(error){if(current!==epoch||error.name==='AbortError')return;lastKey=null;result=null;$('siteSearchStatus').textContent=error.message;$('siteSearchGrid').innerHTML='<button type="button" class="secondary-button" data-site-search-retry>'+tr('ניסיון נוסף','Try again')+'</button>';}
   finally{if(current===epoch){pending=false;view.removeAttribute('aria-busy');}}
 }
-function openResult(index){
+const contentKey=item=>item.type+':'+item.id;
+function syncContentRoute(){
+  const key=new URL(location.href).searchParams.get('content'),panel=$('siteSearchContentDialog');
+  if(!key||location.hash.split('/')[0]!=='#search'){if(panel?.open)panel.close();return;}
+  if(!result||lastKey!==routeParams().toString()||panel?.open&&panel.dataset.contentKey===key)return;
+  const index=result.items.findIndex(item=>item.content&&contentKey(item)===key);if(index>=0)openResult(index,false);
+}
+function openResult(index,sync=true){
   const item=result?.items[index];if(!item)return;
   if(item.type==='person'){openProfile(item.id);return;}
   if(item.media){window.FamilyMedia?.open(result.items.filter(row=>row.media).map(row=>row.media),result.items.slice(0,index).filter(row=>row.media).length,'site-search');return;}
   if(item.content){
     const content=item.content,panel=$('siteSearchContentDialog');
+    if(sync){const url=new URL(location.href);url.searchParams.set('content',contentKey(item));window.FamilyNavigation?.go(url.href);}
+    panel.dataset.contentKey=contentKey(item);
     panel.innerHTML='<button type="button" class="site-search-close" data-site-content-close aria-label="'+tr('סגירה','Close')+'">×</button><small>'+safe(typeLabel(item.type))+(item.year?' · '+item.year:'')+'</small><h2 id="siteSearchContentTitle" dir="auto">'+safe(item.title)+'</h2>'+(content.author?'<p dir="auto">'+safe(content.author)+'</p>':'')+(item.type==='voice'?'<audio controls preload="none" src="'+safe(content.src)+'"></audio>':'')+'<div class="site-search-full-text" dir="auto">'+safe(content.body)+'</div>'+listAttachments(content.attachments)+'<a class="site-search-related" href="'+safe(item.href)+'">'+tr('לעמוד '+typeLabel(item.type),'Browse '+typeLabel(item.type))+'</a>';
-    panel.querySelector('[data-site-content-close]').addEventListener('click',()=>panel.close());panel.querySelector('a[href^="#"]')?.addEventListener('click',()=>panel.close());panel.showModal();return;
+    panel.querySelector('[data-site-content-close]').addEventListener('click',()=>panel.close());
+    panel.querySelector('a[href^="#"]')?.addEventListener('click',event=>{
+      if(window.FamilyNavigation){event.preventDefault();window.FamilyNavigation.go(event.currentTarget.getAttribute('href'));window.dispatchEvent(new Event('hashchange'));}
+      panel.close();
+    });
+    if(!panel.open)panel.showModal();return;
   }
   if(item.href){window.FamilyNavigation?.go(item.href);window.dispatchEvent(new Event('hashchange'));}
 }
@@ -190,7 +204,7 @@ function activate(name){
   if(!view)return;view.hidden=name!=='search';
   const host=name==='home'?document.querySelector('[data-home-install-actions]'):headerSlot;
   if(button&&host&&button.parentElement!==host)host.append(button);
-  if(name==='search')load();else if(controller){controller.abort();epoch++;lastKey=null;pending=false;view.removeAttribute('aria-busy');}
+  if(name==='search'){load();syncContentRoute();}else if(controller){controller.abort();epoch++;lastKey=null;pending=false;view.removeAttribute('aria-busy');}
 }
 function mountCompactLanguage(){
   const host=document.querySelector('.language-selector');if(!host)return;
@@ -226,9 +240,12 @@ function init(){
   dialog.addEventListener('click',selectSuggestion);
   dialog.addEventListener('keydown',quickNavigation.keydown);
   dialog.addEventListener('close',()=>{quickNavigation.clear();$('siteSearchQuickInput').setAttribute('aria-expanded','false');button.setAttribute('aria-expanded','false');if(!button.closest('[hidden]'))button.focus();});
-  for(const name of ['hashchange','popstate'])window.addEventListener(name,()=>{closeDialog();if($('siteSearchContentDialog')?.open)$('siteSearchContentDialog').close();if(location.hash.split('/')[0]==='#search'){window.FamilyApp?.setView('search',false);activate('search');}});
+  for(const name of ['hashchange','popstate'])window.addEventListener(name,()=>{closeDialog();if(location.hash.split('/')[0]==='#search'){window.FamilyApp?.setView('search',false);activate('search');}syncContentRoute();});
   for(const name of ['family-media-changed','family-person-changed'])window.addEventListener(name,()=>{lastKey=null;if(active())load();});
-  const content=document.createElement('dialog');content.id='siteSearchContentDialog';content.className='site-search-dialog site-search-content-dialog';content.setAttribute('aria-labelledby','siteSearchContentTitle');content.addEventListener('close',()=>content.querySelector('audio')?.pause());document.body.append(content);
+  const content=document.createElement('dialog');content.id='siteSearchContentDialog';content.className='site-search-dialog site-search-content-dialog';content.setAttribute('aria-labelledby','siteSearchContentTitle');content.addEventListener('close',()=>{
+    if(content.open)return;content.querySelector('audio')?.pause();
+    const url=new URL(location.href);if(url.searchParams.get('content')===content.dataset.contentKey){url.searchParams.delete('content');window.FamilyNavigation?.returnTo(url.href);}
+  });document.body.append(content);
   window.FamilySiteSearch={activate,open:openQuick};activate(window.FamilyApp?.getView()||location.hash.slice(1).split('/')[0]);
 }
 init();

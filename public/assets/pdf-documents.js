@@ -244,16 +244,41 @@
   }
 
   let dialog,body,opener;
-  function open(item){
+  const clearPDF=url=>{for(const key of ['pdf','pdfName','pdfTitle'])url.searchParams.delete(key);return url;};
+  function syncRoute(){
+    const url=new URL(location.href),src=url.searchParams.get('pdf');
+    if(!src){if(dialog?.open)dialog.close();return;}
+    if(!(/\.pdf(?:[?#]|$)/i.test(src)||/^\/media\/[a-f0-9]{32}(?:\?|$)/.test(src)))return;
+    const item={src,filename:url.searchParams.get('pdfName')||'document.pdf',title:url.searchParams.get('pdfTitle')||t('מסמך משפחתי','Family document')};
+    let source;try{source=fileURL(item);}catch{return;}
+    if(dialog?.open&&dialog.dataset.pdfSource===source)return;
+    open(item,{sync:false});
+  }
+  function open(item,{sync=true,replace=false}={}){
     // Only documents hosted by this site may enter the renderer or shared links.
     try{fileURL(item);}catch{return false;}
     if(!dialog){
       dialog=document.createElement('dialog');dialog.className='pdf-document-dialog';dialog.id='pdfDocumentViewer';dialog.setAttribute('aria-labelledby','pdfDocumentTitle');
       dialog.innerHTML=`<header><h2 id="pdfDocumentTitle" dir="auto"></h2><button type="button" class="pdf-close" aria-label="${t('סגירה','Close')}">×</button></header><div class="pdf-dialog-body"></div>`;document.body.append(dialog);body=dialog.querySelector('.pdf-dialog-body');
       dialog.querySelector('.pdf-close').addEventListener('click',()=>dialog.close());
-      dialog.addEventListener('close',()=>{unmount(body);body.replaceChildren();const url=new URL(location.href);if(url.searchParams.has('pdf')){for(const key of ['pdf','pdfName','pdfTitle'])url.searchParams.delete(key);history.replaceState(history.state,'',url);}if(opener?.isConnected)opener.focus();});
+      dialog.addEventListener('close',()=>{
+        if(dialog.open)return;
+        unmount(body);body.replaceChildren();
+        const url=new URL(location.href);
+        let source;try{if(url.searchParams.has('pdf'))source=fileURL({src:url.searchParams.get('pdf')});}catch{}
+        if(source===dialog.dataset.pdfSource){
+          clearPDF(url);if(window.FamilyNavigation)window.FamilyNavigation.returnTo(url.href);else history.replaceState(history.state,'',url);
+        }
+        if(opener?.isConnected)opener.focus({preventScroll:true});
+      });
     }
     if(!dialog.open)opener=document.activeElement;
+    if(sync&&window.FamilyNavigation){
+      const url=new URL(location.href),source=new URL(fileURL(item));source.searchParams.delete('inline');
+      url.searchParams.set('pdf',source.pathname+source.search);url.searchParams.set('pdfName',item.filename||item.name||'document.pdf');url.searchParams.set('pdfTitle',title(item));
+      window.FamilyNavigation.go(url.href,{replace:replace||dialog.open});
+    }
+    dialog.dataset.pdfSource=fileURL(item);
     dialog.querySelector('h2').textContent=title(item);if(!dialog.open)dialog.showModal();mount(body,item);return true;
   }
 
@@ -297,6 +322,6 @@
   window.FamilyPDF={isPDF,preview,attachment,mount,unmount,open,shareURL,fileURL,scan};
   scan();
   if(typeof MutationObserver==='function')new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1&&(node.matches('[data-pdf-thumbnail],a[href]')||node.querySelector('[data-pdf-thumbnail],a[href]')))scan(node);}).observe(document.body,{childList:true,subtree:true});
-  const direct=new URL(location.href),src=direct.searchParams.get('pdf');
-  if(src&&(/\.pdf(?:[?#]|$)/i.test(src)||/^\/media\/[a-f0-9]{32}(?:\?|$)/.test(src)))open({src,filename:direct.searchParams.get('pdfName')||'document.pdf',title:direct.searchParams.get('pdfTitle')||t('מסמך משפחתי','Family document')});
+  window.addEventListener?.('popstate',syncRoute);window.addEventListener?.('hashchange',syncRoute);
+  syncRoute();
 })();

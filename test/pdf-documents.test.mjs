@@ -4,11 +4,12 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {parseHTML} from 'linkedom';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/pdf-documents.js',import.meta.url),'utf8');
 const tick=async()=>{for(let n=0;n<12;n++)await new Promise(resolve=>setImmediate(resolve));};
 const item={src:'/media/'+'a'.repeat(32)+'?version=original',filename:'תעודה.pdf',name:'תעודה משפחתית',mime:'application/pdf'};
-function fixture({branch,english=false,nativeShare,error=false,delayed=false,clipboard=true,pageCount=3,mixedSizes=false,nativeRotation=0}={}){
+function fixture({branch,english=false,nativeShare,error=false,delayed=false,clipboard=true,pageCount=3,mixedSizes=false,nativeRotation=0,historyNavigation=false,href}={}){
   const {document,window:dom}=parseHTML('<html><body><main id="host"></main></body></html>');
   if(branch){document.documentElement.dataset.nakashBranch=branch;document.documentElement.dataset.nakashHome='/keha-extended/'+branch+'/';document.documentElement.dataset.nakashOrigin='https://family.example';}
   const requests=[],renders=[],destroyed=[],copied=[],shared=[],observers=[],pending=[],resizes=[],viewport={width:600,height:600};
@@ -27,13 +28,17 @@ function fixture({branch,english=false,nativeShare,error=false,delayed=false,cli
     const pdf={numPages:pageCount,async getPage(number){return {rotate:nativeRotation,getViewport:({scale,rotation=nativeRotation})=>{const width=600,height=mixedSizes&&number===2?400:800;return {width:(rotation%180?height:width)*scale,height:(rotation%180?width:height)*scale,rotation};},render({canvas,viewport}){renders.push({id,number,canvas,viewport});let complete;const promise=delayed?new Promise(resolve=>{complete=resolve;pending.push(resolve);}):Promise.resolve();return {promise,cancel(){complete?.();}};},async getTextContent(){return {items:[{str:'Document '+id+' page '+number,hasEOL:true}]};},cleanup(){}};}};
     return {promise:error?Promise.reject(Error('Missing document')):Promise.resolve(pdf),destroy:async()=>{destroyed.push(id);}};
   }};
-  const location=new URL('https://family.example/'+(branch?'keha-extended/'+branch+'/':'')+'?media=old#person/yona');
-  const history={state:{},replaceState(state,_,url){location.href=String(url);}};
+  const browser=historyNavigation?browserHistory(href||'https://family.example/?lang=en-GB#documents'):null;
+  const location=browser?.location||new URL('https://family.example/'+(branch?'keha-extended/'+branch+'/':'')+'?media=old#person/yona');
+  const history=browser?.history||{state:{},replaceState(state,_,url){location.href=String(url);}};
   const navigator={...(clipboard?{clipboard:{writeText:async value=>{copied.push(value);}}}:{}),...(nativeShare?{share:async data=>{shared.push(data);if(nativeShare==='cancel')throw Object.assign(Error(),{name:'AbortError'});}}:{})};
   class Observer{constructor(callback){this.callback=callback;this.nodes=[];observers.push(this);}observe(node){this.nodes.push(node);}unobserve(node){this.nodes=this.nodes.filter(value=>value!==node);}}
   class Resize{constructor(callback){this.callback=callback;resizes.push(this);}observe(){}disconnect(){}}
   const window={devicePixelRatio:2,FamilyI18n:{isEnglish:english,language:english?'en':'he'},testPdfLibrary:async()=>pdfLibrary,requestAnimationFrame:fn=>{queueMicrotask(fn);return 1;},cancelAnimationFrame(){}};
-  vm.runInNewContext(source.replace("import(assetRoot+'pdf.mjs')",'window.testPdfLibrary()'),{document,window,location,history,navigator,URL,IntersectionObserver:Observer,ResizeObserver:Resize,setTimeout,clearTimeout});
+  window.addEventListener=browser?.addEventListener;
+  const context=vm.createContext({document,window,location,history,navigator,URL,matchMedia:()=>({matches:true}),IntersectionObserver:Observer,ResizeObserver:Resize,setTimeout,clearTimeout});
+  if(browser)vm.runInContext(navigationSource,context);
+  vm.runInContext(source.replace("import(assetRoot+'pdf.mjs')",'window.testPdfLibrary()'),context);
   const mount=window.FamilyPDF.mount;
   window.FamilyPDF.mount=(host,item)=>{
     const dispose=mount(host,item),scroll=host.querySelector('.pdf-page-scroll');
@@ -41,12 +46,30 @@ function fixture({branch,english=false,nativeShare,error=false,delayed=false,cli
     scroll.getBoundingClientRect=()=>({left:0,top:0,width:viewport.width,height:viewport.height});return dispose;
   };
   const fire=(node,type,values={})=>{const event=new dom.Event(type,{bubbles:true,cancelable:true});Object.assign(event,values);node.dispatchEvent(event);return event;};
-  return {document,dom,api:window.FamilyPDF,requests,renders,destroyed,copied,shared,observers,pending,host:document.getElementById('host'),location,fire,resizes,viewport};
+  return {document,dom,browser,api:window.FamilyPDF,requests,renders,destroyed,copied,shared,observers,pending,host:document.getElementById('host'),location,fire,resizes,viewport};
 }
 
 test('PDF detection covers MIME, attachment names and URLs, and rejects foreign sources',()=>{
   const f=fixture();assert.equal(f.api.isPDF(item),true);assert.equal(f.api.isPDF({name:'attachment.PDF'}),true);assert.equal(f.api.isPDF({name:'Historical record',src:'/records/example.pdf?x=1'}),true);assert.equal(f.api.isPDF({filename:'record.docx'}),false);
   assert.equal(f.api.open({...item,src:'https://other.example/record.pdf'}),false);assert.equal(f.api.open({...item,src:'javascript:alert(1)'}),false);
+});
+
+test('a PDF attachment returns to its story before the story list, and Forward and X preserve those steps',async()=>{
+  const f=fixture({historyNavigation:true,href:'https://family.example/?lang=en-GB#stories/story'});
+  f.api.open(item);await tick();const reader=f.document.getElementById('pdfDocumentViewer'),length=f.browser.history.length;
+  assert.equal(reader.open,true);assert.equal(f.location.hash,'#stories/story');assert.equal(f.location.searchParams.get('pdfTitle'),item.name);
+  f.browser.history.back();await tick();assert.equal(reader.open,false);assert.equal(f.location.href,'https://family.example/?lang=en-GB#stories/story');assert.equal(f.destroyed.length,1);
+  f.browser.history.forward();await tick();assert.equal(reader.open,true);assert.equal(f.browser.history.length,length);assert.equal(f.requests.length,2);
+  reader.querySelector('.pdf-close').click();await tick();assert.equal(reader.open,false);assert.equal(f.location.href,'https://family.example/?lang=en-GB#stories/story');
+  f.browser.history.back();await tick();assert.equal(f.location.hash,'#stories');assert.equal(f.browser.history.length,length);
+});
+
+test('a shared PDF starts with its archive parent and changing the open PDF replaces its viewer step',async()=>{
+  const href='https://family.example/?lang=he&pdf=%2Frecord.pdf&pdfName=record.pdf&pdfTitle=Record#documents';
+  const f=fixture({historyNavigation:true,href});await tick();const reader=f.document.getElementById('pdfDocumentViewer'),length=f.browser.history.length;
+  assert.equal(reader.open,true);f.api.open(item);await tick();assert.equal(f.browser.history.length,length);
+  f.browser.history.back();await tick();assert.equal(reader.open,false);assert.equal(f.location.href,'https://family.example/?lang=he#documents');
+  f.browser.history.forward();await tick();assert.equal(reader.open,true);assert.equal(reader.querySelector('h2').textContent,item.name);assert.equal(f.browser.history.length,length);
 });
 test('the reader lays out every page in order, scrolls to a page number and keeps download controls',async()=>{
   const f=fixture();f.api.mount(f.host,item);await tick();

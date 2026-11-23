@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {parseHTML} from 'linkedom';
 import {suggestPeople,SEARCH_TYPES} from '../public/assets/site-search-core.mjs';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=(await readFile(new URL('../public/assets/site-search.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
 const accessibilitySource=await readFile(new URL('../public/assets/accessibility.js',import.meta.url),'utf8');
@@ -12,25 +13,28 @@ const authoredHeader=parseHTML(await readFile(new URL('../public/index.html',imp
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const empty={items:[],count:0,page:1,pages:1,size:24,facets:{types:[],branches:[],years:[],labels:[]}};
 function press(window,field,key,extra={}){const event=new window.Event('keydown',{bubbles:true,cancelable:true});Object.assign(event,{key,...extra});field.dispatchEvent(event);return event;}
-function fixture({fetcher,headerControls=false,language='he'}={}){
+function fixture({fetcher,headerControls=false,language='he',historyNavigation=false,href='https://family.example/#home'}={}){
   const {window,document}=parseHTML('<html><body><a id="skipToContent"></a><main id="mainContent"></main><header class="site-header"><a id="homeLink"><span>בית משפחת קהא</span></a>'+(headerControls?authoredHeader:'')+'<section id="homeInstall"><div data-home-install-actions></div></section>'+navigation+'</header><section id="siteSearchView" hidden></section></body></html>');
   // Linkedom exposes selected options but does not implement the native value setter.
   if(!Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype,'value')?.set)Object.defineProperty(window.HTMLSelectElement.prototype,'value',{configurable:true,get(){return this.querySelector('option[selected]')?.getAttribute('value')||this.querySelector('option')?.getAttribute('value')||'';},set(value){for(const option of this.querySelectorAll('option'))option.toggleAttribute('selected',option.getAttribute('value')===String(value));}});
-  const url=new URL('https://family.example/#home'),requests=[],profiles=[],views=[],selectedLanguages=[];let currentView='home';
+  const browser=historyNavigation?browserHistory(href):null,url=browser?.location||new URL(href),requests=[],profiles=[],views=[],selectedLanguages=[];let currentView='home';
   const create=document.createElement.bind(document);document.createElement=tag=>{
     const element=create(tag);if(tag==='dialog'){element.showModal=()=>{element.open=true;};element.close=()=>{element.open=false;element.dispatchEvent(new window.Event('close'));};}return element;
   };
+  window.HTMLElement.prototype.pause=function(){this.paused=true;};
   const people=[{id:'roi',name:'רועי אלחריזי',nameEn:'Roei Elharizi',profile:'/media/123',branch:'harizi'}];
   window.FamilyI18n={language,isEnglish:language!=='he',setLanguage:next=>selectedLanguages.push(next),personName:p=>p.name,error:value=>value,async fetch(path,options){requests.push({path,options});return fetcher?fetcher(path,options):Response.json({...empty,query:new URL(path,url).searchParams.get('q')||'',person:new URL(path,url).searchParams.has('person')?people[0]:null});}};
   window.FamilyPeopleRoster={snapshot:()=>people,load:async()=>people};
   const go=route=>{url.href=new URL(route,url).href;};
-  window.FamilyNavigation={go};
+  window.FamilyNavigation={go,returnTo:go};
+  if(browser)for(const type of ['popstate','hashchange'])browser.addEventListener(type,event=>window.dispatchEvent(Object.assign(new window.Event(type),event)));
   window.FamilyApp={getView:()=>currentView,setView(view,syncRoute=true){views.push(view);if(syncRoute)go('#'+view);currentView=view;window.FamilySiteSearch?.activate(view);},openPerson(id){profiles.push(id);currentView='person';window.FamilySiteSearch?.activate('person');}};
-  const context=vm.createContext({window,document,location:url,history:{pushState:(state,unused,route)=>go(route)},URL,URLSearchParams,AbortController,Event:window.Event,CustomEvent:window.CustomEvent,localStorage:{getItem:()=>null,setItem(){}},matchMedia:()=>({matches:false,addEventListener(){}}),suggestPeople,SEARCH_TYPES});
+  const context=vm.createContext({window,document,location:url,history:browser?.history||{pushState:(state,unused,route)=>go(route)},URL,URLSearchParams,AbortController,Event:window.Event,CustomEvent:window.CustomEvent,localStorage:{getItem:()=>null,setItem(){}},matchMedia:()=>({matches:false,addEventListener(){}}),suggestPeople,SEARCH_TYPES});
+  if(browser)vm.runInContext(navigationSource,context);
   if(headerControls)vm.runInContext(accessibilitySource,context);
   vm.runInContext(source,context);
   if(headerControls)document.dispatchEvent(new window.Event('DOMContentLoaded'));
-  return {window,document,url,requests,profiles,views,selectedLanguages,$:id=>document.getElementById(id),input(value){const field=document.getElementById('siteSearchQuickInput');field.value=value;field.dispatchEvent(new window.Event('input'));},route(route){go(route);window.dispatchEvent(new window.Event('popstate'));}};
+  return {window,document,url,browser,requests,profiles,views,selectedLanguages,$:id=>document.getElementById(id),input(value){const field=document.getElementById('siteSearchQuickInput');field.value=value;field.dispatchEvent(new window.Event('input'));},route(route){go(route);window.dispatchEvent(new window.Event('popstate'));}};
 }
 test('the compact language flag reflects the current language and opens all supported choices without a content search',()=>{
   for(const language of ['he','en-US','en-GB']){
@@ -96,6 +100,19 @@ test('result cards show real thumbnails, links and mixed-media viewer items',asy
   const opened=[];f.window.FamilyMedia={open:(...args)=>opened.push(args)};f.route('#search/q=רועי');await tick();
   assert.equal(f.$('siteSearchGrid').querySelector('img').getAttribute('src'),'/media/image');assert.equal(f.$('siteSearchGrid').querySelector('script'),null);
   f.document.querySelector('[data-site-search-result]').click();assert.equal(opened[0][0][0].id,'image');assert.equal(opened[0][1],0);
+});
+
+test('Back from a search story or recording retains its exact results and Forward reopens the selected content',async()=>{
+  for(const type of ['story','voice']){
+    const item={id:'memory',type,title:'זיכרון בדרך',excerpt:'הדרך הביתה',people:[],href:type==='story'?'#stories':'#voices',content:{body:'הסיפור המלא',author:'משפחה',src:'/voice.mp3'}};
+    const f=fixture({historyNavigation:true,fetcher:async()=>Response.json({...empty,query:'roots',count:1,items:[item],facets:{...empty.facets,types:[{id:type,count:1}]}})});
+    f.window.FamilyNavigation.go('#search/q=roots&type='+type+'&page=2');f.window.FamilyApp.setView('search',false);await tick();
+    const results=f.url.href;f.document.querySelector('[data-site-search-result]').click();assert.equal(f.$('siteSearchContentDialog').open,true);const length=f.browser.history.length;
+    f.browser.history.back();await tick();assert.equal(f.$('siteSearchContentDialog').open,false);assert.equal(f.url.href,results);assert.equal(f.$('siteSearchGrid').children.length,1);
+    f.browser.history.forward();await tick();assert.equal(f.$('siteSearchContentDialog').open,true);assert.match(f.$('siteSearchContentDialog').textContent,/הסיפור המלא/);assert.equal(f.browser.history.length,length);
+    f.$('siteSearchContentDialog').querySelector('[data-site-content-close]').click();await tick();assert.equal(f.url.href,results);
+    f.browser.history.back();await tick();assert.equal(f.url.hash,'#home');assert.equal(f.browser.history.length,length);
+  }
 });
 test('desktop typing suggests the same profiles and canonical all-content searches without fetching results early',async()=>{
   const f=fixture(),field=f.$('siteSearchDesktopInput'),menu=f.$('siteSearchDesktopMenu');

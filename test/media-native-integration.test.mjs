@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {parseHTML} from 'linkedom';
+import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const names=['gallery-input-settings.js','photo-zoom-pad.js','photo-native.js','photo-vertical-wheel.js','photo-swipe.js','media.js'];
@@ -66,7 +67,7 @@ async function finishWheel(f,viewport){
 // production index, DOM tree, native scroller, gesture binding and media state
 // machine are real, so missing script wiring or reparenting cannot be hidden
 // by the lightweight object fixtures used in the individual unit suites.
-function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,delayedFaces=false,realPresentation=false,hiddenDialogGeometry=false,query='',route='photos',linkedItem=null,loadView=null,dateNow=null,storage=new Map([[directionKey,'1']])}={}){
+function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,delayedFaces=false,realPresentation=false,hiddenDialogGeometry=false,query='',route='photos',historyNavigation=false,linkedItem=null,loadView=null,dateNow=null,storage=new Map([[directionKey,'1']])}={}){
  const {window,document}=parseHTML(html),requests=[],captures=[],observers=[],faceReady=[],faceMounts=[],animations=[],frames=new Map();let failSave=false,layoutReady=!hiddenDialogGeometry,frameId=0;
  const get=id=>document.getElementById(id);
  Object.defineProperty(document,'scripts',{configurable:true,get:()=>document.querySelectorAll('script[src]')});
@@ -130,8 +131,11 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
  function Image(){
   const image=document.createElement('img');Object.defineProperty(image,'src',{configurable:true,get(){return this.getAttribute('src')||'';},set(value){this.setAttribute('src',value);queueMicrotask(()=>{image.onload?.();image.dispatchEvent(new window.Event('load'));});}});return image;
  }
- const location={origin:'https://family.test',href:'https://family.test/'+query+'#'+route};
- const context=vm.createContext({window,document,navigator,...(dateNow?{Date:class extends Date{static now(){return dateNow();}}}:{}),...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:{replaceState(){}},location,matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:node=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4',overflowY:node.matches?.('.media-viewer-footer,.face-photo-scroll')?'auto':'visible'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
+ const browser=historyNavigation?browserHistory('https://family.test/'+query+'#'+route):null;
+ const location=browser?.location||{origin:'https://family.test',href:'https://family.test/'+query+'#'+route};
+ if(browser)for(const type of ['popstate','hashchange'])browser.addEventListener(type,event=>window.dispatchEvent(Object.assign(new window.Event(type),event)));
+ const context=vm.createContext({window,document,navigator,...(dateNow?{Date:class extends Date{static now(){return dateNow();}}}:{}),...(realPresentation?{Image}:{}),CSS:{supports:()=>supported},ResizeObserver,CustomEvent:window.CustomEvent,URL,Response,history:browser?.history||{replaceState(){}},location,matchMedia:query=>({matches:query.includes('max-width')&&(mobile||width<=700)}),getComputedStyle:node=>({minHeight:'40',maxHeight:'280',backgroundColor:'#ede5d4',overflowY:node.matches?.('.media-viewer-footer,.face-photo-scroll')?'auto':'visible'}),requestAnimationFrame:fn=>{const id=++frameId;if(layoutReady)queueMicrotask(fn);else frames.set(id,fn);return id;},cancelAnimationFrame:id=>frames.delete(id),setTimeout:(fn,ms)=>{const timer=setTimeout(fn,ms);timer.unref();return timer;},clearTimeout});
+ if(browser)vm.runInContext(navigationSource,context);
  // Follow production ordering when loading the scripts under test.
  const loaded=[];
  for(const script of document.querySelectorAll('script[src]')){
@@ -143,7 +147,7 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
  const photo=id=>({id,kind:'photo',mime:'image/jpeg',src:'/media/'+id,previewSrc:'/media/'+id+'?preview=1',name:id,tags:[]});
  const video=id=>({...photo(id),kind:'video',mime:'video/mp4',poster:'/posters/'+id+'.jpg'});
  const strip=()=>get('mediaStage').querySelector('.native-photo-strip');
- return {window,document,location,get,emit,requests,captures,loaded,photo,video,strip,faceReady,faceMounts,animations,
+ return {window,document,location,browser,get,emit,requests,captures,loaded,photo,video,strip,faceReady,faceMounts,animations,
   finishAnimations(){for(const animation of animations)animation.finish();},
   open:async(kind='photo',scope=kind==='photo'?'photos':'videos',index=0)=>{window.FamilyMedia.open(['a','b','c'].map(kind==='photo'?photo:video),index,scope);await flush();},
   async snap(page){nativeStroke({strip,emit},page===0?140:-140);await flush();},
@@ -154,6 +158,19 @@ function fixture({supported=true,mobile=false,navigatorOverride=null,width=1200,
   close(){get('mediaViewer').close();}
  };
 }
+
+test('phone Back closes photos and videos before their album, while Forward and X reuse the viewer step',async()=>{
+ for(const kind of ['photo','video']){
+  const route=kind==='photo'?'gallery':'videos',f=fixture({mobile:true,route,historyNavigation:true});
+  await f.open(kind,route);assert.equal(f.get('mediaViewer').open,true);assert.equal(new URL(f.location.href).searchParams.get('media'),'a');
+  const length=f.browser.history.length;
+  f.window.FamilyMedia.open([f.photo('a'),kind==='photo'?f.photo('b'):f.video('b')],1,route);await flush();assert.equal(f.browser.history.length,length);
+  f.browser.history.back();await flush();assert.equal(f.location.hash,'#'+route);assert.equal(f.location.search,'');assert.equal(f.get('mediaViewer').open,false);
+  f.browser.history.forward();await flush();assert.equal(f.get('mediaViewer').open,true);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.browser.history.length,length);
+  f.close();await flush();assert.equal(f.location.search,'');assert.equal(f.location.hash,'#'+route);
+  f.browser.history.back();await flush();assert.equal(f.location.hash,'#home');assert.equal(f.browser.history.length,length);
+ }
+});
 
 test('document deletion in a personal album requires the owner password and clears it after errors and cancellation',async()=>{
  const f=fixture(),scope='personal:shlomo',item={...f.photo('a'),kind:'document',mime:'application/pdf',scope};

@@ -10,6 +10,7 @@
   const path=url=>url.pathname+url.search+url.hash;
   const current=()=>new URL(location.href);
   const entry=()=>history.state?.[key];
+  const readerParams=['media','pdf','pdfName','pdfTitle','content'];
   function normalize(value){
     const url=new URL(value,location.href);
     if(url.origin!==location.origin||url.pathname!==location.pathname)return null;
@@ -34,11 +35,13 @@
   }
   function parent(url){
     const next=new URL(url);
+    if(next.searchParams.has('pdf')){for(const key of ['pdf','pdfName','pdfTitle'])next.searchParams.delete(key);return next;}
     if(next.searchParams.has('media')){next.searchParams.delete('media');return next;}
+    if(next.searchParams.has('content')){next.searchParams.delete('content');return next;}
     const [view,id]=next.hash.slice(1).split('/');
     if(view==='founder-tree')next.hash='#tree';
     else if(site?.extendedKeha&&view==='family-map'&&id)next.hash='#family-map';
-    else if(id&&['games','weddings','nursery','updates','memorial','nostalgia','voices'].includes(view))next.hash='#'+view;
+    else if(id&&['games','weddings','nursery','updates','memorial','nostalgia','voices','stories','documents'].includes(view))next.hash='#'+view;
     else if(view==='person'&&id)next.hash='#directory';
     else if(views.has(view)&&next.hash!==root()&&view!=='home'&&view!=='tree')next.hash=root();
     else return null;
@@ -54,7 +57,7 @@
   }
   function go(value,{replace=false}={}){
     const url=normalize(value);if(!url)return false;
-    if(String(value).startsWith('#')&&url.hash!==location.hash)url.searchParams.delete('media');
+    if(String(value).startsWith('#')&&url.hash!==location.hash)for(const key of readerParams)url.searchParams.delete(key);
     if(path(url)===path(current()))return false;
     write(url,replace?entry()?.previous||null:path(current()),replace);return true;
   }
