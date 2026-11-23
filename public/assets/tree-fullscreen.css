@@ -1,6 +1,7 @@
 #treeFullscreenButton{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:auto;padding-inline:5px}
 #treeFullscreenButton .tree-fullscreen-label{font:600 calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans);white-space:nowrap}
 #treeViewport .zoom-controls{height:auto;min-height:44px;max-width:calc(100% - 24px);flex-wrap:wrap}
+#treeViewport .zoom-controls button:disabled{opacity:.4;cursor:default;background:transparent}
 #treeFullscreenButton svg{display:block;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 #treeFullscreenButton .tree-fullscreen-collapse{display:none}
 .tree-is-fullscreen #treeFullscreenButton .tree-fullscreen-expand{display:none}

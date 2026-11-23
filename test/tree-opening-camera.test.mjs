@@ -18,7 +18,7 @@ const portalSource=await readFile(new URL('../public/keha-extended/portal-tree.j
 const hubSource=await readFile(new URL('../public/keha-extended/hub.js',import.meta.url),'utf8');
 const parents={haim:'u-nakash-haim',yehuda:'u-nakash-yehuda',medina:'u-nakash-medina',keha:'u-root',nakash:'u-nakash-root',shlomo:'u-root',zechariah:'u-keha-zechariah','zechariah-tzadok':'u-kehat-zechariah-ben-tzadok',kehat:'u-keha-kehat'};
 
-function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportHeight,viewportWidth}={}){
+function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportHeight,viewportWidth,ResizeObserver}={}){
   const portal=['zechariah','zechariah-tzadok','kehat'].includes(site);
   const original=site==='original';
   const extended=site==='extended';
@@ -26,9 +26,9 @@ function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportH
   const page=original?html:portal?branchPortalHTML(html,site):extended?extendedKehaHTML(html):site==='shlomo'?shlomoKehaHTML(html):nakashHTML(html,site==='nakash'?'':site);
   const {document,window:dom}=parseHTML(page);
   const viewport=document.getElementById('treeViewport'),width=viewportWidth??(phone?358:1100),height=viewportHeight??(phone?560:720);
-  Object.defineProperties(viewport,{clientWidth:{value:width},clientHeight:{value:height}});
+  Object.defineProperties(viewport,{clientWidth:{value:width,configurable:true},clientHeight:{value:height,configurable:true}});
   viewport.setPointerCapture=()=>{};
-  viewport.getBoundingClientRect=()=>({left:0,top:0,width,height,right:width,bottom:height});
+  viewport.getBoundingClientRect=()=>({left:0,top:0,width:viewport.clientWidth,height:viewport.clientHeight,right:viewport.clientWidth,bottom:viewport.clientHeight});
   Object.defineProperty(dom.HTMLElement.prototype,'offsetHeight',{configurable:true,get(){return this.classList?.contains('tree-unit')?(phone?180:300)*text/100:0;}});
   Object.defineProperty(dom.HTMLElement.prototype,'offsetTop',{configurable:true,get(){return parseFloat(this.style.top)||0;}});
   const listeners=new Map(),frames=[];
@@ -36,7 +36,7 @@ function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportH
   window.FamilyI18n={isEnglish:english,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?p.nameEn:p.name,branchName:b=>english?b?.titleEn:b?.title,searchNames:p=>p.name,date:v=>v};
   window.FamilyDates={age:()=>null,parse:()=>null};
   const location={hash};
-  const context=vm.createContext({window,document,location,performance,history:{pushState(state,title,next){location.hash=next;}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(callback){frames.push(callback);return frames.length;},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+  const context=vm.createContext({window,document,location,performance,ResizeObserver,history:{pushState(state,title,next){location.hash=next;}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(callback){frames.push(callback);return frames.length;},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
   if(portal)vm.runInContext(portalSource,context);
   if(extended)vm.runInContext(hubSource,context);
   vm.runInContext(source,context);
@@ -377,15 +377,102 @@ test('phone momentum stops at the last generation and extended hub branches use 
   }
 });
 
-test('phone wheel scrolling moves the canvas and consumes the scroll while desktop scrolling stays native',()=>{
+function wheel(f,deltaX,deltaY,options={}){
+  const event=new f.document.defaultView.Event('wheel',{cancelable:true});
+  Object.assign(event,{deltaMode:0,deltaX,deltaY,clientX:23,clientY:74,...options});
+  f.document.getElementById('treeViewport').dispatchEvent(event);
+  return event;
+}
+
+test('vertical scrolling stays on the page on desktop and moves the tree on phones',()=>{
   for(const phone of [true,false]){
-    const f=fixture('haim',{phone}),before=cameraPosition(f),event=new f.document.defaultView.Event('wheel',{cancelable:true});
-    Object.assign(event,{deltaX:15,deltaY:30,deltaMode:0});
-    f.document.getElementById('treeViewport').dispatchEvent(event);
+    const f=fixture('haim',{phone}),before=cameraPosition(f),event=wheel(f,15,30);
     const after=cameraPosition(f);
     assert.equal(event.defaultPrevented,phone);
     if(phone){assert.ok(after[0]<before[0]);assert.ok(after[1]<before[1]);}
     else assert.deepEqual(after,before);
+  }
+});
+
+test('horizontal trackpad gestures pan in both directions on desktop without zooming or drifting vertically',()=>{
+  for(const site of ['original','haim','kehat']){
+    const f=fixture(site);
+    zoomIntoMiddle(f);
+    const [x,y,scale]=cameraPosition(f);
+    assert.ok(wheel(f,37,3).defaultPrevented);
+    assert.deepEqual(cameraPosition(f),[x-37,y,scale]);
+    assert.ok(wheel(f,-37,0).defaultPrevented);
+    assert.deepEqual(cameraPosition(f),[x,y,scale]);
+    wheel(f,2,0,{deltaMode:1});
+    assert.deepEqual(cameraPosition(f),[x-32,y,scale]);
+  }
+});
+
+function assertFittedTree(f){
+  const viewport=f.document.getElementById('treeViewport'),frame=frameBounds(f);
+  const top=f.phone?68:0,bottom=f.phone?40:0,height=viewport.clientHeight-top-bottom;
+  const [x,y,scale]=cameraPosition(f),width=viewport.clientWidth;
+  const expected=Math.min((width-16)/frame.width,(height-16)/frame.height);
+  assert.ok(Math.abs(scale-expected)<1e-8,'One dimension of the displayed frame fills the available space');
+  assert.ok(Math.abs(x+(frame.left+frame.width/2)*scale-width/2)<1e-6);
+  assert.ok(Math.abs(y+(frame.top+frame.height/2)*scale-top-height/2)<1e-6);
+  assert.ok(f.document.getElementById('zoomOut').disabled);
+  return cameraPosition(f);
+}
+
+test('zoom-out stops at the centred fit for the current overview, full tree, branch and selected marriage',()=>{
+  for(const phone of [false,true]){
+    for(const site of ['original','haim','zechariah','kehat']){
+      const f=fixture(site,{phone}),byId=id=>f.document.getElementById(id);
+      const views=[byId('overviewButton'),byId('fullTreeButton')];
+      const branch=f.document.querySelector('#branchBar [data-branch="medina"],#branchBar [data-tree-unit]');
+      if(branch)views.push(branch);
+      views.push(...f.document.querySelectorAll('#treeMarriageFilters button'));
+      for(const view of views){
+        view.click();f.flush();
+        for(let i=0;i<45&&!byId('zoomOut').disabled;i++)byId('zoomOut').click();
+        const fit=assertFittedTree(f);
+        byId('zoomIn').click();
+        assert.equal(byId('zoomOut').disabled,false);
+        const key=new f.document.defaultView.Event('keydown',{cancelable:true});
+        key.key='-';byId('treeViewport').dispatchEvent(key);byId('treeViewport').dispatchEvent(key);
+        assert.deepEqual(cameraPosition(f),fit);
+        byId('zoomIn').click();
+        wheel(f,0,40,{ctrlKey:true});wheel(f,0,40,{ctrlKey:true});
+        assert.deepEqual(cameraPosition(f),fit,'An off-centre trackpad pinch ends on the complete tree');
+        byId('fitButton').click();wheel(f,45,0);
+        assert.deepEqual(cameraPosition(f),fit);
+      }
+    }
+    const f=fixture('haim',{phone});
+    f.document.getElementById('fitButton').click();
+    const fit=assertFittedTree(f);
+    f.document.getElementById('zoomIn').click();
+    pointer(f,'pointerdown',{x:20});pointer(f,'pointerdown',{id:2,x:260});
+    pointer(f,'pointermove',{id:2,x:30});
+    assert.deepEqual(cameraPosition(f),fit,'A two-finger touchscreen pinch reaches the same centred limit');
+  }
+});
+
+test('a fitted tree follows viewport changes and can still zoom in when its fit exceeds 100%',()=>{
+  let notify;
+  const observed=new Set();
+  class ResizeObserver{
+    constructor(callback){notify=callback;}
+    observe(node){observed.add(node);}
+    disconnect(){observed.clear();}
+  }
+  const f=fixture('original',{ResizeObserver,viewportWidth:7000,viewportHeight:3000});
+  const viewport=f.document.getElementById('treeViewport');
+  assert.ok(observed.has(viewport));
+  assert.ok(assertFittedTree(f)[2]>2.4,'A small tree opens at its fitted size even on a very large display');
+  f.document.getElementById('zoomIn').click();
+  assert.equal(f.document.getElementById('zoomOut').disabled,false);
+  f.document.getElementById('fitButton').click();
+  for(const [width,height] of [[920,420],[1600,900],[800,1100]]){
+    Object.defineProperties(viewport,{clientWidth:{value:width},clientHeight:{value:height}});
+    notify([{target:viewport}]);
+    assertFittedTree(f);
   }
 });
 
