@@ -6,6 +6,8 @@ window.FAMILY_TRANSLATIONS={
   "העץ של סבתא יונה":"Grandma Yona’s family tree",
   "לעץ של זכריה בן צדוק":"Tree of Zechariah, son of Tzadok",
   "לעץ של ג׳ימעאן בן אהרון":"Tree of Jimaan, son of Aharon",
+  "למשפחת סעדיה (ג׳ימעאן) בן אהרון":"Saadia (Jimaan), son of Aharon’s family",
+  "למשפחת קהא המורחבת":"Extended Keha family",
   "יעקב בן ג׳ימעאן נישא ליהודית בת זכריה בן צדוק":"Yaakov, son of Jimaan, married Yehudit, daughter of Zechariah son of Tzadok.",
   "תעודות מסמכים ותיעודים נדירים":"Certificates, documents and rare recordings",
   "מסמכים ותיעודים":"Documents and recordings",

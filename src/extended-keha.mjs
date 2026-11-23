@@ -11,19 +11,19 @@ import {withStoryFormLink} from './story-submissions.mjs';
 
 const relatedTrees={
   kehat:{to:'zechariah-tzadok',label:'לעץ של זכריה בן צדוק'},
-  'zechariah-tzadok':{to:'kehat',label:'לעץ של ג׳ימעאן בן אהרון'},
+  'zechariah-tzadok':{to:'kehat',label:'לעץ של ג׳ימעאן בן אהרון',footerLabel:'למשפחת סעדיה (ג׳ימעאן) בן אהרון'},
 };
 
-function relatedTreeNavigation(fromIds,origins){
+function relatedTreeNavigation(fromIds,origins,footer=false){
   const links=[];
   for(const from of fromIds){
     const other=relatedTrees[from];
     if(!other)continue;
     const href=(origins[other.to]||'')+BRANCH_PORTALS[other.to].home+'#tree';
     const id='related-tree-'+from;
-    links.push(`<a data-related-from="${BRANCH_PORTALS[from].branches[0]}" data-family-language-link href="${href}" aria-labelledby="${id}-label" aria-describedby="${id}-kinship"><strong id="${id}-label">${other.label}</strong><small id="${id}-kinship">יעקב בן ג׳ימעאן נישא ליהודית בת זכריה בן צדוק</small></a>`);
+    links.push(`<a ${footer?'id="relatedFamilyTreeFooterLink" class="family-extended-button family-related-tree-link" ':''}data-related-from="${BRANCH_PORTALS[from].branches[0]}" data-family-language-link href="${href}" aria-labelledby="${id}-label" aria-describedby="${id}-kinship"><strong id="${id}-label">${footer?other.footerLabel:other.label}</strong><small${footer?' class="visually-hidden"':''} id="${id}-kinship">יעקב בן ג׳ימעאן נישא ליהודית בת זכריה בן צדוק</small></a>`);
   }
-  return links.length?'<div id="relatedFamilyTrees">'+links.join('')+'</div>':'';
+  return footer?links.join(''):links.length?'<div id="relatedFamilyTrees">'+links.join('')+'</div>':'';
 }
 
 function withNameOrigin(html, home) {
@@ -90,7 +90,7 @@ export function shlomoKehaHTML(original,appOrigin=''){
   return withNameOrigin(withExtendedAccess(html),SHLOMO_HOME);
 }
 
-function withExtendedAccess(html,extendedOrigin='https://family-extended.eldadkeha.workers.dev'){
+function withExtendedAccess(html,extendedOrigin='https://family-extended.eldadkeha.workers.dev',footerLink=''){
   const extendedHome=extendedOrigin+EXTENDED_HOME;
   const extendedLogo='<img src="/keha-extended/brand.svg" alt="" width="32" height="32">';
   const extendedTrigger=placement=>'<button type="button" class="'+(placement==='footer'?'family-extended-button':'nav-link')+'" data-extended-open="'+placement+'" aria-haspopup="dialog" aria-controls="extendedKehaDialog" data-i18n-skip>'+extendedLogo+'<span data-extended-label>'+(placement==='footer'?'לאתר קהא המורחבת':'לאתר משפחת קהא המורחבת')+'</span></button>';
@@ -100,11 +100,11 @@ function withExtendedAccess(html,extendedOrigin='https://family-extended.eldadke
     '<div class="family-extended-choices"><a data-extended-install-link href="'+extendedHome+'?install=1#home"><span class="family-extended-choice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="12" height="20" rx="2"/><path d="M8 18h4M19 5v8m-4-4h8"/></svg></span><span><strong data-extended-install-title>התקנת האתר במסך הבית</strong><small data-extended-install-note>קיצור ישיר לאתר קהא המורחבת</small></span></a>'+
     '<a data-extended-tree-link href="'+extendedHome+'#tree"><span class="family-extended-choice-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z"/></svg></span><span><strong data-extended-visit-title>מעבר לאתר</strong><small data-extended-visit-note>לכל ענפי משפחת קהא המורחבת</small></span></a></div></dialog>';
   return html
-    .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'<nav class="family-extended-access" aria-label="קהא המורחבת" data-i18n-skip>'+extendedTrigger('footer')+'</nav>')
+    .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'<nav class="family-extended-access" aria-label="קהא המורחבת">'+footerLink+extendedTrigger('footer')+'</nav>')
     .replace(/(<button\b[^>]*data-view="tree"[^>]*>.*?<\/button>)/,'$1'+extendedTrigger('nav'))
     .replace('<main id="mainContent"',extendedDialog+'<main id="mainContent"')
-    .replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=family-top-tabs-v4"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=family-top-tabs-v2" defer></script>\n$1');
+    .replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=family-footer-tabs-v5"></head>')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=family-footer-tabs-v3" defer></script>\n$1');
 }
 
 export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev',portalOrigins={}){
@@ -126,10 +126,10 @@ export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https:
     .replace(/(<style id="familyStartupBackground">)[^<]*/,'$1html,body{background:'+portal.color+'}:root{--family-accent:'+portal.color+'}')
     .replace(/<link rel="icon"[^>]*>/g,'<link rel="icon" type="image/svg+xml" href="'+portal.home+'brand.svg">')
     .replace('</head>','<link rel="stylesheet" href="/assets/nakash-theme.css?v=related-trees-1">'+startup+'</head>')
-    .replace('<div class="tree-viewport"',relatedTreeNavigation([id],portalOrigins)+'<div class="tree-viewport"')
+    .replace('<div class="tree-viewport"',(id==='zechariah-tzadok'?'':relatedTreeNavigation([id],portalOrigins))+'<div class="tree-viewport"')
     .replace('<h2>הבית שלנו מתחיל כאן</h2>','<h2>'+portal.name+'</h2>')
     .replace('חמישה דורות, סיפור אחד',portal.tagline);
-  return withNameOrigin(withExtendedAccess(html,extendedOrigin),portal.home);
+  return withNameOrigin(withExtendedAccess(html,extendedOrigin,id==='zechariah-tzadok'?relatedTreeNavigation([id],portalOrigins,true):''),portal.home);
 }
 
 export async function extendedKehaRoute(request,env,db,ctx,options) {

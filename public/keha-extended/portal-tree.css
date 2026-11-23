@@ -2,6 +2,11 @@
 .family-extended-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;max-width:100%;padding:8px 20px;border:1px solid var(--family-accent);border-radius:14px;background:linear-gradient(135deg,var(--paper),var(--family-tint));color:var(--family-ink);box-shadow:0 3px 0 var(--family-line),0 5px 16px #30291812;font:600 calc(16px * var(--a11y-text-scale,1))/1.45 var(--sans);cursor:pointer}
 .family-extended-button img,#mainNav [data-extended-open] img{display:block;width:32px;height:32px;flex:0 0 32px}
 .family-extended-button:hover{background:var(--family-tint);border-color:var(--family-ink)}
+html[data-branch-portal=zechariah-tzadok] body[data-active-view=tree] :is(#branchBar,.tree-header-mode,.tree-topline,#workspaceSubtitle,.workspace-title .section-diamond){display:none}
+html[data-branch-portal=zechariah-tzadok] .site-footer>.family-extended-access{gap:8px}
+html[data-branch-portal=zechariah-tzadok] .site-footer .family-extended-button{flex:1 1 0;min-width:0;max-width:310px;align-self:stretch;text-align:center;text-wrap:balance}
+.family-related-tree-link{text-decoration:none}
+.family-related-tree-link:focus-visible{outline:3px solid var(--family-accent);outline-offset:3px}
 [data-extended-open]:focus-visible,.family-extended-dialog :is(a,button):focus-visible{outline:3px solid var(--family-accent);outline-offset:3px}
 #mainNav [data-extended-open]{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:normal}
 .home-tile-extended .home-tile-icon img{display:block;max-width:100%;height:auto}
@@ -35,6 +40,8 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
 html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon{width:34px;height:38px;flex-basis:34px;border-radius:10px}
 html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon :is(svg,img){width:29px;height:29px}
 @media(max-width:700px){
+  html[data-branch-portal=zechariah-tzadok] .site-footer>.family-extended-access{gap:6px}
+  html[data-branch-portal=zechariah-tzadok] .site-footer .family-extended-button{gap:5px;padding:5px 6px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.3}
   html[data-branch-portal] .family-extended-button{font-size:calc(14px * var(--a11y-text-scale,1))}
   html[data-branch-portal] .family-extended-button img{width:24px;height:24px;flex-basis:24px}
   html[data-branch-portal] .phone-home-intro{gap:6px;padding:12px 0}

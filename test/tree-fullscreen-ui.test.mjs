@@ -53,6 +53,13 @@ test('the same family buttons stay above the phone tree in fullscreen and return
 test('the link to the other family stays available in fullscreen and returns above each tree',()=>{
   for(const portal of ['kehat','zechariah-tzadok'])for(const native of [false,true]){
     const h=harness({native,page:branchPortalHTML(html,portal)});
+    if(portal==='zechariah-tzadok'){
+      const link=h.document.querySelector('.site-footer #relatedFamilyTreeFooterLink'),parent=link.parentNode;
+      assert.equal(h.document.querySelector('#treeView #relatedFamilyTrees'),null);
+      h.click();assert.equal(link.parentNode,parent);
+      h.click();assert.equal(link.parentNode,parent);
+      continue;
+    }
     const link=h.document.querySelector('#relatedFamilyTrees a');
     assert.equal(link.parentNode.nextElementSibling,h.viewport);
     h.click();

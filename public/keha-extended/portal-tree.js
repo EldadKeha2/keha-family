@@ -9,7 +9,7 @@
   let returnFocus=null;
   for(const trigger of document.querySelectorAll('[data-extended-open]')){
     trigger.querySelector('[data-extended-label]').textContent=trigger.dataset.extendedOpen==='footer'
-      ?tr('לאתר קהא המורחבת','Visit extended Keha')
+      ?config.branchPortal==='zechariah-tzadok'?tr('למשפחת קהא המורחבת','Extended Keha family'):tr('לאתר קהא המורחבת','Visit extended Keha')
       :tr('לאתר משפחת קהא המורחבת','The extended Keha family site');
   }
   if(dialog){

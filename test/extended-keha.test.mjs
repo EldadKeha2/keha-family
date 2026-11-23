@@ -913,13 +913,14 @@ test('Jimaan and Tzadok link directly to each other’s tree on the configured f
   const translations=await readFile(new URL('../public/assets/translations.js',import.meta.url),'utf8');
   const bases=[
     ['kehat','zechariah-tzadok','לעץ של זכריה בן צדוק','Tree of Zechariah, son of Tzadok'],
-    ['zechariah-tzadok','kehat','לעץ של ג׳ימעאן בן אהרון','Tree of Jimaan, son of Aharon'],
+    ['zechariah-tzadok','kehat','למשפחת סעדיה (ג׳ימעאן) בן אהרון','Saadia (Jimaan), son of Aharon’s family'],
   ];
   for(const [from,to,label,english] of bases){
     const page=await f.call(BRANCH_PORTALS[from].home);
     assert.equal(page.status,200);
     const {document}=parseHTML(await page.text());
-    const links=document.querySelectorAll('#treeView #relatedFamilyTrees a');
+    const selector=from==='zechariah-tzadok'?'.site-footer #relatedFamilyTreeFooterLink':'#treeView #relatedFamilyTrees a';
+    const links=document.querySelectorAll(selector);
     assert.equal(links.length,1);
     const link=links[0];
     assert.equal(document.getElementById(link.getAttribute('aria-labelledby')).textContent,label);
@@ -927,7 +928,7 @@ test('Jimaan and Tzadok link directly to each other’s tree on the configured f
     assert.equal(link.getAttribute('href'),origins[to]+BRANCH_PORTALS[to].home+'#tree');
     assert.equal(link.hasAttribute('target'),false);
     const fallback=parseHTML(branchPortalHTML(originalHTML,from)).document;
-    assert.equal(fallback.querySelector('#relatedFamilyTrees a').getAttribute('href'),BRANCH_PORTALS[to].home+'#tree');
+    assert.equal(fallback.querySelector(selector).getAttribute('href'),BRANCH_PORTALS[to].home+'#tree');
     const context=vm.createContext({window:{},document,URL,URLSearchParams,NodeFilter:{SHOW_TEXT:4},location:new URL(origins[from]+BRANCH_PORTALS[from].home+'?lang=en-GB#tree')});
     vm.runInContext(translations,context);
     vm.runInContext(i18n,context);
