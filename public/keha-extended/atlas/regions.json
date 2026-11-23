@@ -627,7 +627,8 @@
           45.03852
         ],
         "tags": [
-          "family"
+          "family",
+          "maybe"
         ]
       },
       {
@@ -884,5 +885,509 @@
         "atlit"
       ]
     ]
+  },
+  "base": {
+    "title": "מפת הבסיס · צעדה וסביבתה",
+    "description": "יישובי מחוז צעדה ועדויות המשפחה",
+    "projection": {
+      "west": 43.13,
+      "span": 0.9600000000000009,
+      "top": 17.411981668209503,
+      "north": 17.15,
+      "south": 16.592166718100994
+    },
+    "pxkm": 9.005181543926119,
+    "labels": [],
+    "markers": [
+      {
+        "id": "saada",
+        "to": "saada",
+        "label": "צעדה",
+        "x": 607.52,
+        "y": 206.84,
+        "pos": [
+          16.94021,
+          43.76393
+        ],
+        "dx": 0.01,
+        "dy": -13.78,
+        "size": 22.7,
+        "status": "known",
+        "cls": "family",
+        "tags": [
+          "family",
+          "maybe",
+          "other"
+        ]
+      },
+      {
+        "id": "haydan",
+        "to": "haydan",
+        "label": "חידאן",
+        "x": 291.06,
+        "y": 365.8,
+        "pos": [
+          16.77899,
+          43.43372
+        ],
+        "dx": -32.07,
+        "dy": -12.1,
+        "size": 17.6,
+        "status": "known",
+        "cls": "family",
+        "tags": [
+          "family",
+          "context"
+        ]
+      },
+      {
+        "id": "talh",
+        "to": "talh",
+        "label": "אלטלח",
+        "x": 528.94,
+        "y": 129.86,
+        "pos": [
+          17.01829,
+          43.68194
+        ],
+        "dx": -25.49,
+        "dy": -14.52,
+        "size": 17.6,
+        "status": "known",
+        "cls": "other",
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "majz",
+        "to": "majz",
+        "label": "מגז",
+        "x": 426.53,
+        "y": 79.48,
+        "pos": [
+          17.06939,
+          43.57507
+        ],
+        "dx": 16.39,
+        "dy": -13.72,
+        "size": 17.6,
+        "status": "known",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "saqin",
+        "to": "saqin",
+        "label": "סאקין",
+        "x": 378.53,
+        "y": 269.17,
+        "pos": [
+          16.877,
+          43.52499
+        ],
+        "dx": -30.41,
+        "dy": -9.7,
+        "size": 17.6,
+        "status": "known",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "naz",
+        "to": "naz",
+        "label": "נצ׳יר",
+        "x": 126.75,
+        "y": 237.46,
+        "pos": [
+          16.90916,
+          43.26226
+        ],
+        "dx": -1.65,
+        "dy": -16.16,
+        "size": 17.6,
+        "status": "known",
+        "cls": "other",
+        "tags": [
+          "other",
+          "context"
+        ]
+      },
+      {
+        "id": "modernMah",
+        "to": "modernMah",
+        "label": "מוהצר",
+        "x": 482.36,
+        "y": 295.79,
+        "pos": [
+          16.85,
+          43.63333
+        ],
+        "dx": -26.3,
+        "dy": 21.84,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "shalil",
+        "to": "shalil",
+        "label": "שליל",
+        "x": 586.11,
+        "y": 137.35,
+        "pos": [
+          17.01069,
+          43.74159
+        ],
+        "dx": 4.09,
+        "dy": 23.44,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "other",
+        "tags": [
+          "other",
+          "context"
+        ]
+      },
+      {
+        "id": "modernMiq",
+        "to": "modernMiq",
+        "label": "מקבאב",
+        "x": 656.48,
+        "y": 319.41,
+        "pos": [
+          16.82604,
+          43.81502
+        ],
+        "dx": 18.9,
+        "dy": -12.95,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "modernSh",
+        "to": "modernSh",
+        "label": "שרמאת של א־צפרא",
+        "x": 673.02,
+        "y": 348.74,
+        "pos": [
+          16.79629,
+          43.83228
+        ],
+        "dx": 59.94,
+        "dy": 18.62,
+        "size": 14.3,
+        "status": "ref",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "akwan",
+        "to": "akwan",
+        "label": "עכואן",
+        "x": 639.51,
+        "y": 160.06,
+        "pos": [
+          16.98766,
+          43.79731
+        ],
+        "dx": 28.73,
+        "dy": 10.52,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "other",
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "tishdan",
+        "to": "tishdan",
+        "label": "תשדאן",
+        "x": 166.36,
+        "y": 147.78,
+        "pos": [
+          17.00012,
+          43.30359
+        ],
+        "dx": -9.87,
+        "dy": -16.18,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "falah",
+        "to": "falah",
+        "label": "פלה",
+        "x": 408.25,
+        "y": 145.45,
+        "pos": [
+          17.00248,
+          43.556
+        ],
+        "dx": -16.43,
+        "dy": 20.2,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "sarah",
+        "to": "sarah",
+        "label": "צארה",
+        "x": 389.34,
+        "y": 84.1,
+        "pos": [
+          17.0647,
+          43.53627
+        ],
+        "dx": -26.27,
+        "dy": 17.81,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "sorm",
+        "to": "sorm",
+        "label": "סורמה",
+        "x": 315.07,
+        "y": 427.71,
+        "pos": [
+          16.7162,
+          43.45877
+        ],
+        "dx": 22.21,
+        "dy": 19.41,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "saf1",
+        "to": "saf1",
+        "label": "צאפייה הקרובה",
+        "x": 293.09,
+        "y": 393.43,
+        "pos": [
+          16.75097,
+          43.43583
+        ],
+        "dx": -53.39,
+        "dy": 12.93,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "saf2",
+        "to": "saf2",
+        "label": "צאפייה הדרום־מערבית",
+        "x": 211.32,
+        "y": 463.55,
+        "pos": [
+          16.67985,
+          43.35051
+        ],
+        "dx": -3.25,
+        "dy": 21.83,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "farwah",
+        "to": "farwah",
+        "label": "פרוה",
+        "x": 557.38,
+        "y": 273.89,
+        "pos": [
+          16.87221,
+          43.71161
+        ],
+        "dx": 30.36,
+        "dy": -3.26,
+        "size": 14.3,
+        "status": "ref",
+        "cls": "context",
+        "tags": [
+          "context"
+        ]
+      },
+      {
+        "id": "buqah",
+        "to": "buqah",
+        "label": "בוקעה",
+        "x": 298.33,
+        "y": 401.12,
+        "pos": [
+          16.74317,
+          43.4413
+        ],
+        "dx": 46.84,
+        "dy": 1.6,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "other",
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "nushur",
+        "to": "nushur",
+        "label": "נשור",
+        "x": 653.0,
+        "y": 104.46,
+        "pos": [
+          17.04405,
+          43.81139
+        ],
+        "dx": 14.82,
+        "dy": -13.71,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "other",
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "eshSahar",
+        "to": "eshSahar",
+        "label": "עשאש שבסחר",
+        "x": 493.28,
+        "y": 298.69,
+        "pos": [
+          16.84706,
+          43.64473
+        ],
+        "dx": 36.95,
+        "dy": 21.04,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "other",
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "eshKitaf",
+        "to": "eshKitaf",
+        "label": "עשאש שבכתאף",
+        "x": 861.09,
+        "y": 160.21,
+        "pos": [
+          16.98751,
+          44.02853
+        ],
+        "dx": -23.81,
+        "dy": -15.35,
+        "size": 14.3,
+        "status": "candidate",
+        "cls": "other",
+        "tags": [
+          "other"
+        ]
+      },
+      {
+        "id": "letter-saada",
+        "to": "saada",
+        "label": "צעדא (צעדה)",
+        "letter": "א",
+        "x": 611.96,
+        "y": 228.09,
+        "cls": "family",
+        "tags": [
+          "family",
+          "maybe",
+          "other"
+        ]
+      },
+      {
+        "id": "letter-sharmat",
+        "to": "sharmat",
+        "label": "שרמאת",
+        "letter": "ב",
+        "x": 437.0,
+        "y": 198.16,
+        "cls": "other",
+        "tags": [
+          "other",
+          "maybe"
+        ]
+      },
+      {
+        "id": "letter-khawlan",
+        "to": "khawlan",
+        "label": "כ׳ולאן שבאזור חיידאן",
+        "letter": "ג",
+        "x": 208.64,
+        "y": 351.03,
+        "cls": "family",
+        "tags": [
+          "family"
+        ]
+      }
+    ],
+    "ids": [
+      "saada",
+      "haydan",
+      "talh",
+      "majz",
+      "saqin",
+      "naz",
+      "modernMah",
+      "shalil",
+      "modernMiq",
+      "modernSh",
+      "akwan",
+      "tishdan",
+      "falah",
+      "sarah",
+      "sorm",
+      "saf1",
+      "saf2",
+      "farwah",
+      "buqah",
+      "nushur",
+      "eshSahar",
+      "eshKitaf",
+      "sharmat",
+      "khawlan"
+    ],
+    "distances": []
   }
 }

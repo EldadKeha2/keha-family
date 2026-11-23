@@ -142,3 +142,64 @@ body[data-active-view="family-map"] .workspace-footer { display:none }
   .atlas-wide-hint { display:none }
   .atlas-touch-hint { display:block }
 }
+
+#familyMapView [hidden] { display:none!important }
+.atlas-north-tools,.atlas-letter-key,.atlas-evidence-modes,.atlas-downloads,.atlas-related { display:flex;align-items:center;flex-wrap:wrap;gap:6px }
+.atlas-north-tools { padding:5px 12px 7px;border-bottom:1px solid var(--atlas-line);background:var(--atlas-paper) }
+.atlas-north-tools button,.atlas-evidence-modes button,.atlas-related button,.atlas-walk button,.atlas-letter-key button {
+  border:1px solid #c9c7b6;background:#fffdf4;color:var(--atlas-blue);border-radius:7px;min-height:33px;padding:4px 10px;font:650 .92em/1.35 var(--sans,Arial,sans-serif)
+}
+.atlas-north-tools [aria-pressed=true],.atlas-evidence-modes [aria-pressed=true] { background:var(--atlas-blue);color:#fff;border-color:var(--atlas-blue) }
+.atlas-north-tools [data-districts],.atlas-north-tools [data-open-walk] { border-color:transparent;text-decoration:underline;text-underline-offset:3px }
+.atlas-letter-key { padding:7px 11px;background:var(--atlas-paper);border-top:1px solid var(--atlas-line) }
+.atlas-letter-key button { display:inline-flex;align-items:center;gap:6px;border:0;padding:3px 6px;background:transparent;color:var(--atlas-ink) }
+.atlas-letter-key button[aria-pressed=true] { background:#ede6db }
+.atlas-letter-key b { background:#713750;color:white;border-radius:50%;width:21px;height:21px;line-height:21px;text-align:center }
+.atlas-base-point,.atlas-base-letter { cursor:pointer }
+.base-glyph { stroke:#fff9eb;stroke-width:1.25;fill:#174a4a }
+.atlas-base-point.city .base-glyph { fill:#803650 }
+.atlas-base-point.candidate .base-glyph { fill:#ffeac2;stroke:#a45720;stroke-width:1.9 }
+.atlas-base-point.ref .base-glyph { fill:#eef2e7;stroke:#4b676b;stroke-width:1.8 }
+.base-leader { fill:none;stroke:currentColor;stroke-width:.9;opacity:.55 }
+.base-name { fill:#244740;font:bold var(--base-label-size) Arial,sans-serif;paint-order:stroke;stroke:#fffaeb;stroke-width:2.5;stroke-linejoin:round }
+.atlas-base-point.city .base-name { fill:#803650 }.atlas-base-point.candidate .base-name { fill:#795021 }
+.atlas-base-point.ref .base-name { fill:#4b676b }
+.atlas-base-point[aria-pressed=true] .atlas-selection,.atlas-base-point:focus-visible .atlas-selection {visibility:visible;stroke:#5f2e45;fill:#fce2a6}
+.atlas-base-letter circle { fill:#713750;stroke:#fff9e9;stroke-width:1.8 }
+.atlas-base-letter[aria-pressed=true] circle,.atlas-base-letter:focus-visible circle { stroke:#dead5b;stroke-width:3 }
+.atlas-base-letter text { fill:white;font:bold 15px Arial,sans-serif }
+.atlas-plot[data-compact=true][data-zoomed=false] .atlas-base-point:not(.principal):not([aria-pressed=true]):not(:focus-visible) .base-name { display:none }
+.atlas-plot[data-compact=true][data-zoomed=false] .atlas-base-point.principal .base-name { font-size:24px }
+.base-key { font:700 18px/1 Arial,sans-serif }.base-key.city {color:#803650}.base-key.known {color:#174a4a}.base-key.candidate {color:#a45720}.base-key.ref {color:#4b676b}
+.atlas-evidence-modes { padding:9px 12px;background:var(--atlas-paper);border-top:3px solid var(--atlas-blue) }
+.atlas-evidence header {border-top:0}
+.atlas-person-select {display:grid;gap:4px;margin-bottom:10px;font-size:.94em;font-weight:650}
+.atlas-person-select select,.atlas-walk-fields select { font:inherit;min-width:0;max-width:100%;width:100%;border:1px solid #aeb5a1;border-radius:6px;background:white;color:var(--atlas-ink);padding:6px 7px }
+.atlas-linked-people>div { display:flex;gap:5px;flex-wrap:wrap }
+.atlas-linked-people a,.atlas-tree-link { border:1px solid #bdcbbf;border-radius:6px;padding:4px 7px;background:#f4f7ec;font-size:.91em;line-height:1.45;color:#234f47 }
+.atlas-person-intro { margin:12px 0!important;line-height:1.65 }
+.atlas-person-stop { position:relative;padding:10px 11px 10px 0;border-right:2px solid var(--atlas-gold);border-bottom:1px solid #e8e3d5 }
+.atlas-person-stop h4 { display:inline;font-size:1.04em }.atlas-person-stop .atlas-kind { margin-inline-start:6px }
+.atlas-person-stop p { margin:5px 0!important;line-height:1.6 }
+.atlas-tree-link { display:inline-block;margin-top:13px }.atlas-related {margin-top:8px;gap:8px}
+.atlas-downloads { margin-top:12px;gap:8px 15px;border-top:1px solid var(--atlas-line);padding-block:9px }
+.atlas-downloads a {font-weight:700}.atlas-area-list {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:12px;margin:6px 0 12px}
+.atlas-area-list h3 {font-size:1em}.atlas-area-list p,.atlas-walk-body p { line-height:1.55 }
+.atlas-walk-fields { display:grid;grid-template-columns:1fr auto 1fr minmax(135px,1fr);gap:8px;align-items:end;margin-block:8px }
+.atlas-walk-fields label { display:grid;gap:3px;font-size:.95em;font-weight:650 }
+.atlas-walk-result {background:#f1f3e9;border-right:3px solid #557866;padding:9px 12px}.atlas-walk-result strong {color:#224f43;font-size:1.1em}
+.atlas-walk-result p,.atlas-walk-method {margin:3px 0!important;padding:0!important}
+.atlas-route-path {pointer-events:none;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.atlas-route-path .route-shadow {stroke:#fff9ed;stroke-width:5.5}.atlas-route-path .route-road {stroke:#803650;stroke-width:2.8}
+.atlas-route-path .route-terrain {stroke:#286b89;stroke-width:2.8;stroke-dasharray:5 4}
+.atlas-route-path circle {stroke:#803650;stroke-width:1.9}
+.atlas-district-dialog {color:var(--atlas-ink);background:var(--atlas-paper);width:min(780px,94vw);max-height:90dvh;overflow:auto;border:1px solid #97866a;border-radius:12px;padding:14px}
+.atlas-district-dialog::backdrop {background:#172d37a8}.atlas-district-dialog header {display:flex;justify-content:space-between;align-items:center;gap:12px}
+.atlas-district-dialog button {background:white;border:1px solid var(--atlas-line);border-radius:50%;font-size:22px!important;width:35px;height:35px}
+.atlas-district-dialog img {display:block;width:100%;height:auto;margin-block:8px}
+.atlas-district-dialog ol {columns:3;padding-inline-start:26px;line-height:1.65}.atlas-district-dialog li {break-inside:avoid}
+@media(max-width:600px) {
+  .atlas-north-tools,.atlas-letter-key {gap:2px;padding:4px 6px}.atlas-north-tools button,.atlas-letter-key button {padding:3px 6px;font-size:.86em!important}
+  .atlas-walk-fields {grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}.atlas-walk-fields label:last-child {grid-column:1/-1}
+  .atlas-district-dialog ol {columns:2}.atlas-person-stop h4,.atlas-linked-people a {font-size:1em}
+}
