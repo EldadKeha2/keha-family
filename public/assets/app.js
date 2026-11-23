@@ -22,7 +22,15 @@
   const requestedView=location.hash.slice(1).split('/')[0];
   const initialTreeBranch=scopedViews&&data.branches.some(branch=>branch.id===searchBranch)?searchBranch:'all';
   const state = {view:validViews.has(requestedView)?requestedView:(isPhone()?'home':'tree'), branch:initialTreeBranch, treeUnit:null, mode:initialTreeBranch==='all'?'overview':'branch', query:'', directoryGroup:'main', currentPerson:null, galleryFilter:'all', gallery:[], photoIndex:0, urls:[]};
-  const camera = {x:0,y:0,scale:1,width:0,height:0};
+  const camera = {x:0,y:0,scale:1,width:0,height:0,bounds:null,area:null,focus:null};
+  const treeUnitHeights=new WeakMap();
+  const treeSizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(entries=>{
+    if(state.view!=='tree'||!$('treeViewport').clientWidth)return;
+    if(entries.some(({target})=>target.isConnected&&target.offsetHeight!==treeUnitHeights.get(target))){
+      camera.bounds=measureTreeBounds($('treeWorld'),treeTextScale());
+      applyCamera();
+    }
+  }):null;
   let motionFrame=0,suppressClickUntil=0,treeRenderVersion=0,treeCameraApplied=false;
   const treeTextScale=()=>Math.max(1,Math.min(2,(Number(window.FamilyAccessibility?.getSettings?.().text)||100)/100));
   let observedTextScale=treeTextScale();
@@ -457,9 +465,12 @@
   }
 
   function renderTree(preserveCamera=false) {
+    stopTreeMotion();
+    treeSizeObserver?.disconnect();
+    const renderVersion=++treeRenderVersion;
     if(window.FamilyExtendedKeha?.renderTree(state))return;
     window.FamilyTreeGuide?.hide();
-    const textScale=treeTextScale(),viewport=$('treeViewport'),renderVersion=++treeRenderVersion;
+    const textScale=treeTextScale(),viewport=$('treeViewport');
     const priorArea=treeViewportArea();
     const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(priorArea.cx-camera.x)/(camera.width*camera.scale),y:(priorArea.cy-camera.y)/(camera.height*camera.scale)}:null;
     const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview',desktopOverview=!phone&&overview;
@@ -483,12 +494,11 @@
     $('canvasHint').innerHTML=phone?I18n.t('<span aria-hidden="true">✧</span> צבטו להגדלה · גררו לטיול בין הענפים'):'';
     requestAnimationFrame(()=>{
       if(state.view!=='tree'||renderVersion!==treeRenderVersion)return;
-      const area=treeViewportArea();
-      if(previous){
-        camera.scale=previous.scale;camera.x=area.cx-previous.x*width*camera.scale;camera.y=area.cy-previous.y*height*camera.scale;clampCamera();
-      }else if(householdOverview){
-        fitTree();
-      }else if(scopedViews){
+      const area=camera.area=treeViewportArea();
+      camera.bounds=measureTreeBounds(world,textScale);
+      if(treeSizeObserver)for(const unit of $('treeNodes').children)treeSizeObserver.observe(unit);
+      camera.focus=null;
+      if(scopedViews&&!householdOverview){
         let focus=positions.find(item=>item.id===rootId);
         // Retain older single ancestors above the founding parents, while
         // opening on the family itself even when its descendants are uneven.
@@ -498,19 +508,36 @@
         }
         const element=world.querySelector(`[data-unit="${treeUnitKey(focus.id)}"]`);
         const focusHeight=element.offsetHeight||(phone?150:278)*textScale;
+        camera.focus={x:focus.x,y:focus.y+focusHeight/2};
         camera.scale=Math.max(.035,Math.min(1.06,(viewport.clientWidth-32)/focus.width,(phone?area.height:viewport.clientHeight-80)/focusHeight));
-        camera.x=area.cx-focus.x*camera.scale;
-        camera.y=area.cy-(focus.y+focusHeight/2)*camera.scale;
+        camera.x=area.cx-camera.focus.x*camera.scale;
+        camera.y=area.cy-camera.focus.y*camera.scale;
+      }else if(householdOverview){
+        fitTree();
       }else{
         const fit=Math.min((viewport.clientWidth-(desktopOverview?28:30))/width,(phone?area.height:viewport.clientHeight-(desktopOverview?24:70))/height,desktopOverview?1:1.06);
         camera.scale=phone?Math.max(.035,fit*textScale):desktopOverview?0.7:Math.max(.9,Math.min(1.06,fit));camera.x=(viewport.clientWidth-width*camera.scale)/2;camera.y=phone?area.top+(area.height-height*camera.scale)/2:desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-height*camera.scale)/2)):25;
+      }
+      if(previous){
+        camera.scale=previous.scale;camera.x=area.cx-previous.x*width*camera.scale;camera.y=area.cy-previous.y*height*camera.scale;
       }
       treeCameraApplied=true;applyCamera();window.FamilyTreeGuide?.show();
     });
   }
   function treeViewportArea(){
     const viewport=$('treeViewport'),width=viewport.clientWidth,height=viewport.clientHeight;
-    if(!isPhone())return {width,height,top:0,cx:width/2,cy:height/2};
+    if(!isPhone()){
+      const rect=viewport.getBoundingClientRect();
+      let top=0,bottom=0;
+      for(const control of viewport.querySelectorAll('.zoom-controls,#treeFullscreenExit,#treeMarriageFilters')){
+        const box=control.getBoundingClientRect();
+        if(!box.height)continue;
+        if(box.top-rect.top<height/2)top=Math.max(top,box.bottom-rect.top+6);
+        else bottom=Math.max(bottom,rect.bottom-box.top+6);
+      }
+      const available=Math.max(1,height-top-bottom);
+      return {width,height:available,top,cx:width/2,cy:top+available/2};
+    }
     const controls=viewport.querySelector('.zoom-controls')?.offsetHeight||44,full=viewport.classList.contains('tree-is-fullscreen');
     const familyBar=full?viewport.querySelector('#branchBar, #treeMarriageFilters'):null;
     const top=familyBar?familyBar.offsetTop+familyBar.offsetHeight+8:full?($('treeFullscreenExit')?.offsetHeight||44)+24:controls+24;
@@ -518,28 +545,91 @@
     const available=Math.max(1,height-top-bottom);
     return {width,height:available,top,cx:width/2,cy:top+available/2};
   }
+  function measureTreeBounds(world,textScale){
+    const worldRect=world.getBoundingClientRect(),scale=worldRect.width/camera.width;
+    const rows=new Map();
+    for(const unit of $('treeNodes').children){
+      const x=parseFloat(unit.style.left),y=parseFloat(unit.style.top);
+      const row=rows.get(y)||{left:Infinity,right:-Infinity,top:Infinity,bottom:-Infinity};
+      row.left=Math.min(row.left,x);row.right=Math.max(row.right,x+parseFloat(unit.style.width));
+      const height=unit.offsetHeight;
+      treeUnitHeights.set(unit,height);
+      row.top=Math.min(row.top,y);row.bottom=Math.max(row.bottom,y+height);
+      // Captions, branch buttons and illustrated links can extend past their unit.
+      if(scale>0)for(const card of unit.querySelectorAll('.person-card,.branch-label,.branch-open,.founder-tree-link')){
+        const box=card.getBoundingClientRect();
+        if(!box.width||!box.height)continue;
+        row.left=Math.min(row.left,(box.left-worldRect.left)/scale);
+        row.right=Math.max(row.right,(box.right-worldRect.left)/scale);
+        row.top=Math.min(row.top,(box.top-worldRect.top)/scale);
+        row.bottom=Math.max(row.bottom,(box.bottom-worldRect.top)/scale);
+      }
+      rows.set(y,row);
+    }
+    if(!rows.size)return null;
+    const levels=[...rows.values()],pad=16*textScale;
+    const left=Math.min(...levels.map(row=>row.left))-pad,right=Math.max(...levels.map(row=>row.right))+pad;
+    const top=Math.min(...levels.map(row=>row.top))-pad,bottom=Math.max(...levels.map(row=>row.bottom))+pad;
+    const corners=[[left,top],[right,top],[right,bottom],[left,bottom]];
+    const diamonds=corners.map(([x,y])=>`M${x} ${y-4}l4 4-4 4-4-4Z`).join(' ');
+    const connectors=$('treeConnectors');
+    connectors.querySelector('.tree-boundary')?.remove();
+    connectors.insertAdjacentHTML('afterbegin',`<g class="tree-boundary" aria-hidden="true" pointer-events="none" stroke="var(--family-accent,var(--gold,#977d4d))" opacity=".65"><rect x="${left}" y="${top}" width="${right-left}" height="${bottom-top}" rx="3" fill="none" stroke-width="1" vector-effect="non-scaling-stroke"/><path d="${diamonds}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></g>`);
+    return {left,right,top,bottom,levels};
+  }
+
+  function boundedAxis(position,first,last,center,size,focus){
+    const scale=camera.scale,space=Math.max(0,size/2-6);
+    const middle=center-(first+last)*scale/2;
+    let min=Math.min(middle,center+space-last*scale);
+    let max=Math.max(middle,center-space-first*scale);
+    // Each branch must still be able to open with its founding couple centred.
+    if(focus!=null){
+      const home=center-focus*scale;
+      min=Math.min(min,home);max=Math.max(max,home);
+    }
+    return Math.max(min,Math.min(max,position));
+  }
+
   function applyCamera(){
+    const {bounds,area,focus,scale}=camera;
+    if(bounds&&area){
+      camera.y=boundedAxis(camera.y,bounds.top,bounds.bottom,area.cy,area.height,focus?.y);
+      camera.x=boundedAxis(camera.x,bounds.left,bounds.right,area.cx,area.width,focus?.x);
+      // At the top of a wide tree the parents may be the only visible row.
+      // Stop a sideways drag before that row disappears into an empty corner.
+      const visible=bounds.levels.filter(row=>camera.y+row.bottom*scale>=area.top&&camera.y+row.top*scale<=area.top+area.height);
+      if(visible.length){
+        const left=Math.min(...visible.map(row=>row.left))*scale,right=Math.max(...visible.map(row=>row.right))*scale;
+        const keep=Math.min(area.width/2,(right-left)/2);
+        camera.x=Math.max(keep-right,Math.min(area.width-keep-left,camera.x));
+      }
+    }
     $('treeWorld').style.transform=`translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
     const value=Math.round(camera.scale*100)+'%';if($('zoomValue').textContent!==value)$('zoomValue').textContent=value;
   }
   function stopTreeMotion(){if(motionFrame)cancelAnimationFrame(motionFrame);motionFrame=0;}
   window.addEventListener('family-accessibility-changed',()=>{if(reducedMotion())stopTreeMotion();const next=treeTextScale();if(next!==observedTextScale){observedTextScale=next;if(state.view==='tree')renderTree(true);}});
-  function clampCamera(){
-    if(!isPhone())return;const area=treeViewportArea(),w=camera.width*camera.scale,h=camera.height*camera.scale;
-    // Leave room at every edge so a small overview can also move in both axes.
-    camera.x=Math.max(area.cx-w,Math.min(area.cx,camera.x));
-    camera.y=Math.max(area.cy-h,Math.min(area.cy,camera.y));
+  function fittedTreeScale(){
+    const {area,bounds}=camera;
+    return Math.min(Math.max(1,area.width-16)/(bounds.right-bounds.left),Math.max(1,area.height-16)/(bounds.bottom-bounds.top),1.1);
+  }
+  function boundedZoom(scale,touch=isPhone()){
+    const minimum=Math.min(touch ? .035 : .08,camera.bounds?fittedTreeScale():1);
+    return Math.max(minimum,Math.min(touch?3.5:2.4,scale));
   }
   function zoom(factor,cx,cy){
-    stopTreeMotion();const area=treeViewportArea();cx=cx??area.cx;cy=cy??area.cy;
-    const old=camera.scale;camera.scale=Math.max(isPhone() ? .035 : .08,Math.min(isPhone()?3.5:2.4,old*factor));camera.x=cx-(cx-camera.x)*camera.scale/old;camera.y=cy-(cy-camera.y)*camera.scale/old;clampCamera();applyCamera();
+    stopTreeMotion();const area=camera.area=treeViewportArea();cx=cx??area.cx;cy=cy??area.cy;
+    const old=camera.scale;camera.scale=boundedZoom(old*factor);camera.x=cx-(cx-camera.x)*camera.scale/old;camera.y=cy-(cy-camera.y)*camera.scale/old;applyCamera();
   }
   function fitTree(){
-    stopTreeMotion();const viewport=$('treeViewport'),phone=isPhone(),area=treeViewportArea(),desktopOverview=!phone&&state.branch==='all'&&state.mode==='overview';
-    const inset=viewport.hasAttribute('data-household-overview')?4:desktopOverview?28:30;
-    const fit=Math.min((viewport.clientWidth-inset)/camera.width,(phone?area.height:viewport.clientHeight-(desktopOverview?24:75))/camera.height,desktopOverview?1:1.1);
-    camera.scale=phone?Math.max(.035,fit):fit;camera.x=area.cx-camera.width*camera.scale/2;
-    camera.y=phone?area.top+(area.height-camera.height*camera.scale)/2:desktopOverview?Math.max(8,Math.min(18,(viewport.clientHeight-camera.height*camera.scale)/2)):Math.max(12,(viewport.clientHeight-55-camera.height*camera.scale)/2);applyCamera();
+    stopTreeMotion();
+    const area=camera.area=treeViewportArea(),bounds=camera.bounds;
+    if(!bounds||!area.width)return;
+    camera.scale=fittedTreeScale();
+    camera.x=area.cx-(bounds.left+bounds.right)*camera.scale/2;
+    camera.y=area.cy-(bounds.top+bounds.bottom)*camera.scale/2;
+    applyCamera();
   }
 
   const apiEnabled = window.LOCAL_FAMILY_SERVER === true;
@@ -890,33 +980,47 @@
       touches.set(event.pointerId,{x:event.clientX,y:event.clientY});
       if(touches.size===2){const [a,b]=[...touches.values()],rect=viewport.getBoundingClientRect();pinch={distance:Math.hypot(a.x-b.x,a.y-b.y),scale:camera.scale,x:(a.x+b.x)/2-rect.left,y:(a.y+b.y)/2-rect.top,cameraX:camera.x,cameraY:camera.y};drag=null;for(const id of touches.keys())viewport.setPointerCapture(id);suppressClickUntil=performance.now()+500;return;}
     }else if(event.target.closest('button,a'))return;
-    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:camera.x,y:camera.y,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,vx:0,vy:0,started:false,touch:event.pointerType==='touch'};
+    drag={id:event.pointerId,startX:event.clientX,startY:event.clientY,lastX:event.clientX,lastY:event.clientY,time:event.timeStamp,vx:0,vy:0,started:false,touch:event.pointerType==='touch'};
   });
   viewport.addEventListener('pointermove',event=>{
     if(touches.has(event.pointerId))touches.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    if(pinch&&touches.size===2){const [a,b]=[...touches.values()],rect=viewport.getBoundingClientRect(),scale=Math.max(.035,Math.min(3.5,pinch.scale*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,pinch.distance)));camera.x=(a.x+b.x)/2-rect.left-(pinch.x-pinch.cameraX)*scale/pinch.scale;camera.y=(a.y+b.y)/2-rect.top-(pinch.y-pinch.cameraY)*scale/pinch.scale;camera.scale=scale;clampCamera();applyCamera();suppressClickUntil=performance.now()+500;return;}
+    if(pinch&&touches.size===2){const [a,b]=[...touches.values()],rect=viewport.getBoundingClientRect(),scale=boundedZoom(pinch.scale*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,pinch.distance),true);camera.x=(a.x+b.x)/2-rect.left-(pinch.x-pinch.cameraX)*scale/pinch.scale;camera.y=(a.y+b.y)/2-rect.top-(pinch.y-pinch.cameraY)*scale/pinch.scale;camera.scale=scale;applyCamera();suppressClickUntil=performance.now()+500;return;}
     if(!drag||event.pointerId!==drag.id)return;
     if(!drag.started&&Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>6){
       drag.started=true;viewport.setPointerCapture(event.pointerId);viewport.classList.add('dragging');
       if(!drag.touch){const selection=window.getSelection?.();if(selection&&(viewport.contains(selection.anchorNode)||viewport.contains(selection.focusNode)))selection.removeAllRanges();}
     }
     if(!drag.started)return;
-    const dt=Math.max(1,event.timeStamp-drag.time);drag.vx=.4*drag.vx+.6*(event.clientX-drag.lastX)/dt;drag.vy=.4*drag.vy+.6*(event.clientY-drag.lastY)/dt;drag.lastX=event.clientX;drag.lastY=event.clientY;drag.time=event.timeStamp;
-    camera.x=drag.x+event.clientX-drag.startX;camera.y=drag.y+event.clientY-drag.startY;clampCamera();applyCamera();suppressClickUntil=performance.now()+400;
+    const dt=Math.max(1,event.timeStamp-drag.time),x=camera.x,y=camera.y;
+    camera.x+=event.clientX-drag.lastX;camera.y+=event.clientY-drag.lastY;
+    applyCamera();
+    drag.vx=camera.x===x?0:.4*drag.vx+.6*(camera.x-x)/dt;
+    drag.vy=camera.y===y?0:.4*drag.vy+.6*(camera.y-y)/dt;
+    drag.lastX=event.clientX;drag.lastY=event.clientY;drag.time=event.timeStamp;
+    suppressClickUntil=performance.now()+400;
   });
   function momentum(vx,vy){
     if(!isPhone()||reducedMotion()||Math.hypot(vx,vy)<.08)return;let previous=performance.now();
-    const step=now=>{if(reducedMotion()){stopTreeMotion();return;}const dt=Math.min(32,now-previous);previous=now;camera.x+=vx*dt;camera.y+=vy*dt;vx*=Math.pow(.91,dt/16);vy*=Math.pow(.91,dt/16);clampCamera();applyCamera();if(Math.hypot(vx,vy)>.025)motionFrame=requestAnimationFrame(step);else motionFrame=0;};motionFrame=requestAnimationFrame(step);
+    const step=now=>{
+      if(reducedMotion()){stopTreeMotion();return;}
+      const dt=Math.min(32,now-previous),decay=Math.pow(.91,dt/16);
+      previous=now;
+      const x=camera.x+vx*dt,y=camera.y+vy*dt;
+      camera.x=x;camera.y=y;applyCamera();
+      vx=camera.x===x?vx*decay:0;vy=camera.y===y?vy*decay:0;
+      if(Math.hypot(vx,vy)>.025)motionFrame=requestAnimationFrame(step);else motionFrame=0;
+    };
+    motionFrame=requestAnimationFrame(step);
   }
   function endDrag(event){
     const ended=drag;touches.delete(event.pointerId);pinch=null;drag=null;viewport.classList.remove('dragging');
-    if(touches.size===1){const [id,point]=[...touches][0];drag={id,startX:point.x,startY:point.y,x:camera.x,y:camera.y,lastX:point.x,lastY:point.y,time:event.timeStamp,vx:0,vy:0,started:true,touch:true};}
+    if(touches.size===1){const [id,point]=[...touches][0];drag={id,startX:point.x,startY:point.y,lastX:point.x,lastY:point.y,time:event.timeStamp,vx:0,vy:0,started:true,touch:true};}
     else if(ended?.started&&ended.touch){suppressClickUntil=performance.now()+400;if(event.timeStamp-ended.time<90)momentum(Math.max(-3,Math.min(3,ended.vx)),Math.max(-3,Math.min(3,ended.vy)));}
   }
   viewport.addEventListener('pointerup',endDrag);viewport.addEventListener('pointercancel',event=>{touches.clear();pinch=null;drag=null;viewport.classList.remove('dragging');stopTreeMotion();});
   viewport.addEventListener('wheel',event=>{
     if(event.ctrlKey||event.metaKey){event.preventDefault();const rect=viewport.getBoundingClientRect();zoom(event.deltaY<0?1.1:1/1.1,event.clientX-rect.left,event.clientY-rect.top);}
-    else if(isPhone()){event.preventDefault();stopTreeMotion();const unit=event.deltaMode===1?16:event.deltaMode===2?viewport.clientHeight:1;camera.x-=event.deltaX*unit;camera.y-=event.deltaY*unit;clampCamera();applyCamera();}
+    else if(isPhone()){event.preventDefault();stopTreeMotion();const unit=event.deltaMode===1?16:event.deltaMode===2?viewport.clientHeight:1;camera.x-=event.deltaX*unit;camera.y-=event.deltaY*unit;applyCamera();}
   }, {passive:false});
   viewport.addEventListener('keydown',e=>{
     if(e.target!==viewport)return;

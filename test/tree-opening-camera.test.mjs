@@ -5,22 +5,25 @@ import {readFile} from 'node:fs/promises';
 import {parseHTML} from 'linkedom';
 import family from '../src/family.mjs';
 import {nakashHTML} from '../src/nakash-shell.mjs';
-import {branchPortalHTML,shlomoKehaHTML} from '../src/extended-keha.mjs';
+import {branchPortalHTML,extendedKehaHTML,shlomoKehaHTML} from '../src/extended-keha.mjs';
 import {createFamily} from '../public/nakash/family-data.mjs';
 import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
+import {createExtendedFamily} from '../public/keha-extended/family-data.mjs';
 import {createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
 const portalSource=await readFile(new URL('../public/keha-extended/portal-tree.js',import.meta.url),'utf8');
+const hubSource=await readFile(new URL('../public/keha-extended/hub.js',import.meta.url),'utf8');
 const parents={haim:'u-nakash-haim',yehuda:'u-nakash-yehuda',medina:'u-nakash-medina',keha:'u-root',nakash:'u-nakash-root',shlomo:'u-root',zechariah:'u-keha-zechariah','zechariah-tzadok':'u-kehat-zechariah-ben-tzadok',kehat:'u-keha-kehat'};
 
 function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportHeight,viewportWidth}={}){
   const portal=['zechariah','zechariah-tzadok','kehat'].includes(site);
   const original=site==='original';
-  const data=original?structuredClone(family):toOriginalFamilyData(portal?createBranchPortal(family,site):site==='shlomo'?createShlomoFamily(family):createFamily(family));
-  const page=original?html:portal?branchPortalHTML(html,site):site==='shlomo'?shlomoKehaHTML(html):nakashHTML(html,site==='nakash'?'':site);
+  const extended=site==='extended';
+  const data=original?structuredClone(family):toOriginalFamilyData(portal?createBranchPortal(family,site):extended?createExtendedFamily(family):site==='shlomo'?createShlomoFamily(family):createFamily(family));
+  const page=original?html:portal?branchPortalHTML(html,site):extended?extendedKehaHTML(html):site==='shlomo'?shlomoKehaHTML(html):nakashHTML(html,site==='nakash'?'':site);
   const {document,window:dom}=parseHTML(page);
   const viewport=document.getElementById('treeViewport'),width=viewportWidth??(phone?358:1100),height=viewportHeight??(phone?560:720);
   Object.defineProperties(viewport,{clientWidth:{value:width},clientHeight:{value:height}});
@@ -29,14 +32,15 @@ function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportH
   Object.defineProperty(dom.HTMLElement.prototype,'offsetHeight',{configurable:true,get(){return this.classList?.contains('tree-unit')?(phone?180:300)*text/100:0;}});
   Object.defineProperty(dom.HTMLElement.prototype,'offsetTop',{configurable:true,get(){return parseFloat(this.style.top)||0;}});
   const listeners=new Map(),frames=[];
-  const window={FAMILY_DATA:data,addEventListener(type,listener){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push(listener);},dispatchEvent(){},scrollTo(){},FamilyAccessibility:{getSettings:()=>({text})}};
+  const window={FAMILY_DATA:data,addEventListener(type,listener){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push(listener);},dispatchEvent(){},scrollTo(){},FamilyAccessibility:{getSettings:()=>({text}),isReducedMotion:()=>false}};
   window.FamilyI18n={isEnglish:english,t:v=>v,html:(parts,...values)=>parts.reduce((out,part,index)=>out+part+(values[index]??''),''),personName:p=>english?p.nameEn:p.name,branchName:b=>english?b?.titleEn:b?.title,searchNames:p=>p.name,date:v=>v};
   window.FamilyDates={age:()=>null,parse:()=>null};
   const location={hash};
   const context=vm.createContext({window,document,location,performance,history:{pushState(state,title,next){location.hash=next;}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(callback){frames.push(callback);return frames.length;},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
   if(portal)vm.runInContext(portalSource,context);
+  if(extended)vm.runInContext(hubSource,context);
   vm.runInContext(source,context);
-  const flush=()=>{while(frames.length)frames.shift()();};
+  const flush=()=>{let now=performance.now();while(frames.length)frames.shift()(now+=16);};
   flush();
   const bounds=id=>{
     const key=original?id:id===data.root?'u-root':id==='u-root'?'u-nakash-keha':id;
@@ -251,15 +255,32 @@ test('Zechariah’s five top buttons switch households directly while the phone 
 function cameraPosition(f){
   return /^translate\(([-\d.]+)px,([-\d.]+)px\) scale\(([-\d.]+)\)$/.exec(f.document.getElementById('treeWorld').style.transform).slice(1).map(Number);
 }
-function pointer(f,type,{id=1,x=120,y=160,time=100}={}){
+function pointer(f,type,{id=1,x=120,y=160,time=100,pointerType='touch'}={}){
   const event=new f.document.defaultView.Event(type,{bubbles:true,cancelable:true});
-  for(const [key,value]of Object.entries({pointerId:id,pointerType:'touch',button:0,clientX:x,clientY:y,timeStamp:time}))Object.defineProperty(event,key,{value});
+  for(const [key,value]of Object.entries({pointerId:id,pointerType,button:0,clientX:x,clientY:y,timeStamp:time}))Object.defineProperty(event,key,{value});
   f.document.getElementById('treeViewport').dispatchEvent(event);
+}
+
+function frameBounds(f){
+  const frame=f.document.querySelector('#treeConnectors .tree-boundary rect');
+  const number=name=>Number(frame.getAttribute(name));
+  return {left:number('x'),top:number('y'),width:number('width'),height:number('height')};
+}
+
+function zoomIntoMiddle(f){
+  f.document.getElementById('fitButton').click();
+  const {width,height}=frameBounds(f);
+  for(let i=0;i<30;i++){
+    const scale=cameraPosition(f)[2];
+    if(width*scale>f.width+120&&height*scale>f.height+120)break;
+    f.document.getElementById('zoomIn').click();
+  }
 }
 
 test('phone swipes pan the original and public trees in both axes in overview and full-tree modes',()=>{
   for(const site of ['original',...Object.keys(parents)])for(const mode of ['overviewButton','fullTreeButton']){
     const f=fixture(site,{phone:true});f.document.getElementById(mode).click();f.flush();
+    zoomIntoMiddle(f);
     const before=cameraPosition(f);
     pointer(f,'pointerdown');pointer(f,'pointermove',{x:140,y:190,time:116});
     const after=cameraPosition(f);
@@ -272,7 +293,9 @@ test('phone swipes pan the original and public trees in both axes in overview an
 
 test('a pinch can continue as a vertical one-finger drag in the phone overview',()=>{
   for(const site of ['original','nakash','zechariah']){
-    const f=fixture(site,{phone:true}),before=cameraPosition(f);
+    const f=fixture(site,{phone:true});
+    zoomIntoMiddle(f);
+    const before=cameraPosition(f);
     pointer(f,'pointerdown',{x:100,y:160});pointer(f,'pointerdown',{id:2,x:180,y:160,time:108});
     pointer(f,'pointermove',{id:2,x:210,y:160,time:124});
     assert.ok(cameraPosition(f)[2]>before[2]);
@@ -281,6 +304,76 @@ test('a pinch can continue as a vertical one-finger drag in the phone overview',
     pointer(f,'pointermove',{x:100,y:190,time:156});
     assert.ok(cameraPosition(f)[1]>pinched[1]+5,'The remaining finger keeps moving the tree vertically');
     pointer(f,'pointercancel');
+  }
+});
+
+test('card borders and drag limits follow each displayed tree on desktop and phone',()=>{
+  for(const site of ['original',...Object.keys(parents)])for(const phone of [false,true]){
+    const f=fixture(site,{phone});
+    const pointerType=phone?'touch':'mouse';
+    zoomIntoMiddle(f);
+    const frame=frameBounds(f);
+    const cards=[...f.document.querySelectorAll('#treeNodes .tree-unit')].map(unit=>{
+      const left=parseFloat(unit.style.left),top=parseFloat(unit.style.top);
+      return {left,top,right:left+parseFloat(unit.style.width),bottom:top+unit.offsetHeight};
+    });
+    assert.equal(frame.left,Math.min(...cards.map(card=>card.left))-16);
+    assert.equal(frame.top,Math.min(...cards.map(card=>card.top))-16);
+    assert.equal(frame.left+frame.width,Math.max(...cards.map(card=>card.right))+16);
+    assert.equal(frame.top+frame.height,Math.max(...cards.map(card=>card.bottom))+16);
+    for(const [dx,dy] of [[1,1],[-1,1],[-1,-1],[1,-1]]){
+      pointer(f,'pointerdown',{pointerType});
+      pointer(f,'pointermove',{x:dx*100000,y:dy*100000,pointerType,time:116});
+      const [x,y,s]=cameraPosition(f);
+      assert.ok(cards.some(card=>x+card.right*s>0&&x+card.left*s<f.width&&y+card.bottom*s>0&&y+card.top*s<f.height),site+' keeps a card visible at the corner');
+      pointer(f,'pointermove',{x:dx*200000,y:dy*200000,pointerType,time:132});
+      assert.deepEqual(cameraPosition(f),[x,y,s],site+' stops at its outermost cards');
+      const arrow=new f.document.defaultView.Event('keydown',{cancelable:true});
+      arrow.key=dy===1?'ArrowUp':'ArrowDown';
+      f.document.getElementById('treeViewport').dispatchEvent(arrow);
+      assert.deepEqual(cameraPosition(f),[x,y,s],'The keyboard shares the drag limits');
+      pointer(f,'pointermove',{x:dx*200000,y:dy*(200000-24),pointerType,time:148});
+      assert.ok((y-cameraPosition(f)[1])*dy>5,site+' immediately reverses a drag at the limit');
+      pointer(f,'pointercancel',{pointerType});
+    }
+    f.document.getElementById('fitButton').click();
+    const [x,y,s]=cameraPosition(f);
+    assert.ok(x+frame.left*s>=0&&x+(frame.left+frame.width)*s<=f.width);
+    assert.ok(y+frame.top*s>=0&&y+(frame.top+frame.height)*s<=f.height);
+  }
+});
+
+test('marriage filters replace the frame and stop at the selected descendants',()=>{
+  for(const site of ['kehat','zechariah-tzadok'])for(const phone of [false,true]){
+    const f=fixture(site,{phone}),whole=frameBounds(f);
+    const buttons=[...f.document.querySelectorAll('#treeMarriageFilters button')];
+    for(const button of buttons){
+      button.click();f.flush();
+      const frame=frameBounds(f);
+      assert.ok(frame.width<whole.width);
+      assert.equal(f.document.querySelectorAll('.tree-boundary').length,1);
+      assertCentred(f,parents[site]);
+    }
+    buttons[1].click();f.flush();
+    assert.deepEqual(frameBounds(f),whole);
+  }
+});
+
+test('phone momentum stops at the last generation and extended hub branches use the same frame',()=>{
+  for(const branch of ['kehat','yissachar']){
+    const f=fixture('extended',{phone:true,hash:'#tree/'+branch});
+    assert.ok(f.document.querySelector('#treeConnectors .tree-boundary'));
+    zoomIntoMiddle(f);
+    pointer(f,'pointerdown');pointer(f,'pointermove',{x:120,y:-350,time:116});
+    pointer(f,'pointerup',{x:120,y:-350,time:124});f.flush();
+    const afterFlick=cameraPosition(f),frame=frameBounds(f);
+    const bottom=()=>cameraPosition(f)[1]+(frame.top+frame.height)*cameraPosition(f)[2];
+    assert.ok(bottom()>=f.height/2,'Inertia leaves the last generation in view');
+    pointer(f,'pointerdown');pointer(f,'pointermove',{x:120,y:-100000,time:140});
+    const limit=cameraPosition(f);
+    assert.ok(afterFlick[1]>=limit[1]);
+    pointer(f,'pointerup',{x:120,y:-100000,time:148});f.flush();
+    assert.deepEqual(cameraPosition(f),limit,'Releasing at the boundary cannot coast past it');
   }
 });
 
