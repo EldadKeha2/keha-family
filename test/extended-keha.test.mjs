@@ -912,14 +912,14 @@ test('Jimaan and Tzadok link directly to each other’s tree on the configured f
   const i18n=await readFile(new URL('../public/assets/i18n.js',import.meta.url),'utf8');
   const translations=await readFile(new URL('../public/assets/translations.js',import.meta.url),'utf8');
   const bases=[
-    ['kehat','zechariah-tzadok','לעץ של זכריה בן צדוק','Tree of Zechariah, son of Tzadok'],
+    ['kehat','zechariah-tzadok','למשפחת זכריה בן צדוק','Zechariah, son of Tzadok’s family'],
     ['zechariah-tzadok','kehat','למשפחת סעדיה (ג׳ימעאן) בן אהרון','Saadia (Jimaan), son of Aharon’s family'],
   ];
   for(const [from,to,label,english] of bases){
     const page=await f.call(BRANCH_PORTALS[from].home);
     assert.equal(page.status,200);
     const {document}=parseHTML(await page.text());
-    const selector=from==='zechariah-tzadok'?'.site-footer #relatedFamilyTreeFooterLink':'#treeView #relatedFamilyTrees a';
+    const selector='.site-footer #relatedFamilyTreeFooterLink';
     const links=document.querySelectorAll(selector);
     assert.equal(links.length,1);
     const link=links[0];

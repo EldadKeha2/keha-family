@@ -50,23 +50,15 @@ test('the same family buttons stay above the phone tree in fullscreen and return
   }
 });
 
-test('the link to the other family stays available in fullscreen and returns above each tree',()=>{
+test('marriage filters enter fullscreen and return to their place while family links stay in the footer',()=>{
   for(const portal of ['kehat','zechariah-tzadok'])for(const native of [false,true]){
     const h=harness({native,page:branchPortalHTML(html,portal)});
-    if(portal==='zechariah-tzadok'){
-      const link=h.document.querySelector('.site-footer #relatedFamilyTreeFooterLink'),parent=link.parentNode;
-      assert.equal(h.document.querySelector('#treeView #relatedFamilyTrees'),null);
-      h.click();assert.equal(link.parentNode,parent);
-      h.click();assert.equal(link.parentNode,parent);
-      continue;
-    }
-    const link=h.document.querySelector('#relatedFamilyTrees a');
-    assert.equal(link.parentNode.nextElementSibling,h.viewport);
-    h.click();
-    assert.equal(h.viewport.querySelector('#relatedFamilyTrees a'),link);
-    h.click();
-    assert.equal(link.parentNode.nextElementSibling,h.viewport);
-    assert.equal(h.document.querySelectorAll('#relatedFamilyTrees a').length,1);
+    const link=h.document.querySelector('.site-footer #relatedFamilyTreeFooterLink'),footer=link.parentNode;
+    const filters=h.document.getElementById('treeMarriageFilters'),parent=filters.parentNode,next=filters.nextSibling;
+    assert.equal(h.document.querySelector('#treeView #relatedFamilyTrees'),null);
+    h.click();assert.equal(link.parentNode,footer);assert.equal(filters.parentNode,h.viewport);
+    h.click();assert.equal(link.parentNode,footer);assert.equal(filters.parentNode,parent);assert.equal(filters.nextSibling,next);
+    assert.equal(h.document.querySelectorAll('#treeMarriageFilters').length,1);
   }
 });
 

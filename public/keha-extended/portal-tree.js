@@ -9,7 +9,7 @@
   let returnFocus=null;
   for(const trigger of document.querySelectorAll('[data-extended-open]')){
     trigger.querySelector('[data-extended-label]').textContent=trigger.dataset.extendedOpen==='footer'
-      ?config.branchPortal==='zechariah-tzadok'?tr('למשפחת קהא המורחבת','Extended Keha family'):tr('לאתר קהא המורחבת','Visit extended Keha')
+      ?config.marriageTree?tr('למשפחת קהא המורחבת','Extended Keha family'):tr('לאתר קהא המורחבת','Visit extended Keha')
       :tr('לאתר משפחת קהא המורחבת','The extended Keha family site');
   }
   if(dialog){
@@ -57,6 +57,35 @@
     });
   }
   if(!config.branchPortal)return;
+
+  const marriageFilters=document.getElementById('treeMarriageFilters');
+  let selectedMarriage=null;
+  if(marriageFilters){
+    marriageFilters.setAttribute('aria-label',tr('התמקדות במשפחה לפי נישואים','Focus on a family by marriage'));
+    document.getElementById('treeMarriageHelp').textContent=tr('לחיצה על זוג מציגה את משפחתו בלבד. לחיצה חוזרת מציגה את שני הצדדים.','Select a couple to show their family. Select them again to show both sides.');
+    for(const button of marriageFilters.querySelectorAll('[data-marriage-index]')){
+      button.lastElementChild.textContent=I.isEnglish?button.dataset.marriageLabelEn:button.dataset.marriageLabel;
+      button.addEventListener('click',()=>{
+        const index=Number(button.dataset.marriageIndex);
+        selectedMarriage=selectedMarriage===index?null:index;
+        for(const choice of marriageFilters.querySelectorAll('[data-marriage-index]')){
+          const active=Number(choice.dataset.marriageIndex)===selectedMarriage;
+          choice.setAttribute('aria-pressed',String(active));
+          choice.title=active?tr('הצגת שני הצדדים','Show both sides'):tr('התמקדות במשפחה זו','Focus on this family');
+        }
+        window.FamilyApp?.refreshTree();
+      });
+    }
+  }
+
+  function treeProjection(){
+    if(!marriageFilters||selectedMarriage===null)return null;
+    const units=window.FAMILY_DATA.units,unit=units[marriageFilters.dataset.familyUnit],union=unit.relationships[selectedMarriage];
+    // Project only the canvas. Profiles, shared records and the complete family
+    // graph keep their canonical people and relationships.
+    const root={...unit,people:[...union.people],displayPeople:[...union.people],children:[...union.children],relationships:[union],splitPartnerships:false,hideBranchLabel:true,parent:null};
+    return {root:unit.id,units:{...units,[unit.id]:root}};
+  }
 
   function zechariahPhoneFamilies(){
     const data=window.FAMILY_DATA;
@@ -156,10 +185,11 @@
   window.FamilyExtendedKeha={
     title:name,
     phoneFamilies:config.branchPortal==='zechariah'?zechariahPhoneFamilies():null,
+    treeProjection,
     renderTree(state){
       // Each single-family portal opens its full tree directly.
       if(window.FAMILY_DATA.branches.length===1&&state.branch==='all')state.mode='full';
-      document.getElementById('workspaceTitle').textContent=tr('האילן המשפחתי','Family tree');
+      document.getElementById('workspaceTitle').textContent=marriageFilters?(I.isEnglish?marriageFilters.dataset.treeTitleEn:marriageFilters.dataset.treeTitle):tr('האילן המשפחתי','Family tree');
       document.getElementById('mobileViewTitle').textContent=name();
       return false;
     },

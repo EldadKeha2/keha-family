@@ -296,16 +296,16 @@
     return `<svg class="tree-partnerships" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">${links}</svg>`+cards;
   }
 
-  function layoutTree(rootId,phone,overview,textScale) {
+  function layoutTree(rootId,phone,overview,textScale,units=data.units) {
     const sideOverview=phone&&overview&&data.branches.length>1;
-    const rootHistorySpace=!compactTreeYears&&!phone&&data.units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
+    const rootHistorySpace=!compactTreeYears&&!phone&&units[rootId].people.some(id=>data.people[id].aliyahYear)?40*textScale:0;
     const desktopOverview=!phone&&overview;
     const gap=(phone?20:desktopOverview?20:36)*textScale,levelHeight=(phone?223:desktopOverview?303:372)*textScale,top=(phone?40:desktopOverview?45:70)*textScale,pad=(phone?25:desktopOverview?32:48)*textScale;
     const positions=[],lines=[],connections=[],widths=new Map(),layouts=new Map();
     const children=unit=>overview&&unit.id!==data.root?[]:unit.children;
     const nodeWidth=unit=>(unit.siblingGroup?(phone?240:300):adaptiveTreeLayout?unit.people.length*(phone?136:146)+Math.max(0,unit.people.length-1)*(phone?14:28):!phone&&unit.id===data.root?788:unit.people.length>=2?(phone?174:desktopOverview?300:320)+(unit.people.length-2)*(phone?90:desktopOverview?160:174):(phone?80:desktopOverview?132:146))*textScale;
     function measure(id){
-      const unit=data.units[id],kids=children(unit),childLefts=new Map();
+      const unit=units[id],kids=children(unit),childLefts=new Map();
       kids.forEach(measure);
       const rowWidth=row=>row.reduce((sum,child)=>sum+widths.get(child),0)+Math.max(0,row.length-1)*gap;
       const row=(ids,left,span,rtl=true)=>{
@@ -338,9 +338,9 @@
       widths.set(id,width);layouts.set(id,{anchor,childLefts});return width;
     }
     function place(id,left,depth,spacing=0){
-      const unit=data.units[id],layout=layouts.get(id),x=left+layout.anchor,y=top+depth*levelHeight+(depth?rootHistorySpace:0)+spacing,partnershipSpace=phone&&unit.relationships?100*textScale:0;
+      const unit=units[id],layout=layouts.get(id),x=left+layout.anchor,y=top+depth*levelHeight+(depth?rootHistorySpace:0)+spacing,partnershipSpace=phone&&unit.relationships?100*textScale:0;
       positions.push({id,unit,x,y,width:nodeWidth(unit),depth});const kids=children(unit),centers=[];
-      for(const child of kids){const childLeft=left+layout.childLefts.get(child);centers.push(childLeft+layouts.get(child).anchor);place(child,childLeft,depth+(data.units[child].parentage==='grandchild'?2:1),spacing+partnershipSpace);}
+      for(const child of kids){const childLeft=left+layout.childLefts.get(child);centers.push(childLeft+layouts.get(child).anchor);place(child,childLeft,depth+(units[child].parentage==='grandchild'?2:1),spacing+partnershipSpace);}
       if(kids.length){
         const display=unit.displayPeople||unit.people,groups=(unit.relationships||[]).map(union=>({union,kids:kids.filter(child=>union.children.includes(child))})).filter(group=>group.kids.length);
         const assigned=new Set(groups.flatMap(group=>group.kids)),remaining=kids.filter(child=>!assigned.has(child));
@@ -356,15 +356,15 @@
     if(sideOverview){
       // The shared phone overview alternates family units on either side of
       // the parents: six branches make 3 + 3, five make 3 + 2, four make 2 + 2.
-      const columnWidth=Math.max(...data.branches.map(branch=>nodeWidth(data.units[branch.unit]))),centreGap=66*textScale,root=data.units[data.root];
+      const columnWidth=Math.max(...data.branches.map(branch=>nodeWidth(units[branch.unit]))),centreGap=66*textScale,root=units[data.root];
       width=2*columnWidth+centreGap+2*pad;height=740*textScale;
       positions.push({id:root.id,unit:root,x:width/2,y:45*textScale,width:nodeWidth(root),depth:0});
-      data.branches.forEach((branch,index)=>{const unit=data.units[branch.unit],side=(index%2===0?1:-1)*(I18n.isEnglish?-1:1);
+      data.branches.forEach((branch,index)=>{const unit=units[branch.unit],side=(index%2===0?1:-1)*(I18n.isEnglish?-1:1);
         positions.push({id:unit.id,unit,x:width/2+side*(columnWidth+centreGap)/2,y:(220+Math.floor(index/2)*170)*textScale,width:nodeWidth(unit),depth:1});
       });
     }else{width=measure(rootId)+2*pad;place(rootId,pad,0);height=Math.max(...positions.map(item=>item.y))+((phone?150:desktopOverview?260:overview?316:278)+30)*textScale;}
     const world=$('treeWorld');world.style.width=width+'px';world.style.height=height+'px';
-    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=(unit.id===rootId&&selectedTreeFamily())||branchFor(unit.branch);let label='';if(unit.id!==data.root&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(unit.parentage==='adopted')label=`<span class="branch-label">${I18n.isEnglish?'Adopted son':'בן מאומץ'}</span>`;if(unit.parentage==='grandchild')label=`<span class="branch-label">${I18n.isEnglish?'Grandson · father under research':'נכד · האב בבירור'}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>inBranch(person,unit.branch)&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
+    $('treeNodes').innerHTML=positions.map(({unit,x,y,width:w,depth})=>{const branch=(unit.id===rootId&&selectedTreeFamily())||branchFor(unit.branch);let label='';if(unit.id!==data.root&&!unit.hideBranchLabel&&(depth===0||overview))label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${safe(I18n.branchName(branch)||'')}</span>`;if(unit.parentage==='adopted')label=`<span class="branch-label">${I18n.isEnglish?'Adopted son':'בן מאומץ'}</span>`;if(unit.parentage==='grandchild')label=`<span class="branch-label">${I18n.isEnglish?'Grandson · father under research':'נכד · האב בבירור'}</span>`;if(scopedViews&&unit.relationship==='former')label=`<span class="branch-label" style="--branch-color:${branch?.color||'#a2824c'}">${I18n.isEnglish?'Former partners':'בני זוג לשעבר'}</span>`;const open=overview&&unit.id!==data.root?I18n.html`<button class="branch-open" data-open-branch="${unit.branch}" style="--branch-color:${branch.color}" aria-label="פתיחת ${safe(I18n.branchName(branch))}">${safe(I18n.branchName(branch))} <span class="branch-count">${people.filter(person=>inBranch(person,unit.branch)&&!isPlaceholder(person)).length}</span>${arrow}</button>`:'';return `<div class="tree-unit${unit.people.length===2?' couple':''}" data-unit="${treeUnitKey(unit.id)}" style="left:${x-w/2}px;top:${y}px;width:${w}px">${label}${unit.people.length===2?'<span class="union-diamond" aria-hidden="true"></span>':''}${treePeopleHTML(unit)}${open}</div>`;}).join('');
     let rootSpacingAdjustment=0,rootContentHeight=0;
     if(!phone&&rootHistorySpace){
       const rootElement=world.querySelector(`[data-unit="${treeUnitKey(rootId)}"]`),firstChild=positions.find(item=>item.depth===1);
@@ -421,7 +421,7 @@
       height=Math.max(...positions.map(bottom))+48*textScale;world.style.height=height+'px';
     }
     const incomingAnchor=childId=>{
-      const child=data.units[childId],position=positions.find(item=>item.id===childId);
+      const child=units[childId],position=positions.find(item=>item.id===childId);
       if(!child||!position)return null;
       const node=world.querySelector(`[data-unit="${treeUnitKey(childId)}"] [data-person-card="${child.people[0]}"] .portrait`);
       const rect=node?.getBoundingClientRect?.(),worldRect=world.getBoundingClientRect?.();
@@ -438,7 +438,7 @@
       }
     }
     for(const {id,x,y,centers,depth,partnershipSpace=0,parentPeople,parentRelationship,childUnits,depthStep=1,lane=0} of connections){
-      const targets=childUnits.map(childId=>({unit:childId,person:data.units[childId].people[0],x:incomingAnchor(childId),y:positions.find(item=>item.id===childId).y}));
+      const targets=childUnits.map(childId=>({unit:childId,person:units[childId].people[0],x:incomingAnchor(childId),y:positions.find(item=>item.id===childId).y}));
       const childCenters=targets.map(target=>target.x);
       const extra=(depth===0?rootHistorySpace+rootSpacingAdjustment:0)+partnershipSpace,historyRoot=depth===0&&rootContentHeight>0;
       // Join the parents' relationship line; label clearance belongs below them.
@@ -463,14 +463,15 @@
     const priorArea=treeViewportArea();
     const previous=preserveCamera&&treeCameraApplied&&camera.width&&camera.height?{scale:camera.scale,x:(priorArea.cx-camera.x)/(camera.width*camera.scale),y:(priorArea.cy-camera.y)/(camera.height*camera.scale)}:null;
     const phone=isPhone(),overview=state.branch==='all'&&state.mode==='overview',desktopOverview=!phone&&overview;
-    const rootId=state.branch==='all'?data.root:state.treeUnit||branchFor(state.branch).unit;
+    const projection=window.FamilyExtendedKeha?.treeProjection?.();
+    const rootId=projection?.root||(state.branch==='all'?data.root:state.treeUnit||branchFor(state.branch).unit);
     const householdOverview=Boolean(phone&&overview&&phoneFamilies);
     viewport.toggleAttribute('data-household-overview',householdOverview);
     viewport.dataset.overview=String(overview);
     const world=$('treeWorld');
     world.style.setProperty('--a11y-tree-scale',String(textScale));
     const layout=householdOverview?phoneFamilies.layout({world,nodes:$('treeNodes'),connectors:$('treeConnectors'),viewportWidth:viewport.clientWidth,textScale,
-      personCard:(id,unit)=>personCardHTML(data.people[id],null,unit)}):layoutTree(rootId,phone,overview,textScale);
+      personCard:(id,unit)=>personCardHTML(data.people[id],null,unit)}):layoutTree(rootId,phone,overview,textScale,projection?.units);
     const {width,height,positions}=layout;
     camera.width=width;camera.height=height;
     const roots=scopedViews?(window.FamilyExtendedKeha?.title?.()||data.units[data.root].people.map(id=>nameOf(data.people[id])).join(' · ')):I18n.t('יונה ושלמה');
@@ -511,7 +512,7 @@
     const viewport=$('treeViewport'),width=viewport.clientWidth,height=viewport.clientHeight;
     if(!isPhone())return {width,height,top:0,cx:width/2,cy:height/2};
     const controls=viewport.querySelector('.zoom-controls')?.offsetHeight||44,full=viewport.classList.contains('tree-is-fullscreen');
-    const familyBar=full?viewport.querySelector('#branchBar'):null;
+    const familyBar=full?viewport.querySelector('#branchBar, #treeMarriageFilters'):null;
     const top=familyBar?familyBar.offsetTop+familyBar.offsetHeight+8:full?($('treeFullscreenExit')?.offsetHeight||44)+24:controls+24;
     const bottom=full?controls+24:($('canvasHint')?.offsetHeight||20)+20;
     const available=Math.max(1,height-top-bottom);
@@ -932,7 +933,7 @@
       if(state.currentPerson===personId&&$('personDialog').open)renderGallery(item);
     }
   });
-  window.FamilyApp={setView,getView:()=>state.view,getPerson:id=>data.people[id],getPersonSummary:id=>({...data.people[id],...media.get(id)}),getPeople:()=>people.filter(person=>!person.extended&&!person.extra).map(person=>({...person,name:nameOf(person)})),nameOf:id=>data.people[id]?nameOf(data.people[id]):id,birthdayOf:id=>birthdayOf(data.people[id]),openPerson,birthdayHTML:id=>birthdayHTML(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
+  window.FamilyApp={setView,refreshTree:()=>{if(state.view==='tree')renderTree();},getView:()=>state.view,getPerson:id=>data.people[id],getPersonSummary:id=>({...data.people[id],...media.get(id)}),getPeople:()=>people.filter(person=>!person.extended&&!person.extra).map(person=>({...person,name:nameOf(person)})),nameOf:id=>data.people[id]?nameOf(data.people[id]):id,birthdayOf:id=>birthdayOf(data.people[id]),openPerson,birthdayHTML:id=>birthdayHTML(data.people[id]),updatePerson:updatePersonUI,toast,apiEnabled,openSharedGallery:(items,index)=>window.FamilyMedia?.open(items,index)};
   function simpleRoute(){const view=location.hash.slice(1).split('/')[0];if(['weddings','nostalgia'].includes(view))return;const target=validViews.has(view)?view:(!view?(isPhone()?'home':'tree'):null);if(target&&target!==state.view)setView(target,false);}
   window.addEventListener('hashchange',simpleRoute);window.addEventListener('popstate',simpleRoute);
   const routedBranch=()=>scopedViews&&location.hash.startsWith('#tree/')?location.hash.split('/')[1]:null;

@@ -3,6 +3,9 @@
   const viewport=document.getElementById('treeViewport'),button=document.getElementById('treeFullscreenButton');
   if(!viewport||!button)return;
   const relatedTrees=document.getElementById('relatedFamilyTrees');
+  const marriageFilters=document.getElementById('treeMarriageFilters');
+  const marriageAnchor=marriageFilters?document.createComment('marriage families'):null;
+  if(marriageAnchor)marriageFilters.before(marriageAnchor);
   const caption=document.createElement('span');caption.className='tree-fullscreen-label';button.append(caption);
   const exitButton=document.createElement('button');exitButton.type='button';exitButton.id='treeFullscreenExit';exitButton.hidden=true;
   exitButton.setAttribute('aria-controls',viewport.id);
@@ -41,6 +44,7 @@
     active=false;hadNative=false;
     viewport.classList.remove('tree-is-fullscreen');document.documentElement.classList.remove('tree-fullscreen-active');
     if(relatedTrees)viewport.before(relatedTrees);
+    if(marriageFilters)marriageAnchor.after(marriageFilters);
     viewport.scrollTop=0;viewport.scrollLeft=0;
     placeFamilyTabs();leaveNative();refresh();fit();
     if(restoreFocus)button.focus({preventScroll:true});
@@ -50,6 +54,7 @@
     active=true;hadNative=false;
     viewport.classList.add('tree-is-fullscreen');document.documentElement.classList.add('tree-fullscreen-active');
     if(relatedTrees)viewport.append(relatedTrees);
+    if(marriageFilters)viewport.append(marriageFilters);
     viewport.scrollTop=0;viewport.scrollLeft=0;
     window.FamilyTreeGuide?.hide();refresh();placeFamilyTabs();fit();button.focus({preventScroll:true});
     // The fixed viewport also fills the screen on browsers without this API.

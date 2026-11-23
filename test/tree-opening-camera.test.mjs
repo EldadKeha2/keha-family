@@ -72,8 +72,37 @@ test('each additional family tree opens on its founding parents at a readable si
     if(['shlomo','zechariah','zechariah-tzadok','kehat'].includes(site)){
       assert.ok(f.document.getElementById('overviewButton').closest('.workspace-header'));
       assert.equal(f.document.getElementById('treeGuideButton'),null);
-      assert.equal(f.document.getElementById('workspaceTitle').textContent,'האילן המשפחתי');
+      const title=site==='kehat'?'האילן המשפחתי של סעדיה (ג׳ימעאן) בן אהרון':site==='zechariah-tzadok'?'האילן המשפחתי של זכריה בן צדוק':'האילן המשפחתי';
+      assert.equal(f.document.getElementById('workspaceTitle').textContent,title);
     }
+  }
+});
+
+test('each marriage focuses its couple and descendants, and a second press restores both families without changing the shared graph',()=>{
+  for(const site of ['kehat','zechariah-tzadok'])for(const phone of [false,true])for(const english of [false,true])for(const text of [100,160]){
+    const f=fixture(site,{phone,english,text}),root=parents[site];
+    const originalUnits=structuredClone(f.data.units),visible=()=>[...new Set([...f.document.querySelectorAll('#treeNodes [data-person-card]')].map(card=>card.dataset.personCard))].sort();
+    const allPeople=visible(),initialScale=f.bounds(root).scale,buttons=[...f.document.querySelectorAll('#treeMarriageFilters button')];
+    assert.equal(buttons.length,2);assert.ok(buttons.every(button=>button.getAttribute('aria-pressed')==='false'));
+    assert.match(buttons[0].textContent,site==='kehat'?(english?/Shoshana/:/שושנה/):(english?/Amna/:/אמנה/));
+    assert.match(buttons[1].textContent,site==='kehat'?(english?/Miriam/:/מרים/):(english?/Tzinia/:/ציניה/));
+    for(const index of [0,1]){
+      buttons[index].click();f.flush();
+      assert.equal(buttons[index].getAttribute('aria-pressed'),'true');assert.equal(buttons[1-index].getAttribute('aria-pressed'),'false');
+      const union=f.data.units[root].relationships[index],expected=new Set(union.people),seen=new Set();
+      const visit=id=>{if(seen.has(id))return;seen.add(id);const unit=f.data.units[id];unit.people.forEach(person=>expected.add(person));unit.children.forEach(visit);};
+      union.children.forEach(visit);
+      assert.deepEqual(visible(),[...expected].sort(),site+': only the selected couple and their complete descendant branch');
+      const centred=assertCentred(f,root);
+      if(phone)assert.ok(centred.scale>initialScale,'Focusing one marriage enlarges its parents');
+      const lines=[...f.document.querySelectorAll('#treeConnectors [data-parent-unit="'+root+'"]')];
+      assert.equal(lines.length,1);assert.equal(lines[0].dataset.parentPeople,union.people.join(' '));
+      assert.deepEqual(f.data.units,originalUnits,'Canvas filtering never edits canonical family relationships');
+    }
+    buttons[1].click();f.flush();
+    assert.deepEqual(visible(),allPeople);assert.ok(buttons.every(button=>button.getAttribute('aria-pressed')==='false'));
+    assert.deepEqual(f.data.units,originalUnits);
+    assertCentred(f,root);
   }
 });
 

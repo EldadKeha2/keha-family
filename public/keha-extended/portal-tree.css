@@ -2,11 +2,24 @@
 .family-extended-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;max-width:100%;padding:8px 20px;border:1px solid var(--family-accent);border-radius:14px;background:linear-gradient(135deg,var(--paper),var(--family-tint));color:var(--family-ink);box-shadow:0 3px 0 var(--family-line),0 5px 16px #30291812;font:600 calc(16px * var(--a11y-text-scale,1))/1.45 var(--sans);cursor:pointer}
 .family-extended-button img,#mainNav [data-extended-open] img{display:block;width:32px;height:32px;flex:0 0 32px}
 .family-extended-button:hover{background:var(--family-tint);border-color:var(--family-ink)}
-html[data-branch-portal=zechariah-tzadok] body[data-active-view=tree] :is(#branchBar,.tree-header-mode,.tree-topline,#workspaceSubtitle,.workspace-title .section-diamond){display:none}
-html[data-branch-portal=zechariah-tzadok] .site-footer>.family-extended-access{gap:8px}
-html[data-branch-portal=zechariah-tzadok] .site-footer .family-extended-button{flex:1 1 0;min-width:0;max-width:310px;align-self:stretch;text-align:center;text-wrap:balance}
+html[data-marriage-tree] body[data-active-view=tree] :is(#branchBar,.tree-header-mode,.tree-topline,#workspaceSubtitle){display:none}
+html[data-marriage-tree] .site-footer>.family-extended-access{gap:8px}
+html[data-marriage-tree] .site-footer .family-extended-button{flex:1 1 0;min-width:0;max-width:310px;align-self:stretch;text-align:center;text-wrap:balance}
 .family-related-tree-link{text-decoration:none}
 .family-related-tree-link:focus-visible{outline:3px solid var(--family-accent);outline-offset:3px}
+html[data-marriage-tree]{--marriage-first:#923b2a;--marriage-second:#b45d48}
+html[data-branch-portal=kehat]{--marriage-first:#165b7d;--marriage-second:#257b93}
+html[data-marriage-tree] body[data-active-view=tree] .workspace-title{width:100%;min-width:0;gap:7px}
+html[data-marriage-tree] body[data-active-view=tree] .workspace-title h2{font-size:calc(clamp(16px,4.3vw,22px) * var(--a11y-text-scale,1));line-height:1.35;white-space:normal;text-wrap:balance}
+html[data-marriage-tree] body[data-active-view=tree] .workspace-title .section-diamond{display:inline-block;flex:none;font-size:calc(18px * var(--a11y-text-scale,1));line-height:1}
+.tree-marriage-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;flex:0 0 auto;width:100%;padding:0 8px 8px}
+.tree-marriage-filters button{--marriage-color:var(--marriage-first);display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:44px;padding:5px 6px;border:1px solid color-mix(in srgb,var(--marriage-color) 55%,white);border-radius:9px;background:color-mix(in srgb,var(--marriage-color) 9%,var(--surface));color:var(--marriage-color);font:600 calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans);text-align:center;text-wrap:balance}
+.tree-marriage-filters [data-marriage-index="1"]{--marriage-color:var(--marriage-second)}
+.tree-marriage-filters button:hover{border-color:var(--marriage-color);background:color-mix(in srgb,var(--marriage-color) 16%,var(--surface))}
+.tree-marriage-filters [aria-pressed=true]{border-color:var(--marriage-color);background:var(--marriage-color);color:white}
+.tree-marriage-filters button:focus-visible{outline:2px solid var(--marriage-color);outline-offset:2px}
+.tree-marriage-filters .marriage-diamond{flex:none;font-size:10px;line-height:1}
+#treeViewport.tree-is-fullscreen>#treeMarriageFilters{position:absolute;z-index:10;top:calc(64px + env(safe-area-inset-top,0px));inset-inline:6px;width:calc(100% - 12px);padding:4px;background:var(--paper);border-radius:10px}
 [data-extended-open]:focus-visible,.family-extended-dialog :is(a,button):focus-visible{outline:3px solid var(--family-accent);outline-offset:3px}
 #mainNav [data-extended-open]{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:normal}
 .home-tile-extended .home-tile-icon img{display:block;max-width:100%;height:auto}
@@ -40,8 +53,8 @@ html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .hom
 html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon{width:34px;height:38px;flex-basis:34px;border-radius:10px}
 html[data-branch-portal] :is(#homeTiles,#mobileMenuTiles,#desktopMenuTiles) .home-tile .home-tile-icon :is(svg,img){width:29px;height:29px}
 @media(max-width:700px){
-  html[data-branch-portal=zechariah-tzadok] .site-footer>.family-extended-access{gap:6px}
-  html[data-branch-portal=zechariah-tzadok] .site-footer .family-extended-button{gap:5px;padding:5px 6px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.3}
+  html[data-marriage-tree] .site-footer>.family-extended-access{gap:6px}
+  html[data-marriage-tree] .site-footer .family-extended-button{gap:5px;padding:5px 6px;font-size:calc(14px * var(--a11y-text-scale,1));line-height:1.3}
   html[data-branch-portal] .family-extended-button{font-size:calc(14px * var(--a11y-text-scale,1))}
   html[data-branch-portal] .family-extended-button img{width:24px;height:24px;flex-basis:24px}
   html[data-branch-portal] .phone-home-intro{gap:6px;padding:12px 0}
