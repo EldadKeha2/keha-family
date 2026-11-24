@@ -104,6 +104,15 @@
 .memory-editor .story-attachment-label{border:1px dashed #d5c7a8;padding:13px;border-radius:8px;background:#fcf8ed}
 .memory-editor .story-attachment-label span{font:12px/1.7 var(--sans);color:#91856b}
 .story-reader-dialog .memory-card-people{margin:10px 0 22px}.story-reader-dialog .story-full-text{overflow-wrap:anywhere}
+.memory-films{margin-block:1.2rem}
+.memory-film-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:.85rem}
+.memory-film{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.45rem .65rem;overflow:hidden;padding-bottom:.65rem;border:1px solid #c9ba96;border-radius:.65rem;color:#344c3d;background:#fffaf0;text-decoration:none}
+.memory-film img{display:block;grid-column:1/-1;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover}
+.memory-film>span{padding-inline-start:.7rem}.memory-film small,.memory-film strong{display:block}.memory-film small{font:.875rem/1.5 var(--sans)}
+.memory-film-play{margin-inline-end:.75rem}.memory-film:focus-visible{outline:3px solid #456547}
+.memory-films [data-film-viewer]:not(:empty){container-type:inline-size;margin-block:1rem}
+.memory-films iframe{display:block;width:100%;height:calc(56.25cqi + 9rem);border:0;border-radius:.5rem}
+.memory-films [data-film-viewer]>a{display:inline-block;padding-block:.45rem;color:#405537}
 .voices-intro{display:flex;align-items:center;gap:24px;padding:30px;border:1px solid #d8c8a8;border-radius:22px;background:radial-gradient(ellipse at 15% 60%,#ead7a94d,transparent 60%),linear-gradient(130deg,#fffdf5,#f6efdd);margin-bottom:24px;box-shadow:inset 0 0 0 7px #fff9ea80}
 .voices-intro h3{font:600 29px/1.4 var(--display,var(--sans));color:#666d54;margin:5px 0 8px}
 .voices-intro p{font:15px/1.8 var(--sans);color:#8c8067;margin:0}
@@ -184,20 +193,6 @@
 .voice-boost svg{width:21px;height:21px;fill:none;stroke:#a0e3dc;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .voice-boost select{min-height:40px;padding:5px 23px 5px 10px;border:1px solid #85c0bb;border-radius:8px;color:#f1fffb;background:#27565a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23b9ece5' stroke-width='1.8'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 6px center/12px;appearance:none;-webkit-appearance:none;font:inherit;font-variant-numeric:tabular-nums;cursor:pointer}
 .voice-list.shared-recording{grid-template-columns:minmax(0,42rem);justify-content:center}
-.voice-sharing{margin-block:12px 0;color:#37523e;font: .9375rem/1.5 var(--sans)}
-.voice-sharing summary{display:flex;align-items:center;gap:8px;width:fit-content;min-height:44px;cursor:pointer;font-weight:600;list-style:none}
-.voice-sharing summary::-webkit-details-marker{display:none}
-.voice-sharing summary:after{content:"";width:7px;height:7px;margin-inline-start:3px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg)}
-.voice-sharing[open] summary:after{transform:translateY(2px) rotate(225deg)}
-.voice-sharing svg{width:20px;height:20px;flex:none}
-.voice-share-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(8rem,100%),1fr));gap:6px}
-.voice-share-options :is(button,a){display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:5px 8px;border:1px solid #c9ba96;border-radius:8px;background:#fffaf0;color:#354b3c;font:inherit;text-align:center;text-decoration:none;cursor:pointer}
-.voice-share-options :is(button,a):hover{background:#eee4ca}
-.voice-sharing :focus-visible{outline:2px solid #456547;outline-offset:3px}
-.voice-share-status{margin:8px 0 0;font-size:.875rem}
-.voice-share-status:empty{display:none}
-.voice-share-url{width:100%;min-width:0;box-sizing:border-box;margin:6px 0;padding:8px;font:inherit}
-.voice-share-open{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-decoration:underline}
 .voices-view [hidden]{display:none!important}
 .voice-player-status,.voice-tone-note{font-size:.875rem;line-height:1.7;color:#f0dca8;margin:12px 0 0}
 .heirloom-player :focus-visible{outline:2px solid #ffdc8a;outline-offset:4px}

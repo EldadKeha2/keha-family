@@ -907,7 +907,7 @@ Object.assign(window.FAMILY_TRANSLATIONS,{
   "איזה זיכרון נפתח יחד?": "Which memory shall we open together?",
   "סיפור קטן, רגע גדול, או משהו שרק אתם זוכרים.": "A small story, a big moment, or something only you remember.",
   "כותבים זיכרון": "Write a memory",
-  "סיפורי שורשים": "Our roots",
+  "סיפורי עלייה ושורשים": "Aliyah and family roots",
   "זיכרונות מאנשים": "People we remember",
   "זיכרונות משפחתיים": "Family memories",
   "זיכרונות ילדות": "Childhood memories",

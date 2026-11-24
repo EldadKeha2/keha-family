@@ -9,6 +9,7 @@ import {familyApp} from '../family-apps/worker.mjs';
 import {MISATTRIBUTED_YONA_DOCUMENT,UNVERIFIED_YONA_MARRIAGE_DOCUMENT,UNATTRIBUTED_KEHAT_REGISTER,contentContext,storyInContext} from '../src/family-content.mjs';
 import {parseHTML} from 'linkedom';
 import {KEHAT_DOCUMENTS} from '../src/kehat-documents.mjs';
+import {ALIYAH_MEMORY_ID} from '../src/memories.mjs';
 import {sha256} from '../src/http.mjs';
 import {nameCorrectionKey} from '../src/name-corrections.mjs';
 const researchIds=new Set(KEHAT_DOCUMENTS.map(item=>item.id));
@@ -81,6 +82,38 @@ test('new family stories use the existing editor contract and remain relevant to
     assert.equal(blocked.status,400);
     const parent=await f.json(scope('extended','stories'),{method:'POST',body:{title:'Shlomo memory',body:'An old family memory',personIds:['shlomo'],category:'roots'}});
     assert.equal((await f.json(scope('extended','stories'))).stories.some(s=>s.id===parent.story.id),true);
+  }finally{f.close();}
+});
+
+test('the aliyah collection survives a category change and restart as one editable memory',async()=>{
+  const f=fixture();try{
+    const story=(await f.json('/api/stories')).stories.find(item=>item.id===ALIYAH_MEMORY_ID);
+    assert.equal(story.category,'roots');assert.equal(story.filmCollection,'aliyah');
+    const changed=await f.json('/api/stories/'+story.id+'/category',{method:'POST',body:{category:'family',expectedUpdatedAt:story.updatedAt}});
+    assert.equal(changed.story.filmCollection,'aliyah');
+    f.restart();
+    const matches=(await f.json('/api/stories')).stories.filter(item=>item.filmCollection==='aliyah');
+    assert.equal(matches.length,1);assert.equal(matches[0].category,'family');
+    assert.deepEqual(matches[0].personIds,['shlomo','yona']);
+    const result=(await f.json('/api/search?type=story&q='+encodeURIComponent('מן ההרים אל רחובות'))).items.find(row=>row.id===story.id);
+    assert.equal(result.href,'#stories/'+story.id);
+  }finally{f.close();}
+});
+
+test('archive tags classify existing scans, persist manual changes and respect each family scope',async()=>{
+  const f=fixture();try{
+    const labels=['נישואי יעקב ויהודית','מצבת אהרון','תעודת העלייה של יונה','תעודת פטירה - שלמה','מסמך מקרקעין'];
+    const ids=labels.map(name=>f.media('yona',{type:'document',name}).id);
+    const items=await f.json('/api/documents');
+    assert.deepEqual(ids.map(id=>items.items.find(item=>item.id===id).documentCategory),['marriage','graves','aliyah','death','other']);
+    assert.deepEqual(items.categories.map(c=>c.he),['תעודות נישואין','קברים','תעודות עליה','תעודות פטירה','אחר']);
+    const change={method:'POST',body:{category:'death',expectedCategory:'other'}};
+    const route='documents/'+ids[4]+'/category';
+    assert.equal((await f.call(scope('haim',route),change)).status,404);
+    await f.json(scope('keha',route),change);f.restart();
+    assert.equal((await f.json('/api/documents')).items.find(item=>item.id===ids[4]).documentCategory,'death');
+    assert.equal((await f.call('/api/'+route,{method:'POST',body:{category:'graves',expectedCategory:'other'}})).status,409);
+    assert.equal((await f.call('/api/'+route,{method:'POST',body:{category:'invalid',expectedCategory:'death'}})).status,400);
   }finally{f.close();}
 });
 

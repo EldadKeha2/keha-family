@@ -54,7 +54,7 @@ function withNameOrigin(html, home) {
     const source='<aside id="storyNameOriginSource" class="story-questionnaire" hidden><a class="secondary-button" href="'+href+'#stories">מקורות לסיפורי השורשים של סבא שלמה · מקור השם קהא</a></aside>';
     html=html.replace('<p id="memoryStatus"',source+'<p id="memoryStatus"');
   }
-  return html.replace(/(src="\/assets\/(?:home|memories)\.js)(?:\?[^"]*)?"/g,'$1?v=keha-name-origin-1"');
+  return html.replace(/(src="\/assets\/home\.js)(?:\?[^"]*)?"/g,'$1?v=keha-name-origin-1"');
 }
 
 function branchHomeHTML(original) {

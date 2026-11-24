@@ -4,9 +4,8 @@
   const t=(he,english)=>en?english:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase().trim();
-  const hasJourneys=!document.documentElement.dataset.nakashBranch&&!document.documentElement.dataset.extendedKeha;
   const categories=[
-    {id:'roots',title:t('סיפורי שורשים','Our roots'),hint:t('מאין באנו','Where our story began'),intro:t('המסעות, הבתים והאנשים שמהם צמחה המשפחה שלנו.','The journeys, homes and people our family grew from.'),icon:'M12 21v-8m0 4-6 4m6-4 6 4M7 13c-6 0-5-7-1-7 0-6 10-6 10 0 5 0 6 7 1 7Z'},
+    {id:'roots',title:t('סיפורי עלייה ושורשים','Aliyah and family roots'),hint:t('מאין באנו','Where our story began'),intro:t('המסעות, הבתים והאנשים שמהם צמחה המשפחה שלנו.','The journeys, homes and people our family grew from.'),icon:'M12 21v-8m0 4-6 4m6-4 6 4M7 13c-6 0-5-7-1-7 0-6 10-6 10 0 5 0 6 7 1 7Z'},
     {id:'people',title:t('זיכרונות מאנשים','People we remember'),hint:t('האנשים שבלב','The people in our hearts'),intro:t('משפט, מחווה או רגע שנשאר איתנו מאדם אהוב.','A word, a gesture, a moment with someone dear.'),icon:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m18 0v-2a4 4 0 0 0-3-4M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8m7 0a4 4 0 0 1 0 8'},
     {id:'family',title:t('זיכרונות משפחתיים','Family memories'),hint:t('הרגעים שלנו יחד','The moments we share'),intro:t('המפגשים, המסורות וכל הרגעים שהופכים אותנו למשפחה.','Our gatherings, traditions and the moments that make us a family.'),icon:'m3 11 9-8 9 8m-16-2v12h14V9m-10 12v-7h6v7'},
     {id:'childhood',title:t('זיכרונות ילדות','Childhood memories'),hint:t('כשהיינו ילדים','When we were little'),intro:t('המשחקים, החופשות, הריחות וההרפתקאות של פעם.','The games, holidays, familiar scents and adventures of childhood.'),icon:'m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z'},
@@ -118,12 +117,6 @@
     finally{categorySaves.delete(id);storyEdits++;renderStories();}
   }
   function renderStories(){
-    const folder=$('storyAliyahFolder');
-    if(folder){
-      folder.hidden=!hasJourneys||state.category!=='roots';
-      folder.querySelector('strong').textContent=t('שורשים ועלייה','Roots and aliyah');
-      const link=folder.querySelector('a');link.textContent=t('סיפורי העלייה','Aliyah stories');link.href='/aliyah/'+(en?'?lang=en':'');
-    }
     const originSource=$('storyNameOriginSource');
     if(originSource)originSource.hidden=state.category!=='all'&&state.category!=='roots';
     const selected=state.category==='all'?null:category(state.category),all=state.stories.filter(item=>!selected||category(item.category).id===selected.id);
@@ -134,11 +127,11 @@
     filterOptions($('storyYearFilter'),[...new Set(all.map(item=>item.year).filter(Boolean))].sort((a,b)=>a-b).map(year=>[year,year]),t('כל השנים','All years'));
     filterOptions($('storyPersonFilter'),peopleOptions(all),t('כל האנשים','Everyone'));
     const year=$('storyYearFilter').value,person=$('storyPersonFilter').value,q=normalize(state.query);
-    const items=all.filter(item=>(year==='all'||item.year===Number(year))&&(person==='all'||item.tags?.some(p=>p.id===person))&&(!q||normalize([item.title,item.body,item.author,item.year,...(item.tags||[]).map(I.searchNames)].join(' ')).includes(q))).sort((a,b)=>$('storySort').value==='oldest'?(a.year??9999)-(b.year??9999)||a.createdAt.localeCompare(b.createdAt):b.createdAt.localeCompare(a.createdAt));
+    const items=all.filter(item=>(year==='all'||item.year===Number(year))&&(person==='all'||item.tags?.some(p=>p.id===person))&&(!q||normalize([item.title,item.body,item.author,item.year,...(item.tags||[]).map(I.searchNames)].join(' ')).includes(q))).sort((a,b)=>$('storySort').value==='oldest'?(a.year??9999)-(b.year??9999)||(a.createdAt||'').localeCompare(b.createdAt||''):(b.createdAt||'').localeCompare(a.createdAt||''));
     $('storiesCount').textContent=state.loaded.stories?`${items.length} ${t(items.length===1?'זיכרון':'זיכרונות',items.length===1?'memory':'memories')}`:'';
     $('storiesEmpty').hidden=!state.loaded.stories||items.length>0;
     $('memoryEmptyText').textContent=all.length?t('לא נמצאו זיכרונות בסינון הזה. אפשר לשנות את הסינון או להוסיף זיכרון.','No memories match these filters. Change them or add a memory.'):selected?.intro||t('סיפור קטן, רגע גדול, או משהו שרק אתם זוכרים.','A small story, a big moment, or something only you remember.');
-    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><div class="memory-card-heading">${narratorHTML(item)}<h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4></div><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div>${categoryControl(item)}</article>`).join('');
+    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><div class="memory-card-heading">${narratorHTML(item)}<h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4></div><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div>${itemSharing(item,'story')}${categoryControl(item)}</article>`).join('');
   }
   function voiceSealHTML(item){
     const id=item.personIds?.[0]||item.tags?.[0]?.id,person=window.FamilyApp?.getPersonSummary?.(id),src=person?.profile;
@@ -146,53 +139,11 @@
     return '<span class="voice-card-seal" aria-hidden="true">♫</span>';
   }
   const sharedVoiceId=()=>location.hash.startsWith('#voices/')?location.hash.slice('#voices/'.length):'';
-  const shareSymbol='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8.7 10.5 6.6-4m-6.6 7 6.6 4"/><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/></svg>';
-  function voiceShareHTML(item){
+  function itemSharing(item,kind){
     const site=document.documentElement.dataset,url=new URL(site.nakashHome||'.',site.nakashOrigin||location.href);
     if(en)url.searchParams.set('lang',I.language);
-    url.hash='voices/'+item.id;
-    const encodedUrl=encodeURIComponent(url.href),title=encodeURIComponent(item.title),message=encodeURIComponent(item.title+'\n'+url.href);
-    const icon=name=>`<svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/share-icons.svg#${name}"></use></svg>`;
-    const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="#1688b5" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 18-7-4 18-6-6-3 3v-6l9-6-11 7Z"/></svg>';
-    const external='target="_blank" rel="noopener noreferrer"';
-    return `<details class="voice-sharing">
-      <summary aria-label="${t('שיתוף ההקלטה','Share recording')} · ${safe(item.title)}">${shareSymbol}${t('שיתוף ההקלטה','Share recording')}</summary>
-      <div class="voice-share-options">
-        <a href="https://wa.me/?text=${safe(message)}" ${external}>${icon('whatsapp')}WhatsApp</a>
-        <a href="https://www.facebook.com/sharer/sharer.php?u=${safe(encodedUrl)}" ${external}>${icon('facebook')}Facebook</a>
-        <button type="button" data-voice-share="messenger">${icon('messenger')}Messenger</button>
-        <button type="button" data-voice-share="instagram">${icon('instagram')}Instagram</button>
-        <a href="https://t.me/share/url?url=${safe(encodedUrl)}&amp;text=${safe(title)}" ${external}>${sendIcon}Telegram</a>
-        <a href="mailto:?subject=${safe(title)}&amp;body=${safe(message)}">${icon('email')}${t('מייל','Email')}</a>
-        <button type="button" data-voice-share="copy">${icon('link')}${t('העתקת קישור','Copy link')}</button>
-        ${typeof navigator.share==='function'?`<button type="button" data-voice-share="device">${shareSymbol}${t('שיתוף דרך המכשיר','Share via device')}</button>`:''}
-      </div>
-      <p class="voice-share-status" role="status"></p>
-      <input type="text" class="voice-share-url" dir="ltr" aria-label="${t('קישור להקלטה','Recording link')}" value="${safe(url.href)}" readonly hidden>
-      <a class="voice-share-open" ${external} hidden></a>
-    </details>`;
-  }
-  async function shareRecording(button){
-    const panel=button.closest('.voice-sharing'),field=panel.querySelector('input'),status=panel.querySelector('[role="status"]'),open=panel.querySelector('.voice-share-open');
-    const action=button.dataset.voiceShare,url=field.value;
-    field.hidden=true;open.hidden=true;status.textContent='';
-    if(action==='device'){
-      try{await navigator.share({title:panel.closest('.voice-card').querySelector('h4').textContent,url});return;}
-      catch(error){if(error?.name==='AbortError')return;}
-    }
-    const platform={messenger:'Messenger',instagram:'Instagram'}[action];
-    try{
-      await navigator.clipboard.writeText(url);
-      status.textContent=platform?t('הקישור הועתק. אפשר להדביק אותו בהודעה ב־','Link copied. Paste it into a message on ')+platform+'.':t('הקישור להקלטה הועתק','Recording link copied');
-    }catch{
-      field.hidden=false;field.focus();field.select();
-      status.textContent=t('אפשר להעתיק את הקישור מהשדה.','Select and copy the recording link.');
-    }
-    if(platform){
-      open.textContent=t('פתיחת ','Open ')+platform;
-      open.href=action==='instagram'?'https://www.instagram.com/direct/inbox/':'https://www.facebook.com/messages/';
-      open.hidden=false;
-    }
+    url.hash=(kind==='story'?'stories/':'voices/')+item.id;
+    return window.FamilyMemorySharing.markup(kind,item.title,url.href);
   }
   function renderVoices({background=false}={}){
     if(background&&[...$('voiceList').querySelectorAll('audio')].some(a=>!a.paused))return;
@@ -205,7 +156,7 @@
     $('voiceSharedMissing').hidden=!shared||!state.loaded.voices||items.length>0;
     const signature=JSON.stringify(items);if($('voiceList').dataset.signature!==signature){
       window.FamilyVoicePlayer?.destroy($('voiceList'));$('voiceList').querySelectorAll('audio').forEach(audio=>audio.pause());$('voiceList').dataset.signature=signature;
-      $('voiceList').innerHTML=items.map(item=>`<article class="voice-card"><div class="voice-card-heading">${voiceSealHTML(item)}<div><h4>${safe(item.title)}</h4><p>${[item.year,item.author].filter(Boolean).map(safe).join(' · ')}</p></div><button type="button" class="voice-edit" data-edit-recording="${item.id}" aria-label="${t('עריכת ההקלטה ','Edit recording ')+safe(item.title)}">${t('עריכה','Edit')}</button></div><audio controls preload="none" src="${safe(item.src)}" aria-label="${safe(item.title)}"></audio>${voiceShareHTML(item)}${item.body?`<p class="voice-description" dir="auto">${safe(item.body)}</p>`:''}<div class="voice-card-footer"><div class="memory-card-people">${tagsHTML(item,'voices')}</div><a href="${safe(item.src)}?download=1" download="${safe(item.filename)}">${t('הורדה','Download')} ↓</a></div></article>`).join('');
+      $('voiceList').innerHTML=items.map(item=>`<article class="voice-card"><div class="voice-card-heading">${voiceSealHTML(item)}<div><h4>${safe(item.title)}</h4><p>${[item.year,item.author].filter(Boolean).map(safe).join(' · ')}</p></div><button type="button" class="voice-edit" data-edit-recording="${item.id}" aria-label="${t('עריכת ההקלטה ','Edit recording ')+safe(item.title)}">${t('עריכה','Edit')}</button></div><audio controls preload="none" src="${safe(item.src)}" aria-label="${safe(item.title)}"></audio>${itemSharing(item,'voice')}${item.body?`<p class="voice-description" dir="auto">${safe(item.body)}</p>`:''}<div class="voice-card-footer"><div class="memory-card-people">${tagsHTML(item,'voices')}</div><a href="${safe(item.src)}?download=1" download="${safe(item.filename)}">${t('הורדה','Download')} ↓</a></div></article>`).join('');
     }
     window.FamilyVoicePlayer?.mount($('voiceList'));
     $('voicesCount').textContent=state.loaded.voices?`${items.length} ${t(items.length===1?'הקלטה':'הקלטות',items.length===1?'recording':'recordings')}`:'';
@@ -221,7 +172,7 @@
   const storyRoute=()=>location.hash.startsWith('#stories/')?location.hash.slice('#stories/'.length):'';
   function syncStoryRoute(){
     const id=storyRoute(),reader=$('storyReader');
-    if(hasJourneys&&id==='roots'&&state.view==='stories'){
+    if(id==='roots'&&state.view==='stories'){
       if(reader.open)reader.close();
       if(state.category!=='roots')chooseCategory('roots');
       return;
@@ -229,10 +180,41 @@
     if(!id){if(reader.open)reader.close();return;}
     if(state.view==='stories'&&(!reader.open||reader.dataset.storyId!==id))openStory(id,false);
   }
+  function journeyFilms(){
+    const films=[
+      {id:'shlomo',name:t('שלמה קהא','Shlomo Keha'),title:t('מן ההרים אל רחובות','From the Mountains to Rehovot'),year:1932},
+      {id:'yona',name:t('יונה נקאש','Yona Nakash'),title:t('סיפורים מעבר לים','Stories Across the Sea'),year:1934},
+    ];
+    // Dedicated branch apps serve a scoped API. Their full film links use the family film archive.
+    const origin=document.documentElement.dataset.nakashHome?'https://keha-family.eldadkeha.workers.dev':location.origin;
+    const cards=films.map(film=>{
+      const url=new URL('/aliyah/'+film.id+'/',origin);
+      if(en)url.searchParams.set('lang','en');
+      return `<a class="memory-film" href="${safe(url.href)}" data-memory-film="${film.id}">
+        <img src="/aliyah/${film.id}-art.webp" alt="" width="480" height="300" loading="lazy">
+        <span><small>${film.name} · <bdi>${film.year}</bdi></small><strong>${film.title}</strong></span>
+        <span class="memory-film-play" aria-hidden="true">▶</span></a>`;
+    });
+    return `<section class="memory-films" aria-label="${t('סרטי העלייה','Aliyah films')}"><div class="memory-film-choices">${cards.join('')}</div><div data-film-viewer></div></section>`;
+  }
+  function openFilm(link){
+    const url=new URL(link.getAttribute('href'));
+    if(url.origin!==location.origin)return false;
+    const viewer=$('storyReaderBody').querySelector('[data-film-viewer]');
+    if(!viewer)return false;
+    const title=link.querySelector('strong').textContent;
+    const fullURL=url.href;url.searchParams.set('embed','1');
+    if(viewer.querySelector('iframe')?.getAttribute('src')!==url.href){
+      viewer.innerHTML=`<iframe src="${safe(url.href)}" title="${safe(title)}" allowfullscreen></iframe>
+        <a href="${safe(fullURL)}">${t('לעמוד הסרט ולשיתוף','Film page and sharing')} · ${safe(title)}</a>`;
+    }
+    viewer.querySelector('iframe').focus();
+    return true;
+  }
   function openStory(id,sync=true){
     const item=state.stories.find(item=>item.id===id);if(!item)return;
     if(sync&&window.FamilyNavigation){$('storyReader').dataset.parentRoute=storyRoute()==='roots'?'#stories/roots':'#stories';window.FamilyNavigation.go('#stories/'+id);}
-    $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2><div class="story-reader-byline">${narratorHTML(item)}${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}</div><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
+    $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2><div class="story-reader-byline">${narratorHTML(item)}${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}</div><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${item.filmCollection==='aliyah'?journeyFilms():''}${itemSharing(item,'story')}${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
     $('storyReader').dataset.storyId=id;
     if(!$('storyReader').open)$('storyReader').showModal();
   }
@@ -303,6 +285,7 @@
     window.addEventListener('hashchange',syncStoryRoute);
     window.addEventListener('popstate',syncStoryRoute);
     $('storyReader').addEventListener('close',()=>{
+      if(!$('storyReader').open)$('storyReaderBody').querySelector('[data-film-viewer]')?.replaceChildren();
       if($('storyReader').open||storyRoute()!==$('storyReader').dataset.storyId)return;
       window.FamilyNavigation?.returnTo($('storyReader').dataset.parentRoute||'#stories');
     });
@@ -312,17 +295,17 @@
     window.addEventListener('family-people-loaded',refreshNarratorPortraits);
     $('memoryWorld').innerHTML=worldHTML();storyPicker=new PeoplePicker($('storyPeoplePicker'),t('מי מופיע בזיכרון?','Who appears in this memory?'));voicePicker=new PeoplePicker($('voicePeoplePicker'),t('את מי שומעים בהקלטה?','Who can we hear in this recording?'));
     document.addEventListener('click',event=>{
-      if(hasJourneys&&event.target.closest('#storyAliyahFolder a')&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){window.FamilyNavigation?.go('#stories/roots',{replace:true});return;}
       const c=event.target.closest('[data-memory-category]');if(c){
-        if(hasJourneys&&storyRoute()==='roots'&&c.dataset.memoryCategory!=='roots')window.FamilyNavigation?.go('#stories');
+        if(storyRoute()==='roots'&&c.dataset.memoryCategory!=='roots')window.FamilyNavigation?.go('#stories');
         chooseCategory(c.dataset.memoryCategory);return;
       }
-      if(event.target.closest('#memoryBook')){if(hasJourneys&&storyRoute()==='roots')window.FamilyNavigation?.go('#stories');chooseCategory('all');return;}
+      if(event.target.closest('#memoryBook')){if(storyRoute()==='roots')window.FamilyNavigation?.go('#stories');chooseCategory('all');return;}
+      const film=event.target.closest('[data-memory-film]');
+      if(film&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&openFilm(film)){event.preventDefault();return;}
       const read=event.target.closest('[data-open-story]');if(read){openStory(read.dataset.openStory);return;}
       const edit=event.target.closest('[data-edit-story]');if(edit){editStory(edit.dataset.editStory);return;}
       if(event.target.closest('#newStory,[data-new-story]')){editStory();return;}
       const voice=event.target.closest('[data-edit-recording]');if(voice){editRecording(voice.dataset.editRecording);return;}
-      const share=event.target.closest('[data-voice-share]');if(share){void shareRecording(share);return;}
       if(event.target.closest('#voiceAllRecordings')&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){
         state.query='';$('searchInput').value='';$('voicePersonFilter').value='all';
         if(window.FamilyNavigation){

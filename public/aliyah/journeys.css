@@ -426,5 +426,10 @@ body[data-film="shlomo"] .view .caption {
  font-size:clamp(15px,2.1vw,24px);z-index:2;
 }
 body[data-film="shlomo"] .view .caption:empty {display:none}
+.embedded-film{background:#142c2b}
+.embedded-film .journeys{max-width:none;margin:0;padding:0}
+.embedded-film .journeys>:not(.stage):not(#playError){display:none}
+.embedded-film .stage{border:0;box-shadow:none}
+.embedded-film #playError{margin:0;padding:.3rem .6rem;background:#fff6e4}
 body[data-film="shlomo"] .stage:fullscreen .caption,
 body[data-film="shlomo"] .stage:-webkit-full-screen .caption {font-size:clamp(18px,2.7vw,37px);bottom:16%}

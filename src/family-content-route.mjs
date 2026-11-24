@@ -2,6 +2,11 @@ import {HttpError,json,uid,readJSON} from './http.mjs';
 import {configured,putObject,deleteObject} from './hf.mjs';
 import {sniffAudio} from './memories.mjs';
 
+export async function setDocumentCategory(request,db,branch,id){
+  const {category,expectedCategory}=await readJSON(request,2048);
+  return json(await db('content.document.category',{branch,id,category,expectedCategory}));
+}
+
 export async function deleteFamilyDocument(request,db,branch,id){
   const {password}=await readJSON(request,2048);
   return json(await db('content.document.delete',{branch,id,password,client:request.headers.get('CF-Connecting-IP')||'unknown'}));

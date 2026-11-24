@@ -2,13 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseHTML } from 'linkedom';
+import { ALIYAH_MEMORY_ID } from '../src/memories.mjs';
 import { journeyFilm } from '../src/journey-films.mjs';
 
 const site = 'https://family.test';
 const assets = new URL('../public/aliyah/', import.meta.url);
 const html = (path) => readFile(new URL(path, assets), 'utf8');
 
-test('each film opens on its own page with the right edition, two caption tracks and a folder backlink', async () => {
+test('each film opens on its own page with the right edition, two caption tracks and a memory backlink', async () => {
   const { document: folder } = parseHTML(await html('index.html'));
   assert.equal(folder.querySelectorAll('.film-card').length, 2);
   for (const [id, version] of [
@@ -22,7 +23,8 @@ test('each film opens on its own page with the right edition, two caption tracks
       player.getAttribute('src'),
       `/api/journey-films/${id}/${version}`,
     );
-    assert.ok(page.querySelector('a[href="/aliyah/"]'));
+    assert.equal(page.querySelector('[data-parent-memory]').getAttribute('href'),'/#stories/'+ALIYAH_MEMORY_ID);
+    assert.ok(page.querySelector('[data-film-sharing]'));
     assert.ok(
       page
         .querySelector('a[download]')

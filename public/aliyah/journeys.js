@@ -3,6 +3,8 @@
   const $ = (selector) => document.querySelector(selector);
   const params = new URLSearchParams(location.search);
   const film = document.body.dataset.film;
+  const embedded=film&&params.get('embed')==='1';
+  if(embedded)document.body.classList.add('embedded-film');
   const translations = [...document.querySelectorAll('[data-en]')].map(
     (node) => ({ node, he: node.textContent, en: node.dataset.en }),
   );
@@ -22,6 +24,14 @@
     }
     $('[data-root]').href =
       (ui === 'en' ? '/?lang=en-US' : '/') + '#stories/roots';
+    const memoryLink=$('[data-parent-memory]');
+    if(memoryLink)memoryLink.href=(ui==='en'?'/?lang=en-US':'/')+memoryLink.hash;
+    const share=$('[data-film-sharing]');
+    if(share&&!embedded){
+      const url=new URL(location.pathname,location.origin);
+      if(ui==='en')url.searchParams.set('lang','en');
+      share.innerHTML=window.FamilyMemorySharing.markup('film',$('h1').textContent.trim(),url.href);
+    }
     for (const b of document.querySelectorAll('[data-ui]'))
       b.setAttribute('aria-pressed', String(b.dataset.ui === ui));
   }

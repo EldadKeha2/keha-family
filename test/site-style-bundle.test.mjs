@@ -10,7 +10,8 @@ const root=new URL('../',import.meta.url);
 
 test('site bundle preserves every authored stylesheet byte and cascade position',async()=>{
   const sources=JSON.parse(await readFile(new URL('scripts/site-style-sources.json',root),'utf8'));
-  assert.equal(sources.length,62);
+  assert.equal(sources.length,63);
+  assert.equal(sources[sources.indexOf('memories.css')+1],'memory-sharing.css');
   assert.equal(new Set(sources).size,sources.length);
   assert.equal(sources[0],'home-install.css');
   assert.deepEqual(sources.slice(-9),['photo-effects.css','photo-framing.css','desktop-media.css','site-search.css','desktop-share.css','founder-trees.css','family-documents.css','tree-fullscreen.css','tree-phone.css']);

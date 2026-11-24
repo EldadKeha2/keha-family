@@ -4,7 +4,7 @@
   const I=window.FamilyI18n,$=id=>document.getElementById(id),t=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase().trim();
-  const state={view:null,items:[],people:[],query:'',kind:'all',person:'all',loaded:false,loading:false,saving:false,deleting:false,deleteId:null,captureFile:null,captureURL:null};
+  const state={view:null,items:[],people:[],categories:[],category:'all',initialCategory:'',savingCategories:new Set(),query:'',kind:'all',person:'all',loaded:false,loading:false,saving:false,deleting:false,deleteId:null,captureFile:null,captureURL:null};
   const emblem='<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 6h18l8 8v28H12ZM30 6v10h8M18 23h14M18 29h14M18 35h9"/><path d="m6 16-3 2v25h25"/></svg>';
   const uploadIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8ZM14 3v5h5M12 17v-6m-3 3 3-3 3 3"/></svg>';
   const cameraIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 1-2h6l1 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="12" r="4"/></svg>';
@@ -15,28 +15,59 @@
     if(!response.ok)throw Error(I.error(data.error)||t('השינוי לא נשמר.','Your changes could not be saved.'));return data;
   }
   const audio=item=>item.kind==='audio'||item.mime?.startsWith('audio/');
+  const categoryLabel=category=>I.isEnglish?category.en:category.he;
+  function categoryOptions(selected){
+    return state.categories.map(c=>`<option value="${safe(c.id)}" ${selected===c.id?'selected':''}>${safe(categoryLabel(c))}</option>`).join('');
+  }
+  function renderCategoryControls(){
+    const buttons=[{id:'all',he:'הכול',en:'All'},...state.categories];
+    $('documentCategoryFilters').innerHTML=buttons.map(c=>`<button type="button" data-document-category="${safe(c.id)}" aria-pressed="${state.category===c.id}">${safe(categoryLabel(c))}</button>`).join('');
+    const select=$('documentUploadCategory'),selected=select.value;
+    select.innerHTML=`<option value="">${t('זיהוי לפי שם המסמך','Use the document name')}</option>`+categoryOptions('');
+    if($('documentEditor').open)select.value=selected;
+  }
+  async function setCategory(select){
+    const id=select.dataset.documentAssign,item=state.items.find(row=>row.id===id);
+    if(!item||state.savingCategories.has(id))return;
+    const category=select.value;
+    state.savingCategories.add(id);select.disabled=true;
+    try{
+      const result=await request('api/documents/'+id+'/category',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category,expectedCategory:item.documentCategory})});
+      const current=state.items.find(row=>row.id===id);
+      if(current)current.documentCategory=result.category;
+      $('documentsStatus').textContent=t('התגית נשמרה.','Tag saved.');
+    }catch(error){
+      await refresh();$('documentsStatus').textContent=error.message;
+    }finally{
+      state.savingCategories.delete(id);render();
+    }
+  }
   function render(){
-    const query=normalize(state.query),items=state.items.filter(item=>(state.kind==='all'||(audio(item)?'audio':'document')===state.kind)&&(state.person==='all'||item.personIds?.includes(state.person)||item.tags?.some(p=>p.id===state.person))&&(!query||normalize([item.name,item.title,item.filename,item.caption,...(item.tags||[]).map(p=>p.name)].join(' ')).includes(query)));
+    const query=normalize(state.query),items=state.items.filter(item=>(state.category==='all'||(item.documentCategory||'other')===state.category)&&(state.kind==='all'||(audio(item)?'audio':'document')===state.kind)&&(state.person==='all'||item.personIds?.includes(state.person)||item.tags?.some(p=>p.id===state.person))&&(!query||normalize([item.name,item.title,item.filename,item.caption,...(item.tags||[]).map(p=>p.name)].join(' ')).includes(query)));
     $('documentCount').textContent=t(`${items.length} פריטים`,`${items.length} records`);
     $('documentGrid').innerHTML=items.map(item=>{
       const title=item.name||item.title||item.filename,recording=audio(item),image=item.mime?.startsWith('image/')||item.documentPreview,pdf=window.FamilyPDF?.isPDF(item);
       const preview=pdf?`<button type="button" class="document-preview document-pdf-preview" data-document-open="${item.id}" aria-label="${safe(t('פתיחת ','Open ')+title)}">${window.FamilyPDF.preview(item)}</button>`:recording?`<div class="document-recording"><div class="document-audio">${emblem}<span>${t('קול מן העבר','A voice from the past')}</span><audio controls preload="none" src="${safe(item.src)}"></audio></div><button type="button" class="document-preview document-recording-preview" data-document-open="${item.id}" aria-label="${safe(t('האזנה ל','Listen to ')+title)}">${recordingIcon}</button></div>`:image?`<button type="button" class="document-preview" data-document-open="${item.id}" aria-label="${safe(t('פתיחת ','Open ')+title)}"><img src="${safe(item.documentPreview||item.src)}" alt="${safe(title)}" loading="lazy" decoding="async"></button>`:`<button type="button" class="document-preview document-paper" data-document-open="${item.id}" aria-label="${safe(t('פתיחת ','Open ')+title)}">${emblem}<span>${safe((item.filename?.split('.').at(-1)||'PDF').toUpperCase())}</span><small>${t('פתיחת המסמך','Open document')}</small></button>`;
-      return `<article class="document-card">${preview}<div class="document-card-body"><h3>${safe(title)}</h3>${item.caption?`<p class="document-description" dir="auto">${safe(item.caption)}</p>`:''}${item.sourceUrl?`<a class="document-source" href="${safe(item.sourceUrl)}" target="_blank" rel="noopener">${safe(item.sourceLabel||t('מקור היסטורי','Historical source'))}</a>`:''}<div class="document-people">${(item.tags||[]).map(p=>`<a href="#person/${encodeURIComponent(p.id)}">${safe(I.personName(p))}</a>`).join('')}</div><div class="document-actions"><a class="document-download" href="${safe(item.src)}${item.src.includes('?')?'&':'?'}download=1" download="${safe(item.filename||title)}">${t('הורדת המקור','Download original')}</a><button type="button" class="document-delete" data-document-delete="${safe(item.id)}" aria-label="${safe(t('מחיקת התיעוד: ','Delete record: ')+title)}">${t('מחיקה','Delete')}</button></div></div></article>`;
+      return `<article class="document-card">${preview}<div class="document-card-body"><h3>${safe(title)}</h3>${state.categories.length?`<select class="document-category-select" data-document-assign="${safe(item.id)}" aria-label="${safe(t('תגית עבור ','Tag for ')+title)}" ${state.savingCategories.has(item.id)?'disabled':''}>${categoryOptions(item.documentCategory||'other')}</select>`:''}${item.caption?`<p class="document-description" dir="auto">${safe(item.caption)}</p>`:''}${item.sourceUrl?`<a class="document-source" href="${safe(item.sourceUrl)}" target="_blank" rel="noopener">${safe(item.sourceLabel||t('מקור היסטורי','Historical source'))}</a>`:''}<div class="document-people">${(item.tags||[]).map(p=>`<a href="#person/${encodeURIComponent(p.id)}">${safe(I.personName(p))}</a>`).join('')}</div><div class="document-actions"><a class="document-download" href="${safe(item.src)}${item.src.includes('?')?'&':'?'}download=1" download="${safe(item.filename||title)}">${t('הורדת המקור','Download original')}</a><button type="button" class="document-delete" data-document-delete="${safe(item.id)}" aria-label="${safe(t('מחיקת התיעוד: ','Delete record: ')+title)}">${t('מחיקה','Delete')}</button></div></div></article>`;
     }).join('');
     $('documentsEmpty').hidden=items.length>0||!state.loaded;
+    const hasRecords=state.items.length>0;
+    $('documentsEmpty').querySelector('h3').textContent=hasRecords?t('לא נמצאו פריטים בסינון הזה','No records match these filters'):t('התיעוד המשפחתי מתחיל כאן','Our family archive begins here');
+    $('documentsEmpty').querySelector('p').hidden=hasRecords;
   }
   async function refresh(){
     if(state.loading)return;state.loading=true;$('documentsStatus').textContent=t('פותחים את הארכיון…','Opening the archive…');
     try{
-      const data=await request('api/documents');state.items=data.items;state.people=data.people;state.loaded=true;
+      const data=await request('api/documents');state.items=data.items;state.people=data.people;state.categories=data.categories||[];state.loaded=true;
+      renderCategoryControls();
       $('documentPersonFilter').innerHTML=`<option value="all">${t('כל האנשים','Everyone')}</option>`+state.people.map(p=>`<option value="${safe(p.id)}">${safe(p.name)}</option>`).join('');
       $('documentPersonFilter').value=state.person;render();syncDocumentRoute();$('documentsStatus').textContent='';
     }catch(error){$('documentsStatus').textContent=error.message;}finally{state.loading=false;}
   }
   function mount(){
-    section.innerHTML=`<header class="documents-intro"><span class="documents-emblem">${emblem}</span><div class="documents-intro-copy"><span class="small-eyebrow">${t('מן המגירה המשפחתית, לדורות הבאים','From the family drawer, for generations to come')}</span><h2>${t('מסמכים ותיעודים','Our family archive')}</h2><p>${t('תעודות, מסמכים היסטוריים והקלטות נדירות — כל פריט והסיפור שהוא שומר.','Certificates, historical records and rare recordings — each with a story to preserve.')}</p></div><div class="document-upload-actions"><button class="primary-button" id="newDocument" type="button">${uploadIcon}<span>${t('העלה מסמך','Upload document')}</span></button><button class="primary-button document-camera-button" id="captureDocument" type="button">${cameraIcon}<span>${t('צלם מסמך','Scan document')}</span></button></div><input id="documentCamera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden></header><div class="document-filters"><div class="archive-filters" role="group" aria-label="${t('סוג התיעוד','Record type')}"><button type="button" data-document-kind="all" aria-pressed="true">${t('הכול','All')}</button><button type="button" data-document-kind="document" aria-pressed="false">${t('תעודות ומסמכים','Documents')}</button><button type="button" data-document-kind="audio" aria-pressed="false">${t('הקלטות נדירות','Rare recordings')}</button></div><label>${t('אנשים בתיעוד','People in the records')}<select id="documentPersonFilter"><option value="all">${t('כל האנשים','Everyone')}</option></select></label><span id="documentCount" role="status"></span></div><p id="documentsStatus" class="archive-status" role="status"></p><div class="document-grid" id="documentGrid"></div><div class="archive-empty" id="documentsEmpty" hidden><h3>${t('התיעוד המשפחתי מתחיל כאן','Our family archive begins here')}</h3><p>${t('תעודה מהמגירה, מסמך של הבית או הקלטה ישנה — יש להם מקום כאן.','A certificate, a house record or an old recording — there is a place for them here.')}</p></div>`;
+    section.innerHTML=`<header class="documents-intro"><span class="documents-emblem">${emblem}</span><div class="documents-intro-copy"><span class="small-eyebrow">${t('מן המגירה המשפחתית, לדורות הבאים','From the family drawer, for generations to come')}</span><h2>${t('מסמכים ותיעודים','Our family archive')}</h2><p>${t('תעודות, מסמכים היסטוריים והקלטות נדירות — כל פריט והסיפור שהוא שומר.','Certificates, historical records and rare recordings — each with a story to preserve.')}</p></div><div class="document-upload-actions"><button class="primary-button" id="newDocument" type="button">${uploadIcon}<span>${t('העלה מסמך','Upload document')}</span></button><button class="primary-button document-camera-button" id="captureDocument" type="button">${cameraIcon}<span>${t('צלם מסמך','Scan document')}</span></button></div><input id="documentCamera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden></header><div id="documentCategoryFilters" class="archive-filters document-category-filters" role="group" aria-label="${t('תגיות מסמכים','Document tags')}"></div><div class="document-filters"><div class="archive-filters" role="group" aria-label="${t('סוג התיעוד','Record type')}"><button type="button" data-document-kind="all" aria-pressed="true">${t('כל סוגי הקבצים','All file types')}</button><button type="button" data-document-kind="document" aria-pressed="false">${t('תעודות ומסמכים','Documents')}</button><button type="button" data-document-kind="audio" aria-pressed="false">${t('הקלטות נדירות','Rare recordings')}</button></div><label>${t('אנשים בתיעוד','People in the records')}<select id="documentPersonFilter"><option value="all">${t('כל האנשים','Everyone')}</option></select></label><span id="documentCount" role="status"></span></div><p id="documentsStatus" class="archive-status" role="status"></p><div class="document-grid" id="documentGrid"></div><div class="archive-empty" id="documentsEmpty" hidden><h3>${t('התיעוד המשפחתי מתחיל כאן','Our family archive begins here')}</h3><p>${t('תעודה מהמגירה, מסמך של הבית או הקלטה ישנה — יש להם מקום כאן.','A certificate, a house record or an old recording — there is a place for them here.')}</p></div>`;
     const editor=document.createElement('dialog');editor.id='documentEditor';editor.className='document-dialog';editor.setAttribute('aria-labelledby','documentEditorTitle');
-    editor.innerHTML=`<form id="documentForm"><header><h2 id="documentEditorTitle">${t('הוספת תיעוד משפחתי','Add a family record')}</h2><button type="button" data-document-close aria-label="${t('סגירה','Close')}">×</button></header><label>${t('כותרת','Title')}<input id="documentTitle" maxlength="200" required dir="auto"></label><label>${t('הקובץ המקורי','Original file')}<input id="documentFile" type="file" accept=".pdf,.doc,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif,image/avif,audio/*" required></label><div class="document-capture-preview" id="documentCapturePreview" hidden><img id="documentCaptureImage" alt="${t('המסמך שצולם','Captured document')}"><p id="documentCaptureName" dir="auto"></p></div><p class="document-file-hint">${t('מסמכים עד 10MB · תמונות עד 50MB · הקלטות עד 90MB','Documents up to 10MB · Images up to 50MB · Audio up to 90MB')}</p><fieldset><legend>${t('למי שייך התיעוד?','Who is this record about?')}</legend><input type="search" id="documentPeopleSearch" aria-label="${t('חיפוש אדם','Find a person')}" placeholder="${t('חיפוש שם…','Search names…')}"><div class="document-person-choices" id="documentPeople"></div></fieldset><label>${t('תיאור ומקור המסמך','Description and source')}<textarea id="documentCaption" maxlength="5000" rows="4" dir="auto"></textarea></label><p id="documentUploadStatus" role="status"></p><p id="documentError" role="alert"></p><button class="primary-button" type="submit" id="saveDocument">${t('שמירה והעלאה','Save and upload')}</button></form>`;
+    editor.innerHTML=`<form id="documentForm"><header><h2 id="documentEditorTitle">${t('הוספת תיעוד משפחתי','Add a family record')}</h2><button type="button" data-document-close aria-label="${t('סגירה','Close')}">×</button></header><label>${t('כותרת','Title')}<input id="documentTitle" maxlength="200" required dir="auto"></label><label>${t('הקובץ המקורי','Original file')}<input id="documentFile" type="file" accept=".pdf,.doc,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif,image/avif,audio/*" required></label><div class="document-capture-preview" id="documentCapturePreview" hidden><img id="documentCaptureImage" alt="${t('המסמך שצולם','Captured document')}"><p id="documentCaptureName" dir="auto"></p></div><p class="document-file-hint">${t('מסמכים עד 10MB · תמונות עד 50MB · הקלטות עד 90MB','Documents up to 10MB · Images up to 50MB · Audio up to 90MB')}</p><label>${t('תגית המסמך','Document tag')}<select id="documentUploadCategory"></select></label><fieldset><legend>${t('למי שייך התיעוד?','Who is this record about?')}</legend><input type="search" id="documentPeopleSearch" aria-label="${t('חיפוש אדם','Find a person')}" placeholder="${t('חיפוש שם…','Search names…')}"><div class="document-person-choices" id="documentPeople"></div></fieldset><label>${t('תיאור ומקור המסמך','Description and source')}<textarea id="documentCaption" maxlength="5000" rows="4" dir="auto"></textarea></label><p id="documentUploadStatus" role="status"></p><p id="documentError" role="alert"></p><button class="primary-button" type="submit" id="saveDocument">${t('שמירה והעלאה','Save and upload')}</button></form>`;
     document.body.append(editor);
     const viewer=document.createElement('dialog');viewer.id='documentViewer';viewer.className='document-dialog document-viewer';viewer.setAttribute('aria-labelledby','documentViewerTitle');viewer.innerHTML=`<header><h2 id="documentViewerTitle"></h2><button type="button" data-document-close aria-label="${t('סגירה','Close')}">×</button></header><div id="documentViewerBody"></div><a id="documentOriginal" target="_blank" rel="noopener">${t('פתיחת המקור בחלון נוסף','Open original in another tab')}</a>`;document.body.append(viewer);
     const removal=document.createElement('dialog');removal.id='documentRemoval';removal.className='document-dialog document-removal';removal.setAttribute('aria-labelledby','documentRemovalTitle');
@@ -65,6 +96,8 @@
     async function openEditor(captured=null){
       if(!state.loaded)await refresh();if(!state.loaded)return;
       clearCapture();$('documentForm').reset();$('documentTitle').value='';$('documentError').textContent='';$('documentUploadStatus').textContent='';
+      state.initialCategory=state.category==='all'?'':state.category;
+      $('documentUploadCategory').value=state.initialCategory;
       $('documentPeople').innerHTML=state.people.map(p=>`<label data-search-names="${safe([p.name,p.nameEn,...(p.aliases||[])].filter(Boolean).join(' '))}"><input type="checkbox" value="${safe(p.id)}"><span>${safe(p.name)}</span></label>`).join('');
       if(captured){
         state.captureFile=captured;$('documentFile').required=false;$('documentTitle').value=captured.name.replace(/\.[^.]+$/,'');$('documentCaptureName').textContent=captured.name;$('documentCapturePreview').hidden=false;
@@ -87,7 +120,14 @@
     $('documentPeopleSearch').addEventListener('input',event=>{const query=normalize(event.target.value);for(const label of $('documentPeople').children)label.hidden=!normalize(label.dataset.searchNames||label.textContent).includes(query);});
     $('documentFile').addEventListener('change',()=>{clearCapture();if(!$('documentTitle').value)$('documentTitle').value=$('documentFile').files[0]?.name.replace(/\.[^.]+$/,'')||'';});
     $('documentPersonFilter').addEventListener('change',event=>{state.person=event.target.value;render();});
+    section.addEventListener('change',event=>{if(event.target.matches('[data-document-assign]'))void setCategory(event.target);});
     section.addEventListener('click',event=>{
+      const tag=event.target.closest('[data-document-category]');
+      if(tag){
+        state.category=tag.dataset.documentCategory;
+        for(const button of $('documentCategoryFilters').children)button.setAttribute('aria-pressed',String(button===tag));
+        render();return;
+      }
       const filter=event.target.closest('[data-document-kind]');if(filter){state.kind=filter.dataset.documentKind;for(const button of section.querySelectorAll('[data-document-kind]'))button.setAttribute('aria-pressed',String(button===filter));render();}
       const remove=event.target.closest('[data-document-delete]');
       if(remove){
@@ -98,7 +138,7 @@
       const item=state.items.find(item=>item.id===button.dataset.documentOpen);if(!item)return;
       openDocument(item);
     });
-    const dirtyDocument=()=>editor.open&&Boolean(state.captureFile||$('documentFile').files.length||$('documentTitle').value||$('documentCaption').value||$('documentPeople').querySelectorAll('input:checked').length);
+    const dirtyDocument=()=>editor.open&&Boolean($('documentUploadCategory').value!==state.initialCategory||state.captureFile||$('documentFile').files.length||$('documentTitle').value||$('documentCaption').value||$('documentPeople').querySelectorAll('input:checked').length);
     const canClose=dialog=>!state.saving&&(dialog!==editor||!dirtyDocument()||window.confirm(t('השינויים לא נשמרו. האם ברצונך לצאת?','Your changes have not been saved. Do you want to leave?')));
     for(const dialog of [editor,viewer]){dialog.querySelector('[data-document-close]').addEventListener('click',()=>{if(canClose(dialog))dialog.close();});dialog.addEventListener('cancel',event=>{if(!canClose(dialog))event.preventDefault();});}
     window.addEventListener('beforeunload',event=>{if(state.saving||dirtyDocument()){event.preventDefault();event.returnValue='';}});
@@ -108,6 +148,7 @@
       if(!personIds.length){$('documentError').textContent=t('בחרו לפחות אדם אחד שאליו שייך התיעוד.','Choose at least one person this record belongs to.');return;}
       if(!file)return;state.saving=true;$('saveDocument').disabled=true;$('documentError').textContent='';
       const fields={title:$('documentTitle').value,caption:$('documentCaption').value,personIds};
+      if($('documentUploadCategory').value)fields.documentCategory=$('documentUploadCategory').value;
       try{
         await new Promise((resolve,reject)=>{
           const xhr=new XMLHttpRequest();xhr.open('POST','api/documents/upload?filename='+encodeURIComponent(file.name));xhr.setRequestHeader('X-Family-Token',window.FAMILY_API_TOKEN);xhr.setRequestHeader('X-Family-Document',encodeURIComponent(JSON.stringify(fields)));xhr.setRequestHeader('Content-Type','application/octet-stream');

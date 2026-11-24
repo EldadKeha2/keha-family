@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {DOCUMENT_CATEGORIES} from '../src/document-categories.mjs';
 import {parseHTML} from 'linkedom';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
@@ -10,7 +11,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture({historyNavigation=false,href='https://family.test/#home',confirm:confirmDiscard=()=>true}={}){
   const {document,window:dom}=parseHTML('<html><body data-active-view="tree"><section id="documentsView" hidden></section></body></html>');
   const browser=historyNavigation?browserHistory(href):null,location=browser?.location||new URL(href);
-  const listeners=new Map(),confirmations=[],uploads=[],removals=[],previews=[],revoked=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
+  const listeners=new Map(),confirmations=[],uploads=[],removals=[],previews=[],revoked=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',documentCategory:'aliyah',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',documentCategory:'other',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
   const window={FamilyI18n:{isEnglish:false,error:v=>v,personName:p=>p.name,fetch:async(path,options)=>{
     if(options?.method==='POST'){
       if(options.headers?.['X-Family-Token']!=='test-token')return Response.json({error:'יש לרענן את הדף לפני שמירת השינוי.'},{status:403});
@@ -18,7 +19,7 @@ function fixture({historyNavigation=false,href='https://family.test/#home',confi
       if(body.password!=='owner-test')return Response.json({error:'הסיסמה אינה נכונה.'},{status:401});
       items.splice(items.findIndex(item=>path.includes(item.id)),1);return Response.json({deleted:true});
     }
-    return Response.json({items,people:[{id:'yona',name:'יונה קהא'},{id:'shlomo',name:'שלמה קהא'}]});
+    return Response.json({items,categories:DOCUMENT_CATEGORIES,people:[{id:'yona',name:'יונה קהא'},{id:'shlomo',name:'שלמה קהא'}]});
   }},FAMILY_API_TOKEN:'test-token'};
   class XHR{constructor(){this.upload={};this.headers={};}open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}send(file){uploads.push({file,url:this.url,headers:this.headers});this.status=201;this.responseText='{"saved":true}';queueMicrotask(()=>this.onload());}}
   const objectURL={createObjectURL(file){previews.push(file);return 'blob:captured-'+previews.length;},revokeObjectURL(url){revoked.push(url);}};
@@ -42,6 +43,24 @@ test('document photo uploads confirm before closing a changed form and preserve 
  const escape=new f.dom.Event('cancel',{cancelable:true});editor.dispatchEvent(escape);assert.equal(escape.defaultPrevented,true);
  let guarded=false;f.listeners.get('beforeunload')({preventDefault(){guarded=true;}});assert.equal(guarded,true);
  leave=true;close.click();assert.equal(editor.open,false);assert.equal(f.revoked.length,1);assert.equal(f.uploads.length,0);
+});
+
+test('the archive tag buttons filter existing records and preselect the tag on upload',async()=>{
+  const f=fixture();f.window.FamilyDocuments.activate('documents');await tick();
+  const buttons=[...f.document.querySelectorAll('[data-document-category]')];
+  assert.deepEqual(buttons.map(b=>b.textContent),['הכול','תעודות נישואין','קברים','תעודות עליה','תעודות פטירה','אחר']);
+  buttons.find(b=>b.dataset.documentCategory==='aliyah').click();
+  assert.equal(f.document.querySelectorAll('.document-card').length,1);
+  assert.equal(f.document.querySelector('.document-card h3').textContent,'תעודת עלייה');
+  f.document.getElementById('newDocument').click();
+  assert.equal(f.document.getElementById('documentUploadCategory').value,'aliyah');
+  const file=f.document.getElementById('documentFile');
+  Object.defineProperty(file,'files',{value:[{name:'scan.png',size:300}]});
+  f.document.querySelector('#documentPeople input[value=yona]').setAttribute('checked','');
+  f.document.getElementById('documentForm').dispatchEvent(new f.dom.Event('submit',{bubbles:true,cancelable:true}));
+  await tick();assert.equal(JSON.parse(decodeURIComponent(f.uploads[0].headers['X-Family-Document'])).documentCategory,'aliyah');
+  f.document.querySelector('[data-document-category="graves"]').click();assert.equal(f.document.getElementById('documentsEmpty').hidden,false);
+  f.document.querySelector('[data-document-category="all"]').click();assert.equal(f.document.querySelectorAll('.document-card').length,2);
 });
 test('the archive filters real documents and audio, searches descriptions, and opens the original image',async()=>{
   const f=fixture();f.window.FamilyDocuments.activate('documents');await tick();

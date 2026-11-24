@@ -58,7 +58,11 @@ export function searchSite(state,options={}){
     }
     for(const [table,kind] of [['stories','story'],['recordings','voice']])for(const row of state.rows('SELECT data FROM '+table)){
       const item=JSON.parse(row.data);
-      add({id:item.id,type:kind,title:item.title,excerpt:item.body,year:yearOf(item.year),date:item.createdAt||'',href:'#'+(kind==='story'?'stories':'voices'),content:kind==='story'?{id:item.id,title:item.title,body:item.body,author:item.author,year:item.year,attachments:list(item.attachments)}:{id:item.id,title:item.title,body:item.body,author:item.author,year:item.year,src:'/api/voices/'+item.id+'/audio'}},[item.title,item.body,item.author,item.year],list(item.personIds));
+      const href=kind==='story'?'#stories/'+item.id:'#voices';
+      const content=item.filmCollection?null:kind==='story'
+        ?{id:item.id,title:item.title,body:item.body,author:item.author,year:item.year,attachments:list(item.attachments)}
+        :{id:item.id,title:item.title,body:item.body,author:item.author,year:item.year,src:'/api/voices/'+item.id+'/audio'};
+      add({id:item.id,type:kind,title:item.title,excerpt:item.body,year:yearOf(item.year),date:item.createdAt||'',href,content},[item.title,item.body,item.author,item.year],list(item.personIds));
     }
     for(const row of state.rows('SELECT data FROM weddings')){
       const item=JSON.parse(row.data),unit=family.units[item.id];if(!unit||unit.people.length!==2)continue;

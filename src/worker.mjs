@@ -1,7 +1,7 @@
 import family from './family.mjs';
 import {uploadRecording} from './voices-route.mjs';
 import {journeyFilm} from './journey-films.mjs';
-import {uploadFamilyDocument,deleteFamilyDocument} from './family-content-route.mjs';
+import {uploadFamilyDocument,deleteFamilyDocument,setDocumentCategory} from './family-content-route.mjs';
 import {nakashProjection,nakashRoute} from './nakash.mjs';
 import {NAKASH_WRITE_TOKEN,nakashShell} from './nakash-shell.mjs';
 import {extendedKehaRoute} from './extended-keha.mjs';
@@ -394,6 +394,7 @@ const worker = {
       if(path==='/api/stories'&&request.method==='GET')return snapshot(request,await db('content.stories',{branch:'original'}));
       if(path==='/api/documents'&&request.method==='GET')return json(await db('content.documents',{branch:'original'}));
       if(path==='/api/documents/upload'&&request.method==='POST')return uploadFamilyDocument(request,env,db,ctx,{streamUpload,archiveFormat},'original');
+      if((match=/^\/api\/documents\/([a-f0-9]{32})\/category$/.exec(path))&&request.method==='POST')return await setDocumentCategory(request,db,'original',match[1]);
       if((match=/^\/api\/documents\/([a-f0-9]{32})\/delete$/.exec(path))&&request.method==='POST')return deleteFamilyDocument(request,db,'original',match[1]);
       if(path==='/api/voices'&&request.method==='GET')return snapshot(request,await db('recordings'));
       if((match=/^\/api\/voices\/([a-f0-9]{32})\/audio$/.exec(path))&&['GET','HEAD'].includes(request.method)){

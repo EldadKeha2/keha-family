@@ -7,6 +7,7 @@ import {webcrypto} from 'node:crypto';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/memories.js',import.meta.url),'utf8');
+const sharing=await readFile(new URL('../public/assets/memory-sharing.js',import.meta.url),'utf8');
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const person={id:'yona',name:'יונה נקאש קהא',nameEn:'Yona Nakash Keha',context:'Family'};
 const story={id:'a'.repeat(24),title:'הדרך הביתה',body:'סיפור משפחתי',category:'roots',year:null,author:'משפחה',personIds:['yona'],tags:[person],attachments:[],createdAt:'2026-11-01T00:00:00Z',updatedAt:'2026-11-01T00:00:00Z'};
@@ -51,6 +52,7 @@ function fixture({english=false,reduced=false,stories=[story],recordings=[record
   }
   const context=vm.createContext({window,document,location,history:browser?.history,navigator,URL,FormData:Form,Response,TextEncoder,crypto:webcrypto,btoa,XMLHttpRequest:XHR,matchMedia:query=>({matches:query.includes('700px')?phone:reduced}),setInterval:()=>0,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id)});
   if(browser)vm.runInContext(navigationSource,context);
+  vm.runInContext(sharing,context);
   vm.runInContext(source,context);
   if(browser)window.addEventListener('popstate',()=>{window.FamilyMemories.activate(location.hash.slice(1).split('/')[0]);});
   if(beforeReadyView)window.FamilyMemories.activate(beforeReadyView);
@@ -64,17 +66,39 @@ test('a cold roots link opens the aliyah folder when the router runs before the 
   const f=fixture({href:'https://family.test/#stories/roots',historyNavigation:true,beforeReadyView:'stories'});
   await f.flush();
   assert.equal(f.get('storiesView').hidden,false);
-  assert.equal(f.get('storyAliyahFolder').hidden,false);
+  assert.equal(f.get('storyAliyahFolder'),null);
+  assert.equal(f.get('storiesCount').textContent,'1 זיכרון');
   assert.equal(f.get('memoryWorld').dataset.category,'roots');
+});
+
+test('the two films form one shareable story in the book and its chapter',async()=>{
+  const filmStory={...story,id:'c'.repeat(24),title:'סיפורי העלייה של סבא שלמה וסבתא יונה',filmCollection:'aliyah'};
+  const copied=[];
+  const f=fixture({historyNavigation:true,stories:[story,{...story,id:'d'.repeat(24),category:'childhood'},filmStory],navigator:{clipboard:{writeText:async url=>copied.push(url)}}});
+  await f.activate('stories');
+  assert.equal(f.get('storyTimeline').children.length,3);
+  assert.equal(f.get('storiesCount').textContent,'3 זיכרונות');
+  f.click('[data-memory-category="roots"]');
+  assert.equal(f.get('storyTimeline').children.length,2);
+  f.click('[data-open-story="'+filmStory.id+'"]');
+  const reader=f.get('storyReaderBody');
+  assert.deepEqual([...reader.querySelectorAll('[data-memory-film]')].map(a=>new URL(a.getAttribute('href')).pathname),['/aliyah/shlomo/','/aliyah/yona/']);
+  f.click('#storyReaderBody [data-memory-share="copy"]');await f.flush();
+  assert.deepEqual(copied,['https://family.test/#stories/'+filmStory.id]);
+  f.click('[data-memory-film="shlomo"]');
+  assert.equal(reader.querySelector('iframe').getAttribute('src'),'https://family.test/aliyah/shlomo/?embed=1');
+  f.click('[data-memory-film="yona"]');assert.equal(reader.querySelectorAll('iframe').length,1);
+  assert.equal(reader.querySelector('iframe').getAttribute('src'),'https://family.test/aliyah/yona/?embed=1');
+  f.browser.history.back();await f.flush();assert.equal(reader.querySelector('iframe'),null);
 });
 
 test('the five category doors open from an ornamented book and each click turns its pages',async()=>{
   const f=fixture();await f.activate('stories');
   assert.equal(f.document.querySelectorAll('[data-memory-category]').length,5);
-  assert.match(f.get('memoryWorld').textContent,/סיפורי שורשים/);assert.doesNotMatch(f.get('memoryWorld').textContent,/סיפור העלייה/);
+  assert.match(f.get('memoryWorld').textContent,/סיפורי עלייה ושורשים/);assert.doesNotMatch(f.get('memoryWorld').textContent,/סיפור העלייה/);
   assert.ok(f.document.querySelector('.memory-book-art'));assert.ok(f.document.querySelector('.memory-turn-sheet'));
   f.click('[data-memory-category="roots"]');assert.equal(f.get('memoryWorld').classList.contains('is-turning'),true);
-  assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי שורשים');assert.match(f.get('storyTimeline').textContent,/הדרך הביתה/);
+  assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי עלייה ושורשים');assert.match(f.get('storyTimeline').textContent,/הדרך הביתה/);
   assert.equal(f.scrolls.includes('memoryCollection'),false);f.finishAnimation();assert.equal(f.get('memoryWorld').classList.contains('is-turning'),false);assert.equal(f.scrolls.at(-1),'memoryCollection');
   f.click('[data-memory-category="funny"]');assert.equal(f.get('storyTimeline').children.length,0);assert.equal(f.get('storiesEmpty').hidden,false);
   f.click('#newStory');assert.equal(f.get('storyEditor').open,true);assert.equal(f.get('storyCategory').value,'funny');
@@ -89,7 +113,7 @@ test('phone Back closes a story before leaving its filtered list, Forward reopen
     f.click('[data-open-story]');assert.equal(f.location.hash,'#stories/'+story.id);assert.equal(f.get('storyReader').open,true);
     const length=f.browser.history.length;
     f.browser.history.back();await f.flush();assert.equal(f.location.hash,'#stories');assert.equal(f.get('storyReader').open,false);
-    assert.equal(f.get('storyPersonFilter').value,'yona');assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי שורשים');
+    assert.equal(f.get('storyPersonFilter').value,'yona');assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי עלייה ושורשים');
     f.browser.history.forward();await f.flush();assert.equal(f.get('storyReader').open,true);assert.match(f.get('storyReaderBody').textContent,/סיפור משפחתי/);assert.equal(f.browser.history.length,length);
     f.get('storyReader').close();await f.flush();assert.equal(f.location.hash,'#stories');
     f.browser.history.back();await f.flush();assert.equal(f.location.hash,'#home');assert.equal(f.location.pathname,home);assert.equal(f.location.search,'?lang=en-GB');
@@ -160,24 +184,24 @@ test('each share destination receives the selected recording link, including the
   const second={...recording,id:'c'.repeat(32),title:'Grandpa & Grandma #1'};
   const f=fixture({recordings:[recording,second],english:true,navigator,href:'https://family.test/?install=1&media=old#voices'});
   await f.activate('voices');
-  const panels=[...f.document.querySelectorAll('.voice-sharing')];
+  const panels=[...f.document.querySelectorAll('.memory-sharing')];
   assert.equal(panels.length,2);assert.equal(panels[1].previousElementSibling.localName,'audio');
   const url='https://family.test/?lang=en-US#voices/'+second.id,panel=panels[1];
   assert.equal(panel.querySelector('input').value,url);assert.notEqual(panels[0].querySelector('input').value,url);
-  const links=[...panel.querySelectorAll('.voice-share-options a')].map(a=>new URL(a.getAttribute('href')));
+  const links=[...panel.querySelectorAll('.memory-share-options a')].map(a=>new URL(a.getAttribute('href')));
   assert.equal(links[0].searchParams.get('text'),second.title+'\n'+url);
   assert.equal(links[1].searchParams.get('u'),url);assert.equal(links[2].searchParams.get('url'),url);
   assert.equal(links[3].searchParams.get('subject'),second.title);assert.equal(links[3].searchParams.get('body'),second.title+'\n'+url);
   for(const action of ['device','copy','messenger','instagram']){
-    panel.querySelector('[data-voice-share="'+action+'"]').dispatchEvent(new f.window.Event('click',{bubbles:true}));
+    panel.querySelector('[data-memory-share="'+action+'"]').dispatchEvent(new f.window.Event('click',{bubbles:true}));
     await f.flush();
-    if(['messenger','instagram'].includes(action))assert.equal(panel.querySelector('.voice-share-open').hidden,false);
+    if(['messenger','instagram'].includes(action))assert.equal(panel.querySelector('.memory-share-open').hidden,false);
   }
   assert.equal(sent.length,1);assert.equal(sent[0].title,second.title);assert.equal(sent[0].url,url);
   assert.deepEqual(copied,[url,url,url]);
   navigator.share=async()=>{throw new DOMException('Cancelled','AbortError');};
-  panel.querySelector('[data-voice-share="device"]').dispatchEvent(new f.window.Event('click',{bubbles:true}));await f.flush();
-  assert.equal(copied.length,3);assert.equal(panel.querySelector('.voice-share-status').textContent,'');
+  panel.querySelector('[data-memory-share="device"]').dispatchEvent(new f.window.Event('click',{bubbles:true}));await f.flush();
+  assert.equal(copied.length,3);assert.equal(panel.querySelector('.memory-share-status').textContent,'');
 });
 test('shared links open a single recording on load and history navigation, with manual copy when needed',async()=>{
   const second={...recording,id:'c'.repeat(32),title:'ראיון שני',src:'/second.mp3'};
@@ -186,9 +210,9 @@ test('shared links open a single recording on load and history navigation, with 
   assert.deepEqual([...f.get('voiceList').querySelectorAll('h4')].map(el=>el.textContent),[second.title]);
   assert.equal(f.get('voiceList').querySelector('audio').getAttribute('src'),second.src);
   assert.equal(f.get('voiceAllRecordings').hidden,false);assert.equal(f.get('voicePersonFilter').closest('label').hidden,true);
-  assert.equal(f.document.querySelector('[data-voice-share="device"]'),null);
-  f.click('[data-voice-share="copy"]');await f.flush();
-  const field=f.document.querySelector('.voice-share-url');
+  assert.equal(f.document.querySelector('[data-memory-share="device"]'),null);
+  f.click('[data-memory-share="copy"]');await f.flush();
+  const field=f.document.querySelector('.memory-share-url');
   assert.equal(field.hidden,false);assert.equal(field.selected,true);assert.equal(field.value,f.location.href);
   f.location.hash='#voices/'+('d'.repeat(32));f.window.dispatchEvent(new f.window.Event('hashchange'));
   assert.equal(f.get('voiceSharedMissing').hidden,false);assert.equal(f.get('voiceList').children.length,0);
@@ -205,7 +229,7 @@ test('each memory has five category choices at its bottom and saves only its cat
 });
 test('moving a memory updates its chapter without switching the reader out of the chosen chapter',async()=>{
   const f=fixture();await f.activate('stories');f.click('[data-memory-category="roots"]');const id='storyCategory-'+story.id;f.get(id).value='funny';f.emit(id,'change');await f.flush();
-  assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי שורשים');assert.equal(f.get('storyTimeline').children.length,0);assert.match(f.notices.at(-1),/סיפורים מצחיקים/);
+  assert.equal(f.get('memoryCollectionTitle').textContent,'סיפורי עלייה ושורשים');assert.equal(f.get('storyTimeline').children.length,0);assert.match(f.notices.at(-1),/סיפורים מצחיקים/);
   f.click('[data-memory-category="funny"]');assert.match(f.get('storyTimeline').textContent,/הדרך הביתה/);assert.equal(f.get(id).value,'funny');
 });
 test('a stale category change restores the saved category and keeps the memory available for retry',async()=>{
@@ -226,7 +250,7 @@ test('audio uploads send original bytes, Hebrew metadata, people and a stable re
 });
 test('reduced motion skips page animation, and failed loading does not masquerade as an empty archive',async()=>{
   const f=fixture({reduced:true,english:true,fail:true});await f.activate('stories');f.click('[data-memory-category="roots"]');
-  assert.equal(f.get('memoryWorld').classList.contains('is-turning'),false);assert.equal(f.get('memoryCollectionTitle').textContent,'Our roots');
+  assert.equal(f.get('memoryWorld').classList.contains('is-turning'),false);assert.equal(f.get('memoryCollectionTitle').textContent,'Aliyah and family roots');
   assert.equal(f.get('storiesEmpty').hidden,true);assert.equal(f.get('memoryStatus').textContent,'Offline');assert.match(f.get('memoryBook').textContent,/Our memories/);
   assert.equal(f.requests.some(r=>r.options.method==='POST'),false);
 });

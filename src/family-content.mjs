@@ -5,6 +5,7 @@ import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
 import {extendedGalleryGenerations,extendedGalleryPhoto} from '../public/keha-extended/gallery-generations.mjs';
 import {HttpError,text,uid} from './http.mjs';
 import {extendedContactBranch} from './extended-people.mjs';
+import {DOCUMENT_CATEGORIES,checkDocumentCategory,documentCategory} from './document-categories.mjs';
 
 export const ORIGINAL_PHOTO_PEOPLE=new Set(['shlomo','yona','ruti','becker-parent','yehiel','avigail','ora','shosh']);
 const originalPeople=new Set(Object.keys(original.people));
@@ -233,15 +234,20 @@ export function contentDocuments(state,branch){
     if(excluded(item)||!mediaInContext(item,context)&&!attachments.has(item.id))continue;
     const key=(item.filename||item.name||item.id)+'\u001f'+item.size;
     const old=merged.get(key),personIds=subjects(item);
-    if(old){old.sourceIds.push(source.id);old.personIds=[...new Set([...old.personIds,...personIds])];old.tags=old.personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}));continue;}
-    merged.set(key,{...state.mediaPublic(source),documentPreview:source.documentPreview||null,sourceUrl:source.sourceUrl||null,sourceLabel:source.sourceLabel||null,sourceIds:[source.id],createdAt:source.createdAt,kind:source.mime?.startsWith('audio/')?'audio':'document',personIds,tags:personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}))});
+    if(old){
+      old.sourceIds.push(source.id);old.personIds=[...new Set([...old.personIds,...personIds])];
+      old.tags=old.personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}));
+      if(source.documentCategory)old.documentCategory=source.documentCategory;
+      continue;
+    }
+    merged.set(key,{...state.mediaPublic(source),documentCategory:documentCategory(source),documentPreview:source.documentPreview||null,sourceUrl:source.sourceUrl||null,sourceLabel:source.sourceLabel||null,sourceIds:[source.id],createdAt:source.createdAt,kind:source.mime?.startsWith('audio/')?'audio':'document',personIds,tags:personIds.map(id=>({id,name:context.tree.people[id]?.name||state.person(id).name}))});
   }
   for(const item of state.run('recordings').recordings){
-    if(contentHasSubjects(item,context,true))merged.set('audio:'+item.id,{...item,recording:true,kind:'audio',name:item.title,caption:item.body});
+    if(contentHasSubjects(item,context,true))merged.set('audio:'+item.id,{...item,recording:true,kind:'audio',documentCategory:item.documentCategory||'other',name:item.title,caption:item.body});
   }
   const selectable=context.contacts?Object.values(context.contacts):[...context.documentIds].map(id=>context.tree.people[id]).filter(p=>p&&!p.placeholder);
   const people=selectable.map(({id,name,nameEn,aliases})=>({id,name,nameEn,aliases}));
-  return {items:[...merged.values()].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')),people};
+  return {items:[...merged.values()].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')),people,categories:DOCUMENT_CATEGORIES};
 }
 
 export function handleFamilyContent(state,action,args){
@@ -254,6 +260,24 @@ export function handleFamilyContent(state,action,args){
     return scopedMediaLinks({...result,people:Object.fromEntries(Object.entries(result.people).filter(([id])=>context.tree.people[id]).map(([id,person])=>[id,shlomoProfile(state,person,items)]))},branch);
   }
   if(action==='content.documents')return contentDocuments(state,branch);
+  if(action==='content.document.category'){
+    const category=checkDocumentCategory(args.category);
+    const item=contentDocuments(state,branch).items.find(item=>item.id===args.id);
+    if(!item)throw new HttpError(404,'התיעוד לא נמצא במשפחה הזאת.');
+    if(category===item.documentCategory)return {id:item.id,category};
+    if(item.documentCategory!==args.expectedCategory)throw new HttpError(409,'התגית השתנתה. הרשימה תתרענן.');
+    if(item.recording){
+      const recording=state.recordings.raw(item.id);
+      state.sql.exec('UPDATE recordings SET data=? WHERE id=?',JSON.stringify({...recording,documentCategory:category}),item.id);
+      state.recordings.touch();
+    }else{
+      for(const id of item.sourceIds){
+        const source=state.media(id);
+        state.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify({...source,documentCategory:category}),id);
+      }
+    }
+    return {id:item.id,category};
+  }
   if(action==='content.document.delete'){
     const item=contentDocuments(state,branch).items.find(item=>item.id===args.id);
     if(!item)throw new HttpError(404,'המסמך לא נמצא במשפחה הזאת.');
@@ -325,8 +349,10 @@ export function handleFamilyContent(state,action,args){
     if(!Array.isArray(personIds)||!personIds.length||personIds.length>30||personIds.some(id=>typeof id!=='string'||(context.contacts?!Object.hasOwn(context.contacts,context.canonical(id)):!context.documentIds.has(context.canonical(id)))))throw new HttpError(400,'בחרו את האנשים שאליהם שייך המסמך.');
     if(branch==='extended'&&!personIds.some(id=>context.documentIds.has(context.canonical(id))))throw new HttpError(400,'בחרו גם בן משפחה מהדורות המתועדים בארכיון המשותף.');
     const clean={title:text(fields.title,'כותרת',200,true),caption:text(fields.caption||'','תיאור',5000),personIds:[...new Set(personIds.map(context.canonical))]};
+    if(fields.documentCategory!=null)clean.documentCategory=checkDocumentCategory(fields.documentCategory);
     if(action==='content.document.prepare')return {fields:clean};
     const item={...args.item,name:clean.title,caption:clean.caption,personId:clean.personIds[0],documentPeople:clean.personIds,familyScopes:[branch],category:'personal'};
+    if(clean.documentCategory)item.documentCategory=clean.documentCategory;
     state.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)',item.id,item.category,item.personId,JSON.stringify(item));
     for(const id of clean.personIds){state.sql.exec('INSERT OR IGNORE INTO media_tags(media_id,person_id) VALUES(?,?)',item.id,id);state.savePerson(state.person(id));}
     return {saved:true,item:state.mediaPublic(item)};

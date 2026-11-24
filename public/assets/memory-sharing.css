@@ -1,0 +1,14 @@
+.memory-sharing{margin-block:12px 0;color:#37523e;font: .9375rem/1.5 var(--sans,system-ui,sans-serif)}
+.memory-sharing summary{display:flex;align-items:center;gap:8px;width:fit-content;min-height:44px;cursor:pointer;font-weight:600;list-style:none}
+.memory-sharing summary::-webkit-details-marker{display:none}
+.memory-sharing summary:after{content:"";width:7px;height:7px;margin-inline-start:3px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg)}
+.memory-sharing[open] summary:after{transform:translateY(2px) rotate(225deg)}
+.memory-sharing svg{width:20px;height:20px;flex:none}
+.memory-share-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(8rem,100%),1fr));gap:6px}
+.memory-share-options :is(button,a){display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:5px 8px;border:1px solid #c9ba96;border-radius:8px;background:#fffaf0;color:#354b3c;font:inherit;text-align:center;text-decoration:none;cursor:pointer}
+.memory-share-options :is(button,a):hover{background:#eee4ca}
+.memory-sharing :focus-visible{outline:2px solid #456547;outline-offset:3px}
+.memory-share-status{margin:8px 0 0;font-size:.875rem}
+.memory-share-status:empty{display:none}
+.memory-share-url{width:100%;min-width:0;box-sizing:border-box;margin:6px 0;padding:8px;font:inherit}
+.memory-share-open{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-decoration:underline}
