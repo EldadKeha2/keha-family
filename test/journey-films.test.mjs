@@ -12,7 +12,7 @@ test('each film opens on its own page with the right edition, two caption tracks
   const { document: folder } = parseHTML(await html('index.html'));
   assert.equal(folder.querySelectorAll('.film-card').length, 2);
   for (const [id, version] of [
-    ['shlomo', 8],
+    ['shlomo', 9],
     ['yona', 2],
   ]) {
     assert.ok(folder.querySelector(`a.film-card[href="/aliyah/${id}/"]`));
@@ -46,7 +46,10 @@ test('each film opens on its own page with the right edition, two caption tracks
     }
     if (id === 'shlomo') {
       assert.equal(cues[0][0], 10);
-      assert.equal(cues[1][1], 24);
+      assert.ok(cues.find(c => c[2].includes('בן שלוש'))[1] < 19);
+      assert.ok(page.querySelector('.view #caption'));
+      assert.ok((await html('shlomo.he.vtt')).includes('line:80%'));
+      assert.ok((await html('shlomo.en.vtt')).includes('line:80%'));
       for (const wording of ['מלפנים ומאחור', 'על חמורים', 'בנפחות', 'עשרים וחמש', 'אישרו לי העלייה']) {
         assert.ok(cues.some((c) => c[4] === 'voice' && c[2].includes(wording)));
       }
@@ -63,7 +66,7 @@ test('each film opens on its own page with the right edition, two caption tracks
       assert.ok(find('1942')[1] <= find('שלמה בן 35')[0]);
       assert.ok(find('רותי בת 2–3')[2].includes('אלישבע בת פחות משנה'));
       assert.ok(find('רותי בת 2–3')[1] - find('1942')[0] >= 15);
-      assert.ok(cues.find((c) => c[4] === 'voice')[0] > 20);
+      assert.ok(cues.find((c) => c[4] === 'voice')[0] >= 20);
     }
   }
 });
