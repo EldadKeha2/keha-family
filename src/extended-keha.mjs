@@ -1,5 +1,6 @@
 import {nakashHTML,NAKASH_WRITE_TOKEN} from './nakash-shell.mjs';
 import {compatRoute} from './nakash-compat.mjs';
+import {otherExtendedPeople} from './extended-people.mjs';
 import {familyAppOrigins} from './family-app-origins.mjs';
 import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 import {createExtendedFamily,EXTENDED_HOME,EXTENDED_NAME,EXTENDED_COLOR} from '../public/keha-extended/family-data.mjs';
@@ -29,6 +30,7 @@ function marriageTreeFilters(id){
   const tree=marriageTrees[id];if(!tree)return '';
   return `<div id="treeMarriageFilters" class="tree-marriage-filters" role="group" aria-label="התמקדות במשפחה לפי נישואים" aria-describedby="treeMarriageHelp" data-family-unit="${tree.unit}" data-tree-title="${tree.title}" data-tree-title-en="${tree.titleEn}" data-i18n-skip>`+
     tree.couples.map(([label,labelEn],index)=>`<button type="button" data-marriage-index="${index}" data-marriage-label="${label}" data-marriage-label-en="${labelEn}" aria-pressed="false" aria-controls="treeViewport"><span class="marriage-diamond" aria-hidden="true">◆</span><span>${label}</span></button>`).join('')+
+    (id==='kehat'?'<button type="button" data-tri-tree aria-pressed="false" aria-controls="treeViewport"><span class="marriage-diamond" aria-hidden="true">◆</span><span>עץ משפחת טרי</span></button>':'')+
     '<span id="treeMarriageHelp" class="visually-hidden">לחיצה על זוג מציגה את משפחתו בלבד. לחיצה חוזרת מציגה את שני הצדדים.</span></div>';
 }
 
@@ -126,8 +128,8 @@ function withExtendedAccess(html,extendedOrigin='https://family-extended.eldadke
     .replace(/<nav class="branch-bar" aria-label="ענפי המשפחה">.*?<\/nav>/s,'<nav class="family-extended-access" aria-label="קהא המורחבת">'+footerLink+extendedTrigger('footer')+'</nav>')
     .replace(/(<button\b[^>]*data-view="tree"[^>]*>.*?<\/button>)/,'$1'+extendedTrigger('nav'))
     .replace('<main id="mainContent"',extendedDialog+'<main id="mainContent"')
-    .replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=marriage-families-v6"></head>')
-    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=marriage-families-v4" defer></script>\n$1');
+    .replace('</head>','<link rel="stylesheet" href="/keha-extended/portal-tree.css?v=tri-households-1"></head>')
+    .replace(/(  <script src="\/assets\/app.js[^>]*>)/,'  <script src="/keha-extended/portal-tree.js?v=tri-households-1" defer></script>\n$1');
 }
 
 export function branchPortalHTML(original,id,appOrigin='',extendedOrigin='https://family-extended.eldadkeha.workers.dev',portalOrigins={}){
@@ -164,12 +166,17 @@ export async function extendedKehaRoute(request,env,db,ctx,options) {
   if(portal&&path===portal.home.slice(0,-1))return Response.redirect(new URL(portal.home+url.search,url),308);
   const shlomo=path.startsWith(SHLOMO_HOME),home=portal?.home || (shlomo?SHLOMO_HOME:EXTENDED_HOME);
   const createFamily=portal?original=>createBranchPortal(original,portal.id):shlomo?createShlomoFamily:createExtendedFamily;
+  const branch=portal?.id||(shlomo?'shlomo':'extended');
+  const lookup=(source,local)=>otherExtendedPeople(source,local,branch,familyAppOrigins(env));
   const projection=async()=>{
     const saved=await db('nakash.extended.projection');
-    if(shlomo)saved.sharedPeople=(await db('content.people',{branch:'shlomo'})).people;
+    if(shlomo){
+      saved.directorySource=saved.sharedPeople;
+      saved.sharedPeople=(await db('content.people',{branch:'shlomo'})).people;
+    }
     return {...options.family,...saved};
   };
-  if(path.startsWith(home+'api/compat/'))return compatRoute(request,env,db,ctx,{...options,createFamily,nakashToken:NAKASH_WRITE_TOKEN},projection);
+  if(path.startsWith(home+'api/compat/'))return compatRoute(request,env,db,ctx,{...options,createFamily,lookup,nakashToken:NAKASH_WRITE_TOKEN},projection);
   if(!['GET','HEAD'].includes(request.method))return null;
   if(path===home+'privacy.html'){
     const response=await env.ASSETS.fetch(new Request(new URL('/privacy.html',url)));
@@ -181,6 +188,8 @@ export async function extendedKehaRoute(request,env,db,ctx,options) {
     let available=true,original;
     try{original=await projection();}catch{available=false;original=options.family;}
     const data=toOriginalFamilyData(createFamily(original));
+    data.lookupPeople=lookup(original,data.people);
+    for(const [alias,id] of Object.entries(original.identities||{}))if(data.people[id]||data.lookupPeople[id])data.identities[alias]=id;
     for(const p of Object.values(data.people))if(restrictedOriginalPerson(p.id))Object.assign(p,{photoCount:0,videoCount:0,documentCount:0,mediaCount:0});
     const script='window.FAMILY_DATA='+JSON.stringify(data)+';\nwindow.LOCAL_FAMILY_SERVER=true;\nwindow.FAMILY_API_TOKEN='+JSON.stringify(NAKASH_WRITE_TOKEN)+';\nwindow.FAMILY_DATA_AVAILABLE='+available+';\n';
     return new Response(request.method==='HEAD'?null:script,{headers:{'Content-Type':'application/javascript; charset=utf-8'}});

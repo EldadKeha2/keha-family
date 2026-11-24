@@ -32,7 +32,7 @@ export function linkSharedProfile(state, identities, seed) {
     Array.isArray(value) ? value.map(replace) : value && typeof value === 'object' ?
       Object.fromEntries(Object.entries(value).map(([key, item]) => {
         const next = replace(item);
-        return [key, ['people','personIds','_profilePeople'].includes(key) && Array.isArray(next) ? [...new Set(next)] : next];
+        return [key, ['people','personIds','documentPeople','_profilePeople'].includes(key) && Array.isArray(next) ? [...new Set(next)] : next];
       })) : value;
   const affected = new Map(state.rows('SELECT media_id FROM media_tags WHERE person_id=?', sourceId)
     .map(row => [row.media_id, state.tagsRevision(row.media_id)]));
@@ -47,9 +47,11 @@ export function linkSharedProfile(state, identities, seed) {
     state.sql.exec('UPDATE media SET person_id=?,data=? WHERE id=?', row.person_id === sourceId ? targetId : row.person_id, JSON.stringify(item), row.id);
     if (!affected.has(row.id)) affected.set(row.id, state.tagsRevision(row.id));
   }
-  for (const table of ['media_trash', 'nakash_media', 'stories']) {
+  for (const table of ['media_trash', 'nakash_media', 'stories', 'recordings']) {
     for (const row of state.rows('SELECT id,data FROM ' + table + ' WHERE instr(data,?)>0', sourceId)) {
-      state.sql.exec('UPDATE ' + table + ' SET data=? WHERE id=?', JSON.stringify(replace(JSON.parse(row.data))), row.id);
+      const item=replace(JSON.parse(row.data));
+      state.sql.exec('UPDATE ' + table + ' SET data=? WHERE id=?', JSON.stringify(item), row.id);
+      if(table==='recordings')state.recordings.touch();
     }
   }
   for (const row of state.rows('SELECT media_id,id,data FROM photo_versions WHERE instr(data,?)>0', sourceId)) {

@@ -13,6 +13,8 @@ html[data-marriage-tree] body[data-active-view=tree] .workspace-title{width:100%
 html[data-marriage-tree] body[data-active-view=tree] .workspace-title h2{font-size:calc(clamp(16px,4.3vw,22px) * var(--a11y-text-scale,1));line-height:1.35;white-space:normal;text-wrap:balance}
 html[data-marriage-tree] body[data-active-view=tree] .workspace-title .section-diamond{display:inline-block;flex:none;font-size:calc(18px * var(--a11y-text-scale,1));line-height:1}
 .tree-marriage-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;flex:0 0 auto;width:100%;padding:0 8px 8px}
+html[data-branch-portal=kehat] .tree-marriage-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tree-marriage-filters [data-tri-tree]{--marriage-color:#24547c}
 .tree-marriage-filters button{--marriage-color:var(--marriage-first);display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:44px;padding:5px 6px;border:1px solid color-mix(in srgb,var(--marriage-color) 55%,white);border-radius:9px;background:color-mix(in srgb,var(--marriage-color) 9%,var(--surface));color:var(--marriage-color);font:600 calc(14px * var(--a11y-text-scale,1))/1.3 var(--sans);text-align:center;text-wrap:balance}
 .tree-marriage-filters [data-marriage-index="1"]{--marriage-color:var(--marriage-second)}
 .tree-marriage-filters button:hover{border-color:var(--marriage-color);background:color-mix(in srgb,var(--marriage-color) 16%,var(--surface))}

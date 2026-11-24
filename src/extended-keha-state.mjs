@@ -287,6 +287,30 @@ export function initializeExtendedKeha(state) {
       }
       state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)',triArchiveMigration,'done');
     }
+    const householdMigration='extended-tri-households-2026-11-24-v1';
+    if(!state.rows('SELECT id FROM meta WHERE id=?',householdMigration).length){
+      const renamed=new Set(['tri-menachem','tri-esther','tri-rachel','tri-ronit','tri-david','tri-miriam','tri-hana','kehat-aharon']);
+      const notes=new Set(['kehat-jidaan','kehat-aharon','kehat-yehudit','tri-hana','tri-esther','tri-ronit','tri-miriam','tri-binyamin','tri-hezi']);
+      for(const seed of EXTENDED_PEOPLE){
+        if(!renamed.has(seed.id)&&!notes.has(seed.id)&&seed.id!=='kehat-zechariah')continue;
+        const saved=state.person(state.sharedNakashIdentities[seed.id]||seed.id);
+        state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',householdMigration+':backup:'+saved.id,JSON.stringify(saved));
+        saved.aliases=[...new Set([...(saved.aliases||[]),...(seed.aliases||[]),saved.name,saved.nameEn].filter(Boolean))];
+        if(renamed.has(seed.id)){
+          const [firstName,...rest]=seed.name.split(' ');
+          Object.assign(saved,{name:seed.name,firstName,lastName:rest.join(' '),nameEn:seed.nameEn,englishName:seed.englishName});
+        }
+        if(notes.has(seed.id))saved.researchNotes=seed.researchNotes;
+        state.savePerson(saved);
+      }
+      // Both free-name profiles were created for Miriam Tri in the two
+      // Zechariah portals. Other Miriam profiles refer to different relatives.
+      for(const id of ['extra-nakash-f6172e08ee7f90100e98875a','extra-nakash-b920bce618b9d0cf29801fb6']){
+        const row=state.rows('SELECT data FROM people WHERE id=?',id)[0];
+        if(row && !JSON.parse(row.data).mergedInto)linkSharedProfile(state,state.sharedNakashIdentities,{id,sharedProfileId:'tri-miriam'});
+      }
+      state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',householdMigration,'done');
+    }
     initializeKehatDocuments(state);
     initializeRegistryDocuments(state);
     state.peopleRevision=uid();state.peopleCache=null;

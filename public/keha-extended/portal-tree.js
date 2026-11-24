@@ -59,32 +59,68 @@
   if(!config.branchPortal)return;
 
   const marriageFilters=document.getElementById('treeMarriageFilters');
-  let selectedMarriage=null;
+  const triButton=marriageFilters?.querySelector('[data-tri-tree]');
+  let selectedFilter=triButton&&location.hash==='#tree/tri'?triButton:null;
+  let syncTriRoute;
   if(marriageFilters){
-    marriageFilters.setAttribute('aria-label',tr('התמקדות במשפחה לפי נישואים','Focus on a family by marriage'));
-    document.getElementById('treeMarriageHelp').textContent=tr('לחיצה על זוג מציגה את משפחתו בלבד. לחיצה חוזרת מציגה את שני הצדדים.','Select a couple to show their family. Select them again to show both sides.');
-    for(const button of marriageFilters.querySelectorAll('[data-marriage-index]')){
-      button.lastElementChild.textContent=I.isEnglish?button.dataset.marriageLabelEn:button.dataset.marriageLabel;
+    const filters=[...marriageFilters.querySelectorAll('button')];
+    const triTree=triButton;
+    const help=triTree
+      ?tr('בחרו משפחה להצגת העץ שלה. לחיצה חוזרת מחזירה לעץ של סעדיה.','Select a family to see its tree. Select it again for Saadia’s tree.')
+      :tr('לחיצה על זוג מציגה את משפחתו בלבד. לחיצה חוזרת מציגה את שני הצדדים.','Select a couple to show their family. Select them again to show both sides.');
+    document.getElementById('treeMarriageHelp').textContent=help;
+    marriageFilters.setAttribute('aria-label',tr('בחירת עץ משפחה','Choose a family tree'));
+    function markSelection(){
+      for(const choice of filters){
+        const active=choice===selectedFilter;
+        choice.setAttribute('aria-pressed',String(active));
+        choice.title=active?tr('חזרה לעץ המלא','Return to the full tree'):tr('הצגת משפחה זו','Show this family');
+      }
+    }
+    for(const button of filters){
+      button.lastElementChild.textContent=button===triTree?tr('עץ משפחת טרי','Tri family tree'):I.isEnglish?button.dataset.marriageLabelEn:button.dataset.marriageLabel;
       button.addEventListener('click',()=>{
-        const index=Number(button.dataset.marriageIndex);
-        selectedMarriage=selectedMarriage===index?null:index;
-        for(const choice of marriageFilters.querySelectorAll('[data-marriage-index]')){
-          const active=Number(choice.dataset.marriageIndex)===selectedMarriage;
-          choice.setAttribute('aria-pressed',String(active));
-          choice.title=active?tr('הצגת שני הצדדים','Show both sides'):tr('התמקדות במשפחה זו','Focus on this family');
+        selectedFilter=selectedFilter===button?null:button;
+        if(triTree && (selectedFilter===triTree || location.hash==='#tree/tri')){
+          const hash=selectedFilter===triTree?'#tree/tri':'#tree';
+          if(window.FamilyNavigation)window.FamilyNavigation.go(hash);
+          else history.pushState(null,'',hash);
         }
+        markSelection();
         window.FamilyApp?.refreshTree();
       });
     }
+    markSelection();
+    syncTriRoute=()=>{
+      if(!triTree)return;
+      const select=location.hash==='#tree/tri';
+      if(select===(selectedFilter===triTree))return;
+      selectedFilter=select?triTree:null;
+      markSelection();
+      return true;
+    };
+    const restoreRoute=()=>{if(syncTriRoute())window.FamilyApp?.refreshTree();};
+    window.addEventListener('hashchange',restoreRoute);
+    window.addEventListener('popstate',restoreRoute);
   }
 
   function treeProjection(){
-    if(!marriageFilters||selectedMarriage===null)return null;
-    const units=window.FAMILY_DATA.units,unit=units[marriageFilters.dataset.familyUnit],union=unit.relationships[selectedMarriage];
-    // Project only the canvas. Profiles, shared records and the complete family
-    // graph keep their canonical people and relationships.
-    const root={...unit,people:[...union.people],displayPeople:[...union.people],children:[...union.children],relationships:[union],splitPartnerships:false,hideBranchLabel:true,parent:null};
-    return {root:unit.id,units:{...units,[unit.id]:root}};
+    if(!marriageFilters)return null;
+    const data=window.FAMILY_DATA,units={...data.units};
+    const triRoot=units['u-kehat-zechariah'];
+    if(selectedFilter?.hasAttribute('data-tri-tree'))return {root:triRoot.id,units};
+    if(config.branchPortal==='kehat'){
+      // In Saadia's overview, show each of the ten siblings as a single card.
+      // Their partners and children remain accessible in the Tri tree and profiles.
+      for(const id of triRoot.children){
+        const child=units[id];
+        units[id]={id,people:[child.people[0]],children:[],parent:triRoot.id,relationship:'single',generation:child.generation,branch:child.branch};
+      }
+    }
+    if(!selectedFilter)return config.branchPortal==='kehat'?{root:data.root,units}:null;
+    const unit=units[marriageFilters.dataset.familyUnit],union=unit.relationships[Number(selectedFilter.dataset.marriageIndex)];
+    units[unit.id]={...unit,people:union.people,displayPeople:union.people,children:union.children,relationships:[union],splitPartnerships:false,hideBranchLabel:true,parent:null};
+    return {root:unit.id,units};
   }
 
   function zechariahPhoneFamilies(){
@@ -187,9 +223,10 @@
     phoneFamilies:config.branchPortal==='zechariah'?zechariahPhoneFamilies():null,
     treeProjection,
     renderTree(state){
+      syncTriRoute?.();
       // Each single-family portal opens its full tree directly.
       if(window.FAMILY_DATA.branches.length===1&&state.branch==='all')state.mode='full';
-      document.getElementById('workspaceTitle').textContent=marriageFilters?(I.isEnglish?marriageFilters.dataset.treeTitleEn:marriageFilters.dataset.treeTitle):tr('האילן המשפחתי','Family tree');
+      document.getElementById('workspaceTitle').textContent=selectedFilter?.hasAttribute('data-tri-tree')?tr('עץ משפחת טרי · זכריה ויונה','Tri family tree · Zechariah and Yona'):marriageFilters?(I.isEnglish?marriageFilters.dataset.treeTitleEn:marriageFilters.dataset.treeTitle):tr('האילן המשפחתי','Family tree');
       document.getElementById('mobileViewTitle').textContent=name();
       return false;
     },

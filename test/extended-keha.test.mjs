@@ -22,7 +22,7 @@ const site=path=>'/keha-extended/api/compat/api/'+path;
 const shlomoSite=path=>SHLOMO_HOME+'api/compat/api/'+path;
 
 test('Jimaan and Shoshana’s four children stay distinct from the Tzadok family and the 1949 register household',()=>{
-  const first=['u-kehat-zechariah','u-kehat-aharon','u-kehat-yehudit','u-kehat-yaakov'];
+  const first=['u-kehat-aharon','u-kehat-zechariah','u-kehat-yehudit','u-kehat-yaakov'];
   for(const tree of [createExtendedFamily(family),createBranchPortal(family,'kehat')]){
     const couple=tree.units['u-keha-kehat'];
     assert.deepEqual(couple.relationships[0].children,first);
@@ -133,7 +133,7 @@ test('the 1954 questionnaire connects Ora’s ten siblings to their parents in b
   vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
   const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
   const ids=data.units['u-kehat-zechariah'].children.map(unit=>data.units[unit].people[0]);
-  assert.deepEqual(ids.map(id=>data.people[id].name),['מנחם','אסתר','יוסף טרי (קהא)','בנימין קהתי','יששכר טרי','רחל','רונית','דוד','מרים','חנה']);
+  assert.deepEqual(ids.map(id=>data.people[id].name),['מנחם טרי','אסתר טרי (דהרי)','יוסף טרי (קהא)','בנימין קהתי','יששכר טרי','רחל טרי','רונית טרי (יעקובי)','דוד טרי','מרים טרי (פרץ)','חנה טרי']);
   assert.equal(new Set(ids).size,10);
   assert.equal(ids.filter(id=>data.people[id].gender==='m').length,5);
   assert.equal(ids.filter(id=>data.people[id].gender==='f').length,5);
@@ -172,13 +172,13 @@ test('the 1954 questionnaire connects Ora’s ten siblings to their parents in b
   }
 });
 
-test('Shifra’s son Hezi does not acquire an unconfirmed father through her marriage',async()=>{
+test('The family chart identifies Binyamin and Shifra’s three children in birth order',async()=>{
   const data=toOriginalFamilyData(createExtendedFamily(family)),window={};
   vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
   const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(data,id)));
-  assert.deepEqual(relatives('tri-hezi').parents,['tri-shifra']);
-  assert.deepEqual(relatives('tri-shifra').children,['tri-hezi']);
-  assert.deepEqual(relatives('tri-binyamin').children,[]);
+  assert.deepEqual(relatives('tri-hezi').parents,['tri-binyamin','tri-shifra']);
+  assert.deepEqual(relatives('tri-shifra').children,['tri-sigalit','tri-hezi','tri-shahar']);
+  assert.deepEqual(relatives('tri-binyamin').children,['tri-sigalit','tri-hezi','tri-shahar']);
   assert.deepEqual(relatives('tri-binyamin').partners,['tri-shifra']);
   assert.deepEqual(relatives('tri-shifra').partners,['tri-binyamin']);
   assert.deepEqual(relatives('tri-shifra').siblings,[]);
@@ -260,14 +260,14 @@ test('Tzadok and Aharon have separate sons and no invented kinship between their
   assert.equal(data.people['kehat-zechariah-ben-tzadok'].branch,'kehat-tzadok');
   assert.equal(data.people['kehat-jidaan'].branch,'kehat');
   assert.equal(data.people['kehat-jidaan'].name,'סעדיה (ג׳ימעאן) בן אהרון קהא');
-  assert.deepEqual(relatives('kehat-jidaan').children,['kehat-zechariah','kehat-aharon','kehat-yehudit','kehat-yaakov','kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah']);
+  assert.deepEqual(relatives('kehat-jidaan').children,['kehat-aharon','kehat-zechariah','kehat-yehudit','kehat-yaakov','kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah']);
   const secondChildren=['kehat-tzion','kehat-shula','kehat-tzvia','kehat-hadassah'];
   assert.deepEqual(relatives('kehat-miriam').children,secondChildren);
   for(const id of secondChildren){
     assert.deepEqual(relatives(id).parents,['kehat-jidaan','kehat-miriam']);
     assert.equal(data.people[id].branch,'kehat');
   }
-  assert.deepEqual(relatives('kehat-first-wife').children,['kehat-zechariah','kehat-aharon','kehat-yehudit','kehat-yaakov']);
+  assert.deepEqual(relatives('kehat-first-wife').children,['kehat-aharon','kehat-zechariah','kehat-yehudit','kehat-yaakov']);
   assert.notEqual(data.people['kehat-zechariah'].id,data.people['kehat-zechariah-ben-tzadok'].id);
   assert.ok(!relatives('kehat-jidaan').children.includes('kehat-zechariah-ben-tzadok'));
 });
@@ -633,7 +633,8 @@ test('Shlomo’s scope shares real Keha portraits and edits while excluding the 
     assert.equal(tree.people['kehat-jidaan'],undefined);
     const people=await f.json(shlomoSite('tag-people'));
     assert.ok(people.people.some(p=>p.id==='ora'));
-    assert.ok(!people.people.some(p=>['yehuda-nakash','ruma-nakash','kehat-jidaan'].includes(p.id)));
+    assert.ok(!people.people.some(p=>['yehuda-nakash','ruma-nakash'].includes(p.id)));
+    assert.match(people.people.find(p=>p.id==='kehat-jidaan').profileHref,/keha-extended\/kehat\/#person\/kehat-jidaan$/);
     const original=await f.json('/api/people/ora/page');
     await f.json(shlomoSite('people/ora/birthday'),{method:'POST',body:{birthday:'2.3.1950',expectedBirthday:original.person.birthday}});
     assert.equal((await f.json('/api/people/ora/page')).person.birthday,'2.3.1950');
@@ -877,7 +878,7 @@ test('each portal can edit profiles and upload documents/photos while the centra
       assert.ok((await f.json(site('tag-people'))).people.some(p=>p.name==='קרוב נוסף '+branch));
       assert.equal((await f.call(path(branch,'people/'+other+'/page'))).status,404);
       const roster=await f.json(path(branch,'tag-people'));
-      assert.ok(roster.people.some(p=>p.id===id));assert.ok(!roster.people.some(p=>p.id===other));
+      assert.ok(roster.people.some(p=>p.id===id));assert.ok(roster.people.find(p=>p.id===other)?.profileHref);
     }
     assert.equal((await f.json(site('collections/gallery?size=all'))).count,0,'Unreviewed uploads and unrelated tags cannot enter the first-generation gallery');
     f.restart();
@@ -974,7 +975,7 @@ test('Jimaan stays below Aharon with each marriage’s descendants on its own si
       assert.equal(connector.dataset.childUnits,relation.children.join(' '));
     }
     assert.deepEqual(second.children,['u-kehat-tzion','u-kehat-shula','u-kehat-tzvia','u-kehat-hadassah']);
-    assert.deepEqual(first.children,['u-kehat-zechariah','u-kehat-aharon','u-kehat-yehudit','u-kehat-yaakov']);
+    assert.deepEqual(first.children,['u-kehat-aharon','u-kehat-zechariah','u-kehat-yehudit','u-kehat-yaakov']);
     for(const marriage of [first,second]){
       const centers=marriage.children.map(id=>bounds(id).center);
       assert.ok(centers.every((center,index)=>index===0||(english?center>centers[index-1]:center<centers[index-1])),'Children appear in birth order on their mother’s side');
@@ -1213,5 +1214,68 @@ test('Saadia remains Keha after the children’s surname changes and an already 
     const backup=migration+':backup:'+id;
     assert.equal(JSON.parse(f.database.prepare('SELECT value FROM meta WHERE id=?').get(backup).value).profileId,'existing-saadia-portrait');
     f.restart();assert.equal((await f.json(path)).person.name,corrected.name);
+  }finally{f.close();}
+});
+
+test('the Tri chart keeps the children in order and assigns each of Hana’s children to the correct marriage',async()=>{
+  const t=toOriginalFamilyData(createBranchPortal(family,'kehat')),window={};
+  vm.runInNewContext(await readFile(new URL('../public/assets/relations.js',import.meta.url),'utf8'),{window});
+  const relatives=id=>JSON.parse(JSON.stringify(window.FamilyRelations.forPerson(t,id)));
+  const children=id=>relatives(id).children.map(id=>t.people[id].name);
+  const rows=[
+    ['keha-yosef-yissachar',['שגית','אבי','עודד','אלעד']], ['tri-menachem',[]],
+    ['tri-yissachar',['רויטל','סעדיה (עדי)','אריק','אביב']], ['tri-binyamin',['סיגלית','חזי קהתי','שחר']],
+    ['tri-david',['בתו של דוד (השם טרם נמסר)','זכי','יוסי']], ['tri-rachel',['ברק','להב','גיא']],
+    ['tri-ronit',['ערן','איריס','עידו','רעות']], ['tri-miriam',['ענר','ענת','ענבר']],
+    ['tri-esther',['אורלי','אורן','אילן','אילנית']], ['tri-hana',['ליאת','אופיר','מורן','דור','יניב','ליאור','עדי']],
+  ];
+  for(const [id,names] of rows)assert.deepEqual(children(id),names,id);
+  assert.deepEqual(relatives('tri-hana').partners,['tri-hanania','tri-shuki']);
+  assert.deepEqual(children('tri-hanania'),['ליאת','אופיר']);
+  assert.deepEqual(children('tri-shuki'),['מורן','דור','יניב','ליאור','עדי']);
+  for(const parent of ['tri-hanania','tri-shuki'])for(const child of relatives(parent).children)assert.deepEqual(relatives(child).parents,['tri-hana',parent]);
+  assert.equal(t.people['kehat-aharon'].name,'אהרון קהא');
+  assert.deepEqual(children('kehat-aharon'),['שושנה','יוסי','ציונה','אהובה']);
+  assert.equal(t.people['kehat-aharon-yossi'].deceased,true);
+});
+
+test('two old Miriam tags resolve to the daughter of Zechariah across branches and new photo uploads use that profile',async()=>{
+  const f=fixture();
+  try{
+    const id='tri-miriam',name='מרים טרי (פרץ)',old=['extra-nakash-f6172e08ee7f90100e98875a','extra-nakash-b920bce618b9d0cf29801fb6'];
+    const home=BRANCH_PORTALS.kehat.home+'api/compat/api/',away=BRANCH_PORTALS['zechariah-tzadok'].home+'api/compat/api/';
+    function person(id,name,fields={}){f.database.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(id,JSON.stringify({id,name,extra:true,...fields}));}
+    person(id,'מרים קהא',{about:'משפחת פרץ',birthday:'12.1.1952'});
+    person(old[0],'מרים טרי',{nakashBranch:'zechariah-tzadok'});
+    person(old[1],'מרים טרי',{nakashBranch:'zechariah'});
+    const mediaId='1'.repeat(32),faceId='2'.repeat(32),rect={x:.1,y:.2,width:.15,height:.2};
+    const legacy={id:mediaId,category:'personal',personId:old[0],filename:'family.jpg',file:mediaId+'.jpg',kind:'photo',mime:'image/jpeg',key:'original/family.jpg',size:20};
+    f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(mediaId,'personal',old[0],JSON.stringify(legacy));
+    for(const tag of old)f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(mediaId,tag);
+    f.database.prepare('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?)').run(mediaId,faceId,old[1],JSON.stringify({id:faceId,personId:old[1],rect}));
+    for(const branch of [away,home,site(''),shlomoSite(''),BRANCH_PORTALS.zechariah.home+'api/compat/api/']){
+      const roster=(await f.json(branch+'tag-people')).people;
+      assert.deepEqual(roster.filter(p=>p.name===name).map(p=>p.id),[id]);
+      assert.ok(roster.some(p=>p.id==='kehat-miriam-zarhi')&&roster.some(p=>p.id==='kehat-yaakov-miriam'));
+      assert.ok(roster.every(p=>!old.includes(p.id)));
+      const search=await f.json(branch+'search?type=person&q='+encodeURIComponent('מרים קהא'));
+      assert.ok(search.items.some(p=>p.id===id&&p.title===name));
+    }
+    const result=(await f.json(away+'search?type=person&q='+encodeURIComponent(name))).items.find(p=>p.id===id);
+    assert.match(result.href,/keha-extended\/kehat\/#person\/tri-miriam$/);
+    const page=await f.json(home+'people/'+old[1]+'/page');
+    assert.equal(page.person.id,id);assert.equal(page.person.about,'משפחת פרץ');assert.equal(page.person.birthday,'12.1.1952');
+    assert.deepEqual(f.database.prepare('SELECT person_id FROM media_tags WHERE media_id=?').all(mediaId).map(row=>row.person_id),[id]);
+    const face=JSON.parse(f.database.prepare('SELECT data FROM media_faces WHERE id=?').get(faceId).data);
+    assert.equal(face.personId,id);assert.deepEqual(face.rect,rect);
+    const metadata=Buffer.from(JSON.stringify({faces:[{personId:id,rect}],complete:true}));
+    const upload=await f.json(away+'collections/gallery/upload?filename=new.jpg',{method:'POST',body:Buffer.concat([metadata,photo]),headers:{'X-Family-Photo-Metadata-Length':String(metadata.length)}});
+    const tagged=upload.collection.items.find(p=>p.filename==='new.jpg');
+    assert.deepEqual(tagged.tags.map(p=>p.id),[id]);assert.equal(tagged.tags[0].name,name);
+    assert.equal((await f.json(away+'media/'+tagged.id+'/faces')).faces[0].person.name,name);
+    const docSubjects=(await f.json(away+'documents')).people;
+    assert.ok(docSubjects.find(p=>p.id===id)?.aliases.includes('מרים קהא'));
+    f.restart();
+    assert.equal((await f.json(home+'people/'+id+'/page')).albums.photos.total,2);
   }finally{f.close();}
 });

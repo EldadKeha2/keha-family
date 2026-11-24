@@ -32,7 +32,11 @@ const people = [
   ['kehat-yaakov','יעקב קהת','Yaakov Kehat','m','u-kehat-yaakov'],
   ['kehat-yaakov-miriam','מרים','Miriam','f','u-kehat-yaakov'],
   ['kehat-zechariah','זכריה קהת','Zechariah Kehat','m','u-kehat-zechariah'],
-  ['kehat-aharon','אהרון קהת','Aharon Kehat','m','u-kehat-aharon'],
+  ['kehat-aharon','אהרון קהא','Aharon Keha','m','u-kehat-aharon',['אהרון קהת','אהרן קהא']],
+  ['kehat-aharon-shoshana','שושנה','Shoshana','f','u-kehat-aharon-shoshana'],
+  ['kehat-aharon-yossi','יוסי','Yossi','m','u-kehat-aharon-yossi',[],{deceased:true}],
+  ['kehat-aharon-tziona','ציונה','Tziona','f','u-kehat-aharon-tziona'],
+  ['kehat-aharon-ahuva','אהובה','Ahuva','f','u-kehat-aharon-ahuva'],
   ['kehat-yehudit','יהודית קהת','Yehudit Kehat','f','u-kehat-yehudit'],
   ['kehat-hadassah','הדסה אנגלסברג','Hadassah Engelsberg','f','u-kehat-hadassah',['הדוס','הדוס קהא','הדסה קהת','הדסה קהא']],
   ['kehat-yossi','יוסי אנגלסברג','Yossi Engelsberg','m','u-kehat-hadassah'],
@@ -57,7 +61,7 @@ enrichHistoricalLifeEvidence(seedPeople);
 applyRegistryEvidence(seedPeople);
 export const EXTENDED_PEOPLE = Object.freeze([...seedPeople.values()].map(Object.freeze));
 
-const firstChildren = ['zechariah','aharon','yehudit','yaakov'].map(id=>'u-kehat-'+id);
+const firstChildren = ['aharon','zechariah','yehudit','yaakov'].map(id=>'u-kehat-'+id);
 // The owner confirmed all four children of Saadia and Miriam, in this order.
 const secondChildren = ['tzion','shula','tzvia','hadassah'].map(id=>'u-kehat-'+id);
 const units = [
@@ -115,6 +119,7 @@ export function createExtendedFamily(original = {}) {
     if(id!==seed.id)result.identities[seed.id]=id;
     result.people[id] = {...seed,...roster[id],id,englishName:roster[id]?.nameEn||seed.englishName,extra:false,extended:false,unit:seed.unit};
   }
+  for(const [alias,id] of Object.entries(original.identities||{}))if(result.people[id])result.identities[alias]=id;
   const canonical=id=>result.identities[id]||id;
   for(const person of Object.values(result.people))for(const field of ['parents','siblings'])if(person[field])person[field]=person[field].map(canonical);
   for(const unit of Object.values(result.units)){

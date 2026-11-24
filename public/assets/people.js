@@ -133,7 +133,15 @@
   }
   function open(id,sync=true){
     id=window.FAMILY_DATA?.identities?.[id] || id;
-    if(!app().getPerson(id))return;
+    if(!app().getPerson(id)){
+      const contact=window.FAMILY_DATA.lookupPeople?.[id]||window.FamilyPeopleRoster?.snapshot().find(p=>p.id===id);
+      if(contact?.profileHref){
+        const url=new URL(contact.profileHref,location.href);
+        if(['en-US','en-GB','he'].includes(I.language))url.searchParams.set('lang',I.language);
+        location.assign(url.href);
+      }
+      return;
+    }
     portraitRequest++;albumEpoch++;
     if($('calendarDayDialog').open)$('calendarDayDialog').close();if($('mediaViewer').open)$('mediaViewer').close();if($('personDialog').open)$('personDialog').close();
     if(state.id!==id){biography()?.reset();refreshPending=false;state.partial=false;state.id=id;state.data=null;state.pages={photos:1,videos:1,documents:1};state.albumOptions=window.FamilyPersonGallery?.defaults()||{};window.FamilyPersonGallery?.reset();state.revision=null;state.aboutEditing=false;state.aboutDraft='';state.status='';state.error='';}

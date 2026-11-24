@@ -47,7 +47,7 @@
   const nameOf = p => I18n.personName({...p,...getMedia(p)});
   const birthdayOf = p => getMedia(p).birthday || p.birthday;
   const isPlaceholder = p => p.placeholder && (getMedia(p).name||p.name) === p.name;
-  const branchTitle = p => p.extra?I18n.t('מכרים וחברי משפחה'):p.extended?(I18n.isEnglish?'Extended family':'בני משפחה נוספים'):I18n.branchName(branchFor(p.branch)) || I18n.t('השורשים של כולנו');
+  const branchTitle = p => p.profileHref?(I18n.isEnglish?p.branchLabelEn:p.branchLabel)||I18n.t('בני משפחה נוספים'):p.extra?I18n.t('מכרים וחברי משפחה'):p.extended?(I18n.isEnglish?'Extended family':'בני משפחה נוספים'):I18n.branchName(branchFor(p.branch)) || I18n.t('השורשים של כולנו');
   const generationName = n => ['',I18n.t('הדור הראשון'),I18n.t('הדור השני'),I18n.t('הדור השלישי'),I18n.t('הדור הרביעי'),I18n.t('הדור החמישי')][n] || I18n.html`דור ${n}`;
   const escapeHTML = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const safe = escapeHTML;
@@ -285,8 +285,14 @@
     if (isTree) renderTree(); else if (isDirectory) renderDirectory();
   }
   function inBranch(person,id){return id==='all'||person.branch===id||person.branches?.includes(id);}
+  function otherBranchMatches(query){
+    if(!query||!data.lookupPeople)return [];
+    const roster=window.FamilyPeopleRoster?.snapshot()||Object.values(data.lookupPeople);
+    return roster.filter(p=>p.profileHref&&!data.people[p.id]&&!p.placeholder&&normalize(I18n.searchNames(p)).includes(query));
+  }
   function directoryMatches(query) {
-    return people.filter(p => (state.directoryGroup==='friends'?p.extra&&getMedia(p).mediaCount>0:state.directoryGroup==='extended'?p.extended&&!p.extra:!p.extended&&!p.extra) && (state.directoryGroup!=='main'||inBranch(p,state.branch)) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query))).sort(searchFamilyOrder);
+    const local=people.filter(p => (state.directoryGroup==='friends'?p.extra&&getMedia(p).mediaCount>0:state.directoryGroup==='extended'?p.extended&&!p.extra:!p.extended&&!p.extra) && (state.directoryGroup!=='main'||inBranch(p,state.branch)) && (!query || normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query))).sort(searchFamilyOrder);
+    return state.directoryGroup==='main'?[...local,...otherBranchMatches(query)]:local;
   }
   function renderDirectory() {
     const query = normalize(state.query);
@@ -295,7 +301,7 @@
     $('directoryHelp').textContent=I18n.t(state.directoryGroup==='friends'?'לחיצה על כרטיס פותחת את התמונות שבהן תויגו':'לחיצה על כרטיס פותחת את העמוד האישי');
     const selected = directoryMatches(query);
     $('directoryCount').textContent = I18n.html`${selected.length} ${I18n.isEnglish?I18n.word(selected.length,'card','cards'):I18n.t('כרטיסים')}${state.directoryGroup==='main'&&state.branch!=='all'?' · '+I18n.branchName(branchFor(state.branch)):''}`;
-    $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="${p.extra?I18n.t('פתיחת האלבום של '):I18n.t('פתיחת העמוד האישי של ')}${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date"${p.extra?'':` data-birthday-for="${p.id}"`}>${p.extra?I18n.html`${getMedia(p).photoCount||0} ${I18n.t((getMedia(p).photoCount||0)===1?'תמונה מתויגת':'תמונות מתויגות')}`:birthdayHTML(p)}</div></article>`).join('');
+    $('directoryGrid').innerHTML = selected.map(p=>I18n.html`<article class="directory-card${p.deceased?' memorial':''}" data-person-card="${p.id}"><button class="directory-open" data-person="${p.id}" aria-label="${p.extra?I18n.t('פתיחת האלבום של '):I18n.t('פתיחת העמוד האישי של ')}${safe(nameOf(p))}">${portraitHTML(p)}<strong>${safe(nameOf(p))}${p.deceased?I18n.t(' <span class="memorial-inline">ז״ל</span>'):''}</strong><span class="directory-branch">${safe(branchTitle(p))}</span></button><div class="directory-date"${p.extra?'':` data-birthday-for="${p.id}"`}>${p.profileHref?'':p.extra?I18n.html`${getMedia(p).photoCount||0} ${I18n.t((getMedia(p).photoCount||0)===1?'תמונה מתויגת':'תמונות מתויגות')}`:birthdayHTML(p)}</div></article>`).join('');
     $('emptySearch').textContent=I18n.t(state.directoryGroup==='friends'&&!query?'מכרים וחברי משפחה יופיעו כאן אוטומטית אחרי תיוג בשם חדש.':'לא נמצאו שמות מתאימים. נסו לחפש בשם הפרטי.');
     $('emptySearch').hidden = selected.length > 0;
   }
@@ -679,7 +685,7 @@
 
   function updatePersonUI(personId, item) {
     let p = data.people[personId];
-    if(!p&&item.extra){p={id:personId,name:item.name,firstName:item.name,lastName:'',extra:true,birthday:item.birthday||'1.1.1111',branch:null,generation:null,placeholder:false};data.people[personId]=p;people.push(p);}
+    if(!p&&item.extra&&!data.lookupPeople?.[personId]){p={id:personId,name:item.name,firstName:item.name,lastName:'',extra:true,birthday:item.birthday||'1.1.1111',branch:null,generation:null,placeholder:false};data.people[personId]=p;people.push(p);}
     if(!p)return;
     const previous = getMedia(p);
     media.set(personId, {...previous, ...item});
@@ -859,7 +865,7 @@
     if(!['tree','directory'].includes(state.view)){window.FamilyPortal?.search(state.query);window.FamilyMemories?.search(state.query);window.FamilyDocuments?.search(state.query);window.FamilyArchive?.search(state.query);window.FamilyCalendar?.search(state.query);window.FamilyTimeline?.search(state.query);window.FamilyNursery?.search(state.query);window.FamilyAI?.search(state.query);$('searchResults').hidden=true;return;}
     if(state.view==='directory')renderDirectory();
     if(!query&&state.view!=='directory'){$('searchResults').hidden=true;return;}
-    const matches=state.view==='directory'?directoryMatches(query):people.filter(p=>!p.extended&&!p.extra&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)).sort(searchFamilyOrder);
+    const matches=state.view==='directory'?directoryMatches(query):[...people.filter(p=>!p.extended&&!p.extra&&normalize(I18n.searchNames({...p,...getMedia(p)})).includes(query)).sort(searchFamilyOrder),...otherBranchMatches(query)];
     $('searchResults').innerHTML=matches.length?matches.slice(0,15).map(p=>`<button type="button" class="search-result" data-search-person="${p.id}">${portraitHTML(p)}<span class="search-result-text"><span class="person-name">${safe(nameOf(p))}${p.deceased?I18n.t(' ז״ל'):''}</span><small>${safe(branchTitle(p))}</small></span></button>`).join(''):I18n.t('<div class="search-empty">לא נמצא שם מתאים</div>');
     $('searchResults').hidden=false;
     fitSearchResults();

@@ -3,7 +3,7 @@
   // One in-memory roster for tagging and both media filters. No family data is
   // written to persistent browser storage, and each consumer keeps its ranking.
   const people=new Map(),changedAt=new Map(),listeners=new Set(),ttl=300000;
-  const fields=['id','name','nameEn','aliases','extra','extended','branch','nakashBranch','generation','placeholder','unit','parents','siblings','profile','profileFraming','profileMediaId'];
+  const fields=['id','name','nameEn','aliases','extra','extended','branch','nakashBranch','generation','placeholder','unit','profileHref','branchLabel','branchLabelEn','parents','siblings','profile','profileFraming','profileMediaId'];
   let loaded=false,checkedAt=Date.now(),etag=null,pending=null,version=0;
   const snapshot=()=>[...people.values()];
   const failed=()=>Error(window.FamilyI18n.t?.('לא התקבלה תשובה מהשרת. נסו שוב.')||'The people list could not load.');
@@ -14,6 +14,7 @@
     if(JSON.stringify(previous)===JSON.stringify(next))return false;
     people.set(person.id,next);changedAt.set(person.id,stamp);return true;
   }
+  for(const person of Object.values(window.FAMILY_DATA?.lookupPeople||{}))merge(person);
   for(const person of Object.values(window.FAMILY_DATA?.people||{}))merge(person);
   function notify(){const current=snapshot();for(const listener of listeners)try{listener(current);}catch{}}
   function invalidate(){checkedAt=-Infinity;etag=null;version++;}

@@ -296,7 +296,7 @@ test('the deployed Jimaan family drops the register household and fixes stored c
       assert.ok(retired.every(id=>!people.some(p=>p.id===id)));
       const current=people.find(p=>p.id===father.id);
       assert.match(current.name,/ג׳ימעאן/);assert.match(current.nameEn,/Jimaan/);
-      assert.match(current.researchNotes,/זכריה \(הבכור\), אהרון, יהודית ויעקב/);
+      assert.match(current.researchNotes,/אהרון \(הבכור\), זכריה, יהודית ויעקב/);
       assert.ok(current.aliases.every(alias=>!alias.includes('ידע')));
       assert.match(people.find(p=>p.id===daughter.id).researchNotes,/גיסתה יהודית בת זכריה בן צדוק/);
       const docs=(await f.json(scope(branch,'documents'))).items;

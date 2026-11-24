@@ -87,14 +87,16 @@ test('each marriage focuses its couple and descendants, and a second press resto
     const f=fixture(site,{phone,english,text}),root=parents[site];
     const originalUnits=structuredClone(f.data.units),visible=()=>[...new Set([...f.document.querySelectorAll('#treeNodes [data-person-card]')].map(card=>card.dataset.personCard))].sort();
     const allPeople=visible(),initialScale=f.bounds(root).scale,buttons=[...f.document.querySelectorAll('#treeMarriageFilters button')];
-    assert.equal(buttons.length,2);assert.ok(buttons.every(button=>button.getAttribute('aria-pressed')==='false'));
+    assert.equal(buttons.length,site==='kehat'?3:2);assert.ok(buttons.every(button=>button.getAttribute('aria-pressed')==='false'));
     assert.match(buttons[0].textContent,site==='kehat'?(english?/Shoshana/:/שושנה/):(english?/Amna/:/אמנה/));
     assert.match(buttons[1].textContent,site==='kehat'?(english?/Miriam/:/מרים/):(english?/Tzinia/:/ציניה/));
     for(const index of [0,1]){
       buttons[index].click();f.flush();
       assert.equal(buttons[index].getAttribute('aria-pressed'),'true');assert.equal(buttons[1-index].getAttribute('aria-pressed'),'false');
       const union=f.data.units[root].relationships[index],expected=new Set(union.people),seen=new Set();
-      const visit=id=>{if(seen.has(id))return;seen.add(id);const unit=f.data.units[id];unit.people.forEach(person=>expected.add(person));unit.children.forEach(visit);};
+      const visit=id=>{if(seen.has(id))return;seen.add(id);const unit=f.data.units[id];
+        if(site==='kehat'&&unit.parent==='u-kehat-zechariah'){expected.add(unit.people[0]);return;}
+        unit.people.forEach(person=>expected.add(person));unit.children.forEach(visit);};
       union.children.forEach(visit);
       assert.deepEqual(visible(),[...expected].sort(),site+': only the selected couple and their complete descendant branch');
       const centred=assertCentred(f,root);
@@ -103,7 +105,15 @@ test('each marriage focuses its couple and descendants, and a second press resto
       assert.equal(lines.length,1);assert.equal(lines[0].dataset.parentPeople,union.people.join(' '));
       assert.deepEqual(f.data.units,originalUnits,'Canvas filtering never edits canonical family relationships');
     }
-    buttons[1].click();f.flush();
+    if(site==='kehat'){
+      buttons[2].click();f.flush();
+      assert.equal(buttons[2].getAttribute('aria-pressed'),'true');
+      const ids=visible();
+      for(const id of ['kehat-zechariah','tri-yona','tri-shifra','tri-anat','tri-hanania','tri-shuki','tri-hana-adi'])assert.ok(ids.includes(id),id);
+      assert.ok(!ids.includes('kehat-aharon'));
+      assertCentred(f,'u-kehat-zechariah');
+      buttons[2].click();f.flush();
+    }else{buttons[1].click();f.flush();}
     assert.deepEqual(visible(),allPeople);assert.ok(buttons.every(button=>button.getAttribute('aria-pressed')==='false'));
     assert.deepEqual(f.data.units,originalUnits);
     assertCentred(f,root);
@@ -346,7 +356,7 @@ test('card borders and drag limits follow each displayed tree on desktop and pho
 test('marriage filters replace the frame and stop at the selected descendants',()=>{
   for(const site of ['kehat','zechariah-tzadok'])for(const phone of [false,true]){
     const f=fixture(site,{phone}),whole=frameBounds(f);
-    const buttons=[...f.document.querySelectorAll('#treeMarriageFilters button')];
+    const buttons=[...f.document.querySelectorAll('#treeMarriageFilters [data-marriage-index]')];
     for(const button of buttons){
       button.click();f.flush();
       const frame=frameBounds(f);

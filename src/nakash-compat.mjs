@@ -102,11 +102,11 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     if(!response.ok || !response.headers.get('Content-Type')?.includes('application/json'))return response;
     const result=await response.json();
     if(extended&&branch!=='shlomo'&&result.taggedPeople?.length){
-      const ids=result.taggedPeople.filter(person=>!Object.hasOwn(names,person.id)).map(person=>person.id);
+      const ids=result.taggedPeople.filter(person=>!Object.hasOwn(contacts,person.id)).map(person=>person.id);
       if(ids.length)await db('nakash.extended.members',{branch,ids});
     }
     const visible=branch==='shlomo'?(await db('content.people',{branch})).people:null;
-    const display=p=>p&&names[p.id]?{...p,...(visible?visible[p.id]:{}),...(p.profile?.startsWith('/media/')&&!visible?{profile:p.profile+(p.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(p.id)}:{}),...(restrictedOriginalPerson(p.id)?{photoCount:0,videoCount:0,documentCount:0,mediaCount:0,gallery:[]}:{}),extra:names[p.id].extra,extended:names[p.id].extended,branch:names[p.id].branch}:p;
+    const display=p=>others[p?.id]||((p&&names[p.id])?{...p,...(visible?visible[p.id]:{}),...(p.profile?.startsWith('/media/')&&!visible?{profile:p.profile+(p.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(p.id)}:{}),...(restrictedOriginalPerson(p.id)?{photoCount:0,videoCount:0,documentCount:0,mediaCount:0,gallery:[]}:{}),extra:names[p.id].extra,extended:names[p.id].extended,branch:names[p.id].branch}:p);
     if(result.person)result.person=display(result.person);
     if(result.people)result.people=Array.isArray(result.people)?result.people.map(display):Object.fromEntries(Object.entries(result.people).map(([id,p])=>[id,display(p)]));
     if(result.taggedPeople)result.taggedPeople=result.taggedPeople.map(display);
@@ -125,7 +125,9 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     const saved=profiles[id]||{};
     return [id,{...p,...saved,...(saved.profile?.startsWith('/media/')?{profile:saved.profile+(saved.profile.includes('?')?'&':'?')+'portrait='+encodeURIComponent(id)}:{}),...(restrictedOriginalPerson(id)?{photoCount:0,videoCount:0,documentCount:0,mediaCount:0,gallery:[]}:{}),extra:false,extended:false,branch:p.branch}];
   }));
-  for(const [id,p] of Object.entries(profiles))if(p.extra&&!Object.hasOwn(names,id)&&(extended?branch==='extended'?['extended','shlomo','zechariah','zechariah-tzadok','kehat'].some(app=>p.nakashBranch===app||p.familyApps?.includes(app)):p.nakashBranch===branch||p.familyApps?.includes(branch):!p.extendedKeha))names[id]=p;
+  const others=options.lookup?.(original,scoped.people)||{};
+  for(const [id,p] of Object.entries(profiles))if(!others[id]&&p.extra&&!Object.hasOwn(names,id)&&(extended?branch==='extended'?['extended','shlomo','zechariah','zechariah-tzadok','kehat'].some(app=>p.nakashBranch===app||p.familyApps?.includes(app)):p.nakashBranch===branch||p.familyApps?.includes(branch):!p.extendedKeha))names[id]=p;
+  const contacts={...others,...names};
   const newProfiles=new Map();
   // Both shells use the original editor and the same underlying media record.
   // Authentication was checked above with the token for the originating shell.
@@ -138,16 +140,22 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     return names[id];
   };
   async function tagPerson(selection) {
-    if(selection?.personId)return person(selection.personId);
+    if(selection?.personId){
+      const id=original.identities?.[selection.personId]||selection.personId;
+      if(!Object.hasOwn(contacts,id))throw absent();
+      return contacts[id];
+    }
     const name=text(selection?.name,'שם',120,true).replace(/\s+/g,' ');
     const normalized=normalizeSearch(name);
     if(!normalized)throw new HttpError(400,'הזינו שם תקין.');
     const id='extra-nakash-'+(await sha256(branch+'\u001f'+normalized)).slice(0,24);
-    if(Object.hasOwn(names,id))return names[id];
-    const known=Object.values(names).find(p=>!p.extra&&searchNames(p).some(alias=>normalizeSearch(alias)===normalized));
-    if(known)return known;
+    if(!extended&&Object.hasOwn(contacts,id))return contacts[id];
+    const matches=Object.values(contacts).filter(p=>!p.extra&&!p.placeholder&&searchNames(p).some(alias=>normalizeSearch(alias)===normalized));
+    if(extended&&matches.length>1)throw new HttpError(400,'יש כמה אנשים בשם הזה. בחרו את האדם המתאים מהרשימה.');
+    if(matches.length)return matches[0];
+    if(Object.hasOwn(contacts,id))return contacts[id];
     const extra={id,name,branch,birthday:'1.1.1111',extra:true,revision:uid()};
-    names[id]=extra;newProfiles.set(id,extra);
+    contacts[id]=names[id]=extra;newProfiles.set(id,extra);
     return extra;
   }
   const collection = async (kind,personId) =>
@@ -155,7 +163,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   const describe = item => scopedMediaLinks({
     ...picture(item),
     ...(nativeRoute?{src:'/media/'+item.id+(item.photoRevision?'?v='+item.photoRevision:'')}:{}),
-    tags:(item.people||[]).filter(id=>Object.hasOwn(names,id)).map(id=>({id,personId:id,name:names[id].name})),
+    tags:(item.people||[]).filter(id=>Object.hasOwn(contacts,id)).map(id=>({id,personId:id,name:contacts[id].name})),
     ...(item.thumbnail?{thumbnailSrc:(nativeRoute?'/media/':mediaPath)+item.id+(nativeRoute?'?thumbnail=1&v=':'?asset=thumbnail&v=')+encodeURIComponent(item.thumbnail.revision)}:{}),
     ...(item.preview?{previewSrc:(nativeRoute?'/media/':mediaPath)+item.id+(nativeRoute?'?preview=1&v=':'?asset=preview&v=')+encodeURIComponent(item.preview.revision)}:{}),
   },branch);
@@ -176,13 +184,13 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       while(stack.length){const unit=scoped.units[stack.pop()];if(unit){unit.people.forEach(id=>ids.add(id));stack.push(...unit.children);}}
     }
     const tags = (options.labels||'').split(',').filter(Boolean);
-    return items.filter(item=>(!search||normalizeSearch([item.name,item.caption,...(item.people||[]).flatMap(id=>searchNames(names[id]||{}))].join(' ')).includes(search))
+    return items.filter(item=>(!search||normalizeSearch([item.name,item.caption,...(item.people||[]).flatMap(id=>searchNames(contacts[id]||{}))].join(' ')).includes(search))
       && (!ids.size||(item.people||[]).some(id=>ids.has(id))) && tags.every(label=>photoLabels(item.labels).includes(label)));
   };
   const isFull = item => Boolean(item.faceSummary?.reviewed || item.reviewed);
   const status = item => isFull(item) ? 'complete' : item.people?.length ? 'partial' : 'untagged';
   function subjectBranches(people, homeBranch) {
-    const subjects = [...new Set(people.map(id=>branchForPerson(family,id)||names[id]?.branch).filter(Boolean))];
+    const subjects = [...new Set(people.map(id=>branchForPerson(family,id)||contacts[id]?.branch).filter(Boolean))];
     return subjects.length ? subjects : [homeBranch];
   }
   function tagsUpdate(item, people, fields={}) {
@@ -197,7 +205,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     return {x,y,width,height};
   };
   function faceState(item) {
-    return {item:describe(item),faces:(item.faces||[]).map(face=>({...face,person:names[face.personId]})).filter(face=>face.person),
+    return {item:describe(item),faces:(item.faces||[]).map(face=>({...face,person:contacts[face.personId]})).filter(face=>face.person),
       ignoredFaces:item.ignoredFaces||[],detectedFaces:item.detectedFaces||[],unassignedFaces:item.unassignedFaces||[]};
   }
   async function gallery(kind,{all=false}={}) {
@@ -378,8 +386,8 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     if(path==='/api/stories')return snapshot(await db('content.stories',{branch:contentBranch}));
     if(path==='/api/documents')return json(scopedMediaLinks(await db('content.documents',{branch:contentBranch}),branch));
     if(path==='/api/media')return json({people:names,revision:await sha256(JSON.stringify(names))});
-    if(path==='/api/tag-people')return json({people:Object.values(names)});
-    if(path==='/api/search')return json(searchNakash(Object.values(names),(await collection()).map(describe),extended?scoped.branches:BRANCHES,params,branch));
+    if(path==='/api/tag-people')return json({people:Object.values(contacts).filter(p=>!p.placeholder)});
+    if(path==='/api/search')return json(searchNakash(Object.values(contacts),(await collection()).map(describe),extended?scoped.branches:BRANCHES,params,branch));
     if(path==='/api/gallery/face-scan')return json({items:[],next:null});
     if(path==='/api/collections/videos/categories')return json({categories:await categories()});
   }

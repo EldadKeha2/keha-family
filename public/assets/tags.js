@@ -62,6 +62,10 @@
     return generation>=1&&generation<=5?generation:6;
   }
   function comparePeople(a,b,query,preferred=new Set()){
+    if(query&&window.FAMILY_DATA.lookupPeople){
+      const byName=matchRank(a,query)-matchRank(b,query);
+      if(byName)return byName;
+    }
     // Only Madi's correctly entered full Hebrew name bypasses family groups.
     const exactMadi=p=>query==='מדי פיש'&&[p.name,window.FAMILY_DATA.people[p.id]?.name].some(name=>name&&normalize(name)===query)?0:1;
     // The six main branches stay ahead of similar extended-family and friend
@@ -82,6 +86,7 @@
     return Math.min(...searchVariants(query).map((value,index)=>aliasRank(aliases,value)+index*.25));
   }
   function personContext(person){
+    if(person.profileHref)return (I18n.isEnglish?person.branchLabelEn:person.branchLabel)||I18n.t('בני משפחה נוספים');
     const data=window.FAMILY_DATA,p=data.people[person.id],unit=data.units?.[p?.unit],parent=unit?.people?.[0]===person.id?data.units[unit.parent]:null;
     const name=id=>I18n.personName(data.people[id]),branch=I18n.branchName(data.branches.find(b=>b.id===person.branch));
     if(parent)return [branch,(I18n.isEnglish?'Parents: ':'הורים: ')+parent.people.map(name).join(' / ')].filter(Boolean).join(' · ');

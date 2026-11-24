@@ -65,7 +65,7 @@
     async function openEditor(captured=null){
       if(!state.loaded)await refresh();if(!state.loaded)return;
       clearCapture();$('documentForm').reset();$('documentTitle').value='';$('documentError').textContent='';$('documentUploadStatus').textContent='';
-      $('documentPeople').innerHTML=state.people.map(p=>`<label><input type="checkbox" value="${safe(p.id)}"><span>${safe(p.name)}</span></label>`).join('');
+      $('documentPeople').innerHTML=state.people.map(p=>`<label data-search-names="${safe([p.name,p.nameEn,...(p.aliases||[])].filter(Boolean).join(' '))}"><input type="checkbox" value="${safe(p.id)}"><span>${safe(p.name)}</span></label>`).join('');
       if(captured){
         state.captureFile=captured;$('documentFile').required=false;$('documentTitle').value=captured.name.replace(/\.[^.]+$/,'');$('documentCaptureName').textContent=captured.name;$('documentCapturePreview').hidden=false;
         if(typeof URL!=='undefined'&&typeof URL.createObjectURL==='function'){state.captureURL=URL.createObjectURL(captured);$('documentCaptureImage').src=state.captureURL;}
@@ -84,7 +84,7 @@
       for(const node of $('documentViewerBody').querySelectorAll('audio'))node.pause?.();$('documentViewerBody').replaceChildren();
       if(documentRoute()===viewer.dataset.documentId)window.FamilyNavigation?.returnTo('#documents');
     });
-    $('documentPeopleSearch').addEventListener('input',event=>{const query=normalize(event.target.value);for(const label of $('documentPeople').children)label.hidden=!normalize(label.textContent).includes(query);});
+    $('documentPeopleSearch').addEventListener('input',event=>{const query=normalize(event.target.value);for(const label of $('documentPeople').children)label.hidden=!normalize(label.dataset.searchNames||label.textContent).includes(query);});
     $('documentFile').addEventListener('change',()=>{clearCapture();if(!$('documentTitle').value)$('documentTitle').value=$('documentFile').files[0]?.name.replace(/\.[^.]+$/,'')||'';});
     $('documentPersonFilter').addEventListener('change',event=>{state.person=event.target.value;render();});
     section.addEventListener('click',event=>{

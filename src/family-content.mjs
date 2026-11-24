@@ -4,6 +4,7 @@ import {createExtendedFamily,EXTENDED_PEOPLE} from '../public/keha-extended/fami
 import {createShlomoFamily} from '../public/keha-extended/shlomo-data.mjs';
 import {extendedGalleryGenerations,extendedGalleryPhoto} from '../public/keha-extended/gallery-generations.mjs';
 import {HttpError,text,uid} from './http.mjs';
+import {extendedContactBranch} from './extended-people.mjs';
 
 export const ORIGINAL_PHOTO_PEOPLE=new Set(['shlomo','yona','ruti','becker-parent','yehiel','avigail','ora','shosh']);
 const originalPeople=new Set(Object.keys(original.people));
@@ -53,7 +54,13 @@ export function contentContext(branch,sharedPeople={},identities={}){
   const documentIds=branch==='original'||branch==='shlomo'?new Set(['shlomo','yona']):new Set(ids);
   const mediaIds=branch==='extended'?new Set(Object.keys(tree.people)):new Set(ids);
   const galleryGenerations=branch==='extended'?extendedGalleryGenerations(tree,sharedPeople,youngerOriginalPeople):null;
-  return {branch,tree,ids,mediaIds,documentIds,canonical,galleryGenerations};
+  let contacts;
+  if(paternal){
+    contacts={...tree.people};
+    for(const p of Object.values(sharedPeople))if(p.extra&&!p.mergedInto&&!p.archiveOnly&&extendedContactBranch(p)&&!contacts[p.id])contacts[p.id]=p;
+    for(const p of Object.values(contacts))if(p.placeholder)delete contacts[p.id];
+  }
+  return {branch,tree,ids,mediaIds,documentIds,contacts,canonical,galleryGenerations};
 }
 
 export function contentHasSubjects(item,context,document=false){
@@ -64,6 +71,7 @@ export function storyInContext(story,context){
   if(context.branch==='shlomo'){const ids=subjects(story).map(context.canonical);return ids.length>0&&ids.every(id=>id==='shlomo');}
   if(context.branch==='original')return !story.familyScopes?.length||story.familyScopes.includes('original')||contentHasSubjects(story,context);
   if(contentHasSubjects(story,context))return true;
+  if(paternalScopes.has(context.branch)&&context.branch!=='extended'&&story.familyScopes?.includes(context.branch))return true;
   return context.branch!=='extended'&&!subjects(story).length&&story.familyScopes?.includes(context.branch);
 }
 export function restrictedOriginalPerson(id){return originalPeople.has(id)&&!ORIGINAL_PHOTO_PEOPLE.has(id);}
@@ -77,7 +85,7 @@ export function mediaInContext(item,context){
     if(kind(item)==='document')return contentHasSubjects(item,context,true)&&subjects(item).every(id=>context.documentIds.has(context.canonical(id)));
     return shlomoTaggedMedia(item,context)&&(kind(item)==='photo'?item.faceSummary?.reviewed===true:(item.people||[]).some(id=>['shlomo','yona'].includes(context.canonical(id))));
   }
-  if(kind(item)==='document')return contentHasSubjects(item,context,true)||!subjects(item).length&&item.familyScopes?.includes(context.branch);
+  if(kind(item)==='document')return contentHasSubjects(item,context,true)||item.familyScopes?.includes(context.branch)&&(!subjects(item).length||paternalScopes.has(context.branch)&&context.branch!=='extended');
   if(subjects(item).some(id=>ORIGINAL_PHOTO_PEOPLE.has(id)&&context.tree.people[id]))return true;
   if(!item.category?.startsWith('nakash:')&&subjects(item).some(id=>originalPeople.has(id)))return false;
   return subjects(item).some(id=>context.mediaIds.has(context.canonical(id)))||item.familyScopes?.includes(context.branch)||item.category==='nakash:'+context.branch||context.branch==='extended'&&['nakash:extended','nakash:shlomo','nakash:zechariah','nakash:zechariah-tzadok','nakash:kehat'].includes(item.category);
@@ -126,7 +134,7 @@ function correctJimaanFamily(state){
     const person=JSON.parse(row.data),seed=EXTENDED_PEOPLE.find(p=>p.id===id);
     if(id==='kehat-jidaan'){
       person.aliases=[...new Set([...(person.aliases||[]),...seed.aliases])];
-      if(person.researchNotes)person.researchNotes=person.researchNotes.replace('ואביהם של שלמה, יעקב, זכריה ואהרון','ואביהם של זכריה (הבכור), אהרון, יהודית ויעקב');
+      if(person.researchNotes)person.researchNotes=person.researchNotes.replace('ואביהם של שלמה, יעקב, זכריה ואהרון','ואביהם של אהרון (הבכור), זכריה, יהודית ויעקב');
     }
     if(!person.researchNotes||id==='kehat-yehudit'&&person.researchNotes.startsWith('השם יהודית הופיע בין ילדי סעדיה בתרשים המוקדם')){
       person.researchNotes=seed.researchNotes;
@@ -231,7 +239,8 @@ export function contentDocuments(state,branch){
   for(const item of state.run('recordings').recordings){
     if(contentHasSubjects(item,context,true))merged.set('audio:'+item.id,{...item,recording:true,kind:'audio',name:item.title,caption:item.body});
   }
-  const people=[...context.documentIds].filter(id=>context.tree.people[id]&&!context.tree.people[id].placeholder).map(id=>({id,name:context.tree.people[id].name}));
+  const selectable=context.contacts?Object.values(context.contacts):[...context.documentIds].map(id=>context.tree.people[id]).filter(p=>p&&!p.placeholder);
+  const people=selectable.map(({id,name,nameEn,aliases})=>({id,name,nameEn,aliases}));
   return {items:[...merged.values()].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')),people};
 }
 
@@ -269,7 +278,7 @@ export function handleFamilyContent(state,action,args){
   }
   if(action==='content.stories'){
     const result=state.run('stories');
-    return {...result,stories:result.stories.filter(item=>storyInContext(item,context)),allowedPersonIds:branch==='original'?null:branch==='shlomo'?['shlomo']:[...context.ids],revision:result.revision+':'+branch+':v2'};
+    return {...result,stories:result.stories.filter(item=>storyInContext(item,context)),allowedPersonIds:branch==='original'?null:branch==='shlomo'?['shlomo']:context.contacts?Object.keys(context.contacts):[...context.ids],revision:result.revision+':'+branch+':v3'};
   }
   if(action==='content.story.save'){
     const fields={...args.fields};
@@ -277,8 +286,8 @@ export function handleFamilyContent(state,action,args){
     if(fields.personIds!==undefined&&(!Array.isArray(fields.personIds)||fields.personIds.length>150||fields.personIds.some(id=>typeof id!=='string')))throw new HttpError(400,'בחרו אנשים מהרשימה.');
     fields.personIds=(fields.personIds||[]).map(context.canonical);
     if(branch==='shlomo'&&(!fields.personIds.length||fields.personIds.some(id=>id!=='shlomo')))throw new HttpError(400,'במשפחה הזאת אפשר לשמור סיפורים על שלמה קהא בלבד.');
-    if(fields.personIds.some(id=>!context.ids.has(id)))throw new HttpError(400,'בחרו את האנשים הרלוונטיים למשפחה הזאת.');
-    if(branch==='extended'&&!fields.personIds.length)throw new HttpError(400,'בחרו אדם מהדורות המייסדים שאליו שייך הסיפור.');
+    if(fields.personIds.some(id=>context.contacts?!Object.hasOwn(context.contacts,id):!context.ids.has(id)))throw new HttpError(400,'בחרו את האנשים הרלוונטיים למשפחה הזאת.');
+    if(branch==='extended'&&!fields.personIds.some(id=>context.ids.has(id)))throw new HttpError(400,'בחרו אדם מהדורות המייסדים שאליו שייך הסיפור.');
     fields.familyScopes=[branch];
     return state.run('memory.story.save',{...args,fields});
   }
@@ -313,7 +322,8 @@ export function handleFamilyContent(state,action,args){
   }
   if(action==='content.document.prepare'||action==='content.document.add'){
     const fields=args.fields||{},personIds=fields.personIds;
-    if(!Array.isArray(personIds)||!personIds.length||personIds.length>30||personIds.some(id=>typeof id!=='string'||!context.documentIds.has(context.canonical(id))))throw new HttpError(400,'בחרו את האנשים שאליהם שייך המסמך.');
+    if(!Array.isArray(personIds)||!personIds.length||personIds.length>30||personIds.some(id=>typeof id!=='string'||(context.contacts?!Object.hasOwn(context.contacts,context.canonical(id)):!context.documentIds.has(context.canonical(id)))))throw new HttpError(400,'בחרו את האנשים שאליהם שייך המסמך.');
+    if(branch==='extended'&&!personIds.some(id=>context.documentIds.has(context.canonical(id))))throw new HttpError(400,'בחרו גם בן משפחה מהדורות המתועדים בארכיון המשותף.');
     const clean={title:text(fields.title,'כותרת',200,true),caption:text(fields.caption||'','תיאור',5000),personIds:[...new Set(personIds.map(context.canonical))]};
     if(action==='content.document.prepare')return {fields:clean};
     const item={...args.item,name:clean.title,caption:clean.caption,personId:clean.personIds[0],documentPeople:clean.personIds,familyScopes:[branch],category:'personal'};

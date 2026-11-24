@@ -40,6 +40,7 @@
     if(next.searchParams.has('content')){next.searchParams.delete('content');return next;}
     const [view,id]=next.hash.slice(1).split('/');
     if(view==='founder-tree')next.hash='#tree';
+    else if(site?.branchPortal==='kehat'&&view==='tree'&&id==='tri')next.hash='#tree';
     else if(site?.extendedKeha&&view==='family-map'&&id)next.hash='#family-map';
     else if(id&&['games','weddings','nursery','updates','memorial','nostalgia','voices','stories','documents'].includes(view))next.hash='#'+view;
     else if(view==='person'&&id)next.hash='#directory';
