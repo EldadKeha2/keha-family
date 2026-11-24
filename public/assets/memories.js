@@ -4,6 +4,7 @@
   const t=(he,english)=>en?english:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').toLowerCase().trim();
+  const hasJourneys=!document.documentElement.dataset.nakashBranch&&!document.documentElement.dataset.extendedKeha;
   const categories=[
     {id:'roots',title:t('סיפורי שורשים','Our roots'),hint:t('מאין באנו','Where our story began'),intro:t('המסעות, הבתים והאנשים שמהם צמחה המשפחה שלנו.','The journeys, homes and people our family grew from.'),icon:'M12 21v-8m0 4-6 4m6-4 6 4M7 13c-6 0-5-7-1-7 0-6 10-6 10 0 5 0 6 7 1 7Z'},
     {id:'people',title:t('זיכרונות מאנשים','People we remember'),hint:t('האנשים שבלב','The people in our hearts'),intro:t('משפט, מחווה או רגע שנשאר איתנו מאדם אהוב.','A word, a gesture, a moment with someone dear.'),icon:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m18 0v-2a4 4 0 0 0-3-4M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8m7 0a4 4 0 0 1 0 8'},
@@ -117,6 +118,12 @@
     finally{categorySaves.delete(id);storyEdits++;renderStories();}
   }
   function renderStories(){
+    const folder=$('storyAliyahFolder');
+    if(folder){
+      folder.hidden=!hasJourneys||state.category!=='roots';
+      folder.querySelector('strong').textContent=t('שורשים ועלייה','Roots and aliyah');
+      const link=folder.querySelector('a');link.textContent=t('סיפורי העלייה','Aliyah stories');link.href='/aliyah/'+(en?'?lang=en':'');
+    }
     const originSource=$('storyNameOriginSource');
     if(originSource)originSource.hidden=state.category!=='all'&&state.category!=='roots';
     const selected=state.category==='all'?null:category(state.category),all=state.stories.filter(item=>!selected||category(item.category).id===selected.id);
@@ -214,12 +221,17 @@
   const storyRoute=()=>location.hash.startsWith('#stories/')?location.hash.slice('#stories/'.length):'';
   function syncStoryRoute(){
     const id=storyRoute(),reader=$('storyReader');
+    if(hasJourneys&&id==='roots'&&state.view==='stories'){
+      if(reader.open)reader.close();
+      if(state.category!=='roots')chooseCategory('roots');
+      return;
+    }
     if(!id){if(reader.open)reader.close();return;}
     if(state.view==='stories'&&(!reader.open||reader.dataset.storyId!==id))openStory(id,false);
   }
   function openStory(id,sync=true){
     const item=state.stories.find(item=>item.id===id);if(!item)return;
-    if(sync&&window.FamilyNavigation)window.FamilyNavigation.go('#stories/'+id);
+    if(sync&&window.FamilyNavigation){$('storyReader').dataset.parentRoute=storyRoute()==='roots'?'#stories/roots':'#stories';window.FamilyNavigation.go('#stories/'+id);}
     $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2><div class="story-reader-byline">${narratorHTML(item)}${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}</div><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
     $('storyReader').dataset.storyId=id;
     if(!$('storyReader').open)$('storyReader').showModal();
@@ -289,7 +301,7 @@
     window.addEventListener('popstate',syncStoryRoute);
     $('storyReader').addEventListener('close',()=>{
       if($('storyReader').open||storyRoute()!==$('storyReader').dataset.storyId)return;
-      window.FamilyNavigation?.returnTo('#stories');
+      window.FamilyNavigation?.returnTo($('storyReader').dataset.parentRoute||'#stories');
     });
     const questionnaire=$('storyQuestionnaireLink');if(questionnaire)questionnaire.textContent=t('כתיבת סיפור','Write a story');
     window.FamilyPeopleRoster?.subscribe?.(refreshNarratorPortraits);
@@ -297,8 +309,12 @@
     window.addEventListener('family-people-loaded',refreshNarratorPortraits);
     $('memoryWorld').innerHTML=worldHTML();storyPicker=new PeoplePicker($('storyPeoplePicker'),t('מי מופיע בזיכרון?','Who appears in this memory?'));voicePicker=new PeoplePicker($('voicePeoplePicker'),t('את מי שומעים בהקלטה?','Who can we hear in this recording?'));
     document.addEventListener('click',event=>{
-      const c=event.target.closest('[data-memory-category]');if(c){chooseCategory(c.dataset.memoryCategory);return;}
-      if(event.target.closest('#memoryBook')){chooseCategory('all');return;}
+      if(hasJourneys&&event.target.closest('#storyAliyahFolder a')&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){window.FamilyNavigation?.go('#stories/roots',{replace:true});return;}
+      const c=event.target.closest('[data-memory-category]');if(c){
+        if(hasJourneys&&storyRoute()==='roots'&&c.dataset.memoryCategory!=='roots')window.FamilyNavigation?.go('#stories');
+        chooseCategory(c.dataset.memoryCategory);return;
+      }
+      if(event.target.closest('#memoryBook')){if(hasJourneys&&storyRoute()==='roots')window.FamilyNavigation?.go('#stories');chooseCategory('all');return;}
       const read=event.target.closest('[data-open-story]');if(read){openStory(read.dataset.openStory);return;}
       const edit=event.target.closest('[data-edit-story]');if(edit){editStory(edit.dataset.editStory);return;}
       if(event.target.closest('#newStory,[data-new-story]')){editStory();return;}
