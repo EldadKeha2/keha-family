@@ -9,6 +9,7 @@ export const englishNames={
   "amit": "Amit Gandelman",
   "chantal": "Chantal Firouz",
   "rami": "Remi Gandelman",
+  "lev": "Lev Gandelman",
   "matan-g": "Matan Gandelman",
   "camille": "Camille De Vita",
   "shay": "Shai Gandelman",
