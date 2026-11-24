@@ -12,7 +12,7 @@ test('each film opens on its own page with the right edition, two caption tracks
   const { document: folder } = parseHTML(await html('index.html'));
   assert.equal(folder.querySelectorAll('.film-card').length, 2);
   for (const [id, version] of [
-    ['shlomo', 3],
+    ['shlomo', 4],
     ['yona', 2],
   ]) {
     assert.ok(folder.querySelector(`a.film-card[href="/aliyah/${id}/"]`));
@@ -45,8 +45,16 @@ test('each film opens on its own page with the right edition, two caption tracks
       );
     }
     if (id === 'shlomo') {
-      assert.equal(cues[0][0], 0);
-      assert.equal(cues[1][1], 14);
+      assert.equal(cues[0][0], 10);
+      assert.equal(cues[1][1], 24);
+      for (const wording of ['מלפנים ומאחור', 'על חמורים']) {
+        assert.ok(cues.some((c) => c[4] === 'voice' && c[2].includes(wording)));
+      }
+      const wedding = cues.find((c) => c[2].includes('נישאו'));
+      const ages = cues.find((c) => c[2].includes('בן 31') && c[2].includes('בת 17'));
+      const family = cues.at(-1);
+      assert.ok(wedding[1] <= ages[0] && ages[1] <= family[0]);
+      assert.match(family[2], /1942/);
       assert.ok(cues.find((c) => c[4] === 'voice')[0] > 20);
     }
   }
