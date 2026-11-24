@@ -284,7 +284,10 @@
       state.recordings=[data.recording,...state.recordings.filter(item=>item.id!==data.recording.id)];state.loaded.voices=true;state.revisions.voices=null;state.query='';$('searchInput').value='';$('voicePersonFilter').value='all';renderVoices();$('voiceEditor').close();window.FamilyApp.toast(t('הקול הזה נשמר איתנו ✓','This voice is now part of our family album ✓'));
     }catch(error){$('voiceError').textContent=error.message;$('voiceUploadStatus').textContent='';}finally{state.savingVoice=false;editorBusy($('voiceEditor'),false);$('saveRecording').textContent=state.recording?t('שמירת הפרטים','Save details'):t('העלאת ההקלטה','Upload recording');}
   }
+  let pendingView=null;
   function activate(view){
+    // The main router can select a direct story link before the book is mounted.
+    if(!$('memoryBook')){pendingView=view;return;}
     const changed=state.view!==view;state.view=view;$('storiesView').hidden=view!=='stories';$('voicesView').hidden=view!=='voices';
     if(view!=='voices')$('voiceList').querySelectorAll('audio').forEach(audio=>audio.pause());
     if(changed)state.query='';
@@ -341,7 +344,8 @@
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&['stories','voices'].includes(state.view))refresh(state.view);});
     setInterval(()=>{if(document.visibilityState!=='hidden'&&['stories','voices'].includes(state.view))refresh(state.view);},30000);
     window.addEventListener('beforeunload',event=>{if(state.savingStory||state.savingVoice||categorySaves.size||$('voiceEditor').open&&($('voiceFile').files.length||$('voiceTitle').value||$('voiceBody').value)){event.preventDefault();event.returnValue='';}});
-    activate(window.FamilyApp?.getView?.()||'tree');
+    activate(pendingView||window.FamilyApp?.getView?.()||'tree');
+    pendingView=null;
   }
   window.FamilyMemories={activate,search(query){state.query=query;if(state.view==='stories')renderStories();if(state.view==='voices')renderVoices();}};
   document.addEventListener('DOMContentLoaded',init);

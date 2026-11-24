@@ -13,7 +13,7 @@ const story={id:'a'.repeat(24),title:'הדרך הביתה',body:'סיפור מש
 const recording={id:'b'.repeat(32),title:'בקולה של סבתא',body:'זיכרון מוקלט',author:'משפחה',year:1985,personIds:['yona'],tags:[person],filename:'voice.mp3',src:'/api/voices/'+('b'.repeat(32))+'/audio',createdAt:'2026-11-01T00:00:00Z',updatedAt:'2026-11-01T00:00:00Z'};
 const tick=async()=>{for(let n=0;n<5;n++)await new Promise(resolve=>setImmediate(resolve));};
 
-function fixture({english=false,reduced=false,stories=[story],recordings=[recording],people=[person],fail=false,categoryError=0,href='https://family.test/',navigator={},historyNavigation=false,phone=false,site={}}={}){
+function fixture({english=false,reduced=false,stories=[story],recordings=[recording],people=[person],fail=false,categoryError=0,href='https://family.test/',navigator={},historyNavigation=false,phone=false,site={},beforeReadyView=''}={}){
   const {window,document}=parseHTML(html),requests=[],timers=new Map(),scrolls=[],uploads=[],notices=[];let timer=0;
   Object.assign(document.documentElement.dataset,site);
   const browser=historyNavigation?browserHistory(href):null,location=browser?.location||new URL(href);
@@ -53,11 +53,20 @@ function fixture({english=false,reduced=false,stories=[story],recordings=[record
   if(browser)vm.runInContext(navigationSource,context);
   vm.runInContext(source,context);
   if(browser)window.addEventListener('popstate',()=>{window.FamilyMemories.activate(location.hash.slice(1).split('/')[0]);});
+  if(beforeReadyView)window.FamilyMemories.activate(beforeReadyView);
   document.dispatchEvent(new window.Event('DOMContentLoaded'));
   const get=id=>document.getElementById(id),click=selector=>{const el=document.querySelector(selector);assert.ok(el,selector);el.dispatchEvent(new window.Event('click',{bubbles:true}));};
   const emit=(id,type,props={})=>{const event=new window.Event(type,{bubbles:true,cancelable:true});Object.assign(event,props);get(id).dispatchEvent(event);return event;};
   return {window,document,location,browser,get,click,emit,requests,uploads,timers,scrolls,notices,async activate(view){if(browser)window.FamilyNavigation.go('#'+view);window.FamilyMemories.activate(view);await tick();},async flush(){await tick();},finishAnimation(){const callbacks=[...timers.values()];timers.clear();callbacks.forEach(fn=>fn());}};
 }
+
+test('a cold roots link opens the aliyah folder when the router runs before the book mounts',async()=>{
+  const f=fixture({href:'https://family.test/#stories/roots',historyNavigation:true,beforeReadyView:'stories'});
+  await f.flush();
+  assert.equal(f.get('storiesView').hidden,false);
+  assert.equal(f.get('storyAliyahFolder').hidden,false);
+  assert.equal(f.get('memoryWorld').dataset.category,'roots');
+});
 
 test('the five category doors open from an ornamented book and each click turns its pages',async()=>{
   const f=fixture();await f.activate('stories');
