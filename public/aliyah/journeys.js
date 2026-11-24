@@ -128,7 +128,7 @@
   });
   $('#retry').addEventListener('click', () => video.load());
   subtitles(lang);
-  fetch(`/aliyah/${film}-cues.json?v=${document.body.dataset.edition}`)
+  fetch(document.body.dataset.cues || `/aliyah/${film}-cues.json?v=${document.body.dataset.edition}`)
     .then((response) => {
       if (!response.ok) throw Error();
       return response.json();

@@ -12,7 +12,7 @@ test('each film opens on its own page with the right edition, two caption tracks
   const { document: folder } = parseHTML(await html('index.html'));
   assert.equal(folder.querySelectorAll('.film-card').length, 2);
   for (const [id, version] of [
-    ['shlomo', 9],
+    ['shlomo', 12],
     ['yona', 2],
   ]) {
     assert.ok(folder.querySelector(`a.film-card[href="/aliyah/${id}/"]`));
@@ -30,9 +30,12 @@ test('each film opens on its own page with the right edition, two caption tracks
         .startsWith(player.getAttribute('src')),
     );
     assert.equal(player.querySelectorAll('track').length, 2);
-    const cues = JSON.parse(await html(`${id}-cues.json`));
+    const cuePath = page.body.dataset.cues?.replace('/aliyah/', '') || `${id}-cues.json`;
+    const cues = JSON.parse(await html(cuePath));
     for (const [index, lang] of ['he', 'en'].entries()) {
-      const vtt = await html(`${id}.${lang}.vtt`);
+      const track = player.querySelector(`track[srclang="${lang}"]`);
+      const trackPath = new URL(track.getAttribute('src'), site).pathname.replace('/aliyah/', '');
+      const vtt = await html(trackPath);
       assert.ok(player.querySelector(`track[srclang="${lang}"]`));
       assert.equal(vtt.split(' --> ').length - 1, cues.length);
       assert.ok(
@@ -48,22 +51,26 @@ test('each film opens on its own page with the right edition, two caption tracks
       assert.equal(cues[0][0], 10);
       assert.ok(cues.find(c => c[2].includes('בן שלוש'))[1] < 19);
       assert.ok(page.querySelector('.view #caption'));
-      assert.ok((await html('shlomo.he.vtt')).includes('line:80%'));
-      assert.ok((await html('shlomo.en.vtt')).includes('line:80%'));
+      assert.ok((await html('shlomo/v12/he.vtt')).includes('line:80%'));
+      assert.ok((await html('shlomo/v12/en.vtt')).includes('line:80%'));
       for (const wording of ['מלפנים ומאחור', 'על חמורים', 'בנפחות', 'עשרים וחמש', 'אישרו לי העלייה']) {
         assert.ok(cues.some((c) => c[4] === 'voice' && c[2].includes(wording)));
       }
       const find = (text) => cues.find((cue) => cue[2].replaceAll('\u200e', '').includes(text));
-      const parts = ['בנפחות', 'לדרך ברגל', 'על חמורים', 'שבאזור צעדא', 'אוטו מארץ ישראל', 'התגלגלה הדרך'];
+      const parts = ['בנפחות', 'אחות אביו', 'בדרה', 'עוד בצעדא', 'כדי לבקש אישור עלייה', 'לדרך ברגל', 'על חמורים', 'שבאזור צעדא', 'אוטו מארץ ישראל', 'התגלגלה הדרך'];
       // Each type of travel appears in the testimony or a close shot before its map.
       for (let i = 1; i < parts.length; i++) {
         assert.ok(find(parts[i - 1])[1] <= find(parts[i])[0]);
       }
+      assert.ok(find('לדרך ברגל')[1] < find('הייתי מלמד אותם')[0]);
+      assert.ok(find('הייתי מלמד אותם')[1] < find('ומקבל משכורת')[0]);
+      assert.ok(find('הממונה על העלייה')[0] - find('ומקבל משכורת')[1] >= 8);
+      assert.ok(find('שלמה בן 34–35')[2].includes('ויונה בת 21'));
       assert.ok(find('נישאו')[1] <= find('17–18')[0]);
       assert.ok(find('17–18')[2].includes('30–31'));
       assert.match(find('17–18')[2], /\u200e17–18\u200e/);
       assert.match(find('17–18')[2], /\u200e30–31\u200e/);
-      assert.ok(find('1942')[1] <= find('שלמה בן 35')[0]);
+      assert.ok(find('1942')[1] <= find('שלמה בן 34–35')[0]);
       assert.ok(find('רותי בת 2–3')[2].includes('אלישבע בת פחות משנה'));
       assert.ok(find('רותי בת 2–3')[1] - find('1942')[0] >= 15);
       assert.ok(cues.find((c) => c[4] === 'voice')[0] >= 20);
