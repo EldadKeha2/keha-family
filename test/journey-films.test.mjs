@@ -12,7 +12,7 @@ test('each film opens on its own page with the right edition, two caption tracks
   const { document: folder } = parseHTML(await html('index.html'));
   assert.equal(folder.querySelectorAll('.film-card').length, 2);
   for (const [id, version] of [
-    ['shlomo', 7],
+    ['shlomo', 8],
     ['yona', 2],
   ]) {
     assert.ok(folder.querySelector(`a.film-card[href="/aliyah/${id}/"]`));
