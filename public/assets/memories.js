@@ -131,7 +131,7 @@
     $('storiesCount').textContent=state.loaded.stories?`${items.length} ${t(items.length===1?'זיכרון':'זיכרונות',items.length===1?'memory':'memories')}`:'';
     $('storiesEmpty').hidden=!state.loaded.stories||items.length>0;
     $('memoryEmptyText').textContent=all.length?t('לא נמצאו זיכרונות בסינון הזה. אפשר לשנות את הסינון או להוסיף זיכרון.','No memories match these filters. Change them or add a memory.'):selected?.intro||t('סיפור קטן, רגע גדול, או משהו שרק אתם זוכרים.','A small story, a big moment, or something only you remember.');
-    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><div class="memory-card-heading">${narratorHTML(item)}<h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4></div><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div>${itemSharing(item,'story')}${categoryControl(item)}</article>`).join('');
+    $('storyTimeline').innerHTML=items.map(item=>`<article class="memory-card"><div class="memory-card-meta"><span>${safe(category(item.category).title)}</span>${item.year?`<bdi>${item.year}</bdi>`:''}</div><div class="memory-card-heading">${narratorHTML(item)}<h4><button type="button" data-open-story="${item.id}">${safe(item.title)}</button></h4></div><p class="memory-card-excerpt" dir="auto">${safe((item.body||'').slice(0,230))}${item.body?.length>230?'…':''}</p><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="memory-card-footer"><span>${safe(item.author||'')}</span><button type="button" data-open-story="${item.id}">${item.filmId?t('צפייה בסרט','Watch film'):t('פתיחת הזיכרון','Read memory')} <span aria-hidden="true">${en?'→':'←'}</span></button><button type="button" data-edit-story="${item.id}" aria-label="${t('עריכת הזיכרון ','Edit memory ')+safe(item.title)}">${t('עריכה','Edit')}</button></div>${itemSharing(item,'story')}${categoryControl(item)}</article>`).join('');
   }
   function voiceSealHTML(item){
     const id=item.personIds?.[0]||item.tags?.[0]?.id,person=window.FamilyApp?.getPersonSummary?.(id),src=person?.profile;
@@ -172,7 +172,10 @@
   const storyRoute=()=>location.hash.startsWith('#stories/')?location.hash.slice('#stories/'.length):'';
   function syncStoryRoute(){
     const id=storyRoute(),reader=$('storyReader');
-    if(id==='roots'&&state.view==='stories'){
+    // The previously shared two-film link now opens the chapter containing both stories.
+    const oldCollection=id==='53455de497f1386c77d0c8f5';
+    if((id==='roots'||oldCollection)&&state.view==='stories'){
+      if(oldCollection)window.FamilyNavigation?.go('#stories/roots',{replace:true});
       if(reader.open)reader.close();
       if(state.category!=='roots')chooseCategory('roots');
       return;
@@ -180,41 +183,29 @@
     if(!id){if(reader.open)reader.close();return;}
     if(state.view==='stories'&&(!reader.open||reader.dataset.storyId!==id))openStory(id,false);
   }
-  function journeyFilms(){
-    const films=[
-      {id:'shlomo',name:t('שלמה קהא','Shlomo Keha'),title:t('מן ההרים אל רחובות','From the Mountains to Rehovot'),year:1932},
-      {id:'yona',name:t('יונה נקאש','Yona Nakash'),title:t('סיפורים מעבר לים','Stories Across the Sea'),year:1934},
-    ];
-    // Dedicated branch apps serve a scoped API. Their full film links use the family film archive.
+  function journeyFilm(item){
+    const filmId=item.filmId;
+    if(filmId!=='shlomo'&&filmId!=='yona')return '';
     const origin=document.documentElement.dataset.nakashHome?'https://keha-family.eldadkeha.workers.dev':location.origin;
-    const cards=films.map(film=>{
-      const url=new URL('/aliyah/'+film.id+'/',origin);
-      if(en)url.searchParams.set('lang','en');
-      return `<a class="memory-film" href="${safe(url.href)}" data-memory-film="${film.id}">
-        <img src="/aliyah/${film.id}-art.webp" alt="" width="480" height="300" loading="lazy">
-        <span><small>${film.name} · <bdi>${film.year}</bdi></small><strong>${film.title}</strong></span>
-        <span class="memory-film-play" aria-hidden="true">▶</span></a>`;
-    });
-    return `<section class="memory-films" aria-label="${t('סרטי העלייה','Aliyah films')}"><div class="memory-film-choices">${cards.join('')}</div><div data-film-viewer></div></section>`;
-  }
-  function openFilm(link){
-    const url=new URL(link.getAttribute('href'));
-    if(url.origin!==location.origin)return false;
-    const viewer=$('storyReaderBody').querySelector('[data-film-viewer]');
-    if(!viewer)return false;
-    const title=link.querySelector('strong').textContent;
-    const fullURL=url.href;url.searchParams.set('embed','1');
-    if(viewer.querySelector('iframe')?.getAttribute('src')!==url.href){
-      viewer.innerHTML=`<iframe src="${safe(url.href)}" title="${safe(title)}" allowfullscreen></iframe>
-        <a href="${safe(fullURL)}">${t('לעמוד הסרט ולשיתוף','Film page and sharing')} · ${safe(title)}</a>`;
+    const url=new URL('/aliyah/'+filmId+'/',origin);
+    if(en)url.searchParams.set('lang','en');
+    const fullPage=safe(url.href),title=safe(item.title);
+    if(url.origin!==location.origin){
+      // Dedicated branch Workers scope their media APIs, so link to the main archive's player.
+      return `<section class="memory-films"><a class="memory-film" href="${fullPage}">
+        <img src="/aliyah/${filmId}-art.webp" alt="" width="480" height="300">
+        <span>${t('לצפייה בסרט','Watch film')} · ${title}</span><span class="memory-film-play" aria-hidden="true">▶</span></a></section>`;
     }
-    viewer.querySelector('iframe').focus();
-    return true;
+    url.searchParams.set('embed','1');
+    return `<section class="memory-films" aria-label="${title}"><div data-film-viewer>
+      <iframe src="${safe(url.href)}" title="${title}" allowfullscreen></iframe>
+      <a href="${fullPage}">${t('לעמוד הסרט ולשיתוף','Film page and sharing')}</a>
+    </div></section>`;
   }
   function openStory(id,sync=true){
     const item=state.stories.find(item=>item.id===id);if(!item)return;
     if(sync&&window.FamilyNavigation){$('storyReader').dataset.parentRoute=storyRoute()==='roots'?'#stories/roots':'#stories';window.FamilyNavigation.go('#stories/'+id);}
-    $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2><div class="story-reader-byline">${narratorHTML(item)}${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}</div><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${item.filmCollection==='aliyah'?journeyFilms():''}${itemSharing(item,'story')}${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
+    $('storyReaderBody').innerHTML=`<span class="story-reader-year">${safe(category(item.category).title)}${item.year?' · '+item.year:''}</span><h2 id="storyReaderTitle">${safe(item.title)}</h2><div class="story-reader-byline">${narratorHTML(item)}${item.author?`<p class="story-reader-author">${t('זיכרון מאת ','A memory by ')+safe(item.author)}</p>`:''}</div><div class="memory-card-people">${tagsHTML(item,'stories')}</div><div class="story-full-text" dir="auto">${safe(item.body)}</div>${journeyFilm(item)}${itemSharing(item,'story')}${item.attachments?.length?`<div class="attachment-list"><h3>${t('המסמכים שמלווים את הזיכרון','Documents accompanying this memory')}</h3>${filesHTML(item.attachments)}</div>`:''}<button type="button" class="secondary-button" data-edit-story="${item.id}">${t('עריכת הזיכרון','Edit memory')}</button>`;
     $('storyReader').dataset.storyId=id;
     if(!$('storyReader').open)$('storyReader').showModal();
   }
@@ -300,8 +291,6 @@
         chooseCategory(c.dataset.memoryCategory);return;
       }
       if(event.target.closest('#memoryBook')){if(storyRoute()==='roots')window.FamilyNavigation?.go('#stories');chooseCategory('all');return;}
-      const film=event.target.closest('[data-memory-film]');
-      if(film&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey&&openFilm(film)){event.preventDefault();return;}
       const read=event.target.closest('[data-open-story]');if(read){openStory(read.dataset.openStory);return;}
       const edit=event.target.closest('[data-edit-story]');if(edit){editStory(edit.dataset.editStory);return;}
       if(event.target.closest('#newStory,[data-new-story]')){editStory();return;}

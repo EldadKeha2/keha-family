@@ -1,18 +1,31 @@
 import {HttpError,text,uid} from './http.mjs';
 
 export const MEMORY_CATEGORIES=['roots','people','family','childhood','funny'];
-export const ALIYAH_MEMORY_ID='53455de497f1386c77d0c8f5';
+export const LEGACY_ALIYAH_MEMORY_ID='53455de497f1386c77d0c8f5';
+export const ALIYAH_FILM_STORIES={
+  shlomo:{
+    id:'a98e784b78060d941831791c',title:'מן ההרים אל רחובות — סרט העלייה של סבא שלמה',author:'שלמה קהא',year:1932,
+    body:'סבא שלמה מספר בקולו על חייו בצעדא, על הדרך לעדן כדי לקבל אישור עלייה, ועל ההפלגה לארץ ישראל בשנת 1932.',
+  },
+  yona:{
+    id:'9db38776edfa50f829e727b4',title:'סיפורים מעבר לים — סרט העלייה של סבתא יונה',author:'יונה נקאש קהא',year:1934,
+    body:'סבתא יונה מספרת בקולה על ילדותה בצנעא, על תנורי החרס שהכינה עם אמה ועל המסע דרך עדן לארץ ישראל בשנת 1934.',
+  },
+};
 
-export function initializeAliyahMemory(state){
-  if(state.rows('SELECT id FROM stories WHERE id=?',ALIYAH_MEMORY_ID).length)return;
+export function initializeAliyahFilmStories(state){
+  const migration='aliyah-film-stories-v1';
+  if(state.rows('SELECT id FROM meta WHERE id=?',migration).length)return;
+  const previous=state.rows('SELECT data FROM stories WHERE id=?',LEGACY_ALIYAH_MEMORY_ID)[0];
+  const isCollection=previous&&JSON.parse(previous.data).filmCollection==='aliyah';
   const now=new Date().toISOString();
-  const story={
-    id:ALIYAH_MEMORY_ID,category:'roots',filmCollection:'aliyah',personIds:['shlomo','yona'],familyScopes:['original'],
-    title:'סיפורי העלייה של סבא שלמה וסבתא יונה',
-    body:'שני סרטים המבוססים על העדויות של סבא שלמה וסבתא יונה. ב״מן ההרים אל רחובות״ שלמה מספר על דרכו מצעדא דרך עדן לארץ ישראל ב־1932. ב״סיפורים מעבר לים״ יונה מספרת על ילדותה בצנעא ועל המסע שהביא אותה לארץ ב־1934.',
-    author:'שלמה קהא ויונה נקאש',year:null,attachments:[],createdAt:now,updatedAt:now,
-  };
-  state.sql.exec('INSERT INTO stories(id,data) VALUES(?,?)',story.id,JSON.stringify(story));
+  for(const [filmId,details] of Object.entries(ALIYAH_FILM_STORIES)){
+    const story={...details,filmId,category:'roots',personIds:[filmId],familyScopes:['original'],attachments:[],createdAt:now,updatedAt:now};
+    state.sql.exec('INSERT OR IGNORE INTO stories(id,data) VALUES(?,?)',story.id,JSON.stringify(story));
+  }
+  // Archive the former combined record in the same transaction, including any edits or attachments.
+  state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',migration,isCollection?previous.data:'applied');
+  if(isCollection)state.sql.exec('DELETE FROM stories WHERE id=?',LEGACY_ALIYAH_MEMORY_ID);
   state.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());
 }
 export function memoryCategory(value='family'){

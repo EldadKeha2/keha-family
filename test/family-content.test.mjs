@@ -9,7 +9,7 @@ import {familyApp} from '../family-apps/worker.mjs';
 import {MISATTRIBUTED_YONA_DOCUMENT,UNVERIFIED_YONA_MARRIAGE_DOCUMENT,UNATTRIBUTED_KEHAT_REGISTER,contentContext,storyInContext} from '../src/family-content.mjs';
 import {parseHTML} from 'linkedom';
 import {KEHAT_DOCUMENTS} from '../src/kehat-documents.mjs';
-import {ALIYAH_MEMORY_ID} from '../src/memories.mjs';
+import {ALIYAH_FILM_STORIES,LEGACY_ALIYAH_MEMORY_ID} from '../src/memories.mjs';
 import {sha256} from '../src/http.mjs';
 import {nameCorrectionKey} from '../src/name-corrections.mjs';
 const researchIds=new Set(KEHAT_DOCUMENTS.map(item=>item.id));
@@ -85,18 +85,37 @@ test('new family stories use the existing editor contract and remain relevant to
   }finally{f.close();}
 });
 
-test('the aliyah collection survives a category change and restart as one editable memory',async()=>{
+test('the combined film record migrates to two independently editable roots stories without merging the written account',async()=>{
   const f=fixture();try{
-    const story=(await f.json('/api/stories')).stories.find(item=>item.id===ALIYAH_MEMORY_ID);
-    assert.equal(story.category,'roots');assert.equal(story.filmCollection,'aliyah');
-    const changed=await f.json('/api/stories/'+story.id+'/category',{method:'POST',body:{category:'family',expectedUpdatedAt:story.updatedAt}});
-    assert.equal(changed.story.filmCollection,'aliyah');
+    const written=(await f.json('/api/stories',{method:'POST',body:{title:'סיפור העלייה של סבתא יונה',body:'עדות מעבודת השורשים של תמי',category:'roots',personIds:['yona'],year:1935}})).story;
+    const childhood=(await f.json('/api/stories',{method:'POST',body:{title:'נעלי הבית של מרגלית',body:'זיכרון ילדות',category:'childhood'}})).story;
+    const previous={id:LEGACY_ALIYAH_MEMORY_ID,filmCollection:'aliyah',category:'roots',title:'סיפורי העלייה',body:'הערת משפחה',attachments:[{name:'הערות'}],personIds:['yona','shlomo']};
+    const oldRow=JSON.stringify(previous);
+    f.sql.prepare('DELETE FROM meta WHERE id=?').run('aliyah-film-stories-v1');
+    for(const {id} of Object.values(ALIYAH_FILM_STORIES))f.sql.prepare('DELETE FROM stories WHERE id=?').run(id);
+    f.sql.prepare('INSERT INTO stories(id,data) VALUES(?,?)').run(previous.id,oldRow);
     f.restart();
-    const matches=(await f.json('/api/stories')).stories.filter(item=>item.filmCollection==='aliyah');
-    assert.equal(matches.length,1);assert.equal(matches[0].category,'family');
-    assert.deepEqual(matches[0].personIds,['shlomo','yona']);
-    const result=(await f.json('/api/search?type=story&q='+encodeURIComponent('מן ההרים אל רחובות'))).items.find(row=>row.id===story.id);
-    assert.equal(result.href,'#stories/'+story.id);
+    const {stories,revision}=await f.json('/api/stories');
+    assert.equal(stories.length,4);assert.equal(stories.filter(item=>item.category==='roots').length,3);
+    assert.equal(stories.some(item=>item.id===previous.id),false);
+    assert.deepEqual(stories.find(item=>item.id===written.id),written);
+    assert.deepEqual(stories.find(item=>item.id===childhood.id),childhood);
+    assert.equal(f.sql.prepare('SELECT value FROM meta WHERE id=?').get('aliyah-film-stories-v1').value,oldRow);
+    for(const [filmId,details] of Object.entries(ALIYAH_FILM_STORIES)){
+      const film=stories.find(item=>item.id===details.id);
+      assert.equal(film.filmId,filmId);assert.equal(film.category,'roots');assert.deepEqual(film.personIds,[filmId]);assert.equal(film.year,details.year);
+      const results=await f.json('/api/search?type=story&q='+encodeURIComponent(film.title));
+      const hit=results.items.find(row=>row.id===film.id);assert.equal(hit.href,'#stories/'+film.id);assert.equal(hit.content,null);
+    }
+    f.restart();
+    assert.equal((await f.json('/api/stories')).revision,revision);
+    const shlomo=stories.find(item=>item.filmId==='shlomo');
+    const updated=await f.json('/api/stories/'+shlomo.id+'/category',{method:'POST',body:{category:'people',expectedUpdatedAt:shlomo.updatedAt}});
+    assert.equal(updated.story.filmId,'shlomo');
+    f.restart();
+    const after=(await f.json('/api/stories')).stories;
+    assert.equal(after.length,4);assert.equal(after.find(item=>item.id===shlomo.id).category,'people');
+    assert.deepEqual(after.find(item=>item.filmId==='yona'),stories.find(item=>item.filmId==='yona'));
   }finally{f.close();}
 });
 
@@ -283,7 +302,7 @@ test('Shlomo lite stories select only Shlomo and cannot create or edit memories 
     const father=await save(['shlomo']),mother=await save(['yona']),mixed=await save(['shlomo','yona']),unknown=await save([]);
     const before=await f.json('/api/stories');
     const stories=await f.json(scope('shlomo','stories'));
-    assert.deepEqual(stories.stories.map(item=>item.id),[father.story.id]);
+    assert.deepEqual(stories.stories.map(item=>item.id),[ALIYAH_FILM_STORIES.shlomo.id,father.story.id]);
     assert.deepEqual(stories.allowedPersonIds,['shlomo']);
     for(const personIds of [[],['yona'],['ora'],['shlomo','yona']])assert.equal((await f.call(scope('shlomo','stories'),{method:'POST',body:{title:'Not permitted',body:'Not a Shlomo story',personIds}})).status,400);
     for(const item of [mother,mixed,unknown])assert.equal((await f.call(scope('shlomo','stories/'+item.story.id),{method:'POST',body:{title:'Do not change',body:'Other family story',personIds:['shlomo'],expectedUpdatedAt:item.story.updatedAt}})).status,404);

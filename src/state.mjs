@@ -2,7 +2,7 @@ import {photoFrame,validatePhotoFrame} from './photo-framing.mjs';
 import family from './family.mjs';
 import {initializeFamilyContent,handleFamilyContent} from './family-content.mjs';
 import {searchSite} from './site-search.mjs';
-import {RecordingLibrary,memoryCategory,memoryYear,memoryPeople,publicStory,initializeAliyahMemory} from './memories.mjs';
+import {RecordingLibrary,memoryCategory,memoryYear,memoryPeople,publicStory,initializeAliyahFilmStories} from './memories.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
 import {NostalgiaLibrary} from './nostalgia-library.mjs';
 import {VideoCategories} from './video-categories.mjs';
@@ -173,7 +173,7 @@ export class FamilyState {
       this.correctStoredNames('names-jimaan-2026-11-22-v1',['%ידעאן%','%ידען%','%מעאן%','%מען%','%Jidaan%'],correctJimaanName);
       this.nostalgiaLibrary.initialize();
       initializeFamilyContent(this);
-      initializeAliyahMemory(this);
+      initializeAliyahFilmStories(this);
     });
   }
   correctStoredNames(migration,patterns,correct){
@@ -1148,7 +1148,7 @@ export class FamilyState {
         if(!body&&!attachments.length)throw new HttpError(400,'כתבו את הסיפור או צרפו מסמך.');
         const now=new Date(Math.max(Date.now(),(Date.parse(previous?.updatedAt)||0)+1)).toISOString();
         const item={id:p.id||uid().slice(0,24),category,personIds,year,title,author,body,attachments,createdAt:previous?.createdAt||now,updatedAt:now,...((fields.familyScopes||previous?.familyScopes)?{familyScopes:fields.familyScopes||previous.familyScopes}:{})};
-        if(previous?.filmCollection)item.filmCollection=previous.filmCollection;
+        if(previous?.filmId)item.filmId=previous.filmId;
         for(const file of p.files||[])this.sql.exec('INSERT INTO media(id,category,person_id,data) VALUES(?,?,NULL,?)',file.id,'attachment',JSON.stringify(file));
         this.sql.exec('INSERT INTO stories(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data',item.id,JSON.stringify(item));
         this.sql.exec("INSERT INTO meta(id,value) VALUES('stories',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",uid());

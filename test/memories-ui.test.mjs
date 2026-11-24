@@ -1,3 +1,4 @@
+import {ALIYAH_FILM_STORIES,LEGACY_ALIYAH_MEMORY_ID} from '../src/memories.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -71,25 +72,36 @@ test('a cold roots link opens the aliyah folder when the router runs before the 
   assert.equal(f.get('memoryWorld').dataset.category,'roots');
 });
 
-test('the two films form one shareable story in the book and its chapter',async()=>{
-  const filmStory={...story,id:'c'.repeat(24),title:'סיפורי העלייה של סבא שלמה וסבתא יונה',filmCollection:'aliyah'};
-  const copied=[];
-  const f=fixture({historyNavigation:true,stories:[story,{...story,id:'d'.repeat(24),category:'childhood'},filmStory],navigator:{clipboard:{writeText:async url=>copied.push(url)}}});
+test('each film has its own card, player and share link alongside the written account',async()=>{
+  const films=Object.entries(ALIYAH_FILM_STORIES).map(([filmId,film])=>({...story,...film,filmId,personIds:[filmId]}));
+  const stories=[story,{...story,id:'d'.repeat(24),category:'childhood'},...films],copied=[];
+  const f=fixture({historyNavigation:true,stories,navigator:{clipboard:{writeText:async url=>copied.push(url)}}});
   await f.activate('stories');
-  assert.equal(f.get('storyTimeline').children.length,3);
-  assert.equal(f.get('storiesCount').textContent,'3 זיכרונות');
+  assert.equal(f.get('storiesCount').textContent,'4 זיכרונות');
   f.click('[data-memory-category="roots"]');
-  assert.equal(f.get('storyTimeline').children.length,2);
-  f.click('[data-open-story="'+filmStory.id+'"]');
-  const reader=f.get('storyReaderBody');
-  assert.deepEqual([...reader.querySelectorAll('[data-memory-film]')].map(a=>new URL(a.getAttribute('href')).pathname),['/aliyah/shlomo/','/aliyah/yona/']);
-  f.click('#storyReaderBody [data-memory-share="copy"]');await f.flush();
-  assert.deepEqual(copied,['https://family.test/#stories/'+filmStory.id]);
-  f.click('[data-memory-film="shlomo"]');
-  assert.equal(reader.querySelector('iframe').getAttribute('src'),'https://family.test/aliyah/shlomo/?embed=1');
-  f.click('[data-memory-film="yona"]');assert.equal(reader.querySelectorAll('iframe').length,1);
-  assert.equal(reader.querySelector('iframe').getAttribute('src'),'https://family.test/aliyah/yona/?embed=1');
-  f.browser.history.back();await f.flush();assert.equal(reader.querySelector('iframe'),null);
+  assert.equal(f.get('storiesCount').textContent,'3 זיכרונות');
+  assert.equal(f.get('storyTimeline').children.length,3);
+  for(const film of films){
+    f.click('[data-open-story="'+film.id+'"]');
+    const reader=f.get('storyReaderBody'),share='https://family.test/#stories/'+film.id;
+    assert.equal(f.location.href,share);
+    assert.equal(reader.querySelector('h2').textContent,film.title);
+    assert.equal(reader.querySelectorAll('iframe').length,1);
+    assert.equal(reader.querySelector('iframe').getAttribute('src'),'https://family.test/aliyah/'+film.filmId+'/?embed=1');
+    f.click('#storyReaderBody [data-memory-share="copy"]');await f.flush();
+    assert.equal(copied.at(-1),share);
+    f.browser.history.back();await f.flush();assert.equal(reader.querySelector('iframe'),null);
+  }
+  assert.equal(new Set(copied).size,2);
+  f.click('[data-open-story="'+story.id+'"]');
+  assert.equal(f.get('storyReaderBody').querySelector('iframe'),null);assert.match(f.get('storyReaderBody').textContent,/סיפור משפחתי/);
+  for(const film of films){
+    const fresh=fixture({href:'https://family.test/#stories/'+film.id,historyNavigation:true,beforeReadyView:'stories',stories});await fresh.flush();
+    assert.equal(fresh.get('storyReader').open,true);assert.equal(fresh.get('storyReaderTitle').textContent,film.title);
+  }
+  const old=fixture({href:'https://family.test/#stories/'+LEGACY_ALIYAH_MEMORY_ID,historyNavigation:true,beforeReadyView:'stories',stories});
+  await old.flush();
+  assert.equal(old.location.hash,'#stories/roots');assert.equal(old.get('storiesCount').textContent,'3 זיכרונות');assert.ok(!old.get('storyReader').open);
 });
 
 test('the five category doors open from an ornamented book and each click turns its pages',async()=>{

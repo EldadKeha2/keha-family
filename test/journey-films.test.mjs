@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseHTML } from 'linkedom';
-import { ALIYAH_MEMORY_ID } from '../src/memories.mjs';
+import { ALIYAH_FILM_STORIES } from '../src/memories.mjs';
 import { journeyFilm } from '../src/journey-films.mjs';
 
 const site = 'https://family.test';
@@ -23,7 +23,7 @@ test('each film opens on its own page with the right edition, two caption tracks
       player.getAttribute('src'),
       `/api/journey-films/${id}/${version}`,
     );
-    assert.equal(page.querySelector('[data-parent-memory]').getAttribute('href'),'/#stories/'+ALIYAH_MEMORY_ID);
+    assert.equal(page.querySelector('[data-parent-memory]').getAttribute('href'),'/#stories/'+ALIYAH_FILM_STORIES[id].id);
     assert.ok(page.querySelector('[data-film-sharing]'));
     assert.ok(
       page

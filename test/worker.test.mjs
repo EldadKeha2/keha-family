@@ -6,7 +6,7 @@ import worker,{FamilyState,LIMITS,sniff} from '../src/worker.mjs';
 import {signedRequest} from '../src/hf.mjs';
 import {fail,sha256,uid} from '../src/http.mjs';
 import family from '../src/family.mjs';
-import {ALIYAH_MEMORY_ID} from '../src/memories.mjs';
+import {ALIYAH_FILM_STORIES} from '../src/memories.mjs';
 import {featuredVideos,weddingVideos} from '../src/featured-videos.mjs';
 import {FACE_SCAN_VERSION} from '../public/assets/face-coverage.mjs';
 import {photoUploadPayload,PHOTO_METADATA_HEADER,MAX_PHOTO_METADATA_BYTES} from '../public/assets/photo-upload-metadata.mjs';
@@ -1211,6 +1211,7 @@ test('tree corrections update existing names and add a spouse without changing s
     response=await f.call('/api/people/bosmat/profile',{method:'POST',body:{file}});assert.equal(response.status,200);
     response=await f.call('/api/people/bosmat/caption',{method:'POST',body:{file,caption:'תיאור שנשמר לפני תיקון השם'}});assert.equal(response.status,200);
     response=await f.call('/api/stories',{method:'POST',body:{title:'זיכרון משפחתי',year:2000,body:'סיפור שנשמר לפני העדכון'}});assert.equal(response.status,201);
+    const savedStory=(await response.json()).story;
     const before=await (await f.call('/api/people/bosmat')).json();
     const tagged=await taggedUpload(f);await setTags(f,tagged,['memo','camille']);
     const beforeTagged=await f.call('/api/collections/photos');
@@ -1229,7 +1230,7 @@ test('tree corrections update existing names and add a spouse without changing s
     const renamedTags=await f.call('/api/collections/photos',{headers:{'If-None-Match':beforeTagged.headers.get('ETag')}});assert.equal(renamedTags.status,200,'A rename must refresh existing cached tag labels');
     const taggedPhoto=(await renamedTags.json()).items[0];assert.equal(taggedPhoto.id,tagged.id);assert.deepEqual(taggedPhoto.tags.map(person=>person.name),['קמיל דה ויטה','גיירמו וארגאס']);
     const roster=(await (await f.call('/api/tag-people')).json()).people;assert.equal(roster.find(person=>person.id==='memo').name,'גיירמו וארגאס');assert.equal(roster.find(person=>person.id==='camille').name,'קמיל דה ויטה');
-    assert.equal((await (await f.call('/api/stories')).json()).stories[0].body,'סיפור שנשמר לפני העדכון');
+    assert.equal((await (await f.call('/api/stories')).json()).stories.find(item=>item.id===savedStory.id).body,'סיפור שנשמר לפני העדכון');
     assert.deepEqual(new Uint8Array(await (await f.call(after.gallery[0].src)).arrayBuffer()),new Uint8Array(photo));
     f.restart();assert.equal((await (await f.call('/api/people/bosmat')).json()).revision,after.revision,'Applying the same tree twice must not change the person again');
   }finally{await f.close();}
@@ -1310,7 +1311,7 @@ test('journal creation, editing, TXT import and attachment rollback',async()=>{
     const stale=new FormData();stale.set('title','התנגשות');stale.set('year','1990');stale.set('body','בדיקה');stale.set('expectedUpdatedAt','wrong');stale.append('files',new File(['new'],'new.txt',{type:'text/plain'}));
     const objectCount=f.objects.size;response=await f.call('/api/stories/'+original.id,{method:'POST',body:stale});assert.equal(response.status,409);
     await f.flush();assert.equal(f.objects.size,objectCount);
-    const all=await (await f.call('/api/stories')).json();assert.deepEqual(all.stories.map(item=>item.year),[1975,1999,null]);
+    const all=await (await f.call('/api/stories')).json();assert.deepEqual(all.stories.map(item=>item.year),[1932,1934,1975,1999]);
   }finally{await f.close();}
 });
 test('missing storage configuration preserves text editing and explains upload limits',async()=>{
@@ -2306,7 +2307,7 @@ test('memory chapters and tagged people survive restarts, while older stories re
   const form=new FormData();form.set('category','roots');form.set('title','הדרך שלנו');form.set('body','סיפורי השורשים שלנו');form.set('year','');form.set('personIds',JSON.stringify(['yona','shlomo','yona']));
   let response=await f.call('/api/stories',{method:'POST',body:form});assert.equal(response.status,201,await response.clone().text());
   const item=(await response.json()).story;assert.equal(item.year,null);assert.equal(item.category,'roots');assert.deepEqual(item.tags.map(p=>p.id),['yona','shlomo']);
-  f.restart();const snapshot=await f.call('/api/stories'),data=await snapshot.json();assert.equal(data.stories.length,3);
+  f.restart();const snapshot=await f.call('/api/stories'),data=await snapshot.json();assert.equal(data.stories.length,4);
   assert.equal(data.stories.find(p=>p.id===legacy.id).body,'נשמר ללא שינוי');assert.equal(data.stories.find(p=>p.id===legacy.id).category,'family');
   assert.equal(data.stories.find(p=>p.id===item.id).tags[0].id,'yona');
   assert.equal((await f.call('/api/stories',{headers:{'If-None-Match':snapshot.headers.get('ETag')}})).status,304);
@@ -2321,7 +2322,7 @@ test('invalid memory tags and categories cannot create partial stories or attach
   for(const change of [{category:'unknown'},{personIds:['no-such-person']},{personIds:'yona'},{year:new Date().getUTCFullYear()+1}]){
    const response=await f.call('/api/stories',{method:'POST',body:{title:'בדיקה',body:'זיכרון',category:'family',...change}});assert.ok([400,404].includes(response.status));
   }
-  assert.deepEqual((await (await f.call('/api/stories')).json()).stories.map(item=>item.id),[ALIYAH_MEMORY_ID]);
+  assert.deepEqual((await (await f.call('/api/stories')).json()).stories.map(item=>item.id),Object.values(ALIYAH_FILM_STORIES).map(item=>item.id));
  }finally{await f.close();}
 });
 test('recordings stream intact, keep Hebrew metadata and tags, support seeking and edit without replacing audio',async()=>{
@@ -2363,7 +2364,7 @@ test('a new tagged memory cannot lose its people or chapter to an older state ve
   f.env.FAMILY_STATE.get=()=>({fetch:async request=>{const payload=await request.clone().json();actions.push(payload.action);if(payload.action==='memory.story.save')return Response.json({error:'הפעולה אינה זמינה.'},{status:404});return state.fetch(request);}});
   const response=await f.call('/api/stories',{method:'POST',body:{title:'זיכרון',body:'תוכן חשוב',category:'roots',personIds:['yona']}});
   assert.equal(response.status,503);assert.equal((await response.json()).code,'MEMORY_UPDATING');assert.equal(actions.includes('story.save'),false);
-  assert.deepEqual((await (await f.call('/api/stories')).json()).stories.map(item=>item.id),[ALIYAH_MEMORY_ID]);
+  assert.deepEqual((await (await f.call('/api/stories')).json()).stories.map(item=>item.id),Object.values(ALIYAH_FILM_STORIES).map(item=>item.id));
  }finally{await f.close();}
 });
 
@@ -2377,7 +2378,7 @@ test('category-only memory changes preserve text, tags, dates and attachments an
   assert.equal(await (await f.call(changed.attachments[0].src)).text(),'המסמך המקורי');
   assert.equal((await f.call('/api/stories/'+original.id+'/category',{method:'POST',body:{category:'funny',expectedUpdatedAt:original.updatedAt}})).status,409);
   assert.equal((await f.call('/api/stories/'+original.id+'/category',{method:'POST',body:{category:'invalid',expectedUpdatedAt:changed.updatedAt}})).status,400);
-  f.restart();const item=(await (await f.call('/api/stories')).json()).stories[0];assert.equal(item.category,'roots');assert.equal(item.body,original.body);assert.deepEqual(item.personIds,original.personIds);assert.equal(f.objects.size,1);
+  f.restart();const item=(await (await f.call('/api/stories')).json()).stories.find(item=>item.id===original.id);assert.equal(item.category,'roots');assert.equal(item.body,original.body);assert.deepEqual(item.personIds,original.personIds);assert.equal(f.objects.size,1);
  }finally{await f.close();}
 });
 
