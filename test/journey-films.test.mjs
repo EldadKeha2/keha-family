@@ -12,7 +12,7 @@ test('each film opens on its own page with the right edition, two caption tracks
   const { document: folder } = parseHTML(await html('index.html'));
   assert.equal(folder.querySelectorAll('.film-card').length, 2);
   for (const [id, version] of [
-    ['shlomo', 4],
+    ['shlomo', 5],
     ['yona', 2],
   ]) {
     assert.ok(folder.querySelector(`a.film-card[href="/aliyah/${id}/"]`));
@@ -47,14 +47,20 @@ test('each film opens on its own page with the right edition, two caption tracks
     if (id === 'shlomo') {
       assert.equal(cues[0][0], 10);
       assert.equal(cues[1][1], 24);
-      for (const wording of ['מלפנים ומאחור', 'על חמורים']) {
+      for (const wording of ['מלפנים ומאחור', 'על חמורים', 'בנפחות', 'עשרים וחמש', 'אישרו לי העלייה']) {
         assert.ok(cues.some((c) => c[4] === 'voice' && c[2].includes(wording)));
       }
-      const wedding = cues.find((c) => c[2].includes('נישאו'));
-      const ages = cues.find((c) => c[2].includes('בן 31') && c[2].includes('בת 17'));
-      const family = cues.at(-1);
-      assert.ok(wedding[1] <= ages[0] && ages[1] <= family[0]);
-      assert.match(family[2], /1942/);
+      const find = (text) => cues.find((cue) => cue[2].includes(text));
+      const parts = ['בנפחות', 'לדרך ברגל', 'על חמורים', 'שבאזור צעדא', 'אוטו מארץ ישראל', 'התגלגלה הדרך'];
+      // Each type of travel appears in the testimony or a close shot before its map.
+      for (let i = 1; i < parts.length; i++) {
+        assert.ok(find(parts[i - 1])[1] <= find(parts[i])[0]);
+      }
+      assert.ok(find('נישאו')[1] <= find('17–18')[0]);
+      assert.ok(find('17–18')[2].includes('30–31'));
+      assert.ok(find('1942')[1] <= find('שלמה בן 35')[0]);
+      assert.ok(find('רותי בת 2–3')[2].includes('אלישבע בת פחות משנה'));
+      assert.ok(find('רותי בת 2–3')[1] - find('1942')[0] >= 15);
       assert.ok(cues.find((c) => c[4] === 'voice')[0] > 20);
     }
   }

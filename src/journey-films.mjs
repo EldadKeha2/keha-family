@@ -5,6 +5,14 @@ import { getObject, putObject } from './hf.mjs';
 // family site can provision that render without making the masters public in git.
 const editions = new Map([
   [
+    'shlomo/5',
+    {
+      size: 34327239,
+      sha: 'f51553a8ae8fe858237f65760562d157fcfbb77aa0574b4fbd4e7534d12d2d0e',
+      filename: 'Shlomo_Keha_Aliyah_v5.mp4',
+    },
+  ],
+  [
     'shlomo/4',
     {
       size: 27618631,

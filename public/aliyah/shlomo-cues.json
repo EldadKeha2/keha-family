@@ -70,143 +70,199 @@
   "story"
  ],
  [
-  57.17,
-  60.41,
+  57.185,
+  58.885,
+  "גם למלאכה היה מקום בילדותו של שלמה.",
+  "Work, too, was part of Shlomo’s childhood.",
+  "story"
+ ],
+ [
+  59.015,
+  61.195,
+  "״היינו עובדים בנפחות.״",
+  "“We worked as blacksmiths.”",
+  "voice"
+ ],
+ [
+  61.325,
+  64.975,
+  "בסדנה עבדו בברזל. היד למדה לכוון את מכת הפטיש.",
+  "In the workshop they shaped iron, learning where to place each hammer blow.",
+  "story"
+ ],
+ [
+  65.17,
+  68.41,
   "בן תשע־עשרה, כך זכר, יצא מן ההרים.",
   "At nineteen, as he remembered it, he left the mountains.",
   "story"
  ],
  [
-  60.66,
-  66.05,
-  "שלמה פנה דרומה. לפניו עוד ימים של הליכה עד נמל עדן.",
-  "Shlomo turned south. The port of Aden was still days away on foot.",
+  68.65,
+  74.28,
+  "שלמה יצא לדרך ברגל. מאחוריו נשארו בתי האבן של ההרים.",
+  "Shlomo set off on foot, leaving the stone houses of the mountains behind.",
   "story"
  ],
  [
-  66.25,
-  71.6,
-  "בהרים הלכו ברגל, ולעיתים רכבו על חמורים.",
-  "In the mountains they walked, and sometimes rode donkeys.",
-  "story"
- ],
- [
-  72.96,
-  74.04,
+  74.96,
+  76.04,
   "״על חמורים.״",
   "“On donkeys.”",
   "voice"
  ],
  [
-  74.1,
-  76.75,
+  76.1,
+  78.75,
   "״לקח לנו איזה שבועיים.״",
   "“It took us about two weeks.”",
   "voice"
  ],
  [
-  77.1,
-  82.83,
+  79.1,
+  84.83,
   "״ממקום למקום. הולכים יום, ובלילה ישנים.״",
   "“From place to place. We walked by day and slept at night.”",
   "voice"
  ],
  [
-  84.18,
-  88.3,
+  86.3,
+  91.85,
+  "מן ההרים שבאזור צעדא ירדה השיירה דרומה.",
+  "From the mountains around Saada, the caravan headed south.",
+  "story"
+ ],
+ [
+  92.03,
+  97.78,
+  "את הדרך מדד שלמה בימי הליכה. בסופה חיכתה עדן, עיר הנמל.",
+  "Shlomo counted the journey in days of walking. At the end lay the port of Aden.",
+  "story"
+ ],
+ [
+  98.18,
+  102.3,
   "בעדן התהפכו התפקידים. לתלמיד שחלק ספר היו עכשיו תלמידים משלו.",
   "In Aden, the boy who had shared a book now had pupils of his own.",
   "story"
  ],
  [
-  88.5,
-  91.97,
+  102.5,
+  105.97,
   "״אז היו לי ילדים, הייתי מלמד אותם.״",
   "“I had children there, and I taught them.”",
   "voice"
  ],
  [
-  94.02,
-  98.96,
-  "בעדן ניתן האישור. לדבריו היה בן עשרים והצהיר שהוא בן עשרים וחמש.",
-  "Aden granted the permit. He recalled being twenty and giving his age as twenty-five.",
+  108.16,
+  111.23,
+  "״בן כמה אתה? אמרתי להם עשרים וחמש.״",
+  "“How old are you? I told them twenty-five.”",
+  "voice"
+ ],
+ [
+  111.38,
+  112.99,
+  "לפי זיכרונו, היה אז בן עשרים.",
+  "He remembered being twenty at the time.",
   "story"
  ],
  [
-  99.05,
-  102.43,
+  113.11,
+  116.44,
+  "״בסוף אישרו לי העלייה.״",
+  "“In the end they approved my aliyah.”",
+  "voice"
+ ],
+ [
+  116.55,
+  119.93,
   "אחרי כשנה של הוראה והמתנה, הגיע יום ההפלגה.",
   "After about a year of teaching and waiting, it was time to sail.",
   "story"
  ],
  [
-  102.65,
-  104.79,
+  120.15,
+  122.29,
   "״מעדן נסענו באונייה.״",
   "“From Aden we went by ship.”",
   "voice"
  ],
  [
-  107.3,
-  113.25,
+  124.8,
+  130.75,
   "עד עכשיו נמדדה הדרך בצעדים. מכאן יישא אותו הים.",
   "Until now the journey was measured in footsteps. From here the sea would carry him.",
   "story"
  ],
  [
-  113.6,
-  119.65,
+  131.1,
+  137.15,
   "האונייה שטה צפונה בים סוף, עד לתעלת סואץ.",
   "The ship sailed north through the Red Sea to the Suez Canal.",
   "story"
  ],
  [
-  122.1,
-  125.89,
+  139.6,
+  143.39,
   "״בפורט סעיד ישבנו יום אחד.״",
   "“We stayed in Port Said for one day.”",
   "voice"
  ],
  [
-  126.65,
-  130.97,
-  "מעבר לתעלה שוב החליפה הדרך צורה. הפעם חיכו גלגלים.",
-  "Beyond the canal, the journey changed again. This time there were wheels.",
-  "story"
- ],
- [
-  131.02,
-  137.91,
+  144.36,
+  151.25,
   "״ומשם כבר שלחו לנו אוטו מארץ ישראל.״",
-  "“Then they sent a vehicle for us from the Land of Israel.”",
+  "“From there they sent us a car from the Land of Israel.”",
   "voice"
  ],
  [
-  138.2,
-  141.94,
+  151.76,
+  160.73,
+  "מעבר לתעלה התגלגלה הדרך מזרחה, עד תל אביב.",
+  "Beyond the canal, the road carried them east, all the way to Tel Aviv.",
+  "story"
+ ],
+ [
+  163.65,
+  167.41,
   "בתל אביב מצא שלמה מיטה בבית העולים.",
-  "In Tel Aviv, Shlomo stayed at the immigrants’ hostel.",
+  "In Tel Aviv, Shlomo found a bed at the immigrants’ hostel.",
   "story"
  ],
  [
-  142.14,
-  146.02,
-  "בשנת 1938 נישאו שלמה קהא ויונה נקאש.",
-  "Shlomo Keha and Yona Nakash were married in 1938.",
+  167.66,
+  171.64,
+  "בשנת 1938 נישאו יונה נקאש ושלמה קהא.",
+  "In 1938, Yona Nakash and Shlomo Keha married.",
   "story"
  ],
  [
-  146.1,
-  150.86,
-  "שלמה היה בן 31. בעבודת השורשים של תמי מסופר שיונה הייתה בת 17.",
-  "Shlomo was 31. Tami’s family history records that Yona was 17.",
+  171.75,
+  176.36,
+  "יונה הייתה בת 17–18 ושלמה היה בן 30–31.",
+  "Yona was 17–18 and Shlomo was 30–31.",
   "story"
  ],
  [
-  151.33,
-  158.12,
-  "ארבע שנים אחר כך, ב־1942, שלמה ויונה מצולמים עם בני המשפחה.",
-  "Four years later, in 1942, Shlomo and Yona posed with their family.",
+  176.74,
+  182.02,
+  "ארבע שנים אחר כך, ב־1942, יונה ושלמה הצטלמו עם המשפחה.",
+  "Four years later, in 1942, Yona and Shlomo posed with their family.",
+  "story"
+ ],
+ [
+  182.27,
+  187.4,
+  "שלמה בן 35 ויונה בת 20–21.",
+  "Shlomo is 35 and Yona is 20–21.",
+  "story"
+ ],
+ [
+  187.6,
+  193.06,
+  "רותי בת 2–3 ואלישבע בת פחות משנה.",
+  "Ruti is 2–3 and Elisheva is under one year old.",
   "story"
  ]
 ]
