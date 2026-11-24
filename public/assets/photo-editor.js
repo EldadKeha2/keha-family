@@ -56,6 +56,8 @@ function startFaces(){
     queueMicrotask(()=>{if(session===owner&&draft()===d&&d.facesComplete&&!owner.loading&&!owner.saving)void saveCurrent();});
   }});
   adapter.enabled=()=>session===owner&&draft()===d&&!d.cropping&&!owner.loading&&!owner.saving;
+  adapter.beginEditing=()=>focusTagging(owner,d);
+  adapter.fixedPhoto=()=>Boolean(owner.taggingFrame);
   owner.faceActive=true;
   window.FamilyFaces.mount(get('Image'),get('Canvas'),{id:d.key,kind:'photo',faceSummary:{reviewed:d.facesComplete}},{adapter,dialog,reviewHost:get('FaceTools'),reviewLabel:true,zoom:false,detectionImage:source}).catch(error=>{if(session===owner&&draft()===d)get('Error').textContent=error.message;});
 }
@@ -77,6 +79,8 @@ function mount(){
     <div id="photoEditInfo" class="photo-edit-info"><span id="photoEditDimensions" dir="ltr" aria-live="polite"></span><span id="photoEditAnimation"></span></div><p id="photoEditError" class="photo-edit-error" role="alert"></p>
     <footer class="photo-edit-footer"><button type="button" id="photoEditSaveCurrent" class="secondary-button" hidden></button><button type="button" id="photoEditSave" class="primary-button"></button><button type="button" id="photoEditSaveCopy" class="secondary-button photo-edit-save-copy" hidden></button><button type="button" id="photoEditCancel" class="secondary-button">${tr('ביטול ההעלאה','Cancel upload')}</button><button type="button" id="photoEditRemove" class="photo-edit-remove" aria-label="${tr('הסרת התמונה הנוכחית מההעלאה','Remove the current photo from this upload')}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6"/></svg><span>${tr('הסרת תמונה','Remove photo')}</span></button></footer>`;
   document.body.append(dialog);
+  const taggingDone=document.createElement('button');taggingDone.type='button';taggingDone.id='photoEditTaggingDone';taggingDone.className='photo-edit-tagging-done';taggingDone.hidden=true;taggingDone.textContent=tr('סיום תיוג','Done tagging');dialog.append(taggingDone);
+  taggingDone.addEventListener('click',()=>endTagging());
   get('Close').addEventListener('click',cancel);get('Cancel').addEventListener('click',cancel);
   dialog.addEventListener('cancel',event=>{event.preventDefault();cancel();});
   get('Previous').addEventListener('click',()=>navigate(-1));get('Next').addEventListener('click',()=>navigate(1));
@@ -132,10 +136,31 @@ function setBusy(busy){
 }
 function fitEditor(){
   if(!session||!dialog?.open||session.mode==='existing')return;
-  dialog.style.setProperty('--photo-editor-height',(window.visualViewport?.height||window.innerHeight)+'px');
+  if(session.taggingFrame&&(desktop()||Math.abs((window.innerWidth||get('Viewport').clientWidth)-session.taggingFrame.windowWidth)>8))endTagging();
+  const height=window.visualViewport?.height||window.innerHeight,width=window.innerWidth||get('Viewport').clientWidth;
+  session.maxViewportHeight=session.windowWidth===width?Math.max(session.maxViewportHeight||0,height):height;session.windowWidth=width;
+  dialog.style.setProperty('--photo-editor-height',height+'px');
   dialog.style.setProperty('--photo-editor-top',(window.visualViewport?.offsetTop||0)+'px');
   fitCaption();renderTagControls();if(!session.saving)saveLabel();
   if(!session.faceActive&&source)startFaces();
+}
+function focusTagging(owner,d){
+  if(session!==owner||draft()!==d||desktop()||owner.mode==='existing'||owner.taggingFrame||!source)return;
+  // Capture the displayed pixels before focus opens the phone keyboard. The
+  // visual viewport may keep resizing, but the photograph must not follow it.
+  const image=get('Image'),previous=d.previewFrame,windowWidth=window.innerWidth||get('Viewport').clientWidth;
+  const frame=previous?.rotation===d.rotation&&previous.windowWidth===windowWidth?previous:null;
+  const width=frame?.width||parseFloat(image.style.width),height=frame?.height||parseFloat(image.style.height);
+  if(!(width>0&&height>0))return;
+  owner.taggingFrame={width,height,windowWidth};image.style.width=width+'px';image.style.height=height+'px';
+  dialog.style.setProperty('--photo-tagging-height',height+'px');
+  dialog.classList.add('is-tagging-focused');get('TaggingDone').hidden=false;dialog.scrollTop=0;
+}
+function endTagging(dismiss=true,repaint=true){
+  if(!session?.taggingFrame)return;
+  if(dismiss){window.FamilyFaces?.dismiss?.();document.activeElement?.blur?.();}
+  session.taggingFrame=null;dialog.classList.remove('is-tagging-focused');dialog.style.removeProperty('--photo-tagging-height');get('TaggingDone').hidden=true;
+  if(repaint&&source)render();
 }
 function fitCaption(){
   if(!session||session.mode==='existing')return;const input=get('Caption');
@@ -217,7 +242,7 @@ function saveLabel(){
   get('Save').textContent+=(count>1?` (${count})`:'');
 }
 async function load(){
-  const id=++loadId;drag=null;stopFaces();release();get('Image').hidden=true;get('Error').textContent='';get('Loading').hidden=false;
+  const id=++loadId;drag=null;endTagging(true,false);stopFaces();release();get('Image').hidden=true;get('Error').textContent='';get('Loading').hidden=false;
   get('Loading').textContent=tr('טוען תצוגה מקדימה…','Loading preview…');setBusy(true);saveLabel();
   get('Counter').textContent=I.isEnglish?`Photo ${session.index+1} of ${session.drafts.length}`:`תמונה ${session.index+1} מתוך ${session.drafts.length}`;
   get('Filename').textContent=draft().file.name;
@@ -237,7 +262,8 @@ function render(){
   const size=rotatedSize(d.width,d.height,d.rotation),viewport=get('Viewport');
   const padding=session.mode==='existing'?40:0;
   const fit=Math.min(Math.max(1,viewport.clientWidth-padding)/size.width,Math.max(1,viewport.clientHeight-padding)/size.height,session.mode==='existing'?1:Infinity);
-  get('Image').style.width=Math.max(1,size.width*fit)+'px';get('Image').style.height=Math.max(1,size.height*fit)+'px';
+  get('Image').style.width=(session.taggingFrame?.width||Math.max(1,size.width*fit))+'px';get('Image').style.height=(session.taggingFrame?.height||Math.max(1,size.height*fit))+'px';
+  if(!desktop()&&!session.taggingFrame&&(window.visualViewport?.height||window.innerHeight)>=session.maxViewportHeight-80)d.previewFrame={width:Math.max(1,size.width*fit),height:Math.max(1,size.height*fit),rotation:d.rotation,windowWidth:window.innerWidth||viewport.clientWidth};
   const canvas=get('Canvas'),scale=Math.min(1,1600/Math.max(size.width,size.height));
   canvas.width=Math.max(1,Math.round(size.width*scale));canvas.height=Math.max(1,Math.round(size.height*scale));
   drawPhoto(canvas.getContext('2d'),source,d.width,d.height,d.rotation,fullCrop(),scale);renderCrop();if(session.faceActive)window.FamilyFaces?.fit?.();
@@ -347,7 +373,7 @@ function keyCrop(event){
   draft().crop=moveCrop(draft().crop,handle,direction[0]*step,direction[1]*step);renderCrop();
 }
 function remove(){
-  if(session.loading||session.saving)return;const removed=draft();session.dateSources=session.dateSources.filter(item=>item!==removed);session.drafts.splice(session.index,1);
+  if(session.loading||session.saving)return;session.removed=true;const removed=draft();session.dateSources=session.dateSources.filter(item=>item!==removed);session.drafts.splice(session.index,1);
   if(!session.drafts.length){finish(session.files.filter(file=>!isPhoto(file)));return;}
   session.index=Math.min(session.index,session.drafts.length-1);load();
 }
@@ -431,13 +457,27 @@ async function saveExisting(asCopy=false){
     owner.saving=false;await load();if(session===owner){get('SaveCopy').textContent=tr('שמור כתמונה נפרדת','Save as a separate photo');get('Error').textContent=error.message||tr('לא ניתן לשמור כרגע. נסו שוב.','The photo could not be saved. Please try again.');}
   }
 }
-function cancel(){if(session?.saving)return;finish(null);}
+function draftState(d){
+  return JSON.stringify([turns(d.rotation),normalizeCrop(d.crop),d.metadata,d.faceTags||[],Boolean(d.facesComplete),d.ignoredFaces||[],d.unassignedFaces||[],d.customLabelName||'',Boolean(d.dateEdited)]);
+}
+function unsavedChanges(){
+  if(!session)return false;
+  if(window.FamilyFaces?.hasPendingChanges?.(get('Image')))return true;
+  if(session.mode==='existing')return session.drafts.some(d=>changed(d.rotation,d.crop))||[...(session.transforms?.values()||[])].some(d=>changed(d.rotation,d.crop));
+  return session.removed||session.drafts.some(d=>draftState(d)!==session.initialDrafts.get(d.key));
+}
+function cancel(){
+  if(!session||session.saving)return;
+  if(unsavedChanges()&&!window.confirm(tr('השינויים לא נשמרו. האם ברצונך לצאת?','Your changes have not been saved. Do you want to leave?')))return;
+  finish(null);
+}
 function finish(files){
-  if(!session)return;const resolve=session.resolve,focus=session.focus;session.abort?.abort();stopFaces();uploadSwipe?.reset();session=null;++loadId;drag=null;release();dialog.close();
+  if(!session)return;const resolve=session.resolve,focus=session.focus;session.abort?.abort();endTagging(true,false);stopFaces();uploadSwipe?.reset();session=null;++loadId;drag=null;release();dialog.close();
   get('Canvas').width=get('Canvas').height=1;resolve(files);focus?.focus?.({preventScroll:true});queueMicrotask(run);
 }
 function run(){
   if(session||!jobs.length)return;mount();session=jobs.shift();session.focus=document.activeElement;session.index=0;session.loading=false;session.saving=false;
+  session.initialDrafts=new Map(session.drafts.map(d=>[d.key,draftState(d)]));
   configure();dialog.showModal();fitEditor();if(session.mode==='existing')loadHistory();else{const owner=session;void loadPhotoLabelCatalog().then(()=>{if(session===owner)renderEventChoices();});load();}
 }
 function prepare(input,{scope,onUpload}={}){
@@ -445,7 +485,7 @@ function prepare(input,{scope,onUpload}={}){
   if(!drafts.length)return Promise.resolve(files);
   return new Promise(resolve=>{jobs.push({files,drafts,dateSources:[...drafts],resolve,scope,onUpload});run();});
 }
-window.addEventListener('beforeunload',event=>{if(session&&(session.mode!=='existing'||session.saving||session.drafts.some(d=>changed(d.rotation,d.crop)))||jobs.some(job=>job.mode!=='existing')){event.preventDefault();event.returnValue='';}});
+window.addEventListener('beforeunload',event=>{if(session&&(session.mode!=='existing'||session.saving||unsavedChanges())||jobs.some(job=>job.mode!=='existing')){event.preventDefault();event.returnValue='';}});
 function edit(item){
   if(!item?.id||item.kind!=='photo')return Promise.resolve(null);
   return new Promise(resolve=>{jobs.push({mode:'existing',item,files:[],drafts:[],resolve});run();});

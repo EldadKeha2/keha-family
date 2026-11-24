@@ -220,3 +220,15 @@
 #photoUploadEditor.is-existing #photoEditSaveCopy{grid-column:2;grid-row:1;min-width:0;white-space:normal}
 #photoUploadEditor.is-existing #photoEditCancel{grid-column:1;grid-row:1;min-width:0}
 #photoUploadEditor.is-existing #photoEditSave{grid-column:1/-1;grid-row:2;min-width:0;width:100%}
+
+.photo-edit-tagging-done{display:none}
+@media(max-width:700px){
+  #photoUploadEditor:not(.is-existing).is-tagging-focused[open]{position:fixed;inset-block-start:var(--photo-editor-top,0px);inset-block-end:auto;width:100vw;height:var(--photo-editor-height,100dvh);max-height:var(--photo-editor-height,100dvh);margin:0 auto;padding:44px 10px 8px;border-radius:0;overflow:auto;overflow-anchor:none}
+  #photoUploadEditor.is-tagging-focused>:not(.photo-edit-viewport):not(.face-popover):not(.photo-edit-tagging-done){display:none!important}
+  #photoUploadEditor:not(.is-existing).is-tagging-focused .photo-edit-viewport{flex:0 0 var(--photo-tagging-height);height:var(--photo-tagging-height);min-height:var(--photo-tagging-height);align-self:center;overflow:visible}
+  #photoUploadEditor.is-tagging-focused .photo-edit-tagging-done{display:block;position:fixed;inset-block-start:calc(var(--photo-editor-top,0px) + 6px);inset-inline-end:10px;z-index:32;min-height:32px;padding:4px 12px;border:1px solid #b8a078;border-radius:6px;background:#fffdf6;color:#52683d;font:14px/1.4 var(--sans);cursor:pointer}
+  #photoUploadEditor.is-tagging-focused .face-picker{width:230px;padding:7px}
+  #photoUploadEditor.is-tagging-focused .face-picker>header{margin-bottom:4px}
+  #photoUploadEditor.is-tagging-focused .face-person-results{max-height:112px}
+  #photoUploadEditor.is-tagging-focused .face-picker .face-current-name{margin-bottom:4px}
+}

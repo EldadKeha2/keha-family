@@ -10,8 +10,8 @@ import * as catalog from '../public/assets/photo-labels-catalog.mjs';
 const source=(await readFile(new URL('../public/assets/photo-editor.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 const keyboardSource=await readFile(new URL('../public/assets/photo-keyboard.js',import.meta.url),'utf8');
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
-function fixture({desktop=true,english=false,onUpload=async()=>{},fetch:fetcher,decode:decodePhoto,photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
- const nodes=new Map(),all=[],mounts=[],uploaded=[],closed=[];
+function fixture({desktop=true,english=false,confirm:confirmDiscard=()=>true,onUpload=async()=>{},fetch:fetcher,decode:decodePhoto,photoSize={width:1000,height:800},viewportSize={width:1000,height:420}}={}){
+ const nodes=new Map(),all=[],mounts=[],uploaded=[],closed=[],confirmations=[],resizes=[];
  const people=[{id:'yona',name:'יונה',nameEn:'Yona'},{id:'shlomo',name:'שלמה',nameEn:'Shlomo'}];
  class Node extends EventTarget{
   constructor(tag='div',id=''){super();this.tagName=tag;this.id=id;this.dataset={};this.hidden=false;this.disabled=false;this.checked=false;this.value='';this.style={setProperty:(k,v)=>{this.style[k]=v;},removeProperty:k=>{delete this.style[k];}};this.classes=new Set();this.classList={toggle:(k,v)=>v?this.classes.add(k):this.classes.delete(k),add:k=>this.classes.add(k),remove:k=>this.classes.delete(k),contains:k=>this.classes.has(k)};this.width=1000;this.height=800;all.push(this);}
@@ -36,18 +36,62 @@ function fixture({desktop=true,english=false,onUpload=async()=>{},fetch:fetcher,
  const node=id=>{if(!nodes.has(id))nodes.set(id,new Node('div',id));return nodes.get(id);};
  const document=Object.assign(new EventTarget(),{activeElement:null,getElementById:node,createElement:tag=>new Node(tag),body:new Node()});
  const window=new EventTarget();window.innerHeight=900;window.createImageBitmap=true;window.FamilyI18n={isEnglish:english,personName:p=>english?p.nameEn||p.name:p.name,fetch:fetcher,error:String};
+ window.confirm=message=>{confirmations.push(message);return confirmDiscard(message);};
  window.FamilyApp={apiEnabled:true,getPersonSummary:id=>people.find(p=>p.id===id)};window.FamilyTags={findPeople:async query=>people.filter(p=>!query||p.name.includes(query))};
  window.FamilyFaces={async mount(stage,image,item,options){mounts.push({stage,image,item,options});await options.adapter.load();},clear(){},dismiss(){},fit(){},async flush(){}};
- vm.runInNewContext(keyboardSource+'\n'+swipeSource+'\n'+source,{...core,...metadata,...faceDraft,...catalog,window,document,navigator:{userAgent:desktop?'Windows NT 10.0':'Android Mobile'},File,Blob,URL,URLSearchParams,AbortController,crypto,queueMicrotask,setTimeout,clearTimeout,ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>decodePhoto?decodePhoto(file):({...photoSize,close(){closed.push(file.name);}})});
+ vm.runInNewContext(keyboardSource+'\n'+swipeSource+'\n'+source,{...core,...metadata,...faceDraft,...catalog,window,document,navigator:{userAgent:desktop?'Windows NT 10.0':'Android Mobile'},File,Blob,URL,URLSearchParams,AbortController,crypto,queueMicrotask,setTimeout,clearTimeout,ResizeObserver:class{constructor(fn){resizes.push(fn);}observe(){}},requestAnimationFrame:fn=>fn(),matchMedia:()=>({matches:desktop}),createImageBitmap:async file=>decodePhoto?decodePhoto(file):({...photoSize,close(){closed.push(file.name);}})});
  const flush=()=>new Promise(resolve=>setImmediate(resolve));
  const gesture=(type,fields={},target=node('photoEditCanvas'))=>{const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({target,...fields}))Object.defineProperty(event,name,{value});if(type==='pointerdown')document.dispatchEvent(event);(type==='pointerdown'||type==='touchstart'?node('photoEditImage'):document).dispatchEvent(event);return event;};
  const pointer=(type,x=100,y=100,target)=>gesture(type,{pointerId:7,pointerType:'touch',isPrimary:true,button:0,clientX:x,clientY:y},target);
  const touch=(type,points,target=node('photoEditCanvas'))=>{const touches=points.map(([identifier,x,y])=>({identifier,clientX:x,clientY:y,target}));return gesture(type,{touches:type==='touchend'?[]:touches,changedTouches:touches},target);};
  const swipe=async(dx,{dy=0,stream='touch',target}={})=>{let moved;if(stream==='pointer'){pointer('pointerdown',100,100,target);moved=pointer('pointermove',100+dx,100+dy,target);pointer('pointerup',100+dx,100+dy,target);}else{touch('touchstart',[[7,100,100]],target);moved=touch('touchmove',[[7,100+dx,100+dy]],target);touch('touchend',[[7,100+dx,100+dy]],target);}await flush();return moved;};
- return {node,mounts,uploaded,window,document,flush,gesture,pointer,touch,swipe,api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{type='keydown',target=document.body,...flags}={}){const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
+ return {node,mounts,uploaded,window,document,flush,gesture,pointer,touch,swipe,confirmations,resize(){for(const fn of resizes)fn();},api:window.FamilyPhotoEditor,async begin(files){const result=window.FamilyPhotoEditor.prepare(files,{scope:'gallery',onUpload:async(file,progress)=>{uploaded.push({file,payload:window.FamilyPhotoEditor.upload(file)});await onUpload(file,progress);}});await flush();return {result};},async click(id){node('photoEdit'+id).dispatchEvent(new Event('click'));await flush();},async key(key,{type='keydown',target=document.body,...flags}={}){const event=new Event(type,{cancelable:true});for(const [name,value]of Object.entries({key,target,...flags}))Object.defineProperty(event,name,{value});window.dispatchEvent(event);await flush();return event;}};
 }
 const image=name=>new File(['original pixels '+name],name,{type:'image/jpeg',lastModified:1234});
 async function details(entry){const bytes=new Uint8Array(await entry.payload.body.arrayBuffer()),n=Number(entry.payload.headers[metadata.PHOTO_METADATA_HEADER]);return {metadata:metadata.decodeUploadMetadata(bytes.subarray(0,n)),pixels:bytes.subarray(n)};}
+
+test('closing an untouched upload needs no confirmation, but every kind of draft edit is protected on phones and desktop',async()=>{
+ const changes=[
+  async f=>enterDate(f,{year:1980}),
+  async f=>{const input=f.node('photoEditCaption');input.value='תיאור חדש';input.dispatchEvent(new Event('input'));},
+  async f=>f.click('Right'),
+  async f=>{const event=new Event('keydown',{cancelable:true});Object.defineProperties(event,{key:{value:'ArrowRight'},target:{value:{closest:()=>({dataset:{handle:'w'}})}}});await f.click('CropToggle');f.node('photoEditCropLayer').dispatchEvent(event);},
+  async f=>{const event=new Event('change');Object.defineProperty(event,'target',{value:{dataset:{uploadLabel:'birthdays'},checked:true}});f.node('photoEditEventChoices').dispatchEvent(event);},
+  async f=>{const input=f.node('photoEditCustomLabelName');input.value='תגית שטרם נוספה';input.dispatchEvent(new Event('input'));},
+  async f=>{const input=f.node('photoEditFamilyPhoto');input.checked=true;input.dispatchEvent(new Event('change'));},
+  async f=>{await f.mounts.at(-1).options.adapter.save({faceId:'one',personId:'yona',rect:{x:.1,y:.2,width:.1,height:.1}});},
+  async f=>{await f.mounts.at(-1).options.adapter.review({complete:true});}
+ ];
+ for(const desktop of [false,true])for(const english of [false,true]){
+  const pristine=fixture({desktop,english}),clean=await pristine.begin([image('1980-01-01.jpg')]);await pristine.click('Close');assert.equal(await clean.result,null);assert.equal(pristine.confirmations.length,0,'Filename dates are initial values, not edits');
+  for(const change of desktop?changes.slice(0,-1):changes){
+   let leave=false;const f=fixture({desktop,english,confirm:()=>leave}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+   await change(f);await f.click('Close');assert.equal(f.node('photoUploadEditor').open,true);assert.equal(f.confirmations.length,1);assert.match(f.confirmations[0],english?/not been saved/:/השינויים לא נשמרו/);assert.equal(f.uploaded.length,0);
+   const escape=new Event('cancel',{cancelable:true});f.node('photoUploadEditor').dispatchEvent(escape);assert.equal(escape.defaultPrevented,true);assert.equal(f.node('photoUploadEditor').open,true);
+   leave=true;await f.click('Cancel');assert.equal(await result,null);assert.equal(f.node('photoUploadEditor').open,false);
+  }
+ }
+});
+test('the exit warning covers other photos and pending face text, preserves rejected cancellation, and stops after a successful upload',async()=>{
+ let leave=false;const f=fixture({confirm:()=>leave}),{result}=await f.begin([image('one.jpg'),image('two.jpg')]);
+ enterDate(f,{year:1981});await f.click('Next');await f.click('Close');assert.equal(f.node('photoUploadEditor').open,true);
+ await f.click('Previous');assert.equal(f.node('photoEditDateyear').value,1981);await f.click('SaveCurrent');assert.equal((await details(f.uploaded[0])).metadata.date.year,1981);
+ const prompts=f.confirmations.length;f.window.FamilyFaces.hasPendingChanges=()=>true;await f.click('Close');assert.equal(f.confirmations.length,prompts+1);assert.equal(f.node('photoUploadEditor').open,true);
+ f.window.FamilyFaces.hasPendingChanges=()=>false;await f.click('Close');assert.equal(await result,null);assert.equal(f.confirmations.length,prompts+1,'Already uploaded changes must not count as unsaved');
+});
+test('phone tagging locks the displayed image through keyboard resizes and consecutive faces, then restores the wizard on Done',async()=>{
+ const viewportSize={width:330,height:290},f=fixture({desktop:false,viewportSize});
+ const viewport=Object.assign(new EventTarget(),{height:800,offsetTop:0});f.window.visualViewport=viewport;
+ const {result}=await f.begin([image('one.jpg'),image('two.jpg')]),adapter=f.mounts.at(-1).options.adapter;
+ const imageNode=f.node('photoEditImage'),before={width:imageNode.style.width,height:imageNode.style.height};
+ viewport.height=420;viewportSize.height=60;viewport.dispatchEvent(new Event('resize'));f.resize();assert.notDeepEqual({width:imageNode.style.width,height:imageNode.style.height},before,'An already open metadata keyboard may have reduced the ordinary preview');
+ adapter.beginEditing();assert.equal(adapter.fixedPhoto(),true);assert.equal(f.node('photoUploadEditor').classes.has('is-tagging-focused'),true);assert.equal(f.node('photoEditTaggingDone').hidden,false);
+ for(const height of [520,420,470,800]){viewport.height=height;viewportSize.height=60;viewport.dispatchEvent(new Event('resize'));f.resize();adapter.beginEditing();assert.deepEqual({width:imageNode.style.width,height:imageNode.style.height},before);assert.equal(f.node('photoUploadEditor').style['--photo-tagging-height'],before.height);}
+ await adapter.save({faceId:'one',personId:'yona',rect:{x:.1,y:.2,width:.1,height:.1}});assert.equal(adapter.fixedPhoto(),true);
+ await f.click('TaggingDone');assert.equal(adapter.fixedPhoto(),false);assert.equal(f.node('photoUploadEditor').classes.has('is-tagging-focused'),false);assert.equal(f.node('photoEditTaggingDone').hidden,true);
+ adapter.beginEditing();await f.click('Next');assert.equal(f.node('photoUploadEditor').classes.has('is-tagging-focused'),false);assert.equal(f.mounts.at(-1).options.adapter.fixedPhoto(),false);await f.click('Cancel');await result;
+ const desktop=fixture(),other=await desktop.begin([image('desktop.jpg')]);desktop.mounts.at(-1).options.adapter.beginEditing();assert.equal(desktop.node('photoUploadEditor').classes.has('is-tagging-focused'),false);await desktop.click('Cancel');await other.result;
+});
 
 test('phone and desktop faces can be tagged immediately and resume automatically after cropping or resetting',async()=>{
  for(const desktop of [true,false]){

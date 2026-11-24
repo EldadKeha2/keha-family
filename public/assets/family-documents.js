@@ -98,7 +98,10 @@
       const item=state.items.find(item=>item.id===button.dataset.documentOpen);if(!item)return;
       openDocument(item);
     });
-    for(const dialog of [editor,viewer]){dialog.querySelector('[data-document-close]').addEventListener('click',()=>{if(!state.saving)dialog.close();});dialog.addEventListener('cancel',event=>{if(state.saving)event.preventDefault();});}
+    const dirtyDocument=()=>editor.open&&Boolean(state.captureFile||$('documentFile').files.length||$('documentTitle').value||$('documentCaption').value||$('documentPeople').querySelectorAll('input:checked').length);
+    const canClose=dialog=>!state.saving&&(dialog!==editor||!dirtyDocument()||window.confirm(t('השינויים לא נשמרו. האם ברצונך לצאת?','Your changes have not been saved. Do you want to leave?')));
+    for(const dialog of [editor,viewer]){dialog.querySelector('[data-document-close]').addEventListener('click',()=>{if(canClose(dialog))dialog.close();});dialog.addEventListener('cancel',event=>{if(!canClose(dialog))event.preventDefault();});}
+    window.addEventListener('beforeunload',event=>{if(state.saving||dirtyDocument()){event.preventDefault();event.returnValue='';}});
     $('documentForm').addEventListener('submit',async event=>{
       event.preventDefault();if(state.saving)return;
       const personIds=[...$('documentPeople').querySelectorAll('input:checked')].map(node=>node.value),file=state.captureFile||$('documentFile').files[0];

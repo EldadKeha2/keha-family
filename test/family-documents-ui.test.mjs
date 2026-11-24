@@ -7,10 +7,10 @@ import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
 const source=await readFile(new URL('../public/assets/family-documents.js',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-function fixture({historyNavigation=false,href='https://family.test/#home'}={}){
+function fixture({historyNavigation=false,href='https://family.test/#home',confirm:confirmDiscard=()=>true}={}){
   const {document,window:dom}=parseHTML('<html><body data-active-view="tree"><section id="documentsView" hidden></section></body></html>');
   const browser=historyNavigation?browserHistory(href):null,location=browser?.location||new URL(href);
-  const uploads=[],removals=[],previews=[],revoked=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
+  const listeners=new Map(),confirmations=[],uploads=[],removals=[],previews=[],revoked=[],items=[{id:'a'.repeat(32),name:'תעודת עלייה',filename:'certificate.png',kind:'document',mime:'image/png',src:'/media/a',caption:'הסריקה המקורית',personIds:['yona'],tags:[{id:'yona',name:'יונה קהא'}]},{id:'b'.repeat(32),name:'הקלטה נדירה',filename:'rare.mp3',kind:'audio',mime:'audio/mpeg',src:'/media/b',personIds:['shlomo'],tags:[{id:'shlomo',name:'שלמה קהא'}]}];
   const window={FamilyI18n:{isEnglish:false,error:v=>v,personName:p=>p.name,fetch:async(path,options)=>{
     if(options?.method==='POST'){
       if(options.headers?.['X-Family-Token']!=='test-token')return Response.json({error:'יש לרענן את הדף לפני שמירת השינוי.'},{status:403});
@@ -22,7 +22,7 @@ function fixture({historyNavigation=false,href='https://family.test/#home'}={}){
   }},FAMILY_API_TOKEN:'test-token'};
   class XHR{constructor(){this.upload={};this.headers={};}open(method,url){this.method=method;this.url=url;}setRequestHeader(key,value){this.headers[key]=value;}send(file){uploads.push({file,url:this.url,headers:this.headers});this.status=201;this.responseText='{"saved":true}';queueMicrotask(()=>this.onload());}}
   const objectURL={createObjectURL(file){previews.push(file);return 'blob:captured-'+previews.length;},revokeObjectURL(url){revoked.push(url);}};
-  window.addEventListener=browser?.addEventListener;
+  window.addEventListener=browser?.addEventListener||((type,fn)=>listeners.set(type,fn));window.confirm=message=>{confirmations.push(message);return confirmDiscard(message);};
   const context=vm.createContext({window,document,location,history:browser?.history,matchMedia:()=>({matches:true}),XMLHttpRequest:XHR,Response,CustomEvent:dom.CustomEvent,URL:Object.assign(class extends URL{},objectURL)});
   if(browser)vm.runInContext(navigationSource,context);
   vm.runInContext(source,context);
@@ -32,8 +32,17 @@ function fixture({historyNavigation=false,href='https://family.test/#home'}={}){
   document.getElementById('documentForm').reset=()=>{};
   Object.defineProperty(document.getElementById('documentFile'),'files',{configurable:true,value:[]});
   Object.defineProperty(document.getElementById('documentCamera'),'files',{configurable:true,value:[]});
-  return {document,dom,window,browser,location,uploads,removals,items,previews,revoked};
+  return {document,dom,window,browser,location,uploads,removals,items,previews,revoked,confirmations,listeners};
 }
+test('document photo uploads confirm before closing a changed form and preserve the captured photo when staying',async()=>{
+ let leave=false;const f=fixture({confirm:()=>leave});f.window.FamilyDocuments.activate('documents');await tick();f.document.getElementById('newDocument').click();
+ const editor=f.document.getElementById('documentEditor'),close=editor.querySelector('[data-document-close]');close.click();assert.equal(f.confirmations.length,0);assert.equal(editor.open,false);
+ const camera=f.document.getElementById('documentCamera'),photo={name:'scan.jpg',type:'image/jpeg'};Object.defineProperty(camera,'files',{value:[photo]});camera.dispatchEvent(new f.dom.Event('change'));await tick();
+ close.click();assert.equal(editor.open,true);assert.match(f.confirmations[0],/השינויים לא נשמרו/);assert.equal(f.document.getElementById('documentCaptureImage').getAttribute('src'),'blob:captured-1');assert.equal(f.revoked.length,0);
+ const escape=new f.dom.Event('cancel',{cancelable:true});editor.dispatchEvent(escape);assert.equal(escape.defaultPrevented,true);
+ let guarded=false;f.listeners.get('beforeunload')({preventDefault(){guarded=true;}});assert.equal(guarded,true);
+ leave=true;close.click();assert.equal(editor.open,false);assert.equal(f.revoked.length,1);assert.equal(f.uploads.length,0);
+});
 test('the archive filters real documents and audio, searches descriptions, and opens the original image',async()=>{
   const f=fixture();f.window.FamilyDocuments.activate('documents');await tick();
   assert.equal(f.document.querySelectorAll('.document-card').length,2);assert.ok(f.document.querySelector('audio[controls]'));

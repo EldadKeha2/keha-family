@@ -613,6 +613,18 @@ test('name bubbles and the upload wizard picker also counter native pinch withou
   f.emit(popup.querySelector('[data-face-edit]'),'click');popup=f.find('face-popover face-picker');assert.ok(popup);assert.equal(popup.getBoundingClientRect().width*viewport.scale,280);assert.equal(f.find('face-selection').style.left,first.rect.x*100+'%');f.faces.clear();
  }
 });
+test('upload face picking freezes the photo before input focus and viewport resizes move only the picker',async()=>{
+ const viewport=Object.assign(new EventTarget(),{width:360,height:800,scale:1,offsetLeft:0,offsetTop:0}),f=fixture([first,second],{visualViewport:viewport});let entered=0,scrolled=0;
+ const adapter={load:async()=>({faces:[]}),mapDetections:faces=>faces,findPeople:async()=>[],enabled:()=>true,beginEditing(){assert.notEqual(f.document.activeElement?.id,'facePersonSearch');entered++;},fixedPhoto:()=>true};
+ await f.mount('fixed-upload',{adapter,zoom:false});for(const hit of f.find('face-hit-buttons').children)hit.scrollIntoView=()=>scrolled++;
+ f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:1,pointerType:'touch'});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(entered,1);assert.equal(scrolled,0);const panel=f.find('face-popover face-picker'),input=panel.querySelector('input'),selection=f.find('face-selection');
+ assert.equal(f.faces.hasPendingChanges(f.stage),false);input.value='שם שטרם נבחר';assert.equal(f.faces.hasPendingChanges(f.stage),true);
+ for(const id of ['photoEditClose','photoEditCancel']){const close=f.document.createElement('button');close.id=id;f.dialog.append(close);f.emit(f.document,'pointerdown',{target:close});f.emit(f.document,'focusin',{target:close});assert.equal(f.find('face-popover face-picker'),panel,'The exit guard must see and preserve uncommitted face text');assert.equal(f.faces.hasPendingChanges(f.stage),true);}
+ const rect={left:selection.style.left,top:selection.style.top,width:selection.style.width,height:selection.style.height};
+ viewport.height=420;f.emit(viewport,'resize');assert.equal(f.find('face-popover face-picker'),panel);assert.equal(f.document.activeElement,input);assert.equal(scrolled,0);assert.deepEqual({left:selection.style.left,top:selection.style.top,width:selection.style.width,height:selection.style.height},rect);
+ assert.ok(parseFloat(panel.style.top)+panel.getBoundingClientRect().height<=viewport.height);f.faces.dismiss();assert.equal(f.faces.hasPendingChanges(f.stage),false);f.faces.clear();
+});
 test('upload preview resizing while face controls are still mounting waits for initialization',async()=>{
  const f=fixture(),adapter={load:async()=>({faces:[]}),mapDetections:faces=>faces,findPeople:async()=>[],enabled:()=>true};
  const pending=f.mount('early-resize',{adapter,zoom:false});assert.doesNotThrow(()=>f.faces.fit());await pending;
