@@ -1235,6 +1235,9 @@ test('the Tri chart keeps the children in order and assigns each of Hana’s chi
   assert.deepEqual(children('tri-shuki'),['מורן','דור','יניב','ליאור','עדי']);
   for(const parent of ['tri-hanania','tri-shuki'])for(const child of relatives(parent).children)assert.deepEqual(relatives(child).parents,['tri-hana',parent]);
   assert.equal(t.people['kehat-aharon'].name,'אהרון קהא');
+  assert.equal(t.people['kehat-zechariah'].name,'זכריה טרי');
+  assert.ok(t.people['kehat-zechariah'].aliases.includes('זכריה קהא טירי'));
+  assert.equal(t.people['kehat-yaakov'].name,'יעקב קהת');
   assert.deepEqual(children('kehat-aharon'),['שושנה','יוסי','ציונה','אהובה']);
   assert.equal(t.people['kehat-aharon-yossi'].deceased,true);
 });
@@ -1246,6 +1249,7 @@ test('two old Miriam tags resolve to the daughter of Zechariah across branches a
     const home=BRANCH_PORTALS.kehat.home+'api/compat/api/',away=BRANCH_PORTALS['zechariah-tzadok'].home+'api/compat/api/';
     function person(id,name,fields={}){f.database.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(id,JSON.stringify({id,name,extra:true,...fields}));}
     person(id,'מרים קהא',{about:'משפחת פרץ',birthday:'12.1.1952'});
+    person('kehat-zechariah','זכריה קהא טירי',{birthday:'15.3.1902'});
     person(old[0],'מרים טרי',{nakashBranch:'zechariah-tzadok'});
     person(old[1],'מרים טרי',{nakashBranch:'zechariah'});
     const mediaId='1'.repeat(32),faceId='2'.repeat(32),rect={x:.1,y:.2,width:.15,height:.2};
@@ -1265,6 +1269,9 @@ test('two old Miriam tags resolve to the daughter of Zechariah across branches a
     assert.match(result.href,/keha-extended\/kehat\/#person\/tri-miriam$/);
     const page=await f.json(home+'people/'+old[1]+'/page');
     assert.equal(page.person.id,id);assert.equal(page.person.about,'משפחת פרץ');assert.equal(page.person.birthday,'12.1.1952');
+    const father=(await f.json(home+'people/kehat-zechariah/page')).person;
+    assert.equal(father.name,'זכריה טרי');assert.equal(father.birthday,'15.3.1902');
+    assert.ok(father.aliases.includes('זכריה קהא טירי'));
     assert.deepEqual(f.database.prepare('SELECT person_id FROM media_tags WHERE media_id=?').all(mediaId).map(row=>row.person_id),[id]);
     const face=JSON.parse(f.database.prepare('SELECT data FROM media_faces WHERE id=?').get(faceId).data);
     assert.equal(face.personId,id);assert.deepEqual(face.rect,rect);

@@ -31,7 +31,7 @@ const people = [
   ['kehat-miriam','מרים קהת','Miriam Kehat','f','u-keha-kehat'],
   ['kehat-yaakov','יעקב קהת','Yaakov Kehat','m','u-kehat-yaakov'],
   ['kehat-yaakov-miriam','מרים','Miriam','f','u-kehat-yaakov'],
-  ['kehat-zechariah','זכריה קהת','Zechariah Kehat','m','u-kehat-zechariah'],
+  ['kehat-zechariah','זכריה טרי','Zechariah Tri','m','u-kehat-zechariah'],
   ['kehat-aharon','אהרון קהא','Aharon Keha','m','u-kehat-aharon',['אהרון קהת','אהרן קהא']],
   ['kehat-aharon-shoshana','שושנה','Shoshana','f','u-kehat-aharon-shoshana'],
   ['kehat-aharon-yossi','יוסי','Yossi','m','u-kehat-aharon-yossi',[],{deceased:true}],

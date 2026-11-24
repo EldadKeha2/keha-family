@@ -311,6 +311,16 @@ export function initializeExtendedKeha(state) {
       }
       state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',householdMigration,'done');
     }
+    const triFatherName='extended-zechariah-tri-family-name-2026-11-24';
+    if(!state.rows('SELECT id FROM meta WHERE id=?',triFatherName).length){
+      const seed=EXTENDED_PEOPLE.find(person=>person.id==='kehat-zechariah');
+      const saved=state.person(state.sharedNakashIdentities[seed.id]||seed.id);
+      state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',triFatherName+':backup',JSON.stringify(saved));
+      saved.aliases=[...new Set([...(saved.aliases||[]),...seed.aliases,saved.name,saved.nameEn].filter(Boolean))];
+      Object.assign(saved,{name:seed.name,firstName:'זכריה',lastName:'טרי',nameEn:seed.nameEn,englishName:seed.englishName});
+      state.savePerson(saved);
+      state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',triFatherName,'done');
+    }
     initializeKehatDocuments(state);
     initializeRegistryDocuments(state);
     state.peopleRevision=uid();state.peopleCache=null;
