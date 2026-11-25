@@ -21,7 +21,7 @@ const assertNoInstallationCopy=dialog=>{
   assert.doesNotMatch(dialog.innerHTML,/<(?:input|textarea)\b|copy|paste|העתק|להדביק|הדבקה/i);
 };
 const assertProgress=(f,active)=>{
-  const bars=[f.card.querySelector('[data-home-install-progress]'),f.dialog.querySelector('[data-home-install-progress]')].filter(Boolean);
+  const bars=[f.card.querySelector('[data-home-install-progress]'),f.dialog.open&&f.dialog.querySelector('[data-home-install-progress]')].filter(Boolean);
   if(active)assert.ok(bars.length,'An active installation has visible progress');
   assert.equal(bars.some(bar=>!bar.hidden),active);
   for(const bar of bars){assert.equal(bar.getAttribute('role'),'progressbar');assert.equal(bar.hasAttribute('aria-valuenow'),false);assert.equal(bar.hasAttribute('value'),false);}
@@ -138,10 +138,10 @@ test('phone toolbar responds to viewport changes and keeps both controls in inst
 
 test('already installed shortcut announces its state for two seconds without reopening installation',async()=>{
   for(const options of [{standalone:true},{iosStandalone:true}]){
-    const f=fixture(options),offer=f.offer(),status=f.card.querySelector('[data-home-install-status]');
+    const f=fixture(options),status=f.card.querySelector('[data-home-install-status]');
     let buttonRect={left:140,right:172,top:20,bottom:68,width:32,height:48};
     f.button().getBoundingClientRect=()=>buttonRect;status.getBoundingClientRect=()=>({height:44});f.click(f.button());
-    assert.equal(f.button().hidden,false);assert.equal(offer.calls,0);assert.equal(f.dialog.open,false);
+    assert.equal(f.button().hidden,false);assert.equal(f.dialog.open,false);
     assert.equal(status.hidden,false);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');assert.equal(status.hasAttribute('data-install-feedback'),true);
     let left=parseFloat(status.style.getPropertyValue('--install-feedback-left')),width=parseFloat(status.style.getPropertyValue('--install-feedback-width'));
     assert.ok(left>buttonRect.right);assert.ok(left+width<=f.document.documentElement.clientWidth-8);assert.equal(parseFloat(status.style.getPropertyValue('--install-feedback-top'))+22,(buttonRect.top+buttonRect.bottom)/2);
@@ -149,7 +149,7 @@ test('already installed shortcut announces its state for two seconds without reo
     left=parseFloat(status.style.getPropertyValue('--install-feedback-left'));width=parseFloat(status.style.getPropertyValue('--install-feedback-width'));assert.ok(left>buttonRect.right);assert.ok(left+width<=312);
     await f.advanceTime(1999);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
     f.click(f.button());await f.advanceTime(1999);assert.equal(status.textContent,'היישום כבר מותקן במכשירך');
-    await f.advanceTime(1);assert.equal(status.textContent,'');assert.equal(status.hasAttribute('data-install-feedback'),false);assert.equal(f.dialog.open,false);assert.equal(offer.calls,0);
+    await f.advanceTime(1);assert.equal(status.textContent,'');assert.equal(status.hasAttribute('data-install-feedback'),false);assert.equal(f.dialog.open,false);
   }
   const english=fixture({english:true,standalone:true});english.click(english.button());
   assert.equal(english.card.querySelector('[data-home-install-status]').textContent,'The app is already installed on your device');assert.equal(english.dialog.open,false);
@@ -168,10 +168,12 @@ test('normal browser detects only this installed web app by its manifest or iden
   }
 });
 
-test('unknown installed state, unrelated apps and detection failure retain installation help',async()=>{
+test('unknown installed state, unrelated apps and detection failure keep Android Install available without manual steps',async()=>{
   for(const installedRelated of ['missing',[],[{platform:'webapp',url:'https://other.example/manifest.webmanifest',id:'https://other.example/'}],'throw']){
     const f=fixture({installedRelated});await tick();f.click(f.button());await tick();
-    assert.equal(f.dialog.open,true);assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
+    assert.equal(f.dialog.open,false);assert.equal(f.button().disabled,false);assert.deepEqual(f.assignments,[]);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+    assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'טוענים את ההתקנה…');
   }
 });
 
@@ -180,27 +182,32 @@ test('embedded preview does not query installed apps and never treats absent pro
   f.click(f.button());await tick();assert.equal(f.relatedCalls.length,0);assert.equal(f.dialog.open,true);
 });
 
-test('Android native prompt requires a tap, is consumed once and dismissal leaves working manual help',async()=>{
+test('Android native prompt requires a tap, is consumed once and dismissal keeps the header Install action',async()=>{
   const f=fixture({installedRelated:[]}),offer=f.offer();assert.equal(offer.event.defaultPrevented,true);assert.equal(offer.calls,0);
   f.click(f.button());f.click(f.button());assert.equal(offer.calls,1);await tick();assert.equal(f.card.hidden,false);
   assertProgress(f,false);
-  f.click(f.button());await tick();assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);
-  assert.match(f.dialog.innerHTML,/Chrome/);assert.match(f.dialog.innerHTML,/הוספה למסך הבית/);
+  assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'ההתקנה בוטלה. אפשר ללחוץ שוב ״התקן״.');
+  f.click(f.button());await tick();assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);
+  assert.doesNotMatch(f.dialog.innerHTML,/<ol>|רשימת כל האפליקציות|לחיצה ארוכה/);
+  const next=f.offer();f.click(f.button());await tick();assert.equal(next.calls,1);assert.equal(offer.calls,1);
 });
 
-test('header installation shows indeterminate requesting and accepted progress without claiming completion',async()=>{
+test('Android header installation uses only the native dialog and completes on the browser event',async()=>{
   const f=fixture(),offer=f.offer({outcome:'accepted',choicePending:true});assertProgress(f,false);
-  f.click(f.button());await tick();assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);assertProgress(f,true);
+  f.click(f.button());await tick();assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,0);
   assert.equal(f.button().disabled,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
-  offer.choose();await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
-  f.window.dispatchEvent(new Event('appinstalled'));await tick();assertProgress(f,true);
-  assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
-  assert.ok(f.dialog.querySelector('[data-home-install-check-icon]'));
+  offer.choose();await tick();assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+  f.click(f.button());assert.equal(f.dialog.open,false);assert.equal(offer.calls,1);
+  f.window.dispatchEvent(new Event('appinstalled'));await tick();assertProgress(f,false);
+  assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);assert.equal(f.dialog.open,false);
+  assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
 });
 
-test('unavailable native prompt opens manual help and re-enables the trigger',async()=>{
+test('an unavailable Android native prompt re-enables Install without a manual instruction dialog',async()=>{
   const f=fixture(),offer=f.offer({error:true});f.click(f.button());await tick();
-  assert.equal(offer.calls,1);assert.equal(f.dialog.open,true);assert.equal(f.button().disabled,false);assertProgress(f,false);
+  assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);assert.equal(f.button().disabled,false);assertProgress(f,false);
+  assert.match(f.card.querySelector('[data-home-install-status]').textContent,/חלון ההתקנה לא נפתח/);
+  const retry=f.offer({outcome:'accepted'});f.click(f.button());await tick();assert.equal(retry.calls,1);assert.equal(f.dialog.open,false);
 });
 
 test('iPhone and touch iPad use Share instructions, while embedded browsers explain opening the full browser',async()=>{
@@ -244,15 +251,81 @@ test('iPhone and touch iPad use Share instructions, while embedded browsers expl
   assert.equal(embedded.dialog.querySelector('[data-home-install-profile]'),null);
 });
 
-test('manual dialog closes and restores button focus',async()=>{
-  const f=fixture();f.click(f.button());await tick();assert.equal(f.dialog.open,true);
+test('an embedded Android installation invitation closes and restores header button focus',async()=>{
+  const f=fixture({userAgent:'Mozilla/5.0 (Linux; Android 16) WhatsApp/2.26.1'});f.click(f.button());await tick();assert.equal(f.dialog.open,true);
   f.click(f.dialog.querySelector('[data-home-install-close]'));assert.equal(f.dialog.open,false);assert.equal(f.document.activeElement,f.button());
 });
 
-test('manual installation help has direct instructions without clipboard controls',async()=>{
+test('Android header preparation never replaces the page with manual steps or clipboard controls',async()=>{
   for(const options of [{},{english:true},{clipboard:'missing'},{clipboard:'blocked'}]){
     const f=fixture(options);f.click(f.button());await tick();
-    assert.equal(f.dialog.open,true);assertNoInstallationCopy(f.dialog);assert.equal(f.copied.length,0);assertProgress(f,false);
+    assert.equal(f.dialog.open,false);assertNoInstallationCopy(f.dialog);assert.equal(f.copied.length,0);assertProgress(f,false);
+    await f.advanceTime(4500);assert.equal(f.dialog.open,false);assert.equal(f.button().disabled,false);assert.deepEqual(f.assignments,[]);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+  }
+});
+
+test('root Android installation never falls back to the rejected instruction and icon-confirmation screen',async()=>{
+  for(const english of [false,true])for(const query of ['', '?install=1', '?install=1&installBrowser=chrome', '?install=1&installBrowser=chrome-full', '?install=1&installFallback=1']){
+    const f=fixture({english,entryUrl:'https://family.example/'+query+'#home'});
+    f.click(f.button());await tick();
+    assert.equal(f.dialog.querySelector('[data-home-install-instructions]'),null);
+    assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);
+    assert.doesNotMatch(f.dialog.innerHTML,/<ol>|<li>|רשימת כל האפליקציות|לחיצה ארוכה|list of all apps|Press and hold/);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+    const offer=f.offer({outcome:'accepted'});f.click(f.button());assert.equal(offer.calls,1);
+    await tick();assert.equal(f.dialog.open,false);assert.deepEqual(f.assignments,[]);
+    f.window.dispatchEvent(new Event('appinstalled'));await tick();
+    assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+  }
+});
+
+test('a delayed root Android offer resumes only a recent install tap with active browser activation',async()=>{
+  for(const userActivation of [false,true])for(const expired of [false,true]){
+    const f=fixture({userActivation,entryUrl:'https://family.example/#home'});f.click(f.button());
+    assert.equal(f.dialog.open,false);assert.deepEqual(f.assignments,[]);
+    if(expired)await f.advanceTime(4500);
+    const offer=f.offer({outcome:'accepted'});await tick();
+    assert.equal(offer.calls,userActivation&&!expired?1:0);
+    if(!offer.calls){f.click(f.button());await tick();assert.equal(offer.calls,1);}
+    assert.equal(f.dialog.open,false);assert.equal(f.dialog.modalCalls,0);
+  }
+});
+
+test('a fresh root Android install offer takes precedence over stale installed session and package lookup',async()=>{
+  let resolveApps;
+  const f=fixture({standalone:true,sessionState:new Map([['family-running-app','/']]),installedRelated:()=>new Promise(resolve=>{resolveApps=resolve;})});
+  await tick();const offer=f.offer({outcome:'accepted'});
+  resolveApps([{platform:'webapp',id:'https://family.example/'}]);await tick();
+  f.click(f.button());assert.equal(offer.calls,1);await tick();assert.equal(f.dialog.open,false);
+  assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+});
+
+test('root Android uses the current-document browser API without another-app permission or custom dialog',async()=>{
+  const f=fixture({webInstall:'works'});f.click(f.button());assert.equal(f.webInstallCalls.length,1);
+  assert.equal(f.webInstallCalls[0],undefined);assert.equal(f.dialog.open,false);
+  await tick();assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
+  f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.open,false);
+  assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+});
+
+test('an unsupported root Android browser API keeps the native-event retry without showing manual instructions',async()=>{
+  const f=fixture({webInstall:'NotSupportedError'});f.click(f.button());await tick();
+  assert.equal(f.webInstallCalls.length,1);assert.equal(f.dialog.open,false);assert.equal(f.button().disabled,false);
+  const offer=f.offer({outcome:'accepted'});f.click(f.button());await tick();
+  assert.equal(offer.calls,1);assert.equal(f.webInstallCalls.length,1);assert.equal(f.dialog.open,false);
+});
+
+test('root Android preparation stops when an existing install is detected or a browser-menu install finishes',async()=>{
+  for(const completion of ['detection','browser-event']){
+    let resolveApps;
+    const f=fixture({installedRelated:()=>new Promise(resolve=>{resolveApps=resolve;})});await tick();
+    f.click(f.button());assert.equal(f.dialog.open,false);
+    if(completion==='detection'){resolveApps([{platform:'webapp',id:'https://family.example/'}]);await tick();}
+    else{f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'ההתקנה הושלמה');}
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+    f.click(f.button());assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
+    await f.advanceTime(4500);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'');assert.equal(f.dialog.open,false);
   }
 });
 
@@ -375,30 +448,30 @@ test('a native offer arriving after the invitation opens is available from its i
     f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
     assert.equal(offer.calls,1);assert.equal(f.button().disabled,false);
     assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,label);
-    assert.equal(f.dialog.querySelector('[data-home-install-invite-status]').textContent,english?'Tap again for installation instructions.':'לחצו שוב להנחיות ההוספה.');
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-status]').textContent,english?'Installation canceled. You can tap “Install” again.':'ההתקנה בוטלה. אפשר ללחוץ שוב ״התקן״.');
     assertProgress(f,false);
   }
 });
 
-test('accepted and appinstalled invitation notifications await actual icon confirmation',async()=>{
+test('Android acceptance closes the invitation and appinstalled completes without website icon confirmation',async()=>{
   const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
   const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
   assert.equal(offer.calls,1);assert.equal(f.dialog.querySelector('[data-home-install-invite-installed]'),null);
-  assert.equal(f.dialog.open,true);assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  assert.equal(f.dialog.open,false);assertProgress(f,false);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
   assert.notEqual(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
   f.window.dispatchEvent(new Event('appinstalled'));await tick();
-  assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
-  f.click(f.dialog.querySelector('[data-home-install-check-icon]'));assertSuccess(f);assert.match(f.dialog.innerHTML,/האייקון מוכן/);
-  f.click(f.dialog.querySelector('[data-home-install-success-browse]'));assert.equal(f.dialog.open,false);
+  assertProgress(f,false);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);assert.equal(f.dialog.open,false);
+  assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
   f.click(f.button());assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
 });
 
 test('installed invitation recipients see their local installed state and browse without prompting',async()=>{
   for(const options of [{standalone:true},{iosStandalone:true},{installedRelated:[{platform:'webapp',id:'https://family.example/'}]}]){
-    const f=fixture({...options,entryUrl:'https://family.example/?lang=he&install=1#home'}),offer=f.offer();await tick();
+    const f=fixture({...options,entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
     assert.equal(f.dialog.open,true);assert.ok(f.dialog.querySelector('[data-home-install-invite-installed]'));
-    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);assert.equal(offer.calls,0);
-    f.click(f.dialog.querySelector('[data-home-install-invite-browse]'));assert.equal(f.dialog.open,false);assert.equal(offer.calls,0);
+    assert.equal(f.dialog.querySelector('[data-home-install-invite-start]'),null);
+    f.click(f.dialog.querySelector('[data-home-install-invite-browse]'));assert.equal(f.dialog.open,false);
   }
 });
 
@@ -449,10 +522,9 @@ test('older phones without native dialog support can open and dismiss an install
   assert.equal(f.dialog.hasAttribute('open'),false);assert.equal(f.document.activeElement,f.card.querySelector('[data-home-install-share]'));
 });
 
-test('invitation without a native prompt opens localized platform steps without copying or pasting',async()=>{
+test('platforms requiring manual installation retain localized steps without copying or pasting',async()=>{
   for(const options of [
     {userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1',browser:/Safari/,otherBrowser:/Chrome/},
-    {userAgent:'Mozilla/5.0 (Linux; Android 16) Chrome/141.0.0.0 Mobile Safari/537.36',browser:/Chrome/,otherBrowser:/Safari/},
     {userAgent:'Mozilla/5.0 (X11; Linux x86_64) Firefox/145.0',browser:/iPhone \/ iPad/,desktop:true}
   ]){
     const f=fixture({...options,entryUrl:'https://family.example/?lang=en-US&install=1#home',english:true,clipboard:'blocked'});await tick();
@@ -476,56 +548,55 @@ test('WhatsApp installation uses the app menu to open a full browser without cop
   }
 });
 
-test('a native prompt arriving during manual help offers a direct one-use Install action in that dialog',async()=>{
+test('a delayed Android offer is available from the header without opening an instruction dialog',async()=>{
   for(const options of [{},{english:true},{nativeDialog:false}]){
-    const f=fixture(options);f.click(f.button());await tick();assert.equal(f.dialog.open,true);
-    assert.equal(f.dialog.querySelector('[data-home-install-native-start]').hidden,true);assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,false);
-    const opened=f.dialog.modalCalls,offer=f.offer({outcome:'accepted'}),action=f.dialog.querySelector('[data-home-install-native-start]');
-    assert.equal(offer.calls,0);assert.equal(f.dialog.open,true);assert.equal(f.dialog.modalCalls,opened);
-    assert.ok(action);assert.equal(action.hidden,false);assert.equal(action.disabled,false);assert.equal(action.textContent,options.english?'Install':'התקן');assertNoInstallationCopy(f.dialog);
-    assert.equal(f.dialog.querySelector('[data-home-install-instructions]').hidden,true);
-    f.click(action);f.click(action);assert.equal(offer.calls,1);assert.equal(action.disabled,true);await tick();
-    const accepted=f.card.querySelector('[data-home-install-status]').textContent;
-    assert.ok(accepted);assert.equal(f.dialog.querySelector('[data-home-install-help-status]').textContent,accepted);assertProgress(f,true);
-    const consumed=f.dialog.querySelector('[data-home-install-native-start]');assert.ok(!consumed||consumed.hidden||consumed.disabled);
-    f.window.dispatchEvent(new Event('appinstalled'));await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
-    f.standalone(true);assertSuccess(f);f.click(f.dialog.querySelector('[data-home-install-success-browse]'));assert.equal(f.dialog.open,false);assert.equal(f.document.activeElement,f.button());
+    const f=fixture(options);f.click(f.button());await tick();assert.equal(f.dialog.open,false);
+    const offer=f.offer({outcome:'accepted'});assert.equal(offer.calls,0);assert.equal(f.dialog.modalCalls,0);
+    assert.equal(f.button().disabled,false);assert.equal(f.button().textContent,options.english?'Install':'התקן');assertNoInstallationCopy(f.dialog);
+    f.click(f.button());f.click(f.button());assert.equal(offer.calls,1);assert.equal(f.button().disabled,true);await tick();
+    assert.equal(f.dialog.open,false);assert.ok(f.card.querySelector('[data-home-install-status]').textContent);
+    f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.open,false);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+    f.standalone(true);f.click(f.button());assert.equal(f.dialog.open,false);assert.equal(offer.calls,1);
   }
 });
 
 test('unconfirmed acceptance stops progress after twenty seconds and explains that completion is unknown',async()=>{
   const f=fixture({entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
-  const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assertProgress(f,true);
-  await f.advanceTime(19999);assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assert.equal(f.dialog.open,false);
+  await f.advanceTime(19999);assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');
   await f.advanceTime(1);assertProgress(f,false);
-  const message='הטלפון לא שלח אישור סיום. בדקו אם האייקון מופיע במסך הבית.';
-  assert.equal(f.card.querySelector('[data-home-install-status]').textContent,message);assert.equal(f.dialog.querySelector('[data-home-install-invite-status]').textContent,message);
+  const message='Chrome לא דיווח על סיום ההתקנה. אפשר לנסות שוב.';
+  assert.equal(f.card.querySelector('[data-home-install-status]').textContent,message);assert.equal(f.dialog.open,false);
   assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);assert.equal(offer.calls,1);
-  f.click(f.dialog.querySelector('[data-home-install-check-icon]'));assertSuccess(f);
+  assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);
+  const retry=f.offer({outcome:'accepted'});f.click(f.button());await tick();assert.equal(retry.calls,1);
 });
 
 test('matching installed-app detection confirms completion on return to the page without another prompt',async()=>{
   for(const eventName of ['pageshow','focus']){
     let apps=[];const f=fixture({english:true,installedRelated:()=>apps,entryUrl:'https://family.example/?lang=en-US&install=1#home'});await tick();
     const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
-    f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);assertProgress(f,true);
+    assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'false');assert.equal(f.dialog.open,false);
     apps=[{platform:'webapp',id:'https://family.example/'}];f.window.dispatchEvent(new Event(eventName));await tick();
-    assertSuccess(f);assert.equal(offer.calls,1);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);assert.doesNotMatch(f.dialog.querySelector('[data-home-install-success]').innerHTML,/icon is ready|icon.*(?:is|on).*home screen/i);
-    await f.advanceTime(20000);assertSuccess(f);
+    assert.equal(f.dialog.open,false);assert.equal(offer.calls,1);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+    assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
+    await f.advanceTime(20000);assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
   }
 });
 
 test('an early appinstalled event and late user choice cannot turn confirmed completion back into progress',async()=>{
   let apps=[];const f=fixture({installedRelated:()=>apps,entryUrl:'https://family.example/?lang=he&install=1#home'});await tick();
   const offer=f.offer({outcome:'accepted',choicePending:true});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();
-  f.window.dispatchEvent(new Event('appinstalled'));await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
-  apps=[{platform:'webapp',url:'https://family.example/manifest.webmanifest'}];f.window.dispatchEvent(new Event('focus'));await tick();assertSuccess(f);
-  offer.choose();await tick();assertSuccess(f);await f.advanceTime(20000);assertSuccess(f);assert.equal(offer.calls,1);
+  f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
+  apps=[{platform:'webapp',url:'https://family.example/manifest.webmanifest'}];f.window.dispatchEvent(new Event('focus'));await tick();
+  offer.choose();await tick();await f.advanceTime(20000);assert.equal(f.dialog.open,false);assert.equal(offer.calls,1);
+  assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');assertProgress(f,false);
 });
 
 test('appinstalled while browsing does not open an unsolicited success dialog',async()=>{
   const f=fixture();f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.open,false);assertProgress(f,false);
-  f.click(f.button());await tick();assert.equal(f.dialog.open,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  f.click(f.button());await tick();assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'היישום כבר מותקן במכשירך');
 });
 
 test('in-dialog English translation preserves the native event and requesting and accepted progress',async()=>{
@@ -535,21 +606,21 @@ test('in-dialog English translation preserves the native event and requesting an
   assert.equal(f.dialog.querySelector('[data-home-install-language]').textContent,'Hebrew');assert.doesNotMatch(f.dialog.innerHTML,/[\u0590-\u05ff]/);
   f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assert.equal(offer.calls,1);assertProgress(f,true);
   f.click(f.dialog.querySelector('[data-home-install-language]'));assert.equal(f.dialog.getAttribute('dir'),'rtl');assertProgress(f,true);assert.equal(offer.calls,1);
-  offer.choose();await tick();assertProgress(f,true);
   f.click(f.dialog.querySelector('[data-home-install-language]'));assert.equal(f.dialog.getAttribute('dir'),'ltr');assertProgress(f,true);assert.equal(offer.calls,1);
-  f.window.dispatchEvent(new Event('appinstalled'));await tick();assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
-  f.standalone(true);assertSuccess(f);assert.equal(f.dialog.getAttribute('dir'),'ltr');assert.ok(f.dialog.querySelector('[data-home-install-language]'));
-  f.click(f.dialog.querySelector('[data-home-install-language]'));assert.equal(f.dialog.getAttribute('dir'),'rtl');assertSuccess(f);assert.match(f.dialog.innerHTML,/ההתקנה הושלמה/);assert.doesNotMatch(f.dialog.innerHTML,/האייקון מוכן/);
+  offer.choose();await tick();assert.equal(f.dialog.open,false);assertProgress(f,false);
+  f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.open,false);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+  assert.equal(f.card.querySelector('[data-home-install-status]').textContent,'Installation complete');
+  f.standalone(true);assert.equal(f.dialog.open,false);assert.equal(f.card.querySelector('[data-home-install-actions]').getAttribute('data-installed'),'true');
 });
 
-test('manual help translates in place without losing a late native installation offer',async()=>{
-  const f=fixture();f.click(f.button());await tick();const offer=f.offer({outcome:'accepted'}),opened=f.dialog.modalCalls;
+test('an Android invitation translates in place without losing a late native installation offer',async()=>{
+  const f=fixture({entryUrl:'https://family.example/?install=1#home'});await tick();const offer=f.offer({outcome:'accepted'}),opened=f.dialog.modalCalls;
   f.click(f.dialog.querySelector('[data-home-install-language]'));
   assert.equal(f.dialog.open,true);assert.equal(f.dialog.modalCalls,opened);assert.equal(f.dialog.getAttribute('dir'),'ltr');assertNoInstallationCopy(f.dialog);
-  assert.equal(f.dialog.querySelector('[data-home-install-native-start]').textContent,'Install');assert.equal(offer.calls,0);assert.equal(f.button().textContent,'התקן');
-  f.click(f.dialog.querySelector('[data-home-install-native-start]'));await tick();assert.equal(offer.calls,1);assertProgress(f,true);
-  f.click(f.dialog.querySelector('[data-home-install-check-icon]'));assertSuccess(f);assert.equal(f.dialog.getAttribute('dir'),'ltr');assert.ok(f.dialog.querySelector('[data-home-install-language]'));
-  f.click(f.dialog.querySelector('[data-home-install-success-browse]'));assert.equal(f.dialog.open,false);assert.equal(f.document.activeElement,f.button());
+  assert.equal(f.dialog.querySelector('[data-home-install-invite-start]').textContent,'Install');assert.equal(offer.calls,0);assert.equal(f.button().textContent,'התקן');
+  f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assert.equal(offer.calls,1);assert.equal(f.dialog.open,false);
+  f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(f.dialog.open,false);assert.equal(f.dialog.querySelector('[data-home-install-check-icon]'),null);
+  assert.equal(f.document.activeElement,f.card.querySelector('[data-home-install-share]'));
 });
 
 test('translated installer continues to the English home only when Continue is chosen',async()=>{
@@ -557,14 +628,15 @@ test('translated installer continues to the English home only when Continue is c
     const f=fixture({recordNavigation:true,entryUrl:'https://family.example/?game=ruti-house&lang=he&install=1#games'});await tick();
     f.click(f.dialog.querySelector('[data-home-install-language]'));assert.deepEqual(f.assignments,[]);assert.equal(f.button().textContent,'התקן');
     if(complete){
-      const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assertProgress(f,true);
-      assert.deepEqual(f.assignments,[]);f.click(f.dialog.querySelector('[data-home-install-check-icon]'));assertSuccess(f);assert.equal(offer.calls,1);assert.deepEqual(f.assignments,[]);
+      const offer=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-invite-start]'));await tick();assert.equal(f.dialog.open,false);
+      f.window.dispatchEvent(new Event('appinstalled'));await tick();assert.equal(offer.calls,1);assert.deepEqual(f.assignments,[]);
+      assert.equal(f.dialog.open,false);continue;
     }
-    f.click(f.dialog.querySelector(complete?'[data-home-install-success-browse]':'[data-home-install-invite-browse]'));
+    f.click(f.dialog.querySelector('[data-home-install-invite-browse]'));
     assert.equal(f.dialog.open,false);assert.deepEqual(f.assignments,['https://family.example/?lang=en-US#home']);
     const destination=new URL(f.assignments[0]);assert.equal(destination.searchParams.has('install'),false);assert.equal(destination.searchParams.has('game'),false);
   }
-  const help=fixture({recordNavigation:true,share:'works'});help.click(help.button());await tick();help.click(help.dialog.querySelector('[data-home-install-language]'));
+  const help=fixture({recordNavigation:true,share:'works',entryUrl:'https://family.example/?install=1#home'});await tick();help.click(help.dialog.querySelector('[data-home-install-language]'));
   assert.deepEqual(help.assignments,[]);help.click(help.dialog.querySelector('[data-home-install-close]'));assert.deepEqual(help.assignments,[]);assert.equal(help.button().textContent,'התקן');
   shareWebsite(help);await tick();assert.equal(help.shared[0].url,'https://family.example/?lang=en-US&install=1#home');
 });
@@ -916,9 +988,9 @@ test('all eight independent family origins ignore another installed family and r
     let apps=[{platform:'webapp',id:'https://another-family.example/'}];
     const f=fixture({site,webInstall:'works',entryUrl:origin+base.home,installedRelated:()=>apps});
     await tick();f.click(f.button());await tick();
-    const simple=site?.home.startsWith('/keha-extended/');
+    const simple=!site||site.home.startsWith('/keha-extended/');
     if(site){assert.equal(f.webInstallCalls.length,1);if(simple)assert.equal(f.webInstallCalls[0],undefined,'The current app installs without another-app permission');else assert.equal(f.webInstallCalls[0].manifestId,origin+base.home);}
-    else{const prompt=f.offer({outcome:'accepted'});f.click(f.dialog.querySelector('[data-home-install-native-start]'));await tick();assert.equal(prompt.calls,1);}
+    else{assert.equal(f.webInstallCalls.length,1);assert.equal(f.webInstallCalls[0],undefined,'The root app installs its own linked manifest');}
     assert.equal(f.dialog.querySelector('[data-home-install-success]'),null,'An API resolution is not proof of a new launcher icon');
     apps=[{platform:'webapp',id:origin+base.home}];f.window.dispatchEvent(new Event('focus'));await tick();
     if(simple){
@@ -945,7 +1017,7 @@ test('Android Install uses the current family native browser offer in the first 
     const native=f.offer({outcome:'accepted'});f.click(f.button());
     assert.equal(native.calls,1,base.branch);
     assert.equal(f.webInstallCalls.length,0);
-    await tick();if(site?.home.startsWith('/keha-extended/'))assert.equal(f.dialog.open,false,'The real browser prompt is the only install dialog');else assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
+    await tick();if(!site||site.home.startsWith('/keha-extended/'))assert.equal(f.dialog.open,false,'The real browser prompt is the only install dialog');else assertProgress(f,true);assert.equal(f.dialog.querySelector('[data-home-install-success]'),null);
   }
 });
 
