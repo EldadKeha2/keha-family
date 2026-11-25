@@ -24,7 +24,7 @@ test('shared family media opens on the independent family origin with the same p
  assert.equal(url.origin,site.origin);assert.equal(url.pathname,site.home);
  assert.equal(url.hash,'#person/shared-person');assert.equal(url.searchParams.get('media'),'shared-photo');f.close();
 });
-function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null,touchscreen=false,site=null}={}){
+function fixture({navigation=false,english=false,native=true,files=true,cancel=false,clipboard=true,defer=false,url=null,loadView=null,touchscreen=false,site=null,viewport=null}={}){
   const nodes=new Map(),events=new Map(),windowEvents=new Map(),shared=[],copied=[],requests=[],pending=[];
   class Node{
     constructor(tag='div'){this.tagName=tag;this.handlers=new Map();this.hidden=false;this.open=false;this.textContent='';this.value='';this.isConnected=true;this.style={};const classes=new Set();this.classList={toggle(name,on){on=on??!classes.has(name);classes[on?'add':'delete'](name);},contains:name=>classes.has(name),add:name=>classes.add(name),remove:name=>classes.delete(name)};this.children=new Map();this.content=[];}
@@ -50,6 +50,7 @@ function fixture({navigation=false,english=false,native=true,files=true,cancel=f
   const location=browser?.location||{origin:'https://family.test',href:initial};
   const window={FamilyApp:{apiEnabled:true,toast(){}},FamilyTags:{taggable:item=>['photo','video'].includes(item.kind),mountInline(){},clearInline(){},controls:()=>'',labels:()=>''},addEventListener(type,fn){if(!windowEvents.has(type))windowEvents.set(type,[]);windowEvents.get(type).push(fn);},dispatchEvent(event){for(const fn of windowEvents.get(event.type)||[])fn(event);}};
   if(touchscreen)window.ontouchstart=null;
+  if(viewport)window.visualViewport=viewport;
   window.FamilyI18n={isEnglish:english,language:english?'en-US':'he',t:v=>v,html:(parts,...values)=>parts.reduce((s,p,i)=>s+p+(values[i]??''),''),mediaName:p=>p.name||'',fetch:async(path,options)=>{requests.push({path,options});if(path.endsWith('/view')&&loadView)return loadView(path,options);return{ok:true,blob:()=>defer?new Promise(resolve=>pending.push(resolve)):Promise.resolve(new Blob(['picture'],{type:'image/jpeg'}))};}};
   const navigator={userActivation:{isActive:true},clipboard:{async writeText(value){if(!clipboard)throw Error('Unavailable');copied.push(value);}}};
   if(native){navigator.canShare=()=>files;navigator.share=async data=>{shared.push(data);if(cancel)throw Object.assign(Error('Cancelled'),{name:'AbortError'});};}
@@ -238,6 +239,31 @@ test('the phone touch owner preserves vertical scroll, pinch zoom and cancellati
  finger(f,'touchstart',180);finger(f,'touchmove',230);finger(f,'touchstart',230,100,2);finger(f,'touchend',330);assert.equal(f.window.FamilyMedia.current().id,'a');
  finger(f,'touchstart',180);finger(f,'touchmove',300);f.events.get('touchcancel')();finger(f,'touchend',300);assert.equal(f.window.FamilyMedia.current().id,'a');
  finger(f,'touchstart',180);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(f.get('mediaNext').clicks,1);f.close();
+});
+test('phone dragging belongs to the enlarged photo for browser and photo zoom, including its edges',async()=>{
+ for(const userAgent of ['Android','iPhone','iPad'])for(const fullscreen of [false,true])for(const zoom of ['browser','photo'])for(const touchscreen of [false,true]){
+  const viewport={scale:1,handlers:new Map(),addEventListener(type,fn){this.handlers.set(type,fn);}},f=fixture({touchscreen,viewport}),stage=f.get('mediaStage');
+  f.navigator.userAgent=userAgent;stage.clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),1,'gallery');if(fullscreen)f.window.FamilyMedia.setFullscreen(true);
+  if(zoom==='browser'){viewport.scale=2;viewport.handlers.get('resize')();assert.equal(stage.classList.contains('photo-browser-zoomed'),true);}else stage.classList.add('face-photo-enlarged');
+  let previews=0;f.window.FamilyPhotoPresentation.dragQueued=()=>previews++;
+  for(const dx of [-200,200,-200]){
+   if(touchscreen){finger(f,'touchstart',180);assert.equal(finger(f,'touchmove',180+dx,130).prevented,undefined);finger(f,'touchend',180+dx,130);}
+   else{pointer(f,'pointerdown',180);assert.equal(pointer(f,'pointermove',180+dx,130).prevented,undefined);pointer(f,'pointerup',180+dx,130);}
+   assert.equal(f.window.FamilyMedia.current().id,'b','Even an edge drag must not change photos');
+  }
+  assert.equal(previews,0,'Panning must not preview a neighbouring photo');
+  await f.get('mediaNext').click();assert.equal(f.window.FamilyMedia.current().id,'c','Explicit navigation remains available');
+  stage.classList.remove('face-photo-enlarged');viewport.scale=1;viewport.handlers.get('resize')();assert.equal(stage.classList.contains('photo-browser-zoomed'),false);
+  if(touchscreen){finger(f,'touchstart',180);finger(f,'touchmove',60);finger(f,'touchend',60);}else swipe(f,-120);
+  assert.equal(f.window.FamilyMedia.current().id,'a','A new fitted-photo swipe works immediately');f.close();
+ }
+});
+test('a native pinch cancels a pending phone swipe and zooming out cannot turn a pan into navigation',()=>{
+ const viewport={scale:1,handlers:new Map(),addEventListener(type,fn){this.handlers.set(type,fn);}},f=fixture({touchscreen:true,viewport}),stage=f.get('mediaStage');
+ f.navigator.userAgent='Android';stage.clientWidth=360;f.window.FamilyMedia.open(['a','b','c'].map(f.photo),0,'gallery');let settles=0;f.window.FamilyPhotoPresentation.settle=()=>settles++;
+ finger(f,'touchstart',180);finger(f,'touchmove',60);viewport.scale=3;viewport.handlers.get('resize')();assert.ok(settles>0);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'a');
+ finger(f,'touchstart',180);viewport.scale=1;viewport.handlers.get('resize')();finger(f,'touchmove',60);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'a','The old pan stays a pan until all fingers lift');
+ finger(f,'touchstart',180);finger(f,'touchmove',60);finger(f,'touchend',60);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
 });
 test('a second phone swipe during a page change queues another photo without disabling the arrows',async()=>{
  const f=fixture({touchscreen:true}),pagination={page:1,pages:2,size:2,total:4};f.navigator.userAgent='Android';f.get('mediaStage').clientWidth=360;let finish;

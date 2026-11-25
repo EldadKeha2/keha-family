@@ -956,7 +956,7 @@ test('zoom keeps vertical panning and reserves horizontal navigation for a short
  }
 });
 
-test('zoomed touch swipes browse in both directions on Windows and phones while mouse drags remain available for photo panning',async()=>{
+test('zoomed phone touch pans while Windows swipes browse and mouse drags remain available for photo panning',async()=>{
  for(const options of [{supported:true},{supported:false},{mobile:true}]){
   const f=fixture(options);await f.open('photo','photos',1);f.zoom(2);
   const stage=f.get('mediaStage'),image=stage.querySelector('.face-photo-scroll img');
@@ -964,11 +964,15 @@ test('zoomed touch swipes browse in both directions on Windows and phones while 
   await flush();assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(stage.classList.contains('photo-pointer-dragging'),false,'Mouse input must not claim an album swipe during zoom');
   const swipe=async direction=>{
    const image=stage.querySelector('.face-photo-scroll img'),dx=direction*(options.mobile?-160:160);
-   if(options.mobile)for(const [type,x]of [['touchstart',300],['touchmove',300+dx],['touchend',300+dx]])touchEvent(f,image,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);
+   if(options.mobile)for(const [type,x]of [['touchstart',300],['touchmove',300+dx],['touchend',300+dx]]){
+    const event=touchEvent(f,image,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);
+    if(type==='touchmove'&&stage.classList.contains('face-photo-enlarged'))assert.equal(event.defaultPrevented,false,'Leave zoomed dragging available to the browser on both axes');
+   }
    else for(const [type,x]of [['pointerdown',300],['pointermove',300+dx],['pointerup',300+dx]])f.emit(image,type,{pointerType:'touch',pointerId:9,isPrimary:true,button:0,clientX:x,clientY:250});
    await flush();
   };
-  await swipe(1);assert.equal(f.window.FamilyMedia.current().id,'c');f.zoom(2);await swipe(-1);assert.equal(f.window.FamilyMedia.current().id,'b');f.close();
+  await swipe(1);assert.equal(f.window.FamilyMedia.current().id,options.mobile?'b':'c');f.zoom(2);await swipe(-1);assert.equal(f.window.FamilyMedia.current().id,'b');
+  if(options.mobile){f.zoom(1);await swipe(1);assert.equal(f.window.FamilyMedia.current().id,'c');await swipe(-1);assert.equal(f.window.FamilyMedia.current().id,'b');}f.close();
  }
 });
 
@@ -988,7 +992,7 @@ test('one zoomed photo still pans but a flick cannot reload it or reset its zoom
  assert.equal(scroller.scrollLeft,122);assert.equal(f.window.FamilyMedia.current().id,'solo');assert.equal(stage._familyFaceContext.zoom,2);f.close();
 });
 
-test('horizontal pad and touch gestures leave an open face picker at fit and zoom without saving its search draft',async()=>{
+test('browsing dismisses face searches without saving while zoomed phone panning retains the current search',async()=>{
  for(const options of [{supported:true},{supported:false},{mobile:true}])for(const zoom of [1,2]){
   const f=fixture(options);await f.open('photo','photos',1);if(zoom>1)f.zoom(zoom);const stage=f.get('mediaStage');
   const picker=()=>{const panel=f.document.createElement('div');panel.className='face-popover face-picker';const input=f.document.createElement('input');input.value='Unsubmitted name';panel.append(input);f.get('mediaViewer').append(panel);stage._familyFaceContext.popup=panel;input.focus();return panel;};
@@ -997,7 +1001,8 @@ test('horizontal pad and touch gestures leave an open face picker at fit and zoo
    assert.equal(f.emit(image,'wheel',{deltaX:140,deltaY:0,...(zoom>1?{momentum:false}:{})}).defaultPrevented,true);
    assert.equal(panel.isConnected,false,'The picker disappears on the first horizontal packet, before image loading');assert.equal(f.window.FamilyMedia.current().id,'b');
    if(zoom>1)f.emit(image,'wheel',{deltaX:12,deltaY:0,momentum:true});else await new Promise(resolve=>setTimeout(resolve,100));await flush();
-  }else for(const [type,x]of [['touchstart',350],['touchmove',190],['touchend',190]]){touchEvent(f,image,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);if(type==='touchmove')assert.equal(panel.isConnected,false,'Touch closes the picker before touchend');}
+  }else for(const [type,x]of [['touchstart',350],['touchmove',190],['touchend',190]]){const event=touchEvent(f,image,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);if(type==='touchmove'){assert.equal(panel.isConnected,zoom>1,'Only fitted-photo browsing dismisses the picker');if(zoom>1)assert.equal(event.defaultPrevented,false);}}
+  if(options.mobile&&zoom>1){await flush();assert.equal(f.window.FamilyMedia.current().id,'b');assert.equal(panel.isConnected,true);assert.equal(panel.querySelector('input').value,'Unsubmitted name');assert.equal(f.requests.length,0);f.close();continue;}
   await flush();assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(panel.isConnected,false,'The old editor closes with its old photo');assert.equal(f.requests.length,0,'Browsing cannot submit the name search or create an empty face tag');
   if(zoom>1)f.zoom(zoom);const previous=picker(),target=stage.querySelector('.face-photo-scroll img'),dx=options.mobile?160:-160;
   if(options.mobile)for(const [type,x]of [['touchstart',300],['touchmove',300+dx],['touchend',300+dx]]){touchEvent(f,target,type,type==='touchend'?[]:[[9,x,250]],[[9,x,250]]);if(type==='touchmove')assert.equal(previous.isConnected,false);}
@@ -1031,18 +1036,18 @@ test('pad strokes over the picker search, name choices, portraits and header bro
  }
 });
 
-test('screen swipes starting on picker inputs and name rows finish after the popover is removed on desktops and phones',async()=>{
+test('screen browsing over picker inputs and rows finishes after removal while zoomed phone pans retain the picker',async()=>{
  for(const options of [{supported:true},{supported:false},{mobile:true}])for(const zoom of [1,2])for(const part of ['input','row']){
   const f=fixture(options);await f.open('photo','photos',1);if(zoom>1)f.zoom(zoom);const picker=openTestPicker(f),target=picker[part],dx=options.mobile?-160:160;
   if(options.mobile){
-   touchEvent(f,target,'touchstart',[[71,300,250]]);touchEvent(f,target,'touchmove',[[71,300+dx,250]]);assert.equal(picker.panel.isConnected,false);
+   touchEvent(f,target,'touchstart',[[71,300,250]]);const event=touchEvent(f,target,'touchmove',[[71,300+dx,250]]);assert.equal(picker.panel.isConnected,zoom>1);if(zoom>1)assert.equal(event.defaultPrevented,false);
    touchEvent(f,target,'touchend',[],[[71,300+dx,250]]);
   }else{
    for(const [type,x]of [['pointerdown',300],['pointermove',300+dx]])f.emit(target,type,{pointerType:'touch',pointerId:71,isPrimary:true,button:0,clientX:x,clientY:250});
    assert.equal(picker.panel.isConnected,false);assert.ok(f.captures.some(c=>c.node===f.get('mediaStage')&&c.id===71),'The stable image stage captures before the picker is removed');
    f.emit(f.get('mediaStage'),'pointerup',{pointerType:'touch',pointerId:71,isPrimary:true,button:0,clientX:300+dx,clientY:250});
   }
-  await flush();assert.equal(f.window.FamilyMedia.current().id,'c');assert.equal(f.requests.length,0);f.close();
+  await flush();const panning=Boolean(options.mobile&&zoom>1);assert.equal(f.window.FamilyMedia.current().id,panning?'b':'c');assert.equal(picker.panel.isConnected,panning);assert.equal(picker.input.value,'Unsubmitted search');assert.equal(f.requests.length,0);f.close();
  }
 });
 

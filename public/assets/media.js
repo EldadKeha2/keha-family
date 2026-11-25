@@ -17,6 +17,8 @@
   const phonePhotoInput=()=>navigator.userAgentData?.mobile===true||/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent||'')||(/Macintosh/i.test(navigator.userAgent||'')&&navigator.maxTouchPoints>1);
   const swipeDirection=direction=>!desktopPhotoInput()&&phonePhotoInput()?-direction:direction;
   const phoneTouchInput=()=>!desktopPhotoInput()&&'ontouchstart' in window;
+  const browserPhotoZoomed=()=>!desktopPhotoInput()&&(window.visualViewport?.scale||1)>1.01;
+  const touchPhotoZoomed=()=>!desktopPhotoInput()&&($('mediaStage').classList.contains('face-photo-enlarged')||browserPhotoZoomed());
   const inlineCaption=()=>!state.fullscreen&&(current()?.kind==='video'||current()?.kind==='photo'&&(window.FamilyPhotoKeyboard?.desktop?.()??desktopPhotoInput()));
   function photoIndex(direction,wrap=true,from=state.index){
     for(let distance=1;distance<=state.items.length;distance++){
@@ -358,6 +360,7 @@
   }
   function refreshPhotoPresentation(){
     const stage=$('mediaStage');
+    syncPhotoTouchZoom();
     const native=window.FamilyPhotoNative,desktop=desktopPhotoInput();
     // The shared strip owns horizontal input and navigation together. The
     // browser only keeps vertical panning; face setup refreshes its wrapper.
@@ -371,6 +374,12 @@
         zoomWheel,horizontalStart:horizontalPhotoStarted,
         busy:()=>state.paging||state.photoLoading});
     }else native?.reset(stage);
+  }
+  function syncPhotoTouchZoom(){
+    $('mediaStage').classList.toggle('photo-browser-zoomed',browserPhotoZoomed());
+    // A magnified photo belongs to the browser scroller for the whole stroke,
+    // including at its edges. Pinching must also cancel any pending preview.
+    if(touchPhotoZoomed())photoSwipe?.reset();
   }
   function requestDelete(scope,id){
     if(['family-ai','living-family'].includes(scope)){window.FamilyAI?.exclude(id);return;}
@@ -558,7 +567,7 @@
       start:horizontalPhotoStarted,step:(direction,options)=>step(direction,options)
     });
     photoSwipe=window.FamilyPhotoSwipe?.bind(stage,{
-      enabled:()=>canNavigatePhoto({pending:true,allowZoom:true,allowPicker:true})||canNavigateVideo({pending:true}),
+      enabled:()=>!touchPhotoZoomed()&&(canNavigatePhoto({pending:true,allowZoom:true,allowPicker:true})||canNavigateVideo({pending:true})),
       mouseEnabled:()=>canNavigatePhoto({pending:true})||canNavigateVideo({pending:true}),mouse:desktopPhotoInput,touchOnly:phoneTouchInput,preferPointer:desktopPhotoInput,claim:()=> 'queued',
       wheelEnabled:()=>canNavigatePhoto({pending:true,wheel:true})||canNavigateVideo({pending:true}),wheelStep:arrowStep,
       nativeScroll:()=>window.FamilyPhotoNative?.has?.(stage)===true,strictStart:true,
@@ -575,6 +584,8 @@
         window.FamilyPhotoPresentation?.dragQueued?.(stage,dx,{current:state.items[from],next});
       },cancel:()=>window.FamilyPhotoPresentation?.settle()
     });
+    window.visualViewport?.addEventListener('resize',syncPhotoTouchZoom,{passive:true});
+    syncPhotoTouchZoom();
     $('editOpenedPhoto')?.addEventListener('click',async()=>{
       const item=current();if(!item||item.kind!=='photo')return;
       if(!app()?.apiEnabled||!window.FamilyPhotoEditor?.edit){notify(tr('העורך אינו זמין כרגע. נסו לרענן.','The editor is unavailable. Please refresh.'));return;}
