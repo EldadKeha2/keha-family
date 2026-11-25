@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {parseHTML} from 'linkedom';
-import sharp from 'sharp';
 import {ANDROID_LAUNCH_HOME,androidLaunchProfile} from '../src/android-launch.mjs';
 import {nakashHTML} from '../src/nakash-shell.mjs';
 import {extendedKehaHTML,branchPortalHTML} from '../src/extended-keha.mjs';
@@ -19,16 +18,6 @@ function initialManifest(html,{density=3,agent='Mozilla/5.0 (Linux; Android 16) 
   return document.querySelector('link[rel="manifest"]').getAttribute('href');
 }
 
-// Chromium's ManifestIconSelector takes the nearest icon at or above the ideal,
-// falling back to the largest usable smaller icon. Primary and splash requests
-// prefer maskable icons and have different ideal sizes (83dp and 128dp).
-function chromeIcon(manifest,ideal,minimum){
-  const icons=manifest.icons.filter(icon=>icon.purpose==='maskable')
-    .map(icon=>({...icon,size:Number(icon.sizes.split('x')[0])}))
-    .filter(icon=>icon.size>=minimum).sort((a,b)=>a.size-b.size);
-  return icons.find(icon=>icon.size>=Math.round(ideal))||icons.at(-1);
-}
-
 test('the Android page selects a density profile before installation without changing other families or platforms',()=>{
   for(const density of [1,1.01,1.25,1.5,2,2.625,2.75,2.8125,3,3.125,3.5,4,5,6]){
     const {quarter}=androidLaunchProfile(density);
@@ -41,36 +30,18 @@ test('the Android page selects a density profile before installation without cha
   }
 });
 
-test('Chrome chooses a normal launcher and a separate compensated splash across phone densities',()=>{
-  for(let step=100;step<=600;step++){
-    const density=step/100,profile=androidLaunchProfile(density),manifest=manifests.get(profile.quarter);
-    const primary=chromeIcon(manifest,83*density,83),splash=chromeIcon(manifest,128*density,16*density);
-    assert.equal(primary.src,ANDROID_LAUNCH_HOME+'launcher-'+profile.primarySize+'.png','Primary icon at density '+density);
-    assert.equal(splash.src,ANDROID_LAUNCH_HOME+'splash-'+profile.splashSize+'.png','Splash icon at density '+density);
-    assert.notEqual(primary.src,splash.src);
+test('Android launch profiles bypass adaptive splash rendering and provide full-resolution standard PNGs',async()=>{
+  for(const manifest of manifests.values()){
+    assert.deepEqual(manifest.icons,base.icons.filter(icon=>icon.purpose==='any'));
+    assert.deepEqual(manifest.icons.map(icon=>icon.sizes),['192x192','512x512']);
+    assert.ok(manifest.icons.every(icon=>icon.type==='image/png'&&icon.purpose==='any'));
+    for(const icon of manifest.icons){
+      const bytes=await readFile(new URL('../public'+icon.src,import.meta.url));
+      assert.deepEqual([...bytes.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+    }
   }
-});
-
-test('the installed density-13 profile keeps the two icons separate when page and Android density differ',()=>{
-  // The phone's chrome://webapks screenshot confirms this exact profile.
-  // Page zoom can change devicePixelRatio while Android retains its density.
-  const profile=androidLaunchProfile(3.2),manifest=manifests.get(13);
-  assert.equal(profile.quarter,13);
-  for(const androidDensity of [2.625,2.75,3,3.25,3.5,3.75,4]){
-    const primary=chromeIcon(manifest,83*androidDensity,83),splash=chromeIcon(manifest,128*androidDensity,16*androidDensity);
-    assert.equal(primary.src,ANDROID_LAUNCH_HOME+'launcher-'+profile.primarySize+'.png','Launcher at native density '+androidDensity);
-    assert.equal(splash.src,ANDROID_LAUNCH_HOME+'splash-'+profile.splashSize+'.png','Splash at native density '+androidDensity);
-    assert.notEqual(primary.src,splash.src,'A page/native density mismatch must not collapse both roles');
-  }
-});
-
-test('typical phone densities retain separate icon roles with Chrome page zoom',()=>{
-  for(const androidDensity of [2,2.625,2.75,3,3.25,3.5,4,4.5])for(const pageZoom of [0.8,0.875,0.9,1,1.1]){
-    const profile=androidLaunchProfile(androidDensity*pageZoom),manifest=manifests.get(profile.quarter);
-    const primary=chromeIcon(manifest,83*androidDensity,83),splash=chromeIcon(manifest,128*androidDensity,16*androidDensity);
-    assert.equal(primary.src,ANDROID_LAUNCH_HOME+'launcher-'+profile.primarySize+'.png','Launcher at density '+androidDensity+', page zoom '+pageZoom);
-    assert.equal(splash.src,ANDROID_LAUNCH_HOME+'splash-'+profile.splashSize+'.png','Splash at density '+androidDensity+', page zoom '+pageZoom);
-  }
+  const installedProfile=manifests.get(13);
+  assert.ok(!installedProfile.icons.some(icon=>icon.purpose.split(/\s+/).includes('maskable')),'The exact manifest from the phone must no longer request the adaptive renderer');
 });
 
 test('every density retains the same application identity, native install fields and self association',()=>{
@@ -80,32 +51,5 @@ test('every density retains the same application identity, native install fields
     const related=manifest.related_applications.find(app=>app.platform==='webapp');
     assert.equal(related.id,'https://keha-family.eldadkeha.workers.dev/');
     assert.equal(new URL(related.url).pathname,ANDROID_LAUNCH_HOME+'density-'+quarter+'.webmanifest');
-  }
-});
-
-async function artwork(icon){
-  const {data,info}=await sharp(new URL('../public'+icon.src,import.meta.url).pathname).removeAlpha().raw().toBuffer({resolveWithObject:true});
-  const size=Number(icon.sizes.split('x')[0]);assert.equal(info.width,size);assert.equal(info.height,size);
-  const background=[247,243,233];let left=size,right=-1,top=size,bottom=-1;
-  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
-    const offset=(y*size+x)*info.channels;
-    if(background.some((value,channel)=>Math.abs(data[offset+channel]-value)>15)){
-      left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
-    }
-  }
-  const width=right-left+1,height=bottom-top+1;
-  assert.ok(Math.abs(left*2+width-size)<=2&&Math.abs(top*2+height-size)<=2,'Artwork stays centered');
-  assert.deepEqual([...data.subarray(0,3)],background);
-  return {width:width/size,height:height/size};
-}
-
-test('the bitmap compensation cancels the 108/66 enlargement seen in the phone recordings',async()=>{
-  for(const manifest of manifests.values()){
-    const [primary,splash]=await Promise.all(manifest.icons.filter(icon=>icon.purpose==='maskable').map(artwork));
-    for(const dimension of ['width','height']){
-      const phoneFirst=primary[dimension],phoneSecond=splash[dimension]*108/66;
-      assert.ok(Math.abs(phoneFirst-phoneSecond)<0.025,'The two native footprints match within raster rounding');
-      assert.ok(phoneFirst>0.79,'The launcher keeps the original visible emblem size');
-    }
   }
 });
