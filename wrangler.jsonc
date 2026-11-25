@@ -86,6 +86,6 @@
     "HF_BUCKET": "keha-family"
   },
   "build": {
-    "command": "node scripts/build-pdf-assets.mjs && node scripts/build-site-styles.mjs && node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs && node scripts/build-branch-portals.mjs && node scripts/prepare-family-apps.mjs"
+    "command": "node scripts/build-pdf-assets.mjs && node scripts/build-site-styles.mjs && node scripts/build-family-fallback.mjs && node scripts/build-nakash-launch.mjs && node scripts/build-branch-portals.mjs && node scripts/build-android-launch.mjs && node scripts/prepare-family-apps.mjs"
   }
 }

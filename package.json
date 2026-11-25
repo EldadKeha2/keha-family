@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "deploy": "npx wrangler deploy",
-    "check": "node scripts/build-pdf-assets.mjs && node scripts/build-site-styles.mjs && node scripts/build-nakash-launch.mjs && node scripts/build-branch-portals.mjs && node --test --test-concurrency=2 test/*.test.mjs"
+    "check": "node scripts/build-pdf-assets.mjs && node scripts/build-site-styles.mjs && node scripts/build-nakash-launch.mjs && node scripts/build-branch-portals.mjs && node scripts/build-android-launch.mjs && node --test --test-concurrency=2 test/*.test.mjs"
   },
   "engines": {
     "node": ">=22"

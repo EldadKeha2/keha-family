@@ -10,6 +10,13 @@
   <title>השורשים שלנו · משפחת קהא</title>
   <link rel="icon" href="assets/medallion.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
+  <script id="familyAndroidLaunch">
+    (()=>{
+      if(document.documentElement.dataset.nakashHome||!/Android/i.test(navigator.userAgent||''))return;
+      const density=Math.ceil(Math.max(1,Math.min(6,Number(window.devicePixelRatio)||1))*4);
+      document.querySelector('link[rel="manifest"]').setAttribute('href','/assets/app-icons/android-launch-v1/density-'+density+'.webmanifest');
+    })();
+  </script>
   <link rel="apple-touch-icon" sizes="180x180" href="assets/app-icons/apple-touch-icon.png">
   <meta name="application-name" content="בית משפחת קהא">
   <meta name="apple-mobile-web-app-title" content="משפחת קהא">
