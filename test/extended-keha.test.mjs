@@ -1242,13 +1242,16 @@ test('the Tri chart keeps the children in order and assigns each of Hana’s chi
   assert.equal(t.people['kehat-aharon-yossi'].deceased,true);
 });
 
-test('two old Miriam tags resolve to the daughter of Zechariah across branches and new photo uploads use that profile',async()=>{
+test('Miriam Keha (Zarhi) and Miriam Tri (Peretz) keep their own family, photos, search results and tags in every branch',async()=>{
   const f=fixture();
   try{
     const id='tri-miriam',name='מרים טרי (פרץ)',old=['extra-nakash-f6172e08ee7f90100e98875a','extra-nakash-b920bce618b9d0cf29801fb6'];
+    const keha='kehat-miriam-zarhi',kehaName='מרים קהא',kehaTag='extra-nakash-0d4606ab015f9fe0531de975';
     const home=BRANCH_PORTALS.kehat.home+'api/compat/api/',away=BRANCH_PORTALS['zechariah-tzadok'].home+'api/compat/api/';
     function person(id,name,fields={}){f.database.prepare('INSERT INTO people(id,data) VALUES(?,?)').run(id,JSON.stringify({id,name,extra:true,...fields}));}
-    person(id,'מרים קהא',{about:'משפחת פרץ',birthday:'12.1.1952'});
+    person(id,'מרים קהא',{about:'משפחת פרץ',birthday:'12.1.1952',aliases:['מרים קהא','Miriam Keha'],nakashBranch:'zechariah-tzadok'});
+    person(keha,'מרים זרחי',{nameEn:'Miriam Zarhi',about:'אמה של תחיה'});
+    person(kehaTag,kehaName,{nakashBranch:'zechariah-tzadok'});
     person('kehat-zechariah','זכריה קהא טירי',{birthday:'15.3.1902'});
     person(old[0],'מרים טרי',{nakashBranch:'zechariah-tzadok'});
     person(old[1],'מרים טרי',{nakashBranch:'zechariah'});
@@ -1257,18 +1260,38 @@ test('two old Miriam tags resolve to the daughter of Zechariah across branches a
     f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(mediaId,'personal',old[0],JSON.stringify(legacy));
     for(const tag of old)f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(mediaId,tag);
     f.database.prepare('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?)').run(mediaId,faceId,old[1],JSON.stringify({id:faceId,personId:old[1],rect}));
+    const groupId='3'.repeat(32),groupFace='4'.repeat(32);
+    const group={...legacy,id:groupId,file:groupId+'.jpg',category:'nakash:zechariah-tzadok',personId:null};
+    f.database.prepare('INSERT INTO media(id,category,person_id,data) VALUES(?,?,?,?)').run(groupId,group.category,null,JSON.stringify(group));
+    f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(groupId,old[0]);
+    f.database.prepare('INSERT INTO media_faces(media_id,id,person_id,data) VALUES(?,?,?,?)').run(groupId,groupFace,old[0],JSON.stringify({id:groupFace,personId:old[0],rect}));
     for(const branch of [away,home,site(''),shlomoSite(''),BRANCH_PORTALS.zechariah.home+'api/compat/api/']){
       const roster=(await f.json(branch+'tag-people')).people;
       assert.deepEqual(roster.filter(p=>p.name===name).map(p=>p.id),[id]);
-      assert.ok(roster.some(p=>p.id==='kehat-miriam-zarhi')&&roster.some(p=>p.id==='kehat-yaakov-miriam'));
+      assert.deepEqual(roster.filter(p=>p.name===kehaName).map(p=>p.id),[keha]);
+      assert.ok(roster.some(p=>p.id==='kehat-yaakov-miriam'));
       assert.ok(roster.every(p=>!old.includes(p.id)));
-      const search=await f.json(branch+'search?type=person&q='+encodeURIComponent('מרים קהא'));
-      assert.ok(search.items.some(p=>p.id===id&&p.title===name));
+      for(const [query,match,other] of [[kehaName,keha,id],['מרים זרחי',keha,id],['מרים טרי',id,keha]]){
+        const search=await f.json(branch+'search?type=person&q='+encodeURIComponent(query));
+        assert.ok(search.items.some(p=>p.id===match));
+        assert.ok(!search.items.some(p=>p.id===other));
+      }
+      const givenName=await f.json(branch+'search?type=person&q='+encodeURIComponent('מרים'));
+      assert.ok([id,keha].every(key=>givenName.items.some(p=>p.id===key)));
     }
     const result=(await f.json(away+'search?type=person&q='+encodeURIComponent(name))).items.find(p=>p.id===id);
     assert.match(result.href,/keha-extended\/kehat\/#person\/tri-miriam$/);
+    const remoteKeha=(await f.json(home+'search?type=person&q='+encodeURIComponent(kehaName))).items.find(p=>p.id===keha);
+    assert.ok(remoteKeha.href.endsWith('zechariah-tzadok/#person/'+keha));
     const page=await f.json(home+'people/'+old[1]+'/page');
     assert.equal(page.person.id,id);assert.equal(page.person.about,'משפחת פרץ');assert.equal(page.person.birthday,'12.1.1952');
+    assert.equal(page.person.nakashBranch,'kehat');
+    assert.deepEqual(new Set(page.albums.photos.items.map(p=>p.id)),new Set([mediaId,groupId]));
+    assert.equal((await f.json(away+'media/'+groupId+'/faces')).faces[0].person.id,id);
+    const kehaPage=await f.json(away+'people/'+keha+'/page');
+    assert.equal(kehaPage.person.name,kehaName);assert.equal(kehaPage.person.nakashBranch,'zechariah-tzadok');
+    assert.equal(kehaPage.person.about,'אמה של תחיה');assert.equal(kehaPage.albums.photos.total,0);
+    assert.equal((await f.json(away+'people/'+kehaTag+'/page')).person.id,keha);
     const father=(await f.json(home+'people/kehat-zechariah/page')).person;
     assert.equal(father.name,'זכריה טרי');assert.equal(father.birthday,'15.3.1902');
     assert.ok(father.aliases.includes('זכריה קהא טירי'));
@@ -1281,8 +1304,13 @@ test('two old Miriam tags resolve to the daughter of Zechariah across branches a
     assert.deepEqual(tagged.tags.map(p=>p.id),[id]);assert.equal(tagged.tags[0].name,name);
     assert.equal((await f.json(away+'media/'+tagged.id+'/faces')).faces[0].person.name,name);
     const docSubjects=(await f.json(away+'documents')).people;
-    assert.ok(docSubjects.find(p=>p.id===id)?.aliases.includes('מרים קהא'));
+    assert.ok(docSubjects.find(p=>p.id===keha)?.aliases.includes('מרים זרחי'));
+    assert.ok(!docSubjects.find(p=>p.id===id).aliases.includes(kehaName));
+    const kehaMetadata=Buffer.from(JSON.stringify({faces:[{name:kehaName,rect}],complete:true}));
+    const kehaUpload=await f.json(home+'collections/gallery/upload?filename=keha.jpg',{method:'POST',body:Buffer.concat([kehaMetadata,photo]),headers:{'X-Family-Photo-Metadata-Length':String(kehaMetadata.length)}});
+    assert.deepEqual(kehaUpload.collection.items.find(p=>p.filename==='keha.jpg').tags.map(p=>p.id),[keha]);
     f.restart();
-    assert.equal((await f.json(home+'people/'+id+'/page')).albums.photos.total,2);
+    assert.equal((await f.json(home+'people/'+id+'/page')).albums.photos.total,3);
+    assert.equal((await f.json(away+'people/'+keha+'/page')).albums.photos.total,1);
   }finally{f.close();}
 });

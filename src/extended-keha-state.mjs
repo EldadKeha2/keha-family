@@ -5,6 +5,7 @@ import {extendedGalleryGenerations,extendedGalleryPhoto} from '../public/keha-ex
 import {BRANCH_PORTALS,createBranchPortal} from '../public/keha-extended/branch-portals.mjs';
 import {uid} from './http.mjs';
 import {linkSharedProfile} from './nakash-shared.mjs';
+import {normalizeSearch} from '../public/assets/site-search-core.mjs';
 import {initializeKehatDocuments,initializeRegistryDocuments} from './kehat-documents.mjs';
 import {REGISTRY_CORRECTION_IDS,REGISTRY_CORRECTION_FIELDS} from '../public/keha-extended/registry-evidence.mjs';
 
@@ -303,8 +304,8 @@ export function initializeExtendedKeha(state) {
         if(notes.has(seed.id))saved.researchNotes=seed.researchNotes;
         state.savePerson(saved);
       }
-      // Both free-name profiles were created for Miriam Tri in the two
-      // Zechariah portals. Other Miriam profiles refer to different relatives.
+      // The family confirmed the photos from the Tzadok portal show Miriam Tri.
+      // Both historical IDs were created with the exact tag text "מרים טרי".
       for(const id of ['extra-nakash-f6172e08ee7f90100e98875a','extra-nakash-b920bce618b9d0cf29801fb6']){
         const row=state.rows('SELECT data FROM people WHERE id=?',id)[0];
         if(row && !JSON.parse(row.data).mergedInto)linkSharedProfile(state,state.sharedNakashIdentities,{id,sharedProfileId:'tri-miriam'});
@@ -320,6 +321,31 @@ export function initializeExtendedKeha(state) {
       Object.assign(saved,{name:seed.name,firstName:'זכריה',lastName:'טרי',nameEn:seed.nameEn,englishName:seed.englishName});
       state.savePerson(saved);
       state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',triFatherName,'done');
+    }
+    const miriamCorrection='extended-miriam-keha-zarhi-and-tri-2026-11-25-v1';
+    if(!state.rows('SELECT id FROM meta WHERE id=?',miriamCorrection).length){
+      const seed=EXTENDED_PEOPLE.find(person=>person.id==='kehat-miriam-zarhi');
+      const keha=state.person(seed.id);
+      const tri=state.person('tri-miriam');
+      state.sql.exec('INSERT OR IGNORE INTO meta(id,value) VALUES(?,?)',miriamCorrection+':before',JSON.stringify({keha,tri}));
+
+      // Her existing ID also identifies Yaakov's wife and Tehiya's mother.
+      const aliases=[...new Set([...(keha.aliases||[]),...seed.aliases,keha.name,keha.nameEn].filter(Boolean))];
+      Object.assign(keha,{name:seed.name,firstName:'מרים',lastName:'קהא',nameEn:seed.nameEn,englishName:seed.englishName,nakashBranch:seed.nakashBranch,aliases});
+      if(!keha.researchNotes)keha.researchNotes=seed.researchNotes;
+      else if(!keha.researchNotes.includes('מרים זרחי'))keha.researchNotes+=' מוכרת במשפחה גם בשם מרים זרחי.';
+      state.savePerson(keha);
+
+      // This is the ID for the exact free-name tag "מרים קהא" in the Tzadok portal.
+      const kehaTag='extra-nakash-0d4606ab015f9fe0531de975';
+      if(!state.sharedNakashIdentities[kehaTag]){
+        linkSharedProfile(state,state.sharedNakashIdentities,{id:kehaTag,sharedProfileId:keha.id});
+      }
+      const kehaNames=new Set([seed.name,seed.nameEn,...seed.aliases].map(normalizeSearch));
+      tri.aliases=(tri.aliases||[]).filter(alias=>!kehaNames.has(normalizeSearch(alias)));
+      tri.nakashBranch='kehat';
+      state.savePerson(tri);
+      state.sql.exec('INSERT INTO meta(id,value) VALUES(?,?)',miriamCorrection,'done');
     }
     initializeKehatDocuments(state);
     initializeRegistryDocuments(state);
