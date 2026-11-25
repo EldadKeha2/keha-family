@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f3e9">
+  <meta name="robots" content="noindex,nofollow">
+  <title>בדיקת פתיחת האפליקציה · בית משפחת קהא</title>
+  <link rel="stylesheet" href="/assets/app-check.css">
+  <script type="module" src="/assets/app-check.mjs"></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="/?source=homescreen#home">חזרה לבית משפחת קהא ←</a>
+    <h1>בדיקת פתיחת האפליקציה</h1>
+    <p>הבדיקה פועלת בהתקנה הקיימת. אין צורך להסיר או להתקין שוב.</p>
+    <dl>
+      <div><dt>גרסת Chrome</dt><dd id="chrome-version" dir="ltr">—</dd></div>
+      <div><dt>צפיפות המסך בדפדפן</dt><dd id="screen-density" dir="ltr">—</dd></div>
+      <div><dt>מצב פתיחה</dt><dd id="display-mode">—</dd></div>
+    </dl>
+    <p>כשהבדיקה מוכנה, לחצו על הכפתור ושלחו את הטקסט שהועתק בצ׳אט.</p>
+    <button id="copy-report" type="button" disabled>העתקת הבדיקה</button>
+    <p id="check-status" role="status" aria-live="polite">מכין את הבדיקה…</p>
+    <details>
+      <summary>הצגת נתוני הבדיקה</summary>
+      <label for="check-report">אפשר גם לבחור ולהעתיק את הטקסט מכאן:</label>
+      <textarea id="check-report" dir="ltr" readonly rows="14" spellcheck="false"></textarea>
+    </details>
+    <noscript>יש להפעיל JavaScript כדי להציג את נתוני הבדיקה.</noscript>
+  </main>
+</body>
+</html>

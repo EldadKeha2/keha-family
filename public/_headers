@@ -32,6 +32,16 @@
 /index.html
   Cache-Control: no-cache
 
+/app-check
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+/app-check.html
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
 /share-story/*
   Cache-Control: no-store
   Referrer-Policy: no-referrer
