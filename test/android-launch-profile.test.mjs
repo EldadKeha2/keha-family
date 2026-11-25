@@ -44,10 +44,32 @@ test('the Android page selects a density profile before installation without cha
 test('Chrome chooses a normal launcher and a separate compensated splash across phone densities',()=>{
   for(let step=100;step<=600;step++){
     const density=step/100,profile=androidLaunchProfile(density),manifest=manifests.get(profile.quarter);
-    const primary=chromeIcon(manifest,83*density,83),splash=chromeIcon(manifest,128*density,48*density);
+    const primary=chromeIcon(manifest,83*density,83),splash=chromeIcon(manifest,128*density,16*density);
     assert.equal(primary.src,ANDROID_LAUNCH_HOME+'launcher-'+profile.primarySize+'.png','Primary icon at density '+density);
     assert.equal(splash.src,ANDROID_LAUNCH_HOME+'splash-'+profile.splashSize+'.png','Splash icon at density '+density);
     assert.notEqual(primary.src,splash.src);
+  }
+});
+
+test('the installed density-13 profile keeps the two icons separate when page and Android density differ',()=>{
+  // The phone's chrome://webapks screenshot confirms this exact profile.
+  // Page zoom can change devicePixelRatio while Android retains its density.
+  const profile=androidLaunchProfile(3.2),manifest=manifests.get(13);
+  assert.equal(profile.quarter,13);
+  for(const androidDensity of [2.625,2.75,3,3.25,3.5,3.75,4]){
+    const primary=chromeIcon(manifest,83*androidDensity,83),splash=chromeIcon(manifest,128*androidDensity,16*androidDensity);
+    assert.equal(primary.src,ANDROID_LAUNCH_HOME+'launcher-'+profile.primarySize+'.png','Launcher at native density '+androidDensity);
+    assert.equal(splash.src,ANDROID_LAUNCH_HOME+'splash-'+profile.splashSize+'.png','Splash at native density '+androidDensity);
+    assert.notEqual(primary.src,splash.src,'A page/native density mismatch must not collapse both roles');
+  }
+});
+
+test('typical phone densities retain separate icon roles with Chrome page zoom',()=>{
+  for(const androidDensity of [2,2.625,2.75,3,3.25,3.5,4,4.5])for(const pageZoom of [0.8,0.875,0.9,1,1.1]){
+    const profile=androidLaunchProfile(androidDensity*pageZoom),manifest=manifests.get(profile.quarter);
+    const primary=chromeIcon(manifest,83*androidDensity,83),splash=chromeIcon(manifest,128*androidDensity,16*androidDensity);
+    assert.equal(primary.src,ANDROID_LAUNCH_HOME+'launcher-'+profile.primarySize+'.png','Launcher at density '+androidDensity+', page zoom '+pageZoom);
+    assert.equal(splash.src,ANDROID_LAUNCH_HOME+'splash-'+profile.splashSize+'.png','Splash at density '+androidDensity+', page zoom '+pageZoom);
   }
 });
 

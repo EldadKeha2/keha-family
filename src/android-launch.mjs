@@ -8,8 +8,14 @@ export const ANDROID_SPLASH_ARTWORK_SCALE=66/108;
 export function androidLaunchProfile(deviceScale=1){
   const quarter=Math.ceil(Math.max(1,Math.min(6,Number(deviceScale)||1))*4);
   const density=quarter/4;
-  // Chromium selects a maskable primary icon at 83dp, and a splash at 128dp.
-  // Rounding density upwards keeps the first bitmap above the primary ideal
-  // and below the splash ideal throughout each quarter-density interval.
-  return {quarter,density,primarySize:Math.ceil(83*density),splashSize:Math.ceil(128*density)};
+  // Chromium uses Android density for its 83dp/128dp requests, whereas the
+  // page's devicePixelRatio can also include browser zoom. Putting the primary
+  // bitmap directly at 83dp lets both requests select the splash when the
+  // Android density is higher. Place it between the two ideals instead.
+  const primaryTarget=Math.sqrt(83*128)*density;
+  const lowestPageDensity=quarter===4?1:(quarter-1)/4;
+  // Keep the primary below the splash request at the bottom of every bucket,
+  // including the first 1.0–1.25 density interval.
+  const primaryLimit=Math.floor(128*lowestPageDensity)-1;
+  return {quarter,density,primarySize:Math.min(Math.ceil(primaryTarget),primaryLimit),splashSize:Math.ceil(128*density)};
 }
