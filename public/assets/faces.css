@@ -13,10 +13,17 @@
 #mediaViewer #mediaStage.photo-swipe-enabled.face-photo-enlarged:not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,img,.face-hit){touch-action:pan-x pan-y pinch-zoom}
 #mediaViewer #mediaStage.photo-swipe-enabled.face-photo-enlarged:is(.has-native-photo-strip,.photo-manual-swipes):not(.face-adjusting):not(.face-resizing),
 #mediaViewer #mediaStage.photo-swipe-enabled.face-photo-enlarged:is(.has-native-photo-strip,.photo-manual-swipes):not(.face-adjusting):not(.face-resizing) :is(.native-photo-strip,.native-photo-pane,.face-photo-scroll,.face-photo-surface,img,.face-hit){touch-action:pinch-zoom}
+/* Phone pinch and pan share the image's own zoom controller. At fit, vertical
+   page scrolling stays native; magnified photos move explicitly on both axes. */
+:is(#mediaViewer,#photoFullscreenRoot) #mediaStage.has-phone-photo-pan:not(.face-adjusting):not(.face-resizing),
+:is(#mediaViewer,#photoFullscreenRoot) #mediaStage.has-phone-photo-pan:not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,img,.face-hit){touch-action:pan-y}
+:is(#mediaViewer,#photoFullscreenRoot) #mediaStage.has-phone-photo-pan.face-photo-enlarged:not(.face-adjusting):not(.face-resizing),
+:is(#mediaViewer,#photoFullscreenRoot) #mediaStage.has-phone-photo-pan.face-photo-enlarged:not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,img,.face-hit){touch-action:none}
 /* Browser pinch zoom leaves the photo's own zoom level at 100%. Release its
    horizontal touch restriction too, so the magnified viewport can be dragged. */
 :is(#mediaViewer,#photoFullscreenRoot) #mediaStage.photo-browser-zoomed:not(.face-adjusting):not(.face-resizing),
 :is(#mediaViewer,#photoFullscreenRoot) #mediaStage.photo-browser-zoomed:not(.face-adjusting):not(.face-resizing) :is(.face-photo-scroll,.face-photo-surface,img,.face-hit){touch-action:pan-x pan-y pinch-zoom}
+:is(#mediaViewer,#photoFullscreenRoot) #mediaStage.photo-browser-zoomed .face-photo-scroll{overscroll-behavior:auto}
 :is(#mediaViewer,#photoUploadEditor) .face-photo-surface img{width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;user-select:none;-webkit-user-drag:none}
 .face-zoom-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;padding:6px 10px;background:#f6f2e7;color:#64714e;border-bottom:1px solid #ddd4bc;font:calc(12px * var(--a11y-text-scale,1))/1.4 var(--sans)}
 .face-zoom-toolbar>div{display:flex;align-items:center;gap:4px;direction:ltr}

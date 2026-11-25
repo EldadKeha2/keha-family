@@ -58,6 +58,47 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
 const first={rect:{x:.5,y:.4,width:.012,height:.016},score:.9},second={rect:{x:.517,y:.4,width:.012,height:.016},score:.9};
 const enlarge=f=>{for(let i=0;i<4;i++)f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');return f.stage._familyFaceContext.scroller;};
 const panMouse=(f,node,type,extra={})=>f.emit(node,type,{target:f.image,pointerType:'mouse',pointerId:71,isPrimary:true,button:0,buttons:type==='pointerup'?0:1,clientX:400,clientY:250,...extra});
+const photoTouch=(f,type,points,changed=points,target=f.image)=>{
+ const touch=([identifier,clientX,clientY])=>({identifier,clientX,clientY,target});
+ return f.emit(type==='touchstart'?f.stage._familyFaceContext.scroller:f.document,type,{target,touches:points.map(touch),changedTouches:changed.map(touch)});
+};
+test('phone drags move the actual zoomed image horizontally, vertically and diagonally without altering face geometry',async()=>{
+ const f=fixture([first]);await f.mount();const scroller=enlarge(f),c=f.stage._familyFaceContext,rect=JSON.stringify(c.faces[0].rect);
+ for(const [dx,dy]of [[-100,0],[60,0],[0,-80],[0,40],[20,20]]){
+  const before={left:scroller.scrollLeft,top:scroller.scrollTop},position=f.image.getBoundingClientRect();
+  photoTouch(f,'touchstart',[[7,180,220]]);const move=photoTouch(f,'touchmove',[[7,180+dx,220+dy]]);
+  assert.equal(move.defaultPrevented,true);assert.equal(scroller.scrollLeft,before.left-dx);assert.equal(scroller.scrollTop,before.top-dy);
+  const after=f.image.getBoundingClientRect();assert.equal(after.left,position.left+dx);assert.equal(after.top,position.top+dy);
+  photoTouch(f,'touchend',[],[[7,180+dx,220+dy]]);assert.equal(c.photoTouch,null);assert.equal(c.zoom,4);assert.equal(JSON.stringify(c.faces[0].rect),rect);
+ }
+ f.faces.clear();
+});
+test('a phone edge drag reverses immediately and its release cannot tag a face, while a fresh tap can',async()=>{
+ const f=fixture([first]);await f.mount();const scroller=enlarge(f),hit=f.find('face-hit-buttons').children[0];let left=0;
+ Object.defineProperty(scroller,'scrollLeft',{get:()=>left,set:value=>{left=Math.max(0,Math.min(1080,value));},configurable:true});
+ photoTouch(f,'touchstart',[[7,180,220]],undefined,hit);photoTouch(f,'touchmove',[[7,280,220]],undefined,hit);assert.equal(left,0);
+ photoTouch(f,'touchmove',[[7,260,220]],undefined,hit);assert.equal(left,20,'Reversing at the edge must move immediately');photoTouch(f,'touchend',[],[[7,260,220]],hit);
+ assert.equal(f.emit(f.stage,'click',{target:hit,detail:1}).defaultPrevented,true);assert.equal(f.find('face-popover face-picker'),undefined);
+ photoTouch(f,'touchstart',[[8,180,220]],undefined,hit);photoTouch(f,'touchend',[],[[8,180,220]],hit);f.emit(f.stage,'click',{target:hit,detail:1});assert.ok(f.find('face-popover face-picker'));f.faces.clear();
+});
+test('phone pinch zooms the image around its fingers, continues as a one-finger pan and keeps zoom buttons usable',async()=>{
+ const f=fixture();await f.mount();const c=f.stage._familyFaceContext,scroller=c.scroller,photo=f.image.getBoundingClientRect(),point={x:180/photo.width,y:(220-photo.top)/photo.height};
+ assert.equal(photoTouch(f,'touchstart',[[1,130,220],[2,230,220]]).defaultPrevented,true);
+ assert.equal(photoTouch(f,'touchmove',[[1,95,220],[2,265,220]]).defaultPrevented,true);assert.equal(c.zoom,1.7);assert.equal(parseFloat(c.surface.style.width),612);
+ let area=f.image.getBoundingClientRect();assert.ok(Math.abs(area.left+point.x*area.width-180)<.001);assert.ok(Math.abs(area.top+point.y*area.height-220)<.001);
+ photoTouch(f,'touchmove',[[1,115,220],[2,285,220]]);area=f.image.getBoundingClientRect();assert.ok(Math.abs(area.left+point.x*area.width-200)<.001,'The same image point follows a moving pinch centre');
+ photoTouch(f,'touchend',[[2,285,220]],[[1,115,220]]);const left=scroller.scrollLeft;photoTouch(f,'touchmove',[[2,265,220]]);assert.equal(scroller.scrollLeft,left+20);photoTouch(f,'touchend',[],[[2,265,220]]);
+ const toolbar=f.find('face-zoom-toolbar');f.emit(toolbar.querySelector('[data-face-zoom-in]'),'click');assert.equal(c.zoom,2);f.emit(toolbar.querySelector('[data-face-zoom-out]'),'click');assert.equal(c.zoom,1.5);f.emit(toolbar.querySelector('[data-face-zoom-reset]'),'click');assert.equal(c.zoom,1);assert.equal(c.photoTouch,null);assert.equal(f.stage.classList.contains('face-photo-enlarged'),false);f.faces.clear();
+});
+test('phone fit scrolling, face editing, cancelled pinches and closed photos never retain a photo pan',async()=>{
+ const f=fixture([first]);await f.mount();let c=f.stage._familyFaceContext;const scroller=c.scroller;
+ photoTouch(f,'touchstart',[[7,180,220]]);assert.equal(photoTouch(f,'touchmove',[[7,180,120]]).defaultPrevented,false);photoTouch(f,'touchend',[],[[7,180,120]]);assert.equal(c.zoom,1);
+ enlarge(f);
+ for(const field of ['saving','reviewSaving','adjust','resizeDrag']){c[field]=true;const left=scroller.scrollLeft;photoTouch(f,'touchstart',[[7,180,220]]);photoTouch(f,'touchmove',[[7,80,220]]);assert.equal(scroller.scrollLeft,left);assert.equal(c.photoTouch,null);c[field]=false;}
+ photoTouch(f,'touchstart',[[7,180,220]]);photoTouch(f,'touchmove',[[7,80,220]]);photoTouch(f,'touchcancel',[],[[7,80,220]]);assert.equal(c.photoTouch,null);assert.equal(f.stage.classList.contains('face-photo-panning'),false);
+ photoTouch(f,'touchstart',[[1,130,220],[2,230,220]]);photoTouch(f,'touchmove',[[1,95,220],[2,265,220]]);photoTouch(f,'touchcancel',[],[[1,95,220],[2,265,220]]);assert.equal(c.photoTouch,null);
+ photoTouch(f,'touchstart',[[7,180,220]]);const left=scroller.scrollLeft;f.faces.clear();assert.equal(f.stage.classList.contains('has-phone-photo-pan'),false);assert.equal(f.stage.classList.contains('face-photo-panning'),false);f.emit(f.document,'touchmove',{target:f.image,touches:[{identifier:7,clientX:80,clientY:220}]});assert.equal(scroller.scrollLeft,left);
+});
 test('zoomed desktop photos pan both pad axes, including diagonal and fractional packets, without changing face geometry',async()=>{
  for(const windows of [false,true]){
   const f=fixture([first],{desktop:true,windows,hoverNone:windows});await f.mount();const scroller=enlarge(f),rect={...f.stage._familyFaceContext.faces[0].rect};

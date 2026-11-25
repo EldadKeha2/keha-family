@@ -175,11 +175,12 @@
     c.resolvePaint?.();
     window.FamilyPhotoNative?.reset(c.stage);
     stopPhotoPan(c);
+    stopPhotoTouch(c);
     cancelPress(c);
     if(current===c)current=null;if(c.stage._familyFaceContext===c)delete c.stage._familyFaceContext;c.events.abort();c.resize?.disconnect();clearTimeout(c.labelTimer);clearAnnotation(c,true);c.popup?.remove();c.layer?.remove();c.labelList?.remove();c.guide?.remove();c.status?.remove();
     if(preserveControls&&!c.adapter){releaseControls();retained={stage:c.stage,dialog:c.dialog,reviewLabel:c.reviewLabel,zoomEnabled:c.zoomEnabled,controls:Object.fromEntries([...controlRoots,'regionsText','reviewText'].map(key=>[key,c[key]]))};}
     else for(const key of controlRoots)c[key]?.remove();
-    c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom','face-label-list-active','face-photo-enlarged');window.FamilyPhotoViewerLayout?.faceControls(null,c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
+    c.scroller?.replaceWith(c.image);c.stage.classList.remove('has-face-layer','face-adjusting','face-resizing','has-face-zoom','has-phone-photo-pan','face-label-list-active','face-photo-enlarged');window.FamilyPhotoViewerLayout?.faceControls(null,c);window.dispatchEvent(new CustomEvent('family-face-viewer',{detail:{active:false}}));
   }
   function clear({preserveControls=false,item=null}={}){
     if(current)dispose(current,{preserveControls});
@@ -303,8 +304,8 @@
       Object.assign(line.style,{left:x+'px',top:(y-.75)+'px',width:Math.hypot(dx,dy)+'px',transform:'rotate('+Math.atan2(dy,dx)+'rad)'});
     }
   }
-  function canPanPhoto(c,target){
-    if(!live(c)||!desktopResize()||!(c.zoom>1)||c.saving||c.reviewSaving||c.adjust||c.resizeDrag||c.popup?.classList.contains('face-picker')||(c.adapter&&!c.adapter.enabled())||!c.scroller.contains(target))return false;
+  function canPanPhoto(c,target,{fitted=false}={}){
+    if(!live(c)||!fitted&&!(c.zoom>1)||c.saving||c.reviewSaving||c.adjust||c.resizeDrag||c.popup?.classList.contains('face-picker')||(c.adapter&&!c.adapter.enabled())||!c.scroller.contains(target))return false;
     const control=target.closest?.('a,input,textarea,select,button,[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"],[role="textbox"],.face-popover,.face-visible-label,.face-label-list,.face-adjust-guide,[data-face-handle]');
     return !control||control.matches('.face-hit');
   }
@@ -315,7 +316,7 @@
   function setupPhotoPan(c){
     const options={signal:c.events.signal},capture={...options,capture:true,passive:false};
     c.scroller.addEventListener('wheel',event=>{
-      if(event.defaultPrevented||event.cancelable===false||event.ctrlKey||event.metaKey||event.altKey||!canPanPhoto(c,event.target))return;
+      if(event.defaultPrevented||!desktopResize()||event.cancelable===false||event.ctrlKey||event.metaKey||event.altKey||!canPanPhoto(c,event.target))return;
       const unit=event.deltaMode===1?16:event.deltaMode===2?c.scroller.clientHeight:1;
       const x=(event.deltaX||event.shiftKey&&event.deltaY||0)*unit,y=(event.shiftKey&&!event.deltaX?0:event.deltaY||0)*unit;
       if(!Number.isFinite(x)||!Number.isFinite(y)||!x&&!y)return;
@@ -325,7 +326,7 @@
     c.scroller.addEventListener('pointerdown',event=>{
       // Arm without capturing or cancelling a click: face buttons retain their
       // exact target until the mouse actually starts dragging the photograph.
-      if(event.defaultPrevented||event.pointerType!=='mouse'||event.sourceCapabilities?.firesTouchEvents||event.isPrimary===false||event.button!==0||event.ctrlKey||event.metaKey||event.altKey||!canPanPhoto(c,event.target))return;
+      if(event.defaultPrevented||!desktopResize()||event.pointerType!=='mouse'||event.sourceCapabilities?.firesTouchEvents||event.isPrimary===false||event.button!==0||event.ctrlKey||event.metaKey||event.altKey||!canPanPhoto(c,event.target))return;
       stopPhotoPan(c);c.panClickUntil=0;
       c.photoPan={id:event.pointerId,target:event.target,x:event.clientX,y:event.clientY,left:c.scroller.scrollLeft,top:c.scroller.scrollTop,moved:false};
     },capture);
@@ -354,15 +355,60 @@
     },{...options,capture:true});
     window.addEventListener('blur',()=>stopPhotoPan(c),options);
   }
+  function stopPhotoTouch(c){c.photoTouch=null;c.stage.classList.remove('face-photo-panning');}
+  function setupPhotoTouch(c){
+    if(desktopResize())return;
+    c.stage.classList.add('has-phone-photo-pan');
+    const options={signal:c.events.signal},capture={...options,capture:true,passive:false};
+    const pan=touch=>({type:'pan',id:touch.identifier,x:touch.clientX,y:touch.clientY,lastX:touch.clientX,lastY:touch.clientY,moved:false});
+    const pair=touches=>{const [a,b]=touches;return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2,distance:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)};};
+    c.scroller.addEventListener('touchstart',event=>{
+      if(!canPanPhoto(c,event.target,{fitted:true})){stopPhotoTouch(c);return;}
+      if(event.touches.length===2){
+        const point=pair(event.touches),photo=imageArea(c);if(!point.distance||!photo.width||!photo.height)return;
+        if(event.cancelable)event.preventDefault();cancelPress(c);closePopup(c);
+        c.photoTouch={type:'pinch',distance:point.distance,zoom:c.zoom,point:{x:(point.x-photo.x)/photo.width,y:(point.y-photo.y)/photo.height}};c.panClickUntil=Date.now()+700;
+      }else if(event.touches.length===1){c.panClickUntil=0;c.photoTouch=c.zoom>1?pan(event.touches[0]):null;}
+      else stopPhotoTouch(c);
+    },capture);
+    document.addEventListener('touchmove',event=>{
+      const g=c.photoTouch;if(!g)return;
+      if(!canPanPhoto(c,event.target,{fitted:true})){stopPhotoTouch(c);return;}
+      if(g.type==='pinch'){
+        if(event.touches.length!==2){stopPhotoTouch(c);return;}
+        if(event.cancelable)event.preventDefault();const point=pair(event.touches);
+        setZoom(c,Math.max(1,Math.min(8,g.zoom*point.distance/g.distance)),{anchor:point,point:g.point,touch:true});c.panClickUntil=Date.now()+700;return;
+      }
+      if(event.touches.length!==1){stopPhotoTouch(c);return;}
+      const touch=event.touches[0];if(touch.identifier!==g.id)return;
+      if(!g.moved){
+        if(Math.hypot(touch.clientX-g.x,touch.clientY-g.y)<5)return;
+        g.moved=true;cancelPress(c);closePopup(c);clearHoverLabel(c);c.stage.classList.add('face-photo-panning');
+      }
+      if(event.cancelable)event.preventDefault();c.panClickUntil=Date.now()+700;
+      // Update the real scroll offsets on every move, also after a direction
+      // reversal at a clamped edge. Never hand this stroke to album navigation.
+      c.scroller.scrollLeft-=touch.clientX-g.lastX;c.scroller.scrollTop-=touch.clientY-g.lastY;g.lastX=touch.clientX;g.lastY=touch.clientY;queuePlace(c);
+    },capture);
+    const finish=event=>{
+      const g=c.photoTouch;if(!g)return;
+      if(g.type==='pinch'||g.moved){c.panClickUntil=Date.now()+700;if(event.cancelable)event.preventDefault();}
+      stopPhotoTouch(c);
+      // Lifting one finger after a pinch continues as a pan of this photograph.
+      if(event.type==='touchend'&&event.touches.length===1&&c.zoom>1&&canPanPhoto(c,event.target))c.photoTouch=pan(event.touches[0]);
+    };
+    document.addEventListener('touchend',finish,capture);document.addEventListener('touchcancel',finish,capture);
+    window.addEventListener('blur',()=>stopPhotoTouch(c),options);
+  }
   function fitZoom(c){
     if(!c.surface)return;const maxHeight=(c.dialog.classList.contains('mobile-photo-frame')||c.stage.closest('#photoFullscreenRoot')?c.scroller.clientHeight:parseFloat(getComputedStyle(c.scroller).maxHeight))||innerHeight*.48;
     const scale=Math.min(1,c.scroller.clientWidth/imageWidth(c.image),maxHeight/imageHeight(c.image));
     c.base={width:imageWidth(c.image)*scale,height:imageHeight(c.image)*scale};
     Object.assign(c.surface.style,{width:c.base.width*c.zoom+'px',height:c.base.height*c.zoom+'px'});place(c);
   }
-  function setZoom(c,value){
-    if(c.saving)return;stopPhotoPan(c);const before=imageArea(c),r=c.scroller.getBoundingClientRect(),anchor={x:r.left+c.scroller.clientWidth/2,y:r.top+c.scroller.clientHeight/2};
-    const p={x:(anchor.x-before.x)/before.width,y:(anchor.y-before.y)/before.height};
+  function setZoom(c,value,{anchor=null,point=null,touch=false}={}){
+    if(c.saving)return;stopPhotoPan(c);if(!touch)stopPhotoTouch(c);const before=imageArea(c),r=c.scroller.getBoundingClientRect();anchor||={x:r.left+c.scroller.clientWidth/2,y:r.top+c.scroller.clientHeight/2};
+    const p=point||{x:(anchor.x-before.x)/before.width,y:(anchor.y-before.y)/before.height};
     closePopup(c);c.zoom=value;fitZoom(c);const after=imageArea(c);
     c.scroller.scrollLeft+=after.x+p.x*after.width-anchor.x;c.scroller.scrollTop+=after.y+p.y*after.height-anchor.y;
     c.stage.classList.toggle('face-photo-enlarged',value>1);
@@ -384,8 +430,8 @@
       c.toolbar.insertBefore(c.regionsButton,c.toolbar.firstChild);c.toolbar.append(c.regionsNote);c.stage.before(c.toolbar);
     }
     const levels=[1,1.5,2,3,4,6,8],options={signal:c.events.signal};
-    c.toolbar.querySelector('[data-face-zoom-in]').addEventListener('click',()=>setZoom(c,levels[Math.min(levels.length-1,levels.indexOf(c.zoom)+1)]),options);
-    c.toolbar.querySelector('[data-face-zoom-out]').addEventListener('click',()=>setZoom(c,levels[Math.max(0,levels.indexOf(c.zoom)-1)]),options);
+    c.toolbar.querySelector('[data-face-zoom-in]').addEventListener('click',()=>setZoom(c,levels.find(level=>level>c.zoom+.001)||8),options);
+    c.toolbar.querySelector('[data-face-zoom-out]').addEventListener('click',()=>setZoom(c,levels.findLast(level=>level<c.zoom-.001)||1),options);
     c.toolbar.querySelector('[data-face-zoom-reset]').addEventListener('click',()=>setZoom(c,1),options);
     let padZoomDelta=0,padZoomAt=0;
     c.stage.addEventListener('wheel',event=>{
@@ -407,6 +453,7 @@
     c.scroller.addEventListener('scroll',()=>queuePlace(c),{passive:true,signal:c.events.signal});
     c.scroller.addEventListener('pointerdown',event=>{c.scrollStart={x:c.scroller.scrollLeft,y:c.scroller.scrollTop};},{passive:true,signal:c.events.signal});
     setupPhotoPan(c);
+    setupPhotoTouch(c);
     fitZoom(c);
   }
   function setupRegions(c,on){
