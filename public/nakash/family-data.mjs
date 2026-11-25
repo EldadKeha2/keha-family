@@ -92,11 +92,11 @@ const PEOPLE = [
   ['yael-nir', 'יעל ניר', 'Yael Nir', 'f', 'u-nakash-gonen'],
   ['amit-nir', 'עמית ניר', 'Amit Nir', '', 'u-nakash-amit-nir'],
   ['omer-nir', 'עומר ניר', 'Omer Nir', '', 'u-nakash-omer-nir'],
-  ['ofer-nir', 'עופר ניר', 'Ofer Nir', 'm', 'u-nakash-ofer'],
+  ['ofer-nir', 'איל ניר', 'Eyal Nir', 'm', 'u-nakash-ofer'],
   ['dalit-nir', 'דלית ניר', 'Dalit Nir', 'f', 'u-nakash-dalit'],
   ['baruch-gaz', 'ברוך גז', 'Baruch Gaz', 'm', 'u-nakash-dalit'],
   ['itai-gaz', 'איתי גז', 'Itai Gaz', 'm', 'u-nakash-itai-gaz'],
-  ['yuli-gaz', 'יולי גז', 'Yuli Gaz', '', 'u-nakash-yuli-gaz'],
+  ['yuli-gaz', 'יהלי גז', 'Yahli Gaz', 'f', 'u-nakash-yuli-gaz'],
   ['yossi-nakash', 'יוסי נקאש', 'Yossi Nakash', 'm', 'u-nakash-yossi', [], {notes:'רווק', notesEn:'Single'}],
   ['yona-yaakobi', 'יונה יעקבי', 'Yona Yaakobi', 'f', 'u-nakash-yona', ['יונה נקאש יעקבי']],
   ['david-yaakobi', 'דוד יעקבי', 'David Yaakobi', 'm', 'u-nakash-yona', [], {deceased:true}],
@@ -197,7 +197,7 @@ const UNITS = [
   ['u-nakash-gonen', ['gonen-nir', 'yael-nir'], ['u-nakash-amit-nir', 'u-nakash-omer-nir'], 'u-nakash-doron'],
   ['u-nakash-amit-nir', ['amit-nir'], [], 'u-nakash-gonen'],
   ['u-nakash-omer-nir', ['omer-nir'], [], 'u-nakash-gonen'],
-  // Ofer's spouse and children's names still need clarification from the diagram.
+  // Eyal's spouse and children's names still need clarification from the diagram.
   ['u-nakash-ofer', ['ofer-nir'], [], 'u-nakash-doron'],
   ['u-nakash-dalit', ['dalit-nir', 'baruch-gaz'], ['u-nakash-itai-gaz', 'u-nakash-yuli-gaz'], 'u-nakash-doron', 'former', {
     relationships: [{people:['dalit-nir', 'baruch-gaz'], relationship:'former', children:['u-nakash-itai-gaz', 'u-nakash-yuli-gaz'], label:'גרוש ואבי ילדיה', labelEn:'Ex-husband and father of her children'}],

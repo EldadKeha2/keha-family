@@ -41,15 +41,20 @@ for (const [id, oldName, oldNameEn, name, nameEn, branch, unit, members] of [
   ['aharon-gueta', 'אהרון גואטה', 'Aharon Gueta', 'אריק גואטה', 'Arik Gueta', 'medina', 'u-nakash-yoni', ['yoni-gueta', 'aharon-gueta']],
   ['hen-pazarkar', 'חן פזרקר', 'Hen Pazarkar', 'בן-חן פזרקר', 'Ben-Chen Pazarkar', 'haim', 'u-nakash-mor', ['mor-pazarkar', 'hen-pazarkar']],
   ['zecharia-nakash', 'זכריה נקאש', 'Zecharia Nakash', 'זכריה (יחיא) נקאש', 'Zecharia (Yihya) Nakash', 'yehuda', 'u-nakash-root', ['margalit-nakash', 'zecharia-nakash']],
+  ['ofer-nir', 'עופר ניר', 'Ofer Nir', 'איל ניר', 'Eyal Nir', 'haim', 'u-nakash-ofer', ['ofer-nir']],
+  ['yuli-gaz', 'יולי גז', 'Yuli Gaz', 'יהלי גז', 'Yahli Gaz', 'haim', 'u-nakash-yuli-gaz', ['yuli-gaz']],
 ]) test(nameEn+' replaces the retired name on the same shared profile without losing its details or portrait',async()=>{
   const f=fixture();try{
     f.database.prepare('INSERT INTO people (id,data) VALUES (?,?)').run(id,JSON.stringify({id,name:oldName,nameEn:oldNameEn,firstName:oldName.split(' ')[0],lastName:oldName.split(' ').slice(1).join(' '),placeholder:true,extra:true,birthday:'2.3.1970',about:'פרטים קיימים',profileId:null,revision:'old-placeholder'}));
     f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-confirmed-names-2026-11-20-v4','done');
+    if (['ofer-nir','yuli-gaz'].includes(id)) f.database.prepare('INSERT INTO meta (id,value) VALUES (?,?)').run('nakash-confirmed-names-2026-11-21-v5','done');
     const uploaded=await f.json('/api/people/'+id+'/photos?filename=portrait.jpg',{method:'POST',body:photo});
     const page=await f.json(f.site(branch,'people/'+id+'/page'));
     assert.equal(page.person.id,id);
     assert.equal(page.person.name,name);
     assert.equal(page.person.nameEn,nameEn);
+    if (id==='ofer-nir') assert.equal(page.person.gender,'m');
+    if (id==='yuli-gaz') assert.equal(page.person.gender,'f');
     assert.equal(page.person.firstName,name.split(' ')[0]);
     assert.equal(page.person.lastName,name.split(' ').slice(1).join(' '));
     if(id==='zecharia-nakash')for(const query of ['יחיא נקאש','זכריה נקאש','Yihya Nakash'])assert.equal(suggestPeople([page.person],query)[0]?.id,id);

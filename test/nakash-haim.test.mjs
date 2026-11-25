@@ -36,7 +36,7 @@ test('Mor belongs to Avner and Yafa, his former wife; Rivka parents only Eliya a
   }
 });
 
-test('Dalit and Baruch remain former partners and both parent Itai and Yuli', () => {
+test('Dalit and Baruch remain former partners and both parent Itai and Yahli', () => {
   assert.deepEqual(relatives('dalit-nir').partners, []);
   assert.deepEqual(relatives('dalit-nir').formerPartners, ['baruch-gaz']);
   for (const id of ['itai-gaz', 'yuli-gaz']) assert.deepEqual(relatives(id).parents, ['dalit-nir', 'baruch-gaz']);
