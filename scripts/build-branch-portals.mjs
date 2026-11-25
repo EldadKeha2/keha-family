@@ -11,7 +11,7 @@ const publicRoot=fileURLToPath(new URL('../public/',import.meta.url));
 const medallion=await readFile(join(publicRoot,'keha-extended/shlomo/brand.svg'),'utf8');
 const appIcon=await readFile(join(publicRoot,'assets/app-icons/icon.svg'),'utf8');
 const existingApps=[
-  {id:'original',home:'/',color:'#536641',backgroundColor:'#f7f3e9',icons:'/assets/app-icons/launch-v3/',iconVersion:'family-launch-v3'},
+  {id:'original',home:'/',color:'#536641',backgroundColor:'#f7f3e9',icons:'/assets/app-icons/launch-v4/',iconVersion:'family-launch-v4'},
   {id:'extended',home:EXTENDED_HOME,color:EXTENDED_COLOR,icons:EXTENDED_HOME},
   {id:'shlomo',home:SHLOMO_HOME,color:SHLOMO_COLOR,icons:SHLOMO_HOME},
 ];
@@ -28,8 +28,10 @@ for(const portal of [...Object.values(BRANCH_PORTALS),...existingApps]){
   const emblem=Buffer.from(portal.id==='original'?appIcon:appIcon.replaceAll('#f7f3e9',portal.color).replaceAll('#eef0e2','#fbf8ef').replaceAll('#87632f',portal.color).replaceAll('#52684c',portal.color).replaceAll('#c4b17f',portal.color));
   const icon=size=>sharp(emblem,{density:144}).resize(size,size).png();
   const canvas=(width,height)=>sharp({create:{width,height,channels:3,background:backgroundColor}});
-  for(const size of [180,192,512])await icon(size).toFile(join(output,'icon-'+size+'.png'));
-  await canvas(512,512).composite([{input:await icon(400).toBuffer(),gravity:'centre'}]).png().toFile(join(output,'maskable-512.png'));
+  const paddedIcon=async size=>canvas(size,size).composite([{input:await icon(Math.round(size*400/512)).toBuffer(),gravity:'centre'}]).png();
+  // Keep the original family's artwork at the same scale across native launch icon choices.
+  for(const size of [180,192,512])await (portal.id==='original'?await paddedIcon(size):icon(size)).toFile(join(output,'icon-'+size+'.png'));
+  await (await paddedIcon(512)).toFile(join(output,'maskable-512.png'));
   const badges=new Map();
   for(const {width,height,scale,href} of existing?[]:appleLaunchImages(portal.id)){
     if(!badges.has(scale))badges.set(scale,await icon(112*scale).toBuffer());
