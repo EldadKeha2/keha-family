@@ -193,6 +193,33 @@ test('finishing a failed face save retains the editor until a successful retry',
  await f.mount('retry-fullscreen');f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});const panel=f.find('face-popover face-picker'),host=panel.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];await new Promise(resolve=>setImmediate(resolve));
  f.emit(option,'click');assert.equal(await f.faces.finish(f.stage),false);assert.equal(f.find('face-popover face-picker'),panel);fail=false;f.emit(option,'click');assert.equal(await f.faces.finish(f.stage),true);f.faces.clear();
 });
+test('Next face skips an unsubmitted search, includes named faces and wraps within every photo album on phone and desktop',async()=>{
+ for(const desktop of [false,true])for(const english of [false,true])for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
+  const named={...first,id:'named',personId:'yona',person:{id:'yona',name:'יונה'}},f=fixture([second],{desktop});let writes=0;
+  f.window.FamilyI18n.isEnglish=english;f.window.FamilyI18n.fetch=async(_path,options)=>{if(options?.method==='POST')writes++;return Response.json({faces:[named]});};
+  await f.mount('next-'+scope,{}, {scope});const c=f.stage._familyFaceContext,ids=c.faces.map(face=>face.id);f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});
+  for(let i=1;i<=ids.length;i++){
+   const panel=f.find('face-popover face-picker'),input=panel.querySelector('input'),button=f.find('face-next-button');input.value='Unselected search';
+   assert.equal(button.textContent,english?'Next face':'לפרצוף הבא');assert.equal(button.parentNode,panel.querySelector('.face-picker-actions'));assert.doesNotMatch(panel.innerHTML,/data-face-adjust/);assert.equal(button.disabled,false);assert.equal(f.emit(button,'pointerdown').defaultPrevented,true);
+   f.emit(button,'click');await new Promise(resolve=>setImmediate(resolve));
+   const next=f.find('face-popover face-picker');assert.notEqual(next,panel);assert.equal(c.active.id,ids[i%ids.length]);assert.equal(f.document.activeElement,next.querySelector('input'));assert.notEqual(next.querySelector('input').value,'Unselected search');
+  }
+  assert.equal(writes,0);assert.equal(c.item.id,'next-'+scope);assert.equal(c.saved[0].person.name,'יונה');f.faces.clear();
+ }
+});
+test('Next face reveals an offscreen face at the same zoom and blocks stale buttons and pending saves',async()=>{
+ const regions=[{rect:{x:.05,y:.05,width:.08,height:.1},score:.95},{rect:{x:.87,y:.85,width:.08,height:.1},score:.95}],f=fixture(regions);await f.mount();const scroller=enlarge(f),c=f.stage._familyFaceContext;
+ f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});const firstId=c.active.id,button=f.find('face-next-button'),left=scroller.scrollLeft,top=scroller.scrollTop;
+ c.saving=true;f.emit(button,'click');assert.equal(c.active.id,firstId);c.saving=false;f.emit(button,'click');assert.notEqual(c.active.id,firstId);assert.ok(scroller.scrollLeft>left);assert.ok(scroller.scrollTop>top);assert.equal(c.zoom,4);
+ const selected=c.active.id;f.emit(button,'click');assert.equal(c.active.id,selected,'The removed picker cannot advance a newer selection');f.faces.clear();f.emit(button,'click');assert.equal(f.stage._familyFaceContext,undefined);
+});
+test('Next face becomes available when another face is detected and upload skipping never changes draft labels',async()=>{
+ const f=fixture([first]);await f.mount();f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});const button=f.find('face-next-button'),id=f.stage._familyFaceContext.active.id;
+ assert.equal(button.disabled,true);f.emit(button,'click');assert.equal(f.stage._familyFaceContext.active.id,id);f.progress([first,second]);assert.equal(button.disabled,false);f.emit(button,'click');assert.notEqual(f.stage._familyFaceContext.active.id,id);f.faces.clear();
+ const upload=fixture([first,second]),draft={key:'next-upload',rotation:0,faceTags:[],facesComplete:false},adapter=createUploadFaceAdapter(draft,{findPeople:async()=>[],getPerson:()=>null});adapter.enabled=()=>true;
+ upload.window.FamilyI18n.fetch=async()=>{throw Error('Upload skipping cannot call the media API');};await upload.mount(draft.key,{adapter,zoom:false});upload.emit(upload.stage,'click',{target:upload.find('face-hit-buttons').children[0],detail:0});const current=upload.stage._familyFaceContext.active.id;
+ upload.emit(upload.find('face-next-button'),'click');assert.notEqual(upload.stage._familyFaceContext.active.id,current);assert.equal(draft.faceTags.length,0);assert.equal(draft.facesComplete,false);upload.faces.clear();
+});
 test('desktop Tab starts after selecting a face, wraps both ways and focuses the next face search in every album',async()=>{
  for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
   const person={id:'yona',name:'יונה'},named={...first,id:'named',personId:person.id,person},f=fixture([second],{desktop:true});
@@ -265,7 +292,7 @@ test('Tab and automatic tagging pan a zoomed photo to distant faces while keepin
 test('Tab leaves unrelated fields, editing controls and modified keys alone, and selection ends on outside focus or another photo',async()=>{
  const f=fixture([first,second],{desktop:true});await f.mount('tab-guards');const hits=()=>f.find('face-hit-buttons').children,select=()=>f.emit(f.stage,'click',{target:hits()[0],detail:0}),press=properties=>f.emit(f.document,'keydown',{key:'Tab',target:f.document.activeElement,...properties});select();
  const panel=f.find('face-popover face-picker'),outside=f.document.createElement('input');f.dialog.append(outside);
- for(const properties of [{ctrlKey:true},{metaKey:true},{altKey:true},{isComposing:true},{target:outside},{target:panel.querySelector('[data-face-adjust]')},{target:panel.querySelector('[data-face-close]')}])assert.equal(press(properties).defaultPrevented,false);
+ for(const properties of [{ctrlKey:true},{metaKey:true},{altKey:true},{isComposing:true},{target:outside},{target:f.find('face-next-button')},{target:panel.querySelector('[data-face-close]')}])assert.equal(press(properties).defaultPrevented,false);
  const other=f.document.createElement('dialog');other.open=true;f.document.body.append(other);assert.equal(press({target:other}).defaultPrevented,false);other.remove();
  f.emit(f.document,'focusin',{target:outside});assert.equal(press({target:f.stage}).defaultPrevented,false);assert.equal(hits().some(node=>node.classList.contains('face-tab-current')),false);
  select();f.emit(f.document,'pointerdown',{target:outside});assert.equal(press({target:f.stage}).defaultPrevented,false);
@@ -995,7 +1022,7 @@ test('backslash leaves unrelated typing, modified keys, hidden controls, other d
  const other=f.document.createElement('dialog'),otherField=f.document.createElement('div');other.open=true;other.append(otherField);f.document.body.append(other);
  assert.equal(press({target:otherField}).defaultPrevented,false);f.document.activeElement=otherField;assert.equal(press({target:f.document.body}).defaultPrevented,false);f.document.activeElement=null;assert.equal(press({target:f.document.body}).defaultPrevented,false);other.remove();
  const openPicker=()=>{const r=f.image.getBoundingClientRect();f.emit(f.stage,'click',{detail:1,target:f.stage,clientX:r.left+r.width/2,clientY:r.top+r.height/2});};openPicker();assert.ok(f.find('face-popover face-picker'));
- f.emit(f.find('face-popover face-picker').querySelector('[data-face-adjust]'),'click');assert.equal(press().defaultPrevented,false);f.faces.dismiss();await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,0);
+ const area=f.image.getBoundingClientRect(),handle=f.find('face-selection').children.find(node=>node.dataset.faceHandle==='se');f.emit(f.stage,'pointerdown',{target:handle,pointerId:1,pointerType:'mouse',button:0,clientX:area.left+area.width*.6,clientY:area.top+area.height*.6});assert.equal(press().defaultPrevented,false);f.faces.dismiss();await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,0);
  assert.equal(press({target:f.document.body}).defaultPrevented,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);f.faces.clear();
  const absent=fixture([],{desktop:true});await absent.mount('native-photo',{}, {scope:'photos',collections:['photos']});assert.equal(absent.find('face-review-button'),undefined);assert.equal(absent.emit(absent.document,'keydown',{key:'\\',target:absent.stage}).defaultPrevented,false);absent.faces.clear();
 });

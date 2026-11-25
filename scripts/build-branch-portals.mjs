@@ -11,12 +11,12 @@ const publicRoot=fileURLToPath(new URL('../public/',import.meta.url));
 const medallion=await readFile(join(publicRoot,'keha-extended/shlomo/brand.svg'),'utf8');
 const appIcon=await readFile(join(publicRoot,'assets/app-icons/icon.svg'),'utf8');
 const existingApps=[
-  {id:'original',home:'/',color:'#536641',icons:'/assets/app-icons/launch-v2/'},
+  {id:'original',home:'/',color:'#536641',backgroundColor:'#f7f3e9',icons:'/assets/app-icons/launch-v3/',iconVersion:'family-launch-v3'},
   {id:'extended',home:EXTENDED_HOME,color:EXTENDED_COLOR,icons:EXTENDED_HOME},
   {id:'shlomo',home:SHLOMO_HOME,color:SHLOMO_COLOR,icons:SHLOMO_HOME},
 ];
 for(const portal of [...Object.values(BRANCH_PORTALS),...existingApps]){
-  const existing=existingApps.includes(portal),iconHome=portal.icons||portal.home;
+  const existing=existingApps.includes(portal),iconHome=portal.icons||portal.home,backgroundColor=portal.backgroundColor||portal.color,iconVersion=portal.iconVersion||'family-launch-v2';
   const output=join(publicRoot,iconHome),launch=join(publicRoot,launchAssets(portal.id));
   await mkdir(output,{recursive:true});await mkdir(launch,{recursive:true});
   if(portal.home.startsWith(EXTENDED_HOME) && portal.home !== EXTENDED_HOME){
@@ -25,9 +25,9 @@ for(const portal of [...Object.values(BRANCH_PORTALS),...existingApps]){
     await copyFile(join(publicRoot,EXTENDED_HOME,'name-origin/index.html'),join(article,'index.html'));
   }
   if(!existing)await writeFile(join(output,'brand.svg'),medallion.replaceAll('#536641',portal.color).replaceAll('#79806c',portal.color));
-  const emblem=Buffer.from(appIcon.replaceAll('#f7f3e9',portal.color).replaceAll('#eef0e2','#fbf8ef').replaceAll('#87632f',portal.color).replaceAll('#52684c',portal.color).replaceAll('#c4b17f',portal.color));
+  const emblem=Buffer.from(portal.id==='original'?appIcon:appIcon.replaceAll('#f7f3e9',portal.color).replaceAll('#eef0e2','#fbf8ef').replaceAll('#87632f',portal.color).replaceAll('#52684c',portal.color).replaceAll('#c4b17f',portal.color));
   const icon=size=>sharp(emblem,{density:144}).resize(size,size).png();
-  const canvas=(width,height)=>sharp({create:{width,height,channels:3,background:portal.color}});
+  const canvas=(width,height)=>sharp({create:{width,height,channels:3,background:backgroundColor}});
   for(const size of [180,192,512])await icon(size).toFile(join(output,'icon-'+size+'.png'));
   await canvas(512,512).composite([{input:await icon(400).toBuffer(),gravity:'centre'}]).png().toFile(join(output,'maskable-512.png'));
   const badges=new Map();
@@ -38,8 +38,8 @@ for(const portal of [...Object.values(BRANCH_PORTALS),...existingApps]){
   const manifest=existing?JSON.parse(await readFile(join(publicRoot,portal.home,'manifest.webmanifest'),'utf8')):{id:portal.home,name:portal.name,short_name:portal.shortName,description:portal.tagline,lang:'he',dir:'rtl',
     start_url:portal.home+'?source=homescreen&familyApp='+portal.id+'#home',scope:portal.home,display:'standalone',
     background_color:portal.color,theme_color:portal.color,icons:[192,512].map(size=>({src:portal.home+'icon-'+size+'.png',sizes:size+'x'+size,type:'image/png',purpose:'any'})),prefer_related_applications:false};
-  manifest.background_color=portal.color;
-  manifest.icons=[192,512].map(size=>({src:iconHome+'icon-'+size+'.png?v=family-launch-v2',sizes:size+'x'+size,type:'image/png',purpose:'any'}));
-  manifest.icons.push({src:iconHome+'maskable-512.png?v=family-launch-v2',sizes:'512x512',type:'image/png',purpose:'maskable'});
+  manifest.background_color=backgroundColor;
+  manifest.icons=[192,512].map(size=>({src:iconHome+'icon-'+size+'.png?v='+iconVersion,sizes:size+'x'+size,type:'image/png',purpose:'any'}));
+  manifest.icons.push({src:iconHome+'maskable-512.png?v='+iconVersion,sizes:'512x512',type:'image/png',purpose:'maskable'});
   await writeFile(join(publicRoot,portal.home,'manifest.webmanifest'),JSON.stringify(manifest,null,2)+'\n');
 }

@@ -45,6 +45,7 @@
     if(c.adapter){c.item={...c.item,...result.item};c.reviewed=Boolean(c.item.faceSummary?.reviewed);}else window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
   }
   function closePopup(c){
+    c.nextFaceButton=null;
     clearHoverLabel(c);
     for(const button of c.buttons?.children||[])button.classList.remove('face-editor-active');
     clearTimeout(c.labelTimer);c.labelTimer=null;const popup=c.popup;c.popup=null;c.active=null;popup?.remove();if(c.selection)c.selection.hidden=true;c.adjust=false;c.drag=null;c.resizeDrag=null;c.stage.classList.remove('face-adjusting','face-resizing');if(c.guide)c.guide.hidden=true;
@@ -58,6 +59,7 @@
     return c.tabFaces;
   }
   function paintTabFace(c){
+    updateNextFaceButton(c);
     for(const button of c.buttons?.children||[]){const face=c.faces.find(face=>face.id===button.dataset.faceId);button.classList.toggle('face-tab-current',Boolean(c.tabFace&&face&&sameTabFace(c,face,c.tabFace)));}
     const next=c.queuedFace&&c.faces.find(face=>!face.person&&sameTabFace(c,face,c.queuedFace));
     if(c.queuedFace&&!next)c.queuedFace=null;
@@ -69,6 +71,18 @@
     if(index<0)order.push(face);else order[index]=face;paintTabFace(c);
   }
   function stopTabFaces(c){c.tabFace=null;c.tabFaces=null;c.queuedFace=null;c.shiftFaces=null;paintTabFace(c);}
+  function updateNextFaceButton(c){if(c.nextFaceButton)c.nextFaceButton.disabled=c.saving||c.reviewSaving||!c.active||!c.faces.some(face=>!sameTabFace(c,face,c.active));}
+  function moveNextPickerFace(c,panel){
+    if(!live(c)||c.popup!==panel||!c.active||c.saving||c.reviewSaving||c.adjust||c.resizeDrag||(c.adapter&&!c.adapter.enabled()))return false;
+    const selected=c.active,order=tabFaces(c),index=order.findIndex(face=>sameTabFace(c,face,selected));
+    for(let offset=1;offset<=order.length;offset++){
+      const candidate=order[(index+offset+order.length)%order.length],next=c.faces.find(face=>sameTabFace(c,face,candidate));
+      if(!next||sameTabFace(c,next,selected))continue;
+      c.shiftFaces=null;c.tabFace=next;openPicker(c,next);paintTabFace(c);
+      announce(c,tr('עברנו לפרצוף הבא באותה תמונה.','Moved to the next face in this photo.'));return true;
+    }
+    return false;
+  }
   function focusTabFace(c,face){
     const button=[...c.buttons.children].find(node=>node.dataset.faceId===face.id);
     button?.focus({preventScroll:true});revealFace(c,face);
@@ -92,6 +106,7 @@
     button?.scrollIntoView?.({block:'nearest',inline:'nearest'});
   }
   function refreshPhotoPresentation(c){
+    updateNextFaceButton(c);
     window.FamilyMedia?.refreshPhotoPresentation?.();
     // Rebuilding the navigation strip reparents the photo scroller. Browsers
     // may reset its offsets, so reveal the new selection after that handoff.
@@ -571,7 +586,11 @@
     revealFace(c,face);
     if(c.loadError){c.loadError=false;c.loading=load(c,true).catch(error=>{c.loadError=true;throw error;});c.loading.catch(()=>{});}
     const panel=document.createElement('div');panel.className='face-popover face-picker';panel.style.touchAction='pan-y pinch-zoom';panel.setAttribute('role','dialog');panel.setAttribute('aria-label',tr('תיוג פנים בתמונה','Tag a face in the photo'));panel.dir=I.isEnglish?'ltr':'rtl';
-    panel.innerHTML=`<header><strong>${tr('מי בתמונה?','Who is this?')}</strong><button type="button" data-face-close aria-label="${tr('סגירה','Close')}">×</button></header>${face.person?`<p class="face-current-name" dir="auto">${safe(photoName(face))}</p>`:''}<label class="visually-hidden" for="facePersonSearch">${tr('חיפוש או הוספת שם','Search or add a name')}</label><input id="facePersonSearch" type="search" autocomplete="off" maxlength="120" placeholder="${tr('חפשו או הוסיפו שם…','Search or add a name…')}" aria-controls="facePersonResults" aria-autocomplete="list"><div id="facePersonResults" class="face-person-results" data-face-results role="listbox" aria-label="${tr('שמות לתיוג הפנים','Names for this face')}"></div><p class="face-save-status" data-face-status role="status"></p><div class="face-picker-actions"><button type="button" data-face-adjust>${tr('דיוק אזור הפנים','Adjust face area')}</button>${face.person?`<button type="button" data-face-remove>${tr('הסרת התיוג הזה','Remove this tag')}</button>`:`<button type="button" data-face-ignore>${tr('התעלמות מהזיהוי הזה','Ignore this detection')}</button>`}</div>`;
+    panel.innerHTML=`<header><strong>${tr('מי בתמונה?','Who is this?')}</strong><button type="button" data-face-close aria-label="${tr('סגירה','Close')}">×</button></header>${face.person?`<p class="face-current-name" dir="auto">${safe(photoName(face))}</p>`:''}<label class="visually-hidden" for="facePersonSearch">${tr('חיפוש או הוספת שם','Search or add a name')}</label><input id="facePersonSearch" type="search" autocomplete="off" maxlength="120" placeholder="${tr('חפשו או הוסיפו שם…','Search or add a name…')}" aria-controls="facePersonResults" aria-autocomplete="list"><div id="facePersonResults" class="face-person-results" data-face-results role="listbox" aria-label="${tr('שמות לתיוג הפנים','Names for this face')}"></div><p class="face-save-status" data-face-status role="status"></p><div class="face-picker-actions">${face.person?`<button type="button" data-face-remove>${tr('הסרת התיוג הזה','Remove this tag')}</button>`:`<button type="button" data-face-ignore>${tr('התעלמות מהזיהוי הזה','Ignore this detection')}</button>`}</div>`;
+    const nextButton=c.nextFaceButton=document.createElement('button');nextButton.type='button';nextButton.className='face-next-button';nextButton.setAttribute('data-face-next','');nextButton.textContent=tr('לפרצוף הבא','Next face');nextButton.setAttribute('aria-label',tr('לפרצוף הבא באותה תמונה','Next face in this photo'));
+    nextButton.disabled=!c.faces.some(candidate=>!sameTabFace(c,candidate,face));const actions=panel.querySelector('.face-picker-actions');actions.insertBefore(nextButton,actions.firstChild);
+    // Keep the phone keyboard open until the next face's search takes focus.
+    nextButton.addEventListener('pointerdown',event=>event.preventDefault());nextButton.addEventListener('click',()=>moveNextPickerFace(c,panel));
     if(desktopResize()){
       const hint=document.createElement('p');hint.className='face-tab-help';hint.id='faceTabHelp-'+c.serial;hint.textContent=tr('Tab: לפנים הבאות · Shift+Tab: אחורה · Esc: יציאה','Tab: next face · Shift+Tab: previous · Esc: exit');panel.append(hint);panel.querySelector('input').setAttribute('aria-describedby',hint.id);
     }
@@ -580,7 +599,6 @@
     input.addEventListener('keydown',event=>{if(event.isComposing)return;if(event.key==='Escape'){event.preventDefault();event.stopPropagation();stopTabFaces(c);closePopup(c);}if(event.key==='ArrowDown'){event.preventDefault();panel.querySelector(choices)?.focus();}if(event.key==='Enter'){event.preventDefault();event.stopPropagation();const options=[...panel.querySelectorAll(choices)];if(options.length===1)options[0].click();else options[0]?.focus();}});
     panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();stopTabFaces(c);closePopup(c);}else if(['ArrowDown','ArrowUp'].includes(event.key)&&event.target.matches(choices)){event.preventDefault();const buttons=[...panel.querySelectorAll(choices)],index=buttons.indexOf(event.target);buttons[(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}});
     panel.querySelector('[data-face-close]').addEventListener('click',()=>{stopTabFaces(c);closePopup(c);});
-    panel.querySelector('[data-face-adjust]').addEventListener('click',()=>{clearHoverLabel(c);panel.remove();c.popup=null;c.active={...c.active,rect:{...c.active.rect}};c.adjust=true;c.guide.hidden=false;c.stage.classList.add('face-adjusting');place(c);});
     panel.querySelector('[data-face-remove]')?.addEventListener('click',()=>dismissFace(c));
     panel.querySelector('[data-face-ignore]')?.addEventListener('click',()=>dismissFace(c));
     input.focus({preventScroll:true});results(c,'');
