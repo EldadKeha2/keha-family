@@ -10,8 +10,9 @@ import {SHLOMO_HOME,SHLOMO_COLOR} from '../public/keha-extended/shlomo-data.mjs'
 const publicRoot=fileURLToPath(new URL('../public/',import.meta.url));
 const medallion=await readFile(join(publicRoot,'keha-extended/shlomo/brand.svg'),'utf8');
 const appIcon=await readFile(join(publicRoot,'assets/app-icons/icon.svg'),'utf8');
+// The original app uses the checked-in icons from its initial installation.
+// Keep their artwork, padding and URLs intact instead of regenerating them.
 const existingApps=[
-  {id:'original',home:'/',color:'#536641',backgroundColor:'#f7f3e9',icons:'/assets/app-icons/launch-v4/',iconVersion:'family-launch-v4'},
   {id:'extended',home:EXTENDED_HOME,color:EXTENDED_COLOR,icons:EXTENDED_HOME},
   {id:'shlomo',home:SHLOMO_HOME,color:SHLOMO_COLOR,icons:SHLOMO_HOME},
 ];
@@ -25,12 +26,11 @@ for(const portal of [...Object.values(BRANCH_PORTALS),...existingApps]){
     await copyFile(join(publicRoot,EXTENDED_HOME,'name-origin/index.html'),join(article,'index.html'));
   }
   if(!existing)await writeFile(join(output,'brand.svg'),medallion.replaceAll('#536641',portal.color).replaceAll('#79806c',portal.color));
-  const emblem=Buffer.from(portal.id==='original'?appIcon:appIcon.replaceAll('#f7f3e9',portal.color).replaceAll('#eef0e2','#fbf8ef').replaceAll('#87632f',portal.color).replaceAll('#52684c',portal.color).replaceAll('#c4b17f',portal.color));
+  const emblem=Buffer.from(appIcon.replaceAll('#f7f3e9',portal.color).replaceAll('#eef0e2','#fbf8ef').replaceAll('#87632f',portal.color).replaceAll('#52684c',portal.color).replaceAll('#c4b17f',portal.color));
   const icon=size=>sharp(emblem,{density:144}).resize(size,size).png();
   const canvas=(width,height)=>sharp({create:{width,height,channels:3,background:backgroundColor}});
   const paddedIcon=async size=>canvas(size,size).composite([{input:await icon(Math.round(size*400/512)).toBuffer(),gravity:'centre'}]).png();
-  // Keep the original family's artwork at the same scale across native launch icon choices.
-  for(const size of [180,192,512])await (portal.id==='original'?await paddedIcon(size):icon(size)).toFile(join(output,'icon-'+size+'.png'));
+  for(const size of [180,192,512])await icon(size).toFile(join(output,'icon-'+size+'.png'));
   await (await paddedIcon(512)).toFile(join(output,'maskable-512.png'));
   const badges=new Map();
   for(const {width,height,scale,href} of existing?[]:appleLaunchImages(portal.id)){

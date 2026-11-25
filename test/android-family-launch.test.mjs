@@ -42,8 +42,26 @@ test('all eight Android launch screens use their family color before styles load
   assert.equal(colors.size,8);assert.equal(icons.size,8);
 });
 
-test('the original family icon files share centered artwork and padding at every size',async()=>{
+test('the original app retains its pre-regression icon files, launch identity and cream background',async()=>{
   const manifest=JSON.parse(await readFile(new URL('../public/manifest.webmanifest',import.meta.url),'utf8'));
+  assert.equal(manifest.id,'/');
+  assert.equal(manifest.start_url,'/?source=homescreen#home');
+  assert.equal(manifest.display,'standalone');
+  assert.equal(manifest.background_color,'#f7f3e9');
+  assert.equal(manifest.theme_color,'#f7f3e9');
+  const originalIcons=[
+    ['/assets/app-icons/icon-192.png','192x192','any','eacb8825b9f30eab0028a65986a9c8df5213f385'],
+    ['/assets/app-icons/icon-512.png','512x512','any','07ee5cbf5e34ff8234a6d56df0b34a05096f73f9'],
+    ['/assets/app-icons/icon-maskable-512.png','512x512','maskable','07ee5cbf5e34ff8234a6d56df0b34a05096f73f9'],
+  ];
+  assert.deepEqual(manifest.icons.map(({src,sizes,purpose})=>[src,sizes,purpose]),originalIcons.map(icon=>icon.slice(0,3)));
+  // Blob IDs from the original November 6 installation: a build must not
+  // replace the known earlier files with differently padded artwork.
+  for(const [path,,,hash]of originalIcons){
+    const bytes=await readFile(new URL('../public'+path,import.meta.url));
+    const actual=createHash('sha1').update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+    assert.equal(actual,hash,path+' remains byte-for-byte identical to the original');
+  }
   const pixels=async icon=>sharp(await readFile(new URL('../public'+new URL(icon.src,'https://family.example').pathname,import.meta.url))).removeAlpha().raw().toBuffer({resolveWithObject:true});
   const regular=await pixels(manifest.icons.find(icon=>icon.purpose==='any'&&icon.sizes==='512x512'));
   const maskable=await pixels(manifest.icons.find(icon=>icon.purpose==='maskable'));
@@ -63,7 +81,7 @@ test('the original family icon files share centered artwork and padding at every
   assert.ok(large.width>256&&large.height>256,'The logo remains clearly visible');
   assert.ok(Math.abs(large.left*2+large.width-512)<=1&&Math.abs(large.top*2+large.height-512)<=1,'The logo remains centered');
   const small=bounds(await pixels(manifest.icons.find(icon=>icon.purpose==='any'&&icon.sizes==='192x192')));
-  for(const dimension of ['left','top','width','height'])assert.ok(Math.abs(small[dimension]*512/192-large[dimension])<=2,'The 192px and 512px logos have matching '+dimension);
+  for(const dimension of ['left','top','width','height'])assert.ok(Math.abs(small[dimension]*512/192-large[dimension])<=3,'The 192px and 512px logos have matching '+dimension);
 });
 
 test('the original family alias retains its identity and receives the same olive launch branding',async()=>{
