@@ -1092,6 +1092,7 @@
   const routedBranch=()=>scopedViews&&location.hash.startsWith('#tree/')?location.hash.split('/')[1]:null;
   const activateRoutedBranch=()=>{const branch=routedBranch();const target=branchFor(branch);if(target&&(state.branch!==branch||(state.treeUnit&&state.treeUnit!==target.unit)))selectBranch(branch);};
   renderBranches();renderView();activateRoutedBranch();
+  delete document.body.dataset.initialView;
   if(scopedViews){window.addEventListener('hashchange',activateRoutedBranch);window.addEventListener('popstate',activateRoutedBranch);}
   if(apiEnabled){
     loadFamilyMedia();

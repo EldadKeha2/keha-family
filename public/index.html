@@ -95,6 +95,19 @@
   <script src="assets/family-documents.js?v=document-tags-1" defer></script>
 </head>
 <body>
+  <style id="familyInitialViewStyle">
+    body[data-initial-view="home"] #treeView,body[data-initial-view="home"] #branchBar{display:none!important}
+    body[data-initial-view="home"] #homeView{display:block!important}
+  </style>
+  <script id="familyInitialView">
+    (()=>{
+      const view=location.hash.slice(1).split('/')[0];
+      if(view==='home'||!view&&matchMedia('(max-width:700px)').matches){
+        document.body.dataset.initialView='home';
+        document.body.dataset.activeView='home';
+      }
+    })();
+  </script>
   <a class="a11y-skip" id="skipToContent" href="#mainContent" data-i18n-skip>דילוג לתוכן הראשי</a>
   <div class="edge-ornament edge-right" aria-hidden="true"></div>
   <div class="edge-ornament edge-left" aria-hidden="true"></div>

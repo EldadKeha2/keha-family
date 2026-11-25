@@ -42,12 +42,12 @@ test('all eight Android launch screens use their family color before styles load
   assert.equal(colors.size,8);assert.equal(icons.size,8);
 });
 
-test('the original family logo keeps the same centered footprint across native launch icons',async()=>{
+test('the original family icon files share centered artwork and padding at every size',async()=>{
   const manifest=JSON.parse(await readFile(new URL('../public/manifest.webmanifest',import.meta.url),'utf8'));
   const pixels=async icon=>sharp(await readFile(new URL('../public'+new URL(icon.src,'https://family.example').pathname,import.meta.url))).removeAlpha().raw().toBuffer({resolveWithObject:true});
   const regular=await pixels(manifest.icons.find(icon=>icon.purpose==='any'&&icon.sizes==='512x512'));
   const maskable=await pixels(manifest.icons.find(icon=>icon.purpose==='maskable'));
-  assert.ok(regular.data.equals(maskable.data),'Switching from the launcher icon to the splash icon must not resize or move the logo');
+  assert.ok(regular.data.equals(maskable.data),'The regular and maskable files contain identical artwork; Android controls their on-screen size');
   const background=manifest.background_color.slice(1).match(/../g).map(value=>parseInt(value,16));
   const bounds=({data,info})=>{
     let left=info.width,top=info.height,right=-1,bottom=-1;

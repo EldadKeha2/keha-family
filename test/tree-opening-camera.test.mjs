@@ -14,6 +14,7 @@ import {toOriginalFamilyData} from '../public/nakash/tree-data-adapter.mjs';
 
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const source=await readFile(new URL('../public/assets/app.js',import.meta.url),'utf8');
+const homeSource=await readFile(new URL('../public/assets/home.js',import.meta.url),'utf8');
 const portalSource=await readFile(new URL('../public/keha-extended/portal-tree.js',import.meta.url),'utf8');
 const hubSource=await readFile(new URL('../public/keha-extended/hub.js',import.meta.url),'utf8');
 const parents={haim:'u-nakash-haim',yehuda:'u-nakash-yehuda',medina:'u-nakash-medina',keha:'u-root',nakash:'u-nakash-root',shlomo:'u-root',zechariah:'u-keha-zechariah','zechariah-tzadok':'u-kehat-zechariah-ben-tzadok',kehat:'u-keha-kehat'};
@@ -37,6 +38,9 @@ function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportH
   window.FamilyDates={age:()=>null,parse:()=>null};
   const location={hash};
   const context=vm.createContext({window,document,location,performance,ResizeObserver,history:{pushState(state,title,next){location.hash=next;}},matchMedia:q=>({matches:phone&&q.includes('700px')}),requestAnimationFrame(callback){frames.push(callback);return frames.length;},cancelAnimationFrame(){},setInterval(){},innerWidth:phone?390:1280,innerHeight:900,CustomEvent:dom.CustomEvent});
+  vm.runInContext(document.getElementById('familyInitialView').textContent,context);
+  const initialView=document.body.dataset.initialView;
+  vm.runInContext(homeSource,context);
   if(portal)vm.runInContext(portalSource,context);
   if(extended)vm.runInContext(hubSource,context);
   vm.runInContext(source,context);
@@ -49,8 +53,33 @@ function fixture(site,{phone=false,text=100,english=false,hash='#tree',viewportH
     const [,x,y,scale]=/^translate\(([-\d.]+)px,([-\d.]+)px\) scale\(([-\d.]+)\)$/.exec(document.getElementById('treeWorld').style.transform).map(Number);
     return {x:x+(parseFloat(node.style.left)+parseFloat(node.style.width)/2)*scale,y:y+(parseFloat(node.style.top)+node.offsetHeight/2)*scale,width:parseFloat(node.style.width)*scale,height:node.offsetHeight*scale,scale};
   };
-  return {document,window,data,flush,bounds,width,height,phone};
+  return {document,window,data,flush,bounds,width,height,phone,initialView};
 }
+
+test('home launches select their first view before deferred scripts, then release it for normal navigation',()=>{
+  for(const site of ['original','haim','yehuda','medina','extended','shlomo','zechariah','zechariah-tzadok','kehat']){
+    for(const phone of [false,true])for(const hash of ['','#home']){
+      const f=fixture(site,{phone,hash}),expected=phone||hash==='#home'?'home':'tree';
+      assert.equal(f.initialView,expected==='home'?'home':undefined);
+      assert.equal(f.window.FamilyApp.getView(),expected);
+      assert.equal(f.document.getElementById('homeView').hidden,expected!=='home');
+      assert.equal(f.document.getElementById('treeView').hidden,expected!=='tree');
+      assert.equal(f.document.body.dataset.initialView,undefined,'Startup rules end after the application renders');
+      f.window.FamilyApp.setView(expected==='home'?'tree':'home');
+      assert.equal(f.document.getElementById('homeView').hidden,expected==='home');
+      assert.equal(f.document.getElementById('treeView').hidden,expected==='tree');
+    }
+  }
+});
+
+test('explicit phone destinations never receive a temporary home screen',()=>{
+  for(const hash of ['#tree','#tree/ruti','#gallery','#stories','#voices','#games']){
+    const f=fixture('original',{phone:true,hash});
+    assert.equal(f.initialView,undefined);
+    assert.equal(f.window.FamilyApp.getView(),hash.slice(1).split('/')[0]);
+    assert.equal(f.document.getElementById('homeView').hidden,true);
+  }
+});
 
 function assertCentred(f,id){
   const bounds=f.bounds(id);
