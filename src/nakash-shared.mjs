@@ -5,6 +5,11 @@ import {uid} from './http.mjs';
 
 const diagramCorrectionKey = 'nakash-confirmed-names-2026-11-21-v5';
 const fatherNameKey = 'nakash-zecharia-yihya-name-2026-11-22-v1';
+const haimChildrenCorrectionKey = 'nakash-haim-children-names-2026-11-25-v1';
+const haimChildrenRetiredNames = {
+  'ofer-nir': ['עופר ניר', 'Ofer Nir'],
+  'yuli-gaz': ['יולי גז', 'Yuli Gaz'],
+};
 const diagramRetiredNames = {
   'doron-nir': ['דורון ניר', 'דורון נקאש', 'Doron Nir', 'Doron Nakash'],
   'alona-shai': ['אלונה', 'אלונה שי', 'אלונה נקאש', 'Alona', 'Alona Shai', 'Alona Nakash'],
@@ -91,6 +96,7 @@ export function initializeSharedNakash(state) {
     const tree = createFamily(family);
     const correctDiagramNames = !state.rows('SELECT id FROM meta WHERE id=?', diagramCorrectionKey).length;
     const updateFatherName = !state.rows('SELECT id FROM meta WHERE id=?', fatherNameKey).length;
+    const correctHaimChildren = !state.rows('SELECT id FROM meta WHERE id=?', haimChildrenCorrectionKey).length;
     // Include historical free-name tags before resolving tree identities.
     for (const row of state.rows('SELECT person_id,data FROM nakash_profiles')) {
       const saved=JSON.parse(row.data);
@@ -122,7 +128,10 @@ export function initializeSharedNakash(state) {
       }
       // Replace retired placeholders and known transcription errors, including
       // historical tag IDs. Preserve all saved media and dates.
-      const retiredNames = correctDiagramNames ? diagramRetiredNames[p.id] || [] : [];
+      const retiredNames = [
+        ...(correctDiagramNames ? diagramRetiredNames[p.id] || [] : []),
+        ...(correctHaimChildren ? haimChildrenRetiredNames[p.id] || [] : []),
+      ];
       let nameChanged = false;
       if (retiredNames.includes(person.name)) {
         person.name = p.name;
@@ -132,6 +141,10 @@ export function initializeSharedNakash(state) {
       }
       if (retiredNames.includes(person.nameEn)) {
         person.nameEn = p.englishName;
+        nameChanged = true;
+      }
+      if (correctHaimChildren && Object.hasOwn(haimChildrenRetiredNames, p.id) && person.gender !== p.gender) {
+        person.gender = p.gender;
         nameChanged = true;
       }
       if (updateFatherName && p.id === 'zecharia-nakash') {
@@ -175,6 +188,7 @@ export function initializeSharedNakash(state) {
     }
     if (correctDiagramNames) state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', diagramCorrectionKey, 'done');
     if (updateFatherName) state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', fatherNameKey, 'done');
+    if (correctHaimChildren) state.sql.exec('INSERT INTO meta (id,value) VALUES (?,?)', haimChildrenCorrectionKey, 'done');
     state.peopleRevision = uid();
     state.peopleCache = null;
   });
