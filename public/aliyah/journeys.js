@@ -63,7 +63,8 @@
     if (caption.hidden) return;
     const time = video.currentTime;
     const cue = cues.find((c) => c[0] <= time && time < c[1]);
-    const line = cue ? cue[lang === 'he' ? 2 : 3] : '';
+    // Some editions print Hebrew directly on an archival card.
+    const line = cue && (lang !== 'he' || cue[5] !== false) ? cue[lang === 'he' ? 2 : 3] : '';
     if (caption.textContent !== line) caption.textContent = line;
     caption.lang = lang;
     caption.dir = lang === 'he' ? 'rtl' : 'ltr';

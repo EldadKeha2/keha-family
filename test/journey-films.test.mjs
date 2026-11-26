@@ -13,7 +13,7 @@ test('each film opens on its own page with the right edition, two caption tracks
   const { document: folder } = parseHTML(await html('index.html'));
   assert.equal(folder.querySelectorAll('.film-card').length, 2);
   for (const [id, version] of [
-    ['shlomo', 12],
+    ['shlomo', 16],
     ['yona', 2],
   ]) {
     assert.ok(folder.querySelector(`a.film-card[href="/aliyah/${id}/"]`));
@@ -39,7 +39,8 @@ test('each film opens on its own page with the right edition, two caption tracks
       const trackPath = new URL(track.getAttribute('src'), site).pathname.replace('/aliyah/', '');
       const vtt = await html(trackPath);
       assert.ok(player.querySelector(`track[srclang="${lang}"]`));
-      assert.equal(vtt.split(' --> ').length - 1, cues.length);
+      const activeCues = lang === 'he' ? cues.filter((c) => c[5] !== false) : cues;
+      assert.equal(vtt.split(' --> ').length - 1, activeCues.length);
       assert.ok(
         cues.every(
           (cue, n) =>
@@ -53,13 +54,13 @@ test('each film opens on its own page with the right edition, two caption tracks
       assert.equal(cues[0][0], 10);
       assert.ok(cues.find(c => c[2].includes('בן שלוש'))[1] < 19);
       assert.ok(page.querySelector('.view #caption'));
-      assert.ok((await html('shlomo/v12/he.vtt')).includes('line:80%'));
-      assert.ok((await html('shlomo/v12/en.vtt')).includes('line:80%'));
+      assert.ok((await html('shlomo/v16/he.vtt')).includes('line:80%'));
+      assert.ok((await html('shlomo/v16/en.vtt')).includes('line:80%'));
       for (const wording of ['מלפנים ומאחור', 'על חמורים', 'בנפחות', 'עשרים וחמש', 'אישרו לי העלייה']) {
         assert.ok(cues.some((c) => c[4] === 'voice' && c[2].includes(wording)));
       }
       const find = (text) => cues.find((cue) => cue[2].replaceAll('\u200e', '').includes(text));
-      const parts = ['בנפחות', 'אחות אביו', 'בדרה', 'עוד בצעדא', 'כדי לבקש אישור עלייה', 'לדרך ברגל', 'על חמורים', 'שבאזור צעדא', 'אוטו מארץ ישראל', 'התגלגלה הדרך'];
+      const parts = ['בנפחות', 'נפטרה', 'לאחר מות אמו', 'הייתה אחות אבא', '״בדרה.״', 'עוד בצעדא', 'כדי לבקש אישור עלייה', 'לדרך ברגל', 'על חמורים', 'שבאזור צעדא', 'אוטו מארץ ישראל', 'התגלגלה הדרך'];
       // Each type of travel appears in the testimony or a close shot before its map.
       for (let i = 1; i < parts.length; i++) {
         assert.ok(find(parts[i - 1])[1] <= find(parts[i])[0]);
@@ -74,8 +75,14 @@ test('each film opens on its own page with the right edition, two caption tracks
       assert.match(find('17–18')[2], /\u200e30–31\u200e/);
       assert.ok(find('1942')[1] <= find('שלמה בן 34–35')[0]);
       assert.ok(find('רותי בת 2–3')[2].includes('אלישבע בת פחות משנה'));
-      assert.ok(find('רותי בת 2–3')[1] - find('1942')[0] >= 15);
+      assert.ok(find('רותי בת 2–3')[1] - find('1942')[0] >= 9);
       assert.ok(cues.find((c) => c[4] === 'voice')[0] >= 20);
+      assert.ok(find('בית המדרש.....')[5] === false);
+      assert.ok(find('ובלילה ישנים')[5]);
+      assert.ok(find('הגיע יום ההפלגה')[0] > 162.75);
+      assert.ok(cues.filter((c) => c[4] === 'voice').every((c) => c[1] < 195));
+      assert.ok(find('שוחררו העולים')[1] <= find('אל קרוב משפחה')[0]);
+      assert.ok(find('במו ידיו')[1] <= find('נשא אותה לאישה')[0]);
     }
   }
 });

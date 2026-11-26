@@ -1,0 +1,426 @@
+[
+ [
+  10,
+  14.22,
+  "בהרי צפון תימן גדל שלמה, ילד קטן לצד אביו, זכריה.",
+  "In the mountains of northern Yemen, little Shlomo grew up beside his father, Zechariah.",
+  "story",
+  true
+ ],
+ [
+  14.38,
+  18.14,
+  "אביו נפטר כששלמה היה כבן שלוש.",
+  "His father died when Shlomo was about three.",
+  "story",
+  true
+ ],
+ [
+  19.12,
+  23.98,
+  "בית המדרש..... כמה שנים אחר כך",
+  "The study house..... A few years later.",
+  "chapter",
+  false
+ ],
+ [
+  25.07,
+  28.85,
+  "״היינו ארבעה ילדים על ספר אחד.״",
+  "“There were four of us children to one book.”",
+  "voice",
+  true
+ ],
+ [
+  29.36,
+  32.73,
+  "״וככה אנחנו יכולים לקרוא בספר…״",
+  "“And this way we could read the book…”",
+  "voice",
+  true
+ ],
+ [
+  32.77,
+  37.41,
+  "מלפנים ומאחור, מימין ומשמאל.",
+  "From the front or the back, from the right or the left.",
+  "voice",
+  true
+ ],
+ [
+  37.46,
+  39.32,
+  "״אנחנו יכולים לקרוא.״",
+  "“We could read it.”",
+  "voice",
+  true
+ ],
+ [
+  39.56,
+  40.97,
+  "בילדותו למד גם מלאכה.",
+  "As a boy, he also learned a trade.",
+  "story",
+  true
+ ],
+ [
+  41.11,
+  43.8,
+  "״היינו עובדים בנפחות.״",
+  "“We worked as blacksmiths.”",
+  "voice",
+  true
+ ],
+ [
+  44.15,
+  47.05,
+  "בסדנה עבדו בברזל ולמדו לכוון את מכת הפטיש.",
+  "In the workshop they shaped iron and learned to guide each hammer blow.",
+  "story",
+  true
+ ],
+ [
+  48.17,
+  52.84,
+  "״ואמא, הייתי כבר אולי בן חמש־עשרה…״",
+  "Kadia, Shlomo’s mother\n“And my mother, I was maybe fifteen …”",
+  "voice",
+  true
+ ],
+ [
+  52.93,
+  54.4,
+  "״נפטרה.״",
+  "“She died.”",
+  "voice",
+  true
+ ],
+ [
+  57.2,
+  63.62,
+  "לאחר מות אמו עבר שלמה להתגורר עם דודתו בדרה. אחותו של זכריה, אביו של שלמה.",
+  "After his mother died, Shlomo went to live with his aunt Badra. She was the sister of his father, Zechariah.",
+  "card",
+  false
+ ],
+ [
+  64.68,
+  66.39,
+  "״הייתה אחות אבא…״",
+  "“There was my father’s sister …”",
+  "voice",
+  true
+ ],
+ [
+  66.7,
+  68.32,
+  "״בדרה.״",
+  "“Badra.”",
+  "voice",
+  true
+ ],
+ [
+  70.94,
+  75.69,
+  "עוד בצעדא רצה שלמה לעלות לארץ ישראל.",
+  "While still in Saada, Shlomo wanted to move to the Land of Israel.",
+  "story",
+  true
+ ],
+ [
+  78.63,
+  82.5,
+  "לדבריו, בגיל תשע־עשרה יצא לעדן כדי לבקש אישור עלייה.",
+  "He recalled setting out for Aden at nineteen to seek an immigration permit.",
+  "story",
+  true
+ ],
+ [
+  82.76,
+  88.03,
+  "שלמה יצא לדרך ברגל. מאחוריו נשארו בתי האבן של ההרים.",
+  "Shlomo set off on foot, leaving the stone houses of the mountains behind.",
+  "story",
+  true
+ ],
+ [
+  88.89,
+  90.03,
+  "״על חמורים.״",
+  "“On donkeys.”",
+  "voice",
+  true
+ ],
+ [
+  90.51,
+  93.45,
+  "״לקח לנו איזה שבועיים.״",
+  "“It took us about two weeks.”",
+  "voice",
+  true
+ ],
+ [
+  95.49,
+  99.45,
+  "״ממקום למקום. הולכים יום…״",
+  "“From place to place. We walk by day …”",
+  "voice",
+  true
+ ],
+ [
+  99.47,
+  101.75,
+  "״ובלילה ישנים.״",
+  "“… and at night we sleep.”",
+  "voice",
+  true
+ ],
+ [
+  110.8,
+  116.4,
+  "מן ההרים שבאזור צעדא ירדה השיירה דרומה.",
+  "From the mountains around Saada, the caravan headed south.",
+  "story",
+  true
+ ],
+ [
+  116.64,
+  122.03,
+  "סדר גודל של ‎600–700‎ ק״מ. לפי עדותו, כשבועיים ברגל ועל חמורים.",
+  "Roughly 600–700 km. He recalled about two weeks on foot and with donkeys.",
+  "story",
+  true
+ ],
+ [
+  123.23,
+  126.31,
+  "בעדן התהפכו היוצרות.",
+  "In Aden, the roles were reversed.",
+  "story",
+  true
+ ],
+ [
+  126.53,
+  130.11,
+  "״אז היה לי ילדים, הייתי מלמד אותם.״",
+  "“I had pupils there. I used to teach them.”",
+  "voice",
+  true
+ ],
+ [
+  132.67,
+  135.03,
+  "״ומקבל משכורת.״",
+  "“And I received a salary.”",
+  "voice",
+  true
+ ],
+ [
+  135.83,
+  142.3,
+  "הילד החרוץ מבית המדרש היה עכשיו למורה בעצמו.",
+  "The boy who had studied so diligently was now a teacher himself.",
+  "story",
+  true
+ ],
+ [
+  144.28,
+  150.35,
+  "בעדן פנה שלמה אל הממונה על העלייה.",
+  "In Aden, Shlomo went to see the official in charge of immigration.",
+  "story",
+  true
+ ],
+ [
+  151.35,
+  155.14,
+  "״בן כמה אתה? אמרתי להם עשרים וחמש.״",
+  "“How old are you? I told them twenty-five.”",
+  "voice",
+  true
+ ],
+ [
+  156.24,
+  158.06,
+  "לפי זיכרונו, היה אז בן עשרים.",
+  "He remembered being twenty at the time.",
+  "story",
+  true
+ ],
+ [
+  159.39,
+  163.27,
+  "״בסוף אישרו לי העלייה.״",
+  "“In the end they approved my aliyah.”",
+  "voice",
+  true
+ ],
+ [
+  164.55,
+  166.82,
+  "כעבור כשנה הגיע יום ההפלגה.",
+  "About a year later came the day of departure.",
+  "story",
+  true
+ ],
+ [
+  166.98,
+  169.29,
+  "״מעדן נסענו באונייה.״",
+  "“From Aden we went by ship.”",
+  "voice",
+  true
+ ],
+ [
+  171.207,
+  176.137,
+  "עד עכשיו נמדדה הדרך בצעדים. מכאן יישא את שלמה הים.",
+  "Until now, the journey was measured in footsteps. From here, the sea would carry Shlomo.",
+  "story",
+  true
+ ],
+ [
+  176.287,
+  180.905,
+  "האונייה שטה צפונה בים סוף, עד לתעלת סואץ.",
+  "The ship sailed north through the Red Sea to the Suez Canal.",
+  "story",
+  true
+ ],
+ [
+  182.065,
+  185.932,
+  "״בפורט סעיד ישבנו יום אחד.״",
+  "“We stayed in Port Said for one day.”",
+  "voice",
+  true
+ ],
+ [
+  187.832,
+  194.682,
+  "״ומשם כבר שלחו לנו אוטו מארץ ישראל.״",
+  "“From there they sent us a car from the Land of Israel.”",
+  "voice",
+  true
+ ],
+ [
+  194.942,
+  199.238,
+  "מעבר לתעלה התגלגלה הדרך לצפון־מזרח, עד תל אביב.",
+  "Beyond the canal, the road turned northeast toward Tel Aviv.",
+  "story",
+  true
+ ],
+ [
+  199.698,
+  205.353,
+  "בתל אביב קיבל שלמה מיטה בבית העולים שברחוב העלייה.",
+  "In Tel Aviv, Shlomo was given a bed at the immigrants’ hostel on HaAliyah Street.",
+  "story",
+  true
+ ],
+ [
+  205.683,
+  209.358,
+  "כעבור יומיים שוחררו העולים, וכל אחד יצא לדרכו.",
+  "After two days the immigrants were free to leave, and each went their own way.",
+  "story",
+  true
+ ],
+ [
+  209.618,
+  214.195,
+  "שלמה נסע לפתח תקווה, אל קרוב משפחה שהתגורר שם.",
+  "Shlomo went to Petah Tikva, where a relative of his lived.",
+  "story",
+  true
+ ],
+ [
+  214.565,
+  218.308,
+  "שלמה נשאר בפתח תקווה ועבד שם.",
+  "Shlomo stayed in Petah Tikva and found work there.",
+  "story",
+  true
+ ],
+ [
+  218.608,
+  222.33,
+  "מפתח תקווה עבר שלמה לרחובות.",
+  "From Petah Tikva, Shlomo moved to Rehovot.",
+  "story",
+  true
+ ],
+ [
+  222.63,
+  226.503,
+  "ברחובות קנו שלמה וזכריה (קהא) טרי מגרש,\nחצי לכל אחד.",
+  "In Rehovot, Shlomo and Zechariah (Keha) Teri bought a plot together, half each.",
+  "story",
+  true
+ ],
+ [
+  226.633,
+  230.585,
+  "הסכום שזכר שלמה היה 40 לירות\n(שווה ערך ל־16 אלף שקלים היום).",
+  "Shlomo recalled a sum of 40 pounds (about 16,000 shekels today, in the family’s estimate).",
+  "price",
+  true
+ ],
+ [
+  230.785,
+  235.198,
+  "את ביתו ברחובות בנה שלמה במו ידיו.",
+  "Shlomo built his home in Rehovot with his own hands.",
+  "story",
+  true
+ ],
+ [
+  236.243,
+  241.348,
+  "לאחר מכן הכיר שלמה את יונה נקאש, ובשנת 1938 נשא אותה לאישה.",
+  "Later Shlomo met Yona Nakash. He married her in 1938.",
+  "card",
+  false
+ ],
+ [
+  241.638,
+  244.028,
+  "בשנת 1938 נישאו יונה נקאש ושלמה קהא.",
+  "In 1938, Yona Nakash and Shlomo Keha married.",
+  "story",
+  false
+ ],
+ [
+  244.078,
+  246.735,
+  "יונה הייתה בת ‎17–18‎ ושלמה היה בן ‎30–31‎.",
+  "Yona was 17–18 and Shlomo was 30–31.",
+  "story",
+  false
+ ],
+ [
+  247.075,
+  250.635,
+  "ארבע שנים אחר כך, ב־1942, יונה ושלמה הצטלמו עם המשפחה.",
+  "Four years later, in 1942, the family posed for this photograph.",
+  "story",
+  false
+ ],
+ [
+  250.705,
+  253.485,
+  "שלמה בן ‎34–35‎ ויונה בת 21.",
+  "Shlomo is 34–35 and Yona is 21.",
+  "story",
+  false
+ ],
+ [
+  253.565,
+  256.902,
+  "רותי בת ‎2–3‎ ואלישבע בת פחות משנה.",
+  "Ruti is 2–3 and Elisheva is under one year old.",
+  "story",
+  false
+ ]
+]
