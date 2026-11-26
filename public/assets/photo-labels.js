@@ -58,8 +58,9 @@ async function flush(entry){
   }
   entry.running=false;render();
 }
-function mount(photo){
+function mount(photo,expanded){
   if(item?.id!==photo.id)open=false;item=photo;
+  if(typeof expanded==='boolean')open=expanded;
   const entry=store(photo);if(!entry.running&&!entry.error)entry.saved=photoLabels(photo.labels);render();
 }
 function init(){
@@ -98,5 +99,5 @@ function init(){
   if(typeof ResizeObserver!=='undefined'){const observer=new ResizeObserver(scheduleFit);observer.observe($('mediaViewer'));observer.observe($('mediaViewer').querySelector('.media-viewer-footer'));}
   const opened=window.FamilyMedia?.current?.();if(opened&&$('mediaViewer').open)mount(opened);
 }
-window.FamilyPhotoLabels={mount};
+window.FamilyPhotoLabels={mount,isExpanded:()=>open};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

@@ -143,7 +143,10 @@
       return;
     }
     portraitRequest++;albumEpoch++;
-    if($('calendarDayDialog').open)$('calendarDayDialog').close();if($('mediaViewer').open)$('mediaViewer').close();if($('personDialog').open)$('personDialog').close();
+    if($('calendarDayDialog').open)$('calendarDayDialog').close();
+    // Back may already have reopened a photo belonging to this person's album.
+    if($('mediaViewer').open&&(sync||!new URLSearchParams(location.search).has('media')))$('mediaViewer').close();
+    if($('personDialog').open)$('personDialog').close();
     if(state.id!==id){biography()?.reset();refreshPending=false;state.partial=false;state.id=id;state.data=null;state.pages={photos:1,videos:1,documents:1};state.albumOptions=window.FamilyPersonGallery?.defaults()||{};window.FamilyPersonGallery?.reset();state.revision=null;state.aboutEditing=false;state.aboutDraft='';state.status='';state.error='';}
     if(sync){const hash='#person/'+encodeURIComponent(id);if(window.FamilyNavigation)window.FamilyNavigation.go(hash);else if(location.hash!==hash)history.pushState(null,'',hash);}
     app().setView('person',false);window.scrollTo({top:0,behavior:'instant'});

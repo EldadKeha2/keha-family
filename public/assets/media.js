@@ -86,8 +86,8 @@
     if(view==='nursery'&&id)return 'nursery:'+id;
     return ['gallery','photos','videos','nostalgia','family-ai'].includes(view)?view:null;
   }
-  function registeredLink(id){
-    const preferred=routeAlbum(),scopes=preferred?[preferred]:[...albums.keys()].filter(scope=>!scope.startsWith('link:'));
+  function registeredLink(id,preferred=routeAlbum()){
+    const scopes=preferred?[preferred]:[...albums.keys()].filter(scope=>!scope.startsWith('link:'));
     for(const scope of scopes){const items=albums.get(scope)||[],index=items.findIndex(item=>identity(item)===id);if(index>=0)return {scope,items,index};}
     return null;
   }
@@ -303,6 +303,18 @@
     if(!window.FamilyNavigation||!item?.id)return;
     const url=new URL(location.href);url.searchParams.set('media',item.id);window.FamilyNavigation.go(url.href,{replace});
   }
+  function openFaceProfile(personId,href,faceView){
+    const viewer=$('mediaViewer'),item=current(),nav=window.FamilyNavigation;
+    if(!viewer.open||!item?.id||new URL(location.href).searchParams.get('media')!==item.id)return;
+    nav.rememberPhoto({
+      id:item.id,scope:state.scope,returnPage:state.returnPage,faceView,scrollTop:viewer.scrollTop,
+      overlays:window.FamilyPhotoDate?.overlays?.(item.id),labelsOpen:window.FamilyPhotoLabels?.isExpanded?.(),
+      fullscreen:window.FamilyPhotoFullscreen?.taggingReturn?.()
+    });
+    if(!nav.go(href))return;
+    // The profile owns the new entry. Closing the viewer must not rewind the source album.
+    state.returnPage=null;app().openPerson(personId);
+  }
   function openFrom(scope,id){const items=albums.get(scope)||[];return open(items,items.findIndex(item=>identity(item)===id||item.file===id),scope);}
   async function step(direction,{native=false,instant=false,queued=false,effect=null}={}){
     if(state.fullscreen&&window.FamilyPhotoFullscreen?.isBlocked?.())return;
@@ -444,17 +456,28 @@
     const href=location.href,id=new URL(href).searchParams.get('media');
     if(!id){restoringLink='';if($('mediaViewer').open)$('mediaViewer').close();return;}
     if($('mediaViewer').open&&state.activeId===id||restoringLink===href)return;
-    const known=registeredLink(id);if(known){open(known.items,known.index,known.scope);return;}
+    const saved=window.FamilyNavigation?.rememberedPhoto?.(),resume=saved?.id===id?saved:null;
+    const reopen=(items,index,scope)=>{
+      open(items,index,scope);
+      if(!resume)return;
+      state.returnPage=resume.returnPage;
+      window.FamilyPhotoDate?.mount(current(),resume.overlays);
+      window.FamilyPhotoLabels?.mount(current(),resume.labelsOpen);
+      $('mediaViewer').scrollTop=resume.scrollTop;
+      if(resume.fullscreen)window.FamilyPhotoFullscreen.enter(resume.fullscreen.backToViewer,resume.faceView);
+      else window.FamilyFaces?.restoreView($('mediaStage'),resume.faceView);
+    };
+    const known=registeredLink(id,resume?.scope);if(known){reopen(known.items,known.index,known.scope);return;}
     if(!/^[a-f0-9]{32}$/.test(id))return;
     restoringLink=href;
     try{
       const response=await I18n.fetch('api/media/'+id+'/view',{cache:'no-store'}),result=await response.json();if(location.href!==href)return;if(!response.ok)throw Error(I18n.error(result.error));
-      const loaded=registeredLink(id),gallery=routeAlbum()==='gallery'?albums.get('gallery'):null;
-      if(loaded)open(loaded.items,loaded.index,loaded.scope);
+      const loaded=registeredLink(id,resume?.scope),gallery=routeAlbum()==='gallery'?albums.get('gallery'):null;
+      if(loaded)reopen(loaded.items,loaded.index,loaded.scope);
       // The gallery can finish first with a random page missing this photo.
       // Retain the requested item beside that page, using its existing total.
-      else if(gallery?.length)open([result.item,...gallery.filter(item=>identity(item)!==id)],0,'gallery');
-      else open([result.item],0,'link:'+result.item.id);
+      else if(gallery?.length)reopen([result.item,...gallery.filter(item=>identity(item)!==id)],0,'gallery');
+      else reopen([result.item],0,'link:'+result.item.id);
     }catch(error){if(location.href===href)app()?.toast(error.message);}finally{if(restoringLink===href)restoringLink='';}
   }
   function fitVideoCaption(expand=false){
@@ -671,7 +694,7 @@
       if(event.key==='ArrowRight'){event.preventDefault();step(1);}
     });
   }
-  window.FamilyMedia={items:scope=>[...(albums.get(scope)||[])],register,controls,open,openFrom,requestDelete,notify,current,refreshPhotoPresentation,photoState,setFullscreen,step,isPhotoBrowsing:()=>Boolean($('mediaViewer')?.open&&current()?.kind==='photo'&&(state.photoLoading||state.paging||zoomPad?.isActive?.()||photoSwipe?.isActive?.()||Date.now()-state.photoActivity<800)),lookup:(scope,id)=>(albums.get(scope)||[]).find(item=>identity(item)===id||item.file===id),isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
+  window.FamilyMedia={items:scope=>[...(albums.get(scope)||[])],register,controls,open,openFrom,openFaceProfile,requestDelete,notify,current,refreshPhotoPresentation,photoState,setFullscreen,step,isPhotoBrowsing:()=>Boolean($('mediaViewer')?.open&&current()?.kind==='photo'&&(state.photoLoading||state.paging||zoomPad?.isActive?.()||photoSwipe?.isActive?.()||Date.now()-state.photoActivity<800)),lookup:(scope,id)=>(albums.get(scope)||[]).find(item=>identity(item)===id||item.file===id),isOpen:scope=>Boolean($('mediaViewer')?.open&&(!scope||state.scope===scope))};
   document.addEventListener('DOMContentLoaded',init);
 })();
 

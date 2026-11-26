@@ -63,14 +63,27 @@
 @media(max-width:760px){body[data-active-view=gallery] .workspace-header .workspace-actions{display:none}.gallery-refine-fields{gap:10px}.gallery-filter-panel{padding:12px}.gallery-filter-field summary{min-height:60px}.gallery-selection-bar{gap:6px}.gallery-selection-bar button{font-size:calc(13px * var(--a11y-text-scale,1));padding:7px 9px}}
 @media(max-width:420px){.gallery-refine-toggle span{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}.gallery-refine-toggle{width:40px;padding:8px}.gallery-selection-count{font-size:calc(13px * var(--a11y-text-scale,1))}}
 
-/* Draw attention to newly opened gallery filters on desktop without moving their contents. */
+.gallery-filter-field summary .gallery-label-icon{display:none}
 @media(min-width:701px){
-  #galleryFilterPanel,.person-gallery-filter{position:relative;padding:20px;border-color:#586d45;border-radius:12px;background:linear-gradient(135deg,#fcfbf4,#f0f2e5);box-shadow:0 4px 14px #48593914,0 0 0 3px #586d4518}
-  #galleryFilterPanel::before,.person-gallery-filter::before{content:'';position:absolute;inset:5px;border:1px solid #586d4540;border-radius:7px;pointer-events:none}
-  #galleryFilterPanel:not([hidden]),.person-gallery-filter:not([hidden]){animation:gallery-filter-open-glow 1.5s ease-in-out 1}
-  @keyframes gallery-filter-open-glow{
-    0%,50%,100%{border-color:#586d45;box-shadow:0 4px 14px #48593914,0 0 0 3px #586d4518}
-    25%,75%{border-color:#40562f;box-shadow:0 4px 14px #48593914,0 0 0 5px #586d4533,0 0 18px #586d4529}
+  #galleryFilterPanel,.person-gallery-filter{
+    padding:19px;
+    border:2px solid #af5453;
+    border-inline-start-width:6px;
+    border-radius:12px;
+    background:linear-gradient(120deg,#fff5ef,#f7ded8);
+    box-shadow:0 3px 12px #7c353324;
   }
+  .gallery-label-field{border:2px solid #872f3b;background:#fff8f5}
+  .gallery-label-field summary{min-height:42px;border-radius:4px;background:#923847;color:white;font-weight:700}
+  .gallery-label-field summary .gallery-label-icon{display:block;order:-1;width:19px;height:19px;transform:none}
+  .gallery-label-field summary:hover,.gallery-label-field[open] summary{background:#762b37;color:white}
+  .gallery-label-field[open] summary{border-color:#872f3b;border-radius:3px 3px 0 0}
+  .gallery-label-field summary:focus-visible{outline:3px solid #682332;outline-offset:3px}
+  .gallery-label-field .gallery-choice-count{color:inherit}
+  .gallery-label-field .gallery-check-option{color:#592d33}
+  .gallery-label-field input[type=checkbox]{accent-color:#923847}
+  .gallery-label-field .gallery-check-option:has(input:checked){background:#f5d9d6;color:#682332;font-weight:700}
+  .gallery-label-field .gallery-check-option:has(input:focus-visible){outline-color:#872f3b}
+  html[data-a11y-contrast] .gallery-label-field summary{background:white}
 }
 

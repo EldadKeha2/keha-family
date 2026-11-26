@@ -128,8 +128,9 @@ function render(){
   window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:item.id,...overlays(item.id)}}));
   window.FamilyPhotoViewerLayout?.sync();
 }
-function mount(photo){
+function mount(photo,savedOverlays){
   if(item?.id!==photo.id){showNames=false;showAges=false;if(inlineDrafts.get(photo.id)?.conflict)inlineDrafts.delete(photo.id);}
+  if(savedOverlays){showNames=savedOverlays.showNames;showAges=savedOverlays.showAges;}
   item=photo;if(!item.takenDate?.year)showAges=false;render();
 }
 function openDate(target=item){

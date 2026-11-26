@@ -103,6 +103,33 @@ test('X, photo paging and browser returns keep the selected tagging category on 
  }
 });
 
+test('Back from a tagged profile restores only its photo entry and preserves the filtered album',async()=>{
+ const f=fixture([photo('a',[{id:'yona'}]),photo('b',[{id:'ruti'}])],{routing:true,phone:true});
+ await f.flush();f.filter('partial');await f.flush();f.open('b');
+ const viewer=f.get('mediaViewer'),view={zoom:3,left:61,top:27,regions:true,faceId:'tag-b'},restored=[];
+ const overlays={showNames:true,showAges:true};
+ f.window.FamilyFaces={clear(){},mount(){},update(){},restoreView:(stage,value)=>restored.push({stage,value})};
+ f.window.FamilyPhotoDate={overlays:()=>overlays,mount(_item,value){if(value)restored.push(value);}};
+ f.window.FamilyPhotoLabels={isExpanded:()=>true,mount(_item,expanded){if(expanded)restored.push(expanded);}};
+ f.window.FamilyApp.openPerson=()=>{viewer.close();f.window.FamilyApp.setView('person',false);};
+ viewer.scrollTop=125;
+ const source=f.browser.location.href;
+ f.window.FamilyMedia.openFaceProfile('ruti','?lang=he#person/ruti',view);
+ assert.equal(f.browser.location.href,'https://test/?lang=he#person/ruti');
+ assert.equal(viewer.open,false);assert.equal(f.window.FamilyNavigation.rememberedPhoto(),undefined);
+ const length=f.browser.history.length;
+ for(let i=0;i<2;i++){
+  f.browser.history.back();await f.flush();assert.equal(f.browser.location.href,source);
+  assert.equal(viewer.open,true);assert.equal(f.window.FamilyMedia.current().id,'b');
+  assert.equal(f.window.FamilyPortal.galleryQuery().filter,'partial');assert.equal(viewer.scrollTop,125);
+  assert.deepEqual(restored.splice(0),[overlays,true,{stage:f.get('mediaStage'),value:view}]);
+  f.browser.history.forward();await f.flush();assert.equal(viewer.open,false);
+  assert.equal(f.browser.history.length,length);
+ }
+ f.browser.history.back();await f.flush();f.close();await f.flush();
+ assert.equal(f.browser.location.hash,'#gallery');assert.equal(viewer.open,false);assert.equal(f.window.FamilyNavigation.rememberedPhoto(),undefined);
+});
+
 test('a first tag moves a photo exclusively to partial after X, where it waits for explicit completion',async()=>{
  const f=fixture();await f.flush();f.filter('untagged');await f.flush();f.open('a');
  const before=f.requests.length,counts=f.filters.map(button=>button.textContent);assert.equal(f.get('mediaViewer').open,true);

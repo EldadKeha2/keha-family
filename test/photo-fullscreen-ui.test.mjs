@@ -209,6 +209,14 @@ test('Tag pauses on the same photo, keeps controls visible and resumes fullscree
   assert.equal(f.find('photo-fullscreen-play').getAttribute('aria-pressed'),'true');assert.equal(f.cleared.length,1);assert.deepEqual(f.presentations,[true,false]);t.mock.timers.tick(3999);assert.equal(f.steps.length,0);t.mock.timers.tick(1);assert.equal(f.media.current().id,'b');f.api.exit();
  }
 });
+test('returning from a profile resumes fullscreen face tagging after the image loads',async()=>{
+ const f=taggingFixture({native:true,mobile:true,loading:true}),view={zoom:2,faceId:'selected'},restored=[];
+ f.window.FamilyFaces.restoreView=(stage,value)=>restored.push({stage,value});
+ assert.equal(f.api.enter(false,view),true);assert.equal(f.api.isTagging(),false);
+ f.load();await f.flush();assert.equal(f.api.isTagging(),true);
+ assert.equal(f.api.taggingReturn().backToViewer,false);assert.deepEqual(restored,[{stage:f.stage,value:view}]);
+ assert.equal(f.nativeCalls.length,0);f.api.exit();
+});
 test('Continue waits for face saving, keeps a failed save open and discards completion after fullscreen closes',async t=>{
  t.mock.timers.enable({apis:['setTimeout']});
  for(const close of [false,true]){

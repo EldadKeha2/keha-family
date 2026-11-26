@@ -545,16 +545,46 @@ test('the upload wizard reuses face picking, frame editing and completion withou
 test('face names open real profiles on desktop and touch; free names and unknown people stay plain text',async()=>{
  for(const desktop of [false,true])for(const kind of ['family','extra','unknown']){
   const f=fixture([],{desktop}),opened=[],person={id:kind==='family'?'yona':'extra-name',name:'יונה <קהא>',extra:kind==='extra'},face={...first,id:'named',personId:person.id,person};
-  f.window.FamilyApp.getPerson=id=>kind==='unknown'?null:person;f.window.FamilyApp.openPerson=id=>opened.push(id);
+  f.window.FamilyApp.getPerson=id=>kind==='unknown'?null:person;
+  f.window.open=(href,target,features)=>opened.push({href,target,features});
+  f.window.FamilyMedia={openFaceProfile:(id,href,view)=>opened.push({id,href,face:view.faceId})};
   f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});await f.mount();
   const hit=f.find('face-hit-buttons').children[0];f.emit(hit,'focus');const bubble=f.find('face-popover face-name');
   assert.match(bubble.innerHTML,/יונה &lt;קהא&gt;/);
   if(kind==='family'){
-   assert.match(bubble.innerHTML,/href="#person\/yona"/);f.emit(bubble.querySelector('[data-face-profile]'),'click',{button:0});assert.deepEqual(opened,['yona']);
-   if(!desktop){f.emit(bubble.querySelector('[data-face-edit]'),'click');assert.ok(f.find('face-popover face-picker'));assert.deepEqual(opened,['yona']);}
+   const href='?lang=he#person/yona',link=bubble.querySelector('[data-face-profile]');
+   assert.match(bubble.innerHTML,/href="\?lang=he#person\/yona"/);
+   assert.equal(new URL(href,'https://family.test/nakash/haim/?media=photo#gallery').href,'https://family.test/nakash/haim/?lang=he#person/yona');
+   assert.equal(f.emit(link,'click',{button:0,ctrlKey:true}).defaultPrevented,false);assert.deepEqual(opened,[]);
+   assert.equal(f.emit(link,'click',{button:0}).defaultPrevented,!desktop);
+   f.emit(f.stage,'click',{target:hit,detail:1});
+   if(desktop){
+    assert.match(bubble.innerHTML,/target="_blank" rel="noopener"/);
+    assert.deepEqual(opened,[{href,target:'_blank',features:'noopener'}]);
+   }else{
+    assert.doesNotMatch(bubble.innerHTML,/target="_blank"/);
+    assert.deepEqual(opened,Array(2).fill({id:'yona',href,face:'named'}));
+   }
+   f.emit(bubble.querySelector('[data-face-edit]'),'click');assert.ok(f.find('face-popover face-picker'));
   }else{assert.doesNotMatch(bubble.innerHTML,/data-face-profile|<a /);assert.deepEqual(opened,[]);}
   f.faces.clear();
  }
+});
+
+test('a phone restores the selected face, tagged regions and zoom position after visiting its profile',async()=>{
+ const f=fixture(),person={id:'ruti',name:'רותי'},face={...first,id:'named',personId:'ruti',person};let saved;
+ f.window.FamilyApp.getPerson=()=>person;
+ f.window.FamilyI18n.fetch=async()=>Response.json({faces:[face]});
+ f.window.FamilyMedia={openFaceProfile:(_id,_href,view)=>{saved=view;}};
+ await f.mount();f.emit(f.find('face-regions-toggle'),'click');
+ const scroll=enlarge(f);scroll.scrollLeft=84;scroll.scrollTop=56;
+ const hit=f.find('face-hit-buttons').children[0];f.emit(f.stage,'click',{target:hit,detail:1,pointerType:'touch'});
+ assert.equal(saved.faceId,'named');assert.equal(saved.regions,true);assert.equal(saved.zoom,4);
+ f.faces.clear();await f.mount();await f.faces.restoreView(f.stage,saved);
+ const c=f.stage._familyFaceContext;
+ assert.equal(c.active.id,face.id);assert.equal(c.showRegions,true);assert.equal(c.zoom,4);
+ assert.equal(c.scroller.scrollLeft,84);assert.equal(c.scroller.scrollTop,56);assert.match(c.popup.innerHTML,/רותי/);
+ f.faces.clear();
 });
 
 test('face information bubbles never expose removal; the editor retains the guarded removal action in every album',async()=>{
@@ -623,8 +653,8 @@ test('all-name and age overlays follow labelled faces, hide unknown ages, reposi
  f.window.FamilyPhotoDate={overlays:()=>state,ageFor:p=>p.id==='yona'?{text:'58',title:'גיל משוער'}:null};
  f.window.FamilyI18n.fetch=async()=>Response.json({faces});await f.mount('all-labels');const host=f.find('face-visible-labels'),visible=()=>host.children.filter(node=>node.classList.contains('face-visible-label'));assert.equal(visible().length,0);
  const toggle=next=>{state=next;f.window.dispatchEvent(new CustomEvent('family-photo-overlays-changed',{detail:{id:'all-labels'}}));};
- toggle({showNames:true,showAges:false});assert.equal(visible().length,2);assert.match(visible()[0].innerHTML,/href="#person\/yona"/);assert.doesNotMatch(visible()[1].innerHTML,/<a /);
- f.emit(visible()[0].querySelector('[data-face-profile]'),'click',{button:0});assert.deepEqual(opened,['yona']);
+ toggle({showNames:true,showAges:false});assert.equal(visible().length,2);assert.match(visible()[0].innerHTML,/href="\?lang=he#person\/yona" target="_blank"/);assert.doesNotMatch(visible()[1].innerHTML,/<a /);
+ const click=f.emit(visible()[0].querySelector('[data-face-profile]'),'click',{button:0});assert.equal(click.defaultPrevented,false);assert.deepEqual(opened,[]);
  toggle({showNames:false,showAges:true});assert.equal(visible().length,1);assert.match(visible()[0].innerHTML,/58/);assert.doesNotMatch(visible()[0].innerHTML,/יונה/);
  const before=parseFloat(visible()[0].style.left);f.emit(f.find('face-zoom-toolbar').querySelector('[data-face-zoom-in]'),'click');assert.ok(parseFloat(visible()[0].style.left)>before);
  toggle({showNames:true,showAges:true});assert.equal(visible().length,2);assert.match(visible()[0].innerHTML,/יונה.*58/);assert.doesNotMatch(visible()[1].innerHTML,/face-visible-age/);

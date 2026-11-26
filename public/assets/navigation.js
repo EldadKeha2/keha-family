@@ -71,6 +71,9 @@
     if(entry()?.previous){history.back();return true;}
     go(fallback,{replace:true});return false;
   }
+  function rememberPhoto(photo){
+    history.replaceState({...history.state,[key]:{...entry(),photo}},'',path(current()));
+  }
   // Plain in-site anchors (for example a memorial portrait) use native hashes.
   // Mark their new entry without adding another step to Back/Forward.
   window.addEventListener('hashchange',event=>{
@@ -79,6 +82,6 @@
     const old=new URL(event.oldURL);
     write(current(),old.origin===location.origin?path(old):null,true);
   });
-  window.FamilyNavigation={go,returnTo,back,gameIds};
+  window.FamilyNavigation={go,returnTo,back,gameIds,rememberPhoto,rememberedPhoto:()=>entry()?.photo};
 })();
 

@@ -10,7 +10,7 @@
   const transitions=['dissolve','zoom-in','zoom-out','drift','rise','curtain','iris'];let transitionBag=[],lastEffect=null,speed=1,effects=false;
   let viewer,stage,root,anchor,bar,play,speedControl,effectsControl,namesControl,agesControl,close,previous,next,counter,caption,status,active=false,playing=false,returnToViewer=true,hadNative=false;
   let showNames=false,showAges=false,albumBlocked=false,labelScale=1;
-  let tagControl,tagTools,tagging=false,tagItem=null,tagSession=0,resuming=false;
+  let tagControl,tagTools,tagging=false,tagItem=null,tagSession=0,resuming=false,pendingTagView=null;
   try{const saved=Number(localStorage.getItem('family-screensaver-label-scale'));if(Number.isFinite(saved)&&saved>=.75&&saved<=2)labelScale=saved;}catch{}
   let timer=null,hideTimer=null,frame=null,paint=0,ready=false,failed=false,wasBusy=false;
   const media=()=>window.FamilyMedia;
@@ -82,7 +82,7 @@
     if(!tagging)return;tagging=false;tagItem=null;tagSession++;resuming=false;
     window.FamilyFaces?.clear();root.classList.remove('photo-fullscreen-tagging');tagTools.hidden=true;
   }
-  function startTagging(){
+  function startTagging(faceView){
     const state=media()?.photoState();
     if(!active||tagging||albumBlocked||state?.busy||!ready||failed||!state?.item?.id||!window.FamilyApp?.apiEnabled||!window.FamilyFaces?.mount)return;
     tagging=true;tagItem=state.item.id;const session=++tagSession;playing=false;cancelAdvance();
@@ -93,6 +93,7 @@
     Promise.resolve(window.FamilyFaces.mount(stage,image,state.item,{popupHost:root,reviewHost:tagTools})).catch(error=>{
       if(active&&tagging&&session===tagSession)status.textContent=error.message||tr('לא ניתן לפתוח כרגע את תיוג הפנים.','Face tagging is temporarily unavailable.');
     });
+    if(faceView)window.FamilyFaces.restoreView(stage,faceView);
   }
   async function resumeTagging(){
     if(!active||!tagging||resuming)return;
@@ -115,7 +116,9 @@
       image.addEventListener('load',resolve,{once:true});image.addEventListener('error',reject,{once:true});
     });
     loaded.then(()=>image.decode?.().catch(()=>{})).then(()=>{
-      if(!active||token!==paint||media().current()!==item)return;ready=true;sync();schedule();
+      if(!active||token!==paint||media().current()!==item)return;ready=true;sync();
+      if(pendingTagView){const view=pendingTagView;pendingTagView=null;if(view.id===item.id)startTagging(view.faceView);}
+      schedule();
     }).catch(()=>{
       if(!active||token!==paint||media().current()!==item)return;
       failed=true;ready=false;
@@ -127,16 +130,17 @@
   }
   function restoreStage(){if(anchor?.parentNode)anchor.replaceWith(stage);anchor=null;root.hidden=true;}
   function leaveNative(){if(document.fullscreenElement===root)Promise.resolve(document.exitFullscreen?.()).catch(()=>{});}
-  function enter(backToViewer=true){
+  function enter(backToViewer=true,faceView=null){
     if(active||!viewer.open||media().current()?.kind!=='photo'||media().photoState().busy)return false;
     returnToViewer=backToViewer;active=true;playing=false;hadNative=false;ready=false;wasBusy=false;albumBlocked=false;root.classList.remove('photo-album-blocked');root.hidden=false;
-    if(!media().setFullscreen(true)){active=false;root.hidden=true;return false;}
+    pendingTagView=faceView?{id:media().current().id,faceView}:null;
+    if(!media().setFullscreen(true)){pendingTagView=null;active=false;root.hidden=true;return false;}
     anchor=document.createComment('fullscreen-photo-position');stage.before(anchor);root.prepend(stage);root.hidden=false;
     window.FamilyScreensaver?.mountFullscreen?.(bar);
     sync();showControls();root.focus({preventScroll:true});
     // A div can request browser fullscreen; a dialog itself cannot. Phones that
     // do not expose that API use the same edge-to-edge viewport presentation.
-    try{const requested=root.requestFullscreen?.();if(requested)Promise.resolve(requested).then(()=>{if(!active)leaveNative();}).catch(()=>{});}catch{}
+    if(!faceView)try{const requested=root.requestFullscreen?.();if(requested)Promise.resolve(requested).then(()=>{if(!active)leaveNative();}).catch(()=>{});}catch{}
     return true;
   }
   function exit(){
@@ -222,6 +226,6 @@
     if(typeof MutationObserver!=='undefined')new MutationObserver(records=>{if(records.some(record=>!viewer.contains(record.target)&&[...record.addedNodes].some(node=>node.nodeType===1)))scheduleDecoration();}).observe(document.body,{childList:true,subtree:true});
     window.addEventListener('family-media-changed',scheduleDecoration);window.addEventListener('resize',sync);decorate();configure();
   }
-  window.FamilyPhotoFullscreen={enter,exit,closed,sync,present,configure,setAlbumStatus,options:()=>({showNames,showAges,labelScale}),play(){if(!active)return;if(tagging){void resumeTagging();return;}playing=true;sync();schedule();showControls();},isBlocked:()=>active&&(albumBlocked||tagging),isTagging:()=>active&&tagging,isActive:()=>active};
+  window.FamilyPhotoFullscreen={enter,exit,closed,sync,present,configure,setAlbumStatus,options:()=>({showNames,showAges,labelScale}),play(){if(!active)return;if(tagging){void resumeTagging();return;}playing=true;sync();schedule();showControls();},isBlocked:()=>active&&(albumBlocked||tagging),isTagging:()=>active&&tagging,taggingReturn:()=>active&&tagging?{backToViewer:returnToViewer}:null,isActive:()=>active};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
