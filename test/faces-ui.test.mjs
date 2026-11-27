@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {parseHTML} from 'linkedom';
@@ -7,7 +8,15 @@ import * as geometryModule from '../public/assets/face-geometry.mjs';
 import {crowdPhotoFaces} from './helpers/crowd-photo.mjs';
 import {createUploadFaceAdapter,faceDraftPeople} from '../public/assets/photo-upload-faces.mjs';
 
-const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
+const authoredSource=await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8');
+test('the album loads the exact tested face picker from a content-versioned path',async()=>{
+ const hash=createHash('sha256').update(authoredSource).digest('hex').slice(0,16);
+ const expected=`assets/faces-${hash}.js`,html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+ const {document}=parseHTML(html);
+ assert.deepEqual([...document.querySelectorAll('script[src^="assets/faces"]')].map(node=>node.getAttribute('src')),[expected]);
+ assert.equal(await readFile(new URL('../public/'+expected,import.meta.url),'utf8'),authoredSource);
+});
+const source=authoredSource
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
  .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
 function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false,visualViewport=null,framed=false,renderSearch=false}={}){
