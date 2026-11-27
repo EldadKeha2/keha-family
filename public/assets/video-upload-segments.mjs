@@ -1,9 +1,18 @@
 export const segmentHue = number => Math.round((181 + (number - 1) * 137.508) % 360);
+const minLength = .1 - 1e-9;
 
 export function markedRange(draft) {
   const {start,end} = draft.segment;
   return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= draft.duration &&
-    end - start >= .1 - 1e-9 ? {start,end} : null;
+    end - start >= minLength ? {start,end} : null;
+}
+
+export function followPreviousEnd(previous,next) {
+  if (!previous || !next?.segment.followsPrevious || next.segment.pinned || next.saved || next.frozen || next.uploaded) return;
+  const range = markedRange(previous);
+  if (!range) return;
+  // An edit to the previous end must not invalidate an already marked interval.
+  if (next.segment.end === null || next.segment.end - range.end >= minLength) next.segment.start = range.end;
 }
 
 export async function prepareSegmentFile(options, onProgress) {
@@ -33,9 +42,6 @@ export function segmentControlsHTML(tr) {
     ['End',tr('סיום','End'),tr('קביעת סוף המקטע לפי מיקום הנגן','Set segment end to player time')]
   ];
   return `<section id="videoUploadSegments" class="upload-segments" hidden aria-label="${tr('סימון מקטעים','Segment selection')}">
-    <div id="videoUploadTrack" class="upload-segment-track" dir="ltr" aria-label="${tr('המקטעים על ציר הזמן','Segments on the timeline')}">
-      <div id="videoUploadMarks"></div><span id="videoUploadPlayhead" aria-hidden="true"></span>
-    </div>
     ${labels.map(([id,label,mark]) => `<div class="upload-segment-boundary">
       <label for="videoUpload${id}Slider">${label}</label>
       <input id="videoUpload${id}Slider" type="range" min="0" step=".01" dir="ltr" data-video-boundary>
@@ -54,10 +60,15 @@ export function segmentControlsHTML(tr) {
 }
 
 export function bindSegmentTimeline({get, tr, editor, select, changed, saving, seekTo, playbackError}) {
-  const player = get('Player');
+  const player = get('Player'), track = get('Track'), playhead = get('Playhead');
   const clock = time => editor.clock(Math.round(time * 100) / 100);
   const axes = [['Start','start'], ['End','end']];
-  let drafts = [], index = 0, preview = null;
+  let drafts = [], index = 0, preview = null, drag = null, dragged = false;
+
+  function showPosition(time) {
+    playhead.value = time;
+    playhead.setAttribute('aria-valuetext',clock(time));
+  }
 
   function seek(time) {
     if (!Number.isFinite(time)) return;
@@ -65,15 +76,18 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     player.pause();
     const target = Math.max(0,Math.min(drafts[index]?.duration ?? time,time));
     if (seekTo) seekTo(target); else player.currentTime = target;
+    showPosition(target);
   }
 
   function updatePlayhead() {
     const draft = drafts[index];
     if (!draft) return;
-    get('Playhead').style.left = Math.min(100, (player.currentTime || 0) / draft.duration * 100) + '%';
+    showPosition(Math.min(draft.duration,player.currentTime || 0));
     if (preview && player.currentTime >= preview.end) seek(preview.end);
   }
   player.addEventListener('timeupdate',updatePlayhead);
+  player.addEventListener('seeked',updatePlayhead);
+  playhead.addEventListener('input',() => { if (!saving() && drafts[index]) seek(Number(playhead.value)); });
   player.addEventListener('seeking',() => {
     if (preview && (player.currentTime < preview.start - .05 || player.currentTime > preview.end + .05)) preview = null;
   });
@@ -88,15 +102,17 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
       let lane = laneEnds.findIndex(end => end <= range.start);
       if (lane < 0) lane = laneEnds.length;
       laneEnds[lane] = range.end;
-      const label = tr('מקטע ','Segment ') + draft.segment.number;
-      return `<button type="button" data-segment-index="${i}" aria-current="${i === index}" aria-label="${label}" title="${label} · ${clock(range.start)} – ${clock(range.end)}" style="--mark-hue:${segmentHue(draft.segment.number)};left:${100*range.start/current.duration}%;width:${100*(range.end-range.start)/current.duration}%;top:${lane*9+4}px"></button>`;
+      const pinned = Boolean(draft.segment.pinned);
+      const label = tr('מקטע ','Segment ') + draft.segment.number + (pinned ? tr(' · מקובע',' · Locked') : '');
+      return `<button type="button" data-segment-index="${i}" data-pinned="${pinned}" aria-current="${i === index}" aria-label="${label}" title="${label} · ${clock(range.start)} – ${clock(range.end)}" style="--mark-hue:${segmentHue(draft.segment.number)};left:${100*range.start/current.duration}%;width:${100*(range.end-range.start)/current.duration}%;top:${lane*14+3}px"></button>`;
     }).join('');
-    get('Track').style.setProperty('--track-height', Math.max(1,laneEnds.length) * 9 + 8 + 'px');
+    track.style.setProperty('--track-height', Math.max(1,laneEnds.length) * 14 + 6 + 'px');
   }
 
   function sync(activeInput) {
     const draft = drafts[index];
     if (!draft) return;
+    playhead.max = draft.duration;
     for (const [id,edge] of axes) {
       const value = draft.segment[edge];
       const fallback = edge === 'start' ? 0 : draft.duration;
@@ -114,13 +130,15 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
 
   function setBoundary(id,edge,source) {
     const draft = drafts[index];
-    if (!draft || saving() || draft.saved || draft.frozen || draft.uploaded) return;
+    if (!draft || saving() || draft.saved || draft.frozen || draft.uploaded || draft.segment.pinned) return;
     const segment = draft.segment, field = get(id+'Time');
     let value = source === 'field' ? editor.seconds(field.value) :
       source === 'slider' ? Number(get(id+'Slider').value) : player.currentTime;
     if (Number.isFinite(value) && Math.abs(draft.duration - value) <= .0051) value = draft.duration;
     segment[edge] = Number.isFinite(value) ? value : null;
     segment[edge+'Text'] = source === 'field' ? field.value : null;
+    if (edge === 'start') segment.followsPrevious = false;
+    followPreviousEnd(draft,drafts[index+1]);
     if (Number.isFinite(value) && value >= 0 && value <= draft.duration && source !== 'playhead') seek(value);
     sync(source === 'field' ? field : null);
     changed();
@@ -153,17 +171,40 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     else select(target);
     return true;
   }
-  get('Track').addEventListener('click',event => {
-    if (pick(event) || saving() || !drafts[index]) return;
-    const rect = get('Track').getBoundingClientRect();
-    if (rect.width > 0) seek(drafts[index].duration * Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)));
+  function seekAtX(x) {
+    const rect = track.getBoundingClientRect();
+    if (rect.width > 0) seek(drafts[index].duration * Math.max(0,Math.min(1,(x-rect.left)/rect.width)));
+  }
+  // A tap selects a marked segment. Dragging anywhere scrubs the same rail.
+  track.addEventListener('pointerdown',event => {
+    if (saving() || !drafts[index] || !event.isPrimary || event.button !== 0) return;
+    dragged = false;
+    if (event.target === playhead) return;
+    drag = {id:event.pointerId, x:event.clientX};
+    event.target.setPointerCapture(event.pointerId);
+  });
+  track.addEventListener('pointermove',event => {
+    if (drag?.id !== event.pointerId || saving() || !drafts[index]) return;
+    if (!dragged && Math.abs(event.clientX-drag.x) < 4) return;
+    dragged = true;
+    seekAtX(event.clientX);
+  });
+  track.addEventListener('pointerup',event => {
+    if (drag?.id !== event.pointerId) return;
+    if (dragged && drafts[index] && !saving()) seekAtX(event.clientX);
+    drag = null;
+  });
+  track.addEventListener('lostpointercapture',() => { drag = null; });
+  track.addEventListener('click',event => {
+    if (event.target === playhead || (dragged && event.detail) || pick(event) || saving() || !drafts[index]) return;
+    seekAtX(event.clientX);
   });
 
   return {
     show(items, activeIndex) {
-      if (drafts[index] !== items[activeIndex]) preview = null;
+      if (drafts[index] !== items[activeIndex]) { preview = null; drag = null; }
       drafts = items; index = activeIndex;
-      get('Segments').hidden = !items.length;
+      track.hidden = get('Segments').hidden = !items.length;
       if (!items.length) return;
       sync();
     },

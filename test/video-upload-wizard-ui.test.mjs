@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import vm from 'node:vm';
-import {bindSegmentTimeline, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from '../public/assets/video-upload-segments.mjs';
+import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from '../public/assets/video-upload-segments.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {bindUploadPreview} from '../public/assets/video-upload-preview.mjs';
 import {filenamePhotoDate} from '../public/assets/photo-upload-metadata.mjs';
@@ -33,7 +33,7 @@ function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker,check
  const document={getElementById:id=>nodes.get(id),createElement:tag=>{const node=new Element(tag);if(tag==='video')probes.push(node);return node;},addEventListener:(name,fn)=>events.set(name,fn),body:{append(node){nodes.set(node.id,node);}}};
  const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String,seconds:text=>String(text).trim()?String(text).split(':').reduce((v,part)=>v*60+Number(part),0):NaN},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
  window.FamilyNostalgia.uploadEventLabel=event=>event.name;
- const context=vm.createContext({window,document,startUploadCheck:check,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
+ const context=vm.createContext({window,document,startUploadCheck:check,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,followPreviousEnd,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
  vm.runInContext(swipeSource,context);vm.runInContext(source,context);
  const upload=(file,progress,target)=>{const pending=deferred();uploads.push({file,progress,target,...pending});return pending.promise;};
  const prepare=(names=['first.mp4','second.mp4'],options={})=>window.FamilyVideoUpload.prepare(names.map(name=>typeof name==='string'?{name,type:'video/mp4',size:500}:name),{scope:'nostalgia',eventId:'original-event',upload,...options});
@@ -158,6 +158,59 @@ function tagName(f,name){
  const button={hasAttribute:attr=>attr==='data-video-add-name'};
  f.get('Wizard').listeners.get('click')({target:{closest:selector=>selector.includes('[data-video-add-name]')?button:null}});
 }
+
+test('Next keeps the marked portion on the player timeline and seeks to the precise cut, including the film end',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);
+ assert.equal(f.get('Track').hidden,true);
+ openSegments(f,10);
+ assert.equal(f.get('Track').hidden,false);
+ boundary(f,'StartTime','1.25');
+ f.get('Player').currentTime=3.75;f.get('EndHere').click();
+ f.get('Player').currentTime=7;f.get('Next').click();
+ assert.match(f.get('Marks').innerHTML,/left:12.5%;width:25%/);
+ assert.equal(f.get('StartTime').value,'3.75');
+ assert.equal(f.get('Player').currentTime,3.75);assert.equal(Number(f.get('Playhead').value),3.75);
+ boundary(f,'EndTime','10');f.get('Next').click();
+ assert.equal(f.get('StartTime').value,'10');assert.equal(f.get('Player').currentTime,10);
+ assert.match(f.get('Marks').innerHTML,/left:37.5%;width:62.5%/);
+ boundary(f,'Playhead','7.5');assert.equal(f.get('Player').currentTime,7.5);
+ assert.equal(f.get('StartTime').value,'10','scrubbing does not change the cut');
+ f.get('Split').click();assert.equal(f.get('Track').hidden,true);
+ f.get('Close').click();await done;
+});
+
+test('locking a marked segment advances without uploading, protects its bounds, and permits unlocking',async()=>{
+ const f=fixture({cut:async()=>new File(['clip'],'clip.mp4')}),done=f.prepare(['tape.mp4']);
+ openSegments(f,10);
+ assert.equal(f.get('PinNext').disabled,true);
+ boundary(f,'EndTime','2.5');f.get('Caption').value='ראשון';f.get('PinNext').click();
+ assert.equal(f.get('Title').textContent,'מקטע 2');assert.equal(f.get('StartTime').value,'2.5');
+ assert.match(f.get('Marks').innerHTML,/data-pinned="true"[^>]+מקטע 1 · מקובע/);
+ assert.equal(f.uploads.length,0);
+ boundary(f,'EndTime','6');f.get('PinNext').click();
+ f.get('Previous').click();f.get('Previous').click();
+ assert.equal(f.get('Caption').value,'ראשון');
+ assert.equal(f.get('PinNext').textContent,'שחרור קיבוע');assert.equal(f.get('EndHere').disabled,true);
+ assert.equal(f.get('Reset').disabled,true);assert.equal(f.get('Remove').hidden,true);
+ assert.equal(f.get('SaveCurrent').disabled,false);
+ f.get('PinNext').click();assert.equal(f.get('EndHere').disabled,false);
+ boundary(f,'EndTime','3.5');f.get('Next').click();
+ assert.equal(f.get('StartTime').value,'2.5','locked successor retains its start even when the prior cut changes');
+ const saving=f.get('SaveCurrent').click();await waitForUpload(f,1);f.uploads[0].resolve(f.result(0));await saving;
+ assert.equal(f.get('PinNext').hidden,true,'saved ranges cannot be unlocked');
+ f.get('Close').click();await done;
+});
+
+test('an automatic start follows corrections to the preceding end, while a manually chosen start stays put',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,12);
+ boundary(f,'EndTime','2');f.get('Next').click();f.get('Previous').click();
+ boundary(f,'EndTime','3.25');f.get('Next').click();
+ assert.equal(f.get('StartTime').value,'3.25');assert.equal(f.get('Player').currentTime,3.25);
+ boundary(f,'StartTime','4');f.get('Previous').click();boundary(f,'EndTime','3.5');f.get('Next').click();
+ assert.equal(f.get('StartTime').value,'4');
+ f.get('Reset').click();assert.equal(f.get('StartTime').value,'3.5');
+ f.get('Close').click();await done;
+});
 
 test('split mode removes duplicate controls and an untouched segment closes immediately',async()=>{
  const f=fixture(),done=f.prepare(['tape.mp4']);

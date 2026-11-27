@@ -22,6 +22,7 @@ dialog.video-clip-editor{width:min(900px,calc(100vw - 24px));max-width:none;max-
 #videoUploadWizard .photo-edit-caption{display:flex;flex-direction:row;align-items:center;gap:9px;font-size:13px}#videoUploadWizard .photo-edit-caption-label{max-width:70px;flex:none}#videoUploadWizard .photo-edit-caption textarea{width:100%;height:46px;min-height:36px;max-height:110px;font-size:14px;padding:6px;resize:vertical}
 #videoUploadWizard .video-upload-viewport{flex:1 1 180px;min-height:135px;height:0;max-height:42dvh;background:#f8f3e8;display:flex;align-items:center;justify-content:center;border-radius:6px;overflow:hidden}
 #videoUploadWizard .video-upload-viewport video{display:block;width:100%;height:100%;object-fit:contain;background:#20251d}
+#videoUploadWizard .video-upload-surface {width:100%;height:100%;min-height:0}
 #videoUploadWizard .video-upload-viewport{touch-action:pan-y pinch-zoom}
 #videoUploadWizard .video-upload-toolbar{padding:8px 0;gap:8px}#videoUploadWizard .video-upload-toolbar>button{min-height:36px;padding:6px 10px;font-size:13px;gap:6px}#videoUploadWizard .video-upload-toolbar svg{height:20px;width:20px}#videoUploadRange{font:12px var(--sans);color:#7f6e51;margin-inline-start:auto}
 .video-upload-details{display:grid;grid-template-columns:1fr 1fr;gap:14px}.video-upload-details label,.video-upload-people>label{display:flex;flex-direction:column;gap:4px;font:12px var(--sans);color:#6f634e}.video-upload-details input,.video-upload-details select,.video-upload-people input{width:100%;min-width:0;padding:8px 10px;border:1px solid #d2c2a1;border-radius:6px;background:#fffaf1;color:#5b503c;font:14px var(--sans)}
@@ -176,7 +177,7 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 #videoUploadWizard.is-splitting :is(.video-upload-metadata,.photo-edit-copy-date,.photo-edit-close,.secondary-button,#videoUploadSaveCurrent,.video-upload-person,.video-upload-results button) {
   color:var(--segment-ink);border-color:var(--segment-line);background:var(--segment-panel);
 }
-#videoUploadWizard.is-splitting :is(.photo-edit-pager button,#videoUploadSaveAll,#videoUploadSplit) {
+#videoUploadWizard.is-splitting :is(.photo-edit-pager button,#videoUploadSaveAll,#videoUploadPinNext) {
   background:var(--segment-accent);border-color:var(--segment-accent);color:white;
 }
 #videoUploadWizard.is-splitting :is(input:not([type=range]),textarea,select) {background:var(--segment-page);border-color:var(--segment-line)}
@@ -204,7 +205,11 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 #videoUploadWizard.is-splitting .photo-edit-date-fields input {height:30px;padding:2px;font-size:13px}
 #videoUploadWizard.is-splitting .photo-edit-copy-date {width:30px;height:30px;padding:4px}
 #videoUploadWizard.is-splitting .photo-edit-caption textarea {height:30px;min-height:30px;padding:4px 7px;line-height:20px;resize:none}
-#videoUploadWizard.is-splitting .video-upload-viewport {flex:1 1 0;min-height:clamp(150px,38dvh,360px);max-height:none}
+#videoUploadWizard.is-splitting .video-upload-viewport {
+  flex:1 1 0;flex-direction:column;align-items:stretch;min-height:clamp(150px,38dvh,360px);max-height:none;background:#1b211e;
+}
+#videoUploadWizard.is-splitting .video-upload-surface {flex:1 1 0;height:0}
+#videoUploadWizard.is-splitting video:not(:fullscreen)::-webkit-media-controls-timeline {display:none}
 #videoUploadWizard.is-splitting .video-upload-toolbar {display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:5px 0}
 #videoUploadWizard.is-splitting .video-upload-toolbar > button {
   flex:0 0 auto;min-width:0;min-height:28px;gap:4px;padding:3px 6px;font:calc(12px * var(--a11y-text-scale,1))/1.25 var(--sans);white-space:nowrap;
@@ -214,14 +219,33 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 #videoUploadWizard.is-splitting #videoUploadRange {width:auto;margin-inline-start:auto}
 #videoUploadWizard.is-splitting :is(.photo-edit-error,.photo-edit-upload-status):empty {display:none}
 #videoUploadWizard .upload-segments {display:grid;gap:3px;padding:8px 10px;margin:0 0 9px;background:var(--segment-panel);border:1px solid var(--segment-line);border-radius:8px}
-#videoUploadWizard .upload-segment-track {position:relative;height:var(--track-height,17px);margin:1px 0 3px;isolation:isolate;cursor:crosshair;background:color-mix(in srgb,var(--segment-line) 48%,white);border-radius:5px}
-#videoUploadMarks button {
-  position:absolute;display:block;box-sizing:border-box;min-width:2px;min-height:0;height:8px;margin:0;padding:0;
-  border:0;border-radius:3px;background:hsl(var(--mark-hue) 50% 39%);cursor:pointer;
+#videoUploadWizard .upload-segment-track {
+  position:relative;flex:none;height:var(--track-height,20px);margin:2px 14px 8px;
+  border-radius:4px;isolation:isolate;background:#48514d;cursor:crosshair;touch-action:pan-y;
 }
-#videoUploadMarks button[aria-current=true] {outline:1px solid var(--segment-ink);outline-offset:1px}
-#videoUploadPlayhead {position:absolute;top:0;bottom:0;width:2px;left:0;z-index:1;pointer-events:none;background:#222;box-shadow:0 0 0 1px white}
-#videoUploadPlayhead::before {content:'';position:absolute;top:-2px;left:-3px;border-inline:4px solid transparent;border-top:5px solid #222}
+#videoUploadMarks button {
+  position:absolute;display:block;box-sizing:border-box;min-width:2px;min-height:0;height:14px;margin:0;padding:0;
+  border:0;border-radius:2px;background:hsl(var(--mark-hue) 62% 58%);cursor:pointer;
+}
+#videoUploadMarks button[data-pinned=true] {
+  background-image:repeating-linear-gradient(125deg,transparent 0 6px,#0003 6px 8px);
+}
+#videoUploadMarks button[aria-current=true] {box-shadow:inset 0 0 0 1.5px #fff}
+#videoUploadWizard #videoUploadPlayhead {
+  position:absolute;z-index:1;inset-block:0;left:-6px;width:calc(100% + 12px);height:100%;min-height:0;
+  margin:0;padding:0;border:0;appearance:none;background:transparent;pointer-events:none;
+}
+#videoUploadPlayhead::-webkit-slider-runnable-track {height:100%;background:transparent;border:0}
+#videoUploadPlayhead::-moz-range-track {height:100%;background:transparent;border:0}
+#videoUploadPlayhead::-moz-range-progress {background:transparent}
+#videoUploadPlayhead::-webkit-slider-thumb {
+  appearance:none;box-sizing:border-box;width:12px;height:var(--track-height);margin:0;
+  border:2px solid #242b28;border-radius:4px;background:white;cursor:ew-resize;pointer-events:auto;
+}
+#videoUploadPlayhead::-moz-range-thumb {
+  box-sizing:border-box;width:12px;height:var(--track-height);border:2px solid #242b28;border-radius:4px;
+  background:white;cursor:ew-resize;pointer-events:auto;
+}
 #videoUploadWizard .upload-segment-boundary {display:grid;grid-template-columns:3.2em minmax(32px,1fr) 6.8em auto;align-items:center;gap:9px;color:var(--segment-ink);font:14px/1.2 var(--sans)}
 #videoUploadWizard .upload-segment-boundary input[type=range] {width:100%;min-width:0;height:32px;margin:0;padding:0;border:0;accent-color:var(--segment-accent);cursor:pointer;touch-action:pan-y}
 #videoUploadWizard .upload-segment-boundary input[type=text] {box-sizing:border-box;width:100%;min-width:0;height:32px;margin:0;padding:3px 5px;border:1px solid var(--segment-line);border-radius:5px;color:var(--segment-ink);font:inherit;font-variant-numeric:tabular-nums;text-align:center}
