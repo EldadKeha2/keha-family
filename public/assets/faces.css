@@ -70,6 +70,12 @@
 :is(#mediaViewer,#photoUploadEditor) .face-hit.face-missing{outline:var(--face-stroke,.9px) dashed #ffd76a;outline-offset:0;box-shadow:none;background:transparent}
 :is(#mediaViewer,#photoUploadEditor) .face-hit.face-missing::after{content:'?';position:absolute;top:-9px;right:-9px;display:grid;place-items:center;width:18px;height:18px;background:#ffda75;color:#382b19;border:1px solid #705829;border-radius:50%;font:bold 13px/1 var(--sans);box-shadow:0 1px 3px #0006;pointer-events:none}
 :is(#mediaViewer,#photoUploadEditor) .face-hit.face-tagged-frame:not(.face-editor-active){outline:calc(2 * var(--face-stroke,.9px)) solid #2684ff;outline-offset:0;box-shadow:inset 0 0 0 var(--face-stroke,.9px) #fff9;background:transparent}
+:is(#mediaViewer,#photoUploadEditor) .face-hit.face-tagged-frame:not(.face-editor-active)::before{
+  content:attr(data-tagged-label);position:absolute;bottom:1px;left:1px;pointer-events:none;
+  padding:1px 4px;border:1px solid #2684ff;border-radius:4px;background:#f5faff;color:#075ba6;
+  font:700 calc(10px * var(--a11y-text-scale,1))/1.2 var(--sans);white-space:nowrap;
+  transform:scale(var(--face-badge-scale,1));transform-origin:bottom left;
+}
 :is(#mediaViewer,#photoUploadEditor) .face-hit.face-tagged-region:is(:hover,:focus-visible){background:#2684ff12;z-index:1}
 :is(#mediaViewer,#photoUploadEditor) .face-hit.face-tagged-region::after{content:'×';position:absolute;top:-8px;right:-8px;display:grid;place-items:center;width:17px;height:17px;border:1px solid #fff3e7;border-radius:50%;background:#8d4635;color:#fff;font:700 15px/1 Arial,sans-serif;opacity:0;pointer-events:none}
 :is(#mediaViewer,#photoUploadEditor) .face-hit.face-tagged-region:hover::after,:is(#mediaViewer,#photoUploadEditor) .face-hit.face-tagged-region:focus-visible::after{opacity:1}
@@ -106,10 +112,11 @@
 :is(#mediaViewer,#photoUploadEditor) .face-picker [data-face-close]{min-width:32px;min-height:32px;font:calc(22px * var(--a11y-text-scale,1))/1 Arial,sans-serif;padding:2px;color:#887557}
 .face-picker .face-current-name{font-size:calc(14px * var(--a11y-text-scale,1));color:#718052;margin:0 0 7px}
 .face-picker input{display:block;box-sizing:border-box;width:100%;min-height:42px;border:1px solid #d1c5aa;border-radius:6px;background:#fffaf0;color:#4d543d;font:calc(16px * var(--a11y-text-scale,1))/1.4 var(--sans);padding:8px 9px;margin:0 0 7px;outline-offset:2px}
-.face-person-results{max-height:210px;overflow:auto;border:1px solid #e3dac4;border-radius:5px;overscroll-behavior:contain}
+.face-person-results{position:relative;max-height:210px;overflow:auto;border:1px solid #e3dac4;border-radius:5px;overscroll-behavior:contain}
 :is(#mediaViewer,#photoUploadEditor) .face-person-option{display:flex;align-items:center;gap:8px;text-align:start;width:100%;min-height:47px;border:0;border-radius:0;border-bottom:1px solid #eee7d6;background:#fffef9;color:#536245;padding:7px 8px;font:calc(14px * var(--a11y-text-scale,1))/1.5 var(--sans)}
 :is(#mediaViewer,#photoUploadEditor) .face-person-option:last-child{border-bottom:0}
-:is(#mediaViewer,#photoUploadEditor) .face-person-option:hover,:is(#mediaViewer,#photoUploadEditor) .face-person-option:focus-visible,:is(#mediaViewer,#photoUploadEditor) .face-person-option[aria-selected=true]{background:#eff3e6}
+:is(#mediaViewer,#photoUploadEditor) .face-person-option:hover,:is(#mediaViewer,#photoUploadEditor) .face-person-option:focus-visible{background:#eff3e6}
+:is(#mediaViewer,#photoUploadEditor) .face-person-option[aria-selected=true]{background:#e2f0ff;color:#174e7c;box-shadow:inset 0 0 0 2px #729fc7}
 .face-person-option>span:last-child{display:flex;flex-direction:column;min-width:0;gap:2px}
 .face-person-option strong{font-weight:500;font-size:calc(14px * var(--a11y-text-scale,1));overflow-wrap:anywhere}
 :is(#mediaViewer,#photoUploadEditor) .face-add-name{background:#f1f4e9;border-top:1px solid #cbd3bb}
@@ -117,7 +124,7 @@
 .face-person-check{display:grid;place-items:center;width:21px;height:21px;flex:0 0 21px;color:#859067;border:1px solid #cbd3bb;border-radius:4px;background:#f6f6eb}
 .face-person-avatar{position:relative;display:grid;place-items:center;box-sizing:border-box;width:36px;height:36px;flex:0 0 36px;overflow:hidden;border:1px solid #c8cfb8;border-radius:50%;background:#edf0e1;color:#65764e;font:600 12px/1 var(--sans)}
 :is(#mediaViewer,#photoUploadEditor) .face-person-avatar img{position:absolute;inset:0;display:block;width:100%;height:100%;max-width:none;max-height:none;border-radius:50%;object-fit:cover}
-.face-person-option[aria-selected=true] .face-person-avatar{box-shadow:0 0 0 2px #6c8453}
+.face-person-option[aria-selected=true] .face-person-avatar{box-shadow:0 0 0 2px #729fc7}
 .face-picker .face-save-status{font-size:calc(12px * var(--a11y-text-scale,1));line-height:1.6;color:#8f633e;margin:6px 0 0}
 .face-picker .face-save-status:empty{display:none}
 .face-picker .face-no-results{font-size:calc(13px * var(--a11y-text-scale,1));line-height:1.6;color:#8e7b59;padding:12px 9px;margin:0}

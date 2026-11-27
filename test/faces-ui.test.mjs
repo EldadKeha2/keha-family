@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {parseHTML} from 'linkedom';
 import * as geometryModule from '../public/assets/face-geometry.mjs';
 import {crowdPhotoFaces} from './helpers/crowd-photo.mjs';
 import {createUploadFaceAdapter,faceDraftPeople} from '../public/assets/photo-upload-faces.mjs';
@@ -9,8 +10,9 @@ import {createUploadFaceAdapter,faceDraftPeople} from '../public/assets/photo-up
 const source=(await readFile(new URL('../public/assets/faces.js',import.meta.url),'utf8'))
  .replace(/import\('\.\/face-geometry\.mjs\?v=\d+'\)/,'Promise.resolve(geometryModule)')
  .replace(/import\('\.\/face-detector\.mjs\?v=\d+'\)/,'Promise.resolve(detectorModule)');
-function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false,visualViewport=null,framed=false}={}){
+function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,installed=false,visualViewport=null,framed=false,renderSearch=false}={}){
  const view={width:desktop?1200:360,height:800,frameHeight:null},created=[],frames=new Map(),resizeCallbacks=[];let frameSerial=0,imageReads=0;
+ const searchDocument=renderSearch?parseHTML('<html></html>').document:null;
  class Node extends EventTarget{
   constructor(tag='div'){super();this.tagName=tag;this.children=[];this.queries=new Map();this.style={setProperty(key,value){this[key]=value;},getPropertyValue(key){return this[key]||'';}};this.dataset={};this.hidden=false;this.scrollLeft=0;this.scrollTop=0;this.className='';this.parent=null;created.push(this);}
   get parentNode(){return this.parent;}
@@ -23,7 +25,9 @@ function fixture(detected=[],{desktop=false,hoverNone=false,windows=false,instal
   replaceWith(node){const parent=this.parent;this.remove();parent?.append(node);}
   replaceChildren(...nodes){for(const node of [...this.children])node.remove();this.append(...nodes);}
   setAttribute(name,value){this[name]=value;}
-  querySelector(selector){if(!this.queries.has(selector)){const node=new Node();node.selector=selector;this.queries.set(selector,node);}return this.queries.get(selector);}
+  getAttribute(name){return this[name]??null;}
+  removeAttribute(name){delete this[name];}
+  querySelector(selector){if(!this.queries.has(selector)){const node=searchDocument&&selector==='[data-face-results]'?searchDocument.createElement('div'):new Node();node.selector=selector;this.queries.set(selector,node);}return this.queries.get(selector);}
   querySelectorAll(selector){const nodes=[...this.children,...this.queries.values()];return nodes.flatMap(node=>[...(node.matches(selector)?[node]:[]),...node.querySelectorAll(selector)]);}
   contains(node){return node===this||[...this.children,...this.queries.values()].some(child=>child.contains(node));}
   closest(selector){return this.matches(selector)?this:this.parent?.closest(selector)||null;}
@@ -338,6 +342,54 @@ test('saving a name immediately opens the next unlabelled face search in every a
   assert.ok(f.find('face-popover face-picker'));assert.equal(button.hidden,true);assert.equal(f.find('face-selection').style.left,second.rect.x*100+'%');
   f.emit(f.find('face-popover face-picker').querySelector('[data-face-close]'),'click');assert.equal(button.hidden,true);assert.equal(f.emit(f.document,'keydown',{key:'ArrowDown',target:f.stage}).defaultPrevented,false);f.faces.clear();
  }
+});
+
+test('one Enter tags the highlighted first match and arrows can choose another while typing',async()=>{
+ const people=[{id:'dana',name:'דנה כהן'},{id:'dan',name:'דן כהן'}];
+ for(const desktop of [true,false]){
+  const f=fixture([first,second],{desktop,renderSearch:true}),draft={key:'single-enter',rotation:0};
+  f.window.FamilyI18n.isEnglish=!desktop;
+  const adapter=createUploadFaceAdapter(draft,{findPeople:async()=>people,getPerson:id=>people.find(person=>person.id===id)});
+  adapter.enabled=()=>true;await f.mount(draft.key,{adapter});
+  f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});
+  for(const [index,person] of people.entries()){
+   const picker=f.find('face-popover face-picker'),input=picker.querySelector('input'),list=picker.querySelector('[data-face-results]');
+   input.value='ד';f.emit(input,'input');await new Promise(resolve=>setImmediate(resolve));
+   const selected=()=>list.querySelector('[aria-selected="true"]');
+   assert.equal(list.querySelectorAll('[role="option"]').length,3,'Two people and the add-name action are available');
+   assert.equal(selected().dataset.facePerson,people[0].id);
+   assert.equal(input.getAttribute('aria-activedescendant'),selected().id);
+   if(index)f.emit(input,'keydown',{key:'ArrowDown'});
+   assert.equal(selected().dataset.facePerson,person.id);assert.equal(f.document.activeElement,input);
+   f.emit(input,'keydown',{key:'Enter',isComposing:true});f.emit(input,'keydown',{key:'Enter',repeat:true});
+   assert.equal(draft.faceTags.length,index);
+   assert.equal(f.emit(input,'keydown',{key:'Enter'}).defaultPrevented,true);await f.faces.flush();
+   assert.equal(draft.faceTags[index].person.id,person.id);
+   const hits=f.find('face-hit-buttons').children,framed=hits.filter(hit=>hit.classList.contains('face-tagged-frame'));
+   assert.equal(framed.length,index+1);assert.ok(framed.every(hit=>hit.dataset.taggedLabel===(desktop?'✓ תוייג':'✓ Tagged')));
+   assert.ok(hits.filter(hit=>!framed.includes(hit)).every(hit=>!hit.dataset.taggedLabel));
+  }
+  f.emit(f.find('face-regions-toggle'),'click');
+  assert.ok(f.find('face-hit-buttons').children.every(hit=>!hit.dataset.taggedLabel));
+  f.faces.clear();
+ }
+});
+
+test('an early Enter waits for that exact lookup and never submits a superseded query',async()=>{
+ const f=fixture([first,second],{desktop:true,renderSearch:true}),draft={key:'pending-enter',rotation:0};
+ const pending=new Map(),person={id:'yona',name:'יונה'},findPeople=query=>query?new Promise(resolve=>pending.set(query,resolve)):Promise.resolve([]);
+ const adapter=createUploadFaceAdapter(draft,{findPeople,getPerson:()=>person});adapter.enabled=()=>true;
+ await f.mount(draft.key,{adapter});f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});
+ const picker=f.find('face-popover face-picker'),input=picker.querySelector('input'),list=picker.querySelector('[data-face-results]');
+ const type=value=>{input.value=value;f.emit(input,'input');};
+ type('י');f.emit(input,'keydown',{key:'Enter'});type('יו');
+ pending.get('י')([person]);pending.get('יו')([person]);await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(draft.faceTags.length,0);
+ type('יונה');f.emit(input,'keydown',{key:'Enter'});
+ assert.equal(list.getAttribute('aria-busy'),'true');assert.equal(input.getAttribute('aria-activedescendant'),null);
+ pending.get('יונה')([person]);await new Promise(resolve=>setImmediate(resolve));await f.faces.flush();
+ assert.deepEqual(draft.faceTags.map(face=>face.person.id),['yona']);
+ assert.notEqual(f.find('face-popover face-picker'),picker);f.faces.clear();
 });
 
 test('upload drafts automatically open the next face picker and stop advancing after the last name',async()=>{
