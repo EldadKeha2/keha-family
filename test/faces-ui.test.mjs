@@ -218,7 +218,9 @@ test('Next face becomes available when another face is detected and upload skipp
  assert.equal(button.disabled,true);f.emit(button,'click');assert.equal(f.stage._familyFaceContext.active.id,id);f.progress([first,second]);assert.equal(button.disabled,false);f.emit(button,'click');assert.notEqual(f.stage._familyFaceContext.active.id,id);f.faces.clear();
  const upload=fixture([first,second]),draft={key:'next-upload',rotation:0,faceTags:[],facesComplete:false},adapter=createUploadFaceAdapter(draft,{findPeople:async()=>[],getPerson:()=>null});adapter.enabled=()=>true;
  upload.window.FamilyI18n.fetch=async()=>{throw Error('Upload skipping cannot call the media API');};await upload.mount(draft.key,{adapter,zoom:false});upload.emit(upload.stage,'click',{target:upload.find('face-hit-buttons').children[0],detail:0});const current=upload.stage._familyFaceContext.active.id;
- upload.emit(upload.find('face-next-button'),'click');assert.notEqual(upload.stage._familyFaceContext.active.id,current);assert.equal(draft.faceTags.length,0);assert.equal(draft.facesComplete,false);upload.faces.clear();
+ upload.emit(upload.find('face-next-button'),'click');assert.notEqual(upload.stage._familyFaceContext.active.id,current);assert.equal(draft.faceTags.length,0);assert.equal(draft.facesComplete,false);
+ assert.equal(upload.find('face-hit-buttons').children.some(hit=>hit.classList.contains('face-tagged-frame')),false);
+ upload.faces.clear();
 });
 test('desktop Tab starts after selecting a face, wraps both ways and focuses the next face search in every album',async()=>{
  for(const scope of ['gallery','photos','personal:yona','wedding:parents','nursery:yona','nostalgia']){
@@ -328,6 +330,9 @@ test('saving a name immediately opens the next unlabelled face search in every a
   const hit=f.find('face-hit-buttons').children.find(node=>node.style.left===first.rect.x*100+'%');f.emit(f.stage,'click',{target:hit,detail:0});
   const host=f.find('face-popover face-picker').querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();
   const queued=f.find('face-hit-buttons').children.find(node=>node.classList.contains('face-tab-current')),button=f.find('face-advance-button'),nextPicker=f.find('face-popover face-picker');assert.equal(queued.style.left,second.rect.x*100+'%');assert.ok(nextPicker);assert.equal(f.document.activeElement,nextPicker.querySelector('input'));assert.equal(button.hidden,true);assert.equal(f.find('face-popover face-name'),undefined);
+  const framed=f.find('face-hit-buttons').children.filter(node=>node.classList.contains('face-tagged-frame'));
+  assert.deepEqual(framed.map(node=>node.dataset.faceId),[third.id,'new-saved-face']);
+  assert.equal(queued.classList.contains('face-tagged-frame'),false);
   const outside=f.document.createElement('textarea');f.dialog.append(outside);
   for(const flags of [{target:outside},{ctrlKey:true},{shiftKey:true},{altKey:true},{metaKey:true},{repeat:true},{isComposing:true}])assert.equal(f.emit(f.document,'keydown',{key:'ArrowDown',target:queued,...flags}).defaultPrevented,false);
   assert.ok(f.find('face-popover face-picker'));assert.equal(button.hidden,true);assert.equal(f.find('face-selection').style.left,second.rect.x*100+'%');
@@ -340,9 +345,14 @@ test('upload drafts automatically open the next face picker and stop advancing a
  f.window.FamilyI18n.fetch=async()=>{throw Error('Draft labels must not use the media API');};await f.mount(draft.key,{adapter});
  const choose=async()=>{const picker=f.find('face-popover face-picker'),host=picker.querySelector('[data-face-results]'),option=f.document.createElement('button');option.dataset.facePerson=person.id;host.querySelectorAll=selector=>selector==='[data-face-person]'?[option]:[];const input=picker.querySelector('input');input.value='';f.emit(input,'input');await new Promise(resolve=>setImmediate(resolve));f.emit(option,'click');await f.faces.flush();};
  f.emit(f.stage,'click',{target:f.find('face-hit-buttons').children[0],detail:0});await choose();assert.equal(draft.faceTags.length,1);assert.equal(f.find('face-advance-button').hidden,true);assert.ok(f.find('face-popover face-picker'));assert.equal(f.find('face-selection').style.left,second.rect.x*100+'%');
+ const framed=()=>f.find('face-hit-buttons').children.filter(hit=>hit.classList.contains('face-tagged-frame')).map(hit=>hit.dataset.faceId);
+ assert.deepEqual(framed(),[draft.faceTags[0].id]);
  adapter.enabled=()=>false;assert.equal(f.emit(f.document,'keydown',{key:'ArrowDown',target:f.document.activeElement}).defaultPrevented,false);adapter.enabled=()=>true;
  const other=f.document.createElement('dialog');other.open=true;f.document.body.append(other);assert.equal(f.emit(f.document,'keydown',{key:'ArrowDown',target:other}).defaultPrevented,false);other.remove();
- await choose();assert.equal(draft.faceTags.length,2);assert.equal(f.find('face-advance-button').hidden,true);assert.ok(f.find('face-popover face-name'));assert.equal(f.emit(f.document,'keydown',{key:'ArrowDown',target:f.stage}).defaultPrevented,false);f.faces.clear();
+ await choose();assert.equal(draft.faceTags.length,2);assert.equal(f.find('face-advance-button').hidden,true);assert.ok(f.find('face-popover face-name'));assert.equal(f.emit(f.document,'keydown',{key:'ArrowDown',target:f.stage}).defaultPrevented,false);
+ assert.deepEqual(framed(),draft.faceTags.map(face=>face.id));
+ f.emit(f.find('face-regions-toggle'),'click');assert.deepEqual(framed(),[]);
+ f.faces.clear();
 });
 
 test('failed face saves never select another face or expose its opening button',async()=>{
@@ -1123,7 +1133,7 @@ test('tagged-area controls cover every shared album, preserve their state throug
  const f=fixture();f.window.FamilyI18n.isEnglish=true;await f.mount();f.emit(f.find('face-regions-toggle'),'click');assert.equal(f.find('face-regions-text').textContent,'Hide tagged areas');assert.match(f.find('face-regions-note').textContent,/no tagged areas/);f.faces.clear();
 });
 
-test('clicking a dashed region removes its exact duplicate tag, renumbers immediately and restores a failed removal',async()=>{
+test('removing a tag in a framed region selects its exact duplicate, renumbers immediately and restores a failed removal',async()=>{
  for(const desktop of [false,true]){
   const person={id:'maya',name:'מאיה'},original=[{...first,id:'duplicate-a',revision:'a1',personId:person.id,person},{...second,id:'duplicate-b',revision:'b1',personId:person.id,person},{id:'other',revision:'c1',rect:{x:.2,y:.2,width:.1,height:.1},personId:'other',person:{id:'other',name:'אחר'}}],f=fixture([first,second],{desktop}),requests=[];let saved=original,unassigned=[],finish,fail=false;
   f.window.FamilyPhotoDate={overlays:()=>({showNames:true})};
