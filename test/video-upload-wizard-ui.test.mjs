@@ -212,6 +212,45 @@ test('an automatic start follows corrections to the preceding end, while a manua
  f.get('Close').click();await done;
 });
 
+test('the end slider begins at the preceding cut and the same floor applies to typing and the playhead',async()=>{
+ for(const advance of ['Next','PinNext']){
+  const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,837.96);
+  boundary(f,'EndTime','02:24.27');f.get(advance).click();
+  const slider=f.get('EndSlider'),field=f.get('EndTime'),player=f.get('Player');
+  assert.equal(slider.min,144.27);assert.equal(slider.value,144.27);
+  assert.equal(field.value,'');assert.equal(field.placeholder,'144.27');
+  assert.equal(f.get('SaveCurrent').disabled,true,'the starting position alone does not mark a clip');
+  boundary(f,'EndSlider','143.53');assert.equal(slider.value,144.27);assert.equal(field.value,'144.27');
+  boundary(f,'Playhead','143.53');assert.equal(player.currentTime,143.53,'the full film can still be reviewed');
+  f.get('EndHere').click();assert.equal(field.value,'144.27');assert.equal(player.currentTime,144.27);
+  boundary(f,'EndTime','02:23.53');assert.equal(f.get('SaveCurrent').disabled,true);
+  field.listeners.get('blur')();assert.equal(field.value,'144.27');
+  boundary(f,'EndTime','03');assert.equal(field.value,'03','typing a later timestamp is uninterrupted');
+  boundary(f,'EndTime','03:00.57');field.listeners.get('change')();
+  assert.equal(slider.value,180.57);assert.equal(f.get('SaveCurrent').disabled,false);
+  boundary(f,'StartTime','100');assert.equal(slider.min,144.27,'an earlier manual start cannot bypass the previous cut');
+  boundary(f,'StartTime','170');assert.equal(slider.min,170);
+  f.get('Reset').click();assert.equal(slider.min,144.27);assert.equal(slider.value,144.27);
+  f.get('Previous').click();assert.equal(slider.min,0);assert.equal(slider.value,144.27);
+  f.get('Close').click();await done;
+ }
+});
+
+test('a revised previous end updates unpinned bounds and the native last step reaches the exact film end',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,12.009);
+ boundary(f,'EndTime','3.253');f.get('Next').click();boundary(f,'EndTime','5');
+ f.get('Previous').click();boundary(f,'EndTime','6.003');f.get('Next').click();
+ const slider=f.get('EndSlider');
+ assert.equal(f.get('Player').currentTime,6.003);
+ assert.equal(slider.min,6.003);assert.equal(slider.value,6.003);assert.equal(f.get('SaveCurrent').disabled,true);
+ f.get('Previous').click();boundary(f,'EndTime','4.003');f.get('Next').click();
+ assert.equal(slider.min,4.003);assert.equal(slider.value,5,'the marked endpoint survives a correction');
+ boundary(f,'EndSlider','12.003');assert.equal(f.get('Player').currentTime,12.009);
+ f.get('Next').click();assert.equal(slider.min,12.009);assert.equal(slider.max,12.009);
+ assert.equal(f.get('SaveCurrent').disabled,true);
+ f.get('Close').click();await done;
+});
+
 test('split mode removes duplicate controls and an untouched segment closes immediately',async()=>{
  const f=fixture(),done=f.prepare(['tape.mp4']);
  f.window.confirm=()=>assert.fail('Untouched segment asked for confirmation');
@@ -366,10 +405,12 @@ test('a split retry reuses the same file and identifiers after interrupted trans
 test('upload through a time selects complete segments by their end on the source timeline, regardless of draft order',async()=>{
  const f=fixture({cut:async({name})=>new File(['clip'],name+'.mp4')}),done=f.prepare(['film.mp4']);
  openSegments(f);
- for(const [index,[start,end]] of [[6,8],[0,2],[2,5]].entries()){
-  if(index)f.get('Next').click();
+ for(const [index,[start,end]] of [[0,1],[1,2],[2,5]].entries()){
+  if(index)f.get(index===2?'PinNext':'Next').click();
   boundary(f,'StartTime',String(start));boundary(f,'EndTime',String(end));f.get('Name').value='Part '+(index+1);
  }
+ // A locked second range keeps its original times if the first is later edited.
+ f.get('Previous').click();f.get('Previous').click();boundary(f,'StartTime','6');boundary(f,'EndTime','8');
  f.get('Player').currentTime=5;f.get('CutoffHere').click();
  assert.equal(f.get('CutoffTime').value,'5');
  const batch=f.get('SaveThrough').click();await waitForUpload(f,1);f.uploads[0].resolve(f.result(0));

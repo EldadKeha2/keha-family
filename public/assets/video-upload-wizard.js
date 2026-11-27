@@ -1,4 +1,4 @@
-import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=player-timeline-1';
+import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=segment-end-floor-1';
 import {bindUploadPreview} from './video-upload-preview.mjs?v=upload-repair-1';
 import {startUploadCheck} from './video-upload-check.mjs';
 import {createVideoSource} from './video-source-upload.mjs';

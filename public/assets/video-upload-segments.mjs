@@ -2,17 +2,22 @@ export const segmentHue = number => Math.round((181 + (number - 1) * 137.508) % 
 const minLength = .1 - 1e-9;
 
 export function markedRange(draft) {
-  const {start,end} = draft.segment;
+  const {start,end,previousEnd = 0} = draft.segment;
   return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end <= draft.duration &&
-    end - start >= minLength ? {start,end} : null;
+    end >= previousEnd && end - start >= minLength ? {start,end} : null;
 }
 
 export function followPreviousEnd(previous,next) {
-  if (!previous || !next?.segment.followsPrevious || next.segment.pinned || next.saved || next.frozen || next.uploaded) return;
-  const range = markedRange(previous);
-  if (!range) return;
-  // An edit to the previous end must not invalidate an already marked interval.
-  if (next.segment.end === null || next.segment.end - range.end >= minLength) next.segment.start = range.end;
+  if (!next || next.segment.pinned || next.saved || next.frozen || next.uploaded) return;
+  const range = previous && markedRange(previous);
+  next.segment.previousEnd = range?.end ?? 0;
+  if (range && next.segment.followsPrevious) next.segment.start = range.end;
+}
+
+function minimumEnd(draft) {
+  const {start,previousEnd = 0} = draft.segment;
+  const validStart = Number.isFinite(start) && start <= draft.duration ? start : 0;
+  return Math.min(draft.duration,Math.max(0,previousEnd,validStart));
 }
 
 export async function prepareSegmentFile(options, onProgress) {
@@ -115,12 +120,18 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     playhead.max = draft.duration;
     for (const [id,edge] of axes) {
       const value = draft.segment[edge];
-      const fallback = edge === 'start' ? 0 : draft.duration;
       const slider = get(id+'Slider'), field = get(id+'Time');
+      const isEnd = edge === 'end';
+      const minimum = isEnd ? minimumEnd(draft) : 0;
+      const belowMinimum = isEnd && Number.isFinite(value) && value < minimum;
+      const hasValue = Number.isFinite(value) && !belowMinimum;
+      const fallback = isEnd && index === 0 && minimum === 0 ? draft.duration : minimum;
+      slider.min = minimum;
       slider.max = draft.duration;
-      slider.value = Number.isFinite(value) ? value : fallback;
-      slider.setAttribute('aria-valuetext', Number.isFinite(value) ? clock(value) : tr('טרם סומן','Unmarked'));
-      if (field !== activeInput) field.value = draft.segment[edge+'Text'] ?? (Number.isFinite(value) ? clock(value) : '');
+      slider.value = hasValue ? value : fallback;
+      slider.setAttribute('aria-valuetext',hasValue ? clock(value) : tr('טרם סומן','Unmarked')+' · '+clock(fallback));
+      if (isEnd) field.placeholder = index > 0 || minimum > 0 ? clock(minimum) : '00:00:00';
+      if (field !== activeInput) field.value = belowMinimum ? '' : draft.segment[edge+'Text'] ?? (hasValue ? clock(value) : '');
       field.setAttribute('aria-invalid',String(Boolean(field.value && !Number.isFinite(value)) ||
         (Number.isFinite(value) && (value < 0 || value > draft.duration || (edge === 'end' && !markedRange(draft))))));
     }
@@ -128,25 +139,35 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     updatePlayhead();
   }
 
-  function setBoundary(id,edge,source) {
+  function setBoundary(id,edge,source,commit = false) {
     const draft = drafts[index];
     if (!draft || saving() || draft.saved || draft.frozen || draft.uploaded || draft.segment.pinned) return;
     const segment = draft.segment, field = get(id+'Time');
     let value = source === 'field' ? editor.seconds(field.value) :
       source === 'slider' ? Number(get(id+'Slider').value) : player.currentTime;
-    if (Number.isFinite(value) && Math.abs(draft.duration - value) <= .0051) value = draft.duration;
+    const isEnd = edge === 'end';
+    const minimum = isEnd ? minimumEnd(draft) : 0;
+    const belowMinimum = isEnd && Number.isFinite(value) && value < minimum;
+    const typing = source === 'field' && !commit;
+    // Partial timestamps can be below the floor while typing a later time.
+    if (belowMinimum) value = typing ? NaN : minimum;
+    else if (Number.isFinite(value) && value !== minimum) {
+      // A fractional minimum shifts the native slider's last .01-second step.
+      const tolerance = isEnd && source === 'slider' ? .01 - 1e-9 : .0051;
+      if (Math.abs(draft.duration - value) <= tolerance) value = draft.duration;
+    }
     segment[edge] = Number.isFinite(value) ? value : null;
-    segment[edge+'Text'] = source === 'field' ? field.value : null;
+    segment[edge+'Text'] = typing ? field.value : null;
     if (edge === 'start') segment.followsPrevious = false;
     followPreviousEnd(draft,drafts[index+1]);
-    if (Number.isFinite(value) && value >= 0 && value <= draft.duration && source !== 'playhead') seek(value);
-    sync(source === 'field' ? field : null);
+    if (Number.isFinite(value) && value >= 0 && value <= draft.duration && (source !== 'playhead' || belowMinimum)) seek(value);
+    sync(typing ? field : null);
     changed();
   }
   for (const [id,edge] of axes) {
     const slider = get(id+'Slider');
     slider.addEventListener('input',() => setBoundary(id,edge,'slider'));
-    // Choosing the pre-positioned end thumb must also mark the exact film end.
+    // A click on the current thumb can select it without a native input event.
     const markDefault = () => {
       if (drafts[index] && drafts[index].segment[edge] === null) setBoundary(id,edge,'slider');
     };
@@ -156,10 +177,14 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     });
     const field = get(id+'Time');
     field.addEventListener('input',() => setBoundary(id,edge,'field'));
-    field.addEventListener('change',() => {
-      const segment = drafts[index]?.segment;
-      if (segment && Number.isFinite(segment[edge])) { segment[edge+'Text'] = null; field.value = clock(segment[edge]); }
-    });
+    const commitField = () => {
+      const draft = drafts[index];
+      if (!draft || draft.segment[edge+'Text'] == null) return;
+      if (edge === 'end' && editor.seconds(field.value) < minimumEnd(draft)) setBoundary(id,edge,'field',true);
+      else if (Number.isFinite(draft.segment[edge])) { draft.segment[edge+'Text'] = null; field.value = clock(draft.segment[edge]); }
+    };
+    field.addEventListener('change',commitField);
+    field.addEventListener('blur',commitField);
     field.addEventListener('keydown',event => { if (event.key === 'Enter') { event.preventDefault(); field.blur(); } });
     get(id+'Here').addEventListener('click',() => setBoundary(id,edge,'playhead'));
   }
