@@ -311,6 +311,8 @@
   function activate(view){
     const changed=state.view!==view;state.view=view;if(changed)state.query='';
     $('weddingsView').hidden=view!=='weddings';$('nostalgiaView').hidden=view!=='nostalgia';
+    const headerUpload=$('nostalgiaHeaderUpload');
+    if(headerUpload)headerUpload.hidden=view!=='nostalgia';
     if(!state.ready)return;
     if(view==='weddings'){
       let id;try{id=decodeURIComponent(location.hash.split('/')[1]||'');}catch{id=null;}
