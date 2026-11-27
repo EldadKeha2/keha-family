@@ -159,6 +159,50 @@ function tagName(f,name){
  f.get('Wizard').listeners.get('click')({target:{closest:selector=>selector.includes('[data-video-add-name]')?button:null}});
 }
 
+test('split mode removes duplicate controls and an untouched segment closes immediately',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);
+ f.window.confirm=()=>assert.fail('Untouched segment asked for confirmation');
+ openSegments(f);
+ assert.equal(f.get('Title').textContent,'מקטע 1');
+ assert.equal(f.get('FileInfo').hidden,true);
+ assert.equal(f.get('PlaybackTools').hidden,true);
+ assert.equal(f.get('SegmentList'),undefined);
+ assert.equal(f.get('Caption').rows,1);
+ assert.equal(f.get('Dateday').placeholder,'יום');
+ f.get('Split').click();
+ assert.equal(f.get('FileInfo').hidden,false);
+ assert.equal(f.get('PlaybackTools').hidden,false);
+ assert.equal(f.get('Caption').rows,2);
+ f.get('Split').click();
+ f.listeners.get('beforeunload')({preventDefault(){assert.fail('Untouched segment blocked leaving the page');}});
+ f.get('Close').click();
+ await done;
+});
+
+test('closing or pressing Escape after segment activity asks first and declining keeps the work',async()=>{
+ for(const activity of ['metadata','mark','play']){
+  const f=fixture(),done=f.prepare(['tape.mp4']);
+  openSegments(f);
+  if(activity==='metadata')f.get('Caption').value='חג משפחתי';
+  if(activity==='mark'){
+   boundary(f,'EndTime','3');
+   f.get('Next').click();
+   f.get('Previous').click();
+  }
+  if(activity==='play'){await f.get('Player').play();f.get('Player').pause();}
+  let prompts=0,exit=false;
+  f.window.confirm=message=>{assert.match(message,/לצאת מעריכת המקטעים/);prompts++;return exit;};
+  f.get('Wizard').listeners.get('cancel')({preventDefault(){}});
+  assert.equal(prompts,1,activity);
+  assert.equal(f.get('Wizard').open,true);
+  if(activity==='metadata')assert.equal(f.get('Caption').value,'חג משפחתי');
+  if(activity==='mark')assert.equal(f.get('EndTime').value,'3');
+  exit=true;
+  f.get('Close').click();await done;
+  assert.equal(prompts,2);
+ }
+});
+
 test('creating an event closes the picker first, keeps the draft and carries only the chosen destination forward',async()=>{
  const f=fixture({cut:async({name})=>new File(['clip'],name+'.mp4')});
  const life='everyday-life-clips',party={id:'party',name:'יום הולדת לנעמה',categoryId:'birthdays'},holiday={id:'holiday',name:'פסח',categoryId:'holidays'};
@@ -305,6 +349,8 @@ test('a lightweight copy keeps original time, tags and source for both segment e
  const f=fixture({previewWorker:()=>worker,cut:async options=>{cuts.push(options);return new File(['export'],'segment.mp4');}});
  const done=f.prepare([original]); openSegments(f); boundary(f,'StartTime','1');boundary(f,'EndTime','4');
  f.get('Caption').value='Birthday';tagName(f,'Grandmother');
+ f.get('Split').click();
+ assert.equal(f.get('PlaybackTools').hidden,false);
  f.get('PreviewMode').click();
  assert.equal(worker.input,original);
  worker.onmessage({data:{percent:30}});assert.equal(f.get('PreviewProgress').value,30);
@@ -313,8 +359,10 @@ test('a lightweight copy keeps original time, tags and source for both segment e
  const probe=f.probes.at(-1);probe.duration=8.05;probe.videoWidth=240;probe.onloadedmetadata();await tick();
  assert.equal(worker.stopped,true);assert.equal(f.urls.at(-1),light);
  const player=f.get('Player');player.duration=8.05;player.currentTime=0;await player.onloadedmetadata();
- assert.equal(player.currentTime,2.75);assert.equal(f.get('EndSlider').max,8);
+ assert.equal(player.currentTime,2.75);
  f.get('PreviewPlay').click();assert.equal(player.paused,false);f.get('PreviewPlay').click();assert.equal(player.paused,true);
+ f.get('Split').click();
+ assert.equal(f.get('EndSlider').max,8);
  f.get('Next').click();f.get('Previous').click();
  assert.equal(f.get('Caption').value,'Birthday');assert.equal(f.urls.at(-1),light);
  const part=f.get('SaveCurrent').click();await waitForUpload(f,1);
@@ -364,8 +412,8 @@ test('the single original starts staging on selection, supplies remote playback 
  openSegments(f,8);boundary(f,'StartTime','1');boundary(f,'EndTime','3');
  source.phase='ready';source.url='https://family.example/api/video-sources/test/play';transfer.resolve(source);source.refresh();
  const player=f.get('Player');assert.equal(player.src,source.url);
- f.get('SourcePlay').click();assert.equal(player.paused,false);
- f.get('PreviewPlay').click();assert.equal(player.paused,true);
+ assert.equal(f.get('PlaybackTools').hidden,true);
+ await player.play();assert.equal(player.paused,false);player.pause();
  await f.get('SaveCurrent').click();
  f.get('Next').click();boundary(f,'EndTime','6');await f.get('SaveCurrent').click();
  assert.equal(publications.length,2);assert.deepEqual(publications.map(p=>({...p.metadata.range})),[{start:1,end:3},{start:3,end:6}]);

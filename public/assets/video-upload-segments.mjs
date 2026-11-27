@@ -42,7 +42,6 @@ export function segmentControlsHTML(tr) {
       <input id="videoUpload${id}Time" type="text" dir="ltr" autocomplete="off" spellcheck="false" placeholder="00:00:00" aria-label="${label}" data-video-boundary>
       <button type="button" id="videoUpload${id}Here" class="secondary-button" title="${mark}" aria-label="${mark}" data-video-boundary>${tr('מהנגן','Use playhead')}</button>
     </div>`).join('')}
-    <div class="upload-segment-list" id="videoUploadSegmentList" aria-label="${tr('מעבר בין מקטעים','Go to a segment')}"></div>
     <details id="videoUploadBatchOptions" class="upload-segment-batch" hidden>
       <summary>${tr('העלאה עד זמן מסוים','Upload up to a time')}</summary>
       <div><label for="videoUploadCutoffTime">${tr('מקטעים שמסתיימים עד','Segments ending by')}</label>
@@ -154,7 +153,6 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     else select(target);
     return true;
   }
-  get('SegmentList').addEventListener('click',pick);
   get('Track').addEventListener('click',event => {
     if (pick(event) || saving() || !drafts[index]) return;
     const rect = get('Track').getBoundingClientRect();
@@ -167,8 +165,6 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
       drafts = items; index = activeIndex;
       get('Segments').hidden = !items.length;
       if (!items.length) return;
-      get('SegmentList').innerHTML = items.map((draft,i) =>
-        `<button type="button" data-segment-index="${i}" aria-current="${i === index}" style="--mark-hue:${segmentHue(draft.segment.number)}">${tr('מקטע ','Segment ')}${draft.segment.number}${draft.saved ? ' ✓' : ''}</button>`).join('');
       sync();
     },
     seekStart() { const draft = drafts[index]; if (draft) seek(draft.segment.start || 0); },
