@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {parseHTML} from 'linkedom';
 import family from '../src/family.mjs';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
@@ -145,6 +146,24 @@ test('the wedding return button and revisiting the weddings tab do not reopen a 
   f.window.FamilyApp.setView('gallery');f.window.FamilyApp.setView('weddings');await f.flush();
   assert.equal(f.browser.location.hash,'#weddings');assert.equal(f.nodes.get('weddingsOverview').hidden,false);
 });
+test('the nostalgia header offers the same video picker as the lower upload area',async()=>{
+  const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+  const {document}=parseHTML(html);
+  const selector='button[data-archive-upload="nostalgia"][data-archive-kind="video"]';
+  const button=document.querySelector('.workspace-header '+selector);
+  assert.ok(button);
+  assert.ok(document.querySelector('#nostalgiaDropzone '+selector));
+  assert.ok(document.getElementById('nostalgiaUploadInput').hasAttribute('multiple'));
+
+  const f=fixture();
+  const control=f.nodes.get(button.id);
+  assert.equal(control.hidden,false);
+  f.window.FamilyApp.setView('videos');
+  assert.equal(control.hidden,true);
+  f.window.FamilyApp.setView('nostalgia');
+  assert.equal(control.hidden,false);
+});
+
 test('empty nostalgia grids stay compact and each upload picker accepts the selected type',async()=>{
   const f=fixture();await f.flush();assert.equal(f.grid.children.filter(n=>n.dataset.nostalgiaKind).length,0);
   for(const [kind,accept]of [['photo','image/jpeg'],['video','video/mp4'],['document','.pdf']]){
