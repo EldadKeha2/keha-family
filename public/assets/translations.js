@@ -462,6 +462,7 @@ window.FAMILY_TRANSLATIONS={
   "הקובץ לא נמצא": "File not found",
   "בית משפחת קהא": "The Keha Family Home",
   "העלאת סרטונים": "Upload videos",
+  "הוספת סרטונים": "Add videos",
   "ברכות ומסמכים": "Greetings and documents",
   "מה נשמר אצלכם": "What have you kept",
   "תאריך לא ידוע": "Unknown date",

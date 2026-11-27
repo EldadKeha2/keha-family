@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {parseHTML} from 'linkedom';
 import family from '../src/family.mjs';
 import {browserHistory,navigationSource} from './helpers/browser-history.mjs';
 
@@ -37,8 +38,9 @@ function fixture(items=[],{navigation=false,entryUrl='https://family.test/#weddi
   if(browser)vm.runInContext(navigationSource,context);vm.runInContext(source,context);
   handlers.get('DOMContentLoaded')();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
-  const click=(selector,dataset)=>handlers.get('click')({target:{closest:s=>s===selector?{dataset}:null}});
-  return {browser,window,get view(){return view;},openWedding:id=>click('[data-open-wedding]',{openWedding:id}),editWeddingDate:id=>click('[data-edit-wedding-date]',{editWeddingDate:id}),back:()=>click('[data-wedding-back]'),nodes,requests,flush,poll:()=>intervals.forEach(fn=>fn()),change:detail=>{for(const fn of windowEvents.get('family-media-changed')||[])fn({detail});},get grid(){return get('nostalgiaGrid');},upload(kind){click('[data-archive-upload]',{archiveUpload:'nostalgia',archiveKind:kind});},filter(kind){click('[data-archive-filter]',{archiveFilter:kind});}};
+  const clickTarget=target=>handlers.get('click')({target});
+  const click=(selector,dataset)=>clickTarget({closest:s=>s===selector?{dataset}:null});
+  return {browser,window,clickTarget,get view(){return view;},openWedding:id=>click('[data-open-wedding]',{openWedding:id}),editWeddingDate:id=>click('[data-edit-wedding-date]',{editWeddingDate:id}),back:()=>click('[data-wedding-back]'),nodes,requests,flush,poll:()=>intervals.forEach(fn=>fn()),change:detail=>{for(const fn of windowEvents.get('family-media-changed')||[])fn({detail});},get grid(){return get('nostalgiaGrid');},upload(kind){click('[data-archive-upload]',{archiveUpload:'nostalgia',archiveKind:kind});},filter(kind){click('[data-archive-filter]',{archiveFilter:kind});}};
 }
 const item=(kind,n)=>({id:String(n),file:n+'.'+({photo:'jpg',video:'mp4',document:'pdf'}[kind]),filename:'Memory '+n,name:'Memory '+n,kind,src:'/media/'+n,mime:{photo:'image/jpeg',video:'video/mp4',document:'application/pdf'}[kind],size:100});
 
@@ -152,6 +154,31 @@ test('empty nostalgia grids stay compact and each upload picker accepts the sele
     if(kind==='video')assert.ok(!input.accept.includes('image/'));if(kind==='photo')assert.ok(!input.accept.includes('video/'));
   }
   assert.equal(f.nodes.get('nostalgiaUploadInput').clicks,3);
+});
+
+test('the nostalgia header opens the video picker next to search and follows view navigation',async()=>{
+  const {document}=parseHTML(await readFile(new URL('../public/index.html',import.meta.url),'utf8'));
+  const button=document.querySelector('.workspace-header .workspace-actions [data-archive-upload="nostalgia"]');
+  assert.ok(button);
+  assert.equal(button.hidden,true);
+  assert.match(button.textContent,/הוספת סרטונים/);
+  assert.ok(document.querySelector('#nostalgiaDropzone [data-archive-kind="video"]'));
+
+  const f=fixture([],{navigation:true,entryUrl:'https://family.test/#videos'});
+  f.nodes.set(button.id,button);
+  f.window.FamilyApp.setView('nostalgia');
+  assert.equal(button.hidden,false);
+  f.clickTarget(button);
+  const picker=f.nodes.get('nostalgiaUploadInput');
+  assert.equal(picker.clicks,1);
+  assert.equal(picker.dataset.scope,'nostalgia');
+  assert.match(picker.accept,/video\/mp4/);
+  assert.doesNotMatch(picker.accept,/image\/|\.pdf/);
+
+  f.window.FamilyApp.setView('videos');
+  assert.equal(button.hidden,true);
+  f.window.FamilyApp.setView('nostalgia');
+  assert.equal(button.hidden,false);
 });
 
 
