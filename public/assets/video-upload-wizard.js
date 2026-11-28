@@ -1,4 +1,5 @@
-import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=segment-hand-scrub-1';
+import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=follow-mark-1';
+import {tagChoices, taggedPeople} from './tag-choices.mjs';
 import {createSegmentHistory} from './video-segment-history.mjs';
 import {bindUploadPreview} from './video-upload-preview.mjs?v=segment-local-scrub-1';
 import {startUploadCheck} from './video-upload-check.mjs';
@@ -95,7 +96,7 @@ function showSource(source) {
  get('SourceRetry').hidden=source.phase!=='failed';get('SourceMinimize').hidden=!active||session.saving;
  get('SourcePlay').hidden=!done;
  if(done)preview.provideRemote(source.file,source.url);
- if(session.saving&&active){get('Progress').value=get('SourceProgress').value;session.percent=get('Progress').value;}
+
  updateBackground();
 }
 function stageFor(owner,file) {
@@ -104,7 +105,11 @@ function stageFor(owner,file) {
  if(source)return source;
  const factory=typeof owner.options.stageSources==='function'?owner.options.stageSources:createVideoSource;
  source=factory(file,{scope:owner.options.scope,request:(...args)=>I.fetch(...args),writeToken:window.FAMILY_API_TOKEN,tr,
-   changed:item=>{if(session===owner&&draft()?.file===item.file)showSource(item);}});
+   changed:item=>{
+    if(session!==owner)return;
+    if(draft()?.file===item.file)showSource(item);
+    if(owner.waitingSource===item)sourceSaveProgress(item);
+   }});
  owner.sources.set(file,source);
  void source.ensure().catch(()=>{});
  return source;
@@ -129,6 +134,7 @@ function showCheckedSource(owner,d) {
  const check=d.check,active=check.phase==='checking'||check.phase==='verifying',message=checkMessage(check);
  get('CheckPanel').hidden=!message;
  get('CheckStatus').textContent=message;
+ if(owner.saving&&active)saveProgress(message,check.percent);
  get('CheckRetry').hidden=check.phase!=='failed';
  get('CheckMinimize').hidden=!active||owner.saving;
  if(check.phase!=='ready'){
@@ -152,15 +158,49 @@ function checkDraft(owner,d) {
  }
  return showCheckedSource(owner,d);
 }
+function saveProgress(message,percent=null){
+ session.percent=Number.isFinite(percent)?Math.max(0,Math.min(100,Math.round(percent))):null;
+ get('Status').textContent=session.batch?segmentLabel(draft())+' · '+message:message;
+ if(session.percent===null)get('Progress').removeAttribute('value');else get('Progress').value=session.percent;
+ updateBackground();
+}
+function sourceSaveProgress(source){
+ const percent=source.phase==='uploading'&&source.file.size?100*source.received/source.file.size:null;
+ saveProgress(sourceProgress(source),percent);
+}
+async function waitForSource(owner,source){
+ owner.waitingSource=source;
+ try{
+  if(source.phase!=='ready')sourceSaveProgress(source);
+  await source.ensure();
+ }finally{owner.waitingSource=null;}
+}
 function updateBackground(){
  if(!background)return;background.hidden=!session||dialog.open;if(!session)return;
+ const batch=session.split&&session.batch;
+ get('BatchMeter').hidden=!batch;
+ if(batch){
+  const percent=Math.floor(100*batch.completed/batch.total);
+  const summary=tr('נשמרו ','Saved ')+batch.completed+tr(' מתוך ',' of ')+batch.total+tr(' מקטעים',' segments')+' · '+percent+'%';
+  if(get('BatchCount').textContent!==summary)get('BatchCount').textContent=summary;
+  get('BatchProgress').value=percent;
+  get('BatchProgress').setAttribute('aria-valuetext',summary);
+  const activity=session.error?tr('ההעלאה נעצרה — לחצו לניסיון נוסף','Upload paused — click to retry'):session.saving?get('Status').textContent:'';
+  get('BackgroundStatus').textContent=activity?summary+' · '+activity:summary;
+  get('BackgroundProgress').value=percent;
+  background.classList.toggle('has-error',Boolean(session.error));
+  return;
+ }
  const marked=session.split?session.drafts.filter(markedRange):session.drafts;
  const completed=marked.filter(d=>d.saved).length,total=marked.length||1;
  const label=session.split?segmentLabel(draft()):tr('סרטון ','Video ')+(session.index+1)+tr(' מתוך ',' of ')+total;
  const stage=session.sources?.get(draft()?.file);
  const check=draft()?.check,checking=check&&check.phase!=='ready';
- const status=checking?checkMessage(check):!session.saving&&stage&&stage.phase!=='ready'?sourceProgress(stage):session.error?tr('ההעלאה נעצרה — לחצו לניסיון נוסף','Upload paused — click to retry'):session.saving?label+' · '+(session.percent||0)+'%':session.split?tr('חזרה למקטעים','Return to segments'):tr('סרטונים ממתינים לשמירה','Videos waiting to be saved');
- get('BackgroundStatus').textContent=status;get('BackgroundProgress').value=checking?check.percent:stage&&!session.saving&&stage.phase!=='ready'?100*stage.received/stage.file.size:(completed+(session.saving&&!draft().saved?(session.percent||0)/100:0))/total*100;
+ const currentProgress=Number.isFinite(session.percent)?session.percent+'%':get('Status').textContent;
+ const status=checking?checkMessage(check):!session.saving&&stage&&stage.phase!=='ready'?sourceProgress(stage):session.error?tr('ההעלאה נעצרה — לחצו לניסיון נוסף','Upload paused — click to retry'):session.saving?[label,currentProgress].filter(Boolean).join(' · '):session.split?tr('חזרה למקטעים','Return to segments'):tr('סרטונים ממתינים לשמירה','Videos waiting to be saved');
+ get('BackgroundStatus').textContent=status;
+ if(session.saving&&!checking&&!Number.isFinite(session.percent))get('BackgroundProgress').removeAttribute('value');
+ else get('BackgroundProgress').value=checking?check.percent:stage&&!session.saving&&stage.phase!=='ready'?100*stage.received/stage.file.size:(completed+(session.saving&&!draft().saved?(session.percent||0)/100:0))/total*100;
  background.classList.toggle('has-error',Boolean(session.error));
 }
 function minimize(){if(!session)return;get('Player').pause();dialog.close();updateBackground();}
@@ -215,7 +255,7 @@ function rangeText(){const d=draft();
   return;
  }
  get('Range').textContent=d.metadata.range?tr(d.metadata.range.remove?'הקטע למחיקה: ':'הקטע שנבחר: ',d.metadata.range.remove?'Segment to delete: ':'Selected clip: ')+window.FamilyVideoEditor.clock(d.metadata.range.start)+' – '+window.FamilyVideoEditor.clock(d.metadata.range.end):tr('הסרטון המלא','Full video');}
-function render(seekTime){
+function render(seekTime,seekOptions){
  const d=draft();if(!d)return;swipe?.reset();searchSerial++;session.matches=[];
  const split=session.split;
  preview.setSegmentMode(split&&!session.review);
@@ -265,7 +305,7 @@ function render(seekTime){
  }else checkDraft(session,d);
  renderedDraft=d;
  timeline.show(split?session.drafts:[],session.index);
- if(split&&Number.isFinite(seekTime))timeline.seek(seekTime);
+ if(split&&Number.isFinite(seekTime))timeline.seek(seekTime,seekOptions);
  else if(split&&changedDraft)timeline.seekStart();
  get('Progress').hidden=true;locks();
  get('SaveAll').textContent=split?tr('שמירת כל המקטעים','Save all segments'):tr('שמירה והעלאה של הכול','Save and upload all');
@@ -298,9 +338,9 @@ function toggleSplit(){
  }
  session.error=null;render();
 }
-function goTo(index,record=true,seekTime){
+function goTo(index,record=true,seekTime,seekOptions){
  if(!session||session.saving||index===session.index||index<0||index>=session.drafts.length)return;
- rememberActivity();collect();if(record)checkpoint();session.index=index;render(seekTime);
+ rememberActivity();collect();if(record)checkpoint();session.index=index;render(seekTime,seekOptions);
 }
 function navigate(direction,record=true){
  if(!session||session.saving)return;
@@ -326,7 +366,10 @@ function pinAndAdvance(){
  navigate(1,false);
 }
 function rememberActivity(){
- if(session&&!session.saving)session.activity=true;
+ if(session&&!session.saving){
+  session.activity=true;
+  if(session.batch){session.batch=null;updateBackground();}
+ }
 }
 function needsExitConfirmation(){
  return !session.split || session.drafts.some(dirtyDetails) || (session.activity && session.drafts.some(d=>!d.saved));
@@ -375,7 +418,9 @@ function mount(){
  <button type="button" id="videoUploadEventClear" hidden>${tr('ללא שיוך','Unassigned')}</button>
  </div></div></div>
  <details id="videoUploadPeoplePanel" class="photo-edit-tags video-upload-people"><summary id="videoUploadTagsLabel"></summary><label>${tr('חיפוש או הוספת שם','Search or add a name')}<input type="search" id="videoUploadSearch" autocomplete="off" maxlength="120" data-video-draft-field></label><div id="videoUploadResults" class="video-upload-results"></div><div id="videoUploadPeopleTags" class="photo-edit-tag-chips"></div></details>
- <p id="videoUploadError" class="photo-edit-error" role="alert"></p><p id="videoUploadStatus" class="photo-edit-upload-status" role="status" aria-live="polite"></p><progress id="videoUploadProgress" max="100" value="0" hidden aria-label="${tr('התקדמות העלאת הסרטון','Video upload progress')}"></progress>
+ <p id="videoUploadError" class="photo-edit-error" role="alert"></p>
+ <section id="videoUploadBatchMeter" class="upload-segments" hidden aria-label="${tr('התקדמות העלאת המקטעים','Segment upload progress')}"><strong id="videoUploadBatchCount" role="status"></strong><progress id="videoUploadBatchProgress" max="100" value="0" aria-labelledby="videoUploadBatchCount"></progress></section>
+ <p id="videoUploadStatus" class="photo-edit-upload-status" role="status" aria-live="polite"></p><progress id="videoUploadProgress" max="100" value="0" hidden aria-label="${tr('התקדמות העלאת הסרטון','Video upload progress')}"></progress>
  <footer class="photo-edit-footer"><button type="button" id="videoUploadSaveCurrent" class="secondary-button"></button><button type="button" id="videoUploadSaveAll" class="primary-button"></button><button type="button" id="videoUploadRemove" class="photo-edit-remove">${tr('הסרת הסרטון מההעלאה','Remove video from upload')}</button><button type="button" id="videoUploadDone" class="secondary-button" hidden>${tr('סיום','Done')}</button></footer>`;
  document.body.append(dialog);
  preview=bindUploadPreview({get,tr,urls:URL,createProbe:()=>document.createElement('video'),
@@ -511,8 +556,35 @@ function mount(){
   navigate:(direction,from)=>{if(from===draft())navigate(direction);}
  });
  dialog.addEventListener('keydown',event=>{if(event.key==='Control'&&session&&!session.split&&!session.removedLast&&!session.saving){event.preventDefault();navigate(event.shiftKey?-1:1);}event.stopPropagation();});
- get('Search').addEventListener('input',async()=>{const query=get('Search').value.trim(),serial=++searchSerial;if(!query){get('Results').replaceChildren();return;}const people=await window.FamilyTags.findPeople(query);if(!session||serial!==searchSerial||get('Search').value.trim()!==query||session.saving||draft().saved||draft().frozen)return;session.matches=people.slice(0,12);get('Results').innerHTML=session.matches.map((p,index)=>`<button type="button" data-video-add-person="${index}">${safe(I.personName(p))}</button>`).join('')+(people.length?'':`<button type="button" data-video-add-name>${tr('הוספת ','Add ')}${safe(query)}</button>`);});
- dialog.addEventListener('click',event=>{if(!session||session.saving||draft().saved||draft().frozen)return;const add=event.target.closest?.('[data-video-add-person],[data-video-add-name]'),remove=event.target.closest?.('[data-video-remove-person]');if(add){const p=add.hasAttribute('data-video-add-name')?{name:get('Search').value.trim()}:{personId:session.matches[Number(add.dataset.videoAddPerson)].id,label:I.personName(session.matches[Number(add.dataset.videoAddPerson)])};const d=draft();if(!d.metadata.people.some(v=>(v.personId||v.name)===(p.personId||p.name))){checkpoint();d.metadata.people.push(p);}get('Search').value='';get('Results').replaceChildren();renderPeople();}if(remove){checkpoint();draft().metadata.people.splice(Number(remove.dataset.videoRemovePerson),1);renderPeople();}});
+ async function searchTags(){
+  const d=draft();if(!d)return;
+  const query=get('Search').value.trim(),serial=++searchSerial;
+  session.matches=[];get('Results').replaceChildren();
+  if(!query||session.saving||d.saved||d.frozen)return;
+  try{
+   const found=await window.FamilyTags.findPeople(query,[],12+d.metadata.people.length);
+   if(serial!==searchSerial||draft()!==d||query!==get('Search').value.trim()||session.saving||d.saved||d.frozen)return;
+   const {people,canAddName}=tagChoices(found,d.metadata.people,query,12);
+   session.matches=people;
+   get('Results').innerHTML=people.map((p,index)=>`<button type="button" data-video-add-person="${index}">${safe(I.personName(p))}</button>`).join('')+
+    (!found.length&&canAddName?`<button type="button" data-video-add-name>${tr('הוספת ','Add ')}${safe(query)}</button>`:'');
+  }catch(error){if(serial===searchSerial&&draft()===d)get('Results').textContent=error.message;}
+ }
+ get('Search').addEventListener('input',searchTags);
+ dialog.addEventListener('click',event=>{
+  if(!session||session.saving||draft().saved||draft().frozen)return;
+  const add=event.target.closest?.('[data-video-add-person],[data-video-add-name]'),remove=event.target.closest?.('[data-video-remove-person]');
+  if(!add&&!remove)return;
+  const people=draft().metadata.people;
+  if(add){
+   const match=session.matches[Number(add.dataset?.videoAddPerson)];
+   const selection=add.hasAttribute('data-video-add-name')?{name:get('Search').value.trim()}:match&&{personId:match.id,label:I.personName(match)};
+   if(!selection||!(selection.personId||selection.name)||taggedPeople(people).has(match||selection))return;
+   checkpoint();people.push(selection);get('Search').value='';void searchTags();renderPeople();
+  }else if(remove){
+   checkpoint();people.splice(Number(remove.dataset.videoRemovePerson),1);renderPeople();void searchTags();
+  }
+ });
 }
 function freezeUpload(d,owner,split){
  if(d.frozen)return;
@@ -524,27 +596,28 @@ async function saveFromSource(d,owner,source,split){
  freezeUpload(d,owner,split);
  const range=split?markedRange(d):d.frozen.metadata.range;
  const payload={mediaId:d.uploadId,operationId:d.frozen.operationId,metadata:{...d.frozen.metadata,...(range?{range}:{})}};
- get('Status').textContent=source.phase==='ready'?tr('שומר מהמקור שבאתר…','Saving from the uploaded original…'):tr('ממתין להשלמת העלאת המקור…','Waiting for the original upload…');
- await source.ensure();
- get('Status').textContent=range?tr('שומר את המקטע מהמקור…','Saving the segment from the original…'):tr('שומר את הסרטון…','Saving the video…');
+ await waitForSource(owner,source);
+ saveProgress(range?tr('שומר את המקטע מהמקור…','Saving the segment from the original…'):tr('שומר את הסרטון…','Saving the video…'));
  if(!d.derivedSource){
   try{return await source.save(payload);}
   catch(error){if(error.code!=='VIDEO_CLIP_FORMAT'||!range||range.remove)throw error;}
   const clip=await prepareSegmentFile({file:d.file,name:d.frozen.metadata.name,range,maxBytes:MAX_VIDEO_SOURCE_BYTES},fraction=>{
-   get('Progress').value=fraction*100;get('Status').textContent=tr('מכין את המקטע…','Preparing the segment…')+' '+Math.round(fraction*100)+'%';
+   saveProgress(tr('מכין את המקטע…','Preparing the segment…')+' '+Math.round(fraction*100)+'%',fraction*100);
   });
   d.derivedSource=stageFor(owner,clip);
  }
+ await waitForSource(owner,d.derivedSource);
+ saveProgress(tr('שומר את הסרטון והפרטים…','Saving the video and details…'));
  const {range:applied,...metadata}=payload.metadata;
  return d.derivedSource.save({...payload,metadata});
 }
 async function saveLocal(d,owner,split,maxMB){
    if(split&&!d.uploaded&&!d.preparedFile){
-    const prepLabel=tr('מכין את ','Preparing ')+segmentLabel(d);
-    get('Status').textContent=prepLabel+'…';
+    const prepLabel=owner.batch?tr('מכין את המקטע','Preparing segment'):tr('מכין את ','Preparing ')+segmentLabel(d);
+    saveProgress(prepLabel+'…');
     try{
      d.preparedFile=await prepareSegmentFile({file:d.file,name:d.metadata.name,range:markedRange(d),maxBytes:maxMB*1024*1024},fraction=>{
-      get('Status').textContent=prepLabel+' · '+Math.round(fraction*100)+'%';
+      saveProgress(prepLabel+' · '+Math.round(fraction*100)+'%',fraction*100);
      });
     }catch(error){
      throw Error(error.code==='SEGMENT_SIZE'?tr('המקטע גדול מ־','This segment exceeds ')+maxMB+tr(' MB. קצרו אותו ונסו שוב.',' MB. Shorten it and try again.'):
@@ -557,18 +630,16 @@ async function saveLocal(d,owner,split,maxMB){
     // bytes, upload ID and destination until the server acknowledges the clip.
     if(split)freezeUpload(d,owner,true);
     const destination={eventId:d.metadata.eventId||null,group:d.metadata.group||'family',uploadId:d.uploadId};
-    get('Status').textContent=tr('מעלה ','Uploading ')+(split?segmentLabel(d):file.name)+'…';
+    saveProgress(tr('מתחיל בהעלאה…','Starting upload…'),0);
     d.uploaded=await owner.options.upload(file,percent=>{
-     owner.percent=percent;get('Progress').value=percent;
-     get('Status').textContent=percent===100?tr('הסרטון התקבל, שומר את הפרטים…','Video received, saving details…'):tr('מעלה ','Uploading ')+percent+'%';
-     updateBackground();
+     saveProgress(percent===100?tr('הסרטון התקבל, שומר את הפרטים…','Video received, saving details…'):tr('מעלה ','Uploading ')+percent+'%',percent);
     },destination);
    }
    const item=d.uploaded.item||d.uploaded.collection?.items.find(v=>v.file===d.uploaded.file)||d.uploaded.person?.gallery?.find(v=>v.file===d.uploaded.file);
    if(!item?.id)throw Error(tr('לא התקבל אישור לסרטון שהועלה.','No video upload confirmation was received.'));
    d.mediaId=item.id;
    freezeUpload(d,owner,split);
-   get('Status').textContent=tr('שומר את הסרטון והפרטים…','Saving the video and details…');
+   saveProgress(tr('שומר את הסרטון והפרטים…','Saving the video and details…'));
    const response=await I.fetch('api/media/'+item.id+(d.frozen.metadata.range?.remove?'/video-upload-remove':'/video-upload'),{
     method:'POST',headers:{'Content-Type':'application/json','X-Family-Token':window.FAMILY_API_TOKEN},body:JSON.stringify(d.frozen)
    });
@@ -596,6 +667,9 @@ async function save(all,cutoff){
  const pending=d=>(!d.saved||dirtyDetails(d))&&(!split||markedBy(d,cutoff));
  const indices=all?owner.drafts.map((_,i)=>i).filter(i=>pending(owner.drafts[i])):pending(draft())?[owner.index]:[];
  if(!indices.length)return;
+ const total=split&&all?owner.drafts.filter(d=>markedBy(d,cutoff)).length:0;
+ owner.batch=total?{total,completed:total-indices.length}:null;
+ owner.error=null;
  const startingIndex=owner.index;
  let activeIndex=startingIndex;
  try{
@@ -608,12 +682,13 @@ async function save(all,cutoff){
   get('Player').pause();
   owner.history?.clear();
   for(const index of indices){
-   activeIndex=index;owner.index=index;owner.percent=0;owner.error=null;render();
-   const d=draft();busy(true);get('Progress').value=0;
+   activeIndex=index;owner.index=index;render();
+   const d=draft();busy(true);saveProgress(tr('מתכונן לשמירה…','Preparing to save…'));
    let result;
-   if(d.saved){result=await saveDetails(d);}
+   if(d.saved){saveProgress(tr('שומר את פרטי המקטע…','Saving segment details…'));result=await saveDetails(d);}
    else{
     if(d.check.phase!=='ready'){
+     saveProgress(checkMessage(d.check),d.check.percent);
      await d.check.ready;
      if(d.check.phase!=='ready')throw Error(checkMessage(d.check));
     }
@@ -622,14 +697,17 @@ async function save(all,cutoff){
     d.mediaId=result.item?.id||d.mediaId||d.uploadId;
    }
    if(split)acceptDetails(d,result.item);
-   d.saved=true;d.preparedFile=null;owner.options.onSaved?.(result);window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));busy(false);
+   d.saved=true;d.preparedFile=null;
+   if(owner.batch)owner.batch.completed++;
+   owner.options.onSaved?.(result);window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+   updateBackground();
   }
   if(split){
    owner.index=startingIndex;render();
    if(all)get('Status').textContent=tr('המקטעים נשמרו ✓ אפשר לחזור אליהם דרך ״עריכת פרטי המקטעים״.','Segments saved ✓ Reopen them with “Edit segment details”.');
    return;
   }
-  if(owner.drafts.every(d=>d.saved)){window.FamilyApp?.toast(tr('הסרטונים נשמרו ✓','Videos saved ✓'));finish();return;}
+  if(owner.drafts.every(d=>d.saved)){busy(false);window.FamilyApp?.toast(tr('הסרטונים נשמרו ✓','Videos saved ✓'));finish();return;}
   owner.index=owner.drafts.findIndex((d,i)=>!d.saved&&i>owner.index);if(owner.index<0)owner.index=owner.drafts.findIndex(d=>!d.saved);render();
  }catch(error){
   owner.index=activeIndex;const d=draft();

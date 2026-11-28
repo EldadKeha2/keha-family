@@ -21,8 +21,8 @@ export function createUploadFaceAdapter(d,{findPeople,getPerson,onChange=()=>{},
   const item=()=>({id:d.key,kind:'photo',tags:faceDraftPeople(d),tagsRevision:String(d.faceRevision||0),faceSummary:{reviewed:d.facesComplete}});
   const snapshot=()=>({item:item(),faces:faces(),unassignedFaces:d.unassignedFaces.map(rect=>({rect:turnRect(rect,d.rotation)})),ignoredFaces:d.ignoredFaces.map(rect=>turnRect(rect,d.rotation))});
   const changed=face=>{d.faceRevision=(d.faceRevision||0)+1;const result={...snapshot(),face:face?faces().find(saved=>saved.id===face.id):null};onChange(result);return result;};
-  async function search(query,preferred=[]){
-    const found=await findPeople(query,preferred);for(const person of found)roster.set(person.id,person);
+  async function search(query,preferred=[],limit=50){
+    const found=await findPeople(query,preferred,limit);for(const person of found)roster.set(person.id,person);
     const local=faceDraftPeople(d).filter(person=>person.draftName&&(!key(query)||key(person.name).includes(key(query))));
     return [...new Map([...local,...found].map(person=>[person.id,person])).values()];
   }

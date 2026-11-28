@@ -168,6 +168,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     if (preview && (position() < preview.start - .05 || position() > preview.end + .05)) preview = null;
   });
 
+  let overlappingMarks = false;
   function paintMarks() {
     const current = drafts[index];
     const intervals = drafts.map((draft,i) => ({draft, i, range:markedRange(draft)}))
@@ -182,6 +183,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
       const label = tr('מקטע ','Segment ') + draft.segment.number + (pinned ? tr(' · מקובע',' · Locked') : '');
       return `<button type="button" data-segment-index="${i}" data-pinned="${pinned}" aria-current="${i === index}" aria-label="${label}" title="${label} · ${clock(range.start)} – ${clock(range.end)}" style="background-color:${segmentColor(draft.segment.number)};left:${100*range.start/current.duration}%;width:${100*(range.end-range.start)/current.duration}%;top:${lane*14+3}px"></button>`;
     }).join('');
+    overlappingMarks = laneEnds.length > 1;
     track.style.setProperty('--track-height', Math.max(1,laneEnds.length) * 14 + 6 + 'px');
   }
 
@@ -260,24 +262,35 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     field.addEventListener('keydown',event => { if (event.key === 'Enter') { event.preventDefault(); field.blur(); } });
     get(id+'Here').addEventListener('click',() => setBoundary(id,edge,'playhead'));
   }
+  function containsTime(draft,time) {
+    const range = markedRange(draft);
+    // A shared cut belongs to the next segment, except at the end of the film.
+    return range && range.start <= time && (time < range.end || time === range.end && time === draft.duration);
+  }
   function userSeek(time,group = null,options,selection = -1) {
     const active = drafts[index];
     if (!active) return;
-    if (selection < 0 && reviewing() && (time < active.segment.start || time > active.segment.end)) {
-      selection = drafts.findIndex(d => d.segment.start <= time && time <= d.segment.end);
-    }
+    if (selection < 0 && !containsTime(active,time)) selection = drafts.findIndex(draft => containsTime(draft,time));
     const switching = selection >= 0 && selection !== index;
     if (!switching && time === position()) return;
     checkpoint(group);
-    if (switching) select(selection,false,time);
+    if (switching) select(selection,false,time,options);
     else seek(time,options);
   }
   function timeAtX(x) {
     const rect = track.getBoundingClientRect();
     return rect.width ? drafts[index].duration * (x-rect.left)/rect.width : position();
   }
-  function scrubAt(x,selection = -1) {
-    const time = Math.max(0,Math.min(drafts[index].duration,timeAtX(x) + (drag?.offset || 0)));
+  function scrubAt(event,selection = -1) {
+    const {clientX,clientY} = event;
+    const time = Math.max(0,Math.min(drafts[index].duration,timeAtX(clientX) + (drag?.offset || 0)));
+    if (selection < 0 && overlappingMarks && Number.isFinite(clientY)) {
+      // Pointer capture keeps delivering moves to the rail. Look under the
+      // thumb to distinguish colors stacked at the same time.
+      const hits = track.ownerDocument?.elementsFromPoint?.(clientX,clientY) || [];
+      const mark = hits.find(hit => hit.dataset?.segmentIndex !== undefined && track.contains(hit));
+      if (mark && containsTime(drafts[Number(mark.dataset.segmentIndex)],time)) selection = Number(mark.dataset.segmentIndex);
+    }
     userSeek(time,drag,{scrub:true},selection);
   }
   const markIndex = target => Number(target.closest('[data-segment-index]')?.dataset.segmentIndex ?? -1);
@@ -302,16 +315,16 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     track.classList.add('is-scrubbing');
     preview = null;
     if (!player.paused) player.pause();
-    if (!thumb) scrubAt(event.clientX,reviewing() ? drag.mark : -1);
+    if (!thumb) scrubAt(event,drag.mark);
   });
   track.addEventListener('pointermove',event => {
     if (drag?.id !== event.pointerId || saving() || !drafts[index]) return;
     if (Math.abs(event.clientX-drag.x) >= 4) drag.moved = true;
-    scrubAt(event.clientX);
+    scrubAt(event);
   });
   track.addEventListener('pointerup',event => {
     if (drag?.id !== event.pointerId) return;
-    if (drafts[index] && !saving()) scrubAt(event.clientX,drag.moved ? -1 : drag.mark);
+    if (drafts[index] && !saving()) scrubAt(event,drag.moved ? -1 : drag.mark);
     finishDrag();
   });
   for (const event of ['pointercancel','lostpointercapture']) {
@@ -350,8 +363,10 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
       return true;
     },
     show(items, activeIndex) {
-      if (drafts[index] !== items[activeIndex] || !items.length) {
-        preview = null; nativeFrom = requestedTime = issuedTime = null;
+      const previous = drafts[index], next = items[activeIndex];
+      if (previous !== next || !next) {
+        preview = null; nativeFrom = null;
+        if (!next || reviewing() || previous?.file !== next.file) requestedTime = issuedTime = null;
       }
       if (!items.length) { if (drag) finishDrag(); pointerSlider = null; }
       drafts = items; index = activeIndex;

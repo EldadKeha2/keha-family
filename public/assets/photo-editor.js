@@ -1,7 +1,7 @@
 import {fullCrop,turns,isPhoto,normalizeCrop,rotateCrop,rotatedSize,pixelCrop,moveCrop,changed,outputFormat,outputName,drawPhoto} from './photo-edit-core.mjs';
 import {filenamePhotoDate,normalizeUploadMetadata,photoUploadPayload} from './photo-upload-metadata.mjs?v=4';
 
-import {createUploadFaceAdapter,faceDraftPeople,transformedUploadFaces} from './photo-upload-faces.mjs?v=3';
+import {createUploadFaceAdapter,faceDraftPeople,transformedUploadFaces} from './photo-upload-faces.mjs?v=4';
 import {MAX_PHOTO_LABELS,photoLabels,photoLabelName,photoLabelOptions,photoLabelFromName,photoLabelKey,rememberPhotoLabels,loadPhotoLabelCatalog} from './photo-labels-catalog.mjs?v=2';
 
 const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
@@ -48,7 +48,7 @@ function stopFaces(){if(session?.faceActive){session.faceActive=false;window.Fam
 function startFaces(){
   stopFaces();const owner=session,d=draft();
   if(!owner||owner.mode==='existing'||!d||!source||!window.FamilyFaces)return;
-  const adapter=createUploadFaceAdapter(d,{tr,findPeople:(query,preferred)=>window.FamilyTags.findPeople(query,preferred),getPerson:id=>window.FamilyApp?.getPersonSummary?.(id),onChange:result=>{
+  const adapter=createUploadFaceAdapter(d,{tr,findPeople:(...args)=>window.FamilyTags.findPeople(...args),getPerson:id=>window.FamilyApp?.getPersonSummary?.(id),onChange:result=>{
     if(session!==owner||draft()!==d)return;
     renderDraftTags();renderTagControls();
     if(!result.item.faceSummary?.reviewed||!owner.onUpload||!(window.FamilyPhotoKeyboard?.desktop?.()??desktop()))return;

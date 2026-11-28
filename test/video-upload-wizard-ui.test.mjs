@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue, segmentColor} from '../public/assets/video-upload-segments.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {createSegmentHistory} from '../public/assets/video-segment-history.mjs';
+import {tagChoices,taggedPeople} from '../public/assets/tag-choices.mjs';
 import {bindUploadPreview} from '../public/assets/video-upload-preview.mjs';
 import {filenamePhotoDate} from '../public/assets/photo-upload-metadata.mjs';
 
@@ -30,13 +31,13 @@ function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker,check
   querySelectorAll(selector){return [...nodes.values()].filter(node=>node.parent===this&&(selector==='[data-video-draft-field]'?node.field:selector==='[data-video-boundary]'?node.boundary:['input','textarea','select','button'].includes(node.tag)));}
   showModal(){this.open=true;}
   close(){this.open=false;this.listeners.get('close')?.();}
-  canPlayType(){return 'probably';} play(){this.paused=false;this.listeners.get('play')?.();return Promise.resolve();} pause(){this.paused=true;this.pauseCount++;this.listeners.get('pause')?.();} load(){this.loadCount++;} replaceChildren(){} blur(){} focus(){this.focused=true;}
+  canPlayType(){return 'probably';} play(){this.paused=false;this.listeners.get('play')?.();return Promise.resolve();} pause(){this.paused=true;this.pauseCount++;this.listeners.get('pause')?.();} load(){this.loadCount++;} replaceChildren(){this.html='';} blur(){} focus(){this.focused=true;}
   click(){assert.equal(this.disabled,false,'clicked control is enabled');return this.listeners.get('click')?.();}
  }
  const document={getElementById:id=>nodes.get(id),createElement:tag=>{const node=new Element(tag);if(tag==='video')probes.push(node);return node;},addEventListener:(name,fn)=>events.set(name,fn),body:{append(node){nodes.set(node.id,node);}}};
  const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String,seconds:text=>String(text).trim()?String(text).split(':').reduce((v,part)=>v*60+Number(part),0):NaN},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
  window.FamilyNostalgia.uploadEventLabel=event=>event.name;
- const context=vm.createContext({window,document,startUploadCheck:check,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,followPreviousEnd,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
+ const context=vm.createContext({window,document,tagChoices,taggedPeople,startUploadCheck:check,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,followPreviousEnd,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
  document.querySelectorAll=selector=>[...nodes.values()].filter(node=>node.tag===selector);
  context.createSegmentHistory=createSegmentHistory;
  vm.runInContext(swipeSource,context);vm.runInContext(source,context);
@@ -154,8 +155,8 @@ function openSegments(f,duration=8){
 function boundary(f,id,value){
  const field=f.get(id);field.value=value;field.listeners.get('input')();
 }
-function railPointer(f,type,x,target=f.get('Track')){
- const event={target,pointerId:1,isPrimary:true,button:0,clientX:x,preventDefault(){this.defaultPrevented=true;}};
+function railPointer(f,type,x,target=f.get('Track'),y){
+ const event={target,pointerId:1,isPrimary:true,button:0,clientX:x,clientY:y,preventDefault(){this.defaultPrevented=true;}};
  f.get('Track').listeners.get(type)(event);return event;
 }
 function markedButton(index){
@@ -191,7 +192,8 @@ test('Next keeps the marked portion on the player timeline and seeks to the prec
  assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(f.get('StartTime').value,'1.25');assert.equal(f.get('Player').currentTime,1.25);
  assert.match(f.get('Marks').innerHTML,/left:37.5%;width:62.5%/);
  boundary(f,'Playhead','7.5');assert.equal(f.get('Player').currentTime,7.5);
- assert.equal(f.get('StartTime').value,'1.25','scrubbing does not change the cut');
+ assert.equal(f.get('Title').textContent,'מקטע 2');assert.equal(f.get('StartTime').value,'3.75');
+ f.get('Previous').click();assert.equal(f.get('StartTime').value,'1.25','scrubbing preserves the original cut');
  f.get('Split').click();assert.equal(f.get('Track').hidden,true);
  f.get('Close').click();await done;
 });
@@ -273,7 +275,7 @@ test('the end slider begins at the preceding cut and the same floor applies to t
   assert.equal(field.value,'');assert.equal(field.placeholder,'144.27');
   assert.equal(f.get('SaveCurrent').disabled,true,'the starting position alone does not mark a clip');
   boundary(f,'EndSlider','143.53');assert.equal(slider.value,144.27);assert.equal(field.value,'144.27');
-  boundary(f,'Playhead','143.53');assert.equal(player.currentTime,143.53,'the full film can still be reviewed');
+  player.currentTime=143.53;player.listeners.get('timeupdate')();
   f.get('EndHere').click();assert.equal(field.value,'144.27');assert.equal(player.currentTime,144.27);
   boundary(f,'EndTime','02:23.53');assert.equal(f.get('SaveCurrent').disabled,true);
   field.listeners.get('blur')();assert.equal(field.value,'144.27');
@@ -805,4 +807,96 @@ test('saved cuts stay editable in the open wizard and reopen as a group from a f
  boundary(g,'Caption','טיול');g.window.confirm=()=>false;g.get('Done').click();assert.equal(g.get('Wizard').open,true);
  await g.get('SaveCurrent').click();g.get('Done').click();assert.equal(g.get('Wizard').open,false);
  assert.equal(requests.filter(p=>p.endsWith('video-segment-details')).length,3);assert.equal(publications.length,2);assert.equal(g.uploads.length,0);
+});
+
+test('the main playhead follows each cut during a single drag, retaining the exact time, metadata and undo group',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,120);
+ const title=()=>f.get('Title').textContent,player=f.get('Player'),thumb=f.get('Playhead');
+ boundary(f,'Caption','ראשון');boundary(f,'Dateyear','1989');boundary(f,'EndTime','30');f.get('PinNext').click();
+ boundary(f,'Caption','שני');boundary(f,'Dateyear','1990');boundary(f,'StartTime','38');boundary(f,'EndTime','70');f.get('PinNext').click();
+ boundary(f,'Caption','שלישי');boundary(f,'Dateyear','1991');boundary(f,'EndTime','120');
+ const loads=player.loadCount;
+ railPointer(f,'pointerdown',360,thumb);
+ railPointer(f,'pointermove',150);assert.equal(title(),'מקטע 2');assert.equal(player.currentTime,50);assert.equal(f.get('Dateyear').value,1990);assert.equal(f.get('Caption').value,'שני');
+ railPointer(f,'pointermove',99);assert.equal(title(),'מקטע 2','A gap preserves the last displayed draft');assert.equal(player.currentTime,33);
+ railPointer(f,'pointermove',66);assert.equal(title(),'מקטע 1');assert.equal(player.currentTime,22);assert.equal(f.get('Caption').value,'ראשון');
+ railPointer(f,'pointermove',210);assert.equal(title(),'מקטע 3','The shared boundary belongs to the following cut');assert.equal(player.currentTime,70);
+ railPointer(f,'pointermove',147);railPointer(f,'pointerup',147);
+ assert.equal(player.currentTime,49);assert.equal(title(),'מקטע 2');assert.equal(player.loadCount,loads);
+ pressEditorKey(f,thumb,'z','KeyZ',{ctrlKey:true});assert.equal(title(),'מקטע 3');assert.equal(player.currentTime,120);assert.equal(f.get('Caption').value,'שלישי');
+ pressEditorKey(f,thumb,'y','KeyY',{ctrlKey:true});assert.equal(title(),'מקטע 2');assert.equal(player.currentTime,49);
+ f.get('Close').click();await done;
+});
+
+test('dragging between colored lanes at the same film time selects the lane under the hand',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,120);
+ boundary(f,'EndTime','60');f.get('PinNext').click();boundary(f,'StartTime','30');boundary(f,'EndTime','90');
+ const track=f.get('Track'),marks=[markedButton(0),markedButton(1)];
+ track.ownerDocument={elementsFromPoint:(_x,y)=>[f.get('Playhead'),marks[y<14?0:1],track]};
+ track.contains=hit=>marks.includes(hit);
+ railPointer(f,'pointerdown',270,f.get('Playhead'),20);
+ railPointer(f,'pointermove',135,track,20);assert.equal(f.get('Title').textContent,'מקטע 2');
+ railPointer(f,'pointermove',135,track,5);assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(f.get('Player').currentTime,45);
+ railPointer(f,'pointerup',135,track,5);f.get('Close').click();await done;
+});
+
+test('the upload picker excludes existing identities per segment, restores removed tags and discards stale searches',async()=>{
+ const f=fixture(),people=[{id:'one',name:'יחיאל קהא'},{id:'two',name:'יחיאל קהא'}],late=deferred();
+ f.window.FamilyTags={findPeople:async query=>query==='late'?late.promise:people.filter(person=>person.name.includes(query))};
+ f.window.FamilyI18n.personName=p=>p.name;
+ const done=f.prepare(['tape.mp4']);openSegments(f,10);
+ const type=query=>{f.get('Search').value=query;return f.get('Search').listeners.get('input')();};
+ const clickOption=(key,value)=>{
+  const add=key==='videoAddPerson',button={dataset:{[key]:String(value)},hasAttribute:()=>false};
+  f.get('Wizard').listeners.get('click')({target:{closest:selector=>selector.includes(add?'[data-video-add-person]':'[data-video-remove-person]')?button:null}});
+ };
+ const options=()=>(f.get('Results').innerHTML.match(/data-video-add-person=/g)||[]).length;
+ await type('יחיאל');assert.equal(options(),2);clickOption('videoAddPerson',0);
+ await type('יחיאל');assert.equal(options(),1);clickOption('videoAddPerson',0);
+ await type('יחיאל קהא');assert.equal(options(),0);assert.doesNotMatch(f.get('Results').innerHTML,/data-video-add-name/);
+ clickOption('videoRemovePerson',0);await tick();assert.equal(options(),1);
+ const waiting=type('late');boundary(f,'EndTime','4');f.get('Next').click();late.resolve(people);await waiting;assert.equal(options(),0);
+ await type('יחיאל קהא');assert.equal(options(),2);assert.equal(f.get('PeopleTags').innerHTML,'');
+ f.get('Previous').click();await type('יחיאל');assert.equal(options(),1);
+ tagName(f,'אורח חדש');await type('אוֹרח   חדש');assert.doesNotMatch(f.get('Results').innerHTML,/data-video-add-name/);
+ f.get('Close').click();await done;
+});
+
+test('segment batch progress counts confirmed saves, covers source and metadata retries, and stays visible in the background',async()=>{
+ const f=fixture(),saves=[],original=deferred();let change,staged;
+ const stage=(file,{changed})=>{
+  change=changed;staged={file,phase:'uploading',received:0,ensure:()=>original.promise,discard(){},
+   save:()=>{const wait=deferred();saves.push(wait);return wait.promise;}};
+  return staged;
+ };
+ const done=f.prepare(['film.mp4'],{stageSources:stage});openSegments(f,12);
+ for(const end of [4,8,12]){boundary(f,'EndTime',String(end));f.get('PinNext').click();}
+ const check=(count,percent)=>{
+  assert.equal(f.get('BatchMeter').hidden,false);assert.equal(f.get('BatchProgress').value,percent);
+  assert.equal(f.get('BackgroundProgress').value,percent);assert.match(f.get('BatchCount').textContent,new RegExp(count+' מתוך 3'));
+ };
+ const saving=f.get('SaveAll').click();check(0,0);
+ staged.received=staged.file.size/2;change(staged);assert.equal(f.get('Progress').value,50);assert.match(f.get('Status').textContent,/50%/);
+ f.get('Close').click();assert.equal(f.get('Background').hidden,false);assert.match(f.get('BackgroundStatus').textContent,/50%/);
+ staged.phase='ready';original.resolve();await tick();saves[0].resolve({item:{id:'one'}});await tick();check(1,33);
+ saves[1].reject(new Error('Try again'));await saving;check(1,33);assert.match(f.get('BackgroundStatus').textContent,/ניסיון נוסף/);
+ f.get('Background').click();const retry=f.get('SaveAll').click();check(1,33);await tick();
+ saves[2].resolve({item:{id:'two'}});await tick();check(2,66);assert.match(f.get('Status').textContent,/מקטע 3/);
+ saves[3].resolve({item:{id:'three'}});await retry;check(3,100);assert.equal(f.get('Wizard').open,true);
+ assert.equal(saves.length,4);f.get('Close').click();await done;
+});
+
+test('batch progress shows current transfer separately and excludes unfinished cuts and cuts beyond the requested end',async()=>{
+ const f=fixture({cut:async({file})=>file}),done=f.prepare(['record.mp4']);openSegments(f,12);
+ for(const end of [4,8,10]){boundary(f,'EndTime',String(end));f.get('Next').click();}
+ boundary(f,'CutoffTime','8');
+ const saving=f.get('SaveThrough').click();await waitForUpload(f,1);
+ assert.match(f.get('BatchCount').textContent,/0 מתוך 2/);f.uploads[0].progress(100);
+ assert.equal(f.get('BatchProgress').value,0,'Received bytes do not confirm a saved cut');
+ f.uploads[0].resolve(f.result(0));await waitForUpload(f,2);f.uploads[1].progress(37);
+ assert.equal(f.get('BatchProgress').value,50);assert.equal(f.get('Progress').value,37);
+ f.uploads[1].resolve(f.result(1));await saving;assert.equal(f.get('BatchProgress').value,100);
+ const remaining=f.get('SaveAll').click();await waitForUpload(f,3);assert.match(f.get('BatchCount').textContent,/2 מתוך 3/);
+ f.uploads[2].resolve(f.result(2));await remaining;assert.match(f.get('BatchCount').textContent,/3 מתוך 3/);
+ f.get('Close').click();await done;
 });

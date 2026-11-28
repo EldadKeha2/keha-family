@@ -272,7 +272,7 @@
       if(!this.searchActive)return;this.searchActive=false;this.widget.classList.remove('is-searching');this.dialog?.classList.remove('tag-search-active');
       const target=this.dialog||this.widget;for(const key of ['--tag-visible-height','--tag-visible-top','--tag-header-height','--tag-results-height'])target.style.removeProperty(key);
     }
-    choose(person,tagged){if(this.photoOnly||!person)return;this.store.enqueue(person,tagged);if(tagged){this.query='';this.input.value='';this.renderResults();this.input.focus({preventScroll:true});}}
+    choose(person,tagged){if(this.photoOnly||!person||tagged&&this.store.selected().has(person.id))return;this.store.enqueue(person,tagged);if(tagged){this.query='';this.input.value='';this.renderResults();this.input.focus({preventScroll:true});}}
     addName(){
       if(this.photoOnly)return;
       const name=this.query.trim().replace(/\s+/g,' ');if(!normalize(name)||name.length>120)return;
@@ -282,29 +282,32 @@
     }
     renderResults(resetScroll=false){
       if(this.photoOnly)return;
-      const query=normalize(this.query),selected=this.store.selected(),names=[...roster.values()].filter(person=>(this.group==='all'||tagGroup(person)===this.group)&&Number.isFinite(matchRank(person,query))).sort((a,b)=>comparePeople(a,b,query));
+      const query=normalize(this.query),selected=this.store.selected();
+      const matching=[...roster.values()].filter(person=>(this.group==='all'||tagGroup(person)===this.group)&&Number.isFinite(matchRank(person,query)));
+      const names=matching.filter(person=>!selected.has(person.id)).sort((a,b)=>comparePeople(a,b,query));
       this.results.hidden=this.inline&&!query&&this.group==='all';
       this.host.querySelector('[data-tag-popup]').hidden=this.results.hidden;
       this.matches=names.slice(0,150);
       if(resetScroll||!this.matches.some(person=>person.id===this.activePersonId))this.activePersonId=this.matches[0]?.id||null;
       const position=resetScroll?0:this.results.scrollTop;
-      let previousGroup=null;this.results.innerHTML=this.matches.map((person,index)=>{const group=tagGroup(person),heading=!this.inline&&group!==previousGroup?`<h4 class="tag-group-heading">${tagGroupLabel(group)}</h4>`:'';previousGroup=group;return heading+`<label class="tag-person-option${person.id===this.activePersonId?' is-keyboard-active':''}" id="${this.optionPrefix}TagPersonOption${index}" data-tag-option="${safe(person.id)}" role="option" aria-selected="${selected.has(person.id)}"><input type="checkbox" data-tag-person="${safe(person.id)}" ${selected.has(person.id)?'checked':''}>${personAvatar(person)}<span class="tag-person-name"><strong dir="auto">${tagName(person,this.store.item)}</strong></span></label>`;}).join('')||I18n.t('<p class="tag-no-results">לא נמצא שם מתאים. אפשר להוסיף שם חדש.</p>');
+      let previousGroup=null;this.results.innerHTML=this.matches.map((person,index)=>{const group=tagGroup(person),heading=!this.inline&&group!==previousGroup?`<h4 class="tag-group-heading">${tagGroupLabel(group)}</h4>`:'';previousGroup=group;return heading+`<label class="tag-person-option${person.id===this.activePersonId?' is-keyboard-active':''}" id="${this.optionPrefix}TagPersonOption${index}" data-tag-option="${safe(person.id)}" role="option" aria-selected="false"><input type="checkbox" data-tag-person="${safe(person.id)}">${personAvatar(person)}<span class="tag-person-name"><strong dir="auto">${tagName(person,this.store.item)}</strong></span></label>`;}).join('')||`<p class="tag-no-results">${I18n.isEnglish?'No more matching names.':'אין שמות נוספים שמתאימים לחיפוש.'}</p>`;
       for(const button of this.host.querySelectorAll('[data-tag-group]'))button.setAttribute('aria-pressed',String(button.dataset.tagGroup===this.group));
       this.results.scrollTop=position;
       this.host.querySelector('[data-tag-search-count]').textContent=this.inline&&!query?'':I18n.html`${names.length} ${I18n.isEnglish?I18n.word(names.length,'name in the list','names in the list'):I18n.t('שמות ברשימה')}`;
-      const add=this.host.querySelector('[data-tag-add]');add.hidden=!this.store.ready||!query||names.some(person=>matchRank(person,query)<=4)||[...selected.values()].some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalize(alias)===query));add.textContent=I18n.t('＋ הוספת השם ״')+this.query.trim()+'״';this.version=rosterVersion;this.activateSuggestion(this.activePersonId);this.positionDesktopResults();
+      const add=this.host.querySelector('[data-tag-add]');add.hidden=!this.store.ready||!query||matching.some(person=>matchRank(person,query)<=4)||[...selected.values()].some(person=>matchRank(person,query)<1);add.textContent=I18n.t('＋ הוספת השם ״')+this.query.trim()+'״';this.version=rosterVersion;this.activateSuggestion(this.activePersonId);this.positionDesktopResults();
     }
     render(){
       if(!this.host.isConnected)return;
       const selected=this.store.selected(),signature=JSON.stringify([...selected].map(([key,person])=>[key,person.name,videoAge(person,this.store.item)]));
-      if(this.lastSelection!==signature){this.selectedHost.innerHTML=[...selected].map(([key,person])=>I18n.html`<button type="button" class="selected-person-tag" data-remove-person-tag="${safe(key)}" aria-label="הסרת התיוג של ${safe(I18n.personName(person))}">${tagName(person,this.store.item)}${person.isNew&&!this.store.draft?I18n.t('<small>שומר…</small>'):''}<span aria-hidden="true">×</span></button>`).join('')||'';this.lastSelection=signature;}
+      const selectionChanged=this.lastSelection!==signature;
+      if(selectionChanged){this.selectedHost.innerHTML=[...selected].map(([key,person])=>I18n.html`<button type="button" class="selected-person-tag" data-remove-person-tag="${safe(key)}" aria-label="הסרת התיוג של ${safe(I18n.personName(person))}">${tagName(person,this.store.item)}${person.isNew&&!this.store.draft?I18n.t('<small>שומר…</small>'):''}<span aria-hidden="true">×</span></button>`).join('')||'';this.lastSelection=signature;}
       if(this.photoOnly)window.FamilyPhotoDate?.decorate(this.selectedHost,this.store.item,[...selected.values()]);
       this.host.querySelector('[data-tag-count]').textContent=selected.size===0?'':selected.size===1?I18n.t('אדם אחד תויג'):selected.size+I18n.t(' מתויגים');
       const state=this.store;if(this.input)this.input.disabled=!state.ready;this.status.className='tag-autosave-status '+(state.error?'failed':state.status);
       this.status.textContent=state.error?I18n.t('התיוג לא נשמר: ')+state.error:state.status==='loading'?I18n.t('טוען את רשימת האנשים…'):state.busy?I18n.t('שומר את התיוג…'):state.status==='saved'?I18n.t('✓ התיוג נשמר בהצלחה'):'';
       this.host.querySelector('[data-tag-error-actions]').hidden=!state.error;
-      if(this.version!==rosterVersion)this.renderResults();
-      for(const checkbox of this.results?.querySelectorAll('[data-tag-person]')||[]){checkbox.checked=selected.has(checkbox.dataset.tagPerson);checkbox.disabled=!state.ready;checkbox.closest('.tag-person-option')?.setAttribute('aria-selected',String(checkbox.checked));}
+      if(selectionChanged||this.version!==rosterVersion)this.renderResults();
+      for(const checkbox of this.results?.querySelectorAll('[data-tag-person]')||[])checkbox.disabled=!state.ready;
     }
     destroy(){this.endSearch();this.events.abort();this.store.listeners.delete(this.listener);}
   }
@@ -360,9 +363,9 @@
     window.addEventListener('beforeunload',event=>{if([...stores.values()].some(store=>store.busy)){event.preventDefault();event.returnValue='';}});
   }
   window.FamilyPeopleRoster.subscribe(people=>{people.forEach(addPerson);for(const store of stores.values())store.emit();});
-  async function findPeople(query='',preferred=[]){
+  async function findPeople(query='',preferred=[],limit=50){
     await loadRoster(true);const normalized=normalize(query),first=new Set(preferred);
-    return [...roster.values()].filter(person=>Number.isFinite(matchRank(person,normalized))).sort((a,b)=>comparePeople(a,b,normalized,first)).slice(0,50).map(person=>({...person,context:personContext(person)}));
+    return [...roster.values()].filter(person=>Number.isFinite(matchRank(person,normalized))).sort((a,b)=>comparePeople(a,b,normalized,first)).slice(0,limit).map(person=>({...person,context:personContext(person),searchRank:matchRank(person,normalized)}));
   }
   async function flush(id){
     const store=stores.get(id);if(!store)return;

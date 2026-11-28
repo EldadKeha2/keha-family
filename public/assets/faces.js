@@ -2,7 +2,6 @@
   'use strict';
   const I=window.FamilyI18n,tr=(he,en)=>I.isEnglish?en:he;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const normalizeName=value=>String(value??'').normalize('NFKD').replace(/[\u0591-\u05c7'"׳״]/g,'').replace(/\s+/g,' ').toLowerCase().trim();
   const choices='[data-face-person],[data-face-add]';
   const labels=new Map();let current=null,retained=null,serial=0,geometry=null,touchUntil=0;
   const controlRoots=['toolbar','missingNote','reviewButton','reviewStatus','regionsButton','regionsNote'];
@@ -569,6 +568,7 @@
     if(c.hoverFace&&!faces.some(face=>face.id===c.hoverFace.id&&face.person))clearHoverLabel(c);
     c.saved=faces;if(c.active){const updated=faces.find(face=>face.id===c.active.id);if(updated)c.active=updated;else if(c.active.person&&!c.saving)closePopup(c);}
     paint(c);
+    if(!c.saving&&c.popup?.classList.contains('face-picker')&&c.popup.querySelector('[data-face-results]').getAttribute('aria-busy')!=='true')void results(c,c.popup.querySelector('input').value);
   }
   async function load(c,force=false){
     if(c.adapter){const result=await c.adapter.load();if(!live(c))return;changed(c,result);c.ignored=result.ignoredFaces||[];c.ready=true;apply(c,result.faces);return;}
@@ -613,16 +613,21 @@
     option.setAttribute('aria-selected','true');
     input.setAttribute('aria-activedescendant',option.id);
   }
+  function photoTags(c){
+    return [...(c.item.tags||[]),...c.saved.map(face=>face.person||{id:face.personId})];
+  }
   async function results(c,query){
     const panel=c.popup;if(c.saving||!panel?.classList.contains('face-picker'))return;
     const sequence=++c.searchSequence,host=panel.querySelector('[data-face-results]'),input=panel.querySelector('input');
     input.removeAttribute('aria-activedescendant');
     host.replaceChildren();host.setAttribute('aria-busy','true');
     try{
-      const people=await (c.adapter?.findPeople||window.FamilyTags.findPeople)(query,(c.item.tags||[]).map(person=>person.id));if(!live(c)||c.saving||c.popup!==panel||sequence!==c.searchSequence)return;
-      const name=String(query).trim().replace(/\s+/g,' '),key=normalizeName(name),exact=people.some(person=>[person.name,person.nameEn].filter(Boolean).some(alias=>normalizeName(alias)===key));
-      host.innerHTML=people.map((person,index)=>`<button id="facePersonOption-${index}" class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="false">${personAvatar(person)}<span><strong dir="auto">${safe(I.personName(person))}</strong></span></button>`).join('')||`<p class="face-no-results">${tr('לא נמצא שם מתאים. אפשר להוסיף שם חדש.','No matching name. You can add a new name.')}</p>`;
-      if(key&&!exact)host.innerHTML+=`<button id="facePersonOption-${people.length}" class="face-person-option face-add-name" type="button" role="option" data-face-add aria-selected="false"><span class="face-person-check" aria-hidden="true">＋</span><span><strong dir="auto">${tr('הוספת השם ״','Add “')}${safe(name)}${tr('״','”')}</strong></span></button>`;
+      const findPeople=c.adapter?.findPeople||window.FamilyTags.findPeople;
+      const [{tagChoices},found]=await Promise.all([import('./tag-choices.mjs'),findPeople(query,[],50+(c.ready?photoTags(c).length:150)),c.loading]);
+      if(!live(c)||c.saving||c.popup!==panel||sequence!==c.searchSequence)return;
+      const name=String(query).trim().replace(/\s+/g,' '),{people,canAddName}=tagChoices(found,photoTags(c),name);
+      host.innerHTML=people.map((person,index)=>`<button id="facePersonOption-${index}" class="face-person-option" type="button" role="option" data-face-person="${safe(person.id)}" aria-selected="false">${personAvatar(person)}<span><strong dir="auto">${safe(I.personName(person))}</strong></span></button>`).join('')||`<p class="face-no-results">${tr('אין שמות נוספים שמתאימים לחיפוש.','No more matching names.')}</p>`;
+      if(canAddName)host.innerHTML+=`<button id="facePersonOption-${people.length}" class="face-person-option face-add-name" type="button" role="option" data-face-add aria-selected="false"><span class="face-person-check" aria-hidden="true">＋</span><span><strong dir="auto">${tr('הוספת השם ״','Add “')}${safe(name)}${tr('״','”')}</strong></span></button>`;
       for(const button of host.querySelectorAll('[data-face-person]'))button.addEventListener('click',()=>save(c,{personId:button.dataset.facePerson}));
       host.querySelector('[data-face-add]')?.addEventListener('click',()=>save(c,{name}));
       const first=host.querySelector(choices);
@@ -718,6 +723,11 @@
     try{
       await c.loading;if(!c.adapter)await window.FamilyTags.flush(c.item.id);if(!live(c))return;
       const known=c.saved.find(saved=>saved.id===face.id||c.geom.sameRegion(saved.rect,face.rect));
+      if(!removing&&!(selection.personId&&selection.personId===(known?.personId||known?.person?.id))){
+        const {taggedPeople}=await import('./tag-choices.mjs');
+        if(!live(c))return;
+        if(taggedPeople(photoTags(c)).has(selection))throw Error(tr('האדם כבר מתויג בתמונה.','This person is already tagged in this photo.'));
+      }
       const payload={faceId:known?.id||face.id,...selection,rect:face.rect,expectedRevision:known?.revision||null},result=c.adapter?await c.adapter.save(payload):await request('api/media/'+c.item.id+'/faces/save',{method:'POST',body:JSON.stringify(payload)});
       changed(c,result);c.pendingUnassign=null;
       if(!c.adapter)remember(c.item.id,result.faces,result.item,c.detected,result.ignoredFaces,c.retained);
@@ -933,4 +943,3 @@
   }
   window.FamilyFaces={mount,clear,update,restoreView,canNavigate,saved,hasPendingChanges(stage){const c=stage._familyFaceContext;return Boolean(live(c)&&c.adapter&&(c.saving||c.adjust||c.resizeDrag||c.popup?.classList.contains('face-picker')&&c.popup.querySelector('input')?.value));},whenReady(stage,image){const c=stage._familyFaceContext;return c?.image===image?c.paintReady:Promise.resolve();},async flush(){await current?.pendingSave;},async finish(stage){const c=stage._familyFaceContext;if(!live(c))return false;await c.pendingSave;if(!live(c)||c.saving||c.reviewSaving||c.saveError||c.reviewError||c.adjust||c.resizeDrag)return false;stopTabFaces(c);closePopup(c);return true;},dismiss(){if(current){stopTabFaces(current);closePopup(current);}},fit(){if(current?.initialized&&imageWidth(current.image)){fitZoom(current);place(current);}}};
 })();
-

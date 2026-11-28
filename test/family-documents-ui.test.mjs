@@ -132,3 +132,14 @@ test('each record has a password dialog; a rejected deletion keeps the record an
   assert.equal(f.document.getElementById('documentRemoval').open,false);
   assert.equal(f.document.getElementById('documentRemovalPassword').value,'');
 });
+
+test('choosing a person in a document moves them out of search and removing their chip restores the choice',async()=>{
+ const f=fixture(),get=id=>f.document.getElementById(id);
+ f.window.FamilyDocuments.activate('documents');await tick();get('newDocument').click();
+ const list=get('documentPeople'),yona=list.querySelector('[value=yona]'),shlomo=list.querySelector('[value=shlomo]');
+ get('documentPeopleSearch').value='קהא';get('documentPeopleSearch').dispatchEvent(new f.dom.Event('input'));
+ yona.checked=true;yona.dispatchEvent(new f.dom.Event('change',{bubbles:true}));
+ assert.equal(yona.parentElement.hidden,true);assert.equal(shlomo.parentElement.hidden,false);
+ const chip=get('documentSelectedPeople').querySelector('[data-document-untag="yona"]');assert.match(chip.textContent,/יונה/);
+ chip.click();assert.equal(yona.checked,false);assert.equal(yona.parentElement.hidden,false);assert.equal(get('documentSelectedPeople').hidden,true);
+});

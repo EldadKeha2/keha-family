@@ -54,14 +54,14 @@
       });
       this.list.addEventListener('mousedown',event=>event.preventDefault());
       this.list.addEventListener('click',event=>{const button=event.target.closest('[data-memory-person]');if(button)this.pick(this.results.find(p=>p.id===button.dataset.memoryPerson));});
-      this.chips.addEventListener('click',event=>{const button=event.target.closest('[data-memory-untag]');if(button){this.selected.delete(button.dataset.memoryUntag);this.renderChips();this.input.focus();}});
+      this.chips.addEventListener('click',event=>{const button=event.target.closest('[data-memory-untag]');if(button){this.selected.delete(button.dataset.memoryUntag);this.renderChips();if(document.activeElement===this.input)void this.search();else this.input.focus();}});
       this.input.addEventListener('blur',()=>setTimeout(()=>{if(!this.host.contains(document.activeElement))this.hide();},100));this.renderChips();
     }
     renderChips(){this.chips.innerHTML=[...this.selected.values()].map(p=>`<button type="button" class="memory-person-chip" data-memory-untag="${safe(p.id)}" aria-label="${t('הסרת התיוג של ','Remove tag for ')+safe(I.personName(p))}">${safe(I.personName(p))}<span aria-hidden="true">×</span></button>`).join('');}
     async search(){
       const serial=++this.serial;this.status.textContent=t('טוען שמות…','Loading names…');
       try{
-        const people=await window.FamilyTags.findPeople(this.input.value);if(serial!==this.serial)return;
+        const people=await window.FamilyTags.findPeople(this.input.value,[],50+this.selected.size);if(serial!==this.serial)return;
         this.results=people.filter(p=>!this.selected.has(p.id)&&(this!==storyPicker||!state.allowedPersonIds||state.allowedPersonIds.includes(p.id))).slice(0,20);this.active=this.results.length?0:-1;this.status.textContent='';
         this.list.innerHTML=this.results.map((p,i)=>`<button type="button" id="${this.host.id}Option${i}" role="option" aria-selected="${i===0}" data-memory-person="${safe(p.id)}"><strong>${safe(I.personName(p))}</strong><small>${safe(p.context||'')}</small></button>`).join('');
         this.list.hidden=!this.results.length;this.input.setAttribute('aria-expanded',String(!this.list.hidden));this.highlight();
@@ -69,7 +69,7 @@
       }catch(error){if(serial===this.serial){this.hide();this.status.textContent=error.message;}}
     }
     highlight(){for(const [i,button]of [...this.list.querySelectorAll('[role=option]')].entries())button.setAttribute('aria-selected',String(i===this.active));if(this.active>=0){this.input.setAttribute('aria-activedescendant',this.host.id+'Option'+this.active);this.list.children[this.active]?.scrollIntoView?.({block:'nearest'});}}
-    pick(person){if(!person)return;if(this.selected.size>=150){this.status.textContent=t('אפשר לתייג עד 150 אנשים.','You can tag up to 150 people.');return;}this.selected.set(person.id,person);this.input.value='';this.renderChips();this.hide();this.input.focus();this.hide();}
+    pick(person){if(!person||this.selected.has(person.id))return;if(this.selected.size>=150){this.status.textContent=t('אפשר לתייג עד 150 אנשים.','You can tag up to 150 people.');return;}this.selected.set(person.id,person);this.input.value='';this.renderChips();this.hide();this.input.focus();this.hide();}
     hide(){this.serial++;this.list.hidden=true;this.input.setAttribute('aria-expanded','false');this.input.removeAttribute('aria-activedescendant');if(this.status.textContent===t('טוען שמות…','Loading names…'))this.status.textContent='';}
     ids(){return [...this.selected.keys()];}
   }

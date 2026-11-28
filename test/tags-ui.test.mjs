@@ -226,3 +226,13 @@ test('Madi Fish comes first only for her exact full Hebrew name in both tagging 
   f.tags.clearInline(host);
  }
 });
+
+test('tag suggestions exclude pending and saved people, preserve distinct namesakes and return a removed person',async()=>{
+ const people=['one','two'].map(id=>({id,name:'Archive Twin',nameEn:'Shared Alias',extra:true}));
+ const f=fixture(()=>Response.json({people}));await f.tags.findPeople('Archive Twin');
+ const host=new NodeStub();f.tags.mountInline(host,{...photo('twins-video'),kind:'video',tags:[people[0]]});
+ const widget=host._tagWidget,query=()=>{widget.query='Shared Alias';widget.renderResults(true);return Array.from(widget.matches,p=>p.id);};
+ assert.deepEqual(query(),['two']);widget.choose(people[1],true);assert.deepEqual(query(),[]);
+ assert.equal(host.querySelector('[data-tag-add]').hidden,true);assert.match(widget.selectedHost.innerHTML,/data-remove-person-tag="two"/);
+ widget.store.enqueue(people[0],false);assert.deepEqual(query(),['one']);f.tags.clearInline(host);
+});
