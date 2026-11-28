@@ -68,6 +68,11 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
   const player = get('Player'), track = get('Track'), playhead = get('Playhead');
   const clock = time => editor.clock(Math.round(time * 100) / 100);
   const axes = [['Start','start'], ['End','end']];
+  const keySteps = new Map([['a',-1],['l',1],['KeyA',-1],['KeyL',1]]);
+  for (const slider of [playhead,get('StartSlider'),get('EndSlider')]) {
+    slider.setAttribute('aria-keyshortcuts','A L');
+    slider.title = tr('A – שנייה אחורה · L – שנייה קדימה','A – back one second · L – forward one second');
+  }
   let drafts = [], index = 0, preview = null, drag = null, dragged = false;
 
   function showPosition(time) {
@@ -75,11 +80,11 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     playhead.setAttribute('aria-valuetext',clock(time));
   }
 
-  function seek(time) {
+  function seek(time, {pause = true} = {}) {
     if (!Number.isFinite(time)) return;
-    preview = null;
-    player.pause();
     const target = Math.max(0,Math.min(drafts[index]?.duration ?? time,time));
+    if (pause || (preview && (target < preview.start || target > preview.end))) preview = null;
+    if (pause) player.pause();
     if (seekTo) seekTo(target); else player.currentTime = target;
     showPosition(target);
   }
@@ -226,6 +231,28 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
   });
 
   return {
+    stepByKey(event) {
+      if (!drafts[index] || saving() || event.defaultPrevented || event.isComposing || event.keyCode === 229 ||
+          event.ctrlKey || event.altKey || event.metaKey) return false;
+      // Physical key codes keep the same shortcuts when the keyboard is set to Hebrew.
+      const step = keySteps.get(event.key.toLowerCase()) ?? keySteps.get(event.code);
+      if (!step) return false;
+      const target = event.target;
+      const boundary = axes.find(([id]) => target === get(id+'Slider'));
+      if (boundary) {
+        if (target.disabled) return false;
+        const current = Number(target.value);
+        const next = Math.max(Number(target.min),Math.min(Number(target.max),current + step));
+        if (next !== current) {
+          target.value = next;
+          setBoundary(...boundary,'slider');
+        }
+      } else {
+        if (target !== playhead && (target.isContentEditable || target.closest('input,textarea,select,[role="textbox"],[role="combobox"]'))) return false;
+        seek(player.currentTime + step,{pause:false});
+      }
+      return true;
+    },
     show(items, activeIndex) {
       if (drafts[index] !== items[activeIndex]) { preview = null; drag = null; }
       drafts = items; index = activeIndex;

@@ -149,6 +149,11 @@ function openSegments(f,duration=8){
 function boundary(f,id,value){
  const field=f.get(id);field.value=value;field.listeners.get('input')();
 }
+function pressEditorKey(f,target,key,code,options={}){
+ const event={target,key,code,preventDefault(){this.defaultPrevented=true;},stopPropagation(){},...options};
+ f.get('Wizard').listeners.get('keydown')(event);
+ return Boolean(event.defaultPrevented);
+}
 async function waitForUpload(f,count){
  for(let i=0;i<100&&f.uploads.length<count;i++)await tick();
  assert.equal(f.uploads.length,count,'the expected upload started');
@@ -176,6 +181,41 @@ test('Next keeps the marked portion on the player timeline and seeks to the prec
  boundary(f,'Playhead','7.5');assert.equal(f.get('Player').currentTime,7.5);
  assert.equal(f.get('StartTime').value,'10','scrubbing does not change the cut');
  f.get('Split').click();assert.equal(f.get('Track').hidden,true);
+ f.get('Close').click();await done;
+});
+
+test('A and L step the playhead by one second on English and Hebrew keyboards without editing a cut or interrupting playback',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']),player=f.get('Player');
+ assert.equal(pressEditorKey(f,player,'l','KeyL'),false,'shortcuts belong to the split editor');
+ openSegments(f,8.75);boundary(f,'EndTime','5.25');
+ assert.equal(pressEditorKey(f,f.get('Next'),'L','KeyL'),true);assert.equal(player.currentTime,6.25);
+ assert.equal(player.paused,true);assert.equal(f.get('EndTime').value,'5.25');
+ await player.play();pressEditorKey(f,player,'ש','KeyA');
+ assert.equal(player.currentTime,5.25);assert.equal(player.paused,false);
+ pressEditorKey(f,f.get('Playhead'),'ך','KeyL',{repeat:true});assert.equal(Number(f.get('Playhead').value),6.25);
+ player.currentTime=8.5;pressEditorKey(f,player,'l','');assert.equal(player.currentTime,8.75);
+ player.currentTime=.25;pressEditorKey(f,player,'a','');assert.equal(player.currentTime,0);
+ for(const id of ['Name','Caption','StartTime','EndTime','Search','Dateyear','Target']){
+  assert.equal(pressEditorKey(f,f.get(id),'l','KeyL'),false,id);
+ }
+ for(const options of [{ctrlKey:true},{altKey:true},{metaKey:true},{isComposing:true},{keyCode:229}]){
+  assert.equal(pressEditorKey(f,player,'l','KeyL',options),false);
+ }
+ assert.equal(player.currentTime,0);assert.equal(f.get('StartTime').value,'0');assert.equal(f.get('EndTime').value,'5.25');
+ f.get('Close').click();await done;
+});
+
+test('A and L move the focused segment handle, retaining the previous cut as the end floor and respecting locks',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,837.96);
+ boundary(f,'EndTime','02:24.27');f.get('PinNext').click();
+ const start=f.get('StartSlider'),end=f.get('EndSlider');
+ pressEditorKey(f,end,'a','KeyA');assert.equal(Number(end.value),144.27);assert.equal(f.get('EndTime').value,'');
+ pressEditorKey(f,end,'ך','KeyL');assert.equal(f.get('EndTime').value,'145.27');assert.equal(f.get('Player').currentTime,145.27);
+ pressEditorKey(f,end,'l','KeyL');pressEditorKey(f,start,'l','KeyL');
+ assert.equal(f.get('StartTime').value,'145.27');assert.equal(f.get('EndTime').value,'146.27');
+ pressEditorKey(f,end,'a','KeyA');pressEditorKey(f,end,'a','KeyA');assert.equal(Number(end.value),145.27);
+ f.get('Previous').click();assert.equal(end.disabled,true);assert.equal(pressEditorKey(f,end,'l','KeyL'),false);
+ assert.equal(Number(end.value),144.27);
  f.get('Close').click();await done;
 });
 

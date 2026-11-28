@@ -1,4 +1,4 @@
-import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=segment-end-floor-1';
+import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=segment-step-keys-1';
 import {bindUploadPreview} from './video-upload-preview.mjs?v=upload-repair-1';
 import {startUploadCheck} from './video-upload-check.mjs';
 import {createVideoSource} from './video-source-upload.mjs';
@@ -437,7 +437,14 @@ function mount(){
  });
  for(const part of ['day','month','year'])get('Date'+part).addEventListener('keydown',event=>{if(event.key===' '){event.preventDefault();get('Date'+({day:'month',month:'year',year:'year'}[part])).focus();}});
  get('Caption').addEventListener('keydown',event=>window.FamilyPhotoKeyboard?.saveDescription(event,()=>{collect();get('Caption').blur();}));
- dialog.addEventListener('keydown',event=>{if(event.key==='Control'&&!session.saving){event.preventDefault();navigate(event.shiftKey?-1:1);}event.stopPropagation();});
+ dialog.addEventListener('keydown',event=>{
+  if(dialog.open&&session?.split&&timeline.stepByKey(event)){event.preventDefault();rememberActivity();}
+ },true);
+ window.FamilyPhotoKeyboard?.bindNavigation({
+  available:()=>Boolean(dialog.open&&session?.split&&!session.saving&&dialog.contains(document.activeElement)),capture:draft,
+  navigate:(direction,from)=>{if(from===draft())navigate(direction);}
+ });
+ dialog.addEventListener('keydown',event=>{if(event.key==='Control'&&session&&!session.split&&!session.saving){event.preventDefault();navigate(event.shiftKey?-1:1);}event.stopPropagation();});
  get('Search').addEventListener('input',async()=>{const query=get('Search').value.trim(),serial=++searchSerial;if(!query){get('Results').replaceChildren();return;}const people=await window.FamilyTags.findPeople(query);if(!session||serial!==searchSerial||get('Search').value.trim()!==query||session.saving||draft().saved||draft().frozen)return;session.matches=people.slice(0,12);get('Results').innerHTML=session.matches.map((p,index)=>`<button type="button" data-video-add-person="${index}">${safe(I.personName(p))}</button>`).join('')+(people.length?'':`<button type="button" data-video-add-name>${tr('הוספת ','Add ')}${safe(query)}</button>`);});
  dialog.addEventListener('click',event=>{if(!session||session.saving||draft().saved||draft().frozen)return;const add=event.target.closest?.('[data-video-add-person],[data-video-add-name]'),remove=event.target.closest?.('[data-video-remove-person]');if(add){const p=add.hasAttribute('data-video-add-name')?{name:get('Search').value.trim()}:{personId:session.matches[Number(add.dataset.videoAddPerson)].id,label:I.personName(session.matches[Number(add.dataset.videoAddPerson)])};const d=draft();if(!d.metadata.people.some(v=>(v.personId||v.name)===(p.personId||p.name)))d.metadata.people.push(p);get('Search').value='';get('Results').replaceChildren();renderPeople();}if(remove){draft().metadata.people.splice(Number(remove.dataset.videoRemovePerson),1);renderPeople();}});
 }
