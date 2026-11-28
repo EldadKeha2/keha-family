@@ -1,6 +1,6 @@
 import {photoFrame,validatePhotoFrame} from './photo-framing.mjs';
 import family from './family.mjs';
-import {initializeFamilyContent,handleFamilyContent} from './family-content.mjs';
+import {initializeFamilyContent,handleFamilyContent,stateContentContext,mediaInContext,scopedMediaLinks} from './family-content.mjs';
 import {searchSite} from './site-search.mjs';
 import {RecordingLibrary,memoryCategory,memoryYear,memoryPeople,publicStory,initializeAliyahFilmStories} from './memories.mjs';
 import {RecycleAccess} from './recycle-access.mjs';
@@ -13,6 +13,7 @@ import {videoAssetsPublic,videoAssetsQueue,saveVideoAsset} from './video-assets-
 import {MEDIA_PUBLIC_BATCH_SIZE,mediaPublicMetadata} from './media-public-batch.mjs';
 import {collectionPage,collectionPageRevision} from './collection-pages.mjs';
 import {initVideoSources,videoSourceState} from './video-source-state.mjs';
+import {segmentInfo,segmentProject,segmentChanges} from './video-segment-projects.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
 import {HttpError,json,fail,text,birthday,calendarDate,uid,stateFailure} from './http.mjs';
 import {couples,couple,weddingCollection,validCollection,weddingDate} from './weddings.mjs';
@@ -83,6 +84,8 @@ export class FamilyState {
     this.sql.exec('CREATE TABLE IF NOT EXISTS ruti_house_run_metrics(id TEXT PRIMARY KEY,missed INTEGER NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS ruti_house_completion_bonuses(id TEXT PRIMARY KEY,stage_results TEXT NOT NULL)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media(id TEXT PRIMARY KEY,category TEXT NOT NULL,person_id TEXT,data TEXT NOT NULL)');
+    this.sql.exec("CREATE INDEX IF NOT EXISTS media_segment_project ON media(json_extract(data,'$.segmentProject.id')) WHERE json_extract(data,'$.segmentProject.id') IS NOT NULL");
+    this.sql.exec("CREATE INDEX IF NOT EXISTS media_video_source ON media(json_extract(data,'$.videoSourceId')) WHERE json_extract(data,'$.videoSourceId') IS NOT NULL");
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_owner ON media(person_id)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS media_category ON media(category)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS media_collections(media_id TEXT NOT NULL,collection TEXT NOT NULL,added_at TEXT NOT NULL,PRIMARY KEY(media_id,collection))');
@@ -410,7 +413,7 @@ export class FamilyState {
     ...(mediaKind(item)==='photo'?{framing:photoFrame(item.framing),faceSummary:this.faceSummary(item,cached?.face)}:{}),
     ...(['photo','video'].includes(mediaKind(item))?{labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
-    ...(item.videoClip?{videoClip:item.videoClip}:{}),...(item.duration?{duration:item.duration}:{}),...(mediaKind(item)==='video'?{videoRevision:item.videoRevision||'original'}:{}),
+    ...(item.videoClip?{videoClip:item.videoClip}:{}),...(item.duration?{duration:item.duration}:{}),...(mediaKind(item)==='video'?{videoRevision:item.videoRevision||'original',...(segmentInfo(item)?{hasSegmentProject:true}:{})}:{}),
     ...(item.youtubeStart!==undefined?{youtubeStart:item.youtubeStart,youtubeEnd:item.youtubeEnd}:{}),
     ...(item.category==='nostalgia'?{nostalgiaEventIds:item.nostalgiaEventIds||[]}:{}),
     ...videoAssetsPublic(item),
@@ -869,6 +872,28 @@ export class FamilyState {
         if(date&&person.birthday!=='1.1.1111'&&time(date)<time(person.birthday))throw new HttpError(400,'תאריך הפטירה צריך להיות אחרי תאריך הלידה.');
         person.deathDate=date;this.savePerson(person);return {saved:true,person:this.snapshot(person,this.personMedia(p.id))};
       }
+      case 'video.segment.project':{
+        const anchor=this.media(p.id),project=segmentInfo(anchor);
+        if(!project)throw new HttpError(404,'חלוקת הסרטון לא נמצאה.');
+        const field=anchor.segmentProject?'$.segmentProject.id':'$.videoSourceId';
+        let items=this.rows("SELECT data FROM media WHERE json_extract(data,'"+field+"')=?",project.id).map(row=>JSON.parse(row.data));
+        if(p.branch){
+          const context=stateContentContext(this,p.branch);
+          items=items.filter(item=>mediaInContext({...item,people:this.tagIds(item.id)},context));
+        }
+        const result=segmentProject(anchor,items,item=>({id:item.id,name:item.name,caption:item.caption||'',takenDate:item.takenDate,src:photoSource(item)}));
+        return scopedMediaLinks(result,p.branch);
+      }
+      case 'video.segment.details':{
+        if(p.branch)this.run('content.media.authorize',{id:p.id,branch:p.branch});
+        const item=this.media(p.id),{changes}=segmentChanges(item,p);
+        if(Object.keys(changes).length){
+          Object.assign(item,changes,{updatedAt:new Date().toISOString()});
+          this.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);
+          this.touchMedia(item);
+        }
+        return this.mediaChanged(item,'video-segment-details');
+      }
       case 'video.upload.prepare':{
         const source=this.media(p.id);if(mediaKind(source)!=='video'||source.provider)throw new HttpError(400,'בחרו סרטון שהועלה לאתר.');
         if(!/^[a-f0-9]{32}$/.test(p.operationId||''))throw new HttpError(400,'אישור השמירה אינו תקין. פתחו את האשף מחדש.');
@@ -885,6 +910,7 @@ export class FamilyState {
         const data=prepared.metadata;let obsoleteKey=null;
         if(data.range){if(!p.rendered?.key?.startsWith('video-clips/'+item.id+'/')||!Number.isSafeInteger(p.rendered.size)||p.rendered.size<1)throw new HttpError(400,'הקטע המסומן לא נשמר.');obsoleteKey=item.key;Object.assign(item,{key:p.rendered.key,mime:'video/mp4',size:p.rendered.size,duration:p.rendered.duration,videoRevision:uid()});item.file=(item.category==='personal'?'gallery/':'')+item.id+'.mp4';}
         Object.assign(item,{name:data.name,nameEn:null,caption:data.caption,takenDate:data.date,takenDateRevision:uid(),videoUploadEdit:{operationId:p.operationId,fingerprint:JSON.stringify(data)}});
+        if(data.segmentProject)item.segmentProject=data.segmentProject;
         if(data.range)item.filename=data.name.replace(/[\/\\<>:"|?*\x00-\x1f]/g,'_')+'.mp4';
         if(item.category==='nostalgia'&&data.eventId!==undefined)item.nostalgiaEventIds=data.eventId?[data.eventId]:[];
         if(item.category==='videos'&&data.group)item.videoCategory=data.group;

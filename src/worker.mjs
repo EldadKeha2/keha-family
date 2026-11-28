@@ -406,6 +406,7 @@ const worker = {
       if(path==='/api/weddings'&&request.method==='GET')return json(await db('weddings'));
       if((match=/^\/api\/weddings\/([^/]+)$/.exec(path))&&request.method==='GET')return json(await db('wedding',{id:decodeURIComponent(match[1]),paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
       if(path==='/api/nostalgia'&&request.method==='GET')return snapshot(request,await db('collection',{kind:'nostalgia',paged:url.searchParams.get('paged')==='1',page:url.searchParams.get('page'),size:url.searchParams.get('size')}));
+      if((match=/^\/api\/media\/([a-f0-9]{32})\/segment-project$/.exec(path))&&request.method==='GET')return json(await db('video.segment.project',{id:match[1],branch:request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope')}));
       if((match=/^\/api\/video-sources\/([a-f0-9]{64})\/play$/.exec(path))&&['GET','HEAD'].includes(request.method))return await videoSourceRoute(request,env,db,ctx,'play',sniff,match[1]);
       if((match=/^\/media\/([a-f0-9]{32})$/.exec(path))&&['GET','HEAD'].includes(request.method)){
         const scope=request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope');
@@ -419,6 +420,7 @@ const worker = {
         return await photoAsset(env,item,request,ctx,derived);
       }
       if(request.method==='POST'){
+        if((match=/^\/api\/media\/([a-f0-9]{32})\/video-segment-details$/.exec(path)))return json(await db('video.segment.details',{...await readJSON(request,80000),id:match[1],branch:request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope')}));
         if((match=/^\/api\/video-sources\/(start|part|status|complete|save|discard)$/.exec(path)))return await videoSourceRoute(request,env,db,ctx,match[1],sniff);
         if(path==='/api/voices/upload')return await uploadRecording(request,env,db,ctx,streamUpload);
         if((match=/^\/api\/voices\/([a-f0-9]{32})$/.exec(path)))return json(await db('recording.edit',{...await readJSON(request,40000),id:match[1]}));

@@ -6,6 +6,7 @@ import {normalizePhotoLabel, photoLabels} from '../public/assets/photo-labels-ca
 import {photoDate} from '../public/assets/photo-date.mjs';
 import {decodeUploadMetadata} from '../public/assets/photo-upload-metadata.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
+import {segmentInfo,segmentProject,segmentChanges} from './video-segment-projects.mjs';
 import {biographyValue, biographyDefaults, contentField} from './biography.mjs';
 import {calendarDate, checkOrigin, equal, HttpError, json, readJSON, sha256, text, uid, boundedBody} from './http.mjs';
 import {configured, deleteObject, getObject, putObject} from './hf.mjs';
@@ -45,7 +46,7 @@ function picture(item) {
     takenDate:item.takenDate||null, takenDateRevision:item.takenDateRevision||null,
     createdAt:created(item), updatedAt:item.updatedAt||created(item),
     ...(item.kind==='photo'?{photoRevision:item.photoRevision||'original',faceSummary,labels:photoLabels(item.labels),framing:item.framing||null}:{}),
-    ...(item.kind==='video'?{videoRevision:item.videoRevision||'original',videoCategory:item.videoCategory||'family',
+    ...(item.kind==='video'?{videoRevision:item.videoRevision||'original',videoCategory:item.videoCategory||'family',...(segmentInfo(item)?{hasSegmentProject:true}:{}),
       duration:item.duration||null, provider:item.provider || 'upload', ...(item.youtubeId?{youtubeId:item.youtubeId,youtubeStart:item.youtubeStart,youtubeEnd:item.youtubeEnd}:{})}:{}),
   };
 }
@@ -131,6 +132,8 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
   const newProfiles=new Map();
   // Both shells use the original editor and the same underlying media record.
   // Authentication was checked above with the token for the originating shell.
+  const projectRequest=method==='GET'&&/^\/api\/media\/([a-f0-9]{32})\/segment-project$/.exec(path);
+  if(nativeRoute&&projectRequest)return json(await db('video.segment.project',{id:projectRequest[1],branch}));
   if(nativeRoute && /^\/api\/media\/[a-f0-9]{32}\//.test(path))return nativeRoute(request,path);
   async function categories() {
     return [...DEFAULT_VIDEO_CATEGORIES,...(await db('nakash.compat.categories',{branch})).categories];
@@ -167,6 +170,11 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     ...(item.thumbnail?{thumbnailSrc:(nativeRoute?'/media/':mediaPath)+item.id+(nativeRoute?'?thumbnail=1&v=':'?asset=thumbnail&v=')+encodeURIComponent(item.thumbnail.revision)}:{}),
     ...(item.preview?{previewSrc:(nativeRoute?'/media/':mediaPath)+item.id+(nativeRoute?'?preview=1&v=':'?asset=preview&v=')+encodeURIComponent(item.preview.revision)}:{}),
   },branch);
+  if(projectRequest){
+    const items=await collection('video'),anchor=items.find(item=>item.id===projectRequest[1]);
+    if(!anchor)throw absent();
+    return json(segmentProject(anchor,items,describe));
+  }
   const itemById = async (id,{deleted=false,writing=false}={}) => {
     const {item} = await db('nakash.get',{id});
     if ((!deleted && item.deletedAt) || !item.branches.includes(branch) && !(writing && item.branch===branch)) throw absent();
@@ -291,6 +299,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
     const people=[...new Set([item.personId,...(await Promise.all(metadata.people.map(tagPerson))).map(person=>person.id)].filter(Boolean))];
     const rendered=metadata.range?await renderVideoRange(request,env,ctx,item,metadata.range,item.id):null;
     const changes={name:metadata.name,caption:metadata.caption,takenDate:metadata.date,people,
+      ...(metadata.segmentProject?{segmentProject:metadata.segmentProject}:{}),
       branches:subjectBranches(people,item.branch),tagsRevision:uid(),videoRevision:uid(),
       videoCategory:metadata.group||item.videoCategory||'family',videoUploadOperation:body.operationId||null,...rendered};
     let saved;
@@ -544,6 +553,7 @@ export async function compatRoute(request, env, db, ctx, options, projection) {
       }
       if(action==='caption'){changes={caption:text(body.caption,'תיאור',5000)};if('expectedCaption'in body)expected.caption=body.expectedCaption;}
       if(action==='photo-date')changes={takenDate:photoDate(body.date),takenDateRevision:uid()};
+      if(action==='video-segment-details')({changes,expected}=segmentChanges(item,body));
       if(action==='framing')changes={framing:photoFrame(body.framing)};
       if(action==='video-category')changes={videoCategory:text(body.group,'קטגוריה',80,true)};
       if(action==='video-upload'||action==='video-upload-remove')return json(await finalizeVideo(item,body));

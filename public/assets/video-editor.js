@@ -9,7 +9,12 @@
  let active=null,dialog=null,player=null,saving=false,queuedSeek=null,deleteDialog=null,pendingDelete=null,progressState=null;
  const clock=value=>{value=Math.max(0,Number(value)||0);const hours=Math.floor(value/3600),minutes=Math.floor(value/60)%60,seconds=(value%60).toFixed(2).padStart(5,'0');return (hours?String(hours)+':':'')+String(minutes).padStart(2,'0')+':'+seconds;};
  function seconds(value){const parts=String(value).trim().replace(',','.').split(':');if(!parts.length||parts.length>3||parts.some(p=>!/^\d+(?:\.\d+)?$/.test(p)))return NaN;if(parts.length>1&&parts.slice(1).some(p=>Number(p)>=60))return NaN;return parts.reduce((n,p)=>n*60+Number(p),0);}
- function controls(item,scope){return item.id&&item.kind==='video'?`<button type="button" class="video-edit-button" data-video-edit="${safe(item.id)}" data-video-scope="${safe(scope)}" aria-label="${tr('עריכת הסרטון','Edit video')}">${editIcon}<span>${tr('עריכה','Edit')}</span></button>`:'';}
+ function controls(item,scope){
+  if(!item.id||item.kind!=='video')return '';
+  const label=tr('עריכת פרטי המקטעים','Edit segment details');
+  const project=item.hasSegmentProject?`<button type="button" class="video-edit-button" data-video-project="${safe(item.id)}" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M9 5v14m6-14v14"/></svg><span>${label}</span></button>`:'';
+  return `<button type="button" class="video-edit-button" data-video-edit="${safe(item.id)}" data-video-scope="${safe(scope)}" aria-label="${tr('עריכת הסרטון','Edit video')}">${editIcon}<span>${tr('עריכה','Edit')}</span></button>`+project;
+ }
  function youtubeFrame(start,end){return 'https://www.youtube-nocookie.com/embed/'+active.item.youtubeId+'?rel=0&start='+Math.floor((active.item.youtubeStart||0)+start)+(end?'&end='+Math.ceil((active.item.youtubeStart||0)+end):'');}
  function feedback(message='',failed=false){$('videoClipStatus').textContent=message;$('videoClipStatus').classList.toggle('is-error',failed);}
  function progressTime(){
@@ -106,6 +111,7 @@
  function open(item,scope,options={}){
   if(!item?.id||item.kind!=='video'||saving)return;for(const video of document.querySelectorAll('video'))if(!video.paused)video.pause();
   resetProgress();queuedSeek=null;active={item,scope,start:options.range?.start||0,end:options.range?.end||item.duration||60,duration:item.duration||60,knownDuration:Boolean(item.duration),valid:false,removeMode:Boolean(options.range?.remove),clipId:crypto.randomUUID().replaceAll('-',''),payload:null,...options};
+  $('videoClipProject').hidden=Boolean(options.selectionOnly)||!item.hasSegmentProject;
   $('videoClipCategory').hidden=Boolean(options.selectionOnly)||!categoryPicker(item,scope)?.openAssign;
   $('videoClipName').maxLength=options.selectionOnly?140:5000;$('videoClipName').value=(options.name||item.caption||I.mediaName(item)||tr('סרטון','Video')).slice(0,$('videoClipName').maxLength);$('videoClipStart').value=clock(active.start);$('videoClipEnd').value=clock(active.end);
   editName(false);dialog.classList.toggle('is-selection',Boolean(options.selectionOnly));
@@ -191,10 +197,12 @@
    </div><div class="video-clip-duration"><span>${tr('אורך הסרטון','Video length')}</span><output id="videoClipLength" for="videoClipStart videoClipEnd" dir="ltr" role="status" aria-live="polite"></output></div><button type="button" id="videoClipDeleteRange" class="video-clip-delete-range" aria-pressed="false">${trashIcon}<span id="videoClipDeleteLabel">${tr('מחיקת הקטע הנבחר','Delete selected segment')}</span></button></div>
    <button type="button" id="videoClipExitDelete" class="video-clip-exit-delete" hidden>${tr('יציאה ממצב מחיקה','Exit deletion mode')}</button>
    <div class="video-clip-completion"><div id="videoClipTags" class="video-clip-tags"></div>
-    <footer><button type="submit" class="primary-button" id="videoClipSave">${tr('שמור','Save')}</button><button type="submit" class="secondary-button" id="videoClipSaveNew">${tr('שמור כקובץ חדש','Save as new clip')}</button><button type="button" class="secondary-button video-clip-category" id="videoClipCategory" hidden>${tr('שיוך לקטגוריה אחרת','Change video category')}</button></footer>
+    <footer><button type="submit" class="primary-button" id="videoClipSave">${tr('שמור','Save')}</button><button type="submit" class="secondary-button" id="videoClipSaveNew">${tr('שמור כקובץ חדש','Save as new clip')}</button><button type="button" id="videoClipProject" class="secondary-button" hidden>${tr('עריכת פרטי המקטעים','Edit segment details')}</button><button type="button" class="secondary-button video-clip-category" id="videoClipCategory" hidden>${tr('שיוך לקטגוריה אחרת','Change video category')}</button></footer>
     <p id="videoClipStatus" role="status" aria-live="polite"></p>
    </div></form>`;
   document.body.appendChild(dialog);$('videoClipClose').addEventListener('click',close);$('videoClipDeleteRange').addEventListener('click',deleteRange);$('videoClipExitDelete').addEventListener('click',exitDeleteMode);$('videoClipCategory').addEventListener('click',editCategory);dialog.addEventListener('cancel',event=>{event.preventDefault();if(active?.removeMode)exitDeleteMode();else close();});$('videoClipForm').addEventListener('submit',save);
+  $('videoClipProject').addEventListener('click',()=>{if(active&&!saving){pausePlayer();window.FamilyVideoUpload?.openProject(active.item.id);}});
+  document.addEventListener('click',event=>{const button=event.target.closest?.('[data-video-project]');if(button)window.FamilyVideoUpload?.openProject(button.dataset.videoProject);});
   dialog.addEventListener('keydown',event=>event.stopPropagation());
   for(const [id,boundary]of [['videoClipStart','start'],['videoClipEnd','end']])$(id).addEventListener('input',()=>sync('fields',boundary));
   $('videoClipName').addEventListener('input',()=>{fitName();sync();});

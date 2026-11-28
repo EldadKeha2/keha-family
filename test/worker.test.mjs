@@ -2405,3 +2405,64 @@ test('personal gallery controls paginate, filter, sort and select the whole owne
   assert.equal((await f.call('/api/people/yehiel/selection?kind=documents')).status,400);
  }finally{await f.close();}
 });
+
+test('saved segment projects reopen after restart and update existing clips without overwriting independent edits or reuploading',async()=>{
+ const f=fixture();
+ try{
+  await f.connect();
+  const group=uid();
+  async function publish(number,project=group){
+   const posted=await(await f.call('/api/nostalgia/upload',{method:'POST',body:video,headers:{'Content-Length':String(video.length)}})).json();
+   const raw=posted.collection.items.find(i=>i.file===posted.file);
+   const operation={operationId:uid(),metadata:{name:'מקטע '+number,caption:'מקורי',date:{year:1998},
+    people:[{personId:'yona'}],segmentProject:{id:project,number,start:5*(number-1),end:5*number,duration:10}}};
+   const response=await f.call('/api/media/'+raw.id+'/video-upload',{method:'POST',body:operation});
+   assert.equal(response.status,200,await response.clone().text());
+   const {item}=await response.json();assert.equal(item.hasSegmentProject,true);return {item,operation};
+  }
+  const second=await publish(2),first=await publish(1);await publish(1,uid());
+  const route='/api/media/'+first.item.id;
+  f.restart();
+  const project=await(await f.call(route+'/segment-project')).json();
+  assert.equal(project.duration,10);assert.deepEqual(project.segments.map(s=>[s.id,s.number,s.start,s.end]),[[first.item.id,1,0,5],[second.item.id,2,5,10]]);
+  const before={name:first.item.name,caption:first.item.caption,date:first.item.takenDate};
+  const post=(body,extra)=>f.call(route+'/video-segment-details',{method:'POST',body,...extra});
+  const edited={before,after:{...before,name:'הטיול',date:{month:7,year:1999}}};
+  assert.equal((await post(edited,{clientHeaders:false})).status,403);
+  const count=f.objects.size,traffic=f.network.length;
+  for(const body of [edited,edited,{before,after:{...before,caption:'המשפחה בחצר'}}]){
+   const response=await post(body);assert.equal(response.status,200,await response.clone().text());
+   const {item}=await response.json();assert.equal(item.src,first.item.src);assert.equal(item.takenDate.year,1999);assert.equal(item.name,'הטיול');
+   assert.deepEqual(item.tags.map(t=>t.id),['yona']);assert.equal(item.videoRevision,first.item.videoRevision);
+  }
+  assert.equal((await post({before,after:{...before,name:'כותרת מתנגשת'}})).status,409);
+  assert.equal((await post({before,after:{...before,date:{day:31,month:2}}})).status,400);
+  const retry=await f.call(route+'/video-upload',{method:'POST',body:first.operation});assert.equal(retry.status,200);
+  f.restart();const saved=await(await f.call('/api/media/'+second.item.id+'/segment-project')).json();
+  assert.equal(saved.segments[0].name,'הטיול');assert.equal(saved.segments[0].caption,'המשפחה בחצר');
+  assert.equal(saved.segments[0].date.month,7);assert.equal(saved.segments.length,2);
+  assert.equal(f.objects.size,count);assert.equal(f.network.length,traffic,'metadata-only updates never touch stored video objects');
+ }finally{await f.close();}
+});
+
+test('historical staged cuts reopen together after their temporary source expired and family portals show only visible members',async()=>{
+ const f=fixture();try{
+  const source='a'.repeat(64),id=uid(),hidden=uid();
+  for(const [mediaId,number] of [[hidden,2],[id,1]]){
+   const name='סרט חג – מקטע '+number,range={start:4*(number-1),end:4*number};
+   const item={id:mediaId,name,filename:'film.mp4',file:mediaId+'.mp4',category:'nostalgia',kind:'video',mime:'video/mp4',videoSourceId:source,
+    videoUploadEdit:{operationId:uid(),fingerprint:JSON.stringify({name,range})}};
+   f.database.prepare('INSERT INTO media(id,category,data) VALUES(?,?,?)').run(mediaId,'nostalgia',JSON.stringify(item));
+  }
+  f.database.prepare('INSERT INTO media_tags(media_id,person_id) VALUES(?,?)').run(id,'shlomo');
+  const route='/api/media/'+id+'/segment-project',all=await(await f.call(route)).json();
+  assert.deepEqual(all.segments.map(s=>s.number),[1,2]);assert.equal(all.duration,8);
+  assert.equal(JSON.stringify(all).includes(source),false);
+  for(const path of [route+'?familyScope=shlomo','/keha-extended/shlomo/api/compat'+route]){
+   const response=await f.call(path);assert.equal(response.status,200,await response.clone().text());
+   const result=await response.json();assert.deepEqual(result.segments.map(s=>s.id),[id]);
+   assert.match(result.segments[0].src,/familyScope=shlomo/);
+  }
+  assert.equal((await f.call('/api/media/'+hidden+'/segment-project?familyScope=shlomo')).status,404);
+ }finally{await f.close();}
+});

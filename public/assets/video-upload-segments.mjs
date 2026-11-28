@@ -1,4 +1,18 @@
-export const segmentHue = number => Math.round((181 + (number - 1) * 137.508) % 360);
+// Mix hue, saturation and lightness so a long tape has distinct marks.
+const palette = [
+  [181,62,58],[322,68,61],[88,65,50],[238,62,65],[16,78,61],
+  [150,58,53],[283,56,61],[56,78,60],[202,71,55],[341,61,46],
+  [116,48,43],[258,68,72],[33,70,48],[168,40,72],[301,62,46],
+  [75,40,67],[219,70,44],[5,77,74],[138,57,32],[267,38,45],
+  [43,90,58],[192,72,36],[332,70,77],[97,37,32],[229,82,81],
+  [22,49,37],[158,74,67],[294,42,77],[59,49,36],[210,34,64]
+];
+const colorFor = number => palette[(number-1) % palette.length];
+export const segmentHue = number => colorFor(number)[0];
+export const segmentColor = number => {
+  const [h,s,l] = colorFor(number);
+  return `hsl(${h} ${s}% ${l}%)`;
+};
 const minLength = .1 - 1e-9;
 
 export function markedRange(draft) {
@@ -64,7 +78,7 @@ export function segmentControlsHTML(tr) {
   </section>`;
 }
 
-export function bindSegmentTimeline({get, tr, editor, select, changed, saving, seekTo, playbackError}) {
+export function bindSegmentTimeline({get, tr, editor, select, changed, saving, seekTo, playbackError, checkpoint, endGesture, reviewing}) {
   const player = get('Player'), track = get('Track'), playhead = get('Playhead');
   const clock = time => editor.clock(Math.round(time * 100) / 100);
   const axes = [['Start','start'], ['End','end']];
@@ -73,7 +87,15 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     slider.setAttribute('aria-keyshortcuts','A L');
     slider.title = tr('A – שנייה אחורה · L – שנייה קדימה','A – back one second · L – forward one second');
   }
-  let drafts = [], index = 0, preview = null, drag = null, dragged = false;
+  let drafts = [], index = 0, preview = null, drag = null, dragged = false, pointerSlider = null, nativeFrom = null;
+  const position = () => (reviewing() ? drafts[index]?.segment.start || 0 : 0) + (player.currentTime || 0);
+
+  for (const slider of [playhead,get('StartSlider'),get('EndSlider')]) {
+    slider.addEventListener('pointerdown',() => { endGesture(); pointerSlider = slider; });
+    for (const event of ['pointerup','pointercancel','lostpointercapture','blur']) {
+      slider.addEventListener(event,() => { pointerSlider = null; endGesture(); });
+    }
+  }
 
   function showPosition(time) {
     playhead.value = time;
@@ -82,24 +104,33 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
 
   function seek(time, {pause = true} = {}) {
     if (!Number.isFinite(time)) return;
-    const target = Math.max(0,Math.min(drafts[index]?.duration ?? time,time));
+    const active = drafts[index];
+    const target = reviewing() && active ? Math.max(active.segment.start,Math.min(active.segment.end,time)) :
+      Math.max(0,Math.min(active?.duration ?? time,time));
+    nativeFrom = null;
     if (pause || (preview && (target < preview.start || target > preview.end))) preview = null;
     if (pause) player.pause();
-    if (seekTo) seekTo(target); else player.currentTime = target;
+    if (reviewing()) player.currentTime = target - active.segment.start;
+    else if (seekTo) seekTo(target); else player.currentTime = target;
     showPosition(target);
   }
 
   function updatePlayhead() {
     const draft = drafts[index];
     if (!draft) return;
-    showPosition(Math.min(draft.duration,player.currentTime || 0));
-    if (preview && player.currentTime >= preview.end) seek(preview.end);
+    showPosition(Math.min(draft.duration,position()));
+    if (preview && position() >= preview.end) seek(preview.end);
   }
   player.addEventListener('timeupdate',updatePlayhead);
   player.addEventListener('seeked',updatePlayhead);
-  playhead.addEventListener('input',() => { if (!saving() && drafts[index]) seek(Number(playhead.value)); });
+  playhead.addEventListener('input',() => { if (!saving() && drafts[index]) userSeek(Number(playhead.value),pointerSlider); });
+  player.addEventListener('pointerdown',() => { if (drafts[index]) nativeFrom = position(); });
+  player.addEventListener('keydown',event => {
+    if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) nativeFrom = position();
+  });
   player.addEventListener('seeking',() => {
-    if (preview && (player.currentTime < preview.start - .05 || player.currentTime > preview.end + .05)) preview = null;
+    if (nativeFrom !== null && position() !== nativeFrom) { checkpoint(null,nativeFrom); nativeFrom = null; }
+    if (preview && (position() < preview.start - .05 || position() > preview.end + .05)) preview = null;
   });
 
   function paintMarks() {
@@ -114,7 +145,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
       laneEnds[lane] = range.end;
       const pinned = Boolean(draft.segment.pinned);
       const label = tr('מקטע ','Segment ') + draft.segment.number + (pinned ? tr(' · מקובע',' · Locked') : '');
-      return `<button type="button" data-segment-index="${i}" data-pinned="${pinned}" aria-current="${i === index}" aria-label="${label}" title="${label} · ${clock(range.start)} – ${clock(range.end)}" style="--mark-hue:${segmentHue(draft.segment.number)};left:${100*range.start/current.duration}%;width:${100*(range.end-range.start)/current.duration}%;top:${lane*14+3}px"></button>`;
+      return `<button type="button" data-segment-index="${i}" data-pinned="${pinned}" aria-current="${i === index}" aria-label="${label}" title="${label} · ${clock(range.start)} – ${clock(range.end)}" style="background-color:${segmentColor(draft.segment.number)};left:${100*range.start/current.duration}%;width:${100*(range.end-range.start)/current.duration}%;top:${lane*14+3}px"></button>`;
     }).join('');
     track.style.setProperty('--track-height', Math.max(1,laneEnds.length) * 14 + 6 + 'px');
   }
@@ -148,6 +179,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     const draft = drafts[index];
     if (!draft || saving() || draft.saved || draft.frozen || draft.uploaded || draft.segment.pinned) return;
     const segment = draft.segment, field = get(id+'Time');
+    checkpoint(source === 'field' ? field : source === 'slider' ? pointerSlider : null);
     let value = source === 'field' ? editor.seconds(field.value) :
       source === 'slider' ? Number(get(id+'Slider').value) : player.currentTime;
     const isEnd = edge === 'end';
@@ -189,7 +221,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
       else if (Number.isFinite(draft.segment[edge])) { draft.segment[edge+'Text'] = null; field.value = clock(draft.segment[edge]); }
     };
     field.addEventListener('change',commitField);
-    field.addEventListener('blur',commitField);
+    field.addEventListener('blur',() => { commitField(); endGesture(); });
     field.addEventListener('keydown',event => { if (event.key === 'Enter') { event.preventDefault(); field.blur(); } });
     get(id+'Here').addEventListener('click',() => setBoundary(id,edge,'playhead'));
   }
@@ -197,13 +229,22 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     const button = event.target.closest('[data-segment-index]');
     if (!button || saving()) return false;
     const target = Number(button.dataset.segmentIndex);
-    if (target === index) seek(drafts[index].segment.start || 0);
+    if (target === index) userSeek(drafts[index].segment.start || 0);
     else select(target);
     return true;
   }
+  function userSeek(time,group = null,options) {
+    if (time === position()) return;
+    checkpoint(group);
+    if (reviewing() && (time < drafts[index].segment.start || time > drafts[index].segment.end)) {
+      const target = drafts.findIndex(d => d.segment.start <= time && time <= d.segment.end);
+      if (target >= 0 && target !== index) select(target,false);
+    }
+    seek(time,options);
+  }
   function seekAtX(x) {
     const rect = track.getBoundingClientRect();
-    if (rect.width > 0) seek(drafts[index].duration * Math.max(0,Math.min(1,(x-rect.left)/rect.width)));
+    if (rect.width > 0) userSeek(drafts[index].duration * Math.max(0,Math.min(1,(x-rect.left)/rect.width)),drag);
   }
   // A tap selects a marked segment. Dragging anywhere scrubs the same rail.
   track.addEventListener('pointerdown',event => {
@@ -222,7 +263,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
   track.addEventListener('pointerup',event => {
     if (drag?.id !== event.pointerId) return;
     if (dragged && drafts[index] && !saving()) seekAtX(event.clientX);
-    drag = null;
+    drag = null; endGesture();
   });
   track.addEventListener('lostpointercapture',() => { drag = null; });
   track.addEventListener('click',event => {
@@ -231,6 +272,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
   });
 
   return {
+    seek,position,
     stepByKey(event) {
       if (!drafts[index] || saving() || event.defaultPrevented || event.isComposing || event.keyCode === 229 ||
           event.ctrlKey || event.altKey || event.metaKey) return false;
@@ -249,12 +291,13 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
         }
       } else {
         if (target !== playhead && (target.isContentEditable || target.closest('input,textarea,select,[role="textbox"],[role="combobox"]'))) return false;
-        seek(player.currentTime + step,{pause:false});
+        userSeek(Math.max(0,Math.min(drafts[index].duration,position()+step)),null,{pause:false});
       }
       return true;
     },
     show(items, activeIndex) {
-      if (drafts[index] !== items[activeIndex]) { preview = null; drag = null; }
+      if (drafts[index] !== items[activeIndex]) { preview = null; nativeFrom = null; }
+      if (!items.length) { drag = null; pointerSlider = null; }
       drafts = items; index = activeIndex;
       track.hidden = get('Segments').hidden = !items.length;
       if (!items.length) return;
@@ -264,6 +307,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     play() {
       const range = markedRange(drafts[index]);
       if (!range) return;
+      if (position() !== range.start) checkpoint();
       seek(range.start); preview = range;
       player.play()?.catch(error => {
         if (preview !== range) return;

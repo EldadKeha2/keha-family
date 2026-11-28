@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import vm from 'node:vm';
-import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from '../public/assets/video-upload-segments.mjs';
+import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue, segmentColor} from '../public/assets/video-upload-segments.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
+import {createSegmentHistory} from '../public/assets/video-segment-history.mjs';
 import {bindUploadPreview} from '../public/assets/video-upload-preview.mjs';
 import {filenamePhotoDate} from '../public/assets/photo-upload-metadata.mjs';
 
@@ -34,6 +35,8 @@ function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker,check
  const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String,seconds:text=>String(text).trim()?String(text).split(':').reduce((v,part)=>v*60+Number(part),0):NaN},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
  window.FamilyNostalgia.uploadEventLabel=event=>event.name;
  const context=vm.createContext({window,document,startUploadCheck:check,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,followPreviousEnd,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
+ document.querySelectorAll=selector=>[...nodes.values()].filter(node=>node.tag===selector);
+ context.createSegmentHistory=createSegmentHistory;
  vm.runInContext(swipeSource,context);vm.runInContext(source,context);
  const upload=(file,progress,target)=>{const pending=deferred();uploads.push({file,progress,target,...pending});return pending.promise;};
  const prepare=(names=['first.mp4','second.mp4'],options={})=>window.FamilyVideoUpload.prepare(names.map(name=>typeof name==='string'?{name,type:'video/mp4',size:500}:name),{scope:'nostalgia',eventId:'original-event',upload,...options});
@@ -176,10 +179,10 @@ test('Next keeps the marked portion on the player timeline and seeks to the prec
  assert.equal(f.get('StartTime').value,'3.75');
  assert.equal(f.get('Player').currentTime,3.75);assert.equal(Number(f.get('Playhead').value),3.75);
  boundary(f,'EndTime','10');f.get('Next').click();
- assert.equal(f.get('StartTime').value,'10');assert.equal(f.get('Player').currentTime,10);
+ assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(f.get('StartTime').value,'1.25');assert.equal(f.get('Player').currentTime,1.25);
  assert.match(f.get('Marks').innerHTML,/left:37.5%;width:62.5%/);
  boundary(f,'Playhead','7.5');assert.equal(f.get('Player').currentTime,7.5);
- assert.equal(f.get('StartTime').value,'10','scrubbing does not change the cut');
+ assert.equal(f.get('StartTime').value,'1.25','scrubbing does not change the cut');
  f.get('Split').click();assert.equal(f.get('Track').hidden,true);
  f.get('Close').click();await done;
 });
@@ -286,8 +289,8 @@ test('a revised previous end updates unpinned bounds and the native last step re
  f.get('Previous').click();boundary(f,'EndTime','4.003');f.get('Next').click();
  assert.equal(slider.min,4.003);assert.equal(slider.value,5,'the marked endpoint survives a correction');
  boundary(f,'EndSlider','12.003');assert.equal(f.get('Player').currentTime,12.009);
- f.get('Next').click();assert.equal(slider.min,12.009);assert.equal(slider.max,12.009);
- assert.equal(f.get('SaveCurrent').disabled,true);
+ f.get('Next').click();assert.equal(slider.min,0);assert.equal(slider.max,12.009);
+ assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(f.get('SaveCurrent').disabled,false);
  f.get('Close').click();await done;
 });
 
@@ -615,4 +618,83 @@ test('an unrepairable file is never sent, and a canceled or removed check cannot
  checks[1].complete({file:new File(['stale'],'a.mp4'),phase:'ready',verified:true});
  assert.equal(f.get('Filename').textContent,'b.mp4');
  f.get('Close').click();await done;assert.equal(checks[2].discarded,true);
+});
+
+test('history restores a whole drag, exact playhead, cuts and locks and invalidates redo after another edit',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,837.96);
+ boundary(f,'EndTime','144.27');boundary(f,'Playhead','123.456');
+ const slider=f.get('EndSlider'),player=f.get('Player');
+ slider.listeners.get('pointerdown')();boundary(f,'EndSlider','171');boundary(f,'EndSlider','192.53');slider.listeners.get('pointerup')();
+ const key=(letter,target=slider)=>pressEditorKey(f,target,letter==='Z'?'ז':'ט','Key'+letter,{ctrlKey:true});
+ assert.equal(key('Z'),true);assert.equal(player.currentTime,123.456);assert.equal(f.get('EndTime').value,'144.27');
+ key('Y');assert.equal(player.currentTime,192.53);assert.equal(f.get('EndTime').value,'192.53');
+ f.get('PinNext').click();assert.equal(f.get('Title').textContent,'מקטע 2');
+ key('Z',player);assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(f.get('EndSlider').disabled,false);
+ key('Y',player);assert.equal(f.get('Title').textContent,'מקטע 2');assert.equal(Number(f.get('EndSlider').min),192.53);
+ boundary(f,'EndTime','400');f.get('Reset').click();key('Z');assert.equal(f.get('EndTime').value,'400');
+ boundary(f,'EndSlider','350');key('Y');assert.equal(f.get('EndTime').value,'350');
+ assert.equal(key('Z',f.get('Caption')),false,'native text undo stays available');
+ key('Z');boundary(f,'Playhead','211.75');key('Z');assert.equal(player.currentTime,400);
+ player.listeners.get('pointerdown')();player.currentTime=310;player.listeners.get('seeking')();
+ key('Z',player);assert.equal(player.currentTime,400);key('Y',player);assert.equal(player.currentTime,310);
+ f.get('Close').click();await done;
+});
+
+test('the final pin wraps to the first cut, including a single fractional-duration clip, and can be undone',async()=>{
+ for(const splitAt of [0,144.27]){
+  const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,837.96);
+  if(splitAt){boundary(f,'EndTime',String(splitAt));f.get('PinNext').click();}
+  boundary(f,'EndSlider','837.96');f.get('PinNext').click();
+  assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(f.get('Player').currentTime,0);
+  assert.equal((f.get('Marks').innerHTML.match(/data-pinned="true"/g)||[]).length,splitAt?2:1);
+  pressEditorKey(f,f.get('Player'),'z','KeyZ',{ctrlKey:true});
+  assert.equal(f.get('Title').textContent,splitAt?'מקטע 2':'מקטע 1');assert.equal(f.get('Player').currentTime,837.96);
+  assert.equal(f.get('EndSlider').disabled,false);
+  pressEditorKey(f,f.get('Player'),'y','KeyY',{ctrlKey:true});assert.equal(f.get('Title').textContent,'מקטע 1');
+  f.get('Close').click();await done;
+ }
+});
+
+test('all thirty marks have distinct colors and segment 31 starts the same cycle',()=>{
+ const colors=Array.from({length:30},(_,i)=>segmentColor(i+1));
+ assert.equal(new Set(colors).size,30);
+ assert.deepEqual(Array.from({length:30},(_,i)=>segmentColor(i+31)),colors);
+});
+
+test('saved cuts stay editable in the open wizard and reopen as a group from a fresh session',async()=>{
+ const publications=[],records=new Map(),requests=[];
+ function stage(file){
+  return {file,phase:'ready',received:file.size,url:'https://family.example/source',ensure:async()=>{},discard(){},
+   async save({mediaId,metadata}){
+    publications.push(metadata.segmentProject);
+    const item={id:mediaId,src:'/media/'+mediaId,name:metadata.name,caption:metadata.caption,takenDate:metadata.date};
+    records.set(mediaId,{item,info:metadata.segmentProject});return {item};
+   }};
+ }
+ function api(f){
+  f.window.FamilyI18n.fetch=async(path,options)=>{
+   requests.push(path);const entry=records.get(path.split('/')[2]);
+   if(!options)return Response.json({duration:8,segments:[...records.values()].map(({item,info})=>({...item,date:item.takenDate,number:info.number,start:info.start,end:info.end}))});
+   assert.match(path,/video-segment-details$/);const {after}=JSON.parse(options.body);
+   Object.assign(entry.item,{name:after.name,caption:after.caption,takenDate:after.date});
+   return Response.json({item:entry.item});
+  };
+ }
+ const f=fixture();api(f);const done=f.prepare(['one.mp4'],{stageSources:stage});
+ openSegments(f);boundary(f,'EndTime','3.75');f.get('PinNext').click();boundary(f,'EndSlider','8');f.get('PinNext').click();
+ await f.get('SaveAll').click();assert.equal(f.get('Wizard').open,true);
+ assert.equal(f.get('Name').disabled,false);assert.equal(f.get('EndSlider').disabled,true);
+ assert.equal(publications.length,2);assert.equal(publications[0].id,publications[1].id);
+ assert.deepEqual(publications.map(p=>[p.number,p.start,p.end,p.duration]),[[1,0,3.75,8],[2,3.75,8,8]]);
+ boundary(f,'Name','חג המשפחה');boundary(f,'Dateyear','1998');f.get('Next').click();boundary(f,'Caption','בחצר');
+ await f.get('SaveAll').click();assert.equal(f.get('Wizard').open,true);assert.equal(publications.length,2);
+ f.get('Close').click();await done;
+ const second=[...records.keys()][1],g=fixture();api(g);await g.window.FamilyVideoUpload.openProject(second);
+ assert.equal(g.get('Title').textContent,'מקטע 2');assert.equal(g.get('Caption').value,'בחצר');
+ assert.equal(g.get('Player').src,'/media/'+second);assert.equal(g.get('StartTime').value,'3.75');
+ boundary(g,'Playhead','5.25');assert.equal(g.get('Player').currentTime,1.5);
+ g.get('Next').click();assert.equal(g.get('Title').textContent,'מקטע 1');assert.equal(g.get('Name').value,'חג המשפחה');assert.equal(g.get('Dateyear').value,1998);
+ boundary(g,'Caption','טיול');g.window.confirm=()=>false;g.get('Done').click();assert.equal(g.get('Wizard').open,true);
+ await g.get('SaveCurrent').click();g.get('Done').click();assert.equal(g.get('Wizard').open,false);
+ assert.equal(requests.filter(p=>p.endsWith('video-segment-details')).length,3);assert.equal(publications.length,2);assert.equal(g.uploads.length,0);
 });
