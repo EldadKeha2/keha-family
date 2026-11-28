@@ -87,10 +87,12 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     slider.setAttribute('aria-keyshortcuts','A L');
     slider.title = tr('A – שנייה אחורה · L – שנייה קדימה','A – back one second · L – forward one second');
   }
-  let drafts = [], index = 0, preview = null, drag = null, dragged = false, pointerSlider = null, nativeFrom = null;
-  const position = () => (reviewing() ? drafts[index]?.segment.start || 0 : 0) + (player.currentTime || 0);
+  let drafts = [], index = 0, preview = null, drag = null, pointerSlider = null, nativeFrom = null;
+  let requestedTime = null, issuedTime = null, waitingToPaint = false;
+  const mediaPosition = () => (reviewing() ? drafts[index]?.segment.start || 0 : 0) + (player.currentTime || 0);
+  const position = () => requestedTime ?? mediaPosition();
 
-  for (const slider of [playhead,get('StartSlider'),get('EndSlider')]) {
+  for (const slider of [get('StartSlider'),get('EndSlider')]) {
     slider.addEventListener('pointerdown',() => { endGesture(); pointerSlider = slider; });
     for (const event of ['pointerup','pointercancel','lostpointercapture','blur']) {
       slider.addEventListener(event,() => { pointerSlider = null; endGesture(); });
@@ -102,17 +104,41 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     playhead.setAttribute('aria-valuetext',clock(time));
   }
 
-  function seek(time, {pause = true} = {}) {
-    if (!Number.isFinite(time)) return;
+  function writeMediaTime(target) {
+    if (reviewing()) player.currentTime = target - drafts[index].segment.start;
+    else if (seekTo) seekTo(target); else player.currentTime = target;
+  }
+
+  // Replacing currentTime on every pointermove can abort every backward
+  // decode before a frame becomes visible. Keep just the newest destination.
+  function flushScrub(final = false) {
+    if (requestedTime === null || player.readyState === 0 || (!final && (player.seeking || waitingToPaint))) return;
+    if (issuedTime === requestedTime && player.seeking) return;
+    if (player.seeking || Math.abs(mediaPosition() - requestedTime) > .000001) {
+      issuedTime = requestedTime;
+      writeMediaTime(issuedTime);
+    }
+    if (!player.seeking) requestedTime = issuedTime = null;
+  }
+  function flushAfterPaint() {
+    if (waitingToPaint || requestedTime === null) return;
+    waitingToPaint = true;
+    const flush = () => { waitingToPaint = false; flushScrub(); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(flush);
+    else setTimeout(flush,0);
+  }
+  function seek(time, {pause = true,scrub = false} = {}) {
     const active = drafts[index];
-    const target = reviewing() && active ? Math.max(active.segment.start,Math.min(active.segment.end,time)) :
-      Math.max(0,Math.min(active?.duration ?? time,time));
+    if (!Number.isFinite(time) || !active) return;
+    const target = reviewing() ? Math.max(active.segment.start,Math.min(active.segment.end,time)) :
+      Math.max(0,Math.min(active.duration ?? time,time));
     nativeFrom = null;
     if (pause || (preview && (target < preview.start || target > preview.end))) preview = null;
-    if (pause) player.pause();
-    if (reviewing()) player.currentTime = target - active.segment.start;
-    else if (seekTo) seekTo(target); else player.currentTime = target;
+    if (pause && !player.paused) player.pause();
     showPosition(target);
+    requestedTime = target;
+    if (player.readyState === 0 && !reviewing() && seekTo) seekTo(target);
+    else flushScrub(!scrub);
   }
 
   function updatePlayhead() {
@@ -122,11 +148,20 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     if (preview && position() >= preview.end) seek(preview.end);
   }
   player.addEventListener('timeupdate',updatePlayhead);
-  player.addEventListener('seeked',updatePlayhead);
-  playhead.addEventListener('input',() => { if (!saving() && drafts[index]) userSeek(Number(playhead.value),pointerSlider); });
-  player.addEventListener('pointerdown',() => { if (drafts[index]) nativeFrom = position(); });
+  player.addEventListener('seeked',() => {
+    if (!player.seeking && issuedTime !== null && issuedTime === requestedTime) requestedTime = issuedTime = null;
+    flushAfterPaint();
+    updatePlayhead();
+  });
+  player.addEventListener('loadedmetadata',flushAfterPaint);
+  playhead.addEventListener('input',() => { if (!drag && !saving() && drafts[index]) userSeek(Number(playhead.value),null,{scrub:true}); });
+  player.addEventListener('pointerdown',() => {
+    if (drafts[index]) { nativeFrom = position(); requestedTime = issuedTime = null; }
+  });
   player.addEventListener('keydown',event => {
-    if (['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) nativeFrom = position();
+    if (!event.defaultPrevented && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
+      nativeFrom = position(); requestedTime = issuedTime = null;
+    }
   });
   player.addEventListener('seeking',() => {
     if (nativeFrom !== null && position() !== nativeFrom) { checkpoint(null,nativeFrom); nativeFrom = null; }
@@ -181,7 +216,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     const segment = draft.segment, field = get(id+'Time');
     checkpoint(source === 'field' ? field : source === 'slider' ? pointerSlider : null);
     let value = source === 'field' ? editor.seconds(field.value) :
-      source === 'slider' ? Number(get(id+'Slider').value) : player.currentTime;
+      source === 'slider' ? Number(get(id+'Slider').value) : position();
     const isEnd = edge === 'end';
     const minimum = isEnd ? minimumEnd(draft) : 0;
     const belowMinimum = isEnd && Number.isFinite(value) && value < minimum;
@@ -197,7 +232,7 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     segment[edge+'Text'] = typing ? field.value : null;
     if (edge === 'start') segment.followsPrevious = false;
     followPreviousEnd(draft,drafts[index+1]);
-    if (Number.isFinite(value) && value >= 0 && value <= draft.duration && (source !== 'playhead' || belowMinimum)) seek(value);
+    if (Number.isFinite(value) && value >= 0 && value <= draft.duration && (source !== 'playhead' || belowMinimum)) seek(value,{scrub:source==='slider'});
     sync(typing ? field : null);
     changed();
   }
@@ -225,50 +260,69 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
     field.addEventListener('keydown',event => { if (event.key === 'Enter') { event.preventDefault(); field.blur(); } });
     get(id+'Here').addEventListener('click',() => setBoundary(id,edge,'playhead'));
   }
-  function pick(event) {
-    const button = event.target.closest('[data-segment-index]');
-    if (!button || saving()) return false;
-    const target = Number(button.dataset.segmentIndex);
-    if (target === index) userSeek(drafts[index].segment.start || 0);
-    else select(target);
-    return true;
-  }
-  function userSeek(time,group = null,options) {
-    if (time === position()) return;
-    checkpoint(group);
-    if (reviewing() && (time < drafts[index].segment.start || time > drafts[index].segment.end)) {
-      const target = drafts.findIndex(d => d.segment.start <= time && time <= d.segment.end);
-      if (target >= 0 && target !== index) select(target,false);
+  function userSeek(time,group = null,options,selection = -1) {
+    const active = drafts[index];
+    if (!active) return;
+    if (selection < 0 && reviewing() && (time < active.segment.start || time > active.segment.end)) {
+      selection = drafts.findIndex(d => d.segment.start <= time && time <= d.segment.end);
     }
-    seek(time,options);
+    const switching = selection >= 0 && selection !== index;
+    if (!switching && time === position()) return;
+    checkpoint(group);
+    if (switching) select(selection,false,time);
+    else seek(time,options);
   }
-  function seekAtX(x) {
+  function timeAtX(x) {
     const rect = track.getBoundingClientRect();
-    if (rect.width > 0) userSeek(drafts[index].duration * Math.max(0,Math.min(1,(x-rect.left)/rect.width)),drag);
+    return rect.width ? drafts[index].duration * (x-rect.left)/rect.width : position();
   }
-  // A tap selects a marked segment. Dragging anywhere scrubs the same rail.
+  function scrubAt(x,selection = -1) {
+    const time = Math.max(0,Math.min(drafts[index].duration,timeAtX(x) + (drag?.offset || 0)));
+    userSeek(time,drag,{scrub:true},selection);
+  }
+  const markIndex = target => Number(target.closest('[data-segment-index]')?.dataset.segmentIndex ?? -1);
+  function finishDrag() {
+    const id = drag.id;
+    drag = null;
+    track.classList.remove('is-scrubbing');
+    if (track.hasPointerCapture(id)) track.releasePointerCapture(id);
+    flushScrub(true);
+    endGesture();
+  }
+  // One stable element owns the gesture even when changing segments repaints
+  // their buttons. Preserve the grab offset so the thumb stays under the hand.
   track.addEventListener('pointerdown',event => {
-    if (saving() || !drafts[index] || !event.isPrimary || event.button !== 0) return;
-    dragged = false;
-    if (event.target === playhead) return;
-    drag = {id:event.pointerId, x:event.clientX};
-    event.target.setPointerCapture(event.pointerId);
+    if (saving() || !drafts[index] || drag || !event.isPrimary || event.button !== 0) return;
+    event.preventDefault();
+    playhead.focus({preventScroll:true});
+    const thumb = event.target === playhead;
+    drag = {id:event.pointerId,x:event.clientX,moved:false,mark:markIndex(event.target),
+      offset:thumb ? position()-timeAtX(event.clientX) : 0};
+    track.setPointerCapture(event.pointerId);
+    track.classList.add('is-scrubbing');
+    preview = null;
+    if (!player.paused) player.pause();
+    if (!thumb) scrubAt(event.clientX,reviewing() ? drag.mark : -1);
   });
   track.addEventListener('pointermove',event => {
     if (drag?.id !== event.pointerId || saving() || !drafts[index]) return;
-    if (!dragged && Math.abs(event.clientX-drag.x) < 4) return;
-    dragged = true;
-    seekAtX(event.clientX);
+    if (Math.abs(event.clientX-drag.x) >= 4) drag.moved = true;
+    scrubAt(event.clientX);
   });
   track.addEventListener('pointerup',event => {
     if (drag?.id !== event.pointerId) return;
-    if (dragged && drafts[index] && !saving()) seekAtX(event.clientX);
-    drag = null; endGesture();
+    if (drafts[index] && !saving()) scrubAt(event.clientX,drag.moved ? -1 : drag.mark);
+    finishDrag();
   });
-  track.addEventListener('lostpointercapture',() => { drag = null; });
+  for (const event of ['pointercancel','lostpointercapture']) {
+    track.addEventListener(event,e => { if (drag?.id === e.pointerId) finishDrag(); });
+  }
   track.addEventListener('click',event => {
-    if (event.target === playhead || (dragged && event.detail) || pick(event) || saving() || !drafts[index]) return;
-    seekAtX(event.clientX);
+    // Pointer clicks were positioned on press/release. Keyboard activation
+    // has no coordinate and opens the focused mark at its beginning.
+    if (event.detail || saving() || !drafts[index]) return;
+    const target = markIndex(event.target);
+    if (target >= 0) userSeek(drafts[target].segment.start,null,{},target);
   });
 
   return {
@@ -296,8 +350,10 @@ export function bindSegmentTimeline({get, tr, editor, select, changed, saving, s
       return true;
     },
     show(items, activeIndex) {
-      if (drafts[index] !== items[activeIndex]) { preview = null; nativeFrom = null; }
-      if (!items.length) { drag = null; pointerSlider = null; }
+      if (drafts[index] !== items[activeIndex] || !items.length) {
+        preview = null; nativeFrom = requestedTime = issuedTime = null;
+      }
+      if (!items.length) { if (drag) finishDrag(); pointerSlider = null; }
       drafts = items; index = activeIndex;
       track.hidden = get('Segments').hidden = !items.length;
       if (!items.length) return;

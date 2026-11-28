@@ -1,6 +1,6 @@
-import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=segment-history-1';
+import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=segment-hand-scrub-1';
 import {createSegmentHistory} from './video-segment-history.mjs';
-import {bindUploadPreview} from './video-upload-preview.mjs?v=upload-repair-1';
+import {bindUploadPreview} from './video-upload-preview.mjs?v=segment-local-scrub-1';
 import {startUploadCheck} from './video-upload-check.mjs';
 import {createVideoSource} from './video-source-upload.mjs';
 import {MAX_VIDEO_SOURCE_BYTES} from './video-source-limits.mjs';
@@ -215,9 +215,10 @@ function rangeText(){const d=draft();
   return;
  }
  get('Range').textContent=d.metadata.range?tr(d.metadata.range.remove?'הקטע למחיקה: ':'הקטע שנבחר: ',d.metadata.range.remove?'Segment to delete: ':'Selected clip: ')+window.FamilyVideoEditor.clock(d.metadata.range.start)+' – '+window.FamilyVideoEditor.clock(d.metadata.range.end):tr('הסרטון המלא','Full video');}
-function render(){
+function render(seekTime){
  const d=draft();if(!d)return;swipe?.reset();searchSerial++;session.matches=[];
  const split=session.split;
+ preview.setSegmentMode(split&&!session.review);
  if(split)followPreviousEnd(session.drafts[session.index-1],d);
  dialog.classList.toggle('is-splitting',split);
  get('Title').textContent=split?segmentLabel(d):tr('אשף העלאת הסרטונים','Video Upload Wizard');
@@ -225,6 +226,10 @@ function render(){
  get('PlaybackTools').hidden=split;
  get('Player').setAttribute('aria-label',session.review?tr('ניגון המקטע השמור','Saved segment playback'):tr('תצוגה מקדימה של הסרטון לפני ההעלאה','Video preview before upload'));
  get('Pager').setAttribute('aria-label',split?tr('מעבר בין מקטעים','Segment navigation'):tr('הסרטונים שנבחרו להעלאה','Videos selected for upload'));
+ for(const [id,key] of [['Next','ArrowRight'],['Previous','ArrowLeft']]){
+  if(split)get(id).setAttribute('aria-keyshortcuts',key);
+  else get(id).removeAttribute('aria-keyshortcuts');
+ }
  get('Split').setAttribute('aria-pressed',String(split));
  get('SplitLabel').textContent=split?tr('חזרה לסרטון המלא','Back to full video'):tr('חלוקת סרטון למקטעים','Split video into segments');
  get('EditIcon').innerHTML=split?'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 4 13 8-13 8Z"/></svg>':window.FamilyVideoEditor.icon;
@@ -260,7 +265,8 @@ function render(){
  }else checkDraft(session,d);
  renderedDraft=d;
  timeline.show(split?session.drafts:[],session.index);
- if(split&&changedDraft)timeline.seekStart();
+ if(split&&Number.isFinite(seekTime))timeline.seek(seekTime);
+ else if(split&&changedDraft)timeline.seekStart();
  get('Progress').hidden=true;locks();
  get('SaveAll').textContent=split?tr('שמירת כל המקטעים','Save all segments'):tr('שמירה והעלאה של הכול','Save and upload all');
  get('SaveCurrent').textContent=d.savedDetails?tr('שמירת פרטי המקטע','Save segment details'):split?tr('שמירה והעלאת המקטע','Save and upload this segment'):tr('שמירה והעלאת סרטון זה','Save and upload this video');
@@ -292,9 +298,9 @@ function toggleSplit(){
  }
  session.error=null;render();
 }
-function goTo(index,record=true){
+function goTo(index,record=true,seekTime){
  if(!session||session.saving||index===session.index||index<0||index>=session.drafts.length)return;
- rememberActivity();collect();if(record)checkpoint();session.index=index;render();
+ rememberActivity();collect();if(record)checkpoint();session.index=index;render(seekTime);
 }
 function navigate(direction,record=true){
  if(!session||session.saving)return;
@@ -302,7 +308,7 @@ function navigate(direction,record=true){
  if(session.split&&index===session.drafts.length&&markedRange(draft())){
   rememberActivity();collect();if(record)checkpoint();
   if(session.review||draft().duration-draft().segment.end<.1-1e-9){
-   session.index=0;render();timeline.seekStart();return;
+   session.index=0;render(session.drafts[0].segment.start??0);return;
   }
   session.drafts.push(createSegment(draft()));session.index=index;render();return;
  }
@@ -393,6 +399,7 @@ function mount(){
  get('Player').addEventListener('play',rememberActivity);
  get('Player').addEventListener('pointerdown',rememberActivity);
  get('Player').addEventListener('keydown',rememberActivity);
+ get('Track').addEventListener('pointerdown',rememberActivity);
  get('Track').addEventListener('click',rememberActivity);
  get('SourcePlay').addEventListener('click',()=>preview.playRemote());
  get('SourceRetry').addEventListener('click',()=>{const source=stageFor(session,draft().file);void source?.ensure().catch(()=>{});});
@@ -407,7 +414,7 @@ function mount(){
  get('PinNext').addEventListener('click',pinAndAdvance);
  get('CutoffTime').addEventListener('input',locks);
  get('CutoffHere').addEventListener('click',()=>{
-  get('CutoffTime').value=window.FamilyVideoEditor.clock(Math.round(get('Player').currentTime*100)/100);
+  get('CutoffTime').value=window.FamilyVideoEditor.clock(Math.round(timeline.position()*100)/100);
   locks();
  });
  get('SaveThrough').addEventListener('click',()=>save(true,uploadCutoff()));
@@ -477,9 +484,17 @@ function mount(){
    if((z||y)&&(timelineField||!(input.isContentEditable||input.closest('input,textarea,select,[role="textbox"],[role="combobox"]')))){
     event.preventDefault();collect();
     const state=session.history.move(y||event.shiftKey,timeline.position());
-    if(state){render();if(state.split)timeline.seek(state.time);rememberActivity();}
+    if(state){render(state.time);rememberActivity();}
     return;
    }
+  }
+  if(session.split&&(event.key==='ArrowRight'||event.key==='ArrowLeft')&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.shiftKey){
+   const target=event.target;
+   if(target!==get('Playhead')&&(target.isContentEditable||target.closest('input,textarea,select,[role="textbox"],[role="combobox"]')))return;
+   event.preventDefault();event.stopPropagation();
+   const next=event.key==='ArrowRight';
+   if(!event.repeat&&!get(next?'Next':'Previous').disabled)navigate(next?1:-1);
+   return;
   }
   if(session.split&&timeline.stepByKey(event)){event.preventDefault();rememberActivity();}
  }

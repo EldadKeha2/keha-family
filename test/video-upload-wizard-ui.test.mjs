@@ -24,7 +24,9 @@ function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker,check
   addEventListener(type,fn){const previous=this.listeners.get(type);this.listeners.set(type,previous?event=>{previous(event);return fn(event);}:fn);}
   closest(selector){return selector.split(',').some(part=>part===this.tag||this.tag==='button'&&part.startsWith('button'))?this:null;}
   getBoundingClientRect(){return {left:0,top:0,right:360,bottom:240,width:360,height:240};}
-  setPointerCapture(id){this.captures.push(id);}
+  setPointerCapture(id){this.captures.push(id);this.capturedPointer=id;}
+  hasPointerCapture(id){return this.capturedPointer===id;}
+  releasePointerCapture(id){if(this.hasPointerCapture(id))this.capturedPointer=null;}
   querySelectorAll(selector){return [...nodes.values()].filter(node=>node.parent===this&&(selector==='[data-video-draft-field]'?node.field:selector==='[data-video-boundary]'?node.boundary:['input','textarea','select','button'].includes(node.tag)));}
   showModal(){this.open=true;}
   close(){this.open=false;this.listeners.get('close')?.();}
@@ -151,6 +153,13 @@ function openSegments(f,duration=8){
 }
 function boundary(f,id,value){
  const field=f.get(id);field.value=value;field.listeners.get('input')();
+}
+function railPointer(f,type,x,target=f.get('Track')){
+ const event={target,pointerId:1,isPrimary:true,button:0,clientX:x,preventDefault(){this.defaultPrevented=true;}};
+ f.get('Track').listeners.get(type)(event);return event;
+}
+function markedButton(index){
+ return {dataset:{segmentIndex:String(index)},closest(selector){return selector==='[data-segment-index]'?this:null;}};
 }
 function pressEditorKey(f,target,key,code,options={}){
  const event={target,key,code,preventDefault(){this.defaultPrevented=true;},stopPropagation(){},...options};
@@ -534,7 +543,7 @@ test('a manual preview must match the source, and a canceled conversion cannot r
  f.get('Close').click();await done;assert.equal(f.revoked.length,f.urls.length);
 });
 
-test('the single original starts staging on selection, supplies remote playback and serves successive segment saves',async()=>{
+test('staging keeps the local file seekable when splitting and supplies remote playback and successive segment saves',async()=>{
  const f=fixture(),original=new File(['original video'],'family.mp4',{type:'video/mp4'});
  const transfer=deferred(),sources=[],publications=[];
  function stage(file,{changed}){
@@ -547,9 +556,15 @@ test('the single original starts staging on selection, supplies remote playback 
  const [source]=sources;
  source.received=5;source.refresh();assert.match(f.get('SourceStatus').textContent,/התקבלו באתר/);
  openSegments(f,8);boundary(f,'StartTime','1');boundary(f,'EndTime','3');
+ const player=f.get('Player'),local=player.src;assert.match(local,/^blob:/);
  source.phase='ready';source.url='https://family.example/api/video-sources/test/play';transfer.resolve(source);source.refresh();
- const player=f.get('Player');assert.equal(player.src,source.url);
+ assert.equal(player.src,local,'a completed upload cannot replace the local file during a scrub');
  assert.equal(f.get('PlaybackTools').hidden,true);
+ f.get('Split').click();assert.equal(player.src,source.url);
+ player.currentTime=5.75;player.readyState=0;await player.play();
+ f.get('Split').click();assert.match(player.src,/^blob:/);
+ player.currentTime=0;player.readyState=2;await player.onloadedmetadata();player.listeners.get('loadedmetadata')();
+ assert.equal(player.currentTime,1);assert.equal(player.paused,true,'entering the cut cancels resume on the old source');
  await player.play();assert.equal(player.paused,false);player.pause();
  await f.get('SaveCurrent').click();
  f.get('Next').click();boundary(f,'EndTime','6');await f.get('SaveCurrent').click();
@@ -637,6 +652,99 @@ test('history restores a whole drag, exact playhead, cuts and locks and invalida
  key('Z');boundary(f,'Playhead','211.75');key('Z');assert.equal(player.currentTime,400);
  player.listeners.get('pointerdown')();player.currentTime=310;player.listeners.get('seeking')();
  key('Z',player);assert.equal(player.currentTime,400);key('Y',player);assert.equal(player.currentTime,310);
+ f.get('Close').click();await done;
+});
+
+test('pressing a colored mark seeks to the exact point and selects it in one undoable gesture',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,120);
+ boundary(f,'EndTime','40');f.get('PinNext').click();boundary(f,'EndTime','100');
+ const track=f.get('Track'),player=f.get('Player'),first=markedButton(0);
+ await player.play();
+ assert.equal(railPointer(f,'pointerdown',65.25,first).defaultPrevented,true);
+ assert.equal(player.paused,true);assert.equal(player.currentTime,21.75);
+ assert.equal(track.hasPointerCapture(1),true);assert.equal(track.classes.has('is-scrubbing'),true);
+ railPointer(f,'pointerup',65.25);
+ track.listeners.get('click')({target:first,detail:1});
+ assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(player.currentTime,21.75);
+ assert.equal(f.get('EndTime').value,'40');assert.equal(track.classes.has('is-scrubbing'),false);
+ pressEditorKey(f,f.get('Playhead'),'z','KeyZ',{ctrlKey:true});
+ assert.equal(f.get('Title').textContent,'מקטע 2');assert.equal(player.currentTime,100);
+ pressEditorKey(f,f.get('Playhead'),'y','KeyY',{ctrlKey:true});
+ assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(player.currentTime,21.75);
+ railPointer(f,'pointerdown',315);railPointer(f,'pointerup',315);
+ assert.equal(player.currentTime,105);assert.equal(f.get('Title').textContent,'מקטע 1');
+ track.listeners.get('click')({target:markedButton(1),detail:0});
+ assert.equal(f.get('Title').textContent,'מקטע 2');assert.equal(player.currentTime,40);
+ f.get('Close').click();await done;
+});
+
+test('left and right navigate cuts from the pager, video or playhead and show the destination start',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,120);
+ const player=f.get('Player'),thumb=f.get('Playhead');
+ const arrow=(target,key,options)=>pressEditorKey(f,target,key,key,options);
+ boundary(f,'StartTime','3.24');boundary(f,'EndTime','39.8');f.get('Next').click();
+ boundary(f,'StartTime','42.44');boundary(f,'EndTime','98');f.get('Previous').click();
+ assert.equal(player.currentTime,3.24);
+ boundary(f,'Playhead','9.48');await player.play();
+ assert.equal(arrow(f.get('Previous'),'ArrowRight'),true);
+ assert.equal(f.get('Title').textContent,'מקטע 2');assert.equal(player.paused,true);assert.equal(player.currentTime,42.44);
+ arrow(player,'ArrowRight',{repeat:true});assert.equal(f.get('Title').textContent,'מקטע 2');
+ for(const field of ['Caption','Name','Dateyear','EndTime','EndSlider']){
+  assert.equal(arrow(f.get(field),'ArrowLeft'),false);
+ }
+ assert.equal(arrow(player,'ArrowLeft',{altKey:true}),false);
+ boundary(f,'Playhead','79.52');
+ arrow(thumb,'ArrowLeft');assert.equal(f.get('Title').textContent,'מקטע 1');assert.equal(player.currentTime,3.24);
+ arrow(f.get('Next'),'ArrowLeft');assert.equal(f.get('Title').textContent,'מקטע 1');
+ player.readyState=0;arrow(player,'ArrowRight');
+ assert.equal(Number(thumb.value),42.44);assert.equal(player.currentTime,3.24);
+ player.readyState=1;player.listeners.get('loadedmetadata')();await new Promise(resolve=>setTimeout(resolve,8));
+ assert.equal(player.currentTime,42.44);
+ f.get('Close').click();await done;
+});
+
+test('clicks across saved clips use local media times and obsolete metadata cannot overwrite later navigation',async()=>{
+ const f=fixture();
+ const segments=[{id:'one',src:'/one.mp4',number:1,start:0,end:40,name:'One'},{id:'two',src:'/two.mp4',number:2,start:40,end:120,name:'Two'}];
+ f.window.FamilyI18n.fetch=async()=>Response.json({duration:120,segments});
+ await f.window.FamilyVideoUpload.openProject('one');
+ const player=f.get('Player'),thumb=f.get('Playhead');
+ player.readyState=0;
+ railPointer(f,'pointerdown',225,markedButton(1));railPointer(f,'pointerup',225);
+ assert.equal(player.src,'/two.mp4');assert.equal(Number(thumb.value),75);
+ player.readyState=2;player.listeners.get('loadedmetadata')();await new Promise(resolve=>setTimeout(resolve,8));
+ assert.equal(player.currentTime,35);assert.equal(Number(thumb.value),75);
+ player.readyState=0;
+ railPointer(f,'pointerdown',60,markedButton(0));railPointer(f,'pointerup',60);
+ assert.equal(Number(thumb.value),20);player.listeners.get('loadedmetadata')();
+ pressEditorKey(f,thumb,'ArrowRight','ArrowRight');
+ player.readyState=2;player.listeners.get('loadedmetadata')();await new Promise(resolve=>setTimeout(resolve,8));
+ assert.equal(player.src,'/two.mp4');assert.equal(player.currentTime,0);assert.equal(Number(thumb.value),40);
+ f.get('Close').click();
+});
+
+test('scrubbing waits for decoding, coalesces reversals, preserves the grab offset and lands on release',async()=>{
+ const f=fixture(),done=f.prepare(['tape.mp4']);openSegments(f,120);
+ boundary(f,'EndTime','90');boundary(f,'Playhead','80');
+ const player=f.get('Player'),track=f.get('Track'),thumb=f.get('Playhead'),issued=[];
+ let mediaTime=80;
+ Object.defineProperty(player,'currentTime',{get:()=>mediaTime,set:time=>{issued.push(time);mediaTime=time;player.seeking=true;}});
+ const decoded=async()=>{player.seeking=false;player.listeners.get('seeked')();await new Promise(resolve=>setTimeout(resolve,8));};
+ railPointer(f,'pointerdown',243,thumb); // Grab three pixels to the right of the center.
+ assert.deepEqual(issued,[]);
+ railPointer(f,'pointermove',303);assert.deepEqual(issued,[100]);
+ for(const x of [294,273,249,183,123])railPointer(f,'pointermove',x);
+ player.listeners.get('timeupdate')();
+ assert.deepEqual(issued,[100]);assert.equal(Number(thumb.value),40);
+ await decoded();assert.deepEqual(issued,[100,40]);
+ railPointer(f,'pointermove',108);railPointer(f,'pointermove',63);
+ assert.equal(Number(thumb.value),20);railPointer(f,'pointerup',33);
+ assert.deepEqual(issued,[100,40,10]);assert.equal(track.hasPointerCapture(1),false);
+ await decoded();assert.equal(Number(thumb.value),10);assert.equal(f.get('EndTime').value,'90');
+ pressEditorKey(f,thumb,'z','KeyZ',{ctrlKey:true});await decoded();assert.equal(mediaTime,80);
+ railPointer(f,'pointerdown',240,thumb);railPointer(f,'pointermove',-60);railPointer(f,'pointercancel',-60);
+ assert.equal(track.classes.has('is-scrubbing'),false);assert.equal(mediaTime,0);await decoded();
+ railPointer(f,'pointermove',340);assert.equal(mediaTime,0);
  f.get('Close').click();await done;
 });
 

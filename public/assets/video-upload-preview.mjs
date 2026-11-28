@@ -5,6 +5,7 @@ const readDuration = async file => (await import('./video-segment-file.mjs')).se
 export function bindUploadPreview({get, tr, onDuration, createProbe, canResume = () => true, urls = URL, worker = createWorker, sourceDuration = readDuration}) {
   const player = get('Player'), mode = get('PreviewMode'), pick = get('PreviewFile'), message = get('PreviewStatus');
   let records = new WeakMap(), record = null, url = null, ownedUrl = null, job = null, pendingTime = null, watchdog = null, stalled = false, resumePending = false;
+  let segmentMode = false;
 
   function note(text = '') {
     message.textContent = text;
@@ -41,6 +42,11 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
       return;
     }
     stalled = true; playLabel();
+    if (segmentMode && !record.useLight && record.remoteUrl && url !== record.remoteUrl) {
+      record.preferRemote = true;
+      switchView(false);
+      return;
+    }
     if (player.error?.code === 3 || player.error?.code === 4) {
       note(record.useLight ? tr('הדפדפן לא הצליח לפענח את העותק הקל. אפשר לבחור ״ניגון מהאתר״ כשהמקור מוכן, או לבחור עותק אחר מהמכשיר.', 'The browser could not decode this preview. Play the uploaded original when ready, or choose another copy.') :
         tr('הדפדפן לא הצליח לפענח את קובץ המקור. אפשר להכין תצוגה קלה או לבחור עותק קל מהמכשיר.', 'The browser could not decode the original. Prepare a lightweight preview or choose a lighter copy.'));
@@ -84,11 +90,15 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
   function displayFile() {
     return record?.useLight ? record.light : record?.file;
   }
+  function remotePreview(owner) {
+    return !owner.useLight && (!segmentMode || owner.preferRemote) ? owner.remoteUrl : null;
+  }
   function load(time = 0, resume = false) {
     clearWatch();
     const owner = record, oldUrl = ownedUrl;
-    ownedUrl = !owner.useLight && owner.remoteUrl ? null : urls.createObjectURL(displayFile());
-    const nextUrl = ownedUrl || owner.remoteUrl;
+    const remote = remotePreview(owner);
+    ownedUrl = remote ? null : urls.createObjectURL(displayFile());
+    const nextUrl = remote || ownedUrl;
     url = nextUrl;
     pendingTime = time;
     resumePending = resume;
@@ -223,22 +233,30 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
   }
   return {
     displayFile, playbackError,
-    displayUrl() { return record && !record.useLight ? record.remoteUrl : null; },
+    displayUrl() { return url && url === record?.remoteUrl ? url : null; },
+    setSegmentMode(enabled) {
+      if (segmentMode === enabled) return;
+      segmentMode = enabled;
+      if (record?.remoteUrl && !record.useLight && Boolean(remotePreview(record)) !== (url === record.remoteUrl)) switchView(false);
+    },
     provideRemote(file, remoteUrl) {
       const owner = records.get(file);
       if (!owner || owner.remoteUrl === remoteUrl) return;
       owner.remoteUrl = remoteUrl;
-      if (record === owner && ((!owner.useLight && player.paused) || stalled)) switchView(false);
+      if (record !== owner) return;
+      // Keep the checked local file seekable while the upload finishes.
+      if (stalled) owner.preferRemote = true;
+      if (stalled || (remotePreview(owner) && player.paused)) switchView(false);
     },
     playRemote() {
       if (!record?.remoteUrl) return;
       const reload = record.useLight || url !== record.remoteUrl || player.error || stalled;
-      record.useLight = false; button(); note(); playOnClick(reload);
+      record.preferRemote = true; record.useLight = false; button(); note(); playOnClick(reload);
     },
     seek(time) {
       resumePending = false;
-      if (pendingTime !== null) pendingTime = time;
-      player.currentTime = time;
+      if (pendingTime !== null || player.readyState === 0) pendingTime = time;
+      if (player.readyState !== 0) player.currentTime = time;
     },
     open(file, duration) {
       if (record?.file === file) return false;
@@ -251,6 +269,7 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
     suspend,
     clear() {
       suspend();
+      segmentMode = false;
       records = new WeakMap();
     }
   };

@@ -221,11 +221,13 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 #videoUploadWizard .upload-segments {display:grid;gap:3px;padding:8px 10px;margin:0 0 9px;background:var(--segment-panel);border:1px solid var(--segment-line);border-radius:8px}
 #videoUploadWizard .upload-segment-track {
   position:relative;flex:none;height:var(--track-height,20px);margin:2px 14px 8px;
-  border-radius:4px;isolation:isolate;background:#48514d;cursor:crosshair;touch-action:pan-y;
+  --scrub-cursor:grab;
+  border-radius:4px;isolation:isolate;background:#48514d;cursor:var(--scrub-cursor);touch-action:pan-y;user-select:none;
 }
+#videoUploadWizard .upload-segment-track.is-scrubbing {--scrub-cursor:grabbing}
 #videoUploadMarks button {
   position:absolute;display:block;box-sizing:border-box;min-width:2px;min-height:0;height:14px;margin:0;padding:0;
-  border:0;border-radius:2px;background:hsl(var(--mark-hue) 62% 58%);cursor:pointer;
+  border:0;border-radius:2px;background:hsl(var(--mark-hue) 62% 58%);cursor:var(--scrub-cursor);
 }
 #videoUploadMarks button[data-pinned=true] {
   background-image:repeating-linear-gradient(125deg,transparent 0 6px,#0003 6px 8px);
@@ -233,18 +235,18 @@ html[data-a11y-text] #videoClipEditor #videoClipForm{max-height:none}
 #videoUploadMarks button[aria-current=true] {box-shadow:inset 0 0 0 1.5px #fff}
 #videoUploadWizard #videoUploadPlayhead {
   position:absolute;z-index:1;inset-block:0;left:-6px;width:calc(100% + 12px);height:100%;min-height:0;
-  margin:0;padding:0;border:0;appearance:none;background:transparent;pointer-events:none;
+  margin:0;padding:0;border:0;appearance:none;background:transparent;cursor:var(--scrub-cursor);pointer-events:none;
 }
 #videoUploadPlayhead::-webkit-slider-runnable-track {height:100%;background:transparent;border:0}
 #videoUploadPlayhead::-moz-range-track {height:100%;background:transparent;border:0}
 #videoUploadPlayhead::-moz-range-progress {background:transparent}
 #videoUploadPlayhead::-webkit-slider-thumb {
   appearance:none;box-sizing:border-box;width:12px;height:var(--track-height);margin:0;
-  border:2px solid #242b28;border-radius:4px;background:white;cursor:ew-resize;pointer-events:auto;
+  border:2px solid #242b28;border-radius:4px;background:white;cursor:var(--scrub-cursor);pointer-events:auto;
 }
 #videoUploadPlayhead::-moz-range-thumb {
   box-sizing:border-box;width:12px;height:var(--track-height);border:2px solid #242b28;border-radius:4px;
-  background:white;cursor:ew-resize;pointer-events:auto;
+  background:white;cursor:var(--scrub-cursor);pointer-events:auto;
 }
 #videoUploadWizard .upload-segment-boundary {display:grid;grid-template-columns:3.2em minmax(32px,1fr) 6.8em auto;align-items:center;gap:9px;color:var(--segment-ink);font:14px/1.2 var(--sans)}
 #videoUploadWizard .upload-segment-boundary input[type=range] {width:100%;min-width:0;height:32px;margin:0;padding:0;border:0;accent-color:var(--segment-accent);cursor:pointer;touch-action:pan-y}
