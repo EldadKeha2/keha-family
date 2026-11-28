@@ -5,7 +5,7 @@ export function createVideoSource(file,{scope,request,writeToken,tr,changed,dela
   const token = (crypto.randomUUID()+crypto.randomUUID()).replaceAll('-','');
   const controller = new AbortController(), confirmed = new Set();
   let running=null, initiated=false, sent=false, partSize=0, parts=0;
-  const source={file,phase:'starting',received:0,error:'',url:null,ensure,save,discard};
+  const source={file,phase:'starting',received:0,error:'',url:null,ensure,save,saveWork,resume,discard};
   function update(phase) { source.phase=phase; changed(source); }
   async function post(action,data,part) {
     const binary=part!==undefined,headers={'X-Family-Token':writeToken,'X-Video-Source':token,
@@ -84,6 +84,15 @@ export function createVideoSource(file,{scope,request,writeToken,tr,changed,dela
     return running;
   }
   async function save(data){await ensure();return retry(()=>post('save',data));}
+  async function saveWork(data){await ensure();return retry(()=>post('checkpoint',data));}
+  async function resume(workId){
+    sent=true;
+    const work=await retry(()=>post('resume',{workId}));
+    file=source.file=work.file;
+    source.phase='ready';source.received=file.size;
+    source.url=new URL('/api/video-sources/'+token+'/play',baseURL).href;
+    return work;
+  }
   function discard(){
     if(controller.signal.aborted)return;
     controller.abort();

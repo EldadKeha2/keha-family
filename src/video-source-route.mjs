@@ -25,6 +25,11 @@ export async function videoSourceRoute(request,env,db,ctx,action,sniff,readToken
   const token = readToken || request.headers.get('X-Video-Source');
   if (!/^[a-f0-9]{64}$/.test(token||'')) throw new HttpError(403,'אישור הטיוטה אינו תקין.');
   const id = await sha256(token);
+  if (action === 'resume') {
+    const {workId}=await readJSON(request,512);
+    return json(await db('video.source.resume',{id,workId,branch:request.headers.get('X-Family-Content-Scope')||new URL(request.url).searchParams.get('familyScope')}));
+  }
+  if (action === 'checkpoint') return json(await db('video.source.checkpoint',{id,body:await readJSON(request)}));
   if (action === 'start') {
     const {size,head,scope,filename} = await readJSON(request,4096);
     if (!Number.isSafeInteger(size)||size<1||size>MAX_VIDEO_SOURCE_BYTES) throw new HttpError(413,'אפשר להעלות קובץ מקור עד 4 GiB.');

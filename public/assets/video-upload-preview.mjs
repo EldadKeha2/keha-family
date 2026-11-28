@@ -258,10 +258,10 @@ export function bindUploadPreview({get, tr, onDuration, createProbe, canResume =
       if (pendingTime !== null || player.readyState === 0) pendingTime = time;
       if (player.readyState !== 0) player.currentTime = time;
     },
-    open(file, duration) {
+    open(file, duration, remoteUrl = null) {
       if (record?.file === file) return false;
       cancelJob(); note();
-      record = records.get(file) || {file, duration, light: null, useLight: false};
+      record = records.get(file) || {file, duration, light: null, useLight: false, remoteUrl, preferRemote:Boolean(remoteUrl)};
       records.set(file, record);
       button(); load();
       return true;

@@ -1,4 +1,5 @@
 import {HttpError} from './http.mjs';
+import {resumeSegmentWork,saveSegmentWork} from './video-segment-work.mjs';
 
 const day = 86400000;
 export function initVideoSources(state) {
@@ -32,6 +33,14 @@ export function videoSourceState(state, action, p) {
     if (['filename','size','scope','ext'].some(key => source[key] !== p.source[key])) throw new HttpError(409,'נבחר קובץ אחר עבור אותה העלאה.');
     return source;
   }
+  if (action === 'resume') {
+    const {item,published} = resumeSegmentWork(state,p.workId,p.branch);
+    if (source && source.fullId !== item.id) throw new HttpError(409,'טיוטת הסרטון כבר בשימוש.');
+    write({id:p.id,originId:item.videoSourceId,fullId:item.id,phase:'ready',joined:true,scope:item.category,key:item.key,
+      size:item.size,mime:item.mime,ext:item.file.slice(item.file.lastIndexOf('.')),filename:item.filename});
+    return {workRevision:item.segmentWork.revision,snapshot:item.segmentWork.snapshot,published,scope:item.category,
+      file:{name:item.filename,size:item.size,type:item.mime}};
+  }
   if (!source) {
     if (action === 'find') return null;
     throw new HttpError(404,'טיוטת הסרטון לא נמצאה.');
@@ -42,10 +51,16 @@ export function videoSourceState(state, action, p) {
   }
   if (action === 'ready') return write({...source,phase:'ready',joined:true});
   if (source.phase !== 'ready') throw new HttpError(409,'יש להמתין לסיום העלאת המקור.','SOURCE_PENDING');
+  if (action === 'checkpoint') {
+    const result = saveSegmentWork(state,source,p.body);
+    // The album now owns the original. Expiring either editing session only retires its upload capability.
+    write({...source,fullId:p.body.workId});
+    return result;
+  }
   const existing = state.rows('SELECT data FROM media WHERE id=?',p.mediaId)[0];
   if (existing) {
     const item = JSON.parse(existing.data);
-    if (item.videoSourceId !== source.id || item.videoUploadEdit?.operationId !== p.operationId ||
+    if (item.videoSourceId !== (source.originId || source.id) || item.videoUploadEdit?.operationId !== p.operationId ||
         item.videoUploadEdit.fingerprint !== JSON.stringify(p.metadata)) throw new HttpError(409,'פרטי השמירה השתנו. פתחו את המקטע מחדש.');
     return {existing:true,...state.mediaChanged(item,'video-upload'),file:item.file,storedKey:item.key};
   }
@@ -56,7 +71,7 @@ export function videoSourceState(state, action, p) {
   // partial upload or a metadata error never creates an entry in the library.
   const item = {id:p.mediaId,category:source.scope,personId:null,kind:'video',filename:source.filename,
     name:p.metadata.name,file:p.mediaId+source.ext,key:source.key,mime:source.mime,size:source.size,
-    createdAt:new Date(now).toISOString(),videoSourceId:source.id};
+    createdAt:new Date(now).toISOString(),videoSourceId:source.originId || source.id};
   state.run('media.add',{item});
   const result = state.run('video.upload.save',{id:item.id,sourceKey:source.key,sourceSize:source.size,
     operationId:p.operationId,metadata:p.metadata,rendered:p.rendered});

@@ -11,6 +11,7 @@
  function seconds(value){const parts=String(value).trim().replace(',','.').split(':');if(!parts.length||parts.length>3||parts.some(p=>!/^\d+(?:\.\d+)?$/.test(p)))return NaN;if(parts.length>1&&parts.slice(1).some(p=>Number(p)>=60))return NaN;return parts.reduce((n,p)=>n*60+Number(p),0);}
  function controls(item,scope){
   if(!item.id||item.kind!=='video')return '';
+  if(item.segmentWork)return `<button type="button" class="video-edit-button" data-segment-work="${safe(item.id)}">${editIcon}<span>${tr('המשך חלוקה למקטעים','Resume splitting')}</span></button>`;
   const label=tr('עריכת פרטי המקטעים','Edit segment details');
   const project=item.hasSegmentProject?`<button type="button" class="video-edit-button" data-video-project="${safe(item.id)}" aria-label="${label}" title="${label}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M9 5v14m6-14v14"/></svg><span>${label}</span></button>`:'';
   return `<button type="button" class="video-edit-button" data-video-edit="${safe(item.id)}" data-video-scope="${safe(scope)}" aria-label="${tr('עריכת הסרטון','Edit video')}">${editIcon}<span>${tr('עריכה','Edit')}</span></button>`+project;

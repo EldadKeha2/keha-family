@@ -122,10 +122,11 @@
     for(const item of items){
       let card=oldCards.get(item.file);
       if(card&&card.dataset.mediaSrc!==item.src)card=null;
-      if(eventGrid&&item.kind==='video'&&window.FamilyVideoPresentation?.tile){
-        const version=JSON.stringify([item.caption,item.duration,item.poster,item.name]);
+      if((eventGrid||item.segmentWork)&&item.kind==='video'&&window.FamilyVideoPresentation?.tile){
+        const version=JSON.stringify([item.caption,item.duration,item.poster,item.name,item.segmentWork]);
         if(card&&card.dataset.videoTileVersion!==version)card=null;
         if(!card){card=document.createElement('article');card.className='shared-media-card video-tile nostalgia-event-video';card.dataset.mediaFile=item.file;card.dataset.mediaSrc=item.src;card.dataset.videoTileVersion=version;card.innerHTML=window.FamilyVideoPresentation.tile(item,key);card.querySelector('video')?.addEventListener('error',event=>{event.currentTarget.hidden=true;},true);card.querySelector('img')?.addEventListener('error',event=>{event.currentTarget.hidden=true;});}
+        if(item.segmentWork&&key==='nostalgia'&&!eventGrid)window.FamilyNostalgia?.decorateCard?.(card,item);
         card.dataset.mediaKind=item.kind;cards.push(card);continue;
       }
       if(!card){

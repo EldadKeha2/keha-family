@@ -23,6 +23,11 @@
   const duration=Number(item.duration),time=Number.isFinite(duration)&&duration>0?Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0'):'';
   const badge=window.FamilyVideoDelivery?.durationBadge?.(item)??(time?`<span class="video-tile-duration" aria-hidden="true">${time}</span>`:'');
   const preview=item.poster?`<img src="${safe(item.poster)}" ${item.provider==='youtube'?'':`data-video-poster-src="${safe(item.src.split('#')[0]+'#t=0.1')}"`} alt="" loading="lazy" decoding="async">`:`<video muted playsinline preload="none" tabindex="-1" aria-hidden="true" data-preview-src="${safe(item.src.split('#')[0]+'#t=0.1')}"></video>`;
+  if(item.segmentWork){
+   const number=tr('מקטע ','Segment ')+item.segmentWork.number,label=tr('המשך חלוקה למקטעים','Resume splitting');
+   const name=safe(item.name||item.filename);
+   return `<div class="video-tile-preview"><button type="button" class="video-tile-open" data-segment-work="${id}" aria-label="${label} · ${name}"><span class="video-tile-cover"><span class="video-tile-placeholder" aria-hidden="true">▤</span>${preview}<span class="video-tile-duration" dir="auto">${safe(number)}</span></span></button></div><div class="media-file-name" dir="auto">${name}</div><div class="video-tile-footer"><button type="button" class="video-tile-caption" data-segment-work="${id}">${label}</button><button type="button" class="video-tile-delete" data-media-delete="${id}" data-media-scope="${context}" aria-label="${tr('מחיקת העבודה השמורה','Delete saved work')} · ${name}">×</button></div>`;
+  }
   return `<div class="video-tile-preview"><button type="button" class="video-tile-open" data-media-open="${id}" data-media-scope="${context}" aria-label="${safe(title)}"><span class="video-tile-cover"><span class="video-tile-placeholder" aria-hidden="true">▤</span>${preview}<span class="video-tile-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 10 7-10 7Z"/></svg></span>${badge}</span></button>${controls(item,scope)}</div><button type="button" class="video-tile-caption ${item.caption?'':'is-empty'}" data-video-caption="${id}" data-video-scope="${context}" dir="auto" title="${safe(caption)}">${safe(caption)}</button>`;
  }
  function mount(){

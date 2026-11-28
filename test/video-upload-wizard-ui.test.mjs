@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import vm from 'node:vm';
 import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue, segmentColor} from '../public/assets/video-upload-segments.mjs';
 import {videoUploadMetadata} from '../public/assets/video-upload-metadata.mjs';
+import {captureSegmentWork,restoreSegmentWork} from '../public/assets/video-segment-work.mjs';
 import {createSegmentHistory} from '../public/assets/video-segment-history.mjs';
 import {tagChoices,taggedPeople} from '../public/assets/tag-choices.mjs';
 import {bindUploadPreview} from '../public/assets/video-upload-preview.mjs';
@@ -14,7 +15,7 @@ const source=(await readFile(new URL('../public/assets/video-upload-wizard.js',i
 const swipeSource=await readFile(new URL('../public/assets/photo-swipe.js',import.meta.url),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function deferred(){let resolve,reject;const promise=new Promise((done,failed)=>{resolve=done;reject=failed;});return {promise,resolve,reject};}
-function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker,check=file=>({file,phase:'ready',verified:true,discard(){}})}={}){
+function fixture({finalize,categories,sourceFactory,cut=prepareSegmentFile,previewWorker,check=file=>({file,phase:'ready',verified:true,discard(){}})}={}){
  const nodes=new Map(),listeners=new Map(),events=new Map(),uploads=[],saves=[],changed=[],toasts=[],probes=[],urls=[],revoked=[];
  class Element{
   constructor(tag='div'){this.tag=tag;this.tagName=tag.toUpperCase();this.dataset={};this.currentTime=0;this.style={setProperty(name,value){this[name]=value;}};this.value='';this.validity={};this.disabled=false;this.hidden=false;this.open=false;this.listeners=new Map();this.attributes=new Map();this.classes=new Set();this.captures=[];this.clientWidth=360;this.loadCount=0;this.paused=true;this.pauseCount=0;this.classList={toggle:(name,on)=>on?this.classes.add(name):this.classes.delete(name),add:name=>this.classes.add(name),remove:name=>this.classes.delete(name)};}
@@ -37,7 +38,7 @@ function fixture({finalize,categories,cut=prepareSegmentFile,previewWorker,check
  const document={getElementById:id=>nodes.get(id),createElement:tag=>{const node=new Element(tag);if(tag==='video')probes.push(node);return node;},addEventListener:(name,fn)=>events.set(name,fn),body:{append(node){nodes.set(node.id,node);}}};
  const window={FAMILY_API_TOKEN:'test',FamilyI18n:{isEnglish:false,error:String,fetch:async(path,options)=>{const data=JSON.parse(options.body);saves.push({path,data});return finalize?finalize(saves.length,data):Response.json({item:{id:path.split('/')[2]}});}},FamilyVideoCategories:categories,FamilyVideoEditor:{icon:'',clock:String,seconds:text=>String(text).trim()?String(text).split(':').reduce((v,part)=>v*60+Number(part),0):NaN},FamilyNostalgia:{uploadEvents:()=>[{id:'original-event',name:'Original event'}]},FamilyApp:{toast:value=>toasts.push(value)},confirm:()=>true,addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>changed.push(event.detail)};
  window.FamilyNostalgia.uploadEventLabel=event=>event.name;
- const context=vm.createContext({window,document,tagChoices,taggedPeople,startUploadCheck:check,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,followPreviousEnd,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
+ const context=vm.createContext({window,document,captureSegmentWork,restoreSegmentWork,createVideoSource:sourceFactory,tagChoices,taggedPeople,startUploadCheck:check,MAX_VIDEO_SOURCE_BYTES:4*1024**3,bindUploadPreview:options=>bindUploadPreview({...options,worker:previewWorker}),videoUploadMetadata,filenamePhotoDate,bindSegmentTimeline,followPreviousEnd,markedRange,prepareSegmentFile:cut,segmentControlsHTML,segmentHue,crypto:{randomUUID},URL:{createObjectURL:file=>'blob:local/'+urls.push(file),revokeObjectURL:url=>revoked.push(url)},clearTimeout,setTimeout,CustomEvent:class{constructor(name,{detail}){this.detail=detail;}}});
  document.querySelectorAll=selector=>[...nodes.values()].filter(node=>node.tag===selector);
  context.createSegmentHistory=createSegmentHistory;
  vm.runInContext(swipeSource,context);vm.runInContext(source,context);
@@ -899,4 +900,43 @@ test('batch progress shows current transfer separately and excludes unfinished c
  const remaining=f.get('SaveAll').click();await waitForUpload(f,3);assert.match(f.get('BatchCount').textContent,/2 מתוך 3/);
  f.uploads[2].resolve(f.result(2));await remaining;assert.match(f.get('BatchCount').textContent,/3 מתוך 3/);
  f.get('Close').click();await done;
+});
+
+test('save work keeps an unfinished cut editable, closes cleanly and resumes at the saved playhead without another upload',async()=>{
+ const store={},published=[];let saves=0;
+ const file={name:'family.mp4',size:500,type:'video/mp4'};
+ function stage(blob){
+  return {file:blob,phase:'ready',received:500,url:'https://test.example/whole.mp4',ensure:async()=>{},discard(){},
+   async save({mediaId,metadata}){
+    published.push({id:mediaId,name:metadata.name,caption:metadata.caption,date:metadata.date});
+    return {item:{id:mediaId,name:metadata.name,caption:metadata.caption,takenDate:metadata.date}};
+   },
+   async saveWork({workId,revision,snapshot}){
+    assert.equal(revision,store.revision||null);Object.assign(store,{workId,revision:String(++saves),snapshot:structuredClone(snapshot)});
+    return {operation:'video-segment-work',workRevision:store.revision};
+   },async resume(workId){assert.equal(workId,store.workId);this.file=file;return {scope:'nostalgia',workRevision:store.revision,snapshot:structuredClone(store.snapshot),published:structuredClone(published)};}};
+ }
+ const f=fixture({sourceFactory:stage}),done=f.prepare([file],{stageSources:stage,eventId:''});openSegments(f,12);
+ boundary(f,'EndTime','4');f.get('PinNext').click();
+ boundary(f,'Name','בחצר');boundary(f,'Caption','כאן ממשיכים');boundary(f,'Dateyear','1998');tagName(f,'דוד');
+ boundary(f,'StartTime','5.25');
+ assert.equal(f.get('SaveWork').hidden,false);await f.get('SaveWork').click();
+ assert.equal(f.get('Wizard').open,true);assert.match(f.get('Status').textContent,/סרטונים לא משויכים/);
+ assert.equal(store.snapshot.segments.length,2);assert.equal(store.snapshot.segments[0].segment.pinned,true);
+ assert.equal(store.snapshot.segments[1].segment.end,null);assert.equal(store.snapshot.position,5.25);
+ assert.equal(f.uploads.length,0);f.window.confirm=()=>assert.fail('A confirmed checkpoint closed with a warning');
+ f.get('Close').click();await done;
+ await f.window.FamilyVideoUpload.openWork(store.workId);
+ assert.equal(f.get('Wizard').open,true);assert.equal(f.get('Title').textContent,'מקטע 2');
+ assert.equal(f.get('Name').value,'בחצר');assert.equal(f.get('Dateyear').value,1998);
+ assert.equal(f.get('Caption').value,'כאן ממשיכים');assert.match(f.get('PeopleTags').innerHTML,/דוד/);
+ assert.equal(f.get('Player').src,'https://test.example/whole.mp4');
+ assert.equal(Number(f.get('Playhead').value),5.25);assert.equal(f.get('EndTime').value,'');
+ assert.equal(f.get('Name').disabled,false);
+ boundary(f,'EndTime','9');f.get('PinNext').click();assert.equal(f.get('Title').textContent,'מקטע 3');assert.equal(Number(f.get('StartTime').value),9);
+ let asked=false;f.window.confirm=()=>{asked=true;return false;};f.get('Close').click();assert.equal(asked,true);assert.equal(f.get('Wizard').open,true);
+ await f.get('SaveAll').click();assert.equal(saves,2);assert.equal(store.snapshot.segments.length,3);
+ assert.equal(published.length,2);assert.equal(store.snapshot.segments[2].segment.end,null);
+ assert.match(f.get('Status').textContent,/המקטעים והעבודה נשמרו/);
+ f.get('Close').click();assert.equal(f.get('Wizard').open,false);
 });

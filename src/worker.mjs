@@ -421,7 +421,7 @@ const worker = {
       }
       if(request.method==='POST'){
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-segment-details$/.exec(path)))return json(await db('video.segment.details',{...await readJSON(request,80000),id:match[1],branch:request.headers.get('X-Family-Content-Scope')||url.searchParams.get('familyScope')}));
-        if((match=/^\/api\/video-sources\/(start|part|status|complete|save|discard)$/.exec(path)))return await videoSourceRoute(request,env,db,ctx,match[1],sniff);
+        if((match=/^\/api\/video-sources\/(start|part|status|complete|save|checkpoint|resume|discard)$/.exec(path)))return await videoSourceRoute(request,env,db,ctx,match[1],sniff);
         if(path==='/api/voices/upload')return await uploadRecording(request,env,db,ctx,streamUpload);
         if((match=/^\/api\/voices\/([a-f0-9]{32})$/.exec(path)))return json(await db('recording.edit',{...await readJSON(request,40000),id:match[1]}));
         if((match=/^\/api\/media\/([a-f0-9]{32})\/video-assets\/(poster|faststart|low|medium)\/multipart\/(start|part|complete|abort)$/.exec(path)))return await multipartVideoAsset(request,env,db,ctx,{id:match[1],variant:match[2],action:match[3]});

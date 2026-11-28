@@ -1,9 +1,10 @@
 import {bindSegmentTimeline, followPreviousEnd, markedRange, prepareSegmentFile, segmentControlsHTML, segmentHue} from './video-upload-segments.mjs?v=follow-mark-1';
 import {tagChoices, taggedPeople} from './tag-choices.mjs';
 import {createSegmentHistory} from './video-segment-history.mjs';
-import {bindUploadPreview} from './video-upload-preview.mjs?v=segment-local-scrub-1';
+import {bindUploadPreview} from './video-upload-preview.mjs?v=segment-work-1';
 import {startUploadCheck} from './video-upload-check.mjs';
-import {createVideoSource} from './video-source-upload.mjs';
+import {createVideoSource} from './video-source-upload.mjs?v=segment-work-1';
+import {captureSegmentWork,restoreSegmentWork} from './video-segment-work.mjs';
 import {MAX_VIDEO_SOURCE_BYTES} from './video-source-limits.mjs';
 import {videoUploadMetadata} from './video-upload-metadata.mjs?v=segment-project-1';
 import {filenamePhotoDate} from './photo-upload-metadata.mjs?v=4';
@@ -99,17 +100,20 @@ function showSource(source) {
 
  updateBackground();
 }
-function stageFor(owner,file) {
- if(!owner.options.stageSources)return null;
- let source=owner.sources.get(file);
- if(source)return source;
+function newSource(owner,file) {
  const factory=typeof owner.options.stageSources==='function'?owner.options.stageSources:createVideoSource;
- source=factory(file,{scope:owner.options.scope,request:(...args)=>I.fetch(...args),writeToken:window.FAMILY_API_TOKEN,tr,
+ return factory(file,{scope:owner.options.scope,request:(...args)=>I.fetch(...args),writeToken:window.FAMILY_API_TOKEN,tr,
    changed:item=>{
     if(session!==owner)return;
     if(draft()?.file===item.file)showSource(item);
     if(owner.waitingSource===item)sourceSaveProgress(item);
    }});
+}
+function stageFor(owner,file) {
+ if(!owner.options.stageSources)return null;
+ let source=owner.sources.get(file);
+ if(source)return source;
+ source=newSource(owner,file);
  owner.sources.set(file,source);
  void source.ensure().catch(()=>{});
  return source;
@@ -143,7 +147,7 @@ function showCheckedSource(owner,d) {
   return false;
  }
  d.file=check.file;
- const changed=preview.open(d.file,d.duration);
+ const changed=preview.open(d.file,d.duration,owner.workSource?.url);
  showSource(stageFor(owner,d.file));
  return changed;
 }
@@ -223,6 +227,8 @@ function locks(){
  for(const node of get('PeopleTags').querySelectorAll('button'))node.disabled=locked;
  for(const node of dialog.querySelectorAll('[data-video-boundary]'))node.disabled=timesLocked;
  get('SaveCurrent').disabled=d.saved?!dirtyDetails(d):d.check?.phase==='failed'||(split&&!range);
+ get('SaveWork').hidden=!split||Boolean(session.review)||!session.options.stageSources;
+ get('SaveWork').disabled=d.check?.phase==='failed';
  get('SaveAll').disabled=split&&!session.drafts.some(item=>dirtyDetails(item)||!item.saved&&markedRange(item));
  get('BatchOptions').hidden=!split||session.review||session.drafts.length<2;
  if(split){
@@ -231,6 +237,7 @@ function locks(){
  }
  const ready=session.review||d.check?.phase==='ready';
  for(const id of ['PreviewMode','PreviewPick','PreviewPlay'])get(id).disabled=!ready;
+ get('PreviewMode').hidden=Boolean(session.workSource);
  get('Edit').disabled=!ready||(split?!range:locked||!d.duration);
  get('Reset').disabled=timesLocked;get('Reset').hidden=Boolean(session.review);
  get('PinNext').hidden=!split||locked||Boolean(d.uploaded);
@@ -372,14 +379,15 @@ function rememberActivity(){
  }
 }
 function needsExitConfirmation(){
+ if(session.split&&session.workRevision)return session.workSignature!==JSON.stringify(captureSegmentWork(session,timeline.position()));
  return !session.split || session.drafts.some(dirtyDetails) || (session.activity && session.drafts.some(d=>!d.saved));
 }
-function finish(cancelled=false){const owner=session;timeline.show([],0);searchSerial++;for(const check of owner.checks)check.discard();for(const source of owner.sources.values())source.discard();preview.clear();renderedDraft=null;dialog.close();session=null;updateBackground();owner.resolve(cancelled?[]:owner.rest);void next();}
+function finish(cancelled=false){const owner=session;timeline.show([],0);searchSerial++;for(const check of owner.checks)check.discard();for(const source of owner.sources.values())source.discard();owner.fullSource?.discard();preview.clear();renderedDraft=null;dialog.close();session=null;updateBackground();owner.resolve(cancelled?[]:owner.rest);void next();}
 function cancel(){
  if(!session)return;
  if(session.saving){minimize();return;}
  collect();
- if(session.split&&session.drafts.every(d=>d.saved&&!dirtyDetails(d))){finish();return;}
+ if(session.split&&!session.workRevision&&session.drafts.every(d=>d.saved&&!dirtyDetails(d))){finish();return;}
  const question=session.split?tr('לצאת מעריכת המקטעים? סימונים ופרטים שלא נשמרו יאבדו.','Leave the segment editor? Unsaved marks and details will be lost.'):tr('לסגור את אשף העלאת הסרטונים?','Close the video upload wizard?');
  if(!needsExitConfirmation()||window.confirm(question))finish(true);
 }
@@ -421,7 +429,7 @@ function mount(){
  <p id="videoUploadError" class="photo-edit-error" role="alert"></p>
  <section id="videoUploadBatchMeter" class="upload-segments" hidden aria-label="${tr('התקדמות העלאת המקטעים','Segment upload progress')}"><strong id="videoUploadBatchCount" role="status"></strong><progress id="videoUploadBatchProgress" max="100" value="0" aria-labelledby="videoUploadBatchCount"></progress></section>
  <p id="videoUploadStatus" class="photo-edit-upload-status" role="status" aria-live="polite"></p><progress id="videoUploadProgress" max="100" value="0" hidden aria-label="${tr('התקדמות העלאת הסרטון','Video upload progress')}"></progress>
- <footer class="photo-edit-footer"><button type="button" id="videoUploadSaveCurrent" class="secondary-button"></button><button type="button" id="videoUploadSaveAll" class="primary-button"></button><button type="button" id="videoUploadRemove" class="photo-edit-remove">${tr('הסרת הסרטון מההעלאה','Remove video from upload')}</button><button type="button" id="videoUploadDone" class="secondary-button" hidden>${tr('סיום','Done')}</button></footer>`;
+ <footer class="photo-edit-footer"><button type="button" id="videoUploadSaveWork" class="secondary-button" hidden>${tr('שמירת העבודה עד לחלק זה','Save work up to this point')}</button><button type="button" id="videoUploadSaveCurrent" class="secondary-button"></button><button type="button" id="videoUploadSaveAll" class="primary-button"></button><button type="button" id="videoUploadRemove" class="photo-edit-remove">${tr('הסרת הסרטון מההעלאה','Remove video from upload')}</button><button type="button" id="videoUploadDone" class="secondary-button" hidden>${tr('סיום','Done')}</button></footer>`;
  document.body.append(dialog);
  preview=bindUploadPreview({get,tr,urls:URL,createProbe:()=>document.createElement('video'),
   canResume:()=>dialog.open&&!session?.saving&&!document.getElementById('videoClipEditor')?.open,
@@ -462,6 +470,7 @@ function mount(){
   get('CutoffTime').value=window.FamilyVideoEditor.clock(Math.round(timeline.position()*100)/100);
   locks();
  });
+ get('SaveWork').addEventListener('click',saveWork);
  get('SaveThrough').addEventListener('click',()=>save(true,uploadCutoff()));
  get('Done').addEventListener('click',cancel);
  background=document.createElement('button');background.id='videoUploadBackground';background.type='button';background.hidden=true;background.dir=I.isEnglish?'ltr':'rtl';background.dataset.i18nSkip='';background.setAttribute('aria-label',tr('פתיחת מצב העלאת הסרטונים','Open video upload status'));background.innerHTML=`<span id="videoUploadBackgroundStatus" role="status" aria-live="polite"></span><progress id="videoUploadBackgroundProgress" max="100" value="0" aria-label="${tr('התקדמות העלאת הסרטונים','Video upload progress')}"></progress>`;document.body.append(background);background.addEventListener('click',restore);
@@ -490,7 +499,7 @@ function mount(){
   else{draft().metadata.range=null;rangeText();}
  });get('SaveCurrent').addEventListener('click',()=>save(false));get('SaveAll').addEventListener('click',()=>save(true));
  get('Remove').addEventListener('click',()=>{if(session.saving||get('Remove').hidden)return;collect();checkpoint();const removed=draft();session.drafts.splice(session.index,1);
-  if(!session.split&&!session.drafts.some(d=>d.file===removed.file)){removed.check?.discard();session.checks.delete(removed.check);session.sources.get(removed.file)?.discard();session.sources.delete(removed.file);}
+  if(!session.split&&!session.drafts.some(d=>d.file===removed.file)){removed.check?.discard?.();session.checks.delete(removed.check);session.sources.get(removed.file)?.discard();session.sources.delete(removed.file);}
   if(session.split&&!session.drafts.length){session.drafts=[session.original];session.split=false;session.removedLast=true;session.index=session.segmentIndex=0;session.nextNumber=1;render();return;}
   if(!session.drafts.length||(!session.split&&session.drafts.every(d=>d.saved))){finish();return;}session.index=Math.min(session.index,session.drafts.length-1);render();});
  get('Target').addEventListener('change',()=>{
@@ -590,7 +599,15 @@ function freezeUpload(d,owner,split){
  if(d.frozen)return;
  const metadata=videoUploadMetadata(d.metadata);
  if(split)metadata.segmentProject={id:owner.projectId,number:d.segment.number,...markedRange(d),duration:d.duration};
- d.frozen={operationId:uuid(),metadata};
+ d.frozen={operationId:split?d.uploadId:uuid(),metadata};
+}
+async function workFile(owner){
+ if(!owner.originalBlob){
+  const source=owner.workSource,response=await I.fetch(source.url);
+  if(!response.ok)throw Error(tr('טעינת המקור נכשלה. אפשר לנסות שוב.','Could not load the original. Please retry.'));
+  owner.originalBlob=new File([await response.blob()],source.file.name,{type:source.file.type});
+ }
+ return owner.originalBlob;
 }
 async function saveFromSource(d,owner,source,split){
  freezeUpload(d,owner,split);
@@ -601,7 +618,8 @@ async function saveFromSource(d,owner,source,split){
  if(!d.derivedSource){
   try{return await source.save(payload);}
   catch(error){if(error.code!=='VIDEO_CLIP_FORMAT'||!range||range.remove)throw error;}
-  const clip=await prepareSegmentFile({file:d.file,name:d.frozen.metadata.name,range,maxBytes:MAX_VIDEO_SOURCE_BYTES},fraction=>{
+  const file=source===owner.workSource?await workFile(owner):d.file;
+  const clip=await prepareSegmentFile({file,name:d.frozen.metadata.name,range,maxBytes:MAX_VIDEO_SOURCE_BYTES},fraction=>{
    saveProgress(tr('מכין את המקטע…','Preparing the segment…')+' '+Math.round(fraction*100)+'%',fraction*100);
   });
   d.derivedSource=stageFor(owner,clip);
@@ -670,7 +688,7 @@ async function save(all,cutoff){
  const total=split&&all?owner.drafts.filter(d=>markedBy(d,cutoff)).length:0;
  owner.batch=total?{total,completed:total-indices.length}:null;
  owner.error=null;
- const startingIndex=owner.index;
+ const startingIndex=owner.index,startingTime=split?timeline.position():null;
  let activeIndex=startingIndex;
  try{
   for(const index of indices){
@@ -692,7 +710,12 @@ async function save(all,cutoff){
      await d.check.ready;
      if(d.check.phase!=='ready')throw Error(checkMessage(d.check));
     }
-    const source=stageFor(owner,d.file);
+    // A separately published full-length video needs its own storage ownership.
+    let source=stageFor(owner,d.file);
+    if(!split&&owner.workRevision&&!d.metadata.range){
+     owner.fullSource??=newSource(owner,owner.workSource?await workFile(owner):d.file);
+     source=owner.fullSource;
+    }
     result=source?await saveFromSource(d,owner,source,split):await saveLocal(d,owner,split,maxMB);
     d.mediaId=result.item?.id||d.mediaId||d.uploadId;
    }
@@ -703,8 +726,13 @@ async function save(all,cutoff){
    updateBackground();
   }
   if(split){
-   owner.index=startingIndex;render();
-   if(all)get('Status').textContent=tr('המקטעים נשמרו ✓ אפשר לחזור אליהם דרך ״עריכת פרטי המקטעים״.','Segments saved ✓ Reopen them with “Edit segment details”.');
+   owner.index=startingIndex;render(startingTime);
+   if(all&&owner.workRevision){
+    activeIndex=startingIndex;
+    saveProgress(tr('מעדכן את העבודה השמורה…','Updating the saved work…'));
+    await persistWork(owner,captureSegmentWork(owner,startingTime));
+    get('Status').textContent=tr('המקטעים והעבודה נשמרו ✓','Segments and work saved ✓');
+   }else if(all)get('Status').textContent=tr('המקטעים נשמרו ✓ אפשר לחזור אליהם דרך ״עריכת פרטי המקטעים״.','Segments saved ✓ Reopen them with “Edit segment details”.');
    return;
   }
   if(owner.drafts.every(d=>d.saved)){busy(false);window.FamilyApp?.toast(tr('הסרטונים נשמרו ✓','Videos saved ✓'));finish();return;}
@@ -716,13 +744,41 @@ async function save(all,cutoff){
   get('Error').textContent=owner.error;
  }finally{if(session===owner)busy(false);}
 }
-function startSession(job,fields){
+function startSession(job,fields,position){
  mount();
  get('CutoffTime').value='';get('BatchOptions').open=false;
  session={...job,sources:new Map(),checks:new Set(),index:0,activity:false,saving:false,matches:[],
   singleVideo:false,split:false,segments:[],segmentIndex:0,nextNumber:1,...fields};
  session.history=createSegmentHistory(session);
- render();dialog.showModal();updateBackground();
+ render(position);dialog.showModal();updateBackground();
+}
+async function persistWork(owner,snapshot){
+ const source=stageFor(owner,owner.original.check.file);
+ await waitForSource(owner,source);
+ const result=await source.saveWork({workId:owner.projectId,revision:owner.workRevision||null,snapshot});
+ owner.workRevision=result.workRevision;
+ owner.workSignature=JSON.stringify(snapshot);
+ owner.activity=false;
+ window.dispatchEvent(new CustomEvent('family-media-changed',{detail:result}));
+}
+async function saveWork(){
+ if(!session?.split||session.saving||session.review)return;
+ const owner=session,d=draft();
+ collect();get('Player').pause();
+ const snapshot=captureSegmentWork(owner,timeline.position());
+ owner.error=null;owner.batch=null;get('Error').textContent='';busy(true);
+ try{
+  if(d.check.phase!=='ready')await d.check.ready;
+  if(d.check.phase!=='ready')throw Error(checkMessage(d.check));
+  saveProgress(tr('שומר את העבודה…','Saving your work…'));
+  await persistWork(owner,snapshot);
+  let where='';
+  if(owner.options.scope==='nostalgia')where=d.metadata.eventId?' · '+get('EventValue').textContent:tr(' · סרטונים לא משויכים',' · Unassigned videos');
+  get('Status').textContent=tr('העבודה נשמרה','Work saved')+where+' ✓';
+ }catch(error){
+  owner.error=error.message||tr('שמירת העבודה נכשלה. אפשר לנסות שוב.','Could not save your work. Please retry.');
+  get('Error').textContent=owner.error;
+ }finally{busy(false);}
 }
 async function next(){
  if(session||!queue.length)return;
@@ -741,6 +797,23 @@ async function next(){
 }
 function prepare(files,options){const list=Array.from(files);if(!list.some(isVideo))return Promise.resolve(list);return new Promise(resolve=>{queue.push({files:list,options,resolve});void next();});}
 let projectRequest=0;
+async function openWork(id){
+ if(session){restore();return;}
+ const request=++projectRequest;
+ const source=createVideoSource(null,{request:(...args)=>I.fetch(...args),writeToken:window.FAMILY_API_TOKEN,tr,changed:()=>{}});
+ try{
+  const work=await source.resume(id);
+  if(request!==projectRequest||session){source.discard();return;}
+  for(const video of document.querySelectorAll('video'))if(!video.paused)video.pause();
+  const fields=restoreSegmentWork(work,source);
+  startSession({options:{scope:work.scope,stageSources:true},resolve:()=>{},rest:[]},
+   {...fields,singleVideo:true,segmentIndex:work.snapshot.index,projectId:id},work.snapshot.position);
+  session.workSignature=JSON.stringify(captureSegmentWork(session,work.snapshot.position));
+ }catch(error){
+  source.discard();
+  if(request===projectRequest)window.FamilyApp?.toast(error.message||tr('טעינת העבודה נכשלה.','Could not open the saved work.'));
+ }
+}
 async function openProject(id){
  if(session){restore();return;}
  const request=++projectRequest;
@@ -761,5 +834,9 @@ async function openProject(id){
   startSession({options:{},resolve:()=>{},rest:[]},{review:true,split:true,segments:drafts,drafts,index});
  }catch(error){if(request===projectRequest)window.FamilyApp?.toast(error.message||tr('טעינת המקטעים נכשלה.','Could not load segments.'));}
 }
-window.FamilyVideoUpload={prepare,isVideo,metadata:videoUploadMetadata,openProject};
+window.FamilyVideoUpload={prepare,isVideo,metadata:videoUploadMetadata,openProject,openWork};
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-segment-work]');
+ if(button)void openWork(button.dataset.segmentWork);
+});
 window.addEventListener('beforeunload',event=>{if(queue.length||(session&&(session.saving||needsExitConfirmation()))){event.preventDefault();event.returnValue='';}});

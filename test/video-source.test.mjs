@@ -84,3 +84,58 @@ test('4 GiB is accepted exactly and an oversized source cannot begin a transfer'
   assert.equal(f.uploads.size,1);
   await f.request('/api/video-sources/discard',{method:'POST',headers,body:'{}'});await f.settle();assert.equal(f.uploads.size,0);
 });
+
+test('a saved split survives source cleanup, reopens the whole film and moves the same work between destinations',async t=>{
+  const f=await videoSourceFixture();t.after(()=>f.close());
+  const initial=count(f),id=()=>crypto.randomUUID().replaceAll('-',''),workId=id();
+  const file=new File([clip],'family.mp4',{type:'video/mp4'}),source=createVideoSource(file,options(f));
+  const metadata={name:'Family tape',date:{year:1998},caption:'',people:[],eventId:''};
+  const snapshot={duration:12,position:3.25,index:1,nextNumber:3,original:{uploadId:id(),metadata},
+    segments:[
+      {uploadId:id(),metadata,segment:{number:1,start:0,end:2,pinned:true}},
+      {uploadId:id(),metadata:{...metadata,name:'',caption:'Unfinished',people:[{name:'Guest'}]},segment:{number:2,start:2,end:null,endText:'00:',followsPrevious:true}}
+    ]};
+  const payload={workId,revision:null,snapshot};
+  const first=await source.saveWork(payload);
+  assert.deepEqual(first.item.nostalgiaEventIds,[]);
+  assert.equal(first.collection.items.find(item=>item.id===workId).segmentWork.number,2);
+  assert.equal(first.item.segmentWork.snapshot,undefined);
+  assert.equal((await source.saveWork(payload)).workRevision,first.workRevision);
+  assert.equal(count(f),initial+1);
+  const published={mediaId:snapshot.segments[0].uploadId,operationId:id(),metadata:{...metadata,range:{start:0,end:2},segmentProject:{id:workId,number:1,start:0,end:2,duration:12}}};
+  await source.save(published);
+  const storageKey=f.scope.media(workId).key;
+  await source.discard();await f.settle();
+  f.database.exec('UPDATE video_sources SET expires=0');
+  await expireVideoSources(f.env,async(action,p={})=>f.scope.run(action,p));
+  assert.deepEqual(await readFile(f.objectFile(storageKey)),clip);
+  const reopened=createVideoSource(null,options(f));
+  const work=await reopened.resume(workId);
+  assert.deepEqual(work.file,{name:file.name,size:file.size,type:file.type});
+  assert.equal(work.snapshot.position,3.25);assert.equal(work.snapshot.index,1);
+  assert.equal(work.snapshot.segments[1].segment.end,null);assert.equal(work.snapshot.segments[1].segment.endText,'00:');
+  assert.deepEqual(work.snapshot.segments[1].metadata.people,[{name:'Guest'}]);
+  assert.deepEqual(work.published.map(item=>item.id),[published.mediaId]);
+  assert.deepEqual(Buffer.from(await (await f.request(reopened.url)).arrayBuffer()),clip);
+  assert.equal((await reopened.save(published)).item.id,published.mediaId);
+  const assigned=structuredClone(snapshot);
+  assigned.segments[1].metadata.eventId='everyday-life-clips';assigned.position=4;
+  const second=await reopened.saveWork({workId,revision:first.workRevision,snapshot:assigned});
+  assert.deepEqual(second.item.nostalgiaEventIds,['everyday-life-clips']);
+  assert.equal(second.collection.items.filter(item=>item.id===workId).length,1);
+  assert.equal(second.item.segmentWork.position,4);
+  assert.notEqual(second.workRevision,first.workRevision);
+  await assert.rejects(reopened.saveWork({workId,revision:first.workRevision,snapshot}),e=>e.status===409);
+  const event=f.scope.nostalgiaLibrary.read().events.find(e=>e.id!=='everyday-life-clips');
+  assigned.segments[1].metadata.eventId=event.id;
+  const moved=await reopened.saveWork({workId,revision:second.workRevision,snapshot:assigned});
+  assert.deepEqual(moved.item.nostalgiaEventIds,[event.id]);
+  const unassigned=f.scope.run('nostalgia.assign',{id:workId,remove:[event.id]});
+  assert.deepEqual(unassigned.item.nostalgiaEventIds,[]);
+  await reopened.discard();
+  const last=createVideoSource(null,options(f));
+  assert.equal((await last.resume(workId)).snapshot.segments[1].metadata.eventId,'');
+  assert.equal(count(f),initial+2);
+  assert.equal(f.calls.filter(c=>c.action==='part').length,1);
+  await last.discard();await f.settle();
+});

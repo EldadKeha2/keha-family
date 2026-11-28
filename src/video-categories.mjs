@@ -1,3 +1,4 @@
+import {updateWorkDestination} from './video-segment-work.mjs';
 import {HttpError,text,uid} from './http.mjs';
 import {DEFAULT_VIDEO_CATEGORIES} from '../public/assets/video-category-catalog.mjs';
 
@@ -31,6 +32,7 @@ export class VideoCategories {
   const category=this.category(p.group),previous=item.videoCategory||'family';
   if(p.expectedGroup!==previous)throw new HttpError(409,'קטגוריית הסרטון השתנתה. פתחו את הבחירה מחדש.');
   if(category.id!==previous){
+   updateWorkDestination(item,'group',category.id);
    item.videoCategory=category.id;item.modifiedAt=new Date().toISOString();
    this.owner.sql.exec('UPDATE media SET data=? WHERE id=?',JSON.stringify(item),item.id);this.owner.touchMedia(item);
   }

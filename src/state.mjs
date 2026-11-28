@@ -413,6 +413,7 @@ export class FamilyState {
     ...(mediaKind(item)==='photo'?{framing:photoFrame(item.framing),faceSummary:this.faceSummary(item,cached?.face)}:{}),
     ...(['photo','video'].includes(mediaKind(item))?{labels:photoLabels(item.labels),takenDate:photoDate(item.takenDate),takenDateRevision:item.takenDateRevision||'empty'}:{}),
     ...(item.category==='videos'?{videoCategory:item.videoCategory||'family'}:{}),
+    ...(item.segmentWork?{segmentWork:{number:item.segmentWork.snapshot.segments[item.segmentWork.snapshot.index].segment.number,position:item.segmentWork.snapshot.position}}:{}),
     ...(item.videoClip?{videoClip:item.videoClip}:{}),...(item.duration?{duration:item.duration}:{}),...(mediaKind(item)==='video'?{videoRevision:item.videoRevision||'original',...(segmentInfo(item)?{hasSegmentProject:true}:{})}:{}),
     ...(item.youtubeStart!==undefined?{youtubeStart:item.youtubeStart,youtubeEnd:item.youtubeEnd}:{}),
     ...(item.category==='nostalgia'?{nostalgiaEventIds:item.nostalgiaEventIds||[]}:{}),
@@ -898,6 +899,7 @@ export class FamilyState {
         const source=this.media(p.id);if(mediaKind(source)!=='video'||source.provider)throw new HttpError(400,'בחרו סרטון שהועלה לאתר.');
         if(!/^[a-f0-9]{32}$/.test(p.operationId||''))throw new HttpError(400,'אישור השמירה אינו תקין. פתחו את האשף מחדש.');
         let metadata;try{metadata=videoUploadMetadata(p.metadata);}catch{throw new HttpError(400,'בדקו את התאריך, התיאור או הקטע המסומן בסרטון.');}
+        if(metadata.range&&source.segmentWork)throw new HttpError(409,'מקור העבודה השמורה משמש להמשך חלוקה למקטעים.');
         if(metadata.eventId&&source.category==='nostalgia')this.nostalgiaLibrary.event(metadata.eventId);
         if(metadata.group&&source.category==='videos')this.videoCategories.category(metadata.group);
         if(source.videoUploadEdit?.operationId===p.operationId){if(source.videoUploadEdit.fingerprint!==JSON.stringify(metadata))throw new HttpError(409,'פרטי הסרטון השתנו. פתחו את האשף מחדש.');return {existing:{...this.mediaChanged(source,'video-upload'),file:source.file,alreadySaved:true}};}

@@ -19,6 +19,7 @@ export class VideoEdits {
   if(source.kind!=='video'&&!source.mime?.startsWith('video/'))throw new HttpError(400,'בחרו סרטון לעריכה.');
   if(!/^[a-f0-9]{32}$/.test(p.operationId||''))throw new HttpError(400,'אישור השמירה אינו תקין. פתחו את העורך מחדש.');
   const name=text(p.name,'שם הסרטון',140,true),caption=text(p.caption??name,'כיתוב הסרטון',5000),people=videoEditorPeople(p.people),range=p.range||null;
+  if(range&&source.segmentWork)throw new HttpError(409,'משך המקור של עבודה שמורה נשמר לצורך המשך חלוקה למקטעים.');
   if(range&&range.remove!==undefined&&typeof range.remove!=='boolean')throw new HttpError(400,'בחרו פעולת עריכה תקינה.');
   if(range?.remove&&source.provider==='youtube')throw new HttpError(415,'מחיקת קטע זמינה בסרטונים שהועלו לאתר.');
   if(range&&(!Number.isFinite(range.start)||!Number.isFinite(range.end)||range.start<0||range.end-range.start<.1||range.end>86400))throw new HttpError(400,'סמנו התחלה וסיום תקינים לקטע.');

@@ -82,6 +82,7 @@
     clearTimeout(draft?.timer);drafts.delete(key);refreshPhotoCaptions();button.closest('.family-photo-caption').querySelector('[data-edit-shared-caption]').focus();
   }
   function videoTile(item){
+    if(item.segmentWork)return window.FamilyVideoPresentation.tile(item,'videos');
     const title=item.caption||(I18n.isEnglish?'Play video':'ניגון הסרטון');
     const duration=Number(item.duration),time=Number.isFinite(duration)&&duration>0?Math.floor(duration/60)+':'+String(Math.floor(duration%60)).padStart(2,'0'):'';
     const badge=window.FamilyVideoDelivery?.durationBadge?.(item)??(time?`<span class="video-tile-duration" aria-hidden="true">${time}</span>`:'');
@@ -110,7 +111,7 @@
       empty.querySelector('p').textContent=I18n.t(complete?'תמונות שאישרתם בהן ״כל הפרצופים תויגו״ יופיעו כאן.':partial?'פתחו תמונה והוסיפו את השמות החסרים בלחיצה על הפנים. בסיום לחצו על ״כל הפרצופים תויגו״.':galleryPage.person||galleryPage.unit||galleryPage.labels?'אפשר לשנות את בחירת האדם או המשפחה, או לאפס את הסינון.':untagged||galleryPage.query?'אפשר להציג את כל התמונות או לשנות את החיפוש.':'אפשר להעלות כמה תמונות יחד. פתחו תמונה, עברו בין הרגעים ותייגו את האנשים שמופיעים בה.');
       for(const control of document.querySelectorAll('[data-gallery-pager]')){control.hidden=!p.total;control.querySelector('[data-gallery-page-label]').textContent=I18n.isEnglish?`Page ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} of ${p.total} ${I18n.word(p.total,'photo','photos')}`:`עמוד ${p.page} / ${p.pages} · ${((p.page-1)*p.size)+1}–${Math.min(p.page*p.size,p.total)} מתוך ${p.total} תמונות`;control.querySelector('[data-gallery-prev]').disabled=control.querySelector('[data-gallery-next]').disabled=p.pages<2;control.querySelector('[data-gallery-size]').value=p.all?'all':String(p.size);control.querySelector('[data-gallery-sort]').value=galleryPage.sort;}
     }
-    const tileVersion=item=>isVideo?JSON.stringify([I18n.mediaName(item),item.caption,item.videoCategory,item.duration,item.poster]):'';
+    const tileVersion=item=>isVideo?JSON.stringify([I18n.mediaName(item),item.caption,item.videoCategory,item.duration,item.poster,item.segmentWork]):'';
     const signature = filtered.map(item=>item.file+'|'+item.src+'|'+tileVersion(item)).join('\u0000');
     if (signatures[kind] !== signature) {
       const active = document.activeElement, focusedFile = active?.dataset?.sharedFile;
